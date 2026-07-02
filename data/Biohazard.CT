@@ -1,0 +1,1584 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="45">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>1</ID>
+      <Description>"Enable"</Description>
+      <Options moHideChildren="1" moDeactivateChildrenAsWell="1"/>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript Async="1">[ENABLE]
+
+aobscanmodule(Ammo_AOB,$process,8A 41 FF 75 01) // should be unique
+aobscanmodule(Health_AOB,$process,66 39 1D 3C 52 C3 00 7D 06) // should be unique
+aobscanmodule(Enemy_Health_AOB,$process,66 29 95 88 00 00 00) // should be unique
+aobscanmodule(Timer_AOB,$process,FF 05 10 8E AA 00) // should be unique
+
+alloc(ammo_mem,2048)
+alloc(newmem_health,2048)
+alloc(newmem_enemy,2048)
+alloc(newmem_timer,2048)
+
+label(inf_ammo)
+label(inf_health)
+label(onehitkill)
+label(timer_0)
+
+ammo_mem:
+cmp byte ptr [inf_ammo],01
+jne code_ammo
+jmp code_check_special
+
+code_check_special:
+cmp byte ptr [ecx-02],6F
+je code_ammo
+cmp byte ptr [ecx-02],70
+je code_ammo
+jmp code_inf_ammo
+
+code_inf_ammo:
+mov byte ptr [ecx-01],64
+jmp code_ammo
+
+code_ammo:
+  mov al,[ecx-01]
+  jne $process+AD68
+  jmp return_ammo
+
+Ammo_AOB:
+  jmp ammo_mem
+return_ammo:
+registersymbol(Ammo_AOB)
+registersymbol(inf_ammo)
+
+ammo_mem+100:
+inf_ammo:
+db 00
+
+/////////////////////////////////////////
+
+newmem_health:
+cmp byte ptr [inf_health],01
+jne code_health
+  mov al, byte ptr [$process+835329]
+  mov byte ptr [$process+83523C],al
+  mov byte ptr [$process+835290],10
+  cmp [$process+83523C],bx
+  jmp return_health
+
+code_health:
+  cmp [$process+83523C],bx
+  jmp return_health
+
+Health_AOB:
+  jmp newmem_health
+  nop 2
+return_health:
+registersymbol(Health_AOB)
+registersymbol(inf_health)
+
+newmem_health+100:
+inf_health:
+db 00
+
+/////////////////////////////////////////
+
+newmem_enemy:
+cmp byte ptr [onehitkill],01
+jne code_enemy
+  mov dx,#999
+  jmp code_enemy
+
+code_enemy:
+  sub [ebp+00000088],dx
+  jmp return_enemy
+
+Enemy_Health_AOB:
+  jmp newmem_enemy
+  nop 2
+return_enemy:
+registersymbol(Enemy_Health_AOB)
+registersymbol(onehitkill)
+
+newmem_enemy+100:
+onehitkill:
+db 00
+
+////////////////////////////////////////
+
+newmem_timer:
+cmp byte ptr [timer_0],01
+jne code_timer
+  mov [$process+6A8E10],00
+  jmp return_timer
+
+code_timer:
+  inc [$process+6A8E10]
+  jmp return_timer
+
+Timer_AOB:
+  jmp newmem_timer
+  nop
+return_timer:
+registersymbol(Timer_AOB)
+registersymbol(timer_0)
+
+newmem_timer+100:
+timer_0:
+  db 00
+
+[DISABLE]
+
+Ammo_AOB:
+  db 8A 41 FF 75 01
+
+unregistersymbol(Ammo_AOB)
+dealloc(ammo_mem)
+unregistersymbol(inf_ammo)
+
+Health_AOB:
+  db 66 39 1D 3C 52 C3 00
+
+unregistersymbol(Health_AOB)
+dealloc(newmem_health)
+unregistersymbol(inf_health)
+
+Enemy_Health_AOB:
+  db 66 29 95 88 00 00 00
+
+unregistersymbol(Enemy_Health_AOB)
+dealloc(newmem_enemy)
+unregistersymbol(onehitkill)
+
+Timer_AOB:
+  db FF 05 10 8E AA 00
+
+unregistersymbol(Timer_AOB)
+dealloc(newmem_timer)
+unregistersymbol(timer_0)
+</AssemblerScript>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>6</ID>
+          <Description>"Toggle One Hit Kill"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>[ENABLE]
+onehitkill:
+db 01
+[DISABLE]
+onehitkill:
+db 00
+</AssemblerScript>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Toggle Activation</Action>
+              <Keys>
+                <Key>96</Key>
+              </Keys>
+              <Description>Toggle One Hit Kill</Description>
+              <ID>0</ID>
+              <ActivateSound>Activate</ActivateSound>
+              <DeactivateSound>Deactivate</DeactivateSound>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>4</ID>
+          <Description>"Toggle Infinite Health"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>[ENABLE]
+inf_health:
+db 01
+[DISABLE]
+inf_health:
+db 00
+</AssemblerScript>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Toggle Activation</Action>
+              <Keys>
+                <Key>97</Key>
+              </Keys>
+              <Description>Toggle Infinite Health</Description>
+              <ID>0</ID>
+              <ActivateSound>Activate</ActivateSound>
+              <DeactivateSound>Deactivate</DeactivateSound>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>2</ID>
+          <Description>"Toggle Infinite Ammo"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>[ENABLE]
+inf_ammo:
+db 01
+[DISABLE]
+inf_ammo:
+db 00
+</AssemblerScript>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Toggle Activation</Action>
+              <Keys>
+                <Key>98</Key>
+              </Keys>
+              <Description>Toggle Infinite Ammo</Description>
+              <ID>0</ID>
+              <ActivateSound>Activate</ActivateSound>
+              <DeactivateSound>Deactivate</DeactivateSound>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>45</ID>
+          <Description>"Toggle Saves Always 0"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>{ Game   : Biohazard.exe
+  Version: 
+  Date   : 2023-07-26
+  Author : Fausto
+
+  This script does blah blah blah
+}
+
+[ENABLE]
+$process+838718:
+db 00
+
+aobscanmodule(Save_AOB,DDRAW.dll,A2 18 87 C3 00) // should be unique
+aobscanmodule(Saves_AOB_2,DDRAW.dll,FE 0D 18 87 C3 00) // should be unique
+alloc(newmem,2048)
+alloc(newmem2,2048)
+
+newmem:
+
+code:
+  mov byte ptr [$process+838718],00
+  jmp return
+
+Save_AOB:
+  jmp newmem
+return:
+registersymbol(Save_AOB)
+
+////////////////////////////////////////////
+
+newmem2:
+
+code2:
+  mov byte ptr [$process+838718],00
+  jmp return2
+
+Saves_AOB_2:
+  jmp newmem2
+  nop
+return2:
+registersymbol(Saves_AOB_2)
+
+[DISABLE]
+
+Save_AOB:
+  db A2 18 87 C3 00
+
+unregistersymbol(Save_AOB)
+dealloc(newmem)
+
+Saves_AOB_2:
+  db FE 0D 18 87 C3 00
+
+unregistersymbol(Saves_AOB_2)
+dealloc(newmem2)
+
+{
+// ORIGINAL CODE - INJECTION POINT: DDRAW.dll+730F7
+
+DDRAW.dll+730D4: C6 46 01 02                    - mov byte ptr [esi+01],02
+DDRAW.dll+730D8: C6 46 03 04                    - mov byte ptr [esi+03],04
+DDRAW.dll+730DC: 80 46 03 FF                    - add byte ptr [esi+03],-01
+DDRAW.dll+730E0: 75 1E                          - jne DDRAW.dll+73100
+DDRAW.dll+730E2: 8A 0D 18 87 C3 00              - mov cl,[Biohazard.exe+838718]
+DDRAW.dll+730E8: BA 63 00 00 00                 - mov edx,00000063
+DDRAW.dll+730ED: FE C1                          - inc cl
+DDRAW.dll+730EF: 3A CA                          - cmp cl,dl
+DDRAW.dll+730F1: 0F B6 C1                       - movzx eax,cl
+DDRAW.dll+730F4: 0F 47 C2                       - cmova eax,edx
+// ---------- INJECTING HERE ----------
+DDRAW.dll+730F7: A2 18 87 C3 00                 - mov [Biohazard.exe+838718],al
+// ---------- DONE INJECTING  ----------
+DDRAW.dll+730FC: C6 46 2D 01                    - mov byte ptr [esi+2D],01
+DDRAW.dll+73100: 0F B7 4E 0E                    - movzx ecx,word ptr [esi+0E]
+DDRAW.dll+73104: B8 0A 00 00 00                 - mov eax,0000000A
+DDRAW.dll+73109: 2B 05 60 A3 4A 00              - sub eax,[Biohazard.exe+AA360]
+DDRAW.dll+7310F: 66 A3 24 00 C3 00              - mov [Biohazard.exe+830024],ax
+DDRAW.dll+73115: 8B C1                          - mov eax,ecx
+DDRAW.dll+73117: C1 E0 04                       - shl eax,04
+DDRAW.dll+7311A: 2B C1                          - sub eax,ecx
+DDRAW.dll+7311C: C7 05 20 00 C3 00 00 00 00 60  - mov [Biohazard.exe+830020],nvd3dum.dll+5C0000
+DDRAW.dll+73126: 66 2B 05 62 A3 4A 00           - sub ax,[Biohazard.exe+AA362]
+}
+</AssemblerScript>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Toggle Activation</Action>
+              <Keys>
+                <Key>99</Key>
+              </Keys>
+              <Description>Toggle Saves Always 0</Description>
+              <ID>0</ID>
+              <ActivateSound>Activate</ActivateSound>
+              <DeactivateSound>Deactivate</DeactivateSound>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>50</ID>
+          <Description>"Toggle Typewriters don't require Ink Ribbons"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>[ENABLE]
+$process+56636:
+db 90 90
+
+[DISABLE]
+$process+56636:
+db 7C 21
+
+</AssemblerScript>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Toggle Activation</Action>
+              <Keys>
+                <Key>100</Key>
+              </Keys>
+              <Description>Toggle Saves don't require ink ribbons</Description>
+              <ID>0</ID>
+              <ActivateSound>Activate</ActivateSound>
+              <DeactivateSound>Deactivate</DeactivateSound>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>48</ID>
+          <Description>"Toggle Game Timer Always 0"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>[ENABLE]
+timer_0:
+db 01
+[DISABLE]
+timer_0:
+db 00
+</AssemblerScript>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Toggle Activation</Action>
+              <Keys>
+                <Key>101</Key>
+              </Keys>
+              <Description>Toggle Timer Always 0</Description>
+              <ID>0</ID>
+              <ActivateSound>Activate</ActivateSound>
+              <DeactivateSound>Deactivate</DeactivateSound>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>11</ID>
+          <Description>"Toggle Speed Hack"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>{ Game   : Biohazard.exe
+  Version: 
+  Date   : 2023-07-25
+  Author : Fausto
+
+  This script does blah blah blah
+}
+
+[ENABLE]
+
+aobscanmodule(Speed_AOB,$process,0F BF 41 7C 01 41 3C) // should be unique
+aobscanmodule(Speed_AOB_2,$process,0F BF 41 78 01 41 34) // should be unique
+
+alloc(newmem_speedz,2048)
+alloc(newmem_speedx,2048)
+
+newmem_speedz:
+cmp ecx,$process+8351B4
+jne code_speedz
+  movsx eax,word ptr [ecx+7C]
+  imul eax,02
+  add [ecx+3C],eax
+  jmp return_speedz
+
+code_speedz:
+  movsx eax,word ptr [ecx+7C]
+  add [ecx+3C],eax
+  jmp return_speedz
+
+Speed_AOB:
+  jmp newmem_speedz
+  nop 2
+return_speedz:
+registersymbol(Speed_AOB)
+
+///////////////////////////////////////////
+
+newmem_speedx:
+cmp ecx,$process+8351B4
+jne code_speedx
+  movsx eax,word ptr [ecx+78]
+  imul eax,02
+  add [ecx+34],eax
+  jmp return_speedx
+
+code_speedx:
+  movsx eax,word ptr [ecx+78]
+  add [ecx+34],eax
+  jmp return_speedx
+
+Speed_AOB_2:
+  jmp newmem_speedx
+  nop 2
+return_speedx:
+registersymbol(Speed_AOB_2)
+
+[DISABLE]
+
+Speed_AOB:
+  db 0F BF 41 7C 01 41 3C
+
+unregistersymbol(Speed_AOB)
+dealloc(newmem_speedz)
+
+Speed_AOB_2:
+  db 0F BF 41 78 01 41 34
+
+unregistersymbol(Speed_AOB_2)
+dealloc(newmem_speedx)
+</AssemblerScript>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Toggle Activation</Action>
+              <Keys>
+                <Key>102</Key>
+              </Keys>
+              <Description>Toggle Speed Hack</Description>
+              <ID>0</ID>
+              <ActivateSound>Activate</ActivateSound>
+              <DeactivateSound>Deactivate</DeactivateSound>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>57</ID>
+          <Description>"Toggle Speed Up Text"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>[ENABLE]
+$process+91B95:
+db 90 90 90 90 90 90
+[DISABLE]
+$process+91B95:
+db 0F 85 D5 04 00 00
+</AssemblerScript>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Toggle Activation</Action>
+              <Keys>
+                <Key>103</Key>
+              </Keys>
+              <Description>Toggle Speed Up Text</Description>
+              <ID>0</ID>
+              <ActivateSound>Activate</ActivateSound>
+              <DeactivateSound>Deactivate</DeactivateSound>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>64</ID>
+          <Description>"Toggle Door Skip"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>[ENABLE]
+$process+8D715:
+db 90 90 90 90 90
+$process+8D85F:
+db 90 90 90 90 90
+
+[DISABLE]
+$process+8D715:
+db E8 D6 A5 F8 FF
+$process+8D85F:
+db F6 44 24 0B 40
+</AssemblerScript>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Toggle Activation</Action>
+              <Keys>
+                <Key>104</Key>
+              </Keys>
+              <Description>Toggle Door Skip</Description>
+              <ID>0</ID>
+              <ActivateSound>Activate</ActivateSound>
+              <DeactivateSound>Deactivate</DeactivateSound>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>22</ID>
+          <Description>"Open Item Box Anywhere"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>{$lua}
+if syntaxcheck then return end
+
+local memrec = AddressList.getMemoryRecordByID(22)
+
+local timer = createTimer()
+timer.Interval = 450 -- 1000 milliseconds = 1 second
+timer.OnTimer = function(timer)
+  memrec.Active = false -- deactivate the script
+  timer.destroy() -- destroy the timer so it doesn't keep running
+end
+{$asm}
+
+[ENABLE]
+$process+833090:
+db 00 10
+$process+833093:
+db 70
+
+[DISABLE]
+$process+8384E8:
+  db 00 00 00 01
+
+
+</AssemblerScript>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Toggle Activation</Action>
+              <Keys>
+                <Key>105</Key>
+              </Keys>
+              <Description>Open Item Box Anywhere</Description>
+              <ID>0</ID>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>103</ID>
+          <Description>"Open Save Menu Anywhere"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>{$lua}
+if syntaxcheck then return end
+
+local memrec = AddressList.getMemoryRecordByID(103)
+
+local timer = createTimer()
+timer.Interval = 100 -- 1000 milliseconds = 1 second
+timer.OnTimer = function(timer)
+  memrec.Active = false -- deactivate the script
+  timer.destroy() -- destroy the timer so it doesn't keep running
+end
+{$asm}
+
+[ENABLE]
+$process+8384E6:
+  db 03
+
+[DISABLE]
+
+
+</AssemblerScript>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>37</ID>
+          <Description>"Go to Main Menu"</Description>
+          <VariableType>Auto Assembler Script</VariableType>
+          <AssemblerScript>{$lua}
+if syntaxcheck then return end
+
+local memrec = AddressList.getMemoryRecordByID(37)
+
+local timer = createTimer()
+timer.Interval = 300 -- 1000 milliseconds per second
+timer.OnTimer = function(timer)
+  memrec.Active = false -- deactivate the script
+  timer.destroy() -- destroy the timer so it doesn't keep running
+end
+{$asm}
+
+[ENABLE]
+$process+833097:
+  db 10
+
+[DISABLE]
+$process+83F8D4:
+  db 80
+$process+838710:
+  db C0 40 00 00
+</AssemblerScript>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>21</ID>
+          <Description>"Game/Player Data"</Description>
+          <Options moHideChildren="1"/>
+          <GroupHeader>1</GroupHeader>
+          <CheatEntries>
+            <CheatEntry>
+              <ID>60</ID>
+              <Description>"Player Character"</Description>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00:Chris
+01:Jill
+03:Rebecca
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+8386F9</Address>
+              <CheatEntries>
+                <CheatEntry>
+                  <ID>61</ID>
+                  <Description>"Character Outfit"</Description>
+                  <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00:Default
+01:Alternative
+</DropDownList>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>0</ShowAsSigned>
+                  <VariableType>Byte</VariableType>
+                  <Address>$process+3A7544</Address>
+                </CheatEntry>
+              </CheatEntries>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>121</ID>
+              <Description>"Story Line"</Description>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00:Chris
+80:Jill
+??:??
+*:Intermission
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>1</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+833092</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>3</ID>
+              <Description>"Player Current Health"</Description>
+              <DropDownList DescriptionOnly="1" DisplayValueAsItem="1">Max:($process+835329)
+</DropDownList>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+83523C</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>58</ID>
+              <Description>"Player Max Health"</Description>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+835329</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>62</ID>
+              <Description>"Health Status"</Description>
+              <Options moHideChildren="1"/>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00 00 01 00:Danger
+00 00 01 01:Caution
+00 00 01 03:Fine
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Array of byte</VariableType>
+              <ByteLength>4</ByteLength>
+              <Address>$process+82E94C</Address>
+              <CheatEntries>
+                <CheatEntry>
+                  <ID>63</ID>
+                  <Description>"Health Status (Pulse)"</Description>
+                  <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00 C0 00 00 C0 00:Danger
+01 FF 7F 00 FF 7F:Caution
+03 00 FF 00 00 FF:Fine
+</DropDownList>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>0</ShowAsSigned>
+                  <VariableType>Array of byte</VariableType>
+                  <ByteLength>6</ByteLength>
+                  <Address>$process+82E94F</Address>
+                </CheatEntry>
+              </CheatEntries>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>59</ID>
+              <Description>"Player Is Poisoned"</Description>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">10:False
+12:True
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+835290</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>8</ID>
+              <Description>"Player X Coord"</Description>
+              <ShowAsSigned>1</ShowAsSigned>
+              <VariableType>4 Bytes</VariableType>
+              <Address>$process+8351E8</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>10</ID>
+              <Description>"Player Y Coord"</Description>
+              <ShowAsSigned>1</ShowAsSigned>
+              <VariableType>4 Bytes</VariableType>
+              <Address>$process+8351EC</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>9</ID>
+              <Description>"Player Z Coord"</Description>
+              <ShowAsSigned>1</ShowAsSigned>
+              <VariableType>4 Bytes</VariableType>
+              <Address>$process+8351F0</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>52</ID>
+              <Description>"Currently Equipped Item"</Description>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00:Nothing
+01:Combat Knife
+02:Beretta
+03:Shotgun
+04:Colt Python (DumDum)
+05:Colt Python
+06:Flamethrower
+07:Grenade Gun (Explosive)
+08:Grenade Gun (Acid)
+09:Grenade Gun (Flame)
+0A:Rocket Launcher
+6F:Ingram
+70:Minimi
+*:Unknown
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+8351B6</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>51</ID>
+              <Description>"Equipped Weapon Inventory Slot Position (Don't edit)"</Description>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00:Nothing Equipped
+01:Weapon Equipped is in Slot 1
+02:Weapon Equipped is in Slot 2
+03:Weapon Equipped is in Slot 3
+04:Weapon Equipped is in Slot 4
+05:Weapon Equipped is in Slot 5
+06:Weapon Equipped is in Slot 6
+07:Weapon Equipped is in Slot 7
+08:Weapon Equipped is in Slot 8
+*:This slot number is invalid
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+838719</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>53</ID>
+              <Description>"Show Last Text (Debug on screen text)"</Description>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00:Waiting
+80:Prompt Text
+*:Unknown
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+8386F5</Address>
+              <CheatEntries>
+                <CheatEntry>
+                  <ID>54</ID>
+                  <Description>"Current Message (It may crash the game)"</Description>
+                  <DropDownList DescriptionOnly="1" DisplayValueAsItem="1">5E BC 70 06 78:It's an old typewriter.
+78 BC 70 06 B0:If I had an INK RIBBON...
+90 66 7C 06 B3:Use an INK RIBBON?
+</DropDownList>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>0</ShowAsSigned>
+                  <VariableType>Array of byte</VariableType>
+                  <ByteLength>5</ByteLength>
+                  <Address>$process+83F8EC</Address>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>55</ID>
+                  <Description>"Text char counter"</Description>
+                  <ShowAsSigned>0</ShowAsSigned>
+                  <VariableType>Byte</VariableType>
+                  <Address>$process+83F8F0</Address>
+                </CheatEntry>
+              </CheatEntries>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>47</ID>
+              <Description>"Game Timer"</Description>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>4 Bytes</VariableType>
+              <Address>$process+6A8E10</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>43</ID>
+              <Description>"Number of Saves"</Description>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+838718</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>42</ID>
+              <Description>"Camera Cut"</Description>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+8386F2</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>40</ID>
+              <Description>"Current Room"</Description>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+8386F1</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>18</ID>
+              <Description>"Entity Flag"</Description>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00010001:Active
+00010041:Inactive
+*:Unknown Status
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>4 Bytes</VariableType>
+              <Address>$process+96ECb4</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>104</ID>
+              <Description>"Map Flag"</Description>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>1</ShowAsSigned>
+              <VariableType>Array of byte</VariableType>
+              <ByteLength>20</ByteLength>
+              <Address>$process+838794</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>30</ID>
+              <Description>"Character Is Controllable"</Description>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00:False
+FF:True
+BA:Opening Container
+7A:In Menu
+*:Unknown Status
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+83AB90</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>20</ID>
+              <Description>"Game Status Flag"</Description>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00 10 00 70:Item Box Transition
+00 00 00 70:Inventory Transition
+00 80 00 70:Game View Transition
+00 80 00 50:Inventory
+00 90 00 50:Item Box
+00 00 00 40:Intro Movie
+00 00 00 80:Main Menu
+00 00 00 50:Loading Map
+00 00 00 54:Starting Up
+00 00 00 56:Room Transition
+00 00 00 90:Game View
+08 00 00 90:Game View (Main Hall)
+*:Unknown
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Array of byte</VariableType>
+              <ByteLength>4</ByteLength>
+              <Address>$process+833090</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>35</ID>
+              <Description>"Game System Trigger"</Description>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00 00 00 00:In Game
+00 00 00 01:In Inventory/Item Box/Room Transition
+*:Unknown
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Array of byte</VariableType>
+              <ByteLength>4</ByteLength>
+              <Address>$process+8384E8</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>36</ID>
+              <Description>"System Flag"</Description>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Array of byte</VariableType>
+              <ByteLength>4</ByteLength>
+              <Address>$process+833094</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>14</ID>
+              <Description>"Game Speed (FrameRate)"</Description>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">0:60 FPS
+2:30 FPS
+4:15 FPS
+</DropDownList>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>Byte</VariableType>
+              <Address>$process+8330AC</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>39</ID>
+              <Description>"Pad 1"</Description>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>2 Bytes</VariableType>
+              <Address>$process+838710</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>38</ID>
+              <Description>"Pad 2"</Description>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>0</ShowAsSigned>
+              <VariableType>2 Bytes</VariableType>
+              <Address>$process+83F8D4</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>67</ID>
+              <Description>"Inventory"</Description>
+              <Options moHideChildren="1"/>
+              <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00:Empty
+01:Knife
+02:Beretta
+03:Shotgun
+04:Colt Python (DumDum)
+05:Colt Python
+06:Flamethrower
+07:Grenade Gun (Explosive)
+08:Grenade Gun (Acid)
+09:Grenade Gun (Flame)
+0A:Rocket Launcher
+0B:Handgun Bullets
+0C:Shotgun Shells
+0D:DumDum Rounds
+0E:Magnum Rounds
+0F:Fuel
+10:Explosive Rounds
+11:Acid Rounds
+12:Flame Rounds
+13:Empty Bottle
+14:Water
+15:UMB No. 2
+16:UMB No. 4
+17:UMB No. 7
+18:UMB No. 13
+19:Yellow-6
+1A:NP-003
+1B:V-Jolt
+1C:Broken Shotgun
+1D:Square Crank
+1E:Hexagonal Crank
+1F:Emblem
+20:Gold Emblem
+21:Blue Jewel
+22:Red Jewel
+23:Music Score
+24:Wolf Medal
+25:Eagle Medal
+26:Herbicide
+27:Battery
+28:MO-Disc
+29:Wind Crest
+2A:Flare
+2B:Slides
+2C:Moon Crest
+2D:Star Crest
+2E:Sun Crest
+2F:Ink Ribbon
+30:Lighter
+31:Lockpick
+32:Oil Tank (Unused)
+33:Sword Key
+34:Armor Key
+35:Shield Key
+36:Helmet Key
+37:Master Key
+38:Closet Key
+39:Key for Room 002
+3A:Key for Room 003
+3B:Control Room Key
+3C:Power Room Key
+3D:Desk key
+3E:Blank Book
+3F:Doom Book 2
+40:Doom Book 1
+41:First Aid Spray
+42:Serum
+43:Red Herb
+44:Green Herb
+45:Blue Herb
+46:Mixed Herbs (R+B)
+47:Mixed Herbs (G+G)
+48:Mixed Herbs (G+B)
+49:Mixed Herbs (G+B+R)
+4A:Mixed Herbs (G+G+G)
+4B:Mixed Herbs (G+G+B)
+4C:Pickaxe (Unused)
+4D:Comm. Radio (Unused)
+6F:Ingram
+70:Minimi
+</DropDownList>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>1</ShowAsSigned>
+              <Color>808000</Color>
+              <GroupHeader>1</GroupHeader>
+              <Address>$process+838813</Address>
+              <CheatEntries>
+                <CheatEntry>
+                  <ID>108</ID>
+                  <Description>"Total Items"</Description>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>808080</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>$process+8386F7</Address>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>65</ID>
+                  <Description>"Inventory Item 1"</Description>
+                  <DropDownListLink>Inventory</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>808000</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+1</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>66</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>808000</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>68</ID>
+                  <Description>"Inventory Item 2"</Description>
+                  <DropDownListLink>Inventory</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>808000</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+3</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>69</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>808000</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>70</ID>
+                  <Description>"Inventory Item 3"</Description>
+                  <DropDownListLink>Inventory</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>808000</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+5</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>71</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>808000</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>72</ID>
+                  <Description>"Inventory Item 4"</Description>
+                  <DropDownListLink>Inventory</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>808000</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+7</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>73</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>808000</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>74</ID>
+                  <Description>"Inventory Item 5"</Description>
+                  <DropDownListLink>Inventory</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>808000</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+9</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>75</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>808000</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>76</ID>
+                  <Description>"Inventory Item 6"</Description>
+                  <DropDownListLink>Inventory</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>808000</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+B</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>77</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>808000</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>78</ID>
+                  <Description>"Inventory Item 7 (Jill Only - Don't edit if playing as Chris)"</Description>
+                  <DropDownListLink>Inventory</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>FF00FF</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+D</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>79</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>FF00FF</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>80</ID>
+                  <Description>"Inventory Item 8 (Jill Only - Don't edit if playing as Chris)"</Description>
+                  <DropDownListLink>Inventory</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>FF00FF</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+F</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>81</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>FF00FF</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>120</ID>
+                  <Description>"Click to update inventory"</Description>
+                  <Color>FFFF00</Color>
+                  <VariableType>Auto Assembler Script</VariableType>
+                  <AssemblerScript>{$lua}
+if syntaxcheck then return end
+
+local memrec = AddressList.getMemoryRecordByID(120)
+
+local timer = createTimer()
+timer.Interval = 450 -- 1000 milliseconds = 1 second
+timer.OnTimer = function(timer)
+  memrec.Active = false -- deactivate the script
+  timer.destroy() -- destroy the timer so it doesn't keep running
+end
+{$asm}
+
+[ENABLE]
+globalalloc(update,2048)
+CREATETHREAD(update)
+update:
+call $process+14140
+ret
+[DISABLE]
+</AssemblerScript>
+                </CheatEntry>
+              </CheatEntries>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>82</ID>
+              <Description>"Item Box"</Description>
+              <Options moHideChildren="1"/>
+              <DropDownListLink>Inventory</DropDownListLink>
+              <ShowAsHex>1</ShowAsHex>
+              <ShowAsSigned>1</ShowAsSigned>
+              <Color>00FF00</Color>
+              <GroupHeader>1</GroupHeader>
+              <Address>$process+8387B3</Address>
+              <CheatEntries>
+                <CheatEntry>
+                  <ID>83</ID>
+                  <Description>"Item 1"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+1</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>84</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>85</ID>
+                  <Description>"Item 2"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+3</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>86</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>87</ID>
+                  <Description>"Item 3"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+5</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>88</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>89</ID>
+                  <Description>"Item 4"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+7</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>90</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>91</ID>
+                  <Description>"Item 5"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+9</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>92</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>93</ID>
+                  <Description>"Item 6"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+B</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>94</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>95</ID>
+                  <Description>"Item 7"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+D</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>96</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>97</ID>
+                  <Description>"Item 8"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+F</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>98</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>99</ID>
+                  <Description>"Item 9"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+11</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>100</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>101</ID>
+                  <Description>"Item 10"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+13</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>102</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>109</ID>
+                  <Description>"Item 11"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+15</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>110</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>111</ID>
+                  <Description>"Item 12"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+17</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>112</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>113</ID>
+                  <Description>"Item 13"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+19</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>114</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>115</ID>
+                  <Description>"Item 14"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+1B</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>116</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+                <CheatEntry>
+                  <ID>117</ID>
+                  <Description>"Item 15"</Description>
+                  <DropDownListLink>Item Box</DropDownListLink>
+                  <ShowAsHex>1</ShowAsHex>
+                  <ShowAsSigned>1</ShowAsSigned>
+                  <Color>00FF00</Color>
+                  <VariableType>Byte</VariableType>
+                  <Address>+1D</Address>
+                  <CheatEntries>
+                    <CheatEntry>
+                      <ID>118</ID>
+                      <Description>"Quantity"</Description>
+                      <ShowAsSigned>1</ShowAsSigned>
+                      <Color>00FF00</Color>
+                      <VariableType>Byte</VariableType>
+                      <Address>+1</Address>
+                    </CheatEntry>
+                  </CheatEntries>
+                </CheatEntry>
+              </CheatEntries>
+            </CheatEntry>
+          </CheatEntries>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+  </CheatEntries>
+  <UserdefinedSymbols>
+    <SymbolEntry>
+      <Name>inventory</Name>
+      <Address>06610000</Address>
+    </SymbolEntry>
+    <SymbolEntry>
+      <Name>update</Name>
+      <Address>08610000</Address>
+    </SymbolEntry>
+  </UserdefinedSymbols>
+  <DisassemblerComments>
+    <DisassemblerComment>
+      <Address>"Biohazard.exe"+8D715</Address>
+      <Comment>Door Skip Trigger, nop this to make it work
+</Comment>
+    </DisassemblerComment>
+    <DisassemblerComment>
+      <Address>"Biohazard.exe"+8D80D</Address>
+      <Comment>Do not touch: This is where rooms are loaded?
+</Comment>
+    </DisassemblerComment>
+    <DisassemblerComment>
+      <Address>"Biohazard.exe"+8D85F</Address>
+      <Comment>Door closing trigger, nop this to remove its sound when loading the room
+</Comment>
+    </DisassemblerComment>
+  </DisassemblerComments>
+</CheatTable>

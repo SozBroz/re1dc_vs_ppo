@@ -5,8 +5,14 @@ from __future__ import annotations
 # BizHawk MainRAM domain offset = PS1 bus address - 0x80000000
 PS1_MAINRAM_BASE = 0x80000000
 
-# --- PS1 Director's Cut (SLUS-00170) — MainRAM bus addresses ---
-PLAYER_HP = 0x800C51AC  # u16; max 0x8C (140) Jill/Chris [CONFIRMED]
+# --- PS1 — MainRAM bus addresses ---
+# Our disc: Director's Cut, serial SLUS-00551 (verified from disc image).
+# Addresses below were seeded from original-release (SLUS-00170) GameShark DBs;
+# the SLUS-00551 cheat list (epsxe SLUS_005.51.txt) confirms PLAYER_HP is the
+# SAME address in Standard/Original mode, so the save block likely matches.
+# Advanced/Arranged mode uses a different block (~0x800B8BC6) — avoid Arranged.
+GAME_SERIAL = "SLUS-00551"
+PLAYER_HP = 0x800C51AC  # u16; max 0x8C (140) Jill/Chris [CONFIRMED, both serials]
 GAME_TIMER = 0x800C867C  # [CONFIRMED]
 LAB_TIMER = 0x800C867A  # [CONFIRMED]
 DOOR_FLAGS = 0x800C86B4  # bitfield, 4 bytes [CONFIRMED]

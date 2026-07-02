@@ -1,0 +1,1412 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="45">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>31</ID>
+      <Description>"Low Game Timer"</Description>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript>[ENABLE]
+
+aobscanmodule(Timer0,ResidentEvil.exe,66 FF 05 3C 98 BE 00) // should be unique
+alloc(newmem,$1000)
+
+label(code)
+label(return)
+
+newmem:
+
+code:
+  mov word ptr [ResidentEvil.exe+7E983C],0
+  inc word ptr [ResidentEvil.exe+7E983C]
+  jmp return
+
+Timer0:
+  jmp newmem
+  nop 2
+return:
+registersymbol(Timer0)
+
+[DISABLE]
+
+Timer0:
+  db 66 FF 05 3C 98 BE 00
+
+unregistersymbol(Timer0)
+dealloc(newmem)
+
+{
+// ORIGINAL CODE - INJECTION POINT: ResidentEvil.exe+80C97
+
+ResidentEvil.exe+80C65: E8 26 B8 F9 FF              - call ResidentEvil.exe+1C490
+ResidentEvil.exe+80C6A: 83 3D 94 22 4D 00 1D        - cmp dword ptr [ResidentEvil.exe+D2294],1D
+ResidentEvil.exe+80C71: 7F 0B                       - jg ResidentEvil.exe+80C7E
+ResidentEvil.exe+80C73: 66 81 3D 3C 98 BE 00 FF 7F  - cmp word ptr [ResidentEvil.exe+7E983C],7FFF
+ResidentEvil.exe+80C7C: 75 29                       - jne ResidentEvil.exe+80CA7
+ResidentEvil.exe+80C7E: 66 81 3D 3C 98 BE 00 FE 7F  - cmp word ptr [ResidentEvil.exe+7E983C],7FFE
+ResidentEvil.exe+80C87: 89 1D 94 22 4D 00           - mov [ResidentEvil.exe+D2294],ebx
+ResidentEvil.exe+80C8D: 73 11                       - jae ResidentEvil.exe+80CA0
+ResidentEvil.exe+80C8F: 85 35 C0 41 BE 00           - test [ResidentEvil.exe+7E41C0],esi
+ResidentEvil.exe+80C95: 75 10                       - jne ResidentEvil.exe+80CA7
+// ---------- INJECTING HERE ----------
+ResidentEvil.exe+80C97: 66 FF 05 3C 98 BE 00        - inc word ptr [ResidentEvil.exe+7E983C]
+// ---------- DONE INJECTING  ----------
+ResidentEvil.exe+80C9E: EB 07                       - jmp ResidentEvil.exe+80CA7
+ResidentEvil.exe+80CA0: 66 89 1D 3C 98 BE 00        - mov [ResidentEvil.exe+7E983C],bx
+ResidentEvil.exe+80CA7: F6 05 C7 41 BE 00 08        - test byte ptr [ResidentEvil.exe+7E41C7],08
+ResidentEvil.exe+80CAE: 0F 84 C8 00 00 00           - je ResidentEvil.exe+80D7C
+ResidentEvil.exe+80CB4: 66 39 3D 3C 98 BE 00        - cmp [ResidentEvil.exe+7E983C],di
+ResidentEvil.exe+80CBB: 75 36                       - jne ResidentEvil.exe+80CF3
+ResidentEvil.exe+80CBD: A1 DC BC BE 00              - mov eax,[ResidentEvil.exe+7EBCDC]
+ResidentEvil.exe+80CC2: 09 35 C0 41 BE 00           - or [ResidentEvil.exe+7E41C0],esi
+ResidentEvil.exe+80CC8: A3 FC 07 BF 00              - mov [ResidentEvil.exe+7F07FC],eax
+ResidentEvil.exe+80CCD: 88 1D E4 62 BE 00           - mov [ResidentEvil.exe+7E62E4],bl
+}
+</AssemblerScript>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>32</ID>
+      <Description>"Set Ink Ribbons To 50 When Saving"</Description>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript>[ENABLE]
+
+aobscanmodule(InkRibbon,ResidentEvil.exe,37 FE CA 88 10 A1 68 27 D2 00) // should be unique
+alloc(newmem,$1000)
+
+label(code)
+label(return)
+
+newmem:
+
+code:
+  mov dl,#50
+  mov [eax],dl
+  mov eax,[ResidentEvil.exe+922768]
+  jmp return
+
+InkRibbon+01:
+  jmp newmem
+  nop 4
+return:
+registersymbol(InkRibbon)
+
+[DISABLE]
+
+InkRibbon+01:
+  db FE CA 88 10 A1 68 27 D2 00
+
+unregistersymbol(InkRibbon)
+dealloc(newmem)
+
+{
+// ORIGINAL CODE - INJECTION POINT: ResidentEvil.exe+63277
+
+ResidentEvil.exe+6325A: 5B                             - pop ebx
+ResidentEvil.exe+6325B: C3                             - ret 
+ResidentEvil.exe+6325C: 33 C0                          - xor eax,eax
+ResidentEvil.exe+6325E: 8B 15 68 27 D2 00              - mov edx,[ResidentEvil.exe+922768]
+ResidentEvil.exe+63264: 8A C1                          - mov al,cl
+ResidentEvil.exe+63266: 8D 0C 45 00 00 00 00           - lea ecx,[eax*2+00000000]
+ResidentEvil.exe+6326D: 8D 44 42 01                    - lea eax,[edx+eax*2+01]
+ResidentEvil.exe+63271: 8A 10                          - mov dl,[eax]
+ResidentEvil.exe+63273: 84 D2                          - test dl,dl
+ResidentEvil.exe+63275: 74 37                          - je ResidentEvil.exe+632AE
+// ---------- INJECTING HERE ----------
+ResidentEvil.exe+63277: FE CA                          - dec dl
+// ---------- DONE INJECTING  ----------
+ResidentEvil.exe+63279: 88 10                          - mov [eax],dl
+ResidentEvil.exe+6327B: A1 68 27 D2 00                 - mov eax,[ResidentEvil.exe+922768]
+ResidentEvil.exe+63280: 03 C1                          - add eax,ecx
+ResidentEvil.exe+63282: 80 78 01 00                    - cmp byte ptr [eax+01],00
+ResidentEvil.exe+63286: 75 26                          - jne ResidentEvil.exe+632AE
+ResidentEvil.exe+63288: 80 3D 26 98 BE 00 33           - cmp byte ptr [ResidentEvil.exe+7E9826],33
+ResidentEvil.exe+6328F: 72 15                          - jb ResidentEvil.exe+632A6
+ResidentEvil.exe+63291: 80 3D 26 98 BE 00 3D           - cmp byte ptr [ResidentEvil.exe+7E9826],3D
+ResidentEvil.exe+63298: 73 0C                          - jae ResidentEvil.exe+632A6
+ResidentEvil.exe+6329A: 81 0D C0 41 BE 00 00 20 00 00  - or [ResidentEvil.exe+7E41C0],00002000
+}
+</AssemblerScript>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>136</ID>
+      <Description>"Infinite Ammo"</Description>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript>[ENABLE]
+
+aobscanmodule(InfAmmo,ResidentEvil.exe,FE 4C 41 FF 66 83 FB 08) // should be unique
+alloc(newmem,$1000)
+
+label(code)
+label(return)
+
+newmem:
+
+code:
+  //dec [ecx+eax*2-01]
+  cmp bx,08
+  jmp return
+
+InfAmmo:
+  jmp newmem
+  nop 3
+return:
+registersymbol(InfAmmo)
+
+[DISABLE]
+
+InfAmmo:
+  db FE 4C 41 FF 66 83 FB 08
+
+unregistersymbol(InfAmmo)
+dealloc(newmem)
+
+{
+// ORIGINAL CODE - INJECTION POINT: ResidentEvil.exe+5815D
+
+ResidentEvil.exe+5812B: E8 40 22 00 00           - call ResidentEvil.exe+5A370
+ResidentEvil.exe+58130: 0F BF FB                 - movsx edi,bx
+ResidentEvil.exe+58133: 8A 0D A2 63 BE 00        - mov cl,[ResidentEvil.exe+7E63A2]
+ResidentEvil.exe+58139: 8D 04 BF                 - lea eax,[edi+edi*4]
+ResidentEvil.exe+5813C: 38 0C 45 D8 0D 4C 00     - cmp [eax*2+ResidentEvil.exe+C0DD8],cl
+ResidentEvil.exe+58143: 8D 34 45 00 00 00 00     - lea esi,[eax*2+00000000]
+ResidentEvil.exe+5814A: 0F 85 5B 01 00 00        - jne ResidentEvil.exe+582AB
+ResidentEvil.exe+58150: 33 C0                    - xor eax,eax
+ResidentEvil.exe+58152: 8B 0D 68 27 D2 00        - mov ecx,[ResidentEvil.exe+922768]
+ResidentEvil.exe+58158: A0 49 98 BE 00           - mov al,[ResidentEvil.exe+7E9849]
+// ---------- INJECTING HERE ----------
+ResidentEvil.exe+5815D: FE 4C 41 FF              - dec [ecx+eax*2-01]
+// ---------- DONE INJECTING  ----------
+ResidentEvil.exe+58161: 66 83 FB 08              - cmp bx,08
+ResidentEvil.exe+58165: 75 6C                    - jne ResidentEvil.exe+581D3
+ResidentEvil.exe+58167: E8 44 23 00 00           - call ResidentEvil.exe+5A4B0
+ResidentEvil.exe+5816C: 24 03                    - and al,03
+ResidentEvil.exe+5816E: 33 C9                    - xor ecx,ecx
+ResidentEvil.exe+58170: 8A C8                    - mov cl,al
+ResidentEvil.exe+58172: 03 CF                    - add ecx,edi
+ResidentEvil.exe+58174: 89 0D EC 0D BE 00        - mov [ResidentEvil.exe+7E0DEC],ecx
+ResidentEvil.exe+5817A: 8D 04 89                 - lea eax,[ecx+ecx*4]
+ResidentEvil.exe+5817D: 0F BF 14 45 DC 0D 4C 00  - movsx edx,word ptr [eax*2+ResidentEvil.exe+C0DDC]
+}
+</AssemblerScript>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>1</ID>
+      <Description>"Won't Lose HP When Taking Damage"</Description>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript>[ENABLE]
+
+aobscanmodule(InfHP,ResidentEvil.exe,66 29 05 6C 63 BE 00) // should be unique
+alloc(newmem,$1000)
+
+label(code)
+label(return)
+
+newmem:
+mov ax,0
+code:
+  sub [ResidentEvil.exe+7E636C],ax
+  jmp return
+
+InfHP:
+  jmp newmem
+  nop 2
+return:
+registersymbol(InfHP)
+
+[DISABLE]
+
+InfHP:
+  db 66 29 05 6C 63 BE 00
+
+unregistersymbol(InfHP)
+dealloc(newmem)
+
+{
+// ORIGINAL CODE - INJECTION POINT: ResidentEvil.exe+35924
+
+ResidentEvil.exe+35900: A1 D4 BC BE 00           - mov eax,[ResidentEvil.exe+7EBCD4]
+ResidentEvil.exe+35905: 5B                       - pop ebx
+ResidentEvil.exe+35906: 80 20 F5                 - and byte ptr [eax],-0B
+ResidentEvil.exe+35909: A1 D4 BC BE 00           - mov eax,[ResidentEvil.exe+7EBCD4]
+ResidentEvil.exe+3590E: C6 80 8A 00 00 00 01     - mov byte ptr [eax+0000008A],01
+ResidentEvil.exe+35915: C3                       - ret 
+ResidentEvil.exe+35916: 24 0F                    - and al,0F
+ResidentEvil.exe+35918: 33 C9                    - xor ecx,ecx
+ResidentEvil.exe+3591A: 8A C8                    - mov cl,al
+ResidentEvil.exe+3591C: 66 0F B6 81 C8 B3 4B 00  - movzx ax,byte ptr [ecx+ResidentEvil.exe+BB3C8]
+// ---------- INJECTING HERE ----------
+ResidentEvil.exe+35924: 66 29 05 6C 63 BE 00     - sub [ResidentEvil.exe+7E636C],ax
+// ---------- DONE INJECTING  ----------
+ResidentEvil.exe+3592B: 6A 00                    - push 00
+ResidentEvil.exe+3592D: 6A 03                    - push 03
+ResidentEvil.exe+3592F: E8 6C A3 04 00           - call ResidentEvil.exe+7FCA0
+ResidentEvil.exe+35934: 83 C4 08                 - add esp,08
+ResidentEvil.exe+35937: A1 D4 BC BE 00           - mov eax,[ResidentEvil.exe+7EBCD4]
+ResidentEvil.exe+3593C: 8B 0D D0 FD D1 00        - mov ecx,[ResidentEvil.exe+91FDD0]
+ResidentEvil.exe+35942: 6A 00                    - push 00
+ResidentEvil.exe+35944: 8B 80 98 00 00 00        - mov eax,[eax+00000098]
+ResidentEvil.exe+3594A: 05 50 01 00 00           - add eax,00000150
+ResidentEvil.exe+3594F: 50                       - push eax
+}
+</AssemblerScript>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>0</ID>
+      <Description>"Current HP"</Description>
+      <VariableType>Byte</VariableType>
+      <Address>ResidentEvil.exe+7E636C</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>2</ID>
+      <Description>"High Damage"</Description>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript>[ENABLE]
+
+aobscanmodule(1HitKill,ResidentEvil.exe,66 29 95 88 00 00 00) // should be unique
+alloc(newmem,$1000)
+
+label(code)
+label(return)
+
+newmem:
+mov dx,ff
+code:
+  sub [ebp+00000088],dx
+  jmp return
+
+1HitKill:
+  jmp newmem
+  nop 2
+return:
+registersymbol(1HitKill)
+
+[DISABLE]
+
+1HitKill:
+  db 66 29 95 88 00 00 00
+
+unregistersymbol(1HitKill)
+dealloc(newmem)
+
+{
+// ORIGINAL CODE - INJECTION POINT: ResidentEvil.exe+3C224
+
+ResidentEvil.exe+3C1FA: 8D 8D 8A 00 00 00     - lea ecx,[ebp+0000008A]
+ResidentEvil.exe+3C200: 85 C0                 - test eax,eax
+ResidentEvil.exe+3C202: 74 11                 - je ResidentEvil.exe+3C215
+ResidentEvil.exe+3C204: 8A 86 02 C0 4B 00     - mov al,[esi+ResidentEvil.exe+BC002]
+ResidentEvil.exe+3C20A: 88 01                 - mov [ecx],al
+ResidentEvil.exe+3C20C: 66 8B 96 FE BF 4B 00  - mov dx,[esi+ResidentEvil.exe+BBFFE]
+ResidentEvil.exe+3C213: EB 0F                 - jmp ResidentEvil.exe+3C224
+ResidentEvil.exe+3C215: 8A 86 A2 B6 4B 00     - mov al,[esi+ResidentEvil.exe+BB6A2]
+ResidentEvil.exe+3C21B: 88 01                 - mov [ecx],al
+ResidentEvil.exe+3C21D: 66 8B 96 9E B6 4B 00  - mov dx,[esi+ResidentEvil.exe+BB69E]
+// ---------- INJECTING HERE ----------
+ResidentEvil.exe+3C224: 66 29 95 88 00 00 00  - sub [ebp+00000088],dx
+// ---------- DONE INJECTING  ----------
+ResidentEvil.exe+3C22B: 33 C0                 - xor eax,eax
+ResidentEvil.exe+3C22D: A0 E4 62 BE 00        - mov al,[ResidentEvil.exe+7E62E4]
+ResidentEvil.exe+3C232: 83 E0 E0              - and eax,-20
+ResidentEvil.exe+3C235: 83 F8 20              - cmp eax,20
+ResidentEvil.exe+3C238: 74 0A                 - je ResidentEvil.exe+3C244
+ResidentEvil.exe+3C23A: A0 E4 62 BE 00        - mov al,[ResidentEvil.exe+7E62E4]
+ResidentEvil.exe+3C23F: C0 E8 05              - shr al,05
+ResidentEvil.exe+3C242: 00 01                 - add [ecx],al
+ResidentEvil.exe+3C244: A1 F8 0D BE 00        - mov eax,[ResidentEvil.exe+7E0DF8]
+ResidentEvil.exe+3C249: 55                    - push ebp
+}
+</AssemblerScript>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>36</ID>
+      <Description>"Save Anywhere (Alt+V)"</Description>
+      <ShowAsSigned>0</ShowAsSigned>
+      <VariableType>Byte</VariableType>
+      <Address>ResidentEvil.exe+7E9616</Address>
+      <Hotkeys>
+        <Hotkey>
+          <Action>Set Value</Action>
+          <Keys>
+            <Key>18</Key>
+            <Key>86</Key>
+          </Keys>
+          <Value>3</Value>
+          <ID>0</ID>
+        </Hotkey>
+      </Hotkeys>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>135</ID>
+      <Description>"AVOID CHEST GAME CRASH: Chest Must Manually Be Opened 1 Time Per Game Session"</Description>
+      <Color>0000FF</Color>
+      <GroupHeader>1</GroupHeader>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>34</ID>
+          <Description>"Open Chest Anywhere (Alt+C)"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9617</Address>
+          <Hotkeys>
+            <Hotkey>
+              <Action>Set Value</Action>
+              <Keys>
+                <Key>18</Key>
+                <Key>67</Key>
+              </Keys>
+              <Value>3</Value>
+              <ID>0</ID>
+            </Hotkey>
+          </Hotkeys>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>24</ID>
+      <Description>"Player Inventory (Drop Into Chest To Update Visuals)"</Description>
+      <Options moHideChildren="1"/>
+      <GroupHeader>1</GroupHeader>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>9</ID>
+          <Description>"Slot 1 Item ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9944</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>10</ID>
+          <Description>"Slot 1 Item Quantity"</Description>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9945</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>5</ID>
+          <Description>"Slot 2 Item ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9946</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>6</ID>
+          <Description>"Slot 2 Item Quantity"</Description>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9947</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>4</ID>
+          <Description>"Slot 3 Item ID"</Description>
+          <DropDownList ReadOnly="1" DescriptionOnly="1" DisplayValueAsItem="1">00:Empty
+01:Knife
+02:Baretta 9mm
+03:Shotgun
+04:Colt Python (Dum Dum Rounds)
+05:Colt Python (Magnum rounds)
+06:Flamethrower
+07:Bazooka (Explosive Rounds)
+08:Bazooka (Acid Rounds)
+09:Bazooka (Flame Rounds)
+0A:Rocket Launcher
+0B:Clip
+0C:Shells
+0D:Dum Dum Rounds
+0E:Magnum Rounds
+0F:Fuel
+10:Explosive Rounds
+11:Acid Rounds
+12:Flame rounds
+1B:V-Jolt
+1C:Broken Shotgun
+1D:Crank (Square)
+1E:Crank (Hex)
+1F:Emblem
+20:Gold Emblem
+21:Blue Jewel
+22:Red Jewel
+23:Music Notes
+24:Wolf Medal
+25:Eagle Medal
+26:Chemical
+27:Battery
+28:M.O. Disk
+29:Wind Crest
+2A:Flare
+2B:Slides
+2C:Moon Crest
+2D:Star Crest
+2E:Sun Crest
+2F:Ink Ribbons
+30:Lighter
+31:Lock Pick
+32:Oil
+33:Sword Key
+34:Armor Key
+35:Shield Key
+36:Helmet Key
+37:Lab Key
+38:Special Key
+39:Dormitory Key
+3A:Dormitory Key
+3B:C-Room Key
+3C:Lab Key
+3D:Desk Key
+3E:Red Book
+3F:Doom Book 2
+40:Doom Book 1
+41:First Aid Spray
+42:Serum
+43:Red Herb
+44:Green Herb
+45:Blue Herb
+46:Mixed Herbs - Blue &amp; Red
+47:Mixed Herbs - 2x Green
+48:Mixed Herbs - Green &amp; Blue
+49:Mixed Herbs - Green, Red &amp; Blue
+4A:Mixed Herbs - 3x Green
+4B:Mixed Herbs - 2x Green, 1x Red
+4D:Comm Radio
+4C:Pick Axe
+4E:Bottle of Cool Water
+4F:"Eagle of East Wolf of West" Book
+13:Empty Bottle of Cool Water
+14:Bottle of Cool Water
+15:UMB No.2 (In Cool Water Bottle)
+16:UMB No.4 (In Cool Water Bottle)
+17:UMB No.7 (In Cool Water Bottle)
+18:UMB No.13 (In Cool Water Bottle)
+19:Yellow-6 (In Cool Water Bottle)
+1A:NP-003 (In Cool Water Bottle)
+</DropDownList>
+          <ShowAsHex>1</ShowAsHex>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9948</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>3</ID>
+          <Description>"Slot 3 Item Quantity"</Description>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9949</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>7</ID>
+          <Description>"Slot 4 Item ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E994A</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>8</ID>
+          <Description>"Slot 4 Item Quantity"</Description>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E994B</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>11</ID>
+          <Description>"Slot 5 Item ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E994C</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>12</ID>
+          <Description>"Slot 5 Item Quantity"</Description>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E994D</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>13</ID>
+          <Description>"Slot 6 Item ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E994E</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>14</ID>
+          <Description>"Slot 6 Item Quantity"</Description>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E994F</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>23</ID>
+          <Description>"Jill And Rebecca Extra Slots"</Description>
+          <Options moHideChildren="1"/>
+          <Color>0000FF</Color>
+          <GroupHeader>1</GroupHeader>
+          <CheatEntries>
+            <CheatEntry>
+              <ID>15</ID>
+              <Description>"Slot 7 Item ID (Jill Only - Slot 1 Rebecca)"</Description>
+              <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+              <ShowAsHex>1</ShowAsHex>
+              <VariableType>Byte</VariableType>
+              <Address>ResidentEvil.exe+7E9950</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>16</ID>
+              <Description>"Slot 7 Item Quantity (Jill Only - Slot 1 Rebecca)"</Description>
+              <VariableType>Byte</VariableType>
+              <Address>ResidentEvil.exe+7E9951</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>17</ID>
+              <Description>"Slot 8 Item ID (Jill - Slot 2 Rebecca)"</Description>
+              <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+              <ShowAsHex>1</ShowAsHex>
+              <VariableType>Byte</VariableType>
+              <Address>ResidentEvil.exe+7E9952</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>18</ID>
+              <Description>"Slot 8 Item Quantity (Jill - Slot 2 Rebecca)"</Description>
+              <VariableType>Byte</VariableType>
+              <Address>ResidentEvil.exe+7E9953</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>19</ID>
+              <Description>"Slot 3 Item ID (Rebecca Only)"</Description>
+              <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+              <ShowAsHex>1</ShowAsHex>
+              <VariableType>Byte</VariableType>
+              <Address>ResidentEvil.exe+7E9954</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>20</ID>
+              <Description>"Slot 3 Item Quantity (Rebecca Only)"</Description>
+              <VariableType>Byte</VariableType>
+              <Address>ResidentEvil.exe+7E9955</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>21</ID>
+              <Description>"Slot 4 Item ID (Rebecca Only)"</Description>
+              <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+              <ShowAsHex>1</ShowAsHex>
+              <VariableType>Byte</VariableType>
+              <Address>ResidentEvil.exe+7E9956</Address>
+            </CheatEntry>
+            <CheatEntry>
+              <ID>22</ID>
+              <Description>"Slot 4 Item Quantity (Rebecca Only)"</Description>
+              <VariableType>Byte</VariableType>
+              <Address>ResidentEvil.exe+7E9957</Address>
+            </CheatEntry>
+          </CheatEntries>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>134</ID>
+      <Description>"All Items In Chest"</Description>
+      <VariableType>Auto Assembler Script</VariableType>
+      <AssemblerScript>[ENABLE]
+//code from here to '[DISABLE]' will be used to enable the cheat
+define(ChestInvent,"ResidentEvil.exe"+7E98E4)
+registersymbol(ChestInvent)
+registersymbol(ChestMax)
+alloc(ChestMax,96)
+
+ChestMax:
+readmem(ChestInvent,96)
+
+ChestInvent:
+db 3D FF 41 FF 06 FF 07 FF 08 FF 09 FF 3E FF 13 FF 14 FF 15 FF 16 FF 17 FF 18 FF 19 FF 1A FF 1B FF 1C FF 1D FF 1E FF 1F FF 20 FF 21 FF 22 FF 23 FF 24 FF 25 FF 26 FF 27 FF 28 FF 29 FF 2A FF 2B FF 2C FF 2D FF 2E FF 2F FF 30 FF 31 FF 33 FF 34 FF 35 FF 36 FF 37 FF 38 FF 39 FF 3A FF 3B FF 3C FF
+
+
+
+//"ResidentEvil.exe"+7E98E4:
+//db 3D FF 41 FF 06 FF 07 FF 08 FF 09 FF 3E FF 13 FF 14 FF 15 FF 16 FF 17 FF 18 FF 19 FF 1A FF 1B FF 1C FF 1D FF 1E FF 1F FF 20 FF 21 FF 22 FF 23 FF 24 FF 25 FF 26 FF 27 FF 28 FF 29 FF 2A FF 2B FF 2C FF 2D FF 2E FF 2F FF 30 FF 31 FF 33 FF 34 FF 35 FF 36 FF 37 FF 38 FF 39 FF 3A FF 3B FF 3C FF
+ 
+ 
+[DISABLE]
+//code from here till the end of the code will be used to disable the cheat
+ChestInvent:
+readmem(ChestMax,96)
+
+dealloc(ChestMax)
+dealloc(ChestData)
+unregistersymbol(ChestInvent)
+unregistersymbol(ChestMax)
+</AssemblerScript>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>133</ID>
+      <Description>"Chest Inventory"</Description>
+      <Options moHideChildren="1"/>
+      <GroupHeader>1</GroupHeader>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>37</ID>
+          <Description>"Slot 1 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98E4</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>38</ID>
+          <Description>"Slot 1 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98E5</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>39</ID>
+          <Description>"Slot 2 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98E6</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>40</ID>
+          <Description>"Slot 2 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98E7</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>41</ID>
+          <Description>"Slot 3 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98E8</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>42</ID>
+          <Description>"Slot 3 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98E9</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>43</ID>
+          <Description>"Slot 4 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98EA</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>44</ID>
+          <Description>"Slot 4 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98EB</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>45</ID>
+          <Description>"Slot 5 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98EC</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>46</ID>
+          <Description>"Slot 5 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98ED</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>47</ID>
+          <Description>"Slot 6 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98EE</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>48</ID>
+          <Description>"Slot 6 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98EF</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>49</ID>
+          <Description>"Slot 7 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98F0</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>50</ID>
+          <Description>"Slot 7 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98F1</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>51</ID>
+          <Description>"Slot 8 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98F2</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>52</ID>
+          <Description>"Slot 8 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98F3</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>53</ID>
+          <Description>"Slot 9 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98F4</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>54</ID>
+          <Description>"Slot 9 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98F5</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>55</ID>
+          <Description>"Slot 10 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98F6</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>56</ID>
+          <Description>"Slot 10 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98F7</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>57</ID>
+          <Description>"Slot 11 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98F8</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>58</ID>
+          <Description>"Slot 11 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98F9</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>59</ID>
+          <Description>"Slot 12 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98FA</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>60</ID>
+          <Description>"Slot 12 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98FB</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>61</ID>
+          <Description>"Slot 13 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98FC</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>62</ID>
+          <Description>"Slot 13 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98FD</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>63</ID>
+          <Description>"Slot 14 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98FE</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>64</ID>
+          <Description>"Slot 14 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E98FF</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>65</ID>
+          <Description>"Slot 15 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9900</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>66</ID>
+          <Description>"Slot 15 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9901</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>67</ID>
+          <Description>"Slot 16 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9902</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>68</ID>
+          <Description>"Slot 16 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9903</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>69</ID>
+          <Description>"Slot 17 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9904</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>70</ID>
+          <Description>"Slot 17 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9905</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>71</ID>
+          <Description>"Slot 18 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9906</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>72</ID>
+          <Description>"Slot 18 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9907</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>73</ID>
+          <Description>"Slot 19 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9908</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>74</ID>
+          <Description>"Slot 19 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9909</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>75</ID>
+          <Description>"Slot 20 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E990A</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>76</ID>
+          <Description>"Slot 20 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E990B</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>77</ID>
+          <Description>"Slot 21 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E990C</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>78</ID>
+          <Description>"Slot 21 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E990D</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>79</ID>
+          <Description>"Slot 22 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E990E</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>80</ID>
+          <Description>"Slot 22 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E990F</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>81</ID>
+          <Description>"Slot 23 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9910</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>82</ID>
+          <Description>"Slot 23 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9911</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>83</ID>
+          <Description>"Slot 24 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9912</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>84</ID>
+          <Description>"Slot 24 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9913</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>85</ID>
+          <Description>"Slot 25 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9914</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>86</ID>
+          <Description>"Slot 25 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9915</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>87</ID>
+          <Description>"Slot 26 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9916</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>88</ID>
+          <Description>"Slot 26 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9917</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>89</ID>
+          <Description>"Slot 27 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9918</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>90</ID>
+          <Description>"Slot 27 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9919</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>91</ID>
+          <Description>"Slot 28 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E991A</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>92</ID>
+          <Description>"Slot 28 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E991B</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>93</ID>
+          <Description>"Slot 29 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E991C</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>94</ID>
+          <Description>"Slot 29 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E991D</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>95</ID>
+          <Description>"Slot 30 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E991E</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>96</ID>
+          <Description>"Slot 30 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E991F</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>97</ID>
+          <Description>"Slot 31 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9920</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>98</ID>
+          <Description>"Slot 31 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9921</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>99</ID>
+          <Description>"Slot 32 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9922</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>100</ID>
+          <Description>"Slot 32 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9923</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>101</ID>
+          <Description>"Slot 33 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9924</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>102</ID>
+          <Description>"Slot 33 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9925</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>103</ID>
+          <Description>"Slot 34 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9926</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>104</ID>
+          <Description>"Slot 34 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9927</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>105</ID>
+          <Description>"Slot 35 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9928</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>106</ID>
+          <Description>"Slot 35 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9929</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>107</ID>
+          <Description>"Slot 36 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E992A</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>108</ID>
+          <Description>"Slot 36 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E992B</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>109</ID>
+          <Description>"Slot 37 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E992C</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>110</ID>
+          <Description>"Slot 37 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E992D</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>111</ID>
+          <Description>"Slot 38 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E992E</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>112</ID>
+          <Description>"Slot 38 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E992F</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>113</ID>
+          <Description>"Slot 39 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9930</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>114</ID>
+          <Description>"Slot 39 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9931</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>115</ID>
+          <Description>"Slot 40 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9932</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>116</ID>
+          <Description>"Slot 40 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9933</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>117</ID>
+          <Description>"Slot 41 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9934</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>118</ID>
+          <Description>"Slot 41 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9935</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>119</ID>
+          <Description>"Slot 42 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9936</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>120</ID>
+          <Description>"Slot 42 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9937</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>121</ID>
+          <Description>"Slot 43 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9938</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>122</ID>
+          <Description>"Slot 43 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9939</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>123</ID>
+          <Description>"Slot 44 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E993A</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>124</ID>
+          <Description>"Slot 44 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E993B</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>125</ID>
+          <Description>"Slot 45 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E993C</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>126</ID>
+          <Description>"Slot 45 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E993D</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>127</ID>
+          <Description>"Slot 46 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E993E</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>128</ID>
+          <Description>"Slot 46 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E993F</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>129</ID>
+          <Description>"Slot 47 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9940</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>130</ID>
+          <Description>"Slot 47 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9941</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>131</ID>
+          <Description>"Slot 48 ID"</Description>
+          <DropDownListLink>Slot 3 Item ID</DropDownListLink>
+          <ShowAsHex>1</ShowAsHex>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9942</Address>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>132</ID>
+          <Description>"Slot 48 Quantity"</Description>
+          <ShowAsSigned>0</ShowAsSigned>
+          <VariableType>Byte</VariableType>
+          <Address>ResidentEvil.exe+7E9943</Address>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+  </CheatEntries>
+  <UserdefinedSymbols/>
+</CheatTable>
