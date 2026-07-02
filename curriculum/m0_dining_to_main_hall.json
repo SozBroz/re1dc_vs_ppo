@@ -1,0 +1,7 @@
+{
+  "stage": "m0_dining_to_main_hall",
+  "init_savestate": "states/105_dining.state",
+  "waypoints": ["105", "106"],
+  "required_items": [],
+  "max_steps": 3000
+}
