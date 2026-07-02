@@ -1,0 +1,691 @@
+[
+  {
+    "seq": 1,
+    "room_id": "105",
+    "objective": "pick up wooden emblem from dining table",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "wooden_emblem"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 2,
+    "room_id": "106",
+    "objective": "reach main hall; meet Barry",
+    "action_type": "scripted_macro",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "Jill start cutscene transitions via dining",
+    "source": "alexfung"
+  },
+  {
+    "seq": 3,
+    "room_id": "106",
+    "objective": "take 1F map from SE stairs alcove",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "map_1f"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 4,
+    "room_id": "106",
+    "objective": "bank: drop wooden emblem in item box",
+    "action_type": "use_item",
+    "required_items": [
+      "wooden_emblem"
+    ],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "Wooden Emblem Bank per WitchRain",
+    "source": "witchrain"
+  },
+  {
+    "seq": 5,
+    "room_id": "103",
+    "objective": "enter east wing map room corridor; kill Kenneth zombie",
+    "action_type": "fight",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "F passage / Kenneth corridor approach",
+    "source": "alexfung"
+  },
+  {
+    "seq": 6,
+    "room_id": "108",
+    "objective": "map room: collect handgun clips",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "handgun_clips"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 7,
+    "room_id": "115",
+    "objective": "shotgun trap room: take shotgun (Barry saves Jill)",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "shotgun"
+    ],
+    "success_condition": "",
+    "notes": "Barry trap rescue \u2014 Jill skips broken-shotgun swap",
+    "source": "alexfung|clix"
+  },
+  {
+    "seq": 8,
+    "room_id": "107",
+    "objective": "crow gallery puzzle; obtain star crest",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "star_crest"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain|alexfung"
+  },
+  {
+    "seq": 9,
+    "room_id": "11B",
+    "objective": "storeroom under east stairs: chemicals + green herb",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "chemical",
+      "green_herb"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 10,
+    "room_id": "10C",
+    "objective": "greenhouse: pump chemicals; kill plant; take armor key",
+    "action_type": "use_item",
+    "required_items": [
+      "chemical"
+    ],
+    "items_gained": [
+      "armor_key"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain|alexfung"
+  },
+  {
+    "seq": 11,
+    "room_id": "209",
+    "objective": "2F bedroom: collect ammo",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "shotgun_shells"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "alexfung"
+  },
+  {
+    "seq": 12,
+    "room_id": "10F",
+    "objective": "bar: play piano (sonata); swap emblems in secret room",
+    "action_type": "use_item",
+    "required_items": [
+      "wooden_emblem"
+    ],
+    "items_gained": [
+      "gold_emblem",
+      "piano_notes"
+    ],
+    "success_condition": "",
+    "notes": "Jill plays piano herself",
+    "source": "witchrain|alexfung"
+  },
+  {
+    "seq": 13,
+    "room_id": "105",
+    "objective": "dining room: place gold emblem; shield key behind clock",
+    "action_type": "use_item",
+    "required_items": [
+      "gold_emblem"
+    ],
+    "items_gained": [
+      "shield_key"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 14,
+    "room_id": "202",
+    "objective": "blue jewel room (2F dining): push statue for blue jewel",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "blue_jewel"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 15,
+    "room_id": "10D",
+    "objective": "small tiger room: insert blue jewel; wind crest",
+    "action_type": "use_item",
+    "required_items": [
+      "blue_jewel"
+    ],
+    "items_gained": [
+      "wind_crest"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 16,
+    "room_id": "205",
+    "objective": "armor room: statue puzzle; sun crest",
+    "action_type": "pickup",
+    "required_items": [
+      "armor_key"
+    ],
+    "items_gained": [
+      "sun_crest"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 17,
+    "room_id": "102",
+    "objective": "rebecca room (vacant): serum on bed",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "serum",
+      "sword_key"
+    ],
+    "success_condition": "",
+    "notes": "Jill uses lockpick on doors; still loots serum room",
+    "source": "witchrain|alexfung",
+    "unverified": true
+  },
+  {
+    "seq": 18,
+    "room_id": "210",
+    "objective": "attic: fight Yawn 1; moon crest",
+    "action_type": "boss",
+    "required_items": [
+      "shield_key"
+    ],
+    "items_gained": [
+      "moon_crest"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain|alexfung"
+  },
+  {
+    "seq": 19,
+    "room_id": "11A",
+    "objective": "outside passage: place four crests; open courtyard door",
+    "action_type": "use_item",
+    "required_items": [
+      "sun_crest",
+      "moon_crest",
+      "star_crest",
+      "wind_crest"
+    ],
+    "items_gained": [],
+    "success_condition": "room_id == 304",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 20,
+    "room_id": "304",
+    "objective": "courtyard: pass second house gate toward residence",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "inferred"
+  },
+  {
+    "seq": 21,
+    "room_id": "400",
+    "objective": "guardhouse entry: cover Plant 42 floor hole with statue",
+    "action_type": "scripted_macro",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "alexfung"
+  },
+  {
+    "seq": 22,
+    "room_id": "401",
+    "objective": "room 001: control room key from bathroom tub",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "control_room_key"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain|alexfung"
+  },
+  {
+    "seq": 23,
+    "room_id": "406",
+    "objective": "room 002: collect room 002 key + red book",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "room_002_key",
+      "red_book"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 24,
+    "room_id": "411",
+    "objective": "control room: drain shark hall; unlock arms store",
+    "action_type": "use_item",
+    "required_items": [
+      "control_room_key"
+    ],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "alexfung"
+  },
+  {
+    "seq": 25,
+    "room_id": "410",
+    "objective": "arms storehouse: room 003 key + ammo",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "room_003_key"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 26,
+    "room_id": "409",
+    "objective": "drug storehouse / rec room: V-Jolt prep (code 3:45 Jill)",
+    "action_type": "use_item",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "Jill Any% uses 3:45 not 12:45",
+    "source": "clix|alexfung",
+    "unverified": true
+  },
+  {
+    "seq": 27,
+    "room_id": "40E",
+    "objective": "water tank / plant roots: apply V-Jolt",
+    "action_type": "use_item",
+    "required_items": [
+      "v_jolt"
+    ],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "alexfung"
+  },
+  {
+    "seq": 28,
+    "room_id": "40C",
+    "objective": "plant 42 boss room: defeat Plant 42; helmet key",
+    "action_type": "boss",
+    "required_items": [],
+    "items_gained": [
+      "helmet_key"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain|alexfung"
+  },
+  {
+    "seq": 29,
+    "room_id": "400",
+    "objective": "meet Wesker; return to mansion",
+    "action_type": "scripted_macro",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "alexfung"
+  },
+  {
+    "seq": 30,
+    "room_id": "203",
+    "objective": "2F hall: survive hunters",
+    "action_type": "fight",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "Hunters populate mansion after Plant 42",
+    "source": "alexfung"
+  },
+  {
+    "seq": 31,
+    "room_id": "20E",
+    "objective": "front of attic / fireplace hall: descend after Yawn 2",
+    "action_type": "navigate",
+    "required_items": [
+      "helmet_key"
+    ],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "alexfung"
+  },
+  {
+    "seq": 32,
+    "room_id": "210",
+    "objective": "attic hole: fight Yawn 2",
+    "action_type": "boss",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain|alexfung"
+  },
+  {
+    "seq": 33,
+    "room_id": "217",
+    "objective": "hidden library shortcut OR mansion basement route",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "Any% often skips full basement; security-door route preferred on PC",
+    "source": "clix|alexfung",
+    "unverified": true
+  },
+  {
+    "seq": 34,
+    "room_id": "216",
+    "objective": "hidden library: MO disk (if basement skipped, get from 2F security room instead)",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "mo_disk_1"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "alexfung",
+    "unverified": true
+  },
+  {
+    "seq": 35,
+    "room_id": "213",
+    "objective": "2F security room: Barry passcode; battery + MO disk alt",
+    "action_type": "pickup",
+    "required_items": [
+      "barry_passcode"
+    ],
+    "items_gained": [
+      "battery",
+      "mo_disk_1"
+    ],
+    "success_condition": "",
+    "notes": "Jill can skip basement entirely",
+    "source": "alexfung|clix",
+    "unverified": true
+  },
+  {
+    "seq": 36,
+    "room_id": "20B",
+    "objective": "doom book vol 1 in lesson room",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "doom_book_1"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain",
+    "unverified": true
+  },
+  {
+    "seq": 37,
+    "room_id": "305",
+    "objective": "fountain courtyard: doom book puzzle; square crank",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "square_crank",
+      "doom_book_2"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain",
+    "unverified": true
+  },
+  {
+    "seq": 38,
+    "room_id": "500",
+    "objective": "under fountain elevator to lab sector",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "inferred"
+  },
+  {
+    "seq": 39,
+    "room_id": "30F",
+    "objective": "crank passage: use square crank",
+    "action_type": "use_item",
+    "required_items": [
+      "square_crank"
+    ],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 40,
+    "room_id": "30C",
+    "objective": "black tiger room: defeat Black Tiger",
+    "action_type": "boss",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain|alexfung"
+  },
+  {
+    "seq": 41,
+    "room_id": "30E",
+    "objective": "underground save: bank heavy items",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "item bank checkpoint",
+    "source": "witchrain"
+  },
+  {
+    "seq": 42,
+    "room_id": "30B",
+    "objective": "rock passage: hex crank + second MO disk",
+    "action_type": "pickup",
+    "required_items": [
+      "hex_crank"
+    ],
+    "items_gained": [
+      "mo_disk_2"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain",
+    "unverified": true
+  },
+  {
+    "seq": 43,
+    "room_id": "506",
+    "objective": "small laboratory: wolf medal",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "wolf_medal"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain",
+    "unverified": true
+  },
+  {
+    "seq": 44,
+    "room_id": "507",
+    "objective": "mortuary: eagle medal",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "eagle_medal"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain",
+    "unverified": true
+  },
+  {
+    "seq": 45,
+    "room_id": "305",
+    "objective": "fountain: insert medals; open lab elevator",
+    "action_type": "use_item",
+    "required_items": [
+      "wolf_medal",
+      "eagle_medal"
+    ],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 46,
+    "room_id": "50E",
+    "objective": "lab save room: power room key",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "power_room_key"
+    ],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain",
+    "unverified": true
+  },
+  {
+    "seq": 47,
+    "room_id": "510",
+    "objective": "maze B / power room: activate elevator power",
+    "action_type": "use_item",
+    "required_items": [
+      "power_room_key"
+    ],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain",
+    "unverified": true
+  },
+  {
+    "seq": 48,
+    "room_id": "508",
+    "objective": "double lock room: collect passcodes with MO disks",
+    "action_type": "use_item",
+    "required_items": [
+      "mo_disk_1",
+      "mo_disk_2"
+    ],
+    "items_gained": [
+      "passcode_a",
+      "passcode_b"
+    ],
+    "success_condition": "",
+    "notes": "Any% may need only subset of three MO disks",
+    "source": "witchrain|inferred",
+    "unverified": true
+  },
+  {
+    "seq": 49,
+    "room_id": "50C",
+    "objective": "front of elevator: ride to B4 tyrant floor",
+    "action_type": "navigate",
+    "required_items": [
+      "battery"
+    ],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain"
+  },
+  {
+    "seq": 50,
+    "room_id": "514",
+    "objective": "tyrant chamber: defeat Tyrant",
+    "action_type": "boss",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain|alexfung"
+  },
+  {
+    "seq": 51,
+    "room_id": "501",
+    "objective": "escape via heliport passage",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "",
+    "notes": "",
+    "source": "witchrain|inferred"
+  },
+  {
+    "seq": 52,
+    "room_id": "303",
+    "objective": "helipad: trigger ending cutscene",
+    "action_type": "scripted_macro",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": "game_complete == true",
+    "notes": "Bad ending acceptable for Any%",
+    "source": "inferred"
+  }
+]

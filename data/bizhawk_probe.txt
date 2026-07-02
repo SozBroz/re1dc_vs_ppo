@@ -1,0 +1,6 @@
+system: PSX
+frames: 1321
+ff_frames: 1200 in 3.67s -> 327.2 fps (5.5x realtime)
+hp_u16@0C51AC: 0
+timer_u32@0C867C: 0
+PROBE_DONE

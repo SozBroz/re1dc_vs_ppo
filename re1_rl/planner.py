@@ -62,7 +62,11 @@ class WaypointPlanner:
 
         step = self.current_objective() or {}
         cond = step.get("success_condition")
-        if cond is None:
+        # Route data (route_jill_anypct.json) stores success_condition as a
+        # string that is usually empty. Empty/None means "advance on room
+        # entry" (already gated by the room check above). A dict allows richer
+        # conditions (has_item, etc.).
+        if not cond:
             self._index += 1
             return True
 
@@ -72,7 +76,13 @@ class WaypointPlanner:
         return False
 
     @staticmethod
-    def _check_condition(cond: dict[str, Any], state: dict[str, Any]) -> bool:
+    def _check_condition(cond: Any, state: dict[str, Any]) -> bool:
+        # String conditions: currently only room-entry, already satisfied by
+        # the caller's room match. Treat any non-empty string as satisfied.
+        if isinstance(cond, str):
+            return True
+        if not isinstance(cond, dict):
+            return False
         cond_type = cond.get("type", "room_enter")
         if cond_type == "room_enter":
             return str(state.get("room_id", "")) == str(cond.get("room_id", ""))

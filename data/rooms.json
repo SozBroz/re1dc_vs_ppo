@@ -1,0 +1,632 @@
+{
+  "100": {
+    "name": "SAVE ROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "101": {
+    "name": "1F LEFT STAIRS",
+    "stage": 1,
+    "notes": ""
+  },
+  "102": {
+    "name": "VACANT ROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "103": {
+    "name": "F PASSAGE",
+    "stage": 1,
+    "notes": ""
+  },
+  "104": {
+    "name": "TEA ROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "105": {
+    "name": "DINING ROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "106": {
+    "name": "MAIN HALL",
+    "stage": 1,
+    "notes": ""
+  },
+  "107": {
+    "name": "GALLERY",
+    "stage": 1,
+    "notes": ""
+  },
+  "108": {
+    "name": "L PASSAGE",
+    "stage": 1,
+    "notes": ""
+  },
+  "109": {
+    "name": "TRAP PASSAGE",
+    "stage": 1,
+    "notes": ""
+  },
+  "10A": {
+    "name": "BACK PASSAGE",
+    "stage": 1,
+    "notes": ""
+  },
+  "10B": {
+    "name": "1F RIGHT STAIRS",
+    "stage": 1,
+    "notes": ""
+  },
+  "10C": {
+    "name": "GREEN HOUSE",
+    "stage": 1,
+    "notes": ""
+  },
+  "10D": {
+    "name": "TIGER STATUE ROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "10E": {
+    "name": "EMPLOYEE ROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "10F": {
+    "name": "BAR",
+    "stage": 1,
+    "notes": ""
+  },
+  "110": {
+    "name": "N/A",
+    "stage": 1,
+    "notes": "unused slot in debug table"
+  },
+  "111": {
+    "name": "DRESSING ROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "112": {
+    "name": "WARDROBE",
+    "stage": 1,
+    "notes": ""
+  },
+  "113": {
+    "name": "BATHROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "114": {
+    "name": "BOILER",
+    "stage": 1,
+    "notes": ""
+  },
+  "115": {
+    "name": "TRAP ROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "116": {
+    "name": "LIVING ROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "117": {
+    "name": "LARGE GALLERY",
+    "stage": 1,
+    "notes": ""
+  },
+  "118": {
+    "name": "STAIRS UNDER ROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "119": {
+    "name": "N/A",
+    "stage": 1,
+    "notes": "unused slot in debug table"
+  },
+  "11A": {
+    "name": "ROOFED PASSAGE",
+    "stage": 1,
+    "notes": ""
+  },
+  "11B": {
+    "name": "STORE ROOM",
+    "stage": 1,
+    "notes": ""
+  },
+  "11C": {
+    "name": "WARDROBE S",
+    "stage": 1,
+    "notes": ""
+  },
+  "200": {
+    "name": "N/A",
+    "stage": 2,
+    "notes": "unused slot in debug table"
+  },
+  "201": {
+    "name": "2F LEFT STAIRS",
+    "stage": 2,
+    "notes": ""
+  },
+  "202": {
+    "name": "DINING ROOM 2F",
+    "stage": 2,
+    "notes": ""
+  },
+  "203": {
+    "name": "HALL 2F",
+    "stage": 2,
+    "notes": ""
+  },
+  "204": {
+    "name": "C PASSAGE",
+    "stage": 2,
+    "notes": ""
+  },
+  "205": {
+    "name": "ARMOR ROOM",
+    "stage": 2,
+    "notes": ""
+  },
+  "206": {
+    "name": "DOLL ROOM",
+    "stage": 2,
+    "notes": ""
+  },
+  "207": {
+    "name": "2F RIGHT STAIRS",
+    "stage": 2,
+    "notes": ""
+  },
+  "208": {
+    "name": "DEER ROOM",
+    "stage": 2,
+    "notes": ""
+  },
+  "209": {
+    "name": "BEDROOM",
+    "stage": 2,
+    "notes": ""
+  },
+  "20A": {
+    "name": "STUDY ROOM",
+    "stage": 2,
+    "notes": ""
+  },
+  "20B": {
+    "name": "FRONT LESSON ROOM",
+    "stage": 2,
+    "notes": ""
+  },
+  "20C": {
+    "name": "LESSON ROOM",
+    "stage": 2,
+    "notes": ""
+  },
+  "20D": {
+    "name": "PILLAR PASSAGE",
+    "stage": 2,
+    "notes": ""
+  },
+  "20E": {
+    "name": "FRONT OF ATTIC",
+    "stage": 2,
+    "notes": ""
+  },
+  "20F": {
+    "name": "DINING",
+    "stage": 2,
+    "notes": ""
+  },
+  "210": {
+    "name": "ATTIC",
+    "stage": 2,
+    "notes": ""
+  },
+  "211": {
+    "name": "TERRACE PASSAGE",
+    "stage": 2,
+    "notes": ""
+  },
+  "212": {
+    "name": "TERRACE",
+    "stage": 2,
+    "notes": ""
+  },
+  "213": {
+    "name": "FRONT ELEVATOR",
+    "stage": 2,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "214": {
+    "name": "ROUGH PASSAGE",
+    "stage": 2,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "215": {
+    "name": "STUFFED ROOM",
+    "stage": 2,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "216": {
+    "name": "LIBRARY A",
+    "stage": 2,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "217": {
+    "name": "LIBRARY B",
+    "stage": 2,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "218": {
+    "name": "HIDDEN LIBRARY",
+    "stage": 2,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "219": {
+    "name": "SHED",
+    "stage": 2,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "21A": {
+    "name": "UNDER PASSAGE 1",
+    "stage": 2,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "21B": {
+    "name": "UNDER PASSAGE 2",
+    "stage": 2,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "21C": {
+    "name": "UNDER KITCHEN",
+    "stage": 2,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "300": {
+    "name": "FIRST HOUSE OUT",
+    "stage": 3,
+    "notes": ""
+  },
+  "301": {
+    "name": "WATER GATE",
+    "stage": 3,
+    "notes": ""
+  },
+  "302": {
+    "name": "FALLS",
+    "stage": 3,
+    "notes": ""
+  },
+  "303": {
+    "name": "HELIPORT",
+    "stage": 3,
+    "notes": ""
+  },
+  "304": {
+    "name": "SECOND HOUSE GATE",
+    "stage": 3,
+    "notes": ""
+  },
+  "305": {
+    "name": "FOUNTAIN",
+    "stage": 3,
+    "notes": ""
+  },
+  "306": {
+    "name": "ITEM PASSAGE",
+    "stage": 3,
+    "notes": ""
+  },
+  "307": {
+    "name": "LADDER PASSAGE",
+    "stage": 3,
+    "notes": ""
+  },
+  "308": {
+    "name": "BRANCH PASSAGE",
+    "stage": 3,
+    "notes": ""
+  },
+  "309": {
+    "name": "DARKNESS PASSAGE",
+    "stage": 3,
+    "notes": ""
+  },
+  "30A": {
+    "name": "ENRICO ROOM",
+    "stage": 3,
+    "notes": ""
+  },
+  "30B": {
+    "name": "ROCK PASSAGE",
+    "stage": 3,
+    "notes": ""
+  },
+  "30C": {
+    "name": "BLACK TIGER ROOM",
+    "stage": 3,
+    "notes": ""
+  },
+  "30D": {
+    "name": "STRAIGHT PASSAGE",
+    "stage": 3,
+    "notes": ""
+  },
+  "30E": {
+    "name": "SAVE ROOM",
+    "stage": 3,
+    "notes": ""
+  },
+  "30F": {
+    "name": "CRANK PASSAGE",
+    "stage": 3,
+    "notes": ""
+  },
+  "310": {
+    "name": "COURT TO LABO",
+    "stage": 3,
+    "notes": ""
+  },
+  "311": {
+    "name": "ROTATING HOLE",
+    "stage": 3,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "400": {
+    "name": "ENTER PASSAGE",
+    "stage": 4,
+    "notes": ""
+  },
+  "401": {
+    "name": "ROOM 001",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "402": {
+    "name": "ROOM 001 BATHROOM",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "403": {
+    "name": "SAVE ROOM",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "404": {
+    "name": "BAR",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "405": {
+    "name": "CENTER PASSAGE",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "406": {
+    "name": "ROOM 002",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "407": {
+    "name": "ROOM 002 BATHROOM",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "408": {
+    "name": "HONEYCOMB PASSAGE",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "409": {
+    "name": "DRUG STOREHOUSE",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "40A": {
+    "name": "ROOM 003",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "40B": {
+    "name": "ROOM 003 BATHROOM",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "40C": {
+    "name": "PLANT BOSS ROOM",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "40D": {
+    "name": "UNDER PASSAGE",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "40E": {
+    "name": "WATER TANK",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "40F": {
+    "name": "SECURITY ROOM",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "410": {
+    "name": "ARMS STOREHOUSE",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "411": {
+    "name": "CONTROL ROOM",
+    "stage": 4,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "500": {
+    "name": "UNDER FOUNTAIN",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "501": {
+    "name": "HELIPORT PASSAGE",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "502": {
+    "name": "LADDER ROOM",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "503": {
+    "name": "STAIRS",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "504": {
+    "name": "CONFERENCE ROOM",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "505": {
+    "name": "O PASSAGE",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "506": {
+    "name": "SMALL LABORATORY",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "507": {
+    "name": "MORTUARY",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "508": {
+    "name": "DOUBLE LOCK",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "509": {
+    "name": "PRIVATE ROOM A",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "50A": {
+    "name": "PRIVATE ROOM B",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "50B": {
+    "name": "FRONT OF CELL",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "50C": {
+    "name": "FRONT OF ELEVATOR",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "50D": {
+    "name": "ESCAPE ELEVATOR",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "50E": {
+    "name": "SAVE ROOM",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "50F": {
+    "name": "MAZE A",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "510": {
+    "name": "MAZE B",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "511": {
+    "name": "MOVIE ROOM",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "512": {
+    "name": "CELL",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "513": {
+    "name": "TYRANT ROOM",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "514": {
+    "name": "FRONT OF TYRANT",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  },
+  "515": {
+    "name": "B3 > B4 ELEVATOR",
+    "stage": 5,
+    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
+    "unverified": true
+  }
+}
