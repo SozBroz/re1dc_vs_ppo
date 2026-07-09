@@ -20,6 +20,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --training-speed 6400 ^
   --skip-chunk 600 ^
   --capture-checkpoints ^
-  --no-local-worker ^
   --batch-threshold 20480 ^
   --resume data/checkpoints/reward_tune_1040k/ppo_re1_11160000_steps.zip

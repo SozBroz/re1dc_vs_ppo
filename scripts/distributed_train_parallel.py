@@ -23,16 +23,17 @@ import sys
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.train_parallel import make_env  # noqa: E402
-from re1_rl.async_fleet import PPO_HYPERPARAMS  # noqa: E402
+from re1_rl.async_fleet import PPO_HYPERPARAMS, load_async_learner  # noqa: E402
 from re1_rl.distributed.learner_server import LearnerState, start_learner_server  # noqa: E402
 from re1_rl.distributed.learner_train import train_on_rollouts  # noqa: E402
 from re1_rl.distributed.log_util import log  # noqa: E402
-from re1_rl.distributed.spaces import make_re1_policy_spaces, make_re1_spaces  # noqa: E402
+from re1_rl.distributed.spaces import make_re1_policy_spaces  # noqa: E402
 from re1_rl.distributed.weight_store import WeightStore  # noqa: E402
 from re1_rl.distributed.weights import export_policy_state_dict  # noqa: E402
 from re1_rl.distributed.worker_client import WorkerClient  # noqa: E402
@@ -114,31 +115,8 @@ def _make_vec_env(args: argparse.Namespace):
 
 
 def _build_learner_model(args: argparse.Namespace, device: str):
-    import gymnasium as gym
-    from stable_baselines3 import PPO
-    from stable_baselines3.common.vec_env import DummyVecEnv
-
+    """Build learner PPO via monolithic ``load_async_learner`` (transplant + Maskable)."""
     from re1_rl.checkpoint_io import resolve_resume_path
-    from re1_rl.policy_config import POLICY_KWARGS
-
-    obs_space, act_space = make_re1_spaces()
-
-    class _StubEnv(gym.Env):
-        def __init__(self) -> None:
-            super().__init__()
-            self.observation_space = obs_space
-            self.action_space = act_space
-
-        def reset(self, *, seed=None, options=None):
-            super().reset(seed=seed)
-            obs = {k: space.sample() for k, space in self.observation_space.items()}
-            return obs, {}
-
-        def step(self, action):
-            obs, _ = self.reset()
-            return obs, 0.0, False, False, {}
-
-    env = DummyVecEnv([lambda: _StubEnv()])
 
     ckpt_dir = PROJECT_ROOT / "data" / "checkpoints"
     if args.run_name:
@@ -152,21 +130,15 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         raise RuntimeError(f"no valid checkpoint for --resume {args.resume!r}")
 
     tb_log = str(PROJECT_ROOT / "logs" / "tb")
-    hp = {
-        **PPO_HYPERPARAMS,
-        "n_steps": int(args.n_steps),
-        "verbose": 1,
-        "device": device,
-        "policy_kwargs": POLICY_KWARGS,
-        "tensorboard_log": tb_log,
-    }
+    if args.run_name:
+        tb_log = str(Path(tb_log) / args.run_name)
 
-    if resume_path:
-        model = PPO.load(str(resume_path), env=env, device=device)
-        model.tensorboard_log = tb_log
+    model = load_async_learner(device=device, resume=resume_path, tb_log=tb_log)
+    # Distributed train_on_rollouts builds its own buffer from worker n_steps;
+    # keep model.n_steps aligned with CLI for any SB3 helpers that read it.
+    model.n_steps = int(args.n_steps)
+    if resume_path is not None:
         log(args.machine_name, f"resumed learner from {resume_path}")
-    else:
-        model = PPO("MultiInputPolicy", env, **hp)
     return model, ckpt_dir
 
 
@@ -290,7 +262,7 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
 
 def _run_learner(args: argparse.Namespace) -> int:
     import torch
-    from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
+    from stable_baselines3.common.callbacks import CheckpointCallback
 
     from re1_rl.checkpoint_io import (
         atomic_model_save,
@@ -319,6 +291,9 @@ def _run_learner(args: argparse.Namespace) -> int:
     metrics_jsonl = training_metrics_jsonl_path(PROJECT_ROOT, run_name=args.run_name)
     metrics_cb = TrainingMetricsJsonlCallback(metrics_jsonl)
     log(args.machine_name, f"metrics jsonl -> {metrics_jsonl}")
+    from re1_rl.training_progress import TrainingProgressTracker
+
+    progress = TrainingProgressTracker(prefix="progress")
     weight_store = WeightStore()
     rollout_queue: queue.Queue = queue.Queue()
     learner_state = LearnerState(
@@ -365,31 +340,12 @@ def _run_learner(args: argparse.Namespace) -> int:
                 log(args.machine_name, f"checkpoint saved {saved}")
             return True
 
-    class ProgressCallback(BaseCallback):
-        def __init__(self) -> None:
-            super().__init__()
-            self.best_waypoint = 0
-            self.episodes = 0
-
-        def _on_step(self) -> bool:
-            return True
-
-        def _on_rollout_end(self) -> None:
-            ep_rew = self.model.ep_info_buffer
-            mean_rew = (sum(e["r"] for e in ep_rew) / len(ep_rew)) if ep_rew else float("nan")
-            log(
-                args.machine_name,
-                f"rollout steps={self.num_timesteps} ep_rew={mean_rew:.3f} "
-                f"best_wp={self.best_waypoint}",
-            )
-
     callbacks = [
         AtomicCheckpointCallback(
             save_freq=checkpoint_save_freq_vec_env(args.n_envs),
             save_path=str(ckpt_dir),
             name_prefix="ppo_re1",
         ),
-        ProgressCallback(),
         metrics_cb.get_callback(),
     ]
     for cb in callbacks:
@@ -415,6 +371,9 @@ def _run_learner(args: argparse.Namespace) -> int:
             if pending_steps < args.batch_threshold:
                 continue
 
+            batch_infos: list[dict[str, Any]] = []
+            for rollout in pending:
+                batch_infos.extend(rollout.episode_infos)
             trained = train_on_rollouts(model, pending)
             version = weight_store.publish(export_policy_state_dict(model))
             learner_state.set_current_version(version)
@@ -422,6 +381,12 @@ def _run_learner(args: argparse.Namespace) -> int:
                 args.machine_name,
                 f"trained {trained} steps from {len(pending)} rollouts -> "
                 f"policy_version={version} total={model.num_timesteps}",
+            )
+            progress.consume_infos(batch_infos, num_timesteps=int(model.num_timesteps))
+            progress.log_rollout_end(
+                model,
+                num_timesteps=int(model.num_timesteps),
+                episode_infos=batch_infos,
             )
             for cb in callbacks:
                 cb.on_rollout_end()

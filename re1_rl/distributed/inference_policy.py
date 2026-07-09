@@ -72,12 +72,16 @@ class InferencePolicy:
                 values = self._model.policy.predict_values(obs_tensor)
             return values.flatten().cpu().numpy()
 
-    def predict_masked(
+    def predict_masked_batch(
         self,
         obs: dict[str, np.ndarray],
         action_masks: np.ndarray,
-    ) -> tuple[int, float, float]:
-        """Sample one action with invalid logits masked to -inf."""
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Sample actions with invalid logits masked to -inf.
+
+        action_masks: bool array shaped (n_envs, n_actions) or (n_actions,) for one env.
+        Returns (actions, values, log_probs) arrays like predict_batch.
+        """
         with self._lock:
             obs = prepare_obs_for_policy(obs, self._model.observation_space)
             obs_tensor = obs_as_tensor(obs, self._device)
@@ -90,10 +94,19 @@ class InferencePolicy:
                 logits[~mask] = torch.finfo(logits.dtype).min
                 cat = torch.distributions.Categorical(logits=logits)
                 actions = cat.sample()
-                log_prob = cat.log_prob(actions)
+                log_probs = cat.log_prob(actions)
                 values = self._model.policy.predict_values(obs_tensor)
             return (
-                int(actions[0].item()),
-                float(values[0].item()),
-                float(log_prob[0].item()),
+                actions.cpu().numpy(),
+                values.flatten().cpu().numpy(),
+                log_probs.cpu().numpy(),
             )
+
+    def predict_masked(
+        self,
+        obs: dict[str, np.ndarray],
+        action_masks: np.ndarray,
+    ) -> tuple[int, float, float]:
+        """Sample one action with invalid logits masked to -inf."""
+        actions, values, log_probs = self.predict_masked_batch(obs, action_masks)
+        return int(actions[0]), float(values[0]), float(log_probs[0])

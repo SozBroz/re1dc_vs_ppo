@@ -27,26 +27,38 @@ def _obs_batch_for_one(obs: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
 
 
 def _policy_obs_and_act_spaces():
-    from re1_rl.distributed.spaces import make_re1_spaces
-    from re1_rl.distributed.weights import _SpaceHolderEnv
+    from re1_rl.distributed.spaces import make_re1_policy_spaces
 
-    obs_space, act_space = make_re1_spaces()
-    frame = obs_space.spaces["frame"]
-    chw_frame = frame.__class__(low=0, high=255, shape=(4, 84, 84), dtype=frame.dtype)
-    policy_obs_space = obs_space.__class__(
-        {**obs_space.spaces, "frame": chw_frame}
-    )
-    return policy_obs_space, act_space
+    return make_re1_policy_spaces()
 
 
 def _checkpoint_spaces_compatible(model) -> bool:
     policy_obs, act_space = _policy_obs_and_act_spaces()
     loaded_keys = set(model.observation_space.spaces.keys())
     current_keys = set(policy_obs.spaces.keys())
-    return (
-        loaded_keys == current_keys
-        and int(model.action_space.n) == int(act_space.n)
-    )
+    if loaded_keys != current_keys:
+        return False
+    if int(model.action_space.n) != int(act_space.n):
+        return False
+    for key, space in policy_obs.spaces.items():
+        if tuple(model.observation_space.spaces[key].shape) != tuple(space.shape):
+            return False
+    return True
+
+
+def _copy_compatible_policy_weights(src_policy, dst_policy) -> int:
+    """Copy tensors that exist in both policies with identical shapes.
+
+    ``strict=False`` still errors on shape mismatches for shared keys; filter first.
+    """
+    src = src_policy.state_dict()
+    dst = dst_policy.state_dict()
+    filtered = {
+        k: v for k, v in src.items()
+        if k in dst and tuple(dst[k].shape) == tuple(v.shape)
+    }
+    dst_policy.load_state_dict(filtered, strict=False)
+    return len(filtered)
 
 
 def _transplant_into_current_spaces(model, *, tb_log: str | None, hp: dict):
@@ -61,11 +73,11 @@ def _transplant_into_current_spaces(model, *, tb_log: str | None, hp: dict):
         tensorboard_log=tb_log,
         **hp,
     )
-    fresh.policy.load_state_dict(model.policy.state_dict(), strict=False)
+    n_copied = _copy_compatible_policy_weights(model.policy, fresh.policy)
     fresh.num_timesteps = int(model.num_timesteps)
     print(
         "[train:async] checkpoint obs/action layout mismatch; "
-        "transplanted weights into current architecture (strict=False)",
+        f"transplanted {n_copied} compatible tensors into current architecture",
         flush=True,
     )
     return fresh
@@ -83,45 +95,39 @@ def load_async_learner(*, device: str, resume: Path | None, tb_log: str | None):
         hp["tensorboard_log"] = tb_log
 
     if resume is not None and resume.is_file():
+        loaded = None
         try:
-            model = PPO.load(str(resume), device=device)
-            if tb_log:
-                model.tensorboard_log = tb_log
-            print(
-                f"[train:async] resumed PPO from {resume} "
-                f"(num_timesteps={model.num_timesteps})",
-                flush=True,
-            )
-            if not _checkpoint_spaces_compatible(model):
-                model = _transplant_into_current_spaces(
-                    model, tb_log=tb_log, hp=hp,
-                )
-            return model
+            loaded = PPO.load(str(resume), device=device)
+            load_kind = "PPO"
         except (TypeError, ValueError, RuntimeError):
-            pass
-        try:
-            from sb3_contrib import MaskablePPO
+            try:
+                from sb3_contrib import MaskablePPO
 
-            maskable = MaskablePPO.load(str(resume), device=device)
-            model = PPO(
-                "MultiInputPolicy",
-                _SpaceHolderEnv(maskable.observation_space, maskable.action_space),
-                tensorboard_log=tb_log,
-                **hp,
-            )
-            model.policy.load_state_dict(maskable.policy.state_dict())
-            model.num_timesteps = int(maskable.num_timesteps)
-            print(
-                f"[train:async] resumed MaskablePPO weights into PPO from {resume}",
-                flush=True,
-            )
-            if not _checkpoint_spaces_compatible(model):
-                model = _transplant_into_current_spaces(
-                    model, tb_log=tb_log, hp=hp,
+                maskable = MaskablePPO.load(str(resume), device=device)
+                loaded = PPO(
+                    "MultiInputPolicy",
+                    _SpaceHolderEnv(maskable.observation_space, maskable.action_space),
+                    tensorboard_log=tb_log,
+                    **hp,
                 )
-            return model
-        except (TypeError, ValueError, RuntimeError) as exc:
-            raise RuntimeError(f"failed to load resume checkpoint {resume}") from exc
+                _copy_compatible_policy_weights(maskable.policy, loaded.policy)
+                loaded.num_timesteps = int(maskable.num_timesteps)
+                load_kind = "MaskablePPO"
+            except (TypeError, ValueError, RuntimeError) as exc:
+                raise RuntimeError(f"failed to load resume checkpoint {resume}") from exc
+
+        if tb_log:
+            loaded.tensorboard_log = tb_log
+        print(
+            f"[train:async] resumed {load_kind} from {resume} "
+            f"(num_timesteps={loaded.num_timesteps})",
+            flush=True,
+        )
+        if not _checkpoint_spaces_compatible(loaded):
+            loaded = _transplant_into_current_spaces(
+                loaded, tb_log=tb_log, hp=hp,
+            )
+        return loaded
 
     policy_obs_space, act_space = _policy_obs_and_act_spaces()
     return PPO(

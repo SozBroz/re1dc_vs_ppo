@@ -14,5 +14,4 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --training-speed 6400 ^
   --skip-chunk 600 ^
   --capture-checkpoints ^
-  --no-local-worker ^
   --batch-threshold 20480 >> data\logs\learner_wh2.log 2>&1

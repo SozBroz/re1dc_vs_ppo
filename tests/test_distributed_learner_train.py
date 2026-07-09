@@ -5,42 +5,27 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import gymnasium as gym
 import numpy as np
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.distributed.learner_train import train_on_rollouts
 from re1_rl.env import ACTION_NAMES
 from re1_rl.distributed.rollout_types import WorkerRollout
-from re1_rl.distributed.spaces import make_re1_spaces
+from re1_rl.distributed.spaces import make_re1_policy_spaces, make_re1_spaces
+from re1_rl.distributed.weights import _SpaceHolderEnv
 from re1_rl.policy_config import POLICY_KWARGS
 
 N_ACTIONS = len(ACTION_NAMES)
 
 
 def _tiny_model() -> PPO:
-    obs_space, act_space = make_re1_spaces()
-
-    class _StubEnv(gym.Env):
-        def __init__(self) -> None:
-            super().__init__()
-            self.observation_space = obs_space
-            self.action_space = act_space
-
-        def reset(self, *, seed=None, options=None):
-            return {k: s.sample() for k, s in self.observation_space.items()}, {}
-
-        def step(self, action):
-            obs, _ = self.reset()
-            return obs, 0.0, False, False, {}
-
-    env = DummyVecEnv([lambda: _StubEnv()])
+    """Learner-shaped PPO (CHW frame), matching load_async_learner / workers."""
+    obs_space, act_space = make_re1_policy_spaces()
     return PPO(
         "MultiInputPolicy",
-        env,
+        _SpaceHolderEnv(obs_space, act_space),
         policy_kwargs=POLICY_KWARGS,
         n_steps=8,
         batch_size=8,

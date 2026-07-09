@@ -67,8 +67,7 @@ python scripts/prune_checkpoints.py --keep 5
 
 | Machine | `--base-port` | `--n-envs` | Bottleneck |
 |---------|---------------|------------|------------|
-| workhorse2 (learner) | 5555 | — | GPU train bursts; `--no-local-worker` |
-| workhorse2 (local worker) | 5555 | 16 | ~32 GB RAM, 28 threads |
+| workhorse2 (learner + local worker) | 5555 | 20 | GPU train bursts; ~32 GB RAM |
 | workhorse1 | 5655 | 8 | **8 CPU threads** (~90% target) |
 | pking | 5755 | 12 | **~48 GB RAM** (~900 MB/EmuHawk) |
 
@@ -96,6 +95,8 @@ set LEARNER_HOST=192.168.0.111
 ```
 
 Or edit `fleet/local/run_distributed_worker.cmd` and set `MACHINE_NAME`.
+
+**workhorse1:** start the worker from an **interactive session** on the box (RDP or local console). Bare SSH often fails to spawn BizHawk `SubprocVecEnv` children.
 
 ---
 

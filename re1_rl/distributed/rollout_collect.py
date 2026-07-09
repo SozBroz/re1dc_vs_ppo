@@ -11,6 +11,12 @@ from re1_rl.distributed.inference_policy import InferencePolicy
 from re1_rl.distributed.rollout_types import WorkerRollout
 
 
+def _stack_action_masks(vec_env: VecEnv) -> np.ndarray:
+    """Fetch per-env bool masks via ActionMasker / env.action_masks()."""
+    masks = vec_env.env_method("action_masks")
+    return np.stack([np.asarray(m, dtype=bool) for m in masks], axis=0)
+
+
 def collect_rollout(
     vec_env: VecEnv,
     policy: InferencePolicy,
@@ -35,7 +41,8 @@ def collect_rollout(
     episode_infos: list[dict[str, Any]] = []
 
     for step in range(n_steps):
-        act, val, lp = policy.predict_batch(obs)
+        masks = _stack_action_masks(vec_env)
+        act, val, lp = policy.predict_masked_batch(obs, masks)
         actions[step] = act
         values[step] = val
         log_probs[step] = lp
