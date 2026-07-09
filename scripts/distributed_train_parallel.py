@@ -60,12 +60,26 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--bind-host", default="0.0.0.0", help="learner HTTP bind address")
     ap.add_argument("--batch-threshold", type=int, default=20480,
                     help="timesteps queued before learner train() (default ~6.5 rollouts @ 12 envs)")
-    ap.add_argument("--max-staleness", type=int, default=5,
-                    help="reject rollouts older than current_version - K")
+    ap.add_argument(
+        "--max-staleness",
+        type=int,
+        default=40,
+        help=(
+            "reject rollouts older than current_version - K "
+            "(default 40: survive ~6+ min weight lag while learner trains)"
+        ),
+    )
     ap.add_argument("--warmup-timeout", type=float, default=600.0,
                     help="seconds to wait for learner weights on worker start")
-    ap.add_argument("--weight-sync-poll-s", type=float, default=360.0,
-                    help="seconds between remote weight polls (default 6 min)")
+    ap.add_argument(
+        "--weight-sync-poll-s",
+        type=float,
+        default=360.0,
+        help=(
+            "seconds between remote FULL weight downloads "
+            "(default 360 = 6 min; only path that ships policy bytes)"
+        ),
+    )
     ap.add_argument("--no-local-worker", action="store_true",
                     help="learner role without co-located BizHawk fleet")
     ap.add_argument(

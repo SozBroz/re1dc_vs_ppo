@@ -21,4 +21,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --skip-chunk 600 ^
   --capture-checkpoints ^
   --batch-threshold 20480 ^
+  --max-staleness 40 ^
   --resume data/checkpoints/reward_tune_1040k/ppo_re1_11160000_steps.zip

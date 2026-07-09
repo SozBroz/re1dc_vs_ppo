@@ -26,7 +26,6 @@ from re1_rl.distributed.inference_policy import InferencePolicy
 from re1_rl.distributed.log_util import log
 from re1_rl.distributed.rollout_types import WorkerRollout
 from re1_rl.distributed.worker_client import WorkerClient
-from re1_rl.distributed.worker_runtime import _try_sync_remote_weights
 
 
 def worker_rollout_from_actor_msg(
@@ -175,7 +174,6 @@ def run_async_worker_loop(
         for conn in parent_conns:
             conn.send({"t": "start"})
 
-        local_version = policy.policy_version
         while not stop_event.is_set() and not stop_flag.value:
             if policy.policy_version <= 0:
                 time.sleep(0.1)
@@ -196,13 +194,8 @@ def run_async_worker_loop(
                 if kind == "need":
                     _serve_need(conn, msg, policy)
                 elif kind == "rollout":
-                    if not is_local and isinstance(rollout_sink, WorkerClient):
-                        local_version = _try_sync_remote_weights(
-                            rollout_sink,
-                            policy,
-                            machine_name=machine_name,
-                            local_version=local_version,
-                        )
+                    # Weight sync is background-only (--weight-sync-poll-s).
+                    # Do not GET /weights on every actor rollout.
                     rollout = worker_rollout_from_actor_msg(
                         msg,
                         policy=policy,

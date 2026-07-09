@@ -44,8 +44,13 @@ def _remote_weight_sync_loop(
     *,
     machine_name: str,
     stop_event: threading.Event,
-    poll_s: float = 1.0,
+    poll_s: float = 360.0,
 ) -> None:
+    """Pull full weights at most once per ``poll_s`` (default 6 min).
+
+    This is the only remote full-weight download path. Rollout boundaries must
+    not call ``GET /weights`` — that caused multi-MB syncs every actor finish.
+    """
     local_version = 0
     while not stop_event.is_set():
         try:
@@ -53,10 +58,16 @@ def _remote_weight_sync_loop(
             if version > local_version and data:
                 policy.load_from_bytes(data, version)
                 local_version = version
-                log(machine_name, f"remote weight sync -> policy_version={version}")
+                log(
+                    machine_name,
+                    f"remote weight sync -> policy_version={version} "
+                    f"(poll_s={poll_s:.0f})",
+                )
         except Exception as exc:
             log(machine_name, f"weight sync error: {exc}")
-        time.sleep(poll_s)
+        # Sleep after the attempt so the first post-warmup pull waits poll_s
+        # (warmup already loaded current weights).
+        stop_event.wait(poll_s)
 
 
 def warmup_local_policy(
@@ -123,19 +134,15 @@ def run_worker_loop(
     rollout_sink: queue.Queue | WorkerClient,
     is_local: bool,
 ) -> None:
+    """Legacy SubprocVecEnv loop (unused by distributed entry; kept for tests).
+
+    Remote full weight sync is background-only via ``_remote_weight_sync_loop``.
+    """
     log(machine_name, f"worker loop started ({worker_id}, {vec_env.num_envs} envs)")
-    local_version = policy.policy_version
     while not stop_event.is_set():
         if policy.policy_version <= 0:
             time.sleep(0.1)
             continue
-        if not is_local and isinstance(rollout_sink, WorkerClient):
-            local_version = _try_sync_remote_weights(
-                rollout_sink,
-                policy,
-                machine_name=machine_name,
-                local_version=local_version,
-            )
         rollout = collect_rollout(
             vec_env,
             policy,
