@@ -28,7 +28,6 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.train_parallel import make_env  # noqa: E402
 from re1_rl.async_fleet import PPO_HYPERPARAMS, load_async_learner  # noqa: E402
 from re1_rl.distributed.learner_server import LearnerState, start_learner_server  # noqa: E402
 from re1_rl.distributed.learner_train import train_on_rollouts  # noqa: E402
@@ -37,10 +36,10 @@ from re1_rl.distributed.spaces import make_re1_policy_spaces  # noqa: E402
 from re1_rl.distributed.weight_store import WeightStore  # noqa: E402
 from re1_rl.distributed.weights import export_policy_state_dict  # noqa: E402
 from re1_rl.distributed.worker_client import WorkerClient  # noqa: E402
+from re1_rl.distributed.async_worker_runtime import run_async_worker_loop  # noqa: E402
 from re1_rl.distributed.worker_runtime import (  # noqa: E402
     _local_weight_sync_loop,
     _remote_weight_sync_loop,
-    run_worker_loop,
     warmup_local_policy,
     warmup_remote_policy,
 )
@@ -92,26 +91,6 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--skip-chunk", type=int, default=600,
                     help="max frames per Lua fast_forward round-trip (default 600)")
     return ap
-
-
-def _make_vec_env(args: argparse.Namespace):
-    from stable_baselines3.common.vec_env import SubprocVecEnv
-
-    return SubprocVecEnv(
-        [
-            make_env(
-                i,
-                args.curriculum,
-                args.base_port,
-                args.capture_checkpoints,
-                training_speed=int(args.training_speed),
-                skip_chunk=int(args.skip_chunk),
-                async_cutscene_skip=True,
-            )
-            for i in range(args.n_envs)
-        ],
-        start_method="spawn",
-    )
 
 
 def _build_learner_model(args: argparse.Namespace, device: str):
@@ -180,21 +159,24 @@ def _run_local_worker(
         )
         sync_thread.start()
 
-        vec_env = _make_vec_env(args)
         try:
-            run_worker_loop(
-                vec_env,
+            run_async_worker_loop(
                 policy,
                 machine_name=args.machine_name,
                 worker_id=worker_id,
-                n_steps=args.n_steps,
+                n_envs=int(args.n_envs),
+                n_steps=int(args.n_steps),
+                curriculum=args.curriculum,
+                base_port=int(args.base_port),
+                training_speed=int(args.training_speed),
+                skip_chunk=int(args.skip_chunk),
+                capture_checkpoints=bool(args.capture_checkpoints),
                 stop_event=stop_event,
                 rollout_sink=rollout_queue,
                 is_local=True,
             )
         finally:
             sync_stop.set()
-            vec_env.close()
 
     threading.Thread(target=_warmup_then_run, name="local-worker", daemon=True).start()
 
@@ -239,14 +221,18 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
     )
     sync_thread.start()
 
-    vec_env = _make_vec_env(args)
     try:
-        run_worker_loop(
-            vec_env,
+        run_async_worker_loop(
             policy,
             machine_name=args.machine_name,
             worker_id=worker_id,
-            n_steps=args.n_steps,
+            n_envs=int(args.n_envs),
+            n_steps=int(args.n_steps),
+            curriculum=args.curriculum,
+            base_port=int(args.base_port),
+            training_speed=int(args.training_speed),
+            skip_chunk=int(args.skip_chunk),
+            capture_checkpoints=bool(args.capture_checkpoints),
             stop_event=stop_event,
             rollout_sink=client,
             is_local=False,
@@ -256,7 +242,6 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
     finally:
         stop_event.set()
         sync_stop.set()
-        vec_env.close()
     return 0
 
 

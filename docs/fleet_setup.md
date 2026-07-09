@@ -10,6 +10,8 @@
 
 Workers **never** load policy from disk; they pull weights from the learner at warmup and hot-sync after each train step.
 
+**Collection path:** each worker box runs the same **desync async actors** as monolithic `train_parallel.py` (`re1_rl/distributed/async_worker_runtime.py` + `async_fleet._actor_process`). Inference is local; only completed rollouts cross the network. Synced `SubprocVecEnv` is no longer used for distributed workers.
+
 Monolithic single-box training remains: `scripts/train_parallel.py` (async fleet) or `scripts/launch_fleet_grid.py`.
 
 ---
@@ -96,7 +98,7 @@ set LEARNER_HOST=192.168.0.111
 
 Or edit `fleet/local/run_distributed_worker.cmd` and set `MACHINE_NAME`.
 
-**workhorse1:** start the worker from an **interactive session** on the box (RDP or local console). Bare SSH often fails to spawn BizHawk `SubprocVecEnv` children.
+**workhorse1:** start the worker from an **interactive session** on the box (RDP or local console). Bare SSH often fails to spawn BizHawk actor children.
 
 ---
 
@@ -113,6 +115,6 @@ Metrics JSONL: `logs/training_metrics_<run-name>.jsonl`
 
 ## Parity with `train_parallel.py`
 
-Distributed workers use the same `make_env()` factory (training speed, skip chunk, async cutscene skip, capture checkpoints). Obs dict matches guidebook keys (`inventory`, `history`, `acquisitions`, `room_enemies`, `keys_held`). PPO hyperparams come from `re1_rl.async_fleet.PPO_HYPERPARAMS`.
+Distributed workers use the same `make_env()` factory via async actors (training speed, skip chunk, async cutscene skip, capture checkpoints, action masks). Obs dict matches guidebook keys. PPO hyperparams come from `re1_rl.async_fleet.PPO_HYPERPARAMS`.
 
 See `tests/test_distributed_parity.py`.

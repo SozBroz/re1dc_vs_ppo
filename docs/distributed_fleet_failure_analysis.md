@@ -92,21 +92,16 @@ act, val, lp = policy.predict_batch(obs)  # no masks
 ## P0 — fleet deployment vs spec
 
 1. Remove `--no-local-worker` from WH2 learner launchers; run local fleet on learner host.
-2. WH1 worker must launch **interactively on the box** (RDP/console), not bare SSH SubprocVecEnv.
-3. Cap pking at **12 envs** until async actors land (24 was RAM-tight).
+2. WH1 worker must launch **interactively on the box** (RDP/console), not bare SSH.
+3. Cap pking at **12 envs** until RAM headroom is confirmed (24 was tight).
 
 ---
 
-## P1 — SubprocVecEnv vs async_fleet
+## P1 — SubprocVecEnv vs async_fleet — **FIXED (async on every box)**
 
-| | Monolithic default | Distributed workers |
-|--|-------------------|---------------------|
-| Orchestration | Desync actors, central batched inference | Synced `SubprocVecEnv` |
-| RAM | Slim actors | ~900 MB/EmuHawk |
-| Inference | Masked | Unmasked (bug) |
-| Train batching | `n_steps × n_envs` | Fixed `batch_threshold` (was 3072 overnight; code default now 20480) |
+Distributed workers now use `re1_rl/distributed/async_worker_runtime.py` (same `_actor_process` as monolithic). Expect ~30% faster step collection vs the old synced SubprocVecEnv path on the same box.
 
-Longer-term: replace worker SubprocVecEnv with async_fleet-style actors; shrink rollout payload (don’t ship full frames if not needed).
+Remaining follow-up: shrink rollout HTTP payload (frames still uploaded).
 
 ---
 
