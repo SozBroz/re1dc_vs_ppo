@@ -97,6 +97,21 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="deprecated alias for --sync-interval-s",
     )
+    ap.add_argument(
+        "--worker-liveness-s",
+        type=float,
+        default=90.0,
+        help="drop remote workers with no heartbeat for this many seconds (default 90)",
+    )
+    ap.add_argument(
+        "--epoch-grace-s",
+        type=float,
+        default=120.0,
+        help=(
+            "after sync_interval, wait up to this many extra seconds for all "
+            "live workers to contribute before training (default 120)"
+        ),
+    )
     ap.add_argument("--no-local-worker", action="store_true",
                     help="learner role without co-located BizHawk fleet")
     ap.add_argument(
@@ -177,12 +192,16 @@ def _run_local_worker(
     rollout_queue: queue.Queue,
     stop_event: threading.Event,
     device: str,
+    learner_state: LearnerState | None = None,
 ) -> None:
     from re1_rl.distributed.inference_policy import InferencePolicy
 
     obs_space, act_space = make_re1_policy_spaces()
     policy = InferencePolicy(obs_space, act_space, device)
     worker_id = args.worker_id or args.machine_name
+    sync_interval = float(args.sync_interval_s)
+    if args.weight_sync_poll_s is not None:
+        sync_interval = float(args.weight_sync_poll_s)
 
     sync_stop = threading.Event()
 
@@ -198,6 +217,14 @@ def _run_local_worker(
             log(args.machine_name, f"local worker warmup failed: {exc}")
             stop_event.set()
             return
+
+        if learner_state is not None:
+            learner_state.register_worker(
+                worker_id,
+                n_envs=int(args.n_envs),
+                hostname=args.machine_name,
+                is_local=True,
+            )
 
         sync_thread = threading.Thread(
             target=_local_weight_sync_loop,
@@ -223,9 +250,12 @@ def _run_local_worker(
                 stop_event=stop_event,
                 rollout_sink=rollout_queue,
                 is_local=True,
+                sync_interval_s=sync_interval,
             )
         finally:
             sync_stop.set()
+            if learner_state is not None:
+                learner_state.unregister_worker(worker_id)
 
     threading.Thread(target=_warmup_then_run, name="local-worker", daemon=True).start()
 
@@ -329,6 +359,7 @@ def _run_learner(args: argparse.Namespace) -> int:
         rollout_queue,
         machine_name=args.machine_name,
         max_staleness=args.max_staleness,
+        worker_liveness_s=float(args.worker_liveness_s),
     )
 
     http_server, _http_thread = start_learner_server(
@@ -351,6 +382,7 @@ def _run_learner(args: argparse.Namespace) -> int:
             rollout_queue=rollout_queue,
             stop_event=stop_event,
             device=device,
+            learner_state=learner_state,
         )
     else:
         log(args.machine_name, "local worker disabled (--no-local-worker)")
@@ -382,6 +414,13 @@ def _run_learner(args: argparse.Namespace) -> int:
     pending: list = []
     pending_steps = 0
     epoch_t0 = time.monotonic()
+    epoch_grace = float(args.epoch_grace_s)
+    waiting_for_fleet = False
+    epoch_id, expected = learner_state.begin_epoch()
+    log(
+        args.machine_name,
+        f"epoch {epoch_id} started; waiting for live workers={expected or '(none yet)'}",
+    )
 
     try:
         while model.num_timesteps < train_steps and not stop_event.is_set():
@@ -397,18 +436,58 @@ def _run_learner(args: argparse.Namespace) -> int:
             except queue.Empty:
                 pass
 
-            if (time.monotonic() - epoch_t0) < sync_interval:
+            elapsed = time.monotonic() - epoch_t0
+            status = learner_state.epoch_status()
+
+            # Before sync_interval: keep collecting.
+            if elapsed < sync_interval:
                 continue
+
+            # After sync_interval: wait for all currently-expected live workers,
+            # but do not block forever if pking disappears (liveness + grace).
+            if not waiting_for_fleet:
+                waiting_for_fleet = True
+                # Refresh expected set once the collect window ends so late
+                # joiners (pking) that registered during the window are included.
+                if status["n_expected"] == 0 and learner_state.live_workers():
+                    epoch_id, expected = learner_state.begin_epoch()
+                    status = learner_state.epoch_status()
+                    log(
+                        args.machine_name,
+                        f"epoch {epoch_id} expected refreshed at barrier: {expected}",
+                    )
+                log(
+                    args.machine_name,
+                    f"epoch {status['epoch_id']} collect window done; "
+                    f"expected={status['expected']} missing={status['missing']}",
+                )
+
+            if status["n_expected"] == 0:
+                # No live workers yet — do not train; keep waiting for register.
+                continue
+
             if not pending:
-                epoch_t0 = time.monotonic()
+                if elapsed >= sync_interval + epoch_grace:
+                    epoch_id, expected = learner_state.begin_epoch()
+                    epoch_t0 = time.monotonic()
+                    waiting_for_fleet = False
+                    log(
+                        args.machine_name,
+                        f"epoch {epoch_id} restart (empty); expected={expected}",
+                    )
                 continue
-            # Optional soft floor: wait a bit longer if under threshold.
-            if (
-                args.batch_threshold > 0
-                and pending_steps < args.batch_threshold
-                and (time.monotonic() - epoch_t0) < sync_interval * 1.5
-            ):
+
+            fleet_ready = bool(status["ready"])
+            grace_expired = elapsed >= sync_interval + epoch_grace
+            if not fleet_ready and not grace_expired:
                 continue
+
+            if not fleet_ready and grace_expired:
+                log(
+                    args.machine_name,
+                    f"epoch {status['epoch_id']} grace expired; training without "
+                    f"{status['missing']} (live={status['n_live']})",
+                )
 
             batch_infos: list[dict[str, Any]] = []
             for rollout in pending:
@@ -418,7 +497,8 @@ def _run_learner(args: argparse.Namespace) -> int:
             learner_state.set_current_version(version)
             log(
                 args.machine_name,
-                f"epoch train {trained} steps from {len(pending)} rollouts -> "
+                f"epoch train {trained} steps from {len(pending)} rollouts "
+                f"contributors={status['contributors']} -> "
                 f"policy_version={version} total={model.num_timesteps}",
             )
             progress.consume_infos(batch_infos, num_timesteps=int(model.num_timesteps))
@@ -432,7 +512,13 @@ def _run_learner(args: argparse.Namespace) -> int:
                 cb.on_step()
             pending.clear()
             pending_steps = 0
+            epoch_id, expected = learner_state.begin_epoch()
             epoch_t0 = time.monotonic()
+            waiting_for_fleet = False
+            log(
+                args.machine_name,
+                f"epoch {epoch_id} started; expected={expected or '(none yet)'}",
+            )
 
     except KeyboardInterrupt:
         log(args.machine_name, "learner interrupted")

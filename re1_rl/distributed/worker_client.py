@@ -66,11 +66,12 @@ class WorkerClient:
         payload = json.loads(body.decode("utf-8"))
         return int(payload["policy_version"]), b""
 
-    def register(self, worker_id: str, n_envs: int) -> None:
+    def register(self, worker_id: str, n_envs: int, *, is_local: bool = False) -> None:
         payload = {
             "worker_id": worker_id,
             "n_envs": n_envs,
             "hostname": socket.gethostname(),
+            "is_local": is_local,
         }
         code, _ = self._request(
             "POST",
@@ -80,6 +81,33 @@ class WorkerClient:
         )
         if code != 200:
             raise RuntimeError(f"POST /register failed with HTTP {code}")
+
+    def heartbeat(self, worker_id: str, n_envs: int) -> None:
+        payload = {
+            "worker_id": worker_id,
+            "n_envs": n_envs,
+            "hostname": socket.gethostname(),
+        }
+        code, _ = self._request(
+            "POST",
+            "/heartbeat",
+            data=json.dumps(payload).encode("utf-8"),
+            content_type="application/json",
+        )
+        if code != 200:
+            raise RuntimeError(f"POST /heartbeat failed with HTTP {code}")
+
+    def unregister(self, worker_id: str) -> None:
+        payload = {"worker_id": worker_id}
+        try:
+            self._request(
+                "POST",
+                "/unregister",
+                data=json.dumps(payload).encode("utf-8"),
+                content_type="application/json",
+            )
+        except Exception:
+            pass
 
     def upload_rollout(self, rollout: WorkerRollout) -> bool:
         body = encode_rollout(rollout)

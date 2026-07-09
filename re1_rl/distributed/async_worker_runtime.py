@@ -192,6 +192,42 @@ def _flush_remote_epoch(
     return []
 
 
+def _flush_local_epoch(
+    buffered: list[WorkerRollout],
+    *,
+    rollout_sink: queue.Queue,
+    machine_name: str,
+    worker_id: str,
+) -> list[WorkerRollout]:
+    if not buffered:
+        log(machine_name, "sync epoch (local): no rollouts buffered")
+        return []
+    total_steps = sum(r.num_timesteps() for r in buffered)
+    # Deliver as packed chunks so learner sees one contribution burst.
+    chunk: list[WorkerRollout] = []
+    chunk_envs = 0
+    pack_max_envs = 16
+    n_posts = 0
+    for r in buffered:
+        if chunk and chunk_envs + r.n_envs > pack_max_envs:
+            packed = pack_rollouts(chunk, worker_id=worker_id)
+            rollout_sink.put(packed)
+            n_posts += 1
+            chunk, chunk_envs = [], 0
+        chunk.append(r)
+        chunk_envs += r.n_envs
+    if chunk:
+        packed = pack_rollouts(chunk, worker_id=worker_id)
+        rollout_sink.put(packed)
+        n_posts += 1
+    log(
+        machine_name,
+        f"sync epoch (local) flushed {len(buffered)} actor-rollouts "
+        f"({total_steps} steps, {n_posts} queue puts)",
+    )
+    return []
+
+
 def _shutdown_actors(
     stop_flag: mp.synchronize.Synchronized,
     parent_conns: list[Connection],
@@ -229,11 +265,13 @@ def run_async_worker_loop(
     rollout_sink: queue.Queue | WorkerClient,
     is_local: bool,
     sync_interval_s: float = DEFAULT_SYNC_INTERVAL_S,
+    heartbeat_s: float = 30.0,
 ) -> None:
     """Spawn desync actors and serve local inference until ``stop_event``.
 
-    Remotes buffer rollouts and every ``sync_interval_s`` upload then pull
-    weights (one network epoch). Local workers enqueue each rollout immediately.
+    Both local and remote workers buffer rollouts and flush every
+    ``sync_interval_s``. Remotes then pull weights; locals only enqueue.
+    Remotes also heartbeat so the learner can drop dead machines.
     """
     log(
         machine_name,
@@ -246,6 +284,22 @@ def run_async_worker_loop(
     parent_conns: list[Connection] = []
     buffered: list[WorkerRollout] = []
     epoch_t0 = time.monotonic()
+    last_heartbeat = 0.0
+    hb_stop = threading.Event()
+
+    def _heartbeat_loop() -> None:
+        if is_local or not isinstance(rollout_sink, WorkerClient):
+            return
+        while not hb_stop.is_set() and not stop_event.is_set():
+            try:
+                rollout_sink.heartbeat(worker_id, n_envs)
+            except Exception as exc:
+                log(machine_name, f"heartbeat error: {exc}")
+            hb_stop.wait(heartbeat_s)
+
+    hb_thread = threading.Thread(
+        target=_heartbeat_loop, name="worker-heartbeat", daemon=True
+    )
 
     try:
         for rank in range(n_envs):
@@ -274,23 +328,35 @@ def run_async_worker_loop(
         for conn in parent_conns:
             conn.send({"t": "start"})
 
+        if not is_local and isinstance(rollout_sink, WorkerClient):
+            try:
+                rollout_sink.heartbeat(worker_id, n_envs)
+                last_heartbeat = time.monotonic()
+            except Exception as exc:
+                log(machine_name, f"initial heartbeat error: {exc}")
+            hb_thread.start()
+
         while not stop_event.is_set() and not stop_flag.value:
             if policy.policy_version <= 0:
                 time.sleep(0.1)
                 continue
 
-            if (
-                not is_local
-                and isinstance(rollout_sink, WorkerClient)
-                and (time.monotonic() - epoch_t0) >= sync_interval_s
-            ):
-                buffered = _flush_remote_epoch(
-                    buffered,
-                    client=rollout_sink,
-                    policy=policy,
-                    machine_name=machine_name,
-                    worker_id=worker_id,
-                )
+            if (time.monotonic() - epoch_t0) >= sync_interval_s:
+                if is_local and isinstance(rollout_sink, queue.Queue):
+                    buffered = _flush_local_epoch(
+                        buffered,
+                        rollout_sink=rollout_sink,
+                        machine_name=machine_name,
+                        worker_id=worker_id,
+                    )
+                elif isinstance(rollout_sink, WorkerClient):
+                    buffered = _flush_remote_epoch(
+                        buffered,
+                        client=rollout_sink,
+                        policy=policy,
+                        machine_name=machine_name,
+                        worker_id=worker_id,
+                    )
                 epoch_t0 = time.monotonic()
 
             ready = wait(parent_conns, timeout=1.0)
@@ -314,30 +380,32 @@ def run_async_worker_loop(
                         worker_id=worker_id,
                         n_steps=n_steps,
                     )
-                    if is_local:
-                        assert isinstance(rollout_sink, queue.Queue)
-                        _deliver_local(
-                            rollout,
-                            machine_name=machine_name,
-                            rollout_sink=rollout_sink,
-                        )
-                    else:
-                        buffered.append(rollout)
+                    buffered.append(rollout)
                 elif kind in ("spawn_progress", "spawned", "spawn_error"):
                     continue
 
-        if (
-            not is_local
-            and isinstance(rollout_sink, WorkerClient)
-            and buffered
-        ):
-            _flush_remote_epoch(
-                buffered,
-                client=rollout_sink,
-                policy=policy,
-                machine_name=machine_name,
-                worker_id=worker_id,
-            )
+        if buffered:
+            if is_local and isinstance(rollout_sink, queue.Queue):
+                _flush_local_epoch(
+                    buffered,
+                    rollout_sink=rollout_sink,
+                    machine_name=machine_name,
+                    worker_id=worker_id,
+                )
+            elif isinstance(rollout_sink, WorkerClient):
+                _flush_remote_epoch(
+                    buffered,
+                    client=rollout_sink,
+                    policy=policy,
+                    machine_name=machine_name,
+                    worker_id=worker_id,
+                )
     finally:
+        hb_stop.set()
+        if not is_local and isinstance(rollout_sink, WorkerClient):
+            try:
+                rollout_sink.unregister(worker_id)
+            except Exception:
+                pass
         _shutdown_actors(stop_flag, parent_conns, processes)
         log(machine_name, "async worker loop stopped")

@@ -6,6 +6,7 @@ import base64
 import json
 import queue
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -16,6 +17,11 @@ from re1_rl.distributed.rollout_types import WorkerRollout
 from re1_rl.distributed.weight_store import WeightStore
 
 
+def base_worker_id(worker_id: str) -> str:
+    """Strip ``:actor_N`` suffix so contribution is per machine."""
+    return str(worker_id).split(":", 1)[0]
+
+
 class LearnerState:
     def __init__(
         self,
@@ -24,20 +30,141 @@ class LearnerState:
         *,
         machine_name: str,
         max_staleness: int,
+        worker_liveness_s: float = 90.0,
     ) -> None:
         self.weight_store = weight_store
         self.rollout_queue = rollout_queue
         self.machine_name = machine_name
         self.max_staleness = max_staleness
+        self.worker_liveness_s = float(worker_liveness_s)
         self.current_policy_version = 0
         self.lock = threading.Lock()
+        # worker_id -> {n_envs, hostname, last_seen, is_local}
         self.workers: dict[str, dict[str, Any]] = {}
         self.rollouts_accepted = 0
         self.rollouts_rejected = 0
+        self.epoch_id = 0
+        self.epoch_contributors: set[str] = set()
+        self.epoch_expected: set[str] = set()
 
     def set_current_version(self, version: int) -> None:
         with self.lock:
             self.current_policy_version = version
+
+    def register_worker(
+        self,
+        worker_id: str,
+        *,
+        n_envs: int | None = None,
+        hostname: str | None = None,
+        is_local: bool = False,
+    ) -> None:
+        wid = base_worker_id(worker_id)
+        now = time.monotonic()
+        with self.lock:
+            prev = self.workers.get(wid, {})
+            self.workers[wid] = {
+                "n_envs": n_envs if n_envs is not None else prev.get("n_envs"),
+                "hostname": hostname if hostname is not None else prev.get("hostname"),
+                "last_seen": now,
+                "is_local": bool(is_local or prev.get("is_local", False)),
+            }
+        log(self.machine_name, f"worker registered: {wid} local={is_local}")
+
+    def heartbeat_worker(
+        self,
+        worker_id: str,
+        *,
+        n_envs: int | None = None,
+        hostname: str | None = None,
+    ) -> None:
+        wid = base_worker_id(worker_id)
+        now = time.monotonic()
+        with self.lock:
+            prev = self.workers.get(wid)
+            if prev is None:
+                self.workers[wid] = {
+                    "n_envs": n_envs,
+                    "hostname": hostname,
+                    "last_seen": now,
+                    "is_local": False,
+                }
+                log(self.machine_name, f"worker heartbeat (auto-register): {wid}")
+            else:
+                if n_envs is not None:
+                    prev["n_envs"] = n_envs
+                if hostname is not None:
+                    prev["hostname"] = hostname
+                prev["last_seen"] = now
+
+    def unregister_worker(self, worker_id: str) -> None:
+        wid = base_worker_id(worker_id)
+        with self.lock:
+            self.workers.pop(wid, None)
+            self.epoch_contributors.discard(wid)
+        log(self.machine_name, f"worker unregistered: {wid}")
+
+    def _prune_and_list_live_unlocked(self) -> dict[str, dict[str, Any]]:
+        now = time.monotonic()
+        live: dict[str, dict[str, Any]] = {}
+        dead: list[str] = []
+        for wid, meta in self.workers.items():
+            if meta.get("is_local"):
+                live[wid] = dict(meta)
+                continue
+            age = now - float(meta.get("last_seen", 0.0))
+            if age <= self.worker_liveness_s:
+                live[wid] = dict(meta)
+            else:
+                dead.append(wid)
+        for wid in dead:
+            self.workers.pop(wid, None)
+            self.epoch_contributors.discard(wid)
+            self.epoch_expected.discard(wid)
+        if dead:
+            log(
+                self.machine_name,
+                f"dropped dead workers (no heartbeat >{self.worker_liveness_s:.0f}s): "
+                f"{dead}",
+            )
+        return live
+
+    def live_workers(self) -> dict[str, dict[str, Any]]:
+        """Workers with a recent heartbeat (or local, always live while registered)."""
+        with self.lock:
+            return self._prune_and_list_live_unlocked()
+
+    def mark_contributor(self, worker_id: str) -> None:
+        wid = base_worker_id(worker_id)
+        with self.lock:
+            self.epoch_contributors.add(wid)
+
+    def begin_epoch(self) -> tuple[int, list[str]]:
+        """Start a new epoch; snapshot currently live workers as expected set."""
+        with self.lock:
+            self.epoch_id += 1
+            self.epoch_contributors.clear()
+            live = self._prune_and_list_live_unlocked()
+            self.epoch_expected = set(live.keys())
+            return self.epoch_id, sorted(self.epoch_expected)
+
+    def epoch_status(self) -> dict[str, Any]:
+        with self.lock:
+            live = self._prune_and_list_live_unlocked()
+            # Drop expected workers that died; keep snapshot otherwise.
+            self.epoch_expected &= set(live.keys())
+            expected = set(self.epoch_expected)
+            contributors = set(self.epoch_contributors) & expected
+            missing = sorted(expected - contributors)
+            return {
+                "epoch_id": self.epoch_id,
+                "expected": sorted(expected),
+                "contributors": sorted(contributors),
+                "missing": missing,
+                "ready": len(expected) > 0 and len(missing) == 0,
+                "n_live": len(live),
+                "n_expected": len(expected),
+            }
 
     def accept_rollout(self, rollout: WorkerRollout) -> bool:
         with self.lock:
@@ -46,6 +173,7 @@ class LearnerState:
                 self.rollouts_rejected += 1
                 return False
             self.rollouts_accepted += 1
+            self.epoch_contributors.add(base_worker_id(rollout.worker_id))
         self.rollout_queue.put(rollout)
         return True
 
@@ -102,6 +230,7 @@ class _LearnerHandler(BaseHTTPRequestHandler):
 
         if path == "/status":
             version, _ = self.state.weight_store.snapshot()
+            epoch = self.state.epoch_status()
             with self.state.lock:
                 payload = {
                     "policy_version": version,
@@ -110,6 +239,7 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "workers": dict(self.state.workers),
                     "rollouts_accepted": self.state.rollouts_accepted,
                     "rollouts_rejected": self.state.rollouts_rejected,
+                    "epoch": epoch,
                 }
             self._send_json(200, payload)
             return
@@ -120,19 +250,38 @@ class _LearnerHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
-        if path == "/register":
+        if path in ("/register", "/heartbeat"):
             try:
                 payload = json.loads(self._read_body().decode("utf-8"))
             except (json.JSONDecodeError, UnicodeDecodeError):
                 self._send_json(400, {"error": "invalid json"})
                 return
             worker_id = str(payload.get("worker_id", "unknown"))
-            with self.state.lock:
-                self.state.workers[worker_id] = {
-                    "n_envs": payload.get("n_envs"),
-                    "hostname": payload.get("hostname"),
-                }
-            log(self.state.machine_name, f"worker registered: {worker_id}")
+            n_envs = payload.get("n_envs")
+            hostname = payload.get("hostname")
+            if path == "/register":
+                self.state.register_worker(
+                    worker_id,
+                    n_envs=int(n_envs) if n_envs is not None else None,
+                    hostname=str(hostname) if hostname is not None else None,
+                    is_local=bool(payload.get("is_local", False)),
+                )
+            else:
+                self.state.heartbeat_worker(
+                    worker_id,
+                    n_envs=int(n_envs) if n_envs is not None else None,
+                    hostname=str(hostname) if hostname is not None else None,
+                )
+            self._send_json(200, {"ok": True, "epoch_id": self.state.epoch_id})
+            return
+
+        if path == "/unregister":
+            try:
+                payload = json.loads(self._read_body().decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                self._send_json(400, {"error": "invalid json"})
+                return
+            self.state.unregister_worker(str(payload.get("worker_id", "unknown")))
             self._send_json(200, {"ok": True})
             return
 
