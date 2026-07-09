@@ -1,0 +1,23 @@
+{
+  "opening": "death_room_overlay",
+  "label": "In-room death overlay before Continue / title escape",
+  "captured_at": "2026-07-08 hunt (QuickSave3)",
+  "screen_id": {
+    "game_state": "0x80800001",
+    "game_mode": "0x80",
+    "scene_flag": "0x80",
+    "msg_flag": "0x00"
+  },
+  "ram": {
+    "player_hp": 96,
+    "room_id": 19,
+    "stage_id": 0,
+    "character_id": 1,
+    "game_state": 2155872257,
+    "game_mode": 128,
+    "scene_flag": 128,
+    "msg_flag": 0
+  },
+  "episode_failure": "death_room_overlay",
+  "notes": "Normal in-mansion play uses gs=0x80800000. Low byte 0x01 is the authoritative death overlay discriminator while HP may still show the last live value."
+}

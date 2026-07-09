@@ -1,0 +1,4043 @@
+[
+  {
+    "description": "Toggle Infinite Ammo",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "ammo",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Typewriters don't require Ink Ribbons",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "ammo",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Typewriters don't require Ink Ribbons (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x56636",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "ammo",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Infinite Ammo",
+    "module": "ResidentEvil.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving",
+    "module": "ResidentEvil.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x5812B",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58130",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58133",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58139",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x5813C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58143",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x5814A",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58150",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58152",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58158",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x5815D",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58161",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58165",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58167",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x5816C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x5816E",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58170",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58172",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x58174",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x5817A",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x5817D",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x581D3",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x582AB",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x5A370",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x5A4B0",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x6325A",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x6325B",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x6325C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x6325E",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63264",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63266",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x6326D",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63271",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63273",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63275",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63277",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63279",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x6327B",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63280",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63282",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63286",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63288",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x6328F",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63291",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x63298",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x6329A",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x632A6",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x632AE",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E0DEC",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E41C0",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E63A2",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9826",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9849",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x922768",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Set Ink Ribbons To 50 When Saving (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x922768",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "37 FE CA 88 10 A1 68 27 D2 00",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0xC0DD8",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Infinite Ammo (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0xC0DDC",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "FE 4C 41 FF 66 83 FB 08",
+    "category": "ammo",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Character Outfit",
+    "module": "Biohazard.exe",
+    "static_offset": "0x3A7544",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "character",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Player Character",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8386F9",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "character",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Door Skip",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "door_flags",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Disassembler comment: Door Skip Trigger, nop this to make it work",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8D715",
+    "type": "disassembler_comment",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "door_flags",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Door Skip (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8D715",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "door_flags",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Disassembler comment: Door closing trigger, nop this to remove its sound when loading the room",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8D85F",
+    "type": "disassembler_comment",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "door_flags",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Door Skip (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8D85F",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "door_flags",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Game Status Flag",
+    "module": "Biohazard.exe",
+    "static_offset": "0x833090",
+    "type": "Array of byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "event_flags",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "System Flag",
+    "module": "Biohazard.exe",
+    "static_offset": "0x833094",
+    "type": "Array of byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "event_flags",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Game System Trigger",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8384E8",
+    "type": "Array of byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "event_flags",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Camera Cut",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8386F2",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "event_flags",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Map Flag",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838794",
+    "type": "Array of byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "event_flags",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Character Is Controllable",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83AB90",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "event_flags",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Infinite Health",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "hp",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle One Hit Kill",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "hp",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Health Status",
+    "module": "Biohazard.exe",
+    "static_offset": "0x82E94C",
+    "type": "Array of byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "hp",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Health Status (Pulse)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x82E94F",
+    "type": "Array of byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "hp",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Player Current Health",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83523C",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "hp",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Player Is Poisoned",
+    "module": "Biohazard.exe",
+    "static_offset": "0x835290",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "hp",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Player Max Health",
+    "module": "Biohazard.exe",
+    "static_offset": "0x835329",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "hp",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "High Damage",
+    "module": "ResidentEvil.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage",
+    "module": "ResidentEvil.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35900",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35905",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35906",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35909",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3590E",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35915",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35916",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35918",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3591A",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3591C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35924",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3592B",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3592D",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3592F",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35934",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35937",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3593C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35942",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x35944",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3594A",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3594F",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C1FA",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C200",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C202",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C204",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C20A",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C20C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C213",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C215",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C21B",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C21D",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C224",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C22B",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C22D",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C232",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C235",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C238",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C23A",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C23F",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C242",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C244",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x3C249",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E0DF8",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E62E4",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Current HP",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E636C",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E636C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7EBCD4",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7FCA0",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x91FDD0",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Won't Lose HP When Taking Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0xBB3C8",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 05 6C 63 BE 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0xBB69E",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0xBB6A2",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0xBBFFE",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "High Damage (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0xBC002",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 29 95 88 00 00 00",
+    "category": "hp",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Click to update inventory",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Click to update inventory (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x14140",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Currently Equipped Item",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8351B6",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Total Items",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8386F7",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Equipped Weapon Inventory Slot Position (Don't edit)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838719",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387B5",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387B7",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387B9",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387BB",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387BD",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387BF",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387C1",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387C3",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387C5",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387C7",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387C9",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387CB",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387CD",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387CF",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387D1",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Inventory",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838813",
+    "type": "Unknown",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Inventory Item 1",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838814",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838815",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Inventory Item 2",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838816",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838817",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Inventory Item 3",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838818",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838819",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Inventory Item 4",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83881A",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83881B",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Inventory Item 5",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83881C",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83881D",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Inventory Item 6",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83881E",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83881F",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Inventory Item 7 (Jill Only - Don't edit if playing as Chris)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838820",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838821",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Inventory Item 8 (Jill Only - Don't edit if playing as Chris)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838822",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Quantity",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838823",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "inventory",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Slot 1 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98E4",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 1 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98E5",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 2 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98E6",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 2 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98E7",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 3 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98E8",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 3 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98E9",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 4 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98EA",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 4 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98EB",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 5 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98EC",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 5 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98ED",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 6 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98EE",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 6 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98EF",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 7 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98F0",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 7 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98F1",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 8 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98F2",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 8 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98F3",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 9 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98F4",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 9 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98F5",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 10 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98F6",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 10 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98F7",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 11 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98F8",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 11 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98F9",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 12 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98FA",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 12 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98FB",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 13 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98FC",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 13 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98FD",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 14 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98FE",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 14 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98FF",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 15 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9900",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 15 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9901",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 16 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9902",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 16 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9903",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 17 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9904",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 17 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9905",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 18 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9906",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 18 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9907",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 19 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9908",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 19 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9909",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 20 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E990A",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 20 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E990B",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 21 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E990C",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 21 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E990D",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 22 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E990E",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 22 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E990F",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 23 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9910",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 23 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9911",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 24 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9912",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 24 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9913",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 25 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9914",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 25 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9915",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 26 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9916",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 26 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9917",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 27 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9918",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 27 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9919",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 28 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E991A",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 28 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E991B",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 29 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E991C",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 29 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E991D",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 30 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E991E",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 30 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E991F",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 31 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9920",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 31 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9921",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 32 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9922",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 32 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9923",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 33 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9924",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 33 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9925",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 34 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9926",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 34 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9927",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 35 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9928",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 35 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9929",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 36 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E992A",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 36 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E992B",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 37 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E992C",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 37 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E992D",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 38 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E992E",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 38 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E992F",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 39 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9930",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 39 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9931",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 40 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9932",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 40 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9933",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 41 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9934",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 41 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9935",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 42 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9936",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 42 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9937",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 43 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9938",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 43 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9939",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 44 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E993A",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 44 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E993B",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 45 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E993C",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 45 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E993D",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 46 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E993E",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 46 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E993F",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 47 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9940",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 47 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9941",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 48 ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9942",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 48 Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9943",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 1 Item ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9944",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 1 Item Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9945",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 2 Item ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9946",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 2 Item Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9947",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 3 Item ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9948",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 3 Item Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9949",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 4 Item ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E994A",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 4 Item Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E994B",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 5 Item ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E994C",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 5 Item Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E994D",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 6 Item ID",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E994E",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 6 Item Quantity",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E994F",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 7 Item ID (Jill Only - Slot 1 Rebecca)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9950",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 7 Item Quantity (Jill Only - Slot 1 Rebecca)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9951",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 8 Item ID (Jill - Slot 2 Rebecca)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9952",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 8 Item Quantity (Jill - Slot 2 Rebecca)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9953",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 3 Item ID (Rebecca Only)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9954",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 3 Item Quantity (Rebecca Only)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9955",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 4 Item ID (Rebecca Only)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9956",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Slot 4 Item Quantity (Rebecca Only)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9957",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "inventory",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Open Item Box Anywhere",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Open Item Box Anywhere (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x833090",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Open Item Box Anywhere (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x833093",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Open Item Box Anywhere (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8384E8",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item Box",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387B3",
+    "type": "Unknown",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 1",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387B4",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 2",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387B6",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 3",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387B8",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 4",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387BA",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 5",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387BC",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 6",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387BE",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 7",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387C0",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 8",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387C2",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 9",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387C4",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 10",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387C6",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 11",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387C8",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 12",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387CA",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 13",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387CC",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 14",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387CE",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Item 15",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8387D0",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "item_box",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "All Items In Chest (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E98E4",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "item_box",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Enable",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Go to Main Menu",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Open Save Menu Anywhere",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Speed Hack",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "0F BF 41 7C 01 41 3C",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Speed Up Text",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Enable (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x6A8E10",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Go to Main Menu (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x833097",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Game Speed (FrameRate)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8330AC",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Speed Hack (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8351B4",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "0F BF 41 7C 01 41 3C",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Enable (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83523C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Enable (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x835290",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Enable (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x835329",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Open Save Menu Anywhere (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8384E6",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Show Last Text (Debug on screen text)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8386F5",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Go to Main Menu (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838710",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Pad 1",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838710",
+    "type": "2 Bytes",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Go to Main Menu (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83F8D4",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Pad 2",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83F8D4",
+    "type": "2 Bytes",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Current Message (It may crash the game)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83F8EC",
+    "type": "Array of byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Text char counter",
+    "module": "Biohazard.exe",
+    "static_offset": "0x83F8F0",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Speed Up Text (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x91B95",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Enable (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0xAD68",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "misc",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Save Anywhere (Alt+V)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9616",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "misc",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Player X Coord",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8351E8",
+    "type": "4 Bytes",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "player_position",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Player Y Coord",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8351EC",
+    "type": "4 Bytes",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "player_position",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Player Z Coord",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8351F0",
+    "type": "4 Bytes",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "player_position",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Current Room",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8386F1",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "room_id",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Disassembler comment: Do not touch: This is where rooms are loaded?",
+    "module": "Biohazard.exe",
+    "static_offset": "0x8D80D",
+    "type": "disassembler_comment",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "room_id",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "nvd3dum.dll",
+    "static_offset": "0x5C0000",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730D4",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730D8",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730DC",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730E0",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730E2",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730E8",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730ED",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730EF",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730F1",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730F4",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730F7",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x730FC",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x73100",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x73104",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x73109",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x7310F",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x73115",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x73117",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x7311A",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x7311C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "DDRAW.dll",
+    "static_offset": "0x73126",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x830020",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x830024",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Number of Saves",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838718",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0x838718",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0xAA360",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Saves Always 0 (script ref)",
+    "module": "Biohazard.exe",
+    "static_offset": "0xAA362",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "A2 18 87 C3 00",
+    "category": "save_count",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Story Line",
+    "module": "Biohazard.exe",
+    "static_offset": "0x833092",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "stage",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Entity Flag",
+    "module": "Biohazard.exe",
+    "static_offset": "0x96ECB4",
+    "type": "4 Bytes",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "stage",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Toggle Game Timer Always 0",
+    "module": "Biohazard.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "timer",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Game Timer",
+    "module": "Biohazard.exe",
+    "static_offset": "0x6A8E10",
+    "type": "4 Bytes",
+    "pointer_offsets": [],
+    "aob": "8A 41 FF 75 01",
+    "category": "timer",
+    "source_table": "Biohazard.CT"
+  },
+  {
+    "description": "Low Game Timer",
+    "module": "ResidentEvil.exe",
+    "type": "Auto Assembler Script",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x1C490",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E41C0",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E41C7",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E62E4",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Open Chest Anywhere (Alt+C)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E9617",
+    "type": "Byte",
+    "pointer_offsets": [],
+    "aob": "",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7E983C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7EBCDC",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x7F07FC",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C65",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C6A",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C71",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C73",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C7C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C7E",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C87",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C8D",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C8F",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C95",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C97",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80C9E",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80CA0",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80CA7",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80CAE",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80CB4",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80CBB",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80CBD",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80CC2",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80CC8",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80CCD",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80CF3",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0x80D7C",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  },
+  {
+    "description": "Low Game Timer (script ref)",
+    "module": "ResidentEvil.exe",
+    "static_offset": "0xD2294",
+    "type": "script_reference",
+    "pointer_offsets": [],
+    "aob": "66 FF 05 3C 98 BE 00",
+    "category": "timer",
+    "source_table": "ResidentEvil.CT"
+  }
+]

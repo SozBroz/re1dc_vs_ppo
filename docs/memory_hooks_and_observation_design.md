@@ -42,7 +42,10 @@ This is defensible DRL: the agent still learns \( \pi(a \mid s) \) and \( V(s) \
 | `DOOR_FLAGS` | `0x800C86B4` | u32 bitfield | Door unlock state | **CONFIRMED** (exists) |
 | `ITEM_BOX_BASE` | `0x800C8724` | 2 B/slot | `(id, qty)` per slot | **CONFIRMED** |
 | `MAPS_FILES_FLAGS` | `0x800C8714` | bitfield | Map pickup flags | **CONFIRMED** |
-| `PLAYER_POS_BLOCK` | `~0x800C8784` | struct | x/y/z + facing (layout TBD) | **LIKELY** |
+| `PLAYER_X` / `PLAYER_Y` / `PLAYER_Z` | `0x800C5158/5C/60` | s16 | world units; ~64–162/frame walking | **CONFIRMED** (verify_pos.py walk trace) |
+| `PLAYER_FACING` | `0x800C5198` | u16 | 0–4095 angle (0x1000 = full circle) | **CONFIRMED** |
+| `STAGE_ID` / `ROOM_ID` / `CAM_ID` | `0x800C8660/61/62` | u8 | from RE1-Autosplitter GOG map | **CONFIRMED** (boot logs) |
+| `CHARACTER_ID` | `0x800C8669` | u8 | 0=Chris, 1=Jill | **CONFIRMED** |
 
 ### 1.2 Full hook catalog
 
@@ -365,6 +368,149 @@ Use on-camera as a scored checklist:
 
 ---
 
+## 9. Missing specs (needed next)
+
+These are not memory hooks, but they **define the MDP** the hooks feed. Without them, parallel envs, BC, and PPO will disagree on what a step is.
+
+### 9.1 Episode boundary
+
+**Problem:** “Episode” means different things for curriculum segments, death, and full Any% evaluation. Mixing them corrupts advantage estimates and BC labels.
+
+| Mode | `reset()` loads | `terminated` | `truncated` | Next episode |
+|------|-----------------|--------------|-------------|--------------|
+| **Segment curriculum** (default training) | Stage `init_savestate` from `curriculum/*.json` | `HP = 0` or planner `segment_complete` | `step >= max_steps` | Same stage savestate (optionally Go-Explore archive slot) |
+| **Death in segment** | Same stage savestate | `terminated=True`, `info.death=True` | — | Immediate `reset()` to **same** stage unless `advance_on_death: false` in stage JSON |
+| **Segment success** | Next stage savestate or frontier pool | `terminated=True`, `info.segment_complete=True` | — | Curriculum index += 1 |
+| **Full Any% eval** (held-out) | New-game or fixed TAS start state | Helipad escape flag **or** death | Wall-clock / step cap (e.g. 200k frames) | No mid-run curriculum teleport; log full trajectory |
+
+**Rules:**
+
+1. **Training default:** one curriculum JSON = one episode distribution. Death → reset to **that** stage’s `init_savestate`, not mansion start.
+2. **PPO rollout:** treat `segment_complete` and `death` both as terminal; bootstrap value from reset state, not from a savestate loaded mid-trajectory without a full `reset()`.
+3. **Gated time excluded:** steps while `not in_control` do **not** increment `step` toward `max_steps` or per-episode timers (see §4).
+4. **Eval metric:** report **segment success rate** and **cumulative Any% progress** separately — do not average them.
+
+**Stage JSON additions (proposed):**
+
+```json
+{
+  "advance_on_death": true,
+  "episode_mode": "segment",
+  "on_success": "next_stage"
+}
+```
+
+### 9.2 Savestate determinism
+
+**Problem:** BizHawk `.state` load + Lua `frameadvance` count changes RAM, RNG, and animation phase. Inconsistent warmup makes BC and parallel workers see different worlds from the same file.
+
+**Pinned environment (record in every dataset manifest):**
+
+| Field | Value |
+|-------|-------|
+| BizHawk version | **2.11.1** (match header) |
+| Core | **Nymashock** (PSX); document if fallback to Octoshock |
+| Serial | **SLUS-00551**, Original difficulty, Jill |
+| Lua script | `lua/re1_client.lua` git SHA |
+| Turbo / throttle | Off for recording; configurable for training |
+
+**Load contract (canonical):**
+
+```
+load_savestate(path)
+frameadvance(WARMUP_FRAMES)   # default WARMUP_FRAMES = 1 (current env.py)
+read_ram + screenshot         # first obs = post-warmup
+```
+
+**Requirements:**
+
+1. **Freeze `WARMUP_FRAMES`** per stage; bump only with a new savestate file suffix (e.g. `105_dining_v2.state`).
+2. **After load, assert invariants** before first policy call: `HP == expected`, `room_id == expected` (once hook exists), `in_control == true` (or run gate macro first).
+3. **RNG:** log first 4 bytes at a chosen seed address (when found) on reset; fail reset if mismatch across workers.
+4. **Re-record savestates** when BizHawk major version or core changes — do not assume binary compatibility.
+5. **Path:** absolute paths from Python; Lua `savestate.load` must receive the same path the manifest lists.
+
+**Acceptance test:** 10 consecutive `reset()` calls on one stage → identical `(room_id, hp, pos)` and identical first-frame hash after warmup.
+
+### 9.3 Bridge bandwidth (vision path)
+
+**Problem:** §6 mentions avoiding per-frame PNG; the live bridge (`bizhawk_bridge.py` / `re1_client.lua`) uses **base64 PNG over TCP JSON**. At 8 envs × 10 Hz × 320×240 RGB, encode + socket dominates before the GPU sees a batch.
+
+| Option | Payload | Est. bytes/step | Pros | Cons |
+|--------|---------|-----------------|------|------|
+| **A — PNG base64** (current) | JSON + PNG | ~30–80 KB | Simple, works today | CPU hell at scale |
+| **B — Raw RGB565/RGB888** | Length-prefixed binary blob | ~150 KB (320×240×2) or ~230 KB ×3 | No PNG encode; fast decode | Custom protocol; larger wire size if uncompressed |
+| **C — Lua JPEG** | base64 JPEG q=80 | ~8–20 KB | Drop-in JSON RPC | Lossy; extra encode on Lua side |
+| **D — Downsample in Lua** | 84×84 RGB raw | ~21 KB | Matches obs size | Still binary framing needed |
+| **E — RAM-only steps** | No frame on gated/macro steps | ~0 | Huge win with §4 gating | Policy never sees cutscene frames (intended) |
+
+**Decision (v1):**
+
+- **Training:** **D + E** — Lua returns **84×84 RGB888 raw** (binary side channel or hex in JSON for prototype); **skip screenshot** when `not in_control` and during fast-forward bursts.
+- **BC recording:** **A or C** at full res optional for human review; training consumes downsampled D.
+- **Parallelism:** one BizHawk process per env; target **≤25 KB/step** average on wire before scaling past 4 workers.
+
+**Protocol note:** add `cmd: "screenshot", format: "rgb888", w: 84, h: 84` alongside existing PNG for backward compatibility.
+
+### 9.4 BC data contract (`frame_skip` alignment)
+
+**Problem:** `env.step(action)` holds buttons and advances `frame_skip` frames (default 8). The `(s, a)` pair is ambiguous unless obs and action share the same time index.
+
+**Canonical step (decision-time indexing):**
+
+```
+s_t     = obs after previous step (or reset warmup)
+a_t     = policy action chosen from s_t
+hold a_t for frame_skip emulator frames
+s_{t+1} = obs read after frameadvance(frame_skip)
+```
+
+| Field | Rule |
+|-------|------|
+| **BC label `a`** | Action chosen at **`s_t`** (start of bundle) |
+| **BC input** | **`s_t`** frame stack + RAM — **not** `s_{t+1}` |
+| **Next row** | `(s_{t+1}, a_{t+1})` — no overlap leak of future frames into current label |
+| **Gated steps** | **No BC rows** — macros are unlabeled |
+| **Decision Hz** | `60 / frame_skip` at 60 FPS (e.g. skip 6 → 10 Hz) |
+
+**Demo ingest (human / TAS):**
+
+1. Downsample human recordings to decision Hz by taking every Nth frame **after** aligning button edges to frame boundaries.
+2. Store `frame_skip`, `decision_hz`, and `label_phase: "pre_hold"` in dataset manifest.
+3. **Reward is not stored in BC** — BC is `(obs, action)` only; PPO may add reward later from replay.
+
+**Sanity check:** train BC → run greedy policy → action distribution KL vs demo should be < threshold on **same** `frame_skip`; mismatch usually means end-of-bundle labeling.
+
+### 9.5 Boss segment overrides
+
+**Problem:** §6 sets 10 Hz nav / 15–20 Hz combat but does not wire overrides to curriculum or env config. Boss fights (Yawn, Tyrant, etc.) need different MDP parameters without forking the codebase.
+
+**Stage JSON extensions:**
+
+```json
+{
+  "segment_profile": "boss",
+  "frame_skip": 4,
+  "decision_hz": 15,
+  "obs_profile": "combat",
+  "reward_profile": "combat",
+  "action_mask_profile": "combat"
+}
+```
+
+| Profile | `frame_skip` | Obs deltas | Reward deltas | Action mask |
+|---------|--------------|------------|---------------|-------------|
+| **`nav`** (default) | 6–8 (~10 Hz) | Standard §3.2 | PBRS room + waypoint | Block interact without prompt (optional) |
+| **`combat`** | 3–4 (~15–20 Hz) | Enforce full `enemy_summary`; add `aiming`, `i_frames` | Enable `kill` / `damage_taken` terms; **disable** room PBRS | Allow fire; optional block fire at ammo=0 |
+| **`boss`** | 3–4 | Same as combat; optional **drop** `goal_waypoint` coord hints | Sparse phase milestones only (flag bits); reduce dense room shaping | No interact mask (prompt timing matters) |
+| **`puzzle`** | gated | Minimal — macro owns stepping | Event-flag sparse only | Policy **not invoked** (`macro_only: true`) |
+
+**Runtime:** `RE1Env` reads profile from active curriculum stage on `reset()`; profiles are **not** learned — they are curriculum metadata.
+
+**Eval:** boss segments reported separately in metrics (`tyrant_phase_reached`, `deaths`, `time_to_kill`); do not merge into mansion nav learning curves.
+
+---
+
 ## Appendix A — Action space & masking (low-level)
 
 **Actions (discrete, 18–24):** D-pad 8-way, aim+walk combos (optional factored: move × aim × fire), stand turn L/R, knife, fire, reload, interact (X), run (optional), quickturn if mapped.
@@ -398,4 +544,4 @@ Planner may read all RAM. Planner **must not** output button presses to the env 
 
 ---
 
-*Document version: 1.0 — internal design / video seed. No code.*
+*Document version: 1.1 — internal design / video seed. See `re1_rl/` for skeleton implementation.*

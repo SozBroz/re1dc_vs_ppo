@@ -1,0 +1,15 @@
+{
+  "file": "states/checkpoints/wp06_seq6_203.State",
+  "completed_seq": 6,
+  "waypoint_index": 6,
+  "room_id": "203",
+  "inventory": [
+    "knife",
+    "beretta",
+    "first_aid_spray_alt",
+    "emblem"
+  ],
+  "episode_step": 20938,
+  "captured_by_port": 5558,
+  "captured_at": "2026-07-04 16:47:04"
+}

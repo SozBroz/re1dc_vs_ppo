@@ -1,0 +1,266 @@
+{
+  "_meta": {
+    "source": "pickups_empirical.json + manual anchors + rdt_item_positions.json",
+    "schema": "'<room>:<item>' -> {x, z, source, confidence, notes}",
+    "generated_by": "scripts/build_item_positions.py"
+  },
+  "100:serum": {
+    "x": 7280,
+    "z": 3920,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_1 type=pickable (init/proc0)"
+  },
+  "105:emblem": {
+    "x": 32700,
+    "z": 8300,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_2 type=object (init/proc0)"
+  },
+  "105:shield_key": {
+    "x": 2900,
+    "z": 8100,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_10 type=pickable (init/proc0)"
+  },
+  "10E:shotgun_shells": {
+    "x": 15,
+    "z": 15,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=object (init/proc0)"
+  },
+  "10F:gold_emblem": {
+    "x": 9750,
+    "z": 8600,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_12 type=object (init/proc0)"
+  },
+  "10F:music_notes": {
+    "x": 9550,
+    "z": 8050,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_1 type=object (init/proc0)"
+  },
+  "112:green_herb": {
+    "x": 3200,
+    "z": 9900,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=object (init/proc0)"
+  },
+  "116:shotgun": {
+    "x": 10820,
+    "z": 6340,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=object (init/proc0)"
+  },
+  "117:star_crest": {
+    "x": 9100,
+    "z": 7400,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_1 type=pickable (init/proc0)"
+  },
+  "202:blue_jewel": {
+    "x": 17488,
+    "z": 4690,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=pickable (init/proc0)"
+  },
+  "205:sun_crest": {
+    "x": 9735,
+    "z": 7236,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=pickable (init/proc0)"
+  },
+  "20D:green_herb": {
+    "x": 8400,
+    "z": 3400,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=pickable (init/proc0)"
+  },
+  "210:moon_crest": {
+    "x": 4608,
+    "z": 24040,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=pickable (init/proc0)"
+  },
+  "212:bazooka_acid": {
+    "x": 24050,
+    "z": 19125,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=pickable (init/proc0)"
+  },
+  "300:green_herb": {
+    "x": 3146,
+    "z": 12036,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=pickable (init/proc0)"
+  },
+  "302:flare": {
+    "x": 23050,
+    "z": 28350,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_7 type=pickable (init/proc0)"
+  },
+  "305:doom_book_2": {
+    "x": 0,
+    "z": 0,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=object (init/proc0)"
+  },
+  "305:green_herb": {
+    "x": 0,
+    "z": 0,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=object (init/proc0)"
+  },
+  "30A:hex_crank": {
+    "x": 11100,
+    "z": 4850,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_2 type=pickable (init/proc0)"
+  },
+  "30B:mo_disc": {
+    "x": 20900,
+    "z": 18350,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=object (init/proc0)"
+  },
+  "30D:flame_rounds": {
+    "x": 4000,
+    "z": 7600,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=object (init/proc0)"
+  },
+  "30F:explosive_rounds": {
+    "x": 12100,
+    "z": 24550,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_8 type=object (init/proc0)"
+  },
+  "30F:first_aid_spray": {
+    "x": 23900,
+    "z": 2250,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=pickable (init/proc0)"
+  },
+  "401:red_book": {
+    "x": 2800,
+    "z": 14000,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=pickable (init/proc0)"
+  },
+  "402:control_room_key": {
+    "x": 2500,
+    "z": 3700,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=object (init/proc0)"
+  },
+  "406:shotgun_shells": {
+    "x": 9500,
+    "z": 5500,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=pickable (init/proc0)"
+  },
+  "409:empty_bottle": {
+    "x": 7448,
+    "z": 5874,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_13 type=pickable (init/proc0)"
+  },
+  "40A:ink_ribbon": {
+    "x": 11850,
+    "z": 10450,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=pickable (init/proc0)"
+  },
+  "40C:helmet_key": {
+    "x": 1850,
+    "z": 9950,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=pickable (init/proc0)"
+  },
+  "40D:green_herb": {
+    "x": 27500,
+    "z": 14655,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_2 type=pickable (init/proc0)"
+  },
+  "410:dorm_key_003": {
+    "x": 2350,
+    "z": 4850,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_16 type=object (init/proc0)"
+  },
+  "500:battery": {
+    "x": 2500,
+    "z": 12500,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=pickable (init/proc0)"
+  },
+  "506:wolf_medal": {
+    "x": 16500,
+    "z": 8200,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_1 type=pickable (init/proc0)"
+  },
+  "507:eagle_medal": {
+    "x": 15900,
+    "z": 8450,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_9 type=object (init/proc0)"
+  },
+  "508:green_herb": {
+    "x": 2400,
+    "z": 5400,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=pickable (init/proc0)"
+  },
+  "50B:flare": {
+    "x": 9850,
+    "z": 15500,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_1 type=pickable (init/proc0)"
+  },
+  "510:slides": {
+    "x": 19500,
+    "z": 2250,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=object (init/proc0)"
+  }
+}

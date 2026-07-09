@@ -1,0 +1,835 @@
+{
+  "port": 5797,
+  "r1_preamble": 8,
+  "max_aim_frames": 60,
+  "results": [
+    {
+      "scenario": "neutral_idle",
+      "strategy": "simultaneous",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 1900
+        },
+        "strategy": "simultaneous",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "neutral_idle",
+      "strategy": "r1_first",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 1900
+        },
+        "strategy": "r1_first",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "after_run",
+      "strategy": "simultaneous",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 1900
+        },
+        "strategy": "simultaneous",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "after_run",
+      "strategy": "r1_first",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 1900
+        },
+        "strategy": "r1_first",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "after_walk",
+      "strategy": "simultaneous",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 1900
+        },
+        "strategy": "simultaneous",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "after_walk",
+      "strategy": "r1_first",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 1900
+        },
+        "strategy": "r1_first",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "after_turn_left",
+      "strategy": "simultaneous",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 652
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 652
+        },
+        "strategy": "simultaneous",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "after_turn_left",
+      "strategy": "r1_first",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 652
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 652
+        },
+        "strategy": "r1_first",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "after_turn_right",
+      "strategy": "simultaneous",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 3148
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 3148
+        },
+        "strategy": "simultaneous",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "after_turn_right",
+      "strategy": "r1_first",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 3148
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 3148
+        },
+        "strategy": "r1_first",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "after_quickturn",
+      "strategy": "simultaneous",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 1900
+        },
+        "strategy": "simultaneous",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "after_quickturn",
+      "strategy": "r1_first",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 0,
+        "label": "idle",
+        "hooks": "anim=0x00 aux=0x00 recovery=0",
+        "knife_action_ready": true,
+        "knife_blocked": false,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 0,
+          "label": "idle",
+          "hooks": "anim=0x00 aux=0x00 recovery=0",
+          "knife_action_ready": true,
+          "knife_blocked": false,
+          "player_facing": 1900
+        },
+        "strategy": "r1_first",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "r1_weapon_ready",
+      "strategy": "simultaneous",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 1,
+        "label": "idle_recovery_latch",
+        "hooks": "anim=0x00 aux=0x00 recovery=1",
+        "knife_action_ready": false,
+        "knife_blocked": true,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 1,
+          "label": "idle_recovery_latch",
+          "hooks": "anim=0x00 aux=0x00 recovery=1",
+          "knife_action_ready": false,
+          "knife_blocked": true,
+          "player_facing": 1900
+        },
+        "strategy": "simultaneous",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 7,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "r1_weapon_ready",
+      "strategy": "r1_first",
+      "pre_state": {
+        "anim": 0,
+        "aux": 0,
+        "recovery": 1,
+        "label": "idle_recovery_latch",
+        "hooks": "anim=0x00 aux=0x00 recovery=1",
+        "knife_action_ready": false,
+        "knife_blocked": true,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 0,
+          "aux": 0,
+          "recovery": 1,
+          "label": "idle_recovery_latch",
+          "hooks": "anim=0x00 aux=0x00 recovery=1",
+          "knife_action_ready": false,
+          "knife_blocked": true,
+          "player_facing": 1900
+        },
+        "strategy": "r1_first",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 7,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=10",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=8",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=6",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=6"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=6",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "standing_idle_hold_aim",
+      "strategy": "simultaneous",
+      "pre_state": {
+        "anim": 21,
+        "aux": 4,
+        "recovery": 0,
+        "label": "crouch_post",
+        "hooks": "anim=0x15 aux=0x04 recovery=0",
+        "knife_action_ready": false,
+        "knife_blocked": true,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 21,
+          "aux": 4,
+          "recovery": 0,
+          "label": "crouch_post",
+          "hooks": "anim=0x15 aux=0x04 recovery=0",
+          "knife_action_ready": false,
+          "knife_blocked": true,
+          "player_facing": 1900
+        },
+        "strategy": "simultaneous",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 9,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=4",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=4",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=3",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=3",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=2",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=2",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=1",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=1",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=14"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=14",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "standing_idle_hold_aim",
+      "strategy": "r1_first",
+      "pre_state": {
+        "anim": 21,
+        "aux": 4,
+        "recovery": 0,
+        "label": "crouch_post",
+        "hooks": "anim=0x15 aux=0x04 recovery=0",
+        "knife_action_ready": false,
+        "knife_blocked": true,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 21,
+          "aux": 4,
+          "recovery": 0,
+          "label": "crouch_post",
+          "hooks": "anim=0x15 aux=0x04 recovery=0",
+          "knife_action_ready": false,
+          "knife_blocked": true,
+          "player_facing": 1900
+        },
+        "strategy": "r1_first",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 9,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=4",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=4",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=3",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=3",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=2",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=2",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=1",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=1",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=14",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=14"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=14",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "standing_idle_aim_release",
+      "strategy": "simultaneous",
+      "pre_state": {
+        "anim": 18,
+        "aux": 4,
+        "recovery": 0,
+        "label": "crouch_aim",
+        "hooks": "anim=0x12 aux=0x04 recovery=0",
+        "knife_action_ready": false,
+        "knife_blocked": false,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 18,
+          "aux": 4,
+          "recovery": 0,
+          "label": "crouch_aim",
+          "hooks": "anim=0x12 aux=0x04 recovery=0",
+          "knife_action_ready": false,
+          "knife_blocked": false,
+          "player_facing": 1900
+        },
+        "strategy": "simultaneous",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=4",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=4",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=2",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=2",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=13",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=13",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=11",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=11"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=11",
+        "final_label": "swing_recovery"
+      }
+    },
+    {
+      "scenario": "standing_idle_aim_release",
+      "strategy": "r1_first",
+      "pre_state": {
+        "anim": 18,
+        "aux": 4,
+        "recovery": 0,
+        "label": "crouch_aim",
+        "hooks": "anim=0x12 aux=0x04 recovery=0",
+        "knife_action_ready": false,
+        "knife_blocked": false,
+        "player_facing": 1900
+      },
+      "probe": {
+        "pre_state": {
+          "anim": 18,
+          "aux": 4,
+          "recovery": 0,
+          "label": "crouch_aim",
+          "hooks": "anim=0x12 aux=0x04 recovery=0",
+          "knife_action_ready": false,
+          "knife_blocked": false,
+          "player_facing": 1900
+        },
+        "strategy": "r1_first",
+        "reached_crouch_aim": true,
+        "frames_to_crouch_aim": 1,
+        "facing_delta": 0,
+        "trail_tail": [
+          "f49:swing_recovery:anim=0x13 aux=0x04 recovery=4",
+          "f50:swing_recovery:anim=0x13 aux=0x04 recovery=4",
+          "f51:swing_recovery:anim=0x13 aux=0x04 recovery=2",
+          "f52:swing_recovery:anim=0x13 aux=0x04 recovery=2",
+          "f53:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f54:swing_recovery:anim=0x13 aux=0x04 recovery=0",
+          "f55:swing_recovery:anim=0x13 aux=0x04 recovery=13",
+          "f56:swing_recovery:anim=0x13 aux=0x04 recovery=13",
+          "f57:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f58:swing_recovery:anim=0x13 aux=0x04 recovery=12",
+          "f59:swing_recovery:anim=0x13 aux=0x04 recovery=11",
+          "f60:swing_recovery:anim=0x13 aux=0x04 recovery=11"
+        ],
+        "final_hooks": "anim=0x13 aux=0x04 recovery=11",
+        "final_label": "swing_recovery"
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+"""RE1 observation/action spaces without starting BizHawk."""
+
+from __future__ import annotations
+
+import gymnasium as gym
+from gymnasium import spaces
+
+from re1_rl.env import ACTION_NAMES
+from re1_rl.episode_history import ACQUISITION_LOG_DIM, ROOM_HISTORY_DIM
+from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, INVENTORY_OBS_DIM, PROPRIO_DIM, ROOM_VISITED_DIM
+from re1_rl.key_items import KEYS_HELD_DIM
+from re1_rl.room_signature import ENEMY_ROSTER_DIM
+from re1_rl.spatial_encoder import SPATIAL_DIM, VISITED_SHAPE
+
+
+def make_re1_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
+    observation_space = spaces.Dict(
+        {
+            "frame": spaces.Box(0, 255, shape=(84, 84, 4), dtype="uint8"),
+            "proprio": spaces.Box(-1.0, 1.0, shape=(PROPRIO_DIM,), dtype="float32"),
+            "goal": spaces.Box(-2.0, 2.0, shape=(GOAL_DIM,), dtype="float32"),
+            "spatial": spaces.Box(-2.0, 2.0, shape=(SPATIAL_DIM,), dtype="float32"),
+            "visited": spaces.Box(0.0, 1.0, shape=VISITED_SHAPE, dtype="float32"),
+            "rooms_visited": spaces.Box(0.0, 1.0, shape=(ROOM_VISITED_DIM,), dtype="float32"),
+            "box": spaces.Box(0.0, 2.0, shape=(BOX_DIM,), dtype="float32"),
+            "inventory": spaces.Box(0.0, 1.0, shape=(INVENTORY_OBS_DIM,), dtype="float32"),
+            "history": spaces.Box(0.0, 1.0, shape=(ROOM_HISTORY_DIM,), dtype="float32"),
+            "acquisitions": spaces.Box(0.0, 1.0, shape=(ACQUISITION_LOG_DIM,), dtype="float32"),
+            "room_enemies": spaces.Box(0.0, 1.0, shape=(ENEMY_ROSTER_DIM,), dtype="float32"),
+            "keys_held": spaces.Box(0.0, 1.0, shape=(KEYS_HELD_DIM,), dtype="float32"),
+        }
+    )
+    action_space = spaces.Discrete(len(ACTION_NAMES))
+    return observation_space, action_space

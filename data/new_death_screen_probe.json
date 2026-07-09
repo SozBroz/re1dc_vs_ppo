@@ -1,0 +1,38 @@
+[
+  {
+    "file": "Resident Evil - Director's Cut (USA).Nymashock.QuickSave0.State",
+    "player_hp": 65535,
+    "stage_id": 0,
+    "room_id": 8,
+    "character_id": 1,
+    "game_state": 2147483648,
+    "game_state_hex": "0x80000000",
+    "game_mode": 128,
+    "game_mode_hex": "0x80",
+    "scene_flag": 0,
+    "msg_flag": 0,
+    "death_ui": false,
+    "opening": null,
+    "outside": null,
+    "episode_failure": null,
+    "screenshot": "D:\\re1_rl\\data\\probe_Resident Evil - Director's Cut (USA).Nymashock.QuickSave0.png"
+  },
+  {
+    "file": "Resident Evil - Director's Cut (USA).Nymashock.QuickSave3.State",
+    "player_hp": 96,
+    "stage_id": 0,
+    "room_id": 19,
+    "character_id": 1,
+    "game_state": 2155872257,
+    "game_state_hex": "0x80800001",
+    "game_mode": 128,
+    "game_mode_hex": "0x80",
+    "scene_flag": 128,
+    "msg_flag": 0,
+    "death_ui": false,
+    "opening": null,
+    "outside": null,
+    "episode_failure": null,
+    "screenshot": "D:\\re1_rl\\data\\probe_Resident Evil - Director's Cut (USA).Nymashock.QuickSave3.png"
+  }
+]

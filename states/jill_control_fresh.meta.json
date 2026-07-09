@@ -1,0 +1,11 @@
+{
+  "file": "states/jill_control_fresh.State",
+  "captured_at": "2026-07-05T22:04:41",
+  "source": "tools/BizHawk-2.11.1/PSX/State/Resident Evil - Director's Cut (USA).Nymashock.QuickSave0.State",
+  "captured_via": "Operator QuickSave slot 0 in EmuHawk; knife equipped",
+  "room_code": "105",
+  "in_control": true,
+  "inventory": ["knife", "beretta", "first_aid_spray_alt"],
+  "waypoint_index": 0,
+  "notes": "Jill dining 105, knife equipped at spawn. Backup: jill_control_fresh.State.bak_20260705_pre_quicksave0"
+}

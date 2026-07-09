@@ -1,0 +1,272 @@
+{
+  "port": 5797,
+  "swings": 1,
+  "crouch_traces": [
+    {
+      "mode": "crouch_first_fixed",
+      "frames": 54,
+      "label_counts": {
+        "idle": 5,
+        "crouch_aim": 16,
+        "crouch_transitional": 4,
+        "swing_recovery": 22,
+        "crouch_post": 7
+      },
+      "hook_pair_counts": {
+        "0x12/0x04": 20,
+        "0x13/0x04": 22,
+        "0x15/0x04": 7
+      },
+      "anim_counts": {
+        "0x12": 20,
+        "0x13": 22,
+        "0x15": 7
+      },
+      "labels_seen": [
+        "crouch_aim",
+        "crouch_post",
+        "crouch_transitional",
+        "swing_recovery"
+      ],
+      "saw_crouch_aim": true,
+      "saw_standing_knife": false,
+      "saw_swing_recovery": true,
+      "player_y_range": [
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "standing_first_fixed",
+      "frames": 54,
+      "label_counts": {
+        "swing_recovery": 5,
+        "crouch_post": 27,
+        "idle": 2,
+        "crouch_aim": 16,
+        "crouch_transitional": 4
+      },
+      "hook_pair_counts": {
+        "0x13/0x04": 5,
+        "0x15/0x04": 27,
+        "0x12/0x04": 20
+      },
+      "anim_counts": {
+        "0x13": 5,
+        "0x15": 27,
+        "0x12": 20
+      },
+      "labels_seen": [
+        "crouch_aim",
+        "crouch_post",
+        "crouch_transitional",
+        "swing_recovery"
+      ],
+      "saw_crouch_aim": true,
+      "saw_standing_knife": false,
+      "saw_swing_recovery": true,
+      "player_y_range": [
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "quick_knife_fixed",
+      "frames": 44,
+      "label_counts": {
+        "idle": 44
+      },
+      "hook_pair_counts": {},
+      "anim_counts": {},
+      "labels_seen": [],
+      "saw_crouch_aim": false,
+      "saw_standing_knife": false,
+      "saw_swing_recovery": false,
+      "player_y_range": [
+        0,
+        0
+      ]
+    },
+    {
+      "mode": "r1_aim_probe",
+      "unique": [
+        "0x00/0x00/0:idle",
+        "0x12/0x04/0:crouch_aim",
+        "0x12/0x04/1:crouch_transitional",
+        "0x12/0x04/2:crouch_transitional",
+        "0x13/0x04/0:swing_recovery",
+        "0x13/0x04/10:swing_recovery",
+        "0x13/0x04/11:swing_recovery",
+        "0x13/0x04/12:swing_recovery",
+        "0x13/0x04/13:swing_recovery",
+        "0x13/0x04/5:swing_recovery",
+        "0x13/0x04/6:swing_recovery",
+        "0x13/0x04/7:swing_recovery",
+        "0x13/0x04/8:swing_recovery",
+        "0x13/0x04/9:swing_recovery"
+      ]
+    },
+    {
+      "mode": "crouch_ram_gated",
+      "swing": 1,
+      "macro_frames": 50,
+      "report": {
+        "outcome": "ok",
+        "died": false,
+        "macro_frames": 50,
+        "ok": true,
+        "issues": [],
+        "crouch_aim": true,
+        "swing_anim": true,
+        "idle_end": true,
+        "swing_frames": 10,
+        "expect_swing": 10,
+        "recovery_frames": 19,
+        "expect_recovery": 22,
+        "standing_knife_frames": 0,
+        "swing_recovery_label_frames": 29,
+        "swing_frame_ok": true,
+        "recovery_frame_ok": true
+      }
+    },
+    {
+      "mode": "crouch_fixed_trace",
+      "swing": 1,
+      "frames": 54,
+      "label_counts": {
+        "idle": 5,
+        "crouch_aim": 16,
+        "crouch_transitional": 4,
+        "swing_recovery": 22,
+        "crouch_post": 7
+      },
+      "hook_pair_counts": {
+        "0x12/0x04": 20,
+        "0x13/0x04": 22,
+        "0x15/0x04": 7
+      },
+      "anim_counts": {
+        "0x12": 20,
+        "0x13": 22,
+        "0x15": 7
+      },
+      "labels_seen": [
+        "crouch_aim",
+        "crouch_post",
+        "crouch_transitional",
+        "swing_recovery"
+      ],
+      "saw_crouch_aim": true,
+      "saw_standing_knife": false,
+      "saw_swing_recovery": true
+    }
+  ],
+  "standing_traces": [
+    {
+      "mode": "standing_fixed_trace",
+      "swing": 1,
+      "frames": 54,
+      "label_counts": {
+        "idle": 5,
+        "crouch_aim": 16,
+        "crouch_transitional": 4,
+        "swing_recovery": 22,
+        "crouch_post": 7
+      },
+      "hook_pair_counts": {
+        "0x12/0x04": 20,
+        "0x13/0x04": 22,
+        "0x15/0x04": 7
+      },
+      "anim_counts": {
+        "0x12": 20,
+        "0x13": 22,
+        "0x15": 7
+      },
+      "labels_seen": [
+        "crouch_aim",
+        "crouch_post",
+        "crouch_transitional",
+        "swing_recovery"
+      ],
+      "saw_crouch_aim": true,
+      "saw_standing_knife": false,
+      "saw_swing_recovery": true
+    }
+  ],
+  "crouch_aggregate": {
+    "frames": 54,
+    "label_counts": {
+      "idle": 5,
+      "crouch_aim": 16,
+      "crouch_transitional": 4,
+      "swing_recovery": 22,
+      "crouch_post": 7
+    },
+    "hook_pair_counts": {
+      "0x12/0x04": 20,
+      "0x13/0x04": 22,
+      "0x15/0x04": 7
+    },
+    "anim_counts": {
+      "0x12": 20,
+      "0x13": 22,
+      "0x15": 7
+    },
+    "labels_seen": [
+      "crouch_aim",
+      "crouch_post",
+      "crouch_transitional",
+      "swing_recovery"
+    ],
+    "saw_crouch_aim": true,
+    "saw_standing_knife": false,
+    "saw_swing_recovery": true,
+    "player_y_range": [
+      0,
+      0
+    ]
+  },
+  "standing_aggregate": {
+    "frames": 54,
+    "label_counts": {
+      "swing_recovery": 5,
+      "crouch_post": 27,
+      "idle": 2,
+      "crouch_aim": 16,
+      "crouch_transitional": 4
+    },
+    "hook_pair_counts": {
+      "0x13/0x04": 5,
+      "0x15/0x04": 27,
+      "0x12/0x04": 20
+    },
+    "anim_counts": {
+      "0x13": 5,
+      "0x15": 27,
+      "0x12": 20
+    },
+    "labels_seen": [
+      "crouch_aim",
+      "crouch_post",
+      "crouch_transitional",
+      "swing_recovery"
+    ],
+    "saw_crouch_aim": true,
+    "saw_standing_knife": false,
+    "saw_swing_recovery": true,
+    "player_y_range": [
+      0,
+      0
+    ]
+  },
+  "distinguishable": false,
+  "reasons": [
+    "standing trace saw crouch_aim \u2014 stances overlap on crouch marker",
+    "no crouch-exclusive anim/aux pairs",
+    "no standing-exclusive anim/aux pairs",
+    "shared hooks (expected few): ['0x12/0x04', '0x13/0x04', '0x15/0x04']",
+    "standing trace did not show 0x14 \u2014 may use different anim than expected",
+    "both traces used swing_recovery (0x13) \u2014 split by aux/recovery"
+  ]
+}

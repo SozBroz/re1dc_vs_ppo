@@ -1,0 +1,15 @@
+{
+  "opening": "mansion_intro_dialogue",
+  "outside": null,
+  "ram": {
+    "game_mode": 128,
+    "scene_flag": 147,
+    "game_state": 2157117440,
+    "player_hp": 96,
+    "stage_id": 0,
+    "msg_flag": 128,
+    "room_id": 5,
+    "character_id": 1
+  },
+  "screenshot": "opening_capture_001_mansion_intro_dialogue.png"
+}

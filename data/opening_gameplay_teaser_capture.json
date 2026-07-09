@@ -1,0 +1,35 @@
+{
+  "opening": "opening_gameplay_teaser",
+  "label": "In-engine opening action preview (Gallery 107 / Main Hall 106 path)",
+  "captured_at": "2026-07-07T06:24:18–06:24:50 local",
+  "source": "play_human RAM log terminal 460675",
+  "screen_id": {
+    "game_state": "0x40000000",
+    "game_mode": "0x40",
+    "scene_flag": "0x00",
+    "msg_flag": "0x00"
+  },
+  "ram": {
+    "player_hp": 140,
+    "room_id": 7,
+    "stage_id": 0,
+    "character_id": 1,
+    "game_state": 1073741824,
+    "game_mode": 64,
+    "scene_flag": 0,
+    "msg_flag": 0
+  },
+  "room_code": "107",
+  "room_name": "GALLERY",
+  "outside": null,
+  "in_control": false,
+  "notes": "Shares gs/mode with PlayStation logo — teaser requires hp=140 and room 6 or 7. Prelude text crawl uses mode 0x44 (opening_narration). Brief transition frame gs=0x82000000 mode=0x82 seen at teaser end.",
+  "sequence": [
+    {"time": "06:23:35", "phase": "opening_narration", "gs": "0x44000000", "mode": "0x44", "room": 0},
+    {"time": "06:23:39", "phase": "opening_narration", "gs": "0x44000000", "mode": "0x44", "room": 7, "msg": "0x80"},
+    {"time": "06:23:46", "phase": "opening_narration", "hp": 140, "room": 7},
+    {"time": "06:24:18", "phase": "opening_gameplay_teaser", "gs": "0x40000000", "mode": "0x40", "hp": 140, "room": 7, "in_control": false},
+    {"time": "06:24:50", "phase": "teaser_end_flash", "gs": "0x82000000", "mode": "0x82"},
+    {"time": "06:24:50", "phase": "post_teaser", "gs": "0x80000000", "mode": "0x80", "in_control": true}
+  ]
+}

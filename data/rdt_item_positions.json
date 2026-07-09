@@ -1,0 +1,1762 @@
+{
+  "100:serum": {
+    "x": 7280,
+    "z": 3920,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_1 type=pickable (init/proc0)",
+    "rdt_slot": 1
+  },
+  "100:@slot_3": {
+    "x": 7700,
+    "z": 5565,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "100:@slot_1": {
+    "x": 7280,
+    "z": 3920,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=pickable",
+    "rdt_slot": 1
+  },
+  "100:@slot_2": {
+    "x": 7294,
+    "z": 8200,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "104:@slot_4": {
+    "x": 4300,
+    "z": 6600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "105:emblem": {
+    "x": 32700,
+    "z": 8300,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_2 type=object (init/proc0)",
+    "rdt_slot": 2
+  },
+  "105:shield_key": {
+    "x": 2900,
+    "z": 8100,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_10 type=pickable (init/proc0)",
+    "rdt_slot": 10
+  },
+  "105:@slot_2": {
+    "x": 32700,
+    "z": 8300,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=object",
+    "rdt_slot": 2
+  },
+  "105:@slot_10": {
+    "x": 2900,
+    "z": 8100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 10 type=pickable",
+    "rdt_slot": 10
+  },
+  "105:@slot_16": {
+    "x": 17850,
+    "z": 13500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 16 type=object",
+    "rdt_slot": 16
+  },
+  "105:@slot_17": {
+    "x": 15850,
+    "z": 13500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 17 type=object",
+    "rdt_slot": 17
+  },
+  "108:@slot_4": {
+    "x": 14900,
+    "z": 4260,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "108:@slot_5": {
+    "x": 19820,
+    "z": 4260,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "108:@slot_6": {
+    "x": 23800,
+    "z": 8760,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=pickable",
+    "rdt_slot": 6
+  },
+  "108:@slot_7": {
+    "x": 23800,
+    "z": 13480,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 7 type=pickable",
+    "rdt_slot": 7
+  },
+  "10E:shotgun_shells": {
+    "x": 15,
+    "z": 15,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=object (init/proc0)",
+    "rdt_slot": 4
+  },
+  "10E:@slot_4": {
+    "x": 15,
+    "z": 15,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "10F:music_notes": {
+    "x": 9550,
+    "z": 8050,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_1 type=object (init/proc0)",
+    "rdt_slot": 1
+  },
+  "10F:gold_emblem": {
+    "x": 9750,
+    "z": 8600,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_12 type=object (init/proc0)",
+    "rdt_slot": 12
+  },
+  "10F:@slot_1": {
+    "x": 9550,
+    "z": 8050,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=object",
+    "rdt_slot": 1
+  },
+  "10F:@slot_12": {
+    "x": 9750,
+    "z": 8600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 12 type=object",
+    "rdt_slot": 12
+  },
+  "10F:@slot_13": {
+    "x": 9750,
+    "z": 8600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 13 type=object",
+    "rdt_slot": 13
+  },
+  "112:green_herb": {
+    "x": 3200,
+    "z": 9900,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=object (init/proc0)",
+    "rdt_slot": 5
+  },
+  "112:@slot_5": {
+    "x": 3200,
+    "z": 9900,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=object",
+    "rdt_slot": 5
+  },
+  "113:@slot_3": {
+    "x": 5500,
+    "z": 7300,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=object",
+    "rdt_slot": 3
+  },
+  "113:@slot_4": {
+    "x": 5500,
+    "z": 7300,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "116:shotgun": {
+    "x": 10820,
+    "z": 6340,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=object (init/proc0)",
+    "rdt_slot": 5
+  },
+  "116:@slot_5": {
+    "x": 10820,
+    "z": 6340,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=object",
+    "rdt_slot": 5
+  },
+  "116:@slot_6": {
+    "x": 10820,
+    "z": 6340,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=object",
+    "rdt_slot": 6
+  },
+  "116:@slot_7": {
+    "x": 5050,
+    "z": 11500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 7 type=object",
+    "rdt_slot": 7
+  },
+  "117:star_crest": {
+    "x": 9100,
+    "z": 7400,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_1 type=pickable (init/proc0)",
+    "rdt_slot": 1
+  },
+  "117:@slot_1": {
+    "x": 9100,
+    "z": 7400,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=pickable",
+    "rdt_slot": 1
+  },
+  "117:@slot_8": {
+    "x": 1850,
+    "z": 4100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 8 type=object",
+    "rdt_slot": 8
+  },
+  "201:@slot_5": {
+    "x": 15450,
+    "z": 26650,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "202:blue_jewel": {
+    "x": 17488,
+    "z": 4690,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=pickable (init/proc0)",
+    "rdt_slot": 3
+  },
+  "202:@slot_3": {
+    "x": 17488,
+    "z": 4690,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "205:sun_crest": {
+    "x": 9735,
+    "z": 7236,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=pickable (init/proc0)",
+    "rdt_slot": 3
+  },
+  "205:@slot_3": {
+    "x": 9735,
+    "z": 7236,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "207:@slot_8": {
+    "x": 9600,
+    "z": 14100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 8 type=pickable",
+    "rdt_slot": 8
+  },
+  "207:@slot_9": {
+    "x": 9600,
+    "z": 16400,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 9 type=pickable",
+    "rdt_slot": 9
+  },
+  "208:@slot_3": {
+    "x": 1550,
+    "z": 4500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=object",
+    "rdt_slot": 3
+  },
+  "20D:green_herb": {
+    "x": 8400,
+    "z": 3400,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=pickable (init/proc0)",
+    "rdt_slot": 4
+  },
+  "20D:@slot_4": {
+    "x": 8400,
+    "z": 3400,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "20E:@slot_5": {
+    "x": 6110,
+    "z": 3250,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "210:moon_crest": {
+    "x": 4608,
+    "z": 24040,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=pickable (init/proc0)",
+    "rdt_slot": 4
+  },
+  "210:@slot_4": {
+    "x": 4608,
+    "z": 24040,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "211:@slot_3": {
+    "x": 2950,
+    "z": 12000,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "211:@slot_4": {
+    "x": 2950,
+    "z": 8600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "212:bazooka_acid": {
+    "x": 24050,
+    "z": 19125,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=pickable (init/proc0)",
+    "rdt_slot": 3
+  },
+  "212:@slot_3": {
+    "x": 24050,
+    "z": 19125,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "300:green_herb": {
+    "x": 3146,
+    "z": 12036,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=pickable (init/proc0)",
+    "rdt_slot": 5
+  },
+  "300:@slot_5": {
+    "x": 3146,
+    "z": 12036,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "301:@slot_7": {
+    "x": 2750,
+    "z": 11250,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 7 type=pickable",
+    "rdt_slot": 7
+  },
+  "302:flare": {
+    "x": 23050,
+    "z": 28350,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_7 type=pickable (init/proc0)",
+    "rdt_slot": 7
+  },
+  "302:@slot_7": {
+    "x": 23050,
+    "z": 28350,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 7 type=pickable",
+    "rdt_slot": 7
+  },
+  "302:@slot_8": {
+    "x": 20500,
+    "z": 4800,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 8 type=pickable",
+    "rdt_slot": 8
+  },
+  "302:@slot_10": {
+    "x": 14350,
+    "z": 28700,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 10 type=pickable",
+    "rdt_slot": 10
+  },
+  "305:green_herb": {
+    "x": 0,
+    "z": 0,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=object (init/proc0)",
+    "rdt_slot": 3
+  },
+  "305:doom_book_2": {
+    "x": 0,
+    "z": 0,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=object (init/proc0)",
+    "rdt_slot": 4
+  },
+  "305:@slot_3": {
+    "x": 0,
+    "z": 0,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=object",
+    "rdt_slot": 3
+  },
+  "305:@slot_4": {
+    "x": 0,
+    "z": 0,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "305:@slot_9": {
+    "x": 21550,
+    "z": 7605,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 9 type=object",
+    "rdt_slot": 9
+  },
+  "305:@slot_10": {
+    "x": 25400,
+    "z": 9883,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 10 type=object",
+    "rdt_slot": 10
+  },
+  "305:@slot_11": {
+    "x": 22635,
+    "z": 7700,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 11 type=object",
+    "rdt_slot": 11
+  },
+  "305:@slot_13": {
+    "x": 25500,
+    "z": 10883,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 13 type=object",
+    "rdt_slot": 13
+  },
+  "305:@slot_14": {
+    "x": 8000,
+    "z": 13250,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 14 type=pickable",
+    "rdt_slot": 14
+  },
+  "308:@slot_4": {
+    "x": 5760,
+    "z": 19000,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "30A:hex_crank": {
+    "x": 11100,
+    "z": 4850,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_2 type=pickable (init/proc0)",
+    "rdt_slot": 2
+  },
+  "30A:@slot_2": {
+    "x": 11100,
+    "z": 4850,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "30A:@slot_3": {
+    "x": 10900,
+    "z": 15700,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "30B:mo_disc": {
+    "x": 20900,
+    "z": 18350,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=object (init/proc0)",
+    "rdt_slot": 4
+  },
+  "30B:@slot_4": {
+    "x": 20900,
+    "z": 18350,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "30B:@slot_5": {
+    "x": 12000,
+    "z": 14000,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=object",
+    "rdt_slot": 5
+  },
+  "30B:@slot_6": {
+    "x": 16850,
+    "z": 14400,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=object",
+    "rdt_slot": 6
+  },
+  "30B:@slot_7": {
+    "x": 15400,
+    "z": 14250,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 7 type=object",
+    "rdt_slot": 7
+  },
+  "30B:@slot_9": {
+    "x": 23000,
+    "z": 18200,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 9 type=object",
+    "rdt_slot": 9
+  },
+  "30B:@slot_11": {
+    "x": 4300,
+    "z": 13600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 11 type=object",
+    "rdt_slot": 11
+  },
+  "30B:@slot_12": {
+    "x": 20900,
+    "z": 18350,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 12 type=object",
+    "rdt_slot": 12
+  },
+  "30D:flame_rounds": {
+    "x": 4000,
+    "z": 7600,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=object (init/proc0)",
+    "rdt_slot": 4
+  },
+  "30D:@slot_4": {
+    "x": 4000,
+    "z": 7600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "30D:@slot_5": {
+    "x": 4000,
+    "z": 7600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=object",
+    "rdt_slot": 5
+  },
+  "30D:@slot_6": {
+    "x": 4000,
+    "z": 7600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=object",
+    "rdt_slot": 6
+  },
+  "30F:first_aid_spray": {
+    "x": 23900,
+    "z": 2250,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=pickable (init/proc0)",
+    "rdt_slot": 3
+  },
+  "30F:explosive_rounds": {
+    "x": 12100,
+    "z": 24550,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_8 type=object (init/proc0)",
+    "rdt_slot": 8
+  },
+  "30F:@slot_3": {
+    "x": 23900,
+    "z": 2250,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "30F:@slot_8": {
+    "x": 12100,
+    "z": 24550,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 8 type=object",
+    "rdt_slot": 8
+  },
+  "30F:@slot_9": {
+    "x": 15500,
+    "z": 23900,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 9 type=object",
+    "rdt_slot": 9
+  },
+  "30F:@slot_12": {
+    "x": 2350,
+    "z": 24190,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 12 type=pickable",
+    "rdt_slot": 12
+  },
+  "30F:@slot_13": {
+    "x": 29900,
+    "z": 25100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 13 type=object",
+    "rdt_slot": 13
+  },
+  "30F:@slot_14": {
+    "x": 14000,
+    "z": 22200,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 14 type=object",
+    "rdt_slot": 14
+  },
+  "401:red_book": {
+    "x": 2800,
+    "z": 14000,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=pickable (init/proc0)",
+    "rdt_slot": 5
+  },
+  "401:@slot_5": {
+    "x": 2800,
+    "z": 14000,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "402:control_room_key": {
+    "x": 2500,
+    "z": 3700,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=object (init/proc0)",
+    "rdt_slot": 3
+  },
+  "402:@slot_3": {
+    "x": 2500,
+    "z": 3700,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=object",
+    "rdt_slot": 3
+  },
+  "406:shotgun_shells": {
+    "x": 9500,
+    "z": 5500,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=pickable (init/proc0)",
+    "rdt_slot": 4
+  },
+  "406:@slot_4": {
+    "x": 9500,
+    "z": 5500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "406:@slot_5": {
+    "x": 12600,
+    "z": 8900,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "409:empty_bottle": {
+    "x": 7448,
+    "z": 5874,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_13 type=pickable (init/proc0)",
+    "rdt_slot": 13
+  },
+  "409:@slot_13": {
+    "x": 7448,
+    "z": 5874,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 13 type=pickable",
+    "rdt_slot": 13
+  },
+  "40A:ink_ribbon": {
+    "x": 11850,
+    "z": 10450,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=pickable (init/proc0)",
+    "rdt_slot": 5
+  },
+  "40A:@slot_5": {
+    "x": 11850,
+    "z": 10450,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "40A:@slot_6": {
+    "x": 11850,
+    "z": 10450,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=object",
+    "rdt_slot": 6
+  },
+  "40A:@slot_7": {
+    "x": 15100,
+    "z": 5100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 7 type=pickable",
+    "rdt_slot": 7
+  },
+  "40C:helmet_key": {
+    "x": 1850,
+    "z": 9950,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_5 type=pickable (init/proc0)",
+    "rdt_slot": 5
+  },
+  "40C:@slot_5": {
+    "x": 1850,
+    "z": 9950,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "40D:green_herb": {
+    "x": 27500,
+    "z": 14655,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_2 type=pickable (init/proc0)",
+    "rdt_slot": 2
+  },
+  "40D:@slot_10": {
+    "x": 3200,
+    "z": 30700,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 10 type=pickable",
+    "rdt_slot": 10
+  },
+  "40D:@slot_2": {
+    "x": 27500,
+    "z": 14655,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "40E:@slot_2": {
+    "x": 1250,
+    "z": 26900,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "410:dorm_key_003": {
+    "x": 2350,
+    "z": 4850,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_16 type=object (init/proc0)",
+    "rdt_slot": 16
+  },
+  "410:@slot_16": {
+    "x": 2350,
+    "z": 4850,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 16 type=object",
+    "rdt_slot": 16
+  },
+  "411:@slot_1": {
+    "x": 9050,
+    "z": 4850,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=object",
+    "rdt_slot": 1
+  },
+  "411:@slot_2": {
+    "x": 6850,
+    "z": 12550,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=object",
+    "rdt_slot": 2
+  },
+  "500:battery": {
+    "x": 2500,
+    "z": 12500,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_3 type=pickable (init/proc0)",
+    "rdt_slot": 3
+  },
+  "500:@slot_3": {
+    "x": 2500,
+    "z": 12500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "501:@slot_5": {
+    "x": 4000,
+    "z": 30200,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "501:@slot_6": {
+    "x": 19750,
+    "z": 8500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=pickable",
+    "rdt_slot": 6
+  },
+  "503:@slot_8": {
+    "x": 11000,
+    "z": 15750,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 8 type=pickable",
+    "rdt_slot": 8
+  },
+  "504:@slot_7": {
+    "x": 11900,
+    "z": 4100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 7 type=pickable",
+    "rdt_slot": 7
+  },
+  "505:@slot_6": {
+    "x": 11100,
+    "z": 1500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=pickable",
+    "rdt_slot": 6
+  },
+  "506:wolf_medal": {
+    "x": 16500,
+    "z": 8200,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_1 type=pickable (init/proc0)",
+    "rdt_slot": 1
+  },
+  "506:@slot_1": {
+    "x": 16500,
+    "z": 8200,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=pickable",
+    "rdt_slot": 1
+  },
+  "507:eagle_medal": {
+    "x": 15900,
+    "z": 8450,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_9 type=object (init/proc0)",
+    "rdt_slot": 9
+  },
+  "507:@slot_9": {
+    "x": 15900,
+    "z": 8450,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 9 type=object",
+    "rdt_slot": 9
+  },
+  "507:@slot_13": {
+    "x": 3670,
+    "z": 6620,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 13 type=object",
+    "rdt_slot": 13
+  },
+  "508:green_herb": {
+    "x": 2400,
+    "z": 5400,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=pickable (init/proc0)",
+    "rdt_slot": 4
+  },
+  "508:@slot_4": {
+    "x": 2400,
+    "z": 5400,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "509:@slot_4": {
+    "x": 10900,
+    "z": 2750,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "50A:@slot_2": {
+    "x": 8500,
+    "z": 1900,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "50A:@slot_3": {
+    "x": 8850,
+    "z": 11000,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "50A:@slot_4": {
+    "x": 1600,
+    "z": 6250,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "50B:flare": {
+    "x": 9850,
+    "z": 15500,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_1 type=pickable (init/proc0)",
+    "rdt_slot": 1
+  },
+  "50B:@slot_1": {
+    "x": 9850,
+    "z": 15500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=pickable",
+    "rdt_slot": 1
+  },
+  "50C:@slot_5": {
+    "x": 16500,
+    "z": 25500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "50F:@slot_2": {
+    "x": 2053,
+    "z": 4394,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "510:slides": {
+    "x": 19500,
+    "z": 2250,
+    "source": "rdt",
+    "confidence": "medium",
+    "notes": "slot_4 type=object (init/proc0)",
+    "rdt_slot": 4
+  },
+  "510:@slot_4": {
+    "x": 19500,
+    "z": 2250,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "511:@slot_1": {
+    "x": 18750,
+    "z": 9100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=object",
+    "rdt_slot": 1
+  },
+  "511:@slot_2": {
+    "x": 6850,
+    "z": 5250,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=object",
+    "rdt_slot": 2
+  },
+  "600:@slot_10": {
+    "x": 8062,
+    "z": 7898,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 10 type=pickable",
+    "rdt_slot": 10
+  },
+  "605:@slot_2": {
+    "x": 32700,
+    "z": 8300,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=object",
+    "rdt_slot": 2
+  },
+  "605:@slot_10": {
+    "x": 2900,
+    "z": 8100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 10 type=pickable",
+    "rdt_slot": 10
+  },
+  "605:@slot_16": {
+    "x": 17850,
+    "z": 13500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 16 type=object",
+    "rdt_slot": 16
+  },
+  "605:@slot_17": {
+    "x": 15850,
+    "z": 13500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 17 type=object",
+    "rdt_slot": 17
+  },
+  "60A:@slot_5": {
+    "x": 2800,
+    "z": 3450,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "60E:@slot_4": {
+    "x": 15,
+    "z": 15,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "60F:@slot_1": {
+    "x": 9550,
+    "z": 8050,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=object",
+    "rdt_slot": 1
+  },
+  "60F:@slot_12": {
+    "x": 9750,
+    "z": 8600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 12 type=object",
+    "rdt_slot": 12
+  },
+  "60F:@slot_13": {
+    "x": 9750,
+    "z": 8600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 13 type=object",
+    "rdt_slot": 13
+  },
+  "610:@slot_4": {
+    "x": 8280,
+    "z": 10600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "610:@slot_5": {
+    "x": 11299,
+    "z": 10600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "612:@slot_5": {
+    "x": 3200,
+    "z": 9900,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=object",
+    "rdt_slot": 5
+  },
+  "613:@slot_3": {
+    "x": 5500,
+    "z": 7300,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=object",
+    "rdt_slot": 3
+  },
+  "613:@slot_4": {
+    "x": 5500,
+    "z": 7300,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "616:@slot_5": {
+    "x": 10820,
+    "z": 6340,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=object",
+    "rdt_slot": 5
+  },
+  "616:@slot_6": {
+    "x": 10820,
+    "z": 6340,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=object",
+    "rdt_slot": 6
+  },
+  "616:@slot_7": {
+    "x": 5050,
+    "z": 11500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 7 type=object",
+    "rdt_slot": 7
+  },
+  "617:@slot_1": {
+    "x": 9100,
+    "z": 7400,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=pickable",
+    "rdt_slot": 1
+  },
+  "617:@slot_8": {
+    "x": 1850,
+    "z": 4100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 8 type=object",
+    "rdt_slot": 8
+  },
+  "619:@slot_2": {
+    "x": 3770,
+    "z": 7362,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "61A:@slot_2": {
+    "x": 7500,
+    "z": 27700,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "701:@slot_5": {
+    "x": 15450,
+    "z": 26650,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "702:@slot_3": {
+    "x": 17488,
+    "z": 4690,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "705:@slot_3": {
+    "x": 9735,
+    "z": 7236,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "706:@slot_4": {
+    "x": 6830,
+    "z": 12340,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "707:@slot_8": {
+    "x": 9600,
+    "z": 14100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 8 type=pickable",
+    "rdt_slot": 8
+  },
+  "707:@slot_9": {
+    "x": 9600,
+    "z": 16400,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 9 type=pickable",
+    "rdt_slot": 9
+  },
+  "708:@slot_3": {
+    "x": 1550,
+    "z": 4500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=object",
+    "rdt_slot": 3
+  },
+  "70C:@slot_7": {
+    "x": 17850,
+    "z": 3610,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 7 type=pickable",
+    "rdt_slot": 7
+  },
+  "70C:@slot_2": {
+    "x": 2700,
+    "z": 2400,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "70C:@slot_3": {
+    "x": 3000,
+    "z": 4750,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "70C:@slot_4": {
+    "x": 17850,
+    "z": 3610,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "710:@slot_4": {
+    "x": 4608,
+    "z": 24040,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "711:@slot_3": {
+    "x": 2950,
+    "z": 12000,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "711:@slot_4": {
+    "x": 2950,
+    "z": 8600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "715:@slot_1": {
+    "x": 8700,
+    "z": 5600,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=pickable",
+    "rdt_slot": 1
+  },
+  "715:@slot_2": {
+    "x": 4950,
+    "z": 11430,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "717:@slot_1": {
+    "x": 2000,
+    "z": 9150,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=pickable",
+    "rdt_slot": 1
+  },
+  "717:@slot_3": {
+    "x": 3450,
+    "z": 14180,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "718:@slot_1": {
+    "x": 5600,
+    "z": 9000,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=pickable",
+    "rdt_slot": 1
+  },
+  "719:@slot_4": {
+    "x": 2700,
+    "z": 2450,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "71A:@slot_2": {
+    "x": 30800,
+    "z": 3950,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "801:@slot_5": {
+    "x": 11900,
+    "z": 20500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "801:@slot_6": {
+    "x": 9400,
+    "z": 20500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=pickable",
+    "rdt_slot": 6
+  },
+  "801:@slot_7": {
+    "x": 4500,
+    "z": 16900,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 7 type=pickable",
+    "rdt_slot": 7
+  },
+  "801:@slot_8": {
+    "x": 4500,
+    "z": 15400,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 8 type=pickable",
+    "rdt_slot": 8
+  },
+  "801:@slot_9": {
+    "x": 4500,
+    "z": 6900,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 9 type=pickable",
+    "rdt_slot": 9
+  },
+  "801:@slot_10": {
+    "x": 4500,
+    "z": 6100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 10 type=pickable",
+    "rdt_slot": 10
+  },
+  "812:@slot_5": {
+    "x": 3200,
+    "z": 9900,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=object",
+    "rdt_slot": 5
+  },
+  "813:@slot_3": {
+    "x": 5500,
+    "z": 7300,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=object",
+    "rdt_slot": 3
+  },
+  "813:@slot_4": {
+    "x": 5500,
+    "z": 7300,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "813:@slot_6": {
+    "x": 5800,
+    "z": 3050,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=pickable",
+    "rdt_slot": 6
+  },
+  "81C:@slot_4": {
+    "x": 9100,
+    "z": 3500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "81C:@slot_5": {
+    "x": 11800,
+    "z": 3500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "901:@slot_5": {
+    "x": 15450,
+    "z": 26650,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "902:@slot_3": {
+    "x": 17638,
+    "z": 4690,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "A00:@slot_5": {
+    "x": 3146,
+    "z": 12036,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "A0F:@slot_3": {
+    "x": 23900,
+    "z": 2250,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "A0F:@slot_8": {
+    "x": 12100,
+    "z": 24550,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 8 type=object",
+    "rdt_slot": 8
+  },
+  "A0F:@slot_9": {
+    "x": 15500,
+    "z": 23900,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 9 type=object",
+    "rdt_slot": 9
+  },
+  "A0F:@slot_12": {
+    "x": 2350,
+    "z": 24190,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 12 type=pickable",
+    "rdt_slot": 12
+  },
+  "A0F:@slot_13": {
+    "x": 29900,
+    "z": 25100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 13 type=object",
+    "rdt_slot": 13
+  },
+  "A0F:@slot_14": {
+    "x": 14000,
+    "z": 22200,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 14 type=object",
+    "rdt_slot": 14
+  },
+  "C04:@slot_7": {
+    "x": 11900,
+    "z": 4100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 7 type=pickable",
+    "rdt_slot": 7
+  },
+  "C05:@slot_6": {
+    "x": 11100,
+    "z": 1500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=pickable",
+    "rdt_slot": 6
+  },
+  "C07:@slot_9": {
+    "x": 15900,
+    "z": 8450,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 9 type=object",
+    "rdt_slot": 9
+  },
+  "C07:@slot_13": {
+    "x": 3670,
+    "z": 6620,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 13 type=object",
+    "rdt_slot": 13
+  },
+  "C11:@slot_1": {
+    "x": 18750,
+    "z": 9100,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=object",
+    "rdt_slot": 1
+  },
+  "C11:@slot_2": {
+    "x": 6850,
+    "z": 5200,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=object",
+    "rdt_slot": 2
+  },
+  "D12:@slot_5": {
+    "x": 3200,
+    "z": 9900,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=object",
+    "rdt_slot": 5
+  },
+  "D13:@slot_3": {
+    "x": 5500,
+    "z": 7300,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=object",
+    "rdt_slot": 3
+  },
+  "D13:@slot_4": {
+    "x": 5500,
+    "z": 7300,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=object",
+    "rdt_slot": 4
+  },
+  "D13:@slot_6": {
+    "x": 5800,
+    "z": 3050,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 6 type=pickable",
+    "rdt_slot": 6
+  },
+  "D1A:@slot_2": {
+    "x": 7500,
+    "z": 27700,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  },
+  "D1C:@slot_4": {
+    "x": 9100,
+    "z": 3500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 4 type=pickable",
+    "rdt_slot": 4
+  },
+  "D1C:@slot_5": {
+    "x": 11800,
+    "z": 3500,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "E01:@slot_5": {
+    "x": 15450,
+    "z": 26650,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 5 type=pickable",
+    "rdt_slot": 5
+  },
+  "E02:@slot_3": {
+    "x": 17488,
+    "z": 4690,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 3 type=pickable",
+    "rdt_slot": 3
+  },
+  "E18:@slot_1": {
+    "x": 5600,
+    "z": 9000,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 1 type=pickable",
+    "rdt_slot": 1
+  },
+  "E1A:@slot_2": {
+    "x": 30800,
+    "z": 3950,
+    "source": "rdt_slot",
+    "confidence": "low",
+    "notes": "unmapped slot 2 type=pickable",
+    "rdt_slot": 2
+  }
+}

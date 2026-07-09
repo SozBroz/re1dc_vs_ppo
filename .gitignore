@@ -5,15 +5,69 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.pyd.locked
 
-# BizHawk / runtime artifacts
-states/*.state
-recordings/*
-tools/*
-
-# IDE
+# IDE / Cursor
 .idea/
 .vscode/
+.cursor/
 
+# BizHawk / emulator runtime
 roms/
+tools/
+recordings/
+states/*.state
+states/checkpoints/*.State
+
+# Checkpoints & training artifacts (never commit weights)
+data/checkpoints/
+data/*.zip
+data/.ppo_*
+data/_ckpt_write*
+data/benchmark_*.zip
+
+# Logs & metrics
+logs/
+*.jsonl
+data/agent_ram_monitor.jsonl
+data/attack_entry_suite.jsonl
+data/ram_log.csv
+data/boot_log.txt
+data/emuhawk_*.log
+data/play_human_run.log
+knife_anim_qa_last_run.log
+
+# Screenshots, captures, probes (media)
+data/**/*.png
+data/**/*.jpg
+data/**/*.jpeg
+data/**/*.gif
+data/**/*.webp
 data/screen.png
+data/_frame*.png
+data/_bridge_test.png
+data/launch_check.png
+data/death_monitor_*.png
+data/opening_capture_*.png
+data/weapon_frames/
+data/knife_capture/
+data/death_screen_hunt/
+data/controller_config_hunt/
+data/equip_probe/
+data/recon/
+data/hunt_*/
+data/probe_*.png
+
+# Large hunt / benchmark dumps (regenerate from scripts)
+data/benchmark_results/
+data/determinism_trace_*.json
+data/rdt_raw/
+data/rdt_extracted.json
+
+# Temp / local-only
+*.tmp
+*.log
+.DS_Store
+Thumbs.db

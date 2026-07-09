@@ -1,0 +1,4 @@
+system=PSX
+frame 1 hp=0 stage=0 room=0
+frame 2921 hp=140 stage=124 room=128
+DONE frames=30000

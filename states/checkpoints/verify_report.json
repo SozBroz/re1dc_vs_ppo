@@ -1,0 +1,240 @@
+{
+  "wp00": {
+    "status": "DEFECT",
+    "next_seq": 1,
+    "goal_room": "105",
+    "achieved": false,
+    "achieved_step": null,
+    "waypoint_bonus_sum": 0.0,
+    "wrong_room_fines_sum": 0.0,
+    "pbrs_net": -2.0,
+    "checks": [
+      {
+        "check": "player alive",
+        "ok": true,
+        "detail": "hp=96"
+      },
+      {
+        "check": "planner goal is next checkpoint room",
+        "ok": true,
+        "detail": "planner says 105, route says 105"
+      },
+      {
+        "check": "goal vector encodes that room",
+        "ok": true,
+        "detail": "goal_room_index=0.0391"
+      },
+      {
+        "check": "in_target_room flag correct",
+        "ok": true,
+        "detail": "flag=1"
+      },
+      {
+        "check": "hop distance informative (goal mapped)",
+        "ok": true,
+        "detail": "hops=0, field=0.000"
+      },
+      {
+        "check": "wrong_room_flag clear on route",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "check": "has_required_items satisfied",
+        "ok": true,
+        "detail": "inventory=['knife', 'beretta', 'first_aid_spray_alt']"
+      },
+      {
+        "check": "NEXT CHECKPOINT (seq 1) achieved by driver",
+        "ok": false,
+        "detail": "not within 10000 steps (6.2 min)"
+      }
+    ]
+  },
+  "wp01": {
+    "status": "DEFECT",
+    "next_seq": 2,
+    "goal_room": "106",
+    "achieved": false,
+    "achieved_step": null,
+    "waypoint_bonus_sum": 0.0,
+    "wrong_room_fines_sum": 0.0,
+    "pbrs_net": -1.0,
+    "checks": [
+      {
+        "check": "savestate restores recorded room",
+        "ok": true,
+        "detail": "expected 105, got 105"
+      },
+      {
+        "check": "player alive",
+        "ok": true,
+        "detail": "hp=96"
+      },
+      {
+        "check": "planner goal is next checkpoint room",
+        "ok": true,
+        "detail": "planner says 106, route says 106"
+      },
+      {
+        "check": "goal vector encodes that room",
+        "ok": true,
+        "detail": "goal_room_index=0.0469"
+      },
+      {
+        "check": "in_target_room flag correct",
+        "ok": true,
+        "detail": "flag=0"
+      },
+      {
+        "check": "hop distance informative (goal mapped)",
+        "ok": true,
+        "detail": "hops=1, field=0.050"
+      },
+      {
+        "check": "wrong_room_flag clear on route",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "check": "door compass available toward goal",
+        "ok": true,
+        "detail": "door_dist=2.000"
+      },
+      {
+        "check": "has_required_items satisfied",
+        "ok": true,
+        "detail": "inventory=['knife', 'beretta', 'first_aid_spray_alt', 'emblem']"
+      },
+      {
+        "check": "NEXT CHECKPOINT (seq 2) achieved by driver",
+        "ok": false,
+        "detail": "not within 10000 steps (2.7 min)"
+      }
+    ]
+  },
+  "wp02": {
+    "status": "DEFECT",
+    "next_seq": 3,
+    "goal_room": "106",
+    "achieved": false,
+    "achieved_step": null,
+    "waypoint_bonus_sum": 0.0,
+    "wrong_room_fines_sum": 0.0,
+    "pbrs_net": -3.0,
+    "checks": [
+      {
+        "check": "savestate restores recorded room",
+        "ok": true,
+        "detail": "expected 106, got 106"
+      },
+      {
+        "check": "player alive",
+        "ok": true,
+        "detail": "hp=96"
+      },
+      {
+        "check": "planner goal is next checkpoint room",
+        "ok": true,
+        "detail": "planner says 106, route says 106"
+      },
+      {
+        "check": "goal vector encodes that room",
+        "ok": true,
+        "detail": "goal_room_index=0.0469"
+      },
+      {
+        "check": "in_target_room flag correct",
+        "ok": true,
+        "detail": "flag=1"
+      },
+      {
+        "check": "hop distance informative (goal mapped)",
+        "ok": true,
+        "detail": "hops=0, field=0.000"
+      },
+      {
+        "check": "wrong_room_flag clear on route",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "check": "has_required_items satisfied",
+        "ok": true,
+        "detail": "inventory=['knife', 'beretta', 'first_aid_spray_alt', 'emblem']"
+      },
+      {
+        "check": "NEXT CHECKPOINT (seq 3) achieved by driver",
+        "ok": false,
+        "detail": "not within 10000 steps (2.7 min)"
+      }
+    ]
+  },
+  "wp03": {
+    "status": "OK",
+    "next_seq": 4,
+    "goal_room": "203",
+    "achieved": true,
+    "achieved_step": 214,
+    "waypoint_bonus_sum": 2.0,
+    "wrong_room_fines_sum": 0.0,
+    "pbrs_net": 2.0,
+    "checks": [
+      {
+        "check": "savestate restores recorded room",
+        "ok": true,
+        "detail": "expected 106, got 106"
+      },
+      {
+        "check": "player alive",
+        "ok": true,
+        "detail": "hp=96"
+      },
+      {
+        "check": "planner goal is next checkpoint room",
+        "ok": true,
+        "detail": "planner says 203, route says 203"
+      },
+      {
+        "check": "goal vector encodes that room",
+        "ok": true,
+        "detail": "goal_room_index=0.2500"
+      },
+      {
+        "check": "in_target_room flag correct",
+        "ok": true,
+        "detail": "flag=0"
+      },
+      {
+        "check": "hop distance informative (goal mapped)",
+        "ok": true,
+        "detail": "hops=1, field=0.050"
+      },
+      {
+        "check": "wrong_room_flag clear on route",
+        "ok": true,
+        "detail": ""
+      },
+      {
+        "check": "door compass available toward goal",
+        "ok": true,
+        "detail": "door_dist=2.000"
+      },
+      {
+        "check": "has_required_items satisfied",
+        "ok": true,
+        "detail": "inventory=['knife', 'beretta', 'first_aid_spray_alt', 'emblem']"
+      },
+      {
+        "check": "NEXT CHECKPOINT (seq 4) achieved by driver",
+        "ok": true,
+        "detail": "step 214, 0.2 min"
+      },
+      {
+        "check": "waypoint bonus paid on completion",
+        "ok": true,
+        "detail": "sum=2.0"
+      }
+    ]
+  }
+}

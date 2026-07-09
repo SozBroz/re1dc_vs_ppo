@@ -1,0 +1,1 @@
+{"stage": "m0_dining_to_main_hall", "stage_index": 0, "init_savestate": "states/jill_control_fresh.State", "route_steps": [1, 2, 3, 4, 5, 6, 7], "success_room": "107", "required_items": [], "max_steps": 2000}

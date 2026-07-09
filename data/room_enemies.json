@@ -1,0 +1,803 @@
+{
+  "_meta": {
+    "source": "evilresource.com + manual Jill walkthrough transcription",
+    "scenario": "jill",
+    "game": "RE1 Director's Cut PS1 standard Jill",
+    "date": "2026-07-04",
+    "fetch_errors": [
+      "https://www.evilresource.com/resident-evil/enemies/hornet: HTTP Error 404: Not Found"
+    ],
+    "notes": "positions intentionally absent \u2014 come from RAM/RDT only",
+    "scrape_ok": true,
+    "unmatched_count": 0,
+    "rdt_positions_merged": 15
+  },
+  "100": {
+    "room_name": "SAVE ROOM",
+    "enemies": []
+  },
+  "101": {
+    "room_name": "1F LEFT STAIRS",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "zombie on east stairs landing",
+        "unverified": true
+      }
+    ]
+  },
+  "102": {
+    "room_name": "VACANT ROOM",
+    "enemies": []
+  },
+  "103": {
+    "room_name": "F PASSAGE",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "zombie in F passage",
+        "unverified": true
+      }
+    ]
+  },
+  "104": {
+    "room_name": "TEA ROOM",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "cutscene",
+        "notes": "Kenneth Sullivan body; first zombie encounter | RDT @(4150,6300)",
+        "unverified": true,
+        "x": 4150,
+        "z": 6300,
+        "model_id": 17
+      }
+    ]
+  },
+  "105": {
+    "room_name": "DINING ROOM",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "zombie enters from kitchen door on revisit",
+        "unverified": true
+      }
+    ]
+  },
+  "106": {
+    "room_name": "MAIN HALL",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 2,
+        "spawn_trigger": "return_visit",
+        "notes": "hallway zombies after mansion revisit",
+        "unverified": true
+      }
+    ]
+  },
+  "107": {
+    "room_name": "GALLERY",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "zombie in statue alcove area",
+        "unverified": true
+      },
+      {
+        "enemy_type": "crow",
+        "count": 2,
+        "spawn_trigger": "always",
+        "notes": "crows in gallery (107); adjacent to art room",
+        "unverified": true
+      }
+    ]
+  },
+  "108": {
+    "room_name": "L PASSAGE",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "always",
+        "notes": "zombie in L-shaped passage | RDT @(30000,30000)",
+        "unverified": true,
+        "x": 30000,
+        "z": 30000,
+        "model_id": 2
+      }
+    ]
+  },
+  "109": {
+    "room_name": "TRAP PASSAGE",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "always",
+        "notes": "zombie en route to trap room",
+        "unverified": true
+      }
+    ]
+  },
+  "10A": {
+    "room_name": "BACK PASSAGE",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "zombie in back passage | RDT @(8272,2433)",
+        "unverified": true,
+        "x": 8272,
+        "z": 2433,
+        "model_id": 17
+      }
+    ]
+  },
+  "10B": {
+    "room_name": "1F RIGHT STAIRS",
+    "enemies": []
+  },
+  "10C": {
+    "room_name": "GREEN HOUSE",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "zombie in greenhouse after crest puzzle",
+        "unverified": true
+      }
+    ]
+  },
+  "10D": {
+    "room_name": "TIGER STATUE ROOM",
+    "enemies": []
+  },
+  "10E": {
+    "room_name": "EMPLOYEE ROOM",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "zombie in employee/keeper bedroom",
+        "unverified": true
+      }
+    ]
+  },
+  "10F": {
+    "room_name": "BAR",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "zombie in piano bar",
+        "unverified": true
+      }
+    ]
+  },
+  "110": {
+    "room_name": "N/A",
+    "enemies": []
+  },
+  "111": {
+    "room_name": "DRESSING ROOM",
+    "enemies": []
+  },
+  "112": {
+    "room_name": "WARDROBE",
+    "enemies": []
+  },
+  "113": {
+    "room_name": "BATHROOM",
+    "enemies": []
+  },
+  "114": {
+    "room_name": "BOILER",
+    "enemies": []
+  },
+  "115": {
+    "room_name": "TRAP ROOM",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 2,
+        "spawn_trigger": "always",
+        "notes": "zombies; ceiling trap over shotgun rack",
+        "unverified": true
+      }
+    ]
+  },
+  "116": {
+    "room_name": "LIVING ROOM",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 2,
+        "spawn_trigger": "always",
+        "notes": "zombies near wall shotgun rack | RDT @(9500,5800)",
+        "unverified": true,
+        "x": 9500,
+        "z": 5800,
+        "model_id": 17
+      }
+    ]
+  },
+  "117": {
+    "room_name": "LARGE GALLERY",
+    "enemies": [
+      {
+        "enemy_type": "crow",
+        "count": 2,
+        "spawn_trigger": "always",
+        "notes": "crows; star crest puzzle room | RDT @(19557,10200)",
+        "unverified": true,
+        "x": 19557,
+        "z": 10200,
+        "model_id": 5
+      }
+    ]
+  },
+  "118": {
+    "room_name": "STAIRS UNDER ROOM",
+    "enemies": []
+  },
+  "119": {
+    "room_name": "N/A",
+    "enemies": []
+  },
+  "11A": {
+    "room_name": "ROOFED PASSAGE",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "always",
+        "notes": "zombie in roofed outdoor passage | RDT @(6500,24860)",
+        "unverified": true,
+        "x": 6500,
+        "z": 24860,
+        "model_id": 2
+      }
+    ]
+  },
+  "11B": {
+    "room_name": "STORE ROOM",
+    "enemies": []
+  },
+  "11C": {
+    "room_name": "WARDROBE S",
+    "enemies": []
+  },
+  "200": {
+    "room_name": "N/A",
+    "enemies": []
+  },
+  "201": {
+    "room_name": "2F LEFT STAIRS",
+    "enemies": []
+  },
+  "202": {
+    "room_name": "DINING ROOM 2F",
+    "enemies": []
+  },
+  "203": {
+    "room_name": "HALL 2F",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 2,
+        "spawn_trigger": "return_visit",
+        "notes": "2F hall zombies after revisit",
+        "unverified": true
+      }
+    ]
+  },
+  "204": {
+    "room_name": "C PASSAGE",
+    "enemies": []
+  },
+  "205": {
+    "room_name": "ARMOR ROOM",
+    "enemies": []
+  },
+  "206": {
+    "room_name": "DOLL ROOM",
+    "enemies": []
+  },
+  "207": {
+    "room_name": "2F RIGHT STAIRS",
+    "enemies": []
+  },
+  "208": {
+    "room_name": "DEER ROOM",
+    "enemies": []
+  },
+  "209": {
+    "room_name": "BEDROOM",
+    "enemies": []
+  },
+  "20A": {
+    "room_name": "STUDY ROOM",
+    "enemies": []
+  },
+  "20B": {
+    "room_name": "FRONT LESSON ROOM",
+    "enemies": []
+  },
+  "20C": {
+    "room_name": "LESSON ROOM",
+    "enemies": []
+  },
+  "20D": {
+    "room_name": "PILLAR PASSAGE",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "zombie near Richard body area",
+        "unverified": true
+      }
+    ]
+  },
+  "20E": {
+    "room_name": "FRONT OF ATTIC",
+    "enemies": []
+  },
+  "20F": {
+    "room_name": "DINING",
+    "enemies": []
+  },
+  "210": {
+    "room_name": "ATTIC",
+    "enemies": [
+      {
+        "enemy_type": "snake_yawn",
+        "count": 1,
+        "spawn_trigger": "event",
+        "notes": "Yawn boss fight (first snake encounter) | RDT @(4500,24500)",
+        "unverified": true,
+        "x": 4500,
+        "z": 24500,
+        "model_id": 13
+      }
+    ]
+  },
+  "211": {
+    "room_name": "TERRACE PASSAGE",
+    "enemies": []
+  },
+  "212": {
+    "room_name": "TERRACE",
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "cutscene",
+        "notes": "Forest Speyer corpse event (not a combat spawn)",
+        "unverified": true
+      }
+    ]
+  },
+  "213": {
+    "room_name": "FRONT ELEVATOR",
+    "enemies": []
+  },
+  "214": {
+    "room_name": "ROUGH PASSAGE",
+    "enemies": []
+  },
+  "215": {
+    "room_name": "STUFFED ROOM",
+    "enemies": []
+  },
+  "216": {
+    "room_name": "LIBRARY A",
+    "enemies": []
+  },
+  "217": {
+    "room_name": "LIBRARY B",
+    "enemies": []
+  },
+  "218": {
+    "room_name": "HIDDEN LIBRARY",
+    "enemies": []
+  },
+  "219": {
+    "room_name": "SHED",
+    "enemies": []
+  },
+  "21A": {
+    "room_name": "UNDER PASSAGE 1",
+    "enemies": []
+  },
+  "21B": {
+    "room_name": "UNDER PASSAGE 2",
+    "enemies": []
+  },
+  "21C": {
+    "room_name": "UNDER KITCHEN",
+    "enemies": []
+  },
+  "300": {
+    "room_name": "FIRST HOUSE OUT",
+    "enemies": [
+      {
+        "enemy_type": "cerberus",
+        "count": 2,
+        "spawn_trigger": "event",
+        "notes": "dogs attack on first courtyard entry | RDT @(23945,20792)",
+        "unverified": true,
+        "x": 23945,
+        "z": 20792,
+        "model_id": 2
+      }
+    ]
+  },
+  "301": {
+    "room_name": "WATER GATE",
+    "enemies": []
+  },
+  "302": {
+    "room_name": "FALLS",
+    "enemies": []
+  },
+  "303": {
+    "room_name": "HELIPORT",
+    "enemies": []
+  },
+  "304": {
+    "room_name": "SECOND HOUSE GATE",
+    "enemies": [
+      {
+        "enemy_type": "cerberus",
+        "count": 2,
+        "spawn_trigger": "always",
+        "notes": "cerberus at guardhouse entrance | RDT @(25657,11984)",
+        "unverified": true,
+        "x": 25657,
+        "z": 11984,
+        "model_id": 2
+      }
+    ]
+  },
+  "305": {
+    "room_name": "FOUNTAIN",
+    "enemies": []
+  },
+  "306": {
+    "room_name": "ITEM PASSAGE",
+    "enemies": []
+  },
+  "307": {
+    "room_name": "LADDER PASSAGE",
+    "enemies": []
+  },
+  "308": {
+    "room_name": "BRANCH PASSAGE",
+    "enemies": []
+  },
+  "309": {
+    "room_name": "DARKNESS PASSAGE",
+    "enemies": [
+      {
+        "enemy_type": "hunter",
+        "count": 1,
+        "spawn_trigger": "always",
+        "notes": "hunter in darkness passage (underground) | RDT @(7750,4760)",
+        "unverified": true,
+        "x": 7750,
+        "z": 4760,
+        "model_id": 6
+      }
+    ]
+  },
+  "30A": {
+    "room_name": "ENRICO ROOM",
+    "enemies": []
+  },
+  "30B": {
+    "room_name": "ROCK PASSAGE",
+    "enemies": []
+  },
+  "30C": {
+    "room_name": "BLACK TIGER ROOM",
+    "enemies": [
+      {
+        "enemy_type": "black_tiger",
+        "count": 1,
+        "spawn_trigger": "event",
+        "notes": "Black Tiger boss in underground cavern | RDT @(4500,5700)",
+        "unverified": true,
+        "x": 4500,
+        "z": 5700,
+        "model_id": 4
+      }
+    ]
+  },
+  "30D": {
+    "room_name": "STRAIGHT PASSAGE",
+    "enemies": []
+  },
+  "30E": {
+    "room_name": "SAVE ROOM",
+    "enemies": []
+  },
+  "30F": {
+    "room_name": "CRANK PASSAGE",
+    "enemies": []
+  },
+  "310": {
+    "room_name": "COURT TO LABO",
+    "enemies": []
+  },
+  "311": {
+    "room_name": "ROTATING HOLE",
+    "enemies": []
+  },
+  "400": {
+    "room_name": "ENTER PASSAGE",
+    "enemies": [
+      {
+        "enemy_type": "hunter",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "hunter in entry passage after power returns",
+        "unverified": true
+      }
+    ]
+  },
+  "401": {
+    "room_name": "ROOM 001",
+    "enemies": []
+  },
+  "402": {
+    "room_name": "ROOM 001 BATHROOM",
+    "enemies": []
+  },
+  "403": {
+    "room_name": "SAVE ROOM",
+    "enemies": []
+  },
+  "404": {
+    "room_name": "BAR",
+    "enemies": [
+      {
+        "enemy_type": "hunter",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "hunter in recreation room | RDT @(14100,24900)",
+        "unverified": true,
+        "x": 14100,
+        "z": 24900,
+        "model_id": 3
+      }
+    ]
+  },
+  "405": {
+    "room_name": "CENTER PASSAGE",
+    "enemies": [
+      {
+        "enemy_type": "hunter",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "hunter in dorm center corridor",
+        "unverified": true
+      }
+    ]
+  },
+  "406": {
+    "room_name": "ROOM 002",
+    "enemies": [
+      {
+        "enemy_type": "hunter",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "hunter in room 002",
+        "unverified": true
+      }
+    ]
+  },
+  "407": {
+    "room_name": "ROOM 002 BATHROOM",
+    "enemies": []
+  },
+  "408": {
+    "room_name": "HONEYCOMB PASSAGE",
+    "enemies": [
+      {
+        "enemy_type": "wasp",
+        "count": 1,
+        "spawn_trigger": "always",
+        "notes": "wasp nest blocks passage to 002 key",
+        "unverified": true
+      }
+    ]
+  },
+  "409": {
+    "room_name": "DRUG STOREHOUSE",
+    "enemies": []
+  },
+  "40A": {
+    "room_name": "ROOM 003",
+    "enemies": [
+      {
+        "enemy_type": "hunter",
+        "count": 2,
+        "spawn_trigger": "return_visit",
+        "notes": "hunters in room 003",
+        "unverified": true
+      }
+    ]
+  },
+  "40B": {
+    "room_name": "ROOM 003 BATHROOM",
+    "enemies": []
+  },
+  "40C": {
+    "room_name": "PLANT BOSS ROOM",
+    "enemies": [
+      {
+        "enemy_type": "plant42",
+        "count": 1,
+        "spawn_trigger": "event",
+        "notes": "Plant 42 boss | RDT @(10800,10800)",
+        "unverified": true,
+        "x": 10800,
+        "z": 10800,
+        "model_id": 8
+      }
+    ]
+  },
+  "40D": {
+    "room_name": "UNDER PASSAGE",
+    "enemies": []
+  },
+  "40E": {
+    "room_name": "WATER TANK",
+    "enemies": []
+  },
+  "40F": {
+    "room_name": "SECURITY ROOM",
+    "enemies": []
+  },
+  "410": {
+    "room_name": "ARMS STOREHOUSE",
+    "enemies": []
+  },
+  "411": {
+    "room_name": "CONTROL ROOM",
+    "enemies": []
+  },
+  "500": {
+    "room_name": "UNDER FOUNTAIN",
+    "enemies": []
+  },
+  "501": {
+    "room_name": "HELIPORT PASSAGE",
+    "enemies": []
+  },
+  "502": {
+    "room_name": "LADDER ROOM",
+    "enemies": []
+  },
+  "503": {
+    "room_name": "STAIRS",
+    "enemies": []
+  },
+  "504": {
+    "room_name": "CONFERENCE ROOM",
+    "enemies": []
+  },
+  "505": {
+    "room_name": "O PASSAGE",
+    "enemies": []
+  },
+  "506": {
+    "room_name": "SMALL LABORATORY",
+    "enemies": []
+  },
+  "507": {
+    "room_name": "MORTUARY",
+    "enemies": [
+      {
+        "enemy_type": "chimera",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "chimera in morgue",
+        "unverified": true
+      }
+    ]
+  },
+  "508": {
+    "room_name": "DOUBLE LOCK",
+    "enemies": []
+  },
+  "509": {
+    "room_name": "PRIVATE ROOM A",
+    "enemies": []
+  },
+  "50A": {
+    "room_name": "PRIVATE ROOM B",
+    "enemies": []
+  },
+  "50B": {
+    "room_name": "FRONT OF CELL",
+    "enemies": []
+  },
+  "50C": {
+    "room_name": "FRONT OF ELEVATOR",
+    "enemies": []
+  },
+  "50D": {
+    "room_name": "ESCAPE ELEVATOR",
+    "enemies": []
+  },
+  "50E": {
+    "room_name": "SAVE ROOM",
+    "enemies": []
+  },
+  "50F": {
+    "room_name": "MAZE A",
+    "enemies": [
+      {
+        "enemy_type": "chimera",
+        "count": 1,
+        "spawn_trigger": "always",
+        "notes": "chimera in power maze | RDT @(5676,7812)",
+        "unverified": true,
+        "x": 5676,
+        "z": 7812,
+        "model_id": 9
+      }
+    ]
+  },
+  "510": {
+    "room_name": "MAZE B",
+    "enemies": []
+  },
+  "511": {
+    "room_name": "MOVIE ROOM",
+    "enemies": []
+  },
+  "512": {
+    "room_name": "CELL",
+    "enemies": []
+  },
+  "513": {
+    "room_name": "TYRANT ROOM",
+    "enemies": [
+      {
+        "enemy_type": "tyrant",
+        "count": 1,
+        "spawn_trigger": "event",
+        "notes": "Tyrant T-002 boss | RDT @(10700,7000)",
+        "unverified": true,
+        "x": 10700,
+        "z": 7000,
+        "model_id": 12
+      }
+    ]
+  },
+  "514": {
+    "room_name": "FRONT OF TYRANT",
+    "enemies": []
+  },
+  "515": {
+    "room_name": "B3 > B4 ELEVATOR",
+    "enemies": []
+  }
+}

@@ -12,7 +12,7 @@ Hierarchical reinforcement-learning stack for **Resident Evil 1** (PS1 Director'
                            │ next_waypoint_room(), rewards
 ┌──────────────────────────▼──────────────────────────────┐
 │  Gymnasium env (env.py)                                   │
-│  frame stack + RAM vector → PPO policy (future)           │
+│  frame stack + proprio/goal vectors → PPO MultiInputPolicy │
 └──────────────┬────────────────────────────┬───────────────┘
                │ PRIMARY                     │ FALLBACK
 ┌──────────────▼──────────────┐  ┌───────────▼──────────────┐
@@ -23,7 +23,36 @@ Hierarchical reinforcement-learning stack for **Resident Evil 1** (PS1 Director'
 
 **Low-level actions (tank controls):** noop, forward, back, turn_left, turn_right, run_forward, quickturn, interact, aim, fire.
 
-**Reward shaping:** step penalty, waypoint room transitions, item pickups, HP loss, death, softlock timeout (`reward.py`).
+**Reward shaping (`reward.py`):** PBRS on room-graph hops + door distance (Ng et al. potential form), one-shot waypoint bonuses gated by max-progress hysteresis (`progress.py`), one-time wrong-room penalty, item pickups, HP loss, death, softlock timeout. Every step exposes a per-term `reward_breakdown` in `info`.
+
+## Observation encoding (NN input)
+
+Full spec with every field, address, normalization, and the reward table: **`docs/nn_architecture_and_encoding.md`**.
+
+`env.py` emits a Dict obs — every float slot is **named** in `re1_rl/obs_encoder.py`:
+
+| Key | Shape | Contents |
+|-----|-------|----------|
+| `frame` | 84×84×4 uint8 | grayscale stack (what the agent sees) |
+| `proprio` | 20 float32 | body state: hp, hp_delta, room-local x/z, elevation, facing sin/cos, room index, cam, in_control, character (`PROPRIO_FIELDS`) |
+| `goal` | 24 float32 | planner compass/TODO: goal room, route progress, door delta/distance/bearing, 5-d objective one-hot, item-TODO progress, pickups left in room, has-required-items, wrong-room flag (`GOAL_FIELDS`) |
+
+Door compass and graph features come from `data/doors_empirical.json` via `re1_rl/room_graph.py` (BFS). Populate more doors with `scripts/log_door_transitions.py` (human plays, script records every room transition).
+
+## Human-readability tools
+
+| Tool | What it shows |
+|------|---------------|
+| `re1_rl.obs_encoder.format_obs_table(obs)` | console table: every obs slot with name, value, meaning |
+| `scripts/watch_env.py` | live cv2 HUD: game frame + door compass, reward bars, planner state; `--policy model.zip` to watch a trained agent |
+| `re1_rl.telemetry.EpisodeLogger` | env wrapper → one JSONL per episode (state, action names, reward breakdown) |
+| `scripts/plot_episode.py --latest` | PNG: top-down per-room trajectory with door stars + reward-term timeline |
+| `scripts/log_door_transitions.py` | records door coordinates while a human plays the route |
+| `scripts/route_todo.py` | key-item TODO checklist for the route; `--rooms` adds per-room pickup lists |
+
+## Items
+
+Live inventory is read from PS1 RAM (`INVENTORY_BASE` in `memory_map.py`, 8 slots × (id, qty), confirmed against a fresh Jill start). `re1_rl/item_todo.py` derives the **key-item TODO** from the route JSON (35 items with prerequisites) and tracks acquisition by **ever-held** set, so banking an item keeps it checked and re-grabbing pays no reward. `data/room_items.json` (compiled from Evil Resource) lists every pickup per room and powers the `items_left_here` / `key_items_left_here` obs fields.
 
 ## Platform tracks
 

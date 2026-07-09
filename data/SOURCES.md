@@ -47,6 +47,33 @@ Generated 2026-07-01 for Jill Any% (PS1 Director's Cut / PC-classic parity).
 6. **Medal rooms `506`/`507`** — wolf/eagle medal hex IDs inferred from stage-5 ordering.
 7. **Start room** — Jill intro may load `105` before `106`; first waypoint uses dining emblem pickup.
 
+## Cheat Engine tables (`ResidentEvil.CT`, `Biohazard.CT`) — 2026-07-02
+
+Parsed into `pc_addresses.json` (406 entries) and `ce_table_addresses.md`.
+
+### What the tables **did** contain
+
+| Build | Process | Highlights |
+|-------|---------|------------|
+| **GOG** (`ResidentEvil.CT`) | `ResidentEvil.exe` | HP `+0x7E636C`, timer `+0x7E983C`, player inventory `+0x7E9944` (8 slots + Rebecca extras), chest `+0x7E98E4`, save-anywhere flags `+0x7E9616/+17`, AOB patches for infinite HP/ammo/one-hit-kill |
+| **MediaKite** (`Biohazard.CT`) | `Biohazard.exe` | **Current Room** `+0x8386F1`, **Player XYZ** `+0x8351E8/+EC/+F0`, HP/max HP, full inventory + item box, map/entity flags, save count, character/outfit, timer `+0x6A8E10`, door-skip code hooks |
+
+PS1↔GOG linear map confirmed by HP and timer anchors (`pc_addresses.json` / `ce_table_addresses.md`).
+
+### What the tables **did not** contain (needs live RAM search)
+
+1. **GOG room ID / stage / player position / facing** — not in `ResidentEvil.CT`; PS1-linear predictions point to `ResidentEvil.exe+0x7EAA40`–`0x7EAA44` (unverified).
+2. **GOG enemy coordinates or per-enemy HP addresses** — only stack-relative enemy damage in AOB (`[ebp+0x88]`).
+3. **Pointer chains** — neither table uses `<Offsets>` multi-level pointers; all resolved addresses are static module+offset (Biohazard inventory uses relative `+N` from a base).
+4. **Cross-build offset parity** — MediaKite offsets cannot be copied to GOG (`Biohazard.exe` vs `ResidentEvil.exe` are different layouts).
+5. **Facing / camera angle** — absent from both tables.
+
+### Recommended live verification
+
+1. Attach CE to GOG `ResidentEvil.exe`, walk rooms, scan for byte matching Biohazard room semantics near `+0x7E9826` or predicted `+0x7EAA44`.
+2. Dereference `ResidentEvil.exe+0x7EBCD4` (player entity ptr from HP script) for position struct.
+3. For MediaKite, confirm `+0x8386F1` tracks `rooms.json` hex IDs during Jill Any%.
+
 ### Recommended verification pass
 
 1. Run RE1 with a room logger (BioRand debug, RE1 autosplitter memory reads, or `roomSXX0.rdt` filename overlay).

@@ -1,0 +1,23 @@
+{
+  "opening": "title_mode_select",
+  "label": "Director's Cut STANDARD / TRAINING / ADVANCED select",
+  "captured_at": "2026-07-08 hunt (QuickSave0 after death Continue)",
+  "screen_id": {
+    "game_state": "0x80000000",
+    "game_mode": "0x80",
+    "scene_flag": "0x00",
+    "msg_flag": "0x00"
+  },
+  "ram": {
+    "player_hp": 65535,
+    "room_id": 8,
+    "stage_id": 0,
+    "character_id": 1,
+    "game_state": 2147483648,
+    "game_mode": 128,
+    "scene_flag": 0,
+    "msg_flag": 0
+  },
+  "episode_failure": "title_mode_select",
+  "notes": "Reached after mashing Continue on a death. HP RAM reads 0xFFFF; gs/mode match main menu stack but room byte is still 8 (not 27). Distinct from New Game / Load Game (hp=0, room=27)."
+}

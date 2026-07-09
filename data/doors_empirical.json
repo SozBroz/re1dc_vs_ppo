@@ -1,0 +1,241 @@
+{
+  "_comment": "Empirically logged door positions in PS1 RAM world coordinates. door_x/z = player position at the transition trigger (exit side); entry_x/z = spawn position in the destination room. Populated by scripts/log_door_transitions.py; seeded with transitions measured during bridge development.",
+  "105->106": {
+    "from_room": "105",
+    "to_room": "106",
+    "door_x": 30700,
+    "door_z": 7200,
+    "entry_x": 3400,
+    "entry_z": 17000,
+    "notes": "dining room west double door to main hall; measured 2026-07-02 (Jill spawn pose = entry through this door)"
+  },
+  "106->105": {
+    "from_room": "106",
+    "to_room": "105",
+    "door_x": 3400,
+    "door_z": 17000,
+    "entry_x": 30700,
+    "entry_z": 7200,
+    "notes": "reverse of 105->106; coordinates mirrored from measured poses"
+  },
+  "106->107": {
+    "from_room": "106",
+    "to_room": "107",
+    "door_x": 31715,
+    "door_z": 13193,
+    "door_facing": 861,
+    "door_cam_id": 2,
+    "entry_x": 2700,
+    "entry_z": 6600,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "107->106": {
+    "from_room": "107",
+    "to_room": "106",
+    "door_x": 2419,
+    "door_z": 7973,
+    "door_facing": 1312,
+    "door_cam_id": 0,
+    "entry_x": 30700,
+    "entry_z": 12400,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "105->104": {
+    "from_room": "105",
+    "to_room": "104",
+    "door_x": 7048,
+    "door_z": 14064,
+    "door_facing": 2320,
+    "door_cam_id": 2,
+    "entry_x": 11500,
+    "entry_z": 2800,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "104->105": {
+    "from_room": "104",
+    "to_room": "105",
+    "door_x": 13565,
+    "door_z": 2207,
+    "door_facing": 1392,
+    "door_cam_id": 0,
+    "entry_x": 6300,
+    "entry_z": 14100,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "106->203": {
+    "from_room": "106",
+    "to_room": "203",
+    "door_x": 15614,
+    "door_z": 15906,
+    "door_facing": 3149,
+    "door_cam_id": 1,
+    "entry_x": 17100,
+    "entry_z": 25300,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "203->202": {
+    "from_room": "203",
+    "to_room": "202",
+    "door_x": 2464,
+    "door_z": 15654,
+    "door_facing": 1664,
+    "door_cam_id": 1,
+    "entry_x": 30900,
+    "entry_z": 8300,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "107->108": {
+    "from_room": "107",
+    "to_room": "108",
+    "door_x": 15089,
+    "door_z": 2647,
+    "door_facing": 3472,
+    "door_cam_id": 2,
+    "entry_x": 3400,
+    "entry_z": 4000,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "108->107": {
+    "from_room": "108",
+    "to_room": "107",
+    "door_x": 2935,
+    "door_z": 3136,
+    "door_facing": 1888,
+    "door_cam_id": 0,
+    "entry_x": 15300,
+    "entry_z": 4200,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "108->11B": {
+    "from_room": "108",
+    "to_room": "11B",
+    "door_x": 24140,
+    "door_z": 2283,
+    "door_facing": 14676,
+    "door_cam_id": 2,
+    "entry_x": 24140,
+    "entry_z": 2283,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "11B->106": {
+    "from_room": "11B",
+    "to_room": "106",
+    "door_x": 24140,
+    "door_z": 2283,
+    "door_facing": 14676,
+    "door_cam_id": 2,
+    "entry_x": 14600,
+    "entry_z": 5000,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "203->204": {
+    "from_room": "203",
+    "to_room": "204",
+    "door_x": 31812,
+    "door_z": 19613,
+    "door_facing": 768,
+    "door_cam_id": 3,
+    "entry_x": 3000,
+    "entry_z": 3600,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "203->106": {
+    "from_room": "203",
+    "to_room": "106",
+    "door_x": 18588,
+    "door_z": 23547,
+    "door_facing": 384,
+    "door_cam_id": 0,
+    "entry_x": 17000,
+    "entry_z": 14300,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "104->10F": {
+    "from_room": "104",
+    "to_room": "10F",
+    "door_x": 31403,
+    "door_z": 4252,
+    "door_facing": 3024,
+    "door_cam_id": 3,
+    "entry_x": 14000,
+    "entry_z": 3000,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "203->211": {
+    "from_room": "203",
+    "to_room": "211",
+    "door_x": 31812,
+    "door_z": 6975,
+    "door_facing": 3488,
+    "door_cam_id": 4,
+    "entry_x": 2400,
+    "entry_z": 3600,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "211->212": {
+    "from_room": "211",
+    "to_room": "212",
+    "door_x": 3462,
+    "door_z": 12958,
+    "door_facing": 3792,
+    "door_cam_id": 2,
+    "entry_x": 19600,
+    "entry_z": 27000,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "10F->104": {
+    "from_room": "10F",
+    "to_room": "104",
+    "door_x": 14606,
+    "door_z": 2600,
+    "door_facing": 1536,
+    "door_cam_id": 0,
+    "entry_x": 30700,
+    "entry_z": 3900,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "106->116": {
+    "from_room": "106",
+    "to_room": "116",
+    "door_x": 30700,
+    "door_z": 9000,
+    "door_facing": 1024,
+    "door_cam_id": 1,
+    "entry_x": 8000,
+    "entry_z": 7500,
+    "notes": "main hall to living room (shotgun rack); coords UNVERIFIED — harvest pending"
+  },
+  "116->106": {
+    "from_room": "116",
+    "to_room": "106",
+    "door_x": 8000,
+    "door_z": 7500,
+    "door_facing": 3072,
+    "door_cam_id": 0,
+    "entry_x": 30700,
+    "entry_z": 9000,
+    "notes": "reverse of 106->116; UNVERIFIED"
+  },
+  "116->115": {
+    "from_room": "116",
+    "to_room": "115",
+    "door_x": 12000,
+    "door_z": 4000,
+    "door_facing": 512,
+    "door_cam_id": 2,
+    "entry_x": 6000,
+    "entry_z": 5500,
+    "notes": "living room shotgun trap into trap room; UNVERIFIED"
+  },
+  "115->116": {
+    "from_room": "115",
+    "to_room": "116",
+    "door_x": 6000,
+    "door_z": 5500,
+    "door_facing": 2560,
+    "door_cam_id": 0,
+    "entry_x": 12000,
+    "entry_z": 4000,
+    "notes": "reverse of 116->115; UNVERIFIED"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "opening": "press_any_button",
+  "label": "Capcom logo / Press Any Button attract (after intro FMV)",
+  "captured_at": "2026-07-07T06:20:40 local",
+  "source": "play_human RAM log — stable from FMV end until button press at 06:23:34",
+  "screen_id": {
+    "game_state": "0x80000000",
+    "game_mode": "0x80",
+    "scene_flag": "0x00",
+    "msg_flag": "0x00"
+  },
+  "ram": {
+    "player_hp": 0,
+    "room_id": 0,
+    "stage_id": 0,
+    "character_id": 0,
+    "game_state": 2147483648,
+    "game_mode": 128,
+    "scene_flag": 0,
+    "msg_flag": 0
+  },
+  "outside": null,
+  "notes": "Room byte still 0 (log shows community code 100). Not main menu yet — menu stack uses room_id=27. After Cross/Start: transitions through 0x40000000/0x40 then opening_narration mode 0x44.",
+  "distinct_from": {
+    "opening_fmv_cinematic": "gs=0x80040000 scene=0x04",
+    "title_main_menu": "room_id=27",
+    "playstation_logo": "gs=0x40000000 mode=0x40"
+  }
+}

@@ -1,0 +1,992 @@
+{
+  "100": {
+    "file": "ROOM1000.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "101": {
+    "file": "ROOM1010.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "102": {
+    "file": "ROOM1020.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "103": {
+    "file": "ROOM1030.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "104": {
+    "file": "ROOM1040.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "105": {
+    "file": "ROOM1050.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "106": {
+    "file": "ROOM1060.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "107": {
+    "file": "ROOM1070.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "108": {
+    "file": "ROOM1080.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "109": {
+    "file": "ROOM1090.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "10A": {
+    "file": "ROOM10A0.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "10B": {
+    "file": "ROOM10B0.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "10C": {
+    "file": "ROOM10C0.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "10D": {
+    "file": "ROOM10D0.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "10E": {
+    "file": "ROOM10E0.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "10F": {
+    "file": "ROOM10F0.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "111": {
+    "file": "ROOM1110.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "112": {
+    "file": "ROOM1120.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "113": {
+    "file": "ROOM1130.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "114": {
+    "file": "ROOM1140.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "115": {
+    "file": "ROOM1150.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "116": {
+    "file": "ROOM1160.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "117": {
+    "file": "ROOM1170.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "118": {
+    "file": "ROOM1180.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "11A": {
+    "file": "ROOM11A0.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "11B": {
+    "file": "ROOM11B0.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "11C": {
+    "file": "ROOM11C0.RDT",
+    "stage": 1,
+    "variant": 0
+  },
+  "200": {
+    "file": "ROOM2000.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "201": {
+    "file": "ROOM2010.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "202": {
+    "file": "ROOM2020.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "203": {
+    "file": "ROOM2030.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "204": {
+    "file": "ROOM2040.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "205": {
+    "file": "ROOM2050.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "206": {
+    "file": "ROOM2060.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "207": {
+    "file": "ROOM2070.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "208": {
+    "file": "ROOM2080.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "209": {
+    "file": "ROOM2090.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "20A": {
+    "file": "ROOM20A0.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "20B": {
+    "file": "ROOM20B0.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "20D": {
+    "file": "ROOM20D0.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "20E": {
+    "file": "ROOM20E0.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "20F": {
+    "file": "ROOM20F0.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "210": {
+    "file": "ROOM2100.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "211": {
+    "file": "ROOM2110.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "212": {
+    "file": "ROOM2120.RDT",
+    "stage": 2,
+    "variant": 0
+  },
+  "300": {
+    "file": "ROOM3000.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "301": {
+    "file": "ROOM3010.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "302": {
+    "file": "ROOM3020.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "303": {
+    "file": "ROOM3030.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "304": {
+    "file": "ROOM3040.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "305": {
+    "file": "ROOM3050.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "306": {
+    "file": "ROOM3060.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "307": {
+    "file": "ROOM3070.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "308": {
+    "file": "ROOM3080.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "309": {
+    "file": "ROOM3090.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "30A": {
+    "file": "ROOM30A0.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "30B": {
+    "file": "ROOM30B0.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "30C": {
+    "file": "ROOM30C0.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "30D": {
+    "file": "ROOM30D0.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "30E": {
+    "file": "ROOM30E0.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "30F": {
+    "file": "ROOM30F0.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "310": {
+    "file": "ROOM3100.RDT",
+    "stage": 3,
+    "variant": 0
+  },
+  "400": {
+    "file": "ROOM4000.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "401": {
+    "file": "ROOM4010.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "402": {
+    "file": "ROOM4020.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "403": {
+    "file": "ROOM4030.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "404": {
+    "file": "ROOM4040.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "405": {
+    "file": "ROOM4050.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "406": {
+    "file": "ROOM4060.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "407": {
+    "file": "ROOM4070.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "408": {
+    "file": "ROOM4080.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "409": {
+    "file": "ROOM4090.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "40A": {
+    "file": "ROOM40A0.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "40B": {
+    "file": "ROOM40B0.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "40C": {
+    "file": "ROOM40C0.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "40D": {
+    "file": "ROOM40D0.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "40E": {
+    "file": "ROOM40E0.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "40F": {
+    "file": "ROOM40F0.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "410": {
+    "file": "ROOM4100.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "411": {
+    "file": "ROOM4110.RDT",
+    "stage": 4,
+    "variant": 0
+  },
+  "500": {
+    "file": "ROOM5000.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "501": {
+    "file": "ROOM5010.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "502": {
+    "file": "ROOM5020.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "503": {
+    "file": "ROOM5030.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "504": {
+    "file": "ROOM5040.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "505": {
+    "file": "ROOM5050.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "506": {
+    "file": "ROOM5060.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "507": {
+    "file": "ROOM5070.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "508": {
+    "file": "ROOM5080.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "509": {
+    "file": "ROOM5090.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "50A": {
+    "file": "ROOM50A0.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "50B": {
+    "file": "ROOM50B0.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "50C": {
+    "file": "ROOM50C0.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "50D": {
+    "file": "ROOM50D0.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "50E": {
+    "file": "ROOM50E0.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "50F": {
+    "file": "ROOM50F0.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "510": {
+    "file": "ROOM5100.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "511": {
+    "file": "ROOM5110.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "512": {
+    "file": "ROOM5120.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "513": {
+    "file": "ROOM5130.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "514": {
+    "file": "ROOM5140.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "515": {
+    "file": "ROOM5150.RDT",
+    "stage": 5,
+    "variant": 0
+  },
+  "600": {
+    "file": "ROOM6000.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "601": {
+    "file": "ROOM6010.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "602": {
+    "file": "ROOM6020.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "603": {
+    "file": "ROOM6030.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "604": {
+    "file": "ROOM6040.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "605": {
+    "file": "ROOM6050.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "606": {
+    "file": "ROOM6060.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "607": {
+    "file": "ROOM6070.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "608": {
+    "file": "ROOM6080.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "609": {
+    "file": "ROOM6090.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "60A": {
+    "file": "ROOM60A0.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "60B": {
+    "file": "ROOM60B0.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "60C": {
+    "file": "ROOM60C0.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "60D": {
+    "file": "ROOM60D0.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "60E": {
+    "file": "ROOM60E0.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "60F": {
+    "file": "ROOM60F0.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "610": {
+    "file": "ROOM6100.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "611": {
+    "file": "ROOM6110.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "612": {
+    "file": "ROOM6120.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "613": {
+    "file": "ROOM6130.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "614": {
+    "file": "ROOM6140.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "615": {
+    "file": "ROOM6150.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "616": {
+    "file": "ROOM6160.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "617": {
+    "file": "ROOM6170.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "618": {
+    "file": "ROOM6180.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "619": {
+    "file": "ROOM6190.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "61A": {
+    "file": "ROOM61A0.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "61B": {
+    "file": "ROOM61B0.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "61C": {
+    "file": "ROOM61C0.RDT",
+    "stage": 6,
+    "variant": 0
+  },
+  "700": {
+    "file": "ROOM7000.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "701": {
+    "file": "ROOM7010.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "702": {
+    "file": "ROOM7020.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "703": {
+    "file": "ROOM7030.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "704": {
+    "file": "ROOM7040.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "705": {
+    "file": "ROOM7050.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "706": {
+    "file": "ROOM7060.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "707": {
+    "file": "ROOM7070.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "708": {
+    "file": "ROOM7080.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "709": {
+    "file": "ROOM7090.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "70A": {
+    "file": "ROOM70A0.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "70B": {
+    "file": "ROOM70B0.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "70C": {
+    "file": "ROOM70C0.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "70D": {
+    "file": "ROOM70D0.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "70E": {
+    "file": "ROOM70E0.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "70F": {
+    "file": "ROOM70F0.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "710": {
+    "file": "ROOM7100.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "711": {
+    "file": "ROOM7110.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "712": {
+    "file": "ROOM7120.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "713": {
+    "file": "ROOM7130.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "714": {
+    "file": "ROOM7140.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "715": {
+    "file": "ROOM7150.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "716": {
+    "file": "ROOM7160.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "717": {
+    "file": "ROOM7170.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "718": {
+    "file": "ROOM7180.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "719": {
+    "file": "ROOM7190.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "71A": {
+    "file": "ROOM71A0.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "71B": {
+    "file": "ROOM71B0.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "71C": {
+    "file": "ROOM71C0.RDT",
+    "stage": 7,
+    "variant": 0
+  },
+  "801": {
+    "file": "ROOM8010.RDT",
+    "stage": 8,
+    "variant": 0
+  },
+  "807": {
+    "file": "ROOM8070.RDT",
+    "stage": 8,
+    "variant": 0
+  },
+  "80B": {
+    "file": "ROOM80B0.RDT",
+    "stage": 8,
+    "variant": 0
+  },
+  "80D": {
+    "file": "ROOM80D0.RDT",
+    "stage": 8,
+    "variant": 0
+  },
+  "812": {
+    "file": "ROOM8120.RDT",
+    "stage": 8,
+    "variant": 0
+  },
+  "813": {
+    "file": "ROOM8130.RDT",
+    "stage": 8,
+    "variant": 0
+  },
+  "81A": {
+    "file": "ROOM81A0.RDT",
+    "stage": 8,
+    "variant": 0
+  },
+  "81C": {
+    "file": "ROOM81C0.RDT",
+    "stage": 8,
+    "variant": 0
+  },
+  "901": {
+    "file": "ROOM9010.RDT",
+    "stage": 9,
+    "variant": 0
+  },
+  "902": {
+    "file": "ROOM9020.RDT",
+    "stage": 9,
+    "variant": 0
+  },
+  "903": {
+    "file": "ROOM9030.RDT",
+    "stage": 9,
+    "variant": 0
+  },
+  "904": {
+    "file": "ROOM9040.RDT",
+    "stage": 9,
+    "variant": 0
+  },
+  "912": {
+    "file": "ROOM9120.RDT",
+    "stage": 9,
+    "variant": 0
+  },
+  "A00": {
+    "file": "ROOMA000.RDT",
+    "stage": 10,
+    "variant": 0
+  },
+  "A0F": {
+    "file": "ROOMA0F0.RDT",
+    "stage": 10,
+    "variant": 0
+  },
+  "B00": {
+    "file": "ROOMB000.RDT",
+    "stage": 11,
+    "variant": 0
+  },
+  "B04": {
+    "file": "ROOMB040.RDT",
+    "stage": 11,
+    "variant": 0
+  },
+  "B05": {
+    "file": "ROOMB050.RDT",
+    "stage": 11,
+    "variant": 0
+  },
+  "C04": {
+    "file": "ROOMC040.RDT",
+    "stage": 12,
+    "variant": 0
+  },
+  "C05": {
+    "file": "ROOMC050.RDT",
+    "stage": 12,
+    "variant": 0
+  },
+  "C07": {
+    "file": "ROOMC070.RDT",
+    "stage": 12,
+    "variant": 0
+  },
+  "C11": {
+    "file": "ROOMC110.RDT",
+    "stage": 12,
+    "variant": 0
+  },
+  "D01": {
+    "file": "ROOMD010.RDT",
+    "stage": 13,
+    "variant": 0
+  },
+  "D04": {
+    "file": "ROOMD040.RDT",
+    "stage": 13,
+    "variant": 0
+  },
+  "D07": {
+    "file": "ROOMD070.RDT",
+    "stage": 13,
+    "variant": 0
+  },
+  "D0B": {
+    "file": "ROOMD0B0.RDT",
+    "stage": 13,
+    "variant": 0
+  },
+  "D0D": {
+    "file": "ROOMD0D0.RDT",
+    "stage": 13,
+    "variant": 0
+  },
+  "D12": {
+    "file": "ROOMD120.RDT",
+    "stage": 13,
+    "variant": 0
+  },
+  "D13": {
+    "file": "ROOMD130.RDT",
+    "stage": 13,
+    "variant": 0
+  },
+  "D1A": {
+    "file": "ROOMD1A0.RDT",
+    "stage": 13,
+    "variant": 0
+  },
+  "D1C": {
+    "file": "ROOMD1C0.RDT",
+    "stage": 13,
+    "variant": 0
+  },
+  "E01": {
+    "file": "ROOME010.RDT",
+    "stage": 14,
+    "variant": 0
+  },
+  "E02": {
+    "file": "ROOME020.RDT",
+    "stage": 14,
+    "variant": 0
+  },
+  "E03": {
+    "file": "ROOME030.RDT",
+    "stage": 14,
+    "variant": 0
+  },
+  "E04": {
+    "file": "ROOME040.RDT",
+    "stage": 14,
+    "variant": 0
+  },
+  "E12": {
+    "file": "ROOME120.RDT",
+    "stage": 14,
+    "variant": 0
+  },
+  "E18": {
+    "file": "ROOME180.RDT",
+    "stage": 14,
+    "variant": 0
+  },
+  "E1A": {
+    "file": "ROOME1A0.RDT",
+    "stage": 14,
+    "variant": 0
+  }
+}

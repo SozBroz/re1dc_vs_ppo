@@ -1,0 +1,1851 @@
+{
+  "_meta": {
+    "source": "evilresource.com + GameFAQs Jill walkthrough (KrystalCelest)",
+    "scenario": "jill",
+    "game": "RE1 Director's Cut PS1 standard Jill",
+    "date": "2026-07-02",
+    "fetch_errors": [],
+    "scrape_count": 125
+  },
+  "_unmatched": [
+    {
+      "er_room": "Courtyard Study",
+      "item": "magnum_rounds",
+      "count": 1,
+      "notes": "optional desk"
+    },
+    {
+      "er_room": "Large Gallery",
+      "item": "star_crest",
+      "count": 1,
+      "notes": "ROUTE CONFLICT wp08: route says 107 GALLERY; Evil Resource places star_crest in Large Gallery (crow paintings) = debug 117 LARGE GALLERY. Kept in 117."
+    },
+    {
+      "er_room": "n/a (Jill has no sword key)",
+      "item": "sword_key",
+      "count": 0,
+      "notes": "ROUTE CONFLICT wp17: sword_key is Chris-only per Evil Resource mansion contents (Jill uses lockpick). Route wp17 items_gained is wrong; serum@102 also dubious (canonical serum is 100 Mansion Save Room)."
+    },
+    {
+      "er_room": "Room 001 Bathroom",
+      "item": "control_room_key",
+      "count": 1,
+      "notes": "ROUTE CONFLICT wp22: route says 401 ROOM 001; key is in the bathtub of the separate bathroom room = 402. Kept in 402."
+    },
+    {
+      "er_room": "Beehive Passage",
+      "item": "dorm_key_002",
+      "count": 1,
+      "notes": "ROUTE CONFLICT wp23: route says 406 ROOM 002; 002 key is on the table near the wasp nest in Beehive Passage = 408 (StrategyWiki + GameFAQs agree). Kept in 408."
+    },
+    {
+      "er_room": "Room 001",
+      "item": "red_book",
+      "count": 1,
+      "notes": "ROUTE CONFLICT wp23: route says 406 ROOM 002; Red Book is on the bed in Room 001 = 401 (GameFAQs Jill DC walkthrough). Kept in 401."
+    },
+    {
+      "er_room": "Private Library / Library B",
+      "item": "mo_disc",
+      "count": 1,
+      "notes": "ROUTE CONFLICT wp34: route says 216 LIBRARY A; the MO disc statue-puzzle room is LIBRARY B = 217 (walkthrough names it Library B literally). Kept in 217; alt copy noted in 213."
+    },
+    {
+      "er_room": "Closet",
+      "item": "battery",
+      "count": 1,
+      "notes": "ROUTE CONFLICT wp35: route says 213 FRONT ELEVATOR; Evil Resource places battery in the Closet adjacent to Elevator 2F, best debug match 219 SHED (stage-2 = 2F). Kept in 219; needs in-game hex confirmation."
+    },
+    {
+      "er_room": "Courtyard Study",
+      "item": "doom_book_1",
+      "count": 1,
+      "notes": "bookshelf next to door; switch on lamp first (contains eagle_medal) | ROUTE CONFLICT wp36: route says 20B FRONT LESSON ROOM; Evil Resource places Doom Book 1 in Courtyard Study (1F, helmet key door off Back Passage). No confident debug code in rooms.json - left unmapped."
+    },
+    {
+      "er_room": "Store Room",
+      "item": "square_crank",
+      "count": 1,
+      "notes": "ROUTE CONFLICT wp37: route says 305 FOUNTAIN; Evil Resource places square_crank on the Store Room top shelf (shed to courtyard) = 11B. Kept in 11B."
+    }
+  ],
+  "100": {
+    "room_name": "SAVE ROOM",
+    "items": [
+      {
+        "name": "serum",
+        "item_id": 66,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "on shelf"
+      }
+    ]
+  },
+  "101": {
+    "room_name": "1F LEFT STAIRS",
+    "items": [
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "next to stairs"
+      }
+    ]
+  },
+  "102": {
+    "room_name": "VACANT ROOM",
+    "items": [
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "on shelf"
+      },
+      {
+        "name": "shotgun_shells",
+        "item_id": 12,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "desk drawer with lockpick",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked desk in vacant room"
+        }
+      },
+      {
+        "name": "broken_shotgun",
+        "item_id": 28,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on wall"
+      },
+      {
+        "name": "serum",
+        "item_id": 66,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "save room shelf route uses serum from 100; also 102"
+      }
+    ]
+  },
+  "103": {
+    "room_name": "F PASSAGE",
+    "items": [
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 3,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "behind pushed statue",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Behind floor grate; push both statues onto grates before red button"
+        }
+      }
+    ]
+  },
+  "104": {
+    "room_name": "TEA ROOM",
+    "items": [
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "on Kenneth body (2x15)"
+      }
+    ]
+  },
+  "105": {
+    "room_name": "DINING ROOM",
+    "items": [
+      {
+        "name": "emblem",
+        "item_id": 31,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "above fireplace; wooden emblem"
+      },
+      {
+        "name": "shield_key",
+        "item_id": 53,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "behind grandfather clock after gold emblem",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "gold_emblem"
+          ],
+          "notes": "Grandfather clock slides after gold emblem placed on fireplace"
+        }
+      }
+    ]
+  },
+  "106": {
+    "room_name": "MAIN HALL",
+    "items": [
+      {
+        "name": "lockpick",
+        "item_id": 49,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "Barry after first zombie",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry gives lockpick after first zombie encounter in tea room"
+        }
+      },
+      {
+        "name": "ink_ribbon",
+        "item_id": 47,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on typewriter"
+      },
+      {
+        "name": "map_1f",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "SE stairs alcove / art room map"
+      },
+      {
+        "name": "acid_rounds",
+        "item_id": 17,
+        "count": 6,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "Barry gives if inventory space (2F return)",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry hands acid rounds on 2F hall return if inventory has space"
+        }
+      }
+    ]
+  },
+  "107": {
+    "room_name": "GALLERY",
+    "items": [
+      {
+        "name": "map_1f",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "on statue after pushing ladder",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Push ladder behind statue and climb to bowl on statue head"
+        }
+      },
+      {
+        "name": "ink_ribbon",
+        "item_id": 47,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "behind movable drawers",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Push movable drawers aside in gallery side corridor"
+        }
+      }
+    ]
+  },
+  "108": {
+    "room_name": "L PASSAGE",
+    "items": [
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "under display case; under second cabinet (15 rounds)"
+      }
+    ]
+  },
+  "109": {
+    "room_name": "TRAP PASSAGE",
+    "items": [
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "opposite outside boiler entrance"
+      }
+    ]
+  },
+  "10A": {
+    "room_name": "BACK PASSAGE",
+    "items": []
+  },
+  "10B": {
+    "room_name": "1F RIGHT STAIRS",
+    "items": []
+  },
+  "10C": {
+    "room_name": "GREEN HOUSE",
+    "items": [
+      {
+        "name": "armor_key",
+        "item_id": 52,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "after chemical on plant; on crest",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "chemical"
+          ],
+          "notes": "Pour chemical into greenhouse pump to kill vines on crest"
+        }
+      },
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 4,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "benches by fountain"
+      }
+    ]
+  },
+  "10D": {
+    "room_name": "TIGER STATUE ROOM",
+    "items": [
+      {
+        "name": "wind_crest",
+        "item_id": 41,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "blue jewel on tiger eye",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "blue_jewel"
+          ],
+          "notes": "Insert blue jewel in tiger eye; statue slides to reveal crest"
+        }
+      }
+    ]
+  },
+  "10E": {
+    "room_name": "EMPLOYEE ROOM",
+    "items": [
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "on bed"
+      },
+      {
+        "name": "shotgun_shells",
+        "item_id": 12,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "in closet"
+      },
+      {
+        "name": "keepers_diary",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "on desk"
+      }
+    ]
+  },
+  "10F": {
+    "room_name": "BAR",
+    "items": [
+      {
+        "name": "music_notes",
+        "item_id": 35,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "behind movable bookcase",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Push bookcase aside to reach shelf behind piano"
+        }
+      },
+      {
+        "name": "gold_emblem",
+        "item_id": 32,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "secret room after piano",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "music_notes",
+            "emblem"
+          ],
+          "notes": "Play piano with music notes; swap wooden emblem for gold in secret alcove"
+        }
+      }
+    ]
+  },
+  "110": {
+    "room_name": "N/A",
+    "items": []
+  },
+  "111": {
+    "room_name": "DRESSING ROOM",
+    "items": [
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "on shelf"
+      },
+      {
+        "name": "shotgun_shells",
+        "item_id": 12,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "locked desk",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked desk in dressing room"
+        }
+      }
+    ]
+  },
+  "112": {
+    "room_name": "WARDROBE",
+    "items": [
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "SE corner"
+      }
+    ]
+  },
+  "113": {
+    "room_name": "BATHROOM",
+    "items": []
+  },
+  "114": {
+    "room_name": "BOILER",
+    "items": []
+  },
+  "115": {
+    "room_name": "TRAP ROOM",
+    "items": [
+      {
+        "name": "shotgun",
+        "item_id": 3,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "living room rack; Jill Barry rescue",
+        "gate": {
+          "type": "trap",
+          "requires": [],
+          "notes": "Ceiling trap; Jill saved by Barry once (Chris needs broken_shotgun swap)"
+        }
+      }
+    ]
+  },
+  "116": {
+    "room_name": "LIVING ROOM",
+    "items": [
+      {
+        "name": "shotgun",
+        "item_id": 3,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "wall rack; ceiling trap in adjacent 115",
+        "gate": {
+          "type": "trap",
+          "requires": [],
+          "notes": "Same wall rack as trap room; taking triggers ceiling trap (Jill: Barry rescue)"
+        }
+      }
+    ]
+  },
+  "117": {
+    "room_name": "LARGE GALLERY",
+    "items": [
+      {
+        "name": "star_crest",
+        "item_id": 45,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "crow painting puzzle",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Crow painting buttons in life-cycle order (large gallery)"
+        }
+      }
+    ]
+  },
+  "118": {
+    "room_name": "STAIRS UNDER ROOM",
+    "items": []
+  },
+  "119": {
+    "room_name": "N/A",
+    "items": []
+  },
+  "11A": {
+    "room_name": "ROOFED PASSAGE",
+    "items": []
+  },
+  "11B": {
+    "room_name": "STORE ROOM",
+    "items": [
+      {
+        "name": "chemical",
+        "item_id": 38,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "herbicide chemicals"
+      },
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on shelf"
+      },
+      {
+        "name": "square_crank",
+        "item_id": 29,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "top shelf via stepladder",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Position stepladder at shelf and climb to top shelf"
+        }
+      }
+    ]
+  },
+  "11C": {
+    "room_name": "WARDROBE S",
+    "items": []
+  },
+  "200": {
+    "room_name": "N/A",
+    "items": []
+  },
+  "201": {
+    "room_name": "2F LEFT STAIRS",
+    "items": []
+  },
+  "202": {
+    "room_name": "DINING ROOM 2F",
+    "items": [
+      {
+        "name": "blue_jewel",
+        "item_id": 33,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "push statue off balcony",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Push statue off 2F dining room balcony gap"
+        }
+      }
+    ]
+  },
+  "203": {
+    "room_name": "HALL 2F",
+    "items": [
+      {
+        "name": "acid_rounds",
+        "item_id": 17,
+        "count": 6,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "Barry after Forest scene if space",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry gives after Forest balcony scene if inventory has space"
+        }
+      }
+    ]
+  },
+  "204": {
+    "room_name": "C PASSAGE",
+    "items": []
+  },
+  "205": {
+    "room_name": "ARMOR ROOM",
+    "items": [
+      {
+        "name": "sun_crest",
+        "item_id": 46,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "statue puzzle cabinet",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Cover both floor grates with statues then press center button"
+        }
+      }
+    ]
+  },
+  "206": {
+    "room_name": "DOLL ROOM",
+    "items": []
+  },
+  "207": {
+    "room_name": "2F RIGHT STAIRS",
+    "items": []
+  },
+  "208": {
+    "room_name": "DEER ROOM",
+    "items": []
+  },
+  "209": {
+    "room_name": "BEDROOM",
+    "items": [
+      {
+        "name": "red_herb",
+        "item_id": 67,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "behind right bed"
+      },
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "behind right bed"
+      },
+      {
+        "name": "lighter",
+        "item_id": 48,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "on shelf"
+      },
+      {
+        "name": "shotgun_shells",
+        "item_id": 12,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "optional"
+      }
+    ]
+  },
+  "20A": {
+    "room_name": "STUDY ROOM",
+    "items": [
+      {
+        "name": "explosive_rounds",
+        "item_id": 16,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "secret cabinet puzzle",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Study room colored-bottle cabinet puzzle (push aquarium, bookcase)"
+        }
+      },
+      {
+        "name": "ink_ribbon",
+        "item_id": 47,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "lab coat rack"
+      },
+      {
+        "name": "researchers_will",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "on desk"
+      }
+    ]
+  },
+  "20B": {
+    "room_name": "FRONT LESSON ROOM",
+    "items": [
+      {
+        "name": "map_2f",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "fireplace with lighter",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lighter"
+          ],
+          "notes": "Burn logs in lesson room entry fireplace"
+        }
+      },
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "corner"
+      }
+    ]
+  },
+  "20C": {
+    "room_name": "LESSON ROOM",
+    "items": []
+  },
+  "20D": {
+    "room_name": "PILLAR PASSAGE",
+    "items": [
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "behind pillar"
+      },
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "search Richard body after serum",
+        "gate": {
+          "type": "event",
+          "requires": [
+            "serum"
+          ],
+          "notes": "Search Richard's body twice after giving him serum (pillar passage)"
+        }
+      }
+    ]
+  },
+  "20E": {
+    "room_name": "FRONT OF ATTIC",
+    "items": []
+  },
+  "20F": {
+    "room_name": "DINING",
+    "items": [
+      {
+        "name": "ink_ribbon",
+        "item_id": 47,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on table"
+      },
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "left cabinet"
+      },
+      {
+        "name": "acid_rounds",
+        "item_id": 17,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "secret bookcase room",
+        "gate": {
+          "type": "puzzle",
+          "requires": [
+            "lighter"
+          ],
+          "notes": "Light candles, push left bookcase, enter secret cabinet room"
+        }
+      }
+    ]
+  },
+  "210": {
+    "room_name": "ATTIC",
+    "items": [
+      {
+        "name": "moon_crest",
+        "item_id": 44,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "after Yawn 1",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Appears after Yawn 1 fight or retreat in attic"
+        }
+      },
+      {
+        "name": "shotgun_shells",
+        "item_id": 12,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "barrel if avoiding Yawn",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "On barrel during Yawn 1 attic visit (fight or sneak past)"
+        }
+      }
+    ]
+  },
+  "211": {
+    "room_name": "TERRACE PASSAGE",
+    "items": []
+  },
+  "212": {
+    "room_name": "TERRACE",
+    "items": [
+      {
+        "name": "bazooka_acid",
+        "item_id": 7,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "Forest Speyer corpse event",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Forest Speyer corpse cutscene on 2F terrace balcony"
+        }
+      }
+    ]
+  },
+  "213": {
+    "room_name": "FRONT ELEVATOR",
+    "items": [
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "alcove near elevator"
+      },
+      {
+        "name": "mo_disc",
+        "item_id": 40,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "first MO disc; Any% may use 213 security room instead"
+      }
+    ]
+  },
+  "214": {
+    "room_name": "ROUGH PASSAGE",
+    "items": []
+  },
+  "215": {
+    "room_name": "STUFFED ROOM",
+    "items": [
+      {
+        "name": "shotgun_shells",
+        "item_id": 12,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on shelf"
+      },
+      {
+        "name": "magnum_rounds",
+        "item_id": 14,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on shelf"
+      },
+      {
+        "name": "red_jewel",
+        "item_id": 34,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "deer head with lights off",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Shut trophy room lights, stepladder under deer head, climb for jewel"
+        }
+      },
+      {
+        "name": "orders",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "on table"
+      }
+    ]
+  },
+  "216": {
+    "room_name": "LIBRARY A",
+    "items": [
+      {
+        "name": "scrapbook",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "on desk"
+      }
+    ]
+  },
+  "217": {
+    "room_name": "LIBRARY B",
+    "items": [
+      {
+        "name": "mo_disc",
+        "item_id": 40,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "first MO disc; Any% may use 213 security room instead",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Library B: press wall button, push statue onto lit floor tile"
+        }
+      }
+    ]
+  },
+  "218": {
+    "room_name": "HIDDEN LIBRARY",
+    "items": []
+  },
+  "219": {
+    "room_name": "SHED",
+    "items": [
+      {
+        "name": "battery",
+        "item_id": 39,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "on chair"
+      },
+      {
+        "name": "explosive_rounds",
+        "item_id": 16,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on shelf"
+      }
+    ]
+  },
+  "21A": {
+    "room_name": "UNDER PASSAGE 1",
+    "items": []
+  },
+  "21B": {
+    "room_name": "UNDER PASSAGE 2",
+    "items": []
+  },
+  "21C": {
+    "room_name": "UNDER KITCHEN",
+    "items": []
+  },
+  "300": {
+    "room_name": "FIRST HOUSE OUT",
+    "items": [
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 3,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "near SE double doors"
+      },
+      {
+        "name": "red_herb",
+        "item_id": 67,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "garden"
+      },
+      {
+        "name": "blue_herb",
+        "item_id": 69,
+        "count": 3,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "garden"
+      },
+      {
+        "name": "map_garden",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "near broken elevator"
+      }
+    ]
+  },
+  "301": {
+    "room_name": "WATER GATE",
+    "items": []
+  },
+  "302": {
+    "room_name": "FALLS",
+    "items": [
+      {
+        "name": "flare",
+        "item_id": 42,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "Barry ending item",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry gives flare at falls for good ending path"
+        }
+      }
+    ]
+  },
+  "303": {
+    "room_name": "HELIPORT",
+    "items": [
+      {
+        "name": "rocket_launcher",
+        "item_id": 10,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "Brad drop bad ending",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Brad drops launcher on helipad bad ending only"
+        }
+      }
+    ]
+  },
+  "304": {
+    "room_name": "SECOND HOUSE GATE",
+    "items": [
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "near gate"
+      },
+      {
+        "name": "blue_herb",
+        "item_id": 69,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "near gate"
+      }
+    ]
+  },
+  "305": {
+    "room_name": "FOUNTAIN",
+    "items": [
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "near welded doors"
+      },
+      {
+        "name": "doom_book_2",
+        "item_id": 63,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "fountain puzzle reward",
+        "gate": {
+          "type": "puzzle",
+          "requires": [
+            "hex_crank"
+          ],
+          "notes": "Item chamber statue + hex crank puzzle (see room placement note in docs)"
+        }
+      }
+    ]
+  },
+  "306": {
+    "room_name": "ITEM PASSAGE",
+    "items": [
+      {
+        "name": "mo_disc",
+        "item_id": 40,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "second MO disk",
+        "gate": {
+          "type": "puzzle",
+          "requires": [
+            "hex_crank"
+          ],
+          "notes": "Push statue five times, hex crank twice, align statue on tile"
+        }
+      },
+      {
+        "name": "explosive_rounds",
+        "item_id": 16,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on shelf"
+      },
+      {
+        "name": "first_aid_spray",
+        "item_id": 11,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on shelf"
+      }
+    ]
+  },
+  "307": {
+    "room_name": "LADDER PASSAGE",
+    "items": []
+  },
+  "308": {
+    "room_name": "BRANCH PASSAGE",
+    "items": []
+  },
+  "309": {
+    "room_name": "DARKNESS PASSAGE",
+    "items": []
+  },
+  "30A": {
+    "room_name": "ENRICO ROOM",
+    "items": [
+      {
+        "name": "hex_crank",
+        "item_id": 30,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "on body after scene",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Sparkle pickup appears after Enrico death cutscene"
+        }
+      },
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "search body twice",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Search Enrico's body twice after cutscene"
+        }
+      }
+    ]
+  },
+  "30B": {
+    "room_name": "ROCK PASSAGE",
+    "items": [
+      {
+        "name": "mo_disc",
+        "item_id": 40,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "alcove after boulder",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "hex_crank"
+          ],
+          "notes": "Alcove behind first boulder trap after using hex crank on wall"
+        }
+      },
+      {
+        "name": "map_underground",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "wall after boulder",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "hex_crank"
+          ],
+          "notes": "On wall in boulder alcove (same gate as second MO disc)"
+        }
+      }
+    ]
+  },
+  "30C": {
+    "room_name": "BLACK TIGER ROOM",
+    "items": []
+  },
+  "30D": {
+    "room_name": "STRAIGHT PASSAGE",
+    "items": [
+      {
+        "name": "flame_rounds",
+        "item_id": 18,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "after boulder trap",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Hunter drop after triggering second boulder trap"
+        }
+      }
+    ]
+  },
+  "30E": {
+    "room_name": "SAVE ROOM",
+    "items": [
+      {
+        "name": "ink_ribbon",
+        "item_id": 47,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "save room"
+      },
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "floor"
+      }
+    ]
+  },
+  "30F": {
+    "room_name": "CRANK PASSAGE",
+    "items": [
+      {
+        "name": "first_aid_spray",
+        "item_id": 11,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "near generator"
+      },
+      {
+        "name": "explosive_rounds",
+        "item_id": 16,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "near generator"
+      }
+    ]
+  },
+  "310": {
+    "room_name": "COURT TO LABO",
+    "items": []
+  },
+  "311": {
+    "room_name": "ROTATING HOLE",
+    "items": []
+  },
+  "400": {
+    "room_name": "ENTER PASSAGE",
+    "items": [
+      {
+        "name": "blue_herb",
+        "item_id": 69,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "near entrance plants"
+      }
+    ]
+  },
+  "401": {
+    "room_name": "ROOM 001",
+    "items": [
+      {
+        "name": "red_book",
+        "item_id": 62,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "on bed"
+      },
+      {
+        "name": "shotgun_shells",
+        "item_id": 12,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "locked desk",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked desk in room 001"
+        }
+      }
+    ]
+  },
+  "402": {
+    "room_name": "ROOM 001 BATHROOM",
+    "items": [
+      {
+        "name": "control_room_key",
+        "item_id": 59,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "drain bathtub",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Pull bathtub drain chain in room 001 bathroom"
+        }
+      }
+    ]
+  },
+  "403": {
+    "room_name": "SAVE ROOM",
+    "items": [
+      {
+        "name": "first_aid_spray",
+        "item_id": 11,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on shelf"
+      },
+      {
+        "name": "explosive_rounds",
+        "item_id": 16,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on shelf"
+      }
+    ]
+  },
+  "404": {
+    "room_name": "BAR",
+    "items": [
+      {
+        "name": "pass_number",
+        "item_id": null,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": false,
+        "notes": "pool table code 345 (Jill)",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Jill reads pool-table code 345 in rec room (Chris: Barry gives pass)"
+        }
+      }
+    ]
+  },
+  "405": {
+    "room_name": "CENTER PASSAGE",
+    "items": []
+  },
+  "406": {
+    "room_name": "ROOM 002",
+    "items": [
+      {
+        "name": "shotgun_shells",
+        "item_id": 12,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "in desk"
+      },
+      {
+        "name": "map_dormitory",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "on wall"
+      }
+    ]
+  },
+  "407": {
+    "room_name": "ROOM 002 BATHROOM",
+    "items": [
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "bathroom"
+      }
+    ]
+  },
+  "408": {
+    "room_name": "HONEYCOMB PASSAGE",
+    "items": [
+      {
+        "name": "dorm_key_002",
+        "item_id": 57,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "on table near wasp nest"
+      }
+    ]
+  },
+  "409": {
+    "room_name": "DRUG STOREHOUSE",
+    "items": [
+      {
+        "name": "empty_bottle",
+        "item_id": 19,
+        "count": 3,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "V-Jolt prep"
+      },
+      {
+        "name": "water",
+        "item_id": 20,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "sink"
+      },
+      {
+        "name": "umb_no2",
+        "item_id": 21,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "shelves"
+      },
+      {
+        "name": "umb_no4",
+        "item_id": 22,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "shelves"
+      }
+    ]
+  },
+  "40A": {
+    "room_name": "ROOM 003",
+    "items": [
+      {
+        "name": "ink_ribbon",
+        "item_id": 47,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "locked desk",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked desk in room 003"
+        }
+      }
+    ]
+  },
+  "40B": {
+    "room_name": "ROOM 003 BATHROOM",
+    "items": [
+      {
+        "name": "flame_rounds",
+        "item_id": 18,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "zombie drop"
+      }
+    ]
+  },
+  "40C": {
+    "room_name": "PLANT BOSS ROOM",
+    "items": [
+      {
+        "name": "helmet_key",
+        "item_id": 54,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "fireplace after boss",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Fireplace after Plant 42 boss (Barry helps if no V-Jolt)"
+        }
+      }
+    ]
+  },
+  "40D": {
+    "room_name": "UNDER PASSAGE",
+    "items": [
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "opposite water tank door"
+      }
+    ]
+  },
+  "40E": {
+    "room_name": "WATER TANK",
+    "items": []
+  },
+  "40F": {
+    "room_name": "SECURITY ROOM",
+    "items": []
+  },
+  "410": {
+    "room_name": "ARMS STOREHOUSE",
+    "items": [
+      {
+        "name": "dorm_key_003",
+        "item_id": 58,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "sparkle on shelf"
+      },
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "on shelves (2x15)"
+      },
+      {
+        "name": "shotgun_shells",
+        "item_id": 12,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "on shelves"
+      }
+    ]
+  },
+  "411": {
+    "room_name": "CONTROL ROOM",
+    "items": []
+  },
+  "500": {
+    "room_name": "UNDER FOUNTAIN",
+    "items": [
+      {
+        "name": "battery",
+        "item_id": 39,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "second battery, floor next to heliport elevator"
+      }
+    ]
+  },
+  "501": {
+    "room_name": "HELIPORT PASSAGE",
+    "items": []
+  },
+  "502": {
+    "room_name": "LADDER ROOM",
+    "items": []
+  },
+  "503": {
+    "room_name": "STAIRS",
+    "items": []
+  },
+  "504": {
+    "room_name": "CONFERENCE ROOM",
+    "items": []
+  },
+  "505": {
+    "room_name": "O PASSAGE",
+    "items": []
+  },
+  "506": {
+    "room_name": "SMALL LABORATORY",
+    "items": [
+      {
+        "name": "wolf_medal",
+        "item_id": 36,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "on desk",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "doom_book_2"
+          ],
+          "notes": "Standard: inside Doom Book 2; open book at fountain (desk placement disputed)"
+        }
+      }
+    ]
+  },
+  "507": {
+    "room_name": "MORTUARY",
+    "items": [
+      {
+        "name": "eagle_medal",
+        "item_id": 37,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "inside coffin",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "doom_book_1"
+          ],
+          "notes": "Standard: inside Doom Book 1; open book at fountain (coffin note disputed)"
+        }
+      }
+    ]
+  },
+  "508": {
+    "room_name": "DOUBLE LOCK",
+    "items": [
+      {
+        "name": "passcode_a",
+        "item_id": null,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": false,
+        "notes": "aka pass_number; decoded on MO disc reader, not a physical pickup",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "mo_disc"
+          ],
+          "notes": "Decoded at MO terminal, not a floor pickup"
+        }
+      },
+      {
+        "name": "passcode_b",
+        "item_id": null,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": false,
+        "notes": "aka pass_number; decoded on MO disc reader, not a physical pickup",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "mo_disc"
+          ],
+          "notes": "Decoded at MO terminal, not a floor pickup"
+        }
+      },
+      {
+        "name": "clip",
+        "item_id": null,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "wooden box (2x15)"
+      },
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "west side floor"
+      }
+    ]
+  },
+  "509": {
+    "room_name": "PRIVATE ROOM A",
+    "items": []
+  },
+  "50A": {
+    "room_name": "PRIVATE ROOM B",
+    "items": []
+  },
+  "50B": {
+    "room_name": "FRONT OF CELL",
+    "items": [
+      {
+        "name": "flare",
+        "item_id": 42,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "Barry good ending",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry good-ending flare near lab escape elevator"
+        }
+      }
+    ]
+  },
+  "50C": {
+    "room_name": "FRONT OF ELEVATOR",
+    "items": []
+  },
+  "50D": {
+    "room_name": "ESCAPE ELEVATOR",
+    "items": []
+  },
+  "50E": {
+    "room_name": "SAVE ROOM",
+    "items": [
+      {
+        "name": "power_room_key",
+        "item_id": 55,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "on shelf; ITEM_IDS 0x37 names this lab_key_1"
+      },
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "next to bed"
+      }
+    ]
+  },
+  "50F": {
+    "room_name": "MAZE A",
+    "items": []
+  },
+  "510": {
+    "room_name": "MAZE B",
+    "items": [
+      {
+        "name": "slides",
+        "item_id": 43,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "projector room"
+      }
+    ]
+  },
+  "511": {
+    "room_name": "MOVIE ROOM",
+    "items": []
+  },
+  "512": {
+    "room_name": "CELL",
+    "items": []
+  },
+  "513": {
+    "room_name": "TYRANT ROOM",
+    "items": []
+  },
+  "514": {
+    "room_name": "FRONT OF TYRANT",
+    "items": [
+      {
+        "name": "rocket_launcher",
+        "item_id": 10,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "Barry drops before Tyrant",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry drops rocket launcher before Tyrant fight (good ending)"
+        }
+      }
+    ]
+  },
+  "515": {
+    "room_name": "B3 > B4 ELEVATOR",
+    "items": []
+  }
+}

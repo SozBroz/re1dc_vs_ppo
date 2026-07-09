@@ -1,0 +1,57 @@
+{
+  "105->104": {
+    "from_room": "105",
+    "to_room": "104",
+    "door_x": 5830,
+    "door_z": 14064,
+    "door_facing": 3241,
+    "door_cam_id": 2,
+    "entry_x": 11500,
+    "entry_z": 2800,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "105->106": {
+    "from_room": "105",
+    "to_room": "106",
+    "door_x": 31601,
+    "door_z": 7167,
+    "door_facing": 3980,
+    "door_cam_id": 0,
+    "entry_x": 3400,
+    "entry_z": 17000,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "106->105": {
+    "from_room": "106",
+    "to_room": "105",
+    "door_x": 3557,
+    "door_z": 16670,
+    "door_facing": 2347,
+    "door_cam_id": 6,
+    "entry_x": 30900,
+    "entry_z": 8300,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "104->105": {
+    "from_room": "104",
+    "to_room": "105",
+    "door_x": 11870,
+    "door_z": 2207,
+    "door_facing": 1664,
+    "door_cam_id": 0,
+    "entry_x": 6300,
+    "entry_z": 14100,
+    "notes": "logged by harvest_doors.py (random walk)"
+  },
+  "104->10F": {
+    "from_room": "104",
+    "to_room": "10F",
+    "door_x": 31241,
+    "door_z": 4222,
+    "door_facing": 3040,
+    "door_cam_id": 3,
+    "entry_x": 14000,
+    "entry_z": 3000,
+    "notes": "logged by harvest_doors.py (random walk)"
+  }
+}

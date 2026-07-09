@@ -1,0 +1,36 @@
+{
+  "opening": "title_new_load_menu",
+  "label": "New Game / Load Game front-end menu",
+  "captured_at": "2026-07-07 hunt (recon_log + death continue + fresh boot transition)",
+  "screen_id": {
+    "game_state": "0x80000000",
+    "game_mode": "0x80",
+    "scene_flag": "0x00",
+    "msg_flag": "0x00"
+  },
+  "ram": {
+    "player_hp": 0,
+    "room_id": 27,
+    "stage_id": 0,
+    "character_id": 0,
+    "game_state": 2147483648,
+    "game_mode": 128,
+    "scene_flag": 0,
+    "msg_flag": 0
+  },
+  "outside": "main_menu_room",
+  "notes": "Authoritative discriminator is room_id=27 with hp=0 (recon frame 1950+). Same gs/mode as press-any-button but room byte advances to 27. outside_gameplay_reason returns main_menu_room.",
+  "transition_into_menu": {
+    "time": "06:27:11",
+    "game_state": "0x41000000",
+    "game_mode": "0x41",
+    "room_id": 7,
+    "player_hp": 140,
+    "phase": "title_menu_enter",
+    "notes": "One-frame style transition after gameplay teaser; room byte may still show 7 before settling on 27."
+  },
+  "distinct_from": {
+    "press_any_button": "room_id=0",
+    "store_room_11B": "room_id=27 only on menus, not in-mansion store save"
+  }
+}
