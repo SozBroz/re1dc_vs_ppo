@@ -207,7 +207,7 @@ def resolve_resume_path(
             p = root / p
         candidates.append(zip_path(p))
 
-    best: tuple[float, Path] | None = None
+    best: tuple[int, float, Path] | None = None
     seen: set[str] = set()
     for cand in candidates:
         key = str(cand.resolve()) if cand.exists() else str(cand)
@@ -219,7 +219,8 @@ def resolve_resume_path(
         # Named runs must not resume from the global legacy alias.
         if named_run and cand.resolve() == (root / "data" / "ppo_re1_final.zip").resolve():
             continue
+        steps = _steps_from_name(cand)
         mtime = cand.stat().st_mtime
-        if best is None or mtime > best[0]:
-            best = (mtime, cand)
-    return best[1] if best else None
+        if best is None or steps > best[0] or (steps == best[0] and mtime > best[1]):
+            best = (steps, mtime, cand)
+    return best[2] if best else None

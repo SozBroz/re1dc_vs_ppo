@@ -152,6 +152,9 @@ class TrainingMetricsJsonlCallback:
         state = {"update": 0, "t0": time.perf_counter()}
 
         class _Cb(BaseCallback):
+            def _on_step(self) -> bool:
+                return True
+
             def _on_rollout_end(self) -> bool:
                 state["update"] += 1
                 elapsed = time.perf_counter() - state["t0"]

@@ -32,3 +32,14 @@ def make_re1_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
     )
     action_space = spaces.Discrete(len(ACTION_NAMES))
     return observation_space, action_space
+
+
+def make_re1_policy_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
+    """Policy-side spaces: frame is CHW (matches SB3 / VecTransposeImage training)."""
+    obs_space, act_space = make_re1_spaces()
+    frame = obs_space.spaces["frame"]
+    chw_frame = frame.__class__(low=0, high=255, shape=(4, 84, 84), dtype=frame.dtype)
+    policy_obs_space = obs_space.__class__(
+        {**obs_space.spaces, "frame": chw_frame}
+    )
+    return policy_obs_space, act_space

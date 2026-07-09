@@ -93,6 +93,25 @@ def warmup_remote_policy(
     return version
 
 
+def _try_sync_remote_weights(
+    client: WorkerClient,
+    policy: InferencePolicy,
+    *,
+    machine_name: str,
+    local_version: int,
+) -> int:
+    """Pull newer weights once (rollout boundary); returns updated local version."""
+    try:
+        version, data = client.fetch_weights(min_version=local_version + 1)
+        if version > local_version and data:
+            policy.load_from_bytes(data, version)
+            log(machine_name, f"remote weight sync -> policy_version={version}")
+            return version
+    except Exception as exc:
+        log(machine_name, f"weight sync error: {exc}")
+    return local_version
+
+
 def run_worker_loop(
     vec_env: VecEnv,
     policy: InferencePolicy,
@@ -105,10 +124,18 @@ def run_worker_loop(
     is_local: bool,
 ) -> None:
     log(machine_name, f"worker loop started ({worker_id}, {vec_env.num_envs} envs)")
+    local_version = policy.policy_version
     while not stop_event.is_set():
         if policy.policy_version <= 0:
             time.sleep(0.1)
             continue
+        if not is_local and isinstance(rollout_sink, WorkerClient):
+            local_version = _try_sync_remote_weights(
+                rollout_sink,
+                policy,
+                machine_name=machine_name,
+                local_version=local_version,
+            )
         rollout = collect_rollout(
             vec_env,
             policy,

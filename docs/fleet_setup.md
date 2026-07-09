@@ -4,9 +4,9 @@
 
 | Machine | Host | Role | Script |
 |---------|------|------|--------|
-| **workhorse2** | `192.168.0.111` | **Learner** — PPO train, checkpoints, HTTP weights | `distributed_train_parallel.py --role learner` |
-| **workhorse1** | `192.168.0.160` | Remote **worker** — BizHawk rollouts only | `--role worker --learner-host 192.168.0.111` |
-| **pking** (dev) | local | Remote **worker** | `--role worker --learner-host 192.168.0.111` |
+| **workhorse2** | `192.168.0.111` | **Learner** — PPO train, checkpoints, HTTP weights | `C:\Users\sshuser\re1_rl` (no D: drive) |
+| **workhorse1** | `192.168.0.160` | Remote **worker** — BizHawk rollouts only | `D:\re1_rl` |
+| **pking** (dev) | local | Remote **worker** | `D:\re1_rl` |
 
 Workers **never** load policy from disk; they pull weights from the learner at warmup and hot-sync after each train step.
 
@@ -65,11 +65,14 @@ python scripts/prune_checkpoints.py --keep 5
 
 ## Port plan (avoid collisions)
 
-| Machine | `--base-port` | `--n-envs` | EmuHawk ports |
-|---------|---------------|------------|---------------|
-| workhorse2 (learner local worker) | 5555 | 12–20 | 5555–5574 |
-| workhorse1 | 5655 | 12 | 5655–5666 |
-| pking | 5755 | 12 | 5755–5766 |
+| Machine | `--base-port` | `--n-envs` | Bottleneck |
+|---------|---------------|------------|------------|
+| workhorse2 (learner) | 5555 | — | GPU train bursts; `--no-local-worker` |
+| workhorse2 (local worker) | 5555 | 16 | ~32 GB RAM, 28 threads |
+| workhorse1 | 5655 | 8 | **8 CPU threads** (~90% target) |
+| pking | 5755 | 12 | **~48 GB RAM** (~900 MB/EmuHawk) |
+
+Weight sync: workers poll every **360 s** (`--weight-sync-poll-s`) and sync at each rollout boundary. Learner trains when **20480** queued steps (~6+ rollouts).
 
 Adjust if a box runs monolithic `train_parallel` instead of distributed worker.
 

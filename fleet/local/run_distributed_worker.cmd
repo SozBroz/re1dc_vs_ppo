@@ -4,8 +4,9 @@ setlocal
 cd /d D:\re1_rl
 if "%MACHINE_NAME%"=="" set MACHINE_NAME=workhorse1
 if "%LEARNER_HOST%"=="" set LEARNER_HOST=192.168.0.111
-set N_ENVS=12
-set BASE_PORT=5655
+if "%N_ENVS%"=="" set N_ENVS=12
+if "%BASE_PORT%"=="" set BASE_PORT=5655
+if "%N_ENVS%"=="" set N_ENVS=8
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role worker ^
@@ -17,4 +18,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --total-steps 0 ^
   --training-speed 6400 ^
   --skip-chunk 600 ^
+  --weight-sync-poll-s 360 ^
   --capture-checkpoints

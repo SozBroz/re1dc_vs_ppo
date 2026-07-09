@@ -32,7 +32,7 @@ from re1_rl.async_fleet import PPO_HYPERPARAMS  # noqa: E402
 from re1_rl.distributed.learner_server import LearnerState, start_learner_server  # noqa: E402
 from re1_rl.distributed.learner_train import train_on_rollouts  # noqa: E402
 from re1_rl.distributed.log_util import log  # noqa: E402
-from re1_rl.distributed.spaces import make_re1_spaces  # noqa: E402
+from re1_rl.distributed.spaces import make_re1_policy_spaces, make_re1_spaces  # noqa: E402
 from re1_rl.distributed.weight_store import WeightStore  # noqa: E402
 from re1_rl.distributed.weights import export_policy_state_dict  # noqa: E402
 from re1_rl.distributed.worker_client import WorkerClient  # noqa: E402
@@ -58,12 +58,14 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--learner-host", default="127.0.0.1", help="learner HTTP host for remote workers")
     ap.add_argument("--learner-port", type=int, default=8765)
     ap.add_argument("--bind-host", default="0.0.0.0", help="learner HTTP bind address")
-    ap.add_argument("--batch-threshold", type=int, default=3072,
-                    help="timesteps queued before learner train() (default 256*12)")
-    ap.add_argument("--max-staleness", type=int, default=1,
+    ap.add_argument("--batch-threshold", type=int, default=20480,
+                    help="timesteps queued before learner train() (default ~6.5 rollouts @ 12 envs)")
+    ap.add_argument("--max-staleness", type=int, default=5,
                     help="reject rollouts older than current_version - K")
     ap.add_argument("--warmup-timeout", type=float, default=600.0,
                     help="seconds to wait for learner weights on worker start")
+    ap.add_argument("--weight-sync-poll-s", type=float, default=360.0,
+                    help="seconds between remote weight polls (default 6 min)")
     ap.add_argument("--no-local-worker", action="store_true",
                     help="learner role without co-located BizHawk fleet")
     ap.add_argument(
@@ -178,7 +180,7 @@ def _run_local_worker(
 ) -> None:
     from re1_rl.distributed.inference_policy import InferencePolicy
 
-    obs_space, act_space = make_re1_spaces()
+    obs_space, act_space = make_re1_policy_spaces()
     policy = InferencePolicy(obs_space, act_space, device)
     worker_id = args.worker_id or args.machine_name
 
@@ -228,7 +230,7 @@ def _run_local_worker(
 def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
     from re1_rl.distributed.inference_policy import InferencePolicy
 
-    obs_space, act_space = make_re1_spaces()
+    obs_space, act_space = make_re1_policy_spaces()
     policy = InferencePolicy(obs_space, act_space, device)
     worker_id = args.worker_id or args.machine_name
     client = WorkerClient(
@@ -255,7 +257,11 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
     sync_thread = threading.Thread(
         target=_remote_weight_sync_loop,
         args=(client, policy),
-        kwargs={"machine_name": args.machine_name, "stop_event": sync_stop},
+        kwargs={
+            "machine_name": args.machine_name,
+            "stop_event": sync_stop,
+            "poll_s": float(args.weight_sync_poll_s),
+        },
         name="remote-weight-sync",
         daemon=True,
     )
@@ -364,6 +370,9 @@ def _run_learner(args: argparse.Namespace) -> int:
             super().__init__()
             self.best_waypoint = 0
             self.episodes = 0
+
+        def _on_step(self) -> bool:
+            return True
 
         def _on_rollout_end(self) -> None:
             ep_rew = self.model.ep_info_buffer
