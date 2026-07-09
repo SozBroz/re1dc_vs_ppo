@@ -100,7 +100,16 @@ set LEARNER_HOST=192.168.0.111
 
 Or edit `fleet/local/run_distributed_worker.cmd` and set `MACHINE_NAME`.
 
-**workhorse1:** start the worker from an **interactive session** on the box (RDP or local console). Bare SSH registers over HTTP but **EmuHawk/Lua never connects** (yesterday’s failure: registered, 0 rollouts, then `EOFError`). Use:
+**workhorse1 / workhorse2 headless desktop:** BizHawk needs an always-on interactive console session (not SSH Session 0). Configure once per box:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\setup_always_on_desktop.ps1 -Role worker   # WH1
+powershell -ExecutionPolicy Bypass -File tools\setup_always_on_desktop.ps1 -Role learner  # WH2
+```
+
+Then reboot. Prefer an HDMI dummy plug if no monitor. Full notes: [docs/always_on_desktop.md](always_on_desktop.md).
+
+**workhorse1 (until always-on is configured):** start from RDP/console, or after autologon use the at-logon task. Bare SSH registers over HTTP but **EmuHawk/Lua never connects**. Manual:
 
 ```bat
 D:\re1_rl\fleet\local\prime_check_workhorse1.cmd
