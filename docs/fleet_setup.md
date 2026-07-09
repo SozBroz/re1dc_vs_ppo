@@ -70,7 +70,7 @@ python scripts/prune_checkpoints.py --keep 5
 | Machine | `--base-port` | `--n-envs` | Bottleneck |
 |---------|---------------|------------|------------|
 | workhorse2 (learner + local worker) | 5555 | **8** | ~32 GB RAM — keep headroom for 5–8 GB epoch ingest spike |
-| workhorse1 | 5655 | 8 | **8 CPU threads** (~90% target) |
+| workhorse1 | 5655 | **8** | **8 CPU threads** — launch from **RDP/console only** |
 | pking | 5755 | 12 | **~48 GB RAM** (~900 MB/EmuHawk) |
 
 Weight sync / experience: **6-minute epochs**. Remotes buffer rollouts, then once per `--sync-interval-s` (default **360**) upload a burst and pull weights. Learner **waits for all live workers** (heartbeat registry) to contribute that epoch, with `--epoch-grace-s` (default 120) so a dead box cannot stall forever. Remotes heartbeat every ~30s; no heartbeat for `--worker-liveness-s` (default 90) drops them from the expected set (pking can leave/rejoin freely). Gentler large-batch hyperparams (`DISTRIBUTED_EPOCH_HYPERPARAMS`). `max_staleness` default **2**.
@@ -100,7 +100,12 @@ set LEARNER_HOST=192.168.0.111
 
 Or edit `fleet/local/run_distributed_worker.cmd` and set `MACHINE_NAME`.
 
-**workhorse1:** start the worker from an **interactive session** on the box (RDP or local console). Bare SSH often fails to spawn BizHawk actor children.
+**workhorse1:** start the worker from an **interactive session** on the box (RDP or local console). Bare SSH registers over HTTP but **EmuHawk/Lua never connects** (yesterday’s failure: registered, 0 rollouts, then `EOFError`). Use:
+
+```bat
+D:\re1_rl\fleet\local\prime_check_workhorse1.cmd
+D:\re1_rl\fleet\local\start_worker_detached_workhorse1.cmd
+```
 
 ---
 
