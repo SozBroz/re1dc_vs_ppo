@@ -21,6 +21,18 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
     ent_coef=0.01,
 )
 
+# Distributed 6-minute sync epochs: larger on-policy batches, gentler updates.
+# Used only by ``scripts/distributed_train_parallel.py`` (not monolithic async).
+DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
+    n_steps=256,
+    batch_size=2048,
+    n_epochs=2,
+    learning_rate=1e-4,
+    gamma=0.99,
+    ent_coef=0.01,
+)
+DEFAULT_SYNC_INTERVAL_S = 360.0
+
 
 def _obs_batch_for_one(obs: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     return {k: np.expand_dims(v, 0) for k, v in obs.items()}

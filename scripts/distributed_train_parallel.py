@@ -28,7 +28,12 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from re1_rl.async_fleet import PPO_HYPERPARAMS, load_async_learner  # noqa: E402
+from re1_rl.async_fleet import (  # noqa: E402
+    DEFAULT_SYNC_INTERVAL_S,
+    DISTRIBUTED_EPOCH_HYPERPARAMS,
+    PPO_HYPERPARAMS,
+    load_async_learner,
+)
 from re1_rl.distributed.learner_server import LearnerState, start_learner_server  # noqa: E402
 from re1_rl.distributed.learner_train import train_on_rollouts  # noqa: E402
 from re1_rl.distributed.log_util import log  # noqa: E402
@@ -39,7 +44,6 @@ from re1_rl.distributed.worker_client import WorkerClient  # noqa: E402
 from re1_rl.distributed.async_worker_runtime import run_async_worker_loop  # noqa: E402
 from re1_rl.distributed.worker_runtime import (  # noqa: E402
     _local_weight_sync_loop,
-    _remote_weight_sync_loop,
     warmup_local_policy,
     warmup_remote_policy,
 )
@@ -58,15 +62,31 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--learner-host", default="127.0.0.1", help="learner HTTP host for remote workers")
     ap.add_argument("--learner-port", type=int, default=8765)
     ap.add_argument("--bind-host", default="0.0.0.0", help="learner HTTP bind address")
-    ap.add_argument("--batch-threshold", type=int, default=20480,
-                    help="timesteps queued before learner train() (default ~6.5 rollouts @ 12 envs)")
+    ap.add_argument(
+        "--sync-interval-s",
+        type=float,
+        default=DEFAULT_SYNC_INTERVAL_S,
+        help=(
+            "seconds between remote network epochs: upload buffered experience "
+            "then pull weights (default 360). Also learner train cadence."
+        ),
+    )
+    ap.add_argument(
+        "--batch-threshold",
+        type=int,
+        default=0,
+        help=(
+            "optional min timesteps before a timed train fires "
+            "(0 = train on whatever arrived each sync interval)"
+        ),
+    )
     ap.add_argument(
         "--max-staleness",
         type=int,
-        default=40,
+        default=2,
         help=(
             "reject rollouts older than current_version - K "
-            "(default 40: survive ~6+ min weight lag while learner trains)"
+            "(default 2: allow one missed epoch under clock skew)"
         ),
     )
     ap.add_argument("--warmup-timeout", type=float, default=600.0,
@@ -74,11 +94,8 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--weight-sync-poll-s",
         type=float,
-        default=360.0,
-        help=(
-            "seconds between remote FULL weight downloads "
-            "(default 360 = 6 min; only path that ships policy bytes)"
-        ),
+        default=None,
+        help="deprecated alias for --sync-interval-s",
     )
     ap.add_argument("--no-local-worker", action="store_true",
                     help="learner role without co-located BizHawk fleet")
@@ -130,8 +147,26 @@ def _build_learner_model(args: argparse.Namespace, device: str):
     # Distributed train_on_rollouts builds its own buffer from worker n_steps;
     # keep model.n_steps aligned with CLI for any SB3 helpers that read it.
     model.n_steps = int(args.n_steps)
+    # Large-batch epoch hyperparams (gentler LR / fewer epochs / bigger minibatches).
+    for key, value in DISTRIBUTED_EPOCH_HYPERPARAMS.items():
+        if key == "n_steps":
+            continue
+        if hasattr(model, key):
+            setattr(model, key, value)
+    if hasattr(model, "lr_schedule"):
+        lr = float(DISTRIBUTED_EPOCH_HYPERPARAMS["learning_rate"])
+        model.lr_schedule = lambda _progress: lr
+        if getattr(model, "policy", None) is not None and hasattr(model.policy, "optimizer"):
+            for group in model.policy.optimizer.param_groups:
+                group["lr"] = lr
     if resume_path is not None:
         log(args.machine_name, f"resumed learner from {resume_path}")
+    log(
+        args.machine_name,
+        f"epoch hyperparams lr={DISTRIBUTED_EPOCH_HYPERPARAMS['learning_rate']} "
+        f"batch_size={DISTRIBUTED_EPOCH_HYPERPARAMS['batch_size']} "
+        f"n_epochs={DISTRIBUTED_EPOCH_HYPERPARAMS['n_epochs']}",
+    )
     return model, ckpt_dir
 
 
@@ -221,19 +256,9 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
 
     client.register(worker_id, args.n_envs)
 
-    sync_stop = threading.Event()
-    sync_thread = threading.Thread(
-        target=_remote_weight_sync_loop,
-        args=(client, policy),
-        kwargs={
-            "machine_name": args.machine_name,
-            "stop_event": sync_stop,
-            "poll_s": float(args.weight_sync_poll_s),
-        },
-        name="remote-weight-sync",
-        daemon=True,
-    )
-    sync_thread.start()
+    sync_interval = float(args.sync_interval_s)
+    if args.weight_sync_poll_s is not None:
+        sync_interval = float(args.weight_sync_poll_s)
 
     try:
         run_async_worker_loop(
@@ -250,12 +275,12 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
             stop_event=stop_event,
             rollout_sink=client,
             is_local=False,
+            sync_interval_s=sync_interval,
         )
     except KeyboardInterrupt:
         log(args.machine_name, "remote worker interrupted")
     finally:
         stop_event.set()
-        sync_stop.set()
     return 0
 
 
@@ -272,9 +297,13 @@ def _run_learner(args: argparse.Namespace) -> int:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     train_steps = args.total_steps if args.total_steps > 0 else 2**62
     step_label = str(args.total_steps) if args.total_steps > 0 else "unlimited"
+    sync_interval = float(args.sync_interval_s)
+    if args.weight_sync_poll_s is not None:
+        sync_interval = float(args.weight_sync_poll_s)
     log(
         args.machine_name,
-        f"learner starting: batch_threshold={args.batch_threshold} "
+        f"learner starting: sync_interval_s={sync_interval:.0f} "
+        f"batch_threshold={args.batch_threshold} max_staleness={args.max_staleness} "
         f"total_steps={step_label} cuda={torch.cuda.is_available()}",
     )
 
@@ -352,11 +381,12 @@ def _run_learner(args: argparse.Namespace) -> int:
 
     pending: list = []
     pending_steps = 0
+    epoch_t0 = time.monotonic()
 
     try:
         while model.num_timesteps < train_steps and not stop_event.is_set():
             try:
-                rollout = rollout_queue.get(timeout=5.0)
+                rollout = rollout_queue.get(timeout=1.0)
                 pending.append(rollout)
                 pending_steps += rollout.num_timesteps()
                 log(
@@ -365,9 +395,19 @@ def _run_learner(args: argparse.Namespace) -> int:
                     f"(+{rollout.num_timesteps()}, pending={pending_steps})",
                 )
             except queue.Empty:
-                continue
+                pass
 
-            if pending_steps < args.batch_threshold:
+            if (time.monotonic() - epoch_t0) < sync_interval:
+                continue
+            if not pending:
+                epoch_t0 = time.monotonic()
+                continue
+            # Optional soft floor: wait a bit longer if under threshold.
+            if (
+                args.batch_threshold > 0
+                and pending_steps < args.batch_threshold
+                and (time.monotonic() - epoch_t0) < sync_interval * 1.5
+            ):
                 continue
 
             batch_infos: list[dict[str, Any]] = []
@@ -378,7 +418,7 @@ def _run_learner(args: argparse.Namespace) -> int:
             learner_state.set_current_version(version)
             log(
                 args.machine_name,
-                f"trained {trained} steps from {len(pending)} rollouts -> "
+                f"epoch train {trained} steps from {len(pending)} rollouts -> "
                 f"policy_version={version} total={model.num_timesteps}",
             )
             progress.consume_infos(batch_infos, num_timesteps=int(model.num_timesteps))
@@ -392,6 +432,7 @@ def _run_learner(args: argparse.Namespace) -> int:
                 cb.on_step()
             pending.clear()
             pending_steps = 0
+            epoch_t0 = time.monotonic()
 
     except KeyboardInterrupt:
         log(args.machine_name, "learner interrupted")

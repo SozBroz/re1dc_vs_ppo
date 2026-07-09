@@ -73,7 +73,7 @@ python scripts/prune_checkpoints.py --keep 5
 | workhorse1 | 5655 | 8 | **8 CPU threads** (~90% target) |
 | pking | 5755 | 12 | **~48 GB RAM** (~900 MB/EmuHawk) |
 
-Weight sync: remotes download full policy bytes at most every **360 s** (`--weight-sync-poll-s`). No weight pull on rollout boundaries. Learner `max_staleness` default **40** so 6‑min-lag rollouts still train. Learner trains when **20480** queued steps.
+Weight sync / experience: **6-minute epochs**. Remotes buffer rollouts, then once per `--sync-interval-s` (default **360**) upload a burst and pull weights. Learner trains on the same cadence with gentler large-batch hyperparams (`DISTRIBUTED_EPOCH_HYPERPARAMS`: lr `1e-4`, `batch_size` 2048, `n_epochs` 2). `max_staleness` default **2**.
 
 Adjust if a box runs monolithic `train_parallel` instead of distributed worker.
 

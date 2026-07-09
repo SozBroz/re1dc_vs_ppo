@@ -1,9 +1,10 @@
-"""Desync actor fleet for distributed workers (local inference, upload rollouts).
+"""Desync actor fleet for distributed workers (local inference, epoch sync).
 
 Mirrors monolithic ``async_fleet`` collection: each env is an independent actor
 process; the worker process serves ``need`` / ``act`` via a local
-``InferencePolicy`` and sinks completed ``WorkerRollout`` batches to the learner
-(in-process queue or HTTP). No per-step network for actions.
+``InferencePolicy``. Remotes buffer rollouts and touch the network once per
+``sync_interval_s`` (upload burst + weight pull). Local workers enqueue
+in-process with no HTTP.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from typing import Any
 import numpy as np
 
 from re1_rl.async_fleet import (
+    DEFAULT_SYNC_INTERVAL_S,
     _actor_process,
     _obs_batch_for_one,
     _wait_for_actor_spawn,
@@ -55,6 +57,38 @@ def worker_rollout_from_actor_msg(
     )
 
 
+def pack_rollouts(rollouts: list[WorkerRollout], *, worker_id: str) -> WorkerRollout:
+    """Merge same-horizon 1-env rollouts into one multi-env batch for a single POST."""
+    if not rollouts:
+        raise ValueError("empty rollout list")
+    n_steps = rollouts[0].n_steps
+    version = rollouts[0].policy_version
+    for r in rollouts:
+        if r.n_steps != n_steps:
+            raise ValueError("pack_rollouts requires identical n_steps")
+        if r.policy_version != version:
+            raise ValueError("pack_rollouts requires identical policy_version")
+    total_envs = sum(r.n_envs for r in rollouts)
+    obs = {
+        key: np.concatenate([r.obs[key] for r in rollouts], axis=1)
+        for key in rollouts[0].obs
+    }
+    return WorkerRollout(
+        worker_id=worker_id,
+        policy_version=version,
+        n_envs=total_envs,
+        n_steps=n_steps,
+        obs=obs,
+        actions=np.concatenate([r.actions for r in rollouts], axis=1),
+        rewards=np.concatenate([r.rewards for r in rollouts], axis=1),
+        dones=np.concatenate([r.dones for r in rollouts], axis=1),
+        values=np.concatenate([r.values for r in rollouts], axis=1),
+        log_probs=np.concatenate([r.log_probs for r in rollouts], axis=1),
+        last_values=np.concatenate([r.last_values for r in rollouts], axis=0),
+        episode_infos=[info for r in rollouts for info in r.episode_infos],
+    )
+
+
 def _serve_need(
     conn: Connection,
     msg: dict[str, Any],
@@ -72,31 +106,90 @@ def _serve_need(
     conn.send({"t": "act", "action": act, "value": val, "logprob": lp})
 
 
-def _deliver_rollout(
+def _deliver_local(
     rollout: WorkerRollout,
     *,
     machine_name: str,
-    rollout_sink: queue.Queue | WorkerClient,
-    is_local: bool,
+    rollout_sink: queue.Queue,
 ) -> None:
-    if is_local:
-        assert isinstance(rollout_sink, queue.Queue)
-        rollout_sink.put(rollout)
+    rollout_sink.put(rollout)
+    log(
+        machine_name,
+        f"delivered rollout v{rollout.policy_version} "
+        f"({rollout.num_timesteps()} steps) to learner queue "
+        f"[{rollout.worker_id}]",
+    )
+
+
+def _flush_remote_epoch(
+    buffered: list[WorkerRollout],
+    *,
+    client: WorkerClient,
+    policy: InferencePolicy,
+    machine_name: str,
+    worker_id: str,
+    pack_max_envs: int = 16,
+) -> list[WorkerRollout]:
+    """Upload buffered experience (burst), then pull weights once. Returns []."""
+    if not buffered:
+        log(machine_name, "sync epoch: no rollouts buffered; weight pull only")
+    else:
+        total_steps = sum(r.num_timesteps() for r in buffered)
+        # Pack into modest multi-env POSTs to avoid one giant HTTP body.
+        by_ver: dict[int, list[WorkerRollout]] = {}
+        for r in buffered:
+            by_ver.setdefault(r.policy_version, []).append(r)
+        n_posts = 0
+        for ver, group in by_ver.items():
+            chunk: list[WorkerRollout] = []
+            chunk_envs = 0
+            ver_posts = 0
+            for r in group:
+                if chunk and chunk_envs + r.n_envs > pack_max_envs:
+                    packed = pack_rollouts(chunk, worker_id=worker_id)
+                    client.upload_rollout(packed)
+                    ver_posts += 1
+                    chunk, chunk_envs = [], 0
+                chunk.append(r)
+                chunk_envs += r.n_envs
+            if chunk:
+                packed = pack_rollouts(chunk, worker_id=worker_id)
+                client.upload_rollout(packed)
+                ver_posts += 1
+            n_posts += ver_posts
+            log(
+                machine_name,
+                f"sync epoch upload v{ver}: {len(group)} actor-rollouts "
+                f"in {ver_posts} POST(s)",
+            )
         log(
             machine_name,
-            f"delivered rollout v{rollout.policy_version} "
-            f"({rollout.num_timesteps()} steps) to learner queue "
-            f"[{rollout.worker_id}]",
+            f"sync epoch flushed {len(buffered)} actor-rollouts "
+            f"({total_steps} steps, {n_posts} POSTs)",
         )
-        return
-    assert isinstance(rollout_sink, WorkerClient)
-    accepted = rollout_sink.upload_rollout(rollout)
-    if accepted:
-        log(
-            machine_name,
-            f"uploaded rollout v{rollout.policy_version} "
-            f"({rollout.num_timesteps()} steps) [{rollout.worker_id}]",
-        )
+
+    try:
+        version, data = client.fetch_weights(min_version=policy.policy_version + 1)
+        if version > policy.policy_version and data:
+            policy.load_from_bytes(data, version)
+            log(machine_name, f"sync epoch weight pull -> policy_version={version}")
+        else:
+            version, data = client.fetch_weights(min_version=0)
+            if version > policy.policy_version and data:
+                policy.load_from_bytes(data, version)
+                log(
+                    machine_name,
+                    f"sync epoch weight pull (refresh) -> policy_version={version}",
+                )
+            else:
+                log(
+                    machine_name,
+                    f"sync epoch: no newer weights "
+                    f"(local=v{policy.policy_version}, remote=v{version})",
+                )
+    except Exception as exc:
+        log(machine_name, f"sync epoch weight pull error: {exc}")
+    return []
 
 
 def _shutdown_actors(
@@ -135,17 +228,24 @@ def run_async_worker_loop(
     stop_event: threading.Event,
     rollout_sink: queue.Queue | WorkerClient,
     is_local: bool,
+    sync_interval_s: float = DEFAULT_SYNC_INTERVAL_S,
 ) -> None:
-    """Spawn desync actors and serve local inference until ``stop_event``."""
+    """Spawn desync actors and serve local inference until ``stop_event``.
+
+    Remotes buffer rollouts and every ``sync_interval_s`` upload then pull
+    weights (one network epoch). Local workers enqueue each rollout immediately.
+    """
     log(
         machine_name,
         f"async worker starting ({worker_id}, {n_envs} desync actors, "
-        f"n_steps={n_steps})",
+        f"n_steps={n_steps}, sync_interval_s={sync_interval_s:.0f})",
     )
     stop_flag = mp.Value("b", False)
     ctx = mp.get_context("spawn")
     processes: list[mp.Process] = []
     parent_conns: list[Connection] = []
+    buffered: list[WorkerRollout] = []
+    epoch_t0 = time.monotonic()
 
     try:
         for rank in range(n_envs):
@@ -179,6 +279,20 @@ def run_async_worker_loop(
                 time.sleep(0.1)
                 continue
 
+            if (
+                not is_local
+                and isinstance(rollout_sink, WorkerClient)
+                and (time.monotonic() - epoch_t0) >= sync_interval_s
+            ):
+                buffered = _flush_remote_epoch(
+                    buffered,
+                    client=rollout_sink,
+                    policy=policy,
+                    machine_name=machine_name,
+                    worker_id=worker_id,
+                )
+                epoch_t0 = time.monotonic()
+
             ready = wait(parent_conns, timeout=1.0)
             if not ready:
                 if not any(p.is_alive() for p in processes):
@@ -194,22 +308,36 @@ def run_async_worker_loop(
                 if kind == "need":
                     _serve_need(conn, msg, policy)
                 elif kind == "rollout":
-                    # Weight sync is background-only (--weight-sync-poll-s).
-                    # Do not GET /weights on every actor rollout.
                     rollout = worker_rollout_from_actor_msg(
                         msg,
                         policy=policy,
                         worker_id=worker_id,
                         n_steps=n_steps,
                     )
-                    _deliver_rollout(
-                        rollout,
-                        machine_name=machine_name,
-                        rollout_sink=rollout_sink,
-                        is_local=is_local,
-                    )
+                    if is_local:
+                        assert isinstance(rollout_sink, queue.Queue)
+                        _deliver_local(
+                            rollout,
+                            machine_name=machine_name,
+                            rollout_sink=rollout_sink,
+                        )
+                    else:
+                        buffered.append(rollout)
                 elif kind in ("spawn_progress", "spawned", "spawn_error"):
                     continue
+
+        if (
+            not is_local
+            and isinstance(rollout_sink, WorkerClient)
+            and buffered
+        ):
+            _flush_remote_epoch(
+                buffered,
+                client=rollout_sink,
+                policy=policy,
+                machine_name=machine_name,
+                worker_id=worker_id,
+            )
     finally:
         _shutdown_actors(stop_flag, parent_conns, processes)
         log(machine_name, "async worker loop stopped")

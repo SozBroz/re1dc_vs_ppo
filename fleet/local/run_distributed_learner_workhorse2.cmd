@@ -7,6 +7,7 @@ set RUN=reward_tune_1040k
 set N_ENVS=20
 set BASE_PORT=5555
 set LEARNER_PORT=8765
+set SYNC_INTERVAL_S=360
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role learner ^
@@ -20,6 +21,6 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --training-speed 6400 ^
   --skip-chunk 600 ^
   --capture-checkpoints ^
-  --batch-threshold 20480 ^
-  --max-staleness 40 ^
+  --sync-interval-s %SYNC_INTERVAL_S% ^
+  --max-staleness 2 ^
   --resume data/checkpoints/reward_tune_1040k/ppo_re1_11160000_steps.zip

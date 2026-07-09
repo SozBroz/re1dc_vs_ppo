@@ -13,9 +13,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.distributed.async_worker_runtime import (
     _serve_need,
+    pack_rollouts,
     worker_rollout_from_actor_msg,
 )
+from re1_rl.distributed.rollout_types import WorkerRollout
 from re1_rl.env import ACTION_NAMES
+from re1_rl.async_fleet import DISTRIBUTED_EPOCH_HYPERPARAMS, PPO_HYPERPARAMS
 
 N_ACTIONS = len(ACTION_NAMES)
 
@@ -104,3 +107,40 @@ def test_worker_rollout_from_actor_msg_shapes() -> None:
     assert rollout.obs["frame"].shape == (n_steps, 1, 84, 84, 4)
     assert rollout.last_values.shape == (1,)
     assert rollout.episode_infos == [{"room_id": "104"}]
+
+
+def _mini_rollout(worker_id: str, *, n_steps: int = 4, version: int = 3) -> WorkerRollout:
+    return WorkerRollout(
+        worker_id=worker_id,
+        policy_version=version,
+        n_envs=1,
+        n_steps=n_steps,
+        obs={
+            "frame": np.zeros((n_steps, 1, 8, 8, 4), dtype=np.uint8),
+            "proprio": np.zeros((n_steps, 1, 4), dtype=np.float32),
+        },
+        actions=np.zeros((n_steps, 1), dtype=np.int64),
+        rewards=np.ones((n_steps, 1), dtype=np.float32),
+        dones=np.zeros((n_steps, 1), dtype=np.bool_),
+        values=np.zeros((n_steps, 1), dtype=np.float32),
+        log_probs=np.zeros((n_steps, 1), dtype=np.float32),
+        last_values=np.zeros((1,), dtype=np.float32),
+        episode_infos=[],
+    )
+
+
+def test_pack_rollouts_merges_env_axis() -> None:
+    a = _mini_rollout("a:actor_0")
+    b = _mini_rollout("a:actor_1")
+    packed = pack_rollouts([a, b], worker_id="a")
+    assert packed.n_envs == 2
+    assert packed.n_steps == 4
+    assert packed.policy_version == 3
+    assert packed.actions.shape == (4, 2)
+    assert packed.num_timesteps() == 8
+
+
+def test_distributed_epoch_hyperparams_gentler_than_monolithic() -> None:
+    assert DISTRIBUTED_EPOCH_HYPERPARAMS["learning_rate"] < PPO_HYPERPARAMS["learning_rate"]
+    assert DISTRIBUTED_EPOCH_HYPERPARAMS["n_epochs"] <= PPO_HYPERPARAMS["n_epochs"]
+    assert DISTRIBUTED_EPOCH_HYPERPARAMS["batch_size"] >= PPO_HYPERPARAMS["batch_size"]
