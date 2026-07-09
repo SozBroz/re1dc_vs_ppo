@@ -164,6 +164,9 @@ def make_env(
             _phase(f"stagger {stagger_s:.0f}s")
         time.sleep(stagger_s)
         _phase("launching EmuHawk")
+        # --gdi: skip OpenGL/D3D init that can hang before SocketServer.Connect
+        # on headless/autologon boxes. --chromeless: less UI chrome.
+        # Do NOT redirect stdout/stderr: WinForms ShowDialog needs UserInteractive.
         proc = subprocess.Popen(
             [
                 str(EMUHAWK),
@@ -171,10 +174,10 @@ def make_env(
                 f"--lua={LUA}",
                 "--socket_ip=127.0.0.1",
                 f"--socket_port={port}",
+                "--gdi",
+                "--chromeless",
             ],
             cwd=str(EMUHAWK.parent),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
         )
         _phase("waiting for Lua client")
         bridge.wait_for_client()
