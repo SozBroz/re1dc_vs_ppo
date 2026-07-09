@@ -124,25 +124,24 @@ Set-ItemProperty -Path $sys -Name "NoLockScreen" -Value 1 -Type DWord
 # Software driver is optional; HDMI dummy plug is more reliable for BizHawk.
 $vddNote = Join-Path $RepoRoot "docs\always_on_desktop.md"
 if ($InstallVirtualDisplay) {
-    Write-Step "InstallVirtualDisplay requested — see docs for Virtual Display Driver / HDMI dummy"
-    Write-Host @"
-
-  RECOMMENDED (most reliable for BizHawk): plug an HDMI/DP dummy dongle (~`$8).
-  SOFTWARE option: install 'Virtual Display Driver' (IddCx) from
-    https://github.com/VirtualDisplay/Virtual-Display-Driver/releases
-  then set a 1920x1080 mode in Display Settings after reboot.
-
-"@ -ForegroundColor Yellow
+    Write-Step "InstallVirtualDisplay requested - see docs for Virtual Display Driver / HDMI dummy"
+    Write-Host ""
+    Write-Host "  RECOMMENDED: plug an HDMI/DP dummy dongle."
+    Write-Host "  SOFTWARE: Virtual Display Driver (IddCx) from"
+    Write-Host "    https://github.com/VirtualDisplay/Virtual-Display-Driver/releases"
+    Write-Host "  then set 1920x1080 in Display Settings after reboot."
+    Write-Host ""
 }
 
 # --- 4) Logon scheduled task (runs IN the interactive desktop) ---
 if ($Role -ne "none") {
-    $taskName = "RE1_$Role`_at_logon"
-    $starter = Join-Path $RepoRoot "fleet\local\start_${Role}_at_logon.cmd"
+    $taskName = "RE1_" + $Role + "_at_logon"
     if ($Role -eq "worker") {
         $starter = Join-Path $RepoRoot "fleet\local\start_worker_at_logon.cmd"
     } elseif ($Role -eq "learner") {
         $starter = Join-Path $RepoRoot "fleet\local\start_learner_at_logon.cmd"
+    } else {
+        throw "Unknown Role=$Role"
     }
     if (-not (Test-Path $starter)) {
         throw "Missing starter script: $starter"
@@ -150,14 +149,14 @@ if ($Role -ne "none") {
 
     Write-Step "Installing Scheduled Task $taskName -> $starter"
     # Run only when user is logged on = interactive session (not Session 0)
-    $action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$starter`"" -WorkingDirectory $RepoRoot
+    $action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument ("/c `"" + $starter + "`"") -WorkingDirectory $RepoRoot
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User $Username
     # Delay so desktop/shell is up
     $trigger.Delay = "PT45S"
     $principal = New-ScheduledTaskPrincipal -UserId $Username -LogonType Interactive -RunLevel Highest
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero)
     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
-    Write-Step "Task $taskName registered (AtLogOn, Interactive)"
+    Write-Step ("Task " + $taskName + " registered (AtLogOn Interactive)")
 }
 
 Write-Host ""
