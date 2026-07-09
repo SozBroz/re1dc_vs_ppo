@@ -69,11 +69,13 @@ python scripts/prune_checkpoints.py --keep 5
 
 | Machine | `--base-port` | `--n-envs` | Bottleneck |
 |---------|---------------|------------|------------|
-| workhorse2 (learner + local worker) | 5555 | 20 | GPU train bursts; ~32 GB RAM |
+| workhorse2 (learner + local worker) | 5555 | **8** | ~32 GB RAM — keep headroom for 5–8 GB epoch ingest spike |
 | workhorse1 | 5655 | 8 | **8 CPU threads** (~90% target) |
 | pking | 5755 | 12 | **~48 GB RAM** (~900 MB/EmuHawk) |
 
 Weight sync / experience: **6-minute epochs**. Remotes buffer rollouts, then once per `--sync-interval-s` (default **360**) upload a burst and pull weights. Learner trains on the same cadence with gentler large-batch hyperparams (`DISTRIBUTED_EPOCH_HYPERPARAMS`: lr `1e-4`, `batch_size` 2048, `n_epochs` 2). `max_staleness` default **2**.
+
+**WH2 RAM budget (~32 GB):** 8 local EmuHawks (~7 GB) + learner/Python + **5–8 GB epoch ingest spike** must stay off the pagefile. Do not raise WH2 `--n-envs` without measuring free RAM at flush.
 
 Adjust if a box runs monolithic `train_parallel` instead of distributed worker.
 

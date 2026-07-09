@@ -6,7 +6,7 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --machine-name workhorse2 ^
   --run-name reward_tune_1040k ^
   --resume data/checkpoints/reward_tune_1040k/ppo_re1_11160000_steps.zip ^
-  --n-envs 20 ^
+  --n-envs 8 ^
   --base-port 5555 ^
   --learner-port 8765 ^
   --bind-host 0.0.0.0 ^

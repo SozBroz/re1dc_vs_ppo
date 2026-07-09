@@ -5,7 +5,7 @@ setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE_NAME=workhorse2
 set LEARNER_HOST=127.0.0.1
-set N_ENVS=16
+set N_ENVS=8
 set BASE_PORT=5555
 set SYNC_INTERVAL_S=360
 

@@ -4,7 +4,7 @@ setlocal
 cd /d D:\re1_rl
 set MACHINE=workhorse2
 set RUN=reward_tune_1040k
-set N_ENVS=20
+set N_ENVS=8
 set BASE_PORT=5555
 set LEARNER_PORT=8765
 

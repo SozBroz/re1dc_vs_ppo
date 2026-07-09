@@ -4,7 +4,8 @@ setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE=workhorse2
 set RUN=reward_tune_1040k
-set N_ENVS=20
+REM 8 local envs: leave ~8GB+ headroom for fleet epoch ingest on ~32GB WH2
+set N_ENVS=8
 set BASE_PORT=5555
 set LEARNER_PORT=8765
 set SYNC_INTERVAL_S=360
