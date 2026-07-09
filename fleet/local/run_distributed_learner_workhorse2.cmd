@@ -24,4 +24,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --capture-checkpoints ^
   --sync-interval-s %SYNC_INTERVAL_S% ^
   --max-staleness 2 ^
+  --no-local-worker ^
   --resume data/checkpoints/reward_tune_1040k/ppo_re1_11160000_steps.zip
