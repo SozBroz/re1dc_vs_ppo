@@ -239,7 +239,7 @@ def _build_model(
         batch_size=512,
         n_epochs=4,
         learning_rate=3e-4,
-        gamma=0.99,
+        gamma=0.995,
         ent_coef=0.01,
         verbose=1,
         device=device,

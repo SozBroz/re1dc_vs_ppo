@@ -17,7 +17,7 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
     batch_size=512,
     n_epochs=4,
     learning_rate=3e-4,
-    gamma=0.99,
+    gamma=0.995,
     ent_coef=0.01,
 )
 
@@ -28,7 +28,7 @@ DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     batch_size=2048,
     n_epochs=2,
     learning_rate=1e-4,
-    gamma=0.99,
+    gamma=0.995,
     ent_coef=0.01,
 )
 DEFAULT_SYNC_INTERVAL_S = 360.0

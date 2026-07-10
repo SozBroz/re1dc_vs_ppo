@@ -199,7 +199,8 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         args.machine_name,
         f"epoch hyperparams lr={DISTRIBUTED_EPOCH_HYPERPARAMS['learning_rate']} "
         f"batch_size={DISTRIBUTED_EPOCH_HYPERPARAMS['batch_size']} "
-        f"n_epochs={DISTRIBUTED_EPOCH_HYPERPARAMS['n_epochs']}",
+        f"n_epochs={DISTRIBUTED_EPOCH_HYPERPARAMS['n_epochs']} "
+        f"gamma={DISTRIBUTED_EPOCH_HYPERPARAMS['gamma']}",
     )
     return model, ckpt_dir
 
