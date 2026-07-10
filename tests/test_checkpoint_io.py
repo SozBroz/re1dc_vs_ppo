@@ -104,6 +104,17 @@ def test_latest_pointer_roundtrip(tmp_path: Path) -> None:
     assert zip_path(ptr["path"]).name == ckpt.name
 
 
+def test_resolve_resume_auto_like_none(tmp_path: Path) -> None:
+    ckpt_dir = tmp_path / "data" / "checkpoints" / "reward_tune_1040k"
+    good = ckpt_dir / "ppo_re1_500_steps.zip"
+    _make_fake_ckpt(good)
+    write_latest_pointer(ckpt_dir, good, steps=500)
+    resolved = resolve_resume_path(
+        "auto", project_root=tmp_path, ckpt_dir=ckpt_dir
+    )
+    assert resolved == good.resolve()
+
+
 def test_checkpoint_interval_scales_with_n_envs() -> None:
     assert checkpoint_timestep_interval(20) == 40_000
     assert checkpoint_timestep_interval(12) == 24_000

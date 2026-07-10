@@ -1,0 +1,289 @@
+{
+  "armor_key": {
+    "door_edges": [],
+    "notes": "Armor room",
+    "rooms": [
+      "10C",
+      "205"
+    ]
+  },
+  "battery": {
+    "door_edges": [],
+    "notes": "on chair",
+    "rooms": [
+      "219",
+      "500"
+    ]
+  },
+  "blue_jewel": {
+    "door_edges": [],
+    "notes": "Insert blue jewel in tiger eye; statue slides to reveal crest",
+    "rooms": [
+      "10D",
+      "202"
+    ]
+  },
+  "chemical": {
+    "door_edges": [],
+    "notes": "Pour chemical into greenhouse pump to kill vines on crest",
+    "rooms": [
+      "10C",
+      "11B"
+    ]
+  },
+  "control_room_key": {
+    "door_edges": [],
+    "notes": "drain bathtub",
+    "rooms": [
+      "402"
+    ]
+  },
+  "doom_book_1": {
+    "door_edges": [],
+    "notes": "Standard: inside Doom Book 1; open book at fountain (coffin note disputed)",
+    "rooms": [
+      "507"
+    ]
+  },
+  "doom_book_2": {
+    "door_edges": [],
+    "notes": "Standard: inside Doom Book 2; open book at fountain (desk placement disputed)",
+    "rooms": [
+      "305",
+      "506"
+    ]
+  },
+  "dorm_key_002": {
+    "door_edges": [],
+    "notes": "on table near wasp nest",
+    "rooms": [
+      "408"
+    ]
+  },
+  "dorm_key_003": {
+    "door_edges": [],
+    "notes": "sparkle on shelf",
+    "rooms": [
+      "410"
+    ]
+  },
+  "eagle_medal": {
+    "door_edges": [],
+    "notes": "inside coffin",
+    "rooms": [
+      "507"
+    ]
+  },
+  "emblem": {
+    "door_edges": [],
+    "notes": "Wooden emblem: bar piano chain; gold swap at 10F alcove",
+    "rooms": [
+      "105",
+      "10F"
+    ]
+  },
+  "empty_bottle": {
+    "door_edges": [],
+    "notes": "V-Jolt prep",
+    "rooms": [
+      "409"
+    ]
+  },
+  "flare": {
+    "door_edges": [],
+    "notes": "Barry ending item",
+    "rooms": [
+      "302",
+      "50B"
+    ]
+  },
+  "gold_emblem": {
+    "door_edges": [],
+    "notes": "Dining fireplace reveals shield_key",
+    "rooms": [
+      "105",
+      "10F"
+    ]
+  },
+  "helmet_key": {
+    "door_edges": [],
+    "notes": "fireplace after boss",
+    "rooms": [
+      "40C"
+    ]
+  },
+  "hex_crank": {
+    "door_edges": [],
+    "notes": "On wall in boulder alcove (same gate as second MO disc)",
+    "rooms": [
+      "305",
+      "306",
+      "30A",
+      "30B"
+    ]
+  },
+  "lab_key_1": {
+    "door_edges": [],
+    "notes": "on shelf; ITEM_IDS 0x37 names this lab_key_1",
+    "rooms": [
+      "50E"
+    ]
+  },
+  "lighter": {
+    "door_edges": [],
+    "notes": "Light candles, push left bookcase, enter secret cabinet room",
+    "rooms": [
+      "209",
+      "20B",
+      "20F"
+    ]
+  },
+  "lockpick": {
+    "door_edges": [],
+    "notes": "Locked desks; Barry gives in tea room",
+    "rooms": [
+      "102",
+      "104",
+      "106",
+      "111",
+      "401",
+      "40A"
+    ]
+  },
+  "mo_disc": {
+    "door_edges": [],
+    "notes": "Decoded at MO terminal, not a floor pickup",
+    "rooms": [
+      "213",
+      "217",
+      "306",
+      "30B",
+      "508"
+    ]
+  },
+  "moon_crest": {
+    "door_edges": [],
+    "notes": "after Yawn 1",
+    "rooms": [
+      "210"
+    ]
+  },
+  "music_notes": {
+    "door_edges": [],
+    "notes": "Play piano with music notes; swap wooden emblem for gold in secret alcove",
+    "rooms": [
+      "10F"
+    ]
+  },
+  "pass_number": {
+    "door_edges": [],
+    "notes": "pool table code 345 (Jill)",
+    "rooms": [
+      "404",
+      "508"
+    ]
+  },
+  "red_book": {
+    "door_edges": [],
+    "notes": "on bed",
+    "rooms": [
+      "401"
+    ]
+  },
+  "red_jewel": {
+    "door_edges": [],
+    "notes": "deer head with lights off",
+    "rooms": [
+      "215"
+    ]
+  },
+  "serum": {
+    "door_edges": [],
+    "notes": "Search Richard's body twice after giving him serum (pillar passage)",
+    "rooms": [
+      "100",
+      "102",
+      "20D"
+    ]
+  },
+  "shield_key": {
+    "door_edges": [],
+    "notes": "Helmet-key doors across mansion",
+    "rooms": [
+      "105",
+      "10C",
+      "10D",
+      "117"
+    ]
+  },
+  "slides": {
+    "door_edges": [],
+    "notes": "projector room",
+    "rooms": [
+      "510"
+    ]
+  },
+  "square_crank": {
+    "door_edges": [],
+    "notes": "top shelf via stepladder",
+    "rooms": [
+      "11B"
+    ]
+  },
+  "star_crest": {
+    "door_edges": [],
+    "notes": "crow painting puzzle",
+    "rooms": [
+      "117"
+    ]
+  },
+  "sun_crest": {
+    "door_edges": [],
+    "notes": "statue puzzle cabinet",
+    "rooms": [
+      "205"
+    ]
+  },
+  "sword_key": {
+    "door_edges": [],
+    "notes": "Chris-only in standard; kept for data completeness",
+    "rooms": [
+      "20D"
+    ]
+  },
+  "umb_no2": {
+    "door_edges": [],
+    "notes": "shelves",
+    "rooms": [
+      "409"
+    ]
+  },
+  "umb_no4": {
+    "door_edges": [],
+    "notes": "shelves",
+    "rooms": [
+      "409"
+    ]
+  },
+  "water": {
+    "door_edges": [],
+    "notes": "sink",
+    "rooms": [
+      "409"
+    ]
+  },
+  "wind_crest": {
+    "door_edges": [],
+    "notes": "blue jewel on tiger eye",
+    "rooms": [
+      "10D"
+    ]
+  },
+  "wolf_medal": {
+    "door_edges": [],
+    "notes": "on desk",
+    "rooms": [
+      "506"
+    ]
+  }
+}

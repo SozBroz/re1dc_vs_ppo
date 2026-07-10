@@ -68,7 +68,7 @@ def make_room_items(tmp_path: Path) -> RoomItems:
 
 
 def test_spatial_dims_consistent():
-    assert len(SPATIAL_FIELDS) == SPATIAL_DIM == 119
+    assert len(SPATIAL_FIELDS) == SPATIAL_DIM == 128
     assert len({n for n, _ in SPATIAL_FIELDS}) == SPATIAL_DIM  # unique names
 
 

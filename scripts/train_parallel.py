@@ -137,6 +137,7 @@ def make_env(
     training_speed: int = 3200,
     skip_chunk: int = 600,
     async_cutscene_skip: bool = True,
+    headless: bool = True,
     spawn_progress: Callable[[str], None] | None = None,
 ):
     """Factory executed INSIDE the subprocess worker."""
@@ -164,19 +165,20 @@ def make_env(
             _phase(f"stagger {stagger_s:.0f}s")
         time.sleep(stagger_s)
         _phase("launching EmuHawk")
-        # --gdi: skip OpenGL/D3D init that can hang before SocketServer.Connect
-        # on headless/autologon boxes. --chromeless: less UI chrome.
+        emuhawk_cmd = [
+            str(EMUHAWK),
+            str(ROM),
+            f"--lua={LUA}",
+            "--socket_ip=127.0.0.1",
+            f"--socket_port={port}",
+        ]
+        if headless:
+            # --gdi: skip OpenGL/D3D init that can hang before SocketServer.Connect
+            # on headless/autologon boxes. --chromeless: less UI chrome.
+            emuhawk_cmd.extend(["--gdi", "--chromeless"])
         # Do NOT redirect stdout/stderr: WinForms ShowDialog needs UserInteractive.
         proc = subprocess.Popen(
-            [
-                str(EMUHAWK),
-                str(ROM),
-                f"--lua={LUA}",
-                "--socket_ip=127.0.0.1",
-                f"--socket_port={port}",
-                "--gdi",
-                "--chromeless",
-            ],
+            emuhawk_cmd,
             cwd=str(EMUHAWK.parent),
         )
         _phase("waiting for Lua client")
@@ -193,10 +195,8 @@ def make_env(
         env._ram_skip.training_speed = training_speed
         env._ram_skip.cutscene_speed = training_speed
         env._ram_skip.skip_chunk = skip_chunk
-        env._ram_skip.invisible_during_skip = True
-        # Sentinel: verify every knife macro against the Lua joypad.get()
-        # readback; prints "[knife_macro] INPUT LOSS ..." only on mismatch.
-        env.knife_echo_joypad = True
+        env._ram_skip.invisible_during_skip = headless
+        env.knife_echo_joypad = False
 
         # ensure the owned EmuHawk dies with the env (instance-level hook)
         orig_close = env.close
@@ -287,6 +287,12 @@ def main() -> int:
         action="store_true",
         help="legacy synced SubprocVecEnv + model.learn() (default: async fleet)",
     )
+    ap.add_argument(
+        "--headless",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="EmuHawk --gdi/--chromeless + invisible cutscene skip (default on)",
+    )
     args = ap.parse_args()
 
     import torch
@@ -354,6 +360,7 @@ def main() -> int:
                 run_name=args.run_name,
                 device=device,
                 tb_log=tb_log,
+                headless=bool(args.headless),
             )
         except KeyboardInterrupt:
             print("[train] interrupted", flush=True)
@@ -376,6 +383,7 @@ def main() -> int:
                 args.capture_checkpoints,
                 training_speed=int(args.training_speed),
                 skip_chunk=int(args.skip_chunk),
+                headless=bool(args.headless),
             )
             for i in range(args.n_envs)
         ],
@@ -397,7 +405,11 @@ def main() -> int:
 
         def __init__(self) -> None:
             super().__init__()
-            self._progress = TrainingProgressTracker(prefix="progress")
+            self._progress = TrainingProgressTracker(
+                prefix="progress",
+                machine_name="standalone",
+                best_log_path=PROJECT_ROOT / "data" / "logs" / "best_rooms_standalone.jsonl",
+            )
 
         def _on_step(self) -> bool:
             for info in self.locals.get("infos", []):

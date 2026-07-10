@@ -8,7 +8,7 @@ timeout /t 2 /nobreak >nul
 set MACHINE_NAME=pking
 set LEARNER_HOST=192.168.0.111
 set BASE_PORT=5755
-set N_ENVS=24
+set N_ENVS=12
 set SYNC_INTERVAL_S=360
-start "pking-worker" /MIN cmd /c "cd /d D:\re1_rl && set MACHINE_NAME=pking&& set LEARNER_HOST=192.168.0.111&& set BASE_PORT=5755&& set N_ENVS=24&& set SYNC_INTERVAL_S=360&& fleet\local\run_distributed_worker.cmd >> data\logs\worker_pking.log 2>&1"
+start "pking-worker" /MIN cmd /c "cd /d D:\re1_rl && fleet\local\run_distributed_worker_pking.cmd >> data\logs\worker_pking.log 2>&1"
 echo Started pking worker detached. Tail: type data\logs\worker_pking.log

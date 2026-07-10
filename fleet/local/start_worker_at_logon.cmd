@@ -20,25 +20,34 @@ set MACHINE_NAME=workhorse1
 set LEARNER_HOST=192.168.0.111
 set BASE_PORT=5655
 set N_ENVS=8
-goto run
+set SYNC_INTERVAL_S=360
+goto run_headless
 
 :wh2
 set MACHINE_NAME=workhorse2
 set LEARNER_HOST=127.0.0.1
 set BASE_PORT=5555
 set N_ENVS=8
-goto run
+set SYNC_INTERVAL_S=360
+goto run_headless
 
 :pking
 set MACHINE_NAME=pking
 set LEARNER_HOST=192.168.0.111
 set BASE_PORT=5755
 set N_ENVS=12
-
-:run
 set SYNC_INTERVAL_S=360
 
 taskkill /F /IM EmuHawk.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 
+call fleet\local\run_distributed_worker_pking.cmd >> data\logs\worker_at_logon.log 2>&1
+goto end
+
+:run_headless
+taskkill /F /IM EmuHawk.exe >nul 2>&1
+timeout /t 2 /nobreak >nul
+
 call fleet\local\run_distributed_worker.cmd >> data\logs\worker_at_logon.log 2>&1
+
+:end

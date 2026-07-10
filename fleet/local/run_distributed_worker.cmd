@@ -19,4 +19,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --training-speed 6400 ^
   --skip-chunk 600 ^
   --sync-interval-s %SYNC_INTERVAL_S% ^
-  --capture-checkpoints
+  --capture-checkpoints ^
+  --headless

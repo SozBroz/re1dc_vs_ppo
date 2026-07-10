@@ -82,7 +82,6 @@ def _transplant_into_current_spaces(model, *, tb_log: str | None, hp: dict):
     fresh = PPO(
         "MultiInputPolicy",
         _SpaceHolderEnv(policy_obs, act_space),
-        tensorboard_log=tb_log,
         **hp,
     )
     n_copied = _copy_compatible_policy_weights(model.policy, fresh.policy)
@@ -119,7 +118,6 @@ def load_async_learner(*, device: str, resume: Path | None, tb_log: str | None):
                 loaded = PPO(
                     "MultiInputPolicy",
                     _SpaceHolderEnv(maskable.observation_space, maskable.action_space),
-                    tensorboard_log=tb_log,
                     **hp,
                 )
                 _copy_compatible_policy_weights(maskable.policy, loaded.policy)
@@ -160,6 +158,7 @@ def _actor_process(
     n_steps: int,
     stop_flag: mp.synchronize.Synchronized,
     capture_checkpoints: bool,
+    headless: bool = True,
 ) -> None:
     from scripts.train_parallel import make_env
     from re1_rl.training_progress import slim_progress_info
@@ -173,6 +172,7 @@ def _actor_process(
             training_speed=training_speed,
             skip_chunk=skip_chunk,
             async_cutscene_skip=True,
+            headless=headless,
             spawn_progress=lambda phase: conn.send(
                 {"t": "spawn_progress", "rank": rank, "phase": phase}
             ),
@@ -338,6 +338,7 @@ def run_async_fleet_training(
     run_name: str | None,
     device: str,
     tb_log: str,
+    headless: bool = True,
 ) -> int:
     from re1_rl.checkpoint_io import (
         atomic_model_save,
@@ -377,7 +378,7 @@ def run_async_fleet_training(
     print(
         f"[train:async] {n_envs} desync actors, target={train_steps} steps, "
         f"batch_threshold={batch_threshold}, "
-        f"checkpoint_every={save_interval} steps",
+        f"checkpoint_every={save_interval} steps, headless={headless}",
         flush=True,
     )
 
@@ -401,6 +402,7 @@ def run_async_fleet_training(
                 "n_steps": n_steps,
                 "stop_flag": stop_flag,
                 "capture_checkpoints": capture_checkpoints,
+                "headless": headless,
             },
             name=f"async-actor-{rank}",
         )

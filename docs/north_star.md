@@ -217,8 +217,10 @@ Before implementing:
 | Room pickup signatures (id, gated, bearing) | **Partial** | `re1_rl/spatial_encoder.py`, `data/room_items.json` |
 | Room enemy signatures | **Blocked** on PS1 enemy RAM | `docs/enemy_ram_hunt.md` |
 | Door open/locked | **Not in obs** | `DOOR_FLAGS` in `memory_map.py`; hunt ongoing |
-| Key-item affordances | **Not in obs** | Target: `data/item_affordances.json` |
-| Episode progress history | **Weak** | `rooms_visited` set + `visited` grid only; no order/events |
+| Key-item affordances | **In obs** | `data/item_affordances.json`, `re1_rl/item_affordances.py` |
+| Episode progress history | **Deque + ledger + milestones** | `history`, `acquisitions`, `cutscene_ledger`, `milestones` |
+| RDT interactables | **In spatial** | `rdt_interactables.json`, nearest box/typewriter/trigger |
+| Map/file flags | **In obs** | `maps_files` u16 bitfield |
 | Goal / checkpoint compass | **Disabled** | `obs_encoder.encode_goal()` → zeros |
 | Combat macros | **Live** | `attack_macro.py`, `knife_macro.py` |
 | Box inventory RAM | **Allowed** | `item_box.py`, magic deposit/withdraw actions |

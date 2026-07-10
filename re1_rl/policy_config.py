@@ -13,7 +13,7 @@ Obs keys and their extractor paths (SB3 CombinedExtractor):
   frame   84x84x4 uint8   -> NatureCNN -> 512
   proprio (28,) float32   -> flatten
   goal    (27,) float32   -> flatten
-  spatial (119,) float32  -> flatten (egocentric items/enemies/exits)
+  spatial (128,) float32  -> flatten (egocentric items/enemies/exits/interactables)
   visited (16,16,1) f32   -> flatten 256 (kept float32 0..1 ON PURPOSE:
                              uint8 would trip is_image_space and NatureCNN
                              cannot take 16x16 input)
@@ -24,7 +24,11 @@ Obs keys and their extractor paths (SB3 CombinedExtractor):
   acquisitions (9,) f32   -> flatten (last 4 pickups)
   room_enemies (12,) f32  -> flatten (static roster counts)
   keys_held (37,) f32     -> flatten (ever-held key-item bitmask)
-Fusion input = 512 + 28 + 27 + 119 + 256 + 128 + 34 + 16 + 65 + 9 + 12 + 37 = 1243 -> 2x256 pi/vf trunks.
+  affordances (40,) f32   -> flatten (top-8 held key item affordances)
+  cutscene_ledger (16,) f32 -> flatten (milestone cutscene bits)
+  milestones (12,) f32   -> flatten (derived episode milestones)
+  maps_files (16,) f32   -> flatten (map/file pickup u16 bitfield)
+Fusion input = 512 + 28 + 27 + 128 + 256 + 128 + 34 + 16 + 65 + 9 + 12 + 37 + 40 + 16 + 12 + 16 = 1336 -> 2x256 pi/vf trunks.
 
 NOTE: PPO.load() restores the architecture stored in the checkpoint zip, so
 resuming an old 2x64 checkpoint keeps the old sizing. Widening requires a

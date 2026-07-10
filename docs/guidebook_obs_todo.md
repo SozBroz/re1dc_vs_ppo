@@ -57,8 +57,8 @@ All items below use existing RAM reads, `ItemTracker`, `ProgressTracker`, `room_
 | Status | ID | Task | Est. | Notes / why not |
 |--------|-----|------|------|-----------------|
 | `[x]` | A1 | **`inventory` obs key** — 8×(`item_id`, `qty`) normalized, mirror `box` layout | S | Shipped 2026-07-08; +16 dims |
-| `[ ]` | A2 | **`data/item_affordances.json`** — key item → rooms (+ door edges when known); Evil Resource + `item_gates.md` | M | Schema: `{item, rooms[], door_edges[], notes}` |
-| `[ ]` | A3 | **`affordances` obs block** — per held key item: top-N room indices / affordant-here bit in current room | M | Depends A1 + A2; ~32–48 dims |
+| `[x]` | A2 | **`data/item_affordances.json`** — key item → rooms (+ door edges when known); Evil Resource + `item_gates.md` | M | `scripts/build_item_affordances.py` |
+| `[x]` | A3 | **`affordances` obs block** — per held key item: top-N room indices / affordant-here bit in current room | M | `re1_rl/item_affordances.py` |
 | `[x]` | A4 | **Static room enemy roster** — from `room_enemies.json`: type counts for current room (no RAM) | S | Shipped 2026-07-08; `room_enemies` +12 dims |
 | `[x]` | A5 | **Rolling room deque** — last K=32 `(room_idx, steps_since)` in `history` | S | Shipped 2026-07-08; 65 dims (was spec'd 6–8, imperator chose 32) |
 | `[x]` | A6 | **Pickup acquisition log** — last K=4 `(item_id, room_idx)` on `ItemTracker` delta | S | Shipped 2026-07-08; `acquisitions` +9 dims |
@@ -74,14 +74,14 @@ All items below use existing RAM reads, `ItemTracker`, `ProgressTracker`, `room_
 
 | Status | ID | Task | Est. | Notes / why not |
 |--------|-----|------|------|-----------------|
-| `[ ]` | B1 | **`scd_work_flags.json` campaign** — capture_session / hunt_scd_flags for mansion milestones (Barry, emblem, crests…) | L | File does not exist yet; blocks event-gated items |
+| `[ ]` | B1 | **`scd_work_flags.json` campaign** — capture_session / hunt_scd_flags for mansion milestones (Barry, emblem, crests…) | L | Stub `data/scd_work_flags.json` seeded; hunt via `scripts/hunt_scd_flags.py` |
 | `[ ]` | B2 | **`flags` obs vector** — sparse named bits from B1 (+ live RAM read each step) | M | Depends B1; unhide `item_gates` event rows |
 | `[ ]` | B3 | **Door-edge bit map** — correlate `DOOR_FLAGS` bits to `doors_rdt` edges | L | Required before open/locked means anything |
 | `[ ]` | B4 | **Exit `open` / `locked` dims** — +1–2 per spatial exit slot from B3 | M | Depends B3 |
-| `[ ]` | B5 | **Cutscene ledger obs** — milestone bits for `room:cam` keys (Kenneth, Barry dining, Barry 2F return…) | M | Reuse `ProgressTracker.rewarded_cutscenes` keys |
-| `[ ]` | B6 | **`rdt_interactables` in spatial** — nearest 2 typewriter/box/trigger: kind + bearing | M | Data exists; not wired |
+| `[x]` | B5 | **Cutscene ledger obs** — milestone bits for `room:cam` keys (Kenneth, Barry dining, Barry 2F return…) | M | `re1_rl/cutscene_ledger.py` |
+| `[x]` | B6 | **`rdt_interactables` in spatial** — nearest 2 typewriter/box/trigger: kind + bearing | M | `re1_rl/rdt_interactables.py`; spatial 128-d |
 | `[ ]` | B7 | **Show event-gated pickups** — when B2 bit set OR prereq held: surface in spatial with `gated` | M | Depends B2 |
-| `[ ]` | B8 | **Derived milestone features** (optional) — e.g. `visited_2f`, `barry_return_pending` from deque+flags | M | Intelligent history; design after A5+B5 |
+| `[x]` | B8 | **Derived milestone features** — `milestones` obs from deque + ledger + keys | M | `re1_rl/milestone_features.py` |
 
 ---
 
@@ -94,7 +94,7 @@ All items below use existing RAM reads, `ItemTracker`, `ProgressTracker`, `room_
 | `[ ]` | C3 | **`pickups_empirical.json` logging run** — grow `item_positions` from 37 → coverage | L | `log_door_transitions` / capture_session |
 | `[ ]` | C4 | **RDT item position validation** — merge tier after empirical cross-check | M | `rdt_pipeline_feasibility.md` trust ladder |
 | `[ ]` | C5 | **Ablation A/B/C** — pixels-only vs privileged vs hybrid on dining→gallery curriculum | L | `privileged_obs_spec.md` §6; after A8 |
-| `[ ]` | C6 | **`maps_files_flags` in obs** (optional) — which maps obtained | S | Low priority vs keys/flags |
+| `[x]` | C6 | **`maps_files_flags` in obs** — which maps obtained | S | `re1_rl/maps_files.py`; 16-bit RAM field |
 
 ---
 

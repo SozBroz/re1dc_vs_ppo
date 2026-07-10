@@ -87,6 +87,8 @@ def test_obs_keys_have_no_path_leakage_names() -> None:
         "acquisitions",
         "room_enemies",
         "keys_held",
+        "affordances",
+        "cutscene_ledger",
     }
     assert not (keys & forbidden)
     from re1_rl.episode_history import ACQUISITION_LOG_DIM, ROOM_HISTORY_DIM

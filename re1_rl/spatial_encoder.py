@@ -21,6 +21,7 @@ import numpy as np
 
 from re1_rl.item_todo import ItemTracker, RoomItems, canonical_item
 from re1_rl.memory_map import ITEM_IDS
+from re1_rl.rdt_interactables import kind_id, load_rdt_interactables
 from re1_rl.room_graph import RoomGraph
 
 FACING_FULL_CIRCLE = 4096.0
@@ -31,6 +32,7 @@ MAX_ENEMY_TYPE = 32.0
 ITEM_SLOTS = 8
 ENEMY_SLOTS = 5
 EXIT_SLOTS = 4
+INTERACTABLE_SLOTS = 2
 
 _ITEM_SLOT_FIELDS = [
     ("rel_x", "(item_x - player_x) / 4096, clip [-2,2]; 0 if position unknown"),
@@ -57,6 +59,12 @@ _EXIT_SLOT_FIELDS = [
     ("bearing_cos", "cos(angle to exit door - facing)"),
     ("dist", "euclidean distance / 4096, clip [0,2]"),
 ]
+_INTERACTABLE_SLOT_FIELDS = [
+    ("bearing_sin", "sin(angle to interactable - facing)"),
+    ("bearing_cos", "cos(angle to interactable - facing)"),
+    ("dist", "euclidean distance / 4096, clip [0,2]"),
+    ("kind_id", "item_box/typewriter/trigger id / 3"),
+]
 
 
 def _build_fields() -> list[tuple[str, str]]:
@@ -71,11 +79,14 @@ def _build_fields() -> list[tuple[str, str]]:
     fields.append(("num_known_exits", "harvested exits from this room / 8"))
     for i in range(EXIT_SLOTS):
         fields.extend((f"exit{i}_{n}", d) for n, d in _EXIT_SLOT_FIELDS)
+    fields.append(("interactables_here", "RDT box/typewriter/trigger in room / 8"))
+    for i in range(INTERACTABLE_SLOTS):
+        fields.extend((f"interactable{i}_{n}", d) for n, d in _INTERACTABLE_SLOT_FIELDS)
     return fields
 
 
 SPATIAL_FIELDS: list[tuple[str, str]] = _build_fields()
-SPATIAL_DIM = len(SPATIAL_FIELDS)  # 1 + 8*8 + 1 + 5*8 + 1 + 4*3 = 119
+SPATIAL_DIM = len(SPATIAL_FIELDS)  # 119 + 1 + 2*4 = 128
 
 _NAME_TO_ITEM_ID = {name: iid for iid, name in ITEM_IDS.items()}
 
@@ -210,10 +221,12 @@ class SpatialEncoder:
         item_positions: ItemPositions | None = None,
         graph: RoomGraph | None = None,
         static_enemies: StaticEnemySpawns | None = None,
+        interactables: dict[str, list[dict[str, Any]]] | None = None,
     ) -> None:
         self.item_positions = item_positions
         self.graph = graph
         self.static_enemies = static_enemies
+        self.interactables = interactables if interactables is not None else load_rdt_interactables()
 
     def encode(
         self,
@@ -229,7 +242,8 @@ class SpatialEncoder:
 
         i = self._encode_items(v, 0, room, px, pz, theta, room_items, item_tracker)
         i = self._encode_enemies(v, i, state, px, pz, theta)
-        self._encode_exits(v, i, room, px, pz, theta)
+        i = self._encode_exits(v, i, room, px, pz, theta)
+        self._encode_interactables(v, i, room, px, pz, theta)
         return v
 
     # --- items ---
@@ -337,9 +351,9 @@ class SpatialEncoder:
         px: float,
         pz: float,
         theta: float,
-    ) -> None:
+    ) -> int:
         if self.graph is None:
-            return
+            return i + 1 + EXIT_SLOTS * 3
         doors = [d for (frm, _), d in self.graph.doors.items() if frm == room]
         v[i] = min(len(doors), 8) / 8.0
         i += 1
@@ -350,3 +364,27 @@ class SpatialEncoder:
             v[i + 1] = bcos
             v[i + 2] = dist
             i += 3
+        return i
+
+    def _encode_interactables(
+        self,
+        v: np.ndarray,
+        i: int,
+        room: str,
+        px: float,
+        pz: float,
+        theta: float,
+    ) -> None:
+        rows = list(self.interactables.get(str(room), []))
+        v[i] = min(len(rows), 8) / 8.0
+        i += 1
+        rows.sort(key=lambda r: math.hypot(float(r["x"]) - px, float(r["z"]) - pz))
+        for row in rows[:INTERACTABLE_SLOTS]:
+            _, _, dist, bsin, bcos = _egocentric(
+                px, pz, theta, float(row["x"]), float(row["z"]),
+            )
+            v[i] = bsin
+            v[i + 1] = bcos
+            v[i + 2] = dist
+            v[i + 3] = kind_id(str(row.get("kind", "")))
+            i += 4

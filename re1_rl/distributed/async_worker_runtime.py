@@ -14,6 +14,7 @@ import queue
 import threading
 import time
 from multiprocessing.connection import Connection, wait
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -28,6 +29,7 @@ from re1_rl.distributed.inference_policy import InferencePolicy
 from re1_rl.distributed.log_util import log
 from re1_rl.distributed.rollout_types import WorkerRollout
 from re1_rl.distributed.worker_client import WorkerClient
+from re1_rl.training_progress import TrainingProgressTracker
 
 
 def worker_rollout_from_actor_msg(
@@ -121,6 +123,30 @@ def _deliver_local(
     )
 
 
+def _pack_and_deliver_rollouts(
+    group: list[WorkerRollout],
+    *,
+    worker_id: str,
+    pack_max_envs: int,
+    deliver,
+) -> int:
+    """Pack same-version rollouts into <=pack_max_envs chunks; return put count."""
+    chunk: list[WorkerRollout] = []
+    chunk_envs = 0
+    n_posts = 0
+    for r in group:
+        if chunk and chunk_envs + r.n_envs > pack_max_envs:
+            deliver(pack_rollouts(chunk, worker_id=worker_id))
+            n_posts += 1
+            chunk, chunk_envs = [], 0
+        chunk.append(r)
+        chunk_envs += r.n_envs
+    if chunk:
+        deliver(pack_rollouts(chunk, worker_id=worker_id))
+        n_posts += 1
+    return n_posts
+
+
 def _flush_remote_epoch(
     buffered: list[WorkerRollout],
     *,
@@ -141,21 +167,12 @@ def _flush_remote_epoch(
             by_ver.setdefault(r.policy_version, []).append(r)
         n_posts = 0
         for ver, group in by_ver.items():
-            chunk: list[WorkerRollout] = []
-            chunk_envs = 0
-            ver_posts = 0
-            for r in group:
-                if chunk and chunk_envs + r.n_envs > pack_max_envs:
-                    packed = pack_rollouts(chunk, worker_id=worker_id)
-                    client.upload_rollout(packed)
-                    ver_posts += 1
-                    chunk, chunk_envs = [], 0
-                chunk.append(r)
-                chunk_envs += r.n_envs
-            if chunk:
-                packed = pack_rollouts(chunk, worker_id=worker_id)
-                client.upload_rollout(packed)
-                ver_posts += 1
+            ver_posts = _pack_and_deliver_rollouts(
+                group,
+                worker_id=worker_id,
+                pack_max_envs=pack_max_envs,
+                deliver=client.upload_rollout,
+            )
             n_posts += ver_posts
             log(
                 machine_name,
@@ -203,23 +220,23 @@ def _flush_local_epoch(
         log(machine_name, "sync epoch (local): no rollouts buffered")
         return []
     total_steps = sum(r.num_timesteps() for r in buffered)
-    # Deliver as packed chunks so learner sees one contribution burst.
-    chunk: list[WorkerRollout] = []
-    chunk_envs = 0
-    pack_max_envs = 16
-    n_posts = 0
+    by_ver: dict[int, list[WorkerRollout]] = {}
     for r in buffered:
-        if chunk and chunk_envs + r.n_envs > pack_max_envs:
-            packed = pack_rollouts(chunk, worker_id=worker_id)
-            rollout_sink.put(packed)
-            n_posts += 1
-            chunk, chunk_envs = [], 0
-        chunk.append(r)
-        chunk_envs += r.n_envs
-    if chunk:
-        packed = pack_rollouts(chunk, worker_id=worker_id)
-        rollout_sink.put(packed)
-        n_posts += 1
+        by_ver.setdefault(r.policy_version, []).append(r)
+    n_posts = 0
+    for ver, group in by_ver.items():
+        ver_posts = _pack_and_deliver_rollouts(
+            group,
+            worker_id=worker_id,
+            pack_max_envs=16,
+            deliver=rollout_sink.put,
+        )
+        n_posts += ver_posts
+        log(
+            machine_name,
+            f"sync epoch (local) v{ver}: {len(group)} actor-rollouts "
+            f"in {ver_posts} queue put(s)",
+        )
     log(
         machine_name,
         f"sync epoch (local) flushed {len(buffered)} actor-rollouts "
@@ -266,6 +283,8 @@ def run_async_worker_loop(
     is_local: bool,
     sync_interval_s: float = DEFAULT_SYNC_INTERVAL_S,
     heartbeat_s: float = 30.0,
+    project_root: Path | None = None,
+    headless: bool = True,
 ) -> None:
     """Spawn desync actors and serve local inference until ``stop_event``.
 
@@ -276,8 +295,17 @@ def run_async_worker_loop(
     log(
         machine_name,
         f"async worker starting ({worker_id}, {n_envs} desync actors, "
-        f"n_steps={n_steps}, sync_interval_s={sync_interval_s:.0f})",
+        f"n_steps={n_steps}, sync_interval_s={sync_interval_s:.0f}, "
+        f"headless={headless})",
     )
+    root = Path(project_root) if project_root else Path.cwd()
+    best_log = root / "data" / "logs" / f"best_rooms_{machine_name}.jsonl"
+    progress = TrainingProgressTracker(
+        prefix=f"progress:{machine_name}",
+        machine_name=machine_name,
+        best_log_path=best_log,
+    )
+    local_steps = 0
     stop_flag = mp.Value("b", False)
     ctx = mp.get_context("spawn")
     processes: list[mp.Process] = []
@@ -315,6 +343,7 @@ def run_async_worker_loop(
                     "n_steps": n_steps,
                     "stop_flag": stop_flag,
                     "capture_checkpoints": capture_checkpoints,
+                    "headless": headless,
                 },
                 name=f"dist-async-actor-{rank}",
             )
@@ -342,6 +371,9 @@ def run_async_worker_loop(
                 continue
 
             if (time.monotonic() - epoch_t0) >= sync_interval_s:
+                epoch_infos = [
+                    info for r in buffered for info in (r.episode_infos or [])
+                ]
                 if is_local and isinstance(rollout_sink, queue.Queue):
                     buffered = _flush_local_epoch(
                         buffered,
@@ -356,6 +388,12 @@ def run_async_worker_loop(
                         policy=policy,
                         machine_name=machine_name,
                         worker_id=worker_id,
+                    )
+                if epoch_infos:
+                    progress.log_rollout_end(
+                        None,
+                        num_timesteps=local_steps,
+                        episode_infos=epoch_infos,
                     )
                 epoch_t0 = time.monotonic()
 
@@ -379,6 +417,11 @@ def run_async_worker_loop(
                         policy=policy,
                         worker_id=worker_id,
                         n_steps=n_steps,
+                    )
+                    local_steps += int(rollout.num_timesteps())
+                    progress.consume_infos(
+                        rollout.episode_infos,
+                        num_timesteps=local_steps,
                     )
                     buffered.append(rollout)
                 elif kind in ("spawn_progress", "spawned", "spawn_error"):

@@ -51,3 +51,12 @@ def test_rollout_codec_roundtrip() -> None:
         assert np.array_equal(restored.obs[key], original.obs[key])
     assert np.array_equal(restored.actions, original.actions)
     assert np.array_equal(restored.last_values, original.last_values)
+
+
+def test_rollout_codec_v2_frame_roundtrip() -> None:
+    original = _sample_rollout()
+    original.obs["frame"] = np.zeros_like(original.obs["frame"], dtype=np.uint8)
+    blob_v2 = encode_rollout(original)
+    assert blob_v2[4] == 2  # codec version
+    restored = decode_rollout(blob_v2)
+    assert np.array_equal(restored.obs["frame"], original.obs["frame"])

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import queue
 import sys
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.distributed.async_worker_runtime import (
+    _flush_local_epoch,
     _serve_need,
     pack_rollouts,
     worker_rollout_from_actor_msg,
@@ -138,6 +140,30 @@ def test_pack_rollouts_merges_env_axis() -> None:
     assert packed.policy_version == 3
     assert packed.actions.shape == (4, 2)
     assert packed.num_timesteps() == 8
+
+
+def test_flush_local_epoch_splits_mixed_policy_versions() -> None:
+    """WH2 local worker: background weight sync can mix versions in one epoch."""
+    q: queue.Queue = queue.Queue()
+    buffered = [
+        _mini_rollout("workhorse2:actor_0", version=2),
+        _mini_rollout("workhorse2:actor_1", version=3),
+        _mini_rollout("workhorse2:actor_2", version=3),
+    ]
+    _flush_local_epoch(
+        buffered,
+        rollout_sink=q,
+        machine_name="workhorse2",
+        worker_id="workhorse2",
+    )
+    assert q.qsize() == 2
+    first = q.get_nowait()
+    second = q.get_nowait()
+    versions = sorted({first.policy_version, second.policy_version})
+    assert versions == [2, 3]
+    assert first.policy_version == 2
+    assert second.policy_version == 3
+    assert second.n_envs == 2
 
 
 def test_distributed_epoch_hyperparams_gentler_than_monolithic() -> None:

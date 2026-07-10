@@ -174,6 +174,9 @@ def resolve_resume_path(
     default_ckpt_dir = root / "data" / "checkpoints"
     named_run = ckpt_dir.resolve() != default_ckpt_dir.resolve()
 
+    if resume is not None and str(resume).lower() == "auto":
+        resume = None
+
     if resume:
         p = Path(resume)
         if not p.is_absolute():

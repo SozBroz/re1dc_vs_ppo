@@ -17,12 +17,66 @@
   reads the file (avoids binary-over-socket issues).
 ]]
 
--- BizHawk has no built-in JSON; use bundled dkjson.lua (same dir as this script)
-local SCRIPT_DIR = "D:/re1_rl/lua/"
-package.path = SCRIPT_DIR .. "?.lua;" .. package.path
-local json = require("dkjson")
+-- BizHawk has no built-in JSON; use bundled dkjson.lua (same dir as this script).
+-- Resolve SCRIPT_DIR without hardcoding a drive letter: WH2 has no D: (repo under
+-- C:\Users\sshuser\re1_rl); WH1/pking use D:\re1_rl. Prefer this file's path;
+-- fall back to known install roots if debug.getinfo is unhelpful.
+local function script_dir_candidates()
+  local dirs = {}
+  local function add(dir)
+    if type(dir) == "string" and #dir > 0 then
+      if dir:sub(-1) ~= "/" and dir:sub(-1) ~= "\\" then
+        dir = dir .. "/"
+      end
+      dirs[#dirs + 1] = dir
+    end
+  end
+  local src = debug.getinfo(1, "S").source
+  if type(src) == "string" and src:sub(1, 1) == "@" then
+    src = src:sub(2)
+  end
+  if type(src) == "string" then
+    add(src:match("^(.*[/\\])"))
+  end
+  add("C:/Users/sshuser/re1_rl/lua/")
+  add("D:/re1_rl/lua/")
+  add("./lua/")
+  add("./")
+  return dirs
+end
 
-local SHOT_PATH = "D:/re1_rl/data/_frame.png"
+local SCRIPT_DIR = "./"
+local json
+do
+  local last_err = "dkjson not found"
+  for _, dir in ipairs(script_dir_candidates()) do
+    package.path = dir .. "?.lua;" .. package.path
+    local ok, mod = pcall(require, "dkjson")
+    if ok and mod then
+      SCRIPT_DIR = dir
+      json = mod
+      break
+    end
+    last_err = tostring(mod)
+  end
+  if not json then
+    error("re1_client: cannot load dkjson.lua (" .. last_err .. ")")
+  end
+end
+
+-- Default only; Python usually passes an explicit screenshot path per port.
+local SHOT_PATH = SCRIPT_DIR .. "../data/_frame.png"
+do
+  local marker = SCRIPT_DIR .. "../data/logs/_lua_script_dir.txt"
+  local f = io.open(marker, "w")
+  if f then
+    f:write(SCRIPT_DIR)
+    f:close()
+  end
+end
+if console and console.log then
+  console.log("re1_client: SCRIPT_DIR=" .. SCRIPT_DIR)
+end
 
 local function ps1_to_mainram(addr)
     return addr - 0x80000000

@@ -10,9 +10,12 @@ from typing import Any
 
 import numpy as np
 
+from pathlib import Path
+
 from re1_rl.memory_map import DEFAULT_RAM_FIELDS, PLAYER_HP
 
-DEFAULT_SCREENSHOT_PATH = "D:/re1_rl/data/_frame.png"
+_DEFAULT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_SCREENSHOT_PATH = str(_DEFAULT_ROOT / "data" / "_frame.png")
 
 
 class BizHawkClient:

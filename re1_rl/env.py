@@ -58,7 +58,11 @@ from re1_rl.episode_history import (
     ROOM_HISTORY_DIM,
     EpisodeHistory,
 )
+from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM, encode_cutscene_ledger
+from re1_rl.item_affordances import AFFORDANCES_DIM, encode_affordances
 from re1_rl.key_items import KEYS_HELD_DIM, encode_keys_held
+from re1_rl.maps_files import MAPS_FILES_DIM, encode_maps_files_flags
+from re1_rl.milestone_features import MILESTONE_DIM, encode_milestones
 from re1_rl.room_signature import ENEMY_ROSTER_DIM, RoomEnemyRoster
 from re1_rl.spatial_encoder import (
     SPATIAL_DIM,
@@ -192,6 +196,12 @@ class RE1Env(gym.Env):
                 # static Evil Resource enemy roster for current room
                 "room_enemies": spaces.Box(0.0, 1.0, shape=(ENEMY_ROSTER_DIM,), dtype=np.float32),
                 "keys_held": spaces.Box(0.0, 1.0, shape=(KEYS_HELD_DIM,), dtype=np.float32),
+                "affordances": spaces.Box(0.0, 1.0, shape=(AFFORDANCES_DIM,), dtype=np.float32),
+                "cutscene_ledger": spaces.Box(
+                    0.0, 1.0, shape=(CUTSCENE_LEDGER_DIM,), dtype=np.float32
+                ),
+                "milestones": spaces.Box(0.0, 1.0, shape=(MILESTONE_DIM,), dtype=np.float32),
+                "maps_files": spaces.Box(0.0, 1.0, shape=(MAPS_FILES_DIM,), dtype=np.float32),
             }
         )
         self.action_space = spaces.Discrete(len(ACTION_NAMES))
@@ -331,6 +341,7 @@ class RE1Env(gym.Env):
                 prev_hp=self._prev_hp,
             ),
             "poisoned": bool(int(ram.get("player_poison", 0))),
+            "maps_files_flags": int(ram.get("maps_files_flags", 0)),
             "anim_history": list(getattr(self, "_anim_history", [])),
         }
 
@@ -378,6 +389,7 @@ class RE1Env(gym.Env):
             room_index=self._encoder.room_index,
             max_episode_steps=max_ep,
         )
+        cutscene_ledger = encode_cutscene_ledger(self._progress.rewarded_cutscenes)
         return {
             "frame": frame_obs,
             "proprio": self._encoder.encode_proprio(state, self._prev_hp),
@@ -396,6 +408,20 @@ class RE1Env(gym.Env):
             "acquisitions": hist["acquisitions"],
             "room_enemies": self._room_roster.encode(str(state.get("room_id", ""))),
             "keys_held": encode_keys_held(self._items.ever_held),
+            "affordances": encode_affordances(
+                ever_held=self._items.ever_held,
+                inventory_slots=state.get("inventory_slots"),
+                current_room=str(state.get("room_id", "")),
+                room_index=self._encoder.room_index,
+            ),
+            "cutscene_ledger": cutscene_ledger,
+            "milestones": encode_milestones(
+                current_room=str(state.get("room_id", "")),
+                episode_history=self._episode_history,
+                cutscene_ledger=cutscene_ledger,
+                ever_held=self._items.ever_held,
+            ),
+            "maps_files": encode_maps_files_flags(state.get("maps_files_flags")),
         }
 
     def _sync_episode_history(self, state: dict[str, Any]) -> None:
@@ -711,6 +737,9 @@ class RE1Env(gym.Env):
         info = {
             "room_id": state.get("room_id"),
             "episode_failure": reason,
+            "visited_rooms": sorted(self._progress.visited_rooms),
+            "n_rooms_visited": len(self._progress.visited_rooms),
+            "max_waypoint": self._progress.max_waypoint,
             "outside_gameplay": reason
             if reason
             in {
@@ -1428,6 +1457,8 @@ class RE1Env(gym.Env):
             "waypoint": self._planner.next_waypoint_room(),
             "waypoint_index": self._planner.waypoint_index,
             "max_waypoint": self._progress.max_waypoint,
+            "visited_rooms": sorted(self._progress.visited_rooms),
+            "n_rooms_visited": len(self._progress.visited_rooms),
             "success_room": self._stage.get("success_room"),
             "reached_success_room": self._progress.reached_success_room,
             "action_name": ACTION_NAMES[int(action)],

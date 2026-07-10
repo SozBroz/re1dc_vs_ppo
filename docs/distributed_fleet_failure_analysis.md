@@ -43,7 +43,7 @@ Rules:
 
 | Machine | Intended | Actual |
 |---------|----------|--------|
-| workhorse2 | Learner + local worker | Learner only — `--no-local-worker` in `run_distributed_learner_workhorse2.cmd` |
+| workhorse2 | Learner + local worker | Local 8 envs re-enabled; `--resume auto` |
 | workhorse1 | ~8 envs | Registered; **0 rollouts** (SubprocVecEnv/EmuHawk fails over non-interactive SSH) |
 | pking | ~12 envs | **24 envs**, ~90% RAM, **only feeder** |
 

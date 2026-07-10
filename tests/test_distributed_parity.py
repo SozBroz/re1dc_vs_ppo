@@ -19,13 +19,17 @@ from re1_rl.distributed.spaces import make_re1_policy_spaces, make_re1_spaces
 from re1_rl.distributed.weights import _SpaceHolderEnv
 from re1_rl.env import ACTION_NAMES
 from re1_rl.episode_history import ACQUISITION_LOG_DIM, ROOM_HISTORY_DIM
+from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM
+from re1_rl.item_affordances import AFFORDANCES_DIM
 from re1_rl.key_items import KEYS_HELD_DIM
+from re1_rl.maps_files import MAPS_FILES_DIM
+from re1_rl.milestone_features import MILESTONE_DIM
 from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, INVENTORY_OBS_DIM, PROPRIO_DIM, ROOM_VISITED_DIM
 from re1_rl.policy_config import POLICY_KWARGS
 from re1_rl.room_signature import ENEMY_ROSTER_DIM
 from re1_rl.spatial_encoder import SPATIAL_DIM, VISITED_SHAPE
 
-# Guidebook / episode-history keys shipped in RE1Env (see policy_config fusion).
+# Privileged obs keys shipped in RE1Env (see policy_config fusion).
 GUIDEBOOK_OBS_KEYS = frozenset(
     {
         "frame",
@@ -40,6 +44,10 @@ GUIDEBOOK_OBS_KEYS = frozenset(
         "acquisitions",
         "room_enemies",
         "keys_held",
+        "affordances",
+        "cutscene_ledger",
+        "milestones",
+        "maps_files",
     }
 )
 
@@ -66,6 +74,10 @@ def test_make_re1_spaces_guidebook_keys_match_env() -> None:
     assert obs_space["acquisitions"].shape == (ACQUISITION_LOG_DIM,)
     assert obs_space["room_enemies"].shape == (ENEMY_ROSTER_DIM,)
     assert obs_space["keys_held"].shape == (KEYS_HELD_DIM,)
+    assert obs_space["affordances"].shape == (AFFORDANCES_DIM,)
+    assert obs_space["cutscene_ledger"].shape == (CUTSCENE_LEDGER_DIM,)
+    assert obs_space["milestones"].shape == (MILESTONE_DIM,)
+    assert obs_space["maps_files"].shape == (MAPS_FILES_DIM,)
 
 
 def test_resolve_resume_path_uses_latest_json(tmp_path: Path) -> None:

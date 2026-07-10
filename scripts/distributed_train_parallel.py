@@ -136,6 +136,25 @@ def build_parser() -> argparse.ArgumentParser:
                     help="BizHawk speedmode %% for fleet training (default 3200)")
     ap.add_argument("--skip-chunk", type=int, default=600,
                     help="max frames per Lua fast_forward round-trip (default 600)")
+    ap.add_argument(
+        "--headless",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="EmuHawk --gdi/--chromeless + invisible cutscene skip (default on)",
+    )
+    ap.add_argument(
+        "--tile-windows",
+        action="store_true",
+        help="tile BizHawk windows in a monitor grid (use with --no-headless)",
+    )
+    ap.add_argument("--grid-cols", type=int, default=4, help="grid columns per monitor")
+    ap.add_argument("--grid-rows", type=int, default=2, help="grid rows per monitor")
+    ap.add_argument("--grid-gap", type=int, default=8, help="pixel gap between grid tiles")
+    ap.add_argument(
+        "--grid-monitor",
+        default="all",
+        help="tile target monitor: left, center, right, 1-based index, or all",
+    )
     return ap
 
 
@@ -183,6 +202,27 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         f"n_epochs={DISTRIBUTED_EPOCH_HYPERPARAMS['n_epochs']}",
     )
     return model, ckpt_dir
+
+
+def _maybe_start_grid_tiler(args: argparse.Namespace) -> threading.Event | None:
+    if not args.tile_windows:
+        return None
+    from re1_rl.window_grid import start_grid_tiler
+
+    stop, _thread = start_grid_tiler(
+        expected=int(args.n_envs),
+        cols=int(args.grid_cols),
+        rows=int(args.grid_rows),
+        gap=int(args.grid_gap),
+        monitor=str(args.grid_monitor),
+        log_fn=lambda msg: log(args.machine_name, msg),
+    )
+    log(
+        args.machine_name,
+        f"window grid tiler started ({args.grid_cols}x{args.grid_rows}, "
+        f"monitor={args.grid_monitor})",
+    )
+    return stop
 
 
 def _run_local_worker(
@@ -251,6 +291,8 @@ def _run_local_worker(
                 rollout_sink=rollout_queue,
                 is_local=True,
                 sync_interval_s=sync_interval,
+                project_root=PROJECT_ROOT,
+                headless=bool(args.headless),
             )
         finally:
             sync_stop.set()
@@ -272,6 +314,7 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
         machine_name=args.machine_name,
     )
     stop_event = threading.Event()
+    grid_stop = _maybe_start_grid_tiler(args)
 
     try:
         warmup_remote_policy(
@@ -306,11 +349,15 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
             rollout_sink=client,
             is_local=False,
             sync_interval_s=sync_interval,
+            project_root=PROJECT_ROOT,
+            headless=bool(args.headless),
         )
     except KeyboardInterrupt:
         log(args.machine_name, "remote worker interrupted")
     finally:
         stop_event.set()
+        if grid_stop is not None:
+            grid_stop.set()
     return 0
 
 
@@ -351,7 +398,11 @@ def _run_learner(args: argparse.Namespace) -> int:
     log(args.machine_name, f"metrics jsonl -> {metrics_jsonl}")
     from re1_rl.training_progress import TrainingProgressTracker
 
-    progress = TrainingProgressTracker(prefix="progress")
+    progress = TrainingProgressTracker(
+        prefix="progress",
+        machine_name=args.machine_name,
+        best_log_path=PROJECT_ROOT / "data" / "logs" / f"best_rooms_{args.machine_name}.jsonl",
+    )
     weight_store = WeightStore()
     rollout_queue: queue.Queue = queue.Queue()
     learner_state = LearnerState(
@@ -375,6 +426,7 @@ def _run_learner(args: argparse.Namespace) -> int:
 
     stop_event = threading.Event()
     run_local = not args.no_local_worker
+    grid_stop = _maybe_start_grid_tiler(args) if run_local else None
     if run_local:
         _run_local_worker(
             args,
@@ -524,6 +576,8 @@ def _run_learner(args: argparse.Namespace) -> int:
         log(args.machine_name, "learner interrupted")
     finally:
         stop_event.set()
+        if grid_stop is not None:
+            grid_stop.set()
         http_server.shutdown()
         suffix = f"_{args.run_name}" if args.run_name else ""
         from re1_rl.checkpoint_io import (

@@ -49,6 +49,22 @@ Expect `sshuser` **Active** (not Disc). Check `data\logs\at_logon.log` / worker 
 
 Without one of these, headless boxes often fail GUI init even with autologon.
 
+## BizHawk firmware paths (WH2 / no D: drive)
+
+`config.ini` must **not** hardcode `D:\re1_rl\...\SCPH1001.BIN` on machines
+without a `D:` drive. That yields a blocking **Missing Firmware!** modal:
+TCP accepts, Lua never boots, Python hangs on hello.
+
+After cloning or copying BizHawk config onto WH2:
+
+```powershell
+cd C:\Users\sshuser\re1_rl
+powershell -ExecutionPolicy Bypass -File tools\patch_bizhawk_paths.ps1 `
+  -RepoRoot C:\Users\sshuser\re1_rl
+```
+
+Prefer relative `./Firmware/SCPH1001.BIN` (what the patcher writes).
+
 ## If you must RDP
 
 Disconnecting RDP parks the session as **Disc**. Return the session to console instead of leaving it disconnected:

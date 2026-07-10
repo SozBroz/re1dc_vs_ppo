@@ -12,222 +12,19 @@ Pin all windows to one display:
 from __future__ import annotations
 
 import argparse
-import ctypes
 import subprocess
 import sys
 import threading
 import time
-from ctypes import wintypes
 from pathlib import Path
 
-import mss
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from re1_rl.window_grid import build_slots, list_monitors, pick_monitors, start_grid_tiler
 PYTHON = PROJECT_ROOT / "venv" / "Scripts" / "python.exe"
 if not PYTHON.is_file():
     PYTHON = Path(sys.executable)
-
-user32 = ctypes.windll.user32
-SWP_NOZORDER = 0x0004
-SWP_SHOWWINDOW = 0x0040
-
-
-class _RECT(ctypes.Structure):
-    _fields_ = [
-        ("left", ctypes.c_long),
-        ("top", ctypes.c_long),
-        ("right", ctypes.c_long),
-        ("bottom", ctypes.c_long),
-    ]
-
-TITLE_NEEDLES = ("bizhawk", "emuhawk", "resident evil")
-
-
-def _monitors() -> list[dict[str, int]]:
-    with mss.MSS() as sct:
-        return [
-            {
-                "left": int(m["left"]),
-                "top": int(m["top"]),
-                "width": int(m["width"]),
-                "height": int(m["height"]),
-            }
-            for m in sct.monitors[1:]
-        ]
-
-
-def _window_title(hwnd: int) -> str:
-    length = user32.GetWindowTextLengthW(hwnd) + 1
-    buf = ctypes.create_unicode_buffer(length)
-    user32.GetWindowTextW(hwnd, buf, length)
-    return buf.value
-
-
-def _enum_bizhawk_windows() -> list[tuple[int, str]]:
-    out: list[tuple[int, str]] = []
-
-    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-    def cb(hwnd: int, _: int) -> bool:
-        if not user32.IsWindowVisible(hwnd):
-            return True
-        title = _window_title(hwnd)
-        if not title:
-            return True
-        low = title.casefold()
-        if any(n in low for n in TITLE_NEEDLES):
-            out.append((hwnd, title))
-        return True
-
-    user32.EnumWindows(cb, 0)
-    out.sort(key=lambda x: x[0])
-    return out
-
-
-def _window_outer_rect(hwnd: int) -> tuple[int, int, int, int]:
-    rect = _RECT()
-    user32.GetWindowRect(hwnd, ctypes.byref(rect))
-    return rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
-
-
-def _place_window(hwnd: int, x: int, y: int, w: int, h: int) -> None:
-    user32.SetWindowPos(
-        hwnd,
-        0,
-        int(x),
-        int(y),
-        int(w),
-        int(h),
-        SWP_NOZORDER | SWP_SHOWWINDOW,
-    )
-
-
-def _slot_rect(
-    monitor: dict[str, int],
-    col: int,
-    row: int,
-    *,
-    cols: int,
-    rows: int,
-    gap: int,
-) -> tuple[int, int, int, int]:
-    usable_w = monitor["width"] - gap * (cols + 1)
-    usable_h = monitor["height"] - gap * (rows + 1)
-    cell_w = max(320, usable_w // cols)
-    cell_h = max(240, usable_h // rows)
-    x = monitor["left"] + gap + col * (cell_w + gap)
-    y = monitor["top"] + gap + row * (cell_h + gap)
-    return x, y, cell_w, cell_h
-
-
-def pick_monitors(monitors: list[dict[str, int]], which: str | None) -> list[dict[str, int]]:
-    if not monitors:
-        raise RuntimeError("no monitors detected")
-    if not which or which == "all":
-        return monitors
-    w = which.casefold()
-    if w == "right":
-        return [max(monitors, key=lambda m: m["left"])]
-    if w == "left":
-        return [min(monitors, key=lambda m: m["left"])]
-    if w == "center":
-        ordered = sorted(monitors, key=lambda m: m["left"])
-        return [ordered[len(ordered) // 2]]
-    if w.isdigit():
-        idx = int(w) - 1
-        if idx < 0 or idx >= len(monitors):
-            raise ValueError(f"monitor index {w} out of range (1..{len(monitors)})")
-        return [monitors[idx]]
-    raise ValueError(f"unknown --monitor {which!r}; use left|center|right|N|all")
-
-
-def build_slots(
-    count: int,
-    monitors: list[dict[str, int]],
-    *,
-    cols: int,
-    rows: int,
-    gap: int,
-) -> list[tuple[int, int, int, int]]:
-    per_monitor = cols * rows
-    if not monitors:
-        raise RuntimeError("no monitors detected")
-    if count > per_monitor * len(monitors):
-        raise ValueError(
-            f"need {count} slots but only {per_monitor * len(monitors)} "
-            f"({cols}x{rows} on {len(monitors)} monitor(s))"
-        )
-    slots: list[tuple[int, int, int, int]] = []
-    for i in range(count):
-        mon = monitors[(i // per_monitor) % len(monitors)]
-        local = i % per_monitor
-        col = local % cols
-        row = local // cols
-        slots.append(_slot_rect(mon, col, row, cols=cols, rows=rows, gap=gap))
-    return slots
-
-
-def tile_loop(
-    *,
-    expected: int,
-    monitors: list[dict[str, int]],
-    cols: int,
-    rows: int,
-    gap: int,
-    stop: threading.Event,
-    interval: float,
-    lock_windows: bool,
-) -> None:
-    slots = build_slots(expected, monitors, cols=cols, rows=rows, gap=gap)
-    placed: dict[int, int] = {}
-    per_monitor = cols * rows
-    lock_note = ", lock=on" if lock_windows else ""
-    print(
-        f"[fleet-grid] tiling up to {expected} windows — "
-        f"{len(monitors)} target monitor(s), {cols}x{rows} grid, gap={gap}px{lock_note}",
-        flush=True,
-    )
-    initial_done = False
-    while not stop.is_set():
-        windows = _enum_bizhawk_windows()
-        for hwnd, title in windows:
-            if hwnd in placed:
-                continue
-            slot_idx = len(placed)
-            if slot_idx >= expected:
-                break
-            x, y, w, h = slots[slot_idx]
-            _place_window(hwnd, x, y, w, h)
-            placed[hwnd] = slot_idx
-            mon_idx = (slot_idx // per_monitor) % len(monitors)
-            local = slot_idx % per_monitor
-            print(
-                f"[fleet-grid] window {slot_idx + 1}/{expected} "
-                f"monitor {mon_idx + 1} slot ({local % cols},{local // cols}) — {title!r}",
-                flush=True,
-            )
-        if len(placed) >= expected and not initial_done:
-            print("[fleet-grid] all windows placed", flush=True)
-            initial_done = True
-            if not lock_windows:
-                break
-
-        if lock_windows and placed:
-            dead: list[int] = []
-            for hwnd, slot_idx in placed.items():
-                if not user32.IsWindow(hwnd):
-                    dead.append(hwnd)
-                    continue
-                x, y, w, h = slots[slot_idx]
-                cur = _window_outer_rect(hwnd)
-                target = (x, y, w, h)
-                if cur != target:
-                    _place_window(hwnd, x, y, w, h)
-            for hwnd in dead:
-                del placed[hwnd]
-
-        if not lock_windows and initial_done:
-            break
-        time.sleep(interval)
 
 
 def main() -> int:
@@ -260,7 +57,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    all_monitors = _monitors()
+    all_monitors = list_monitors()
     try:
         target_monitors = pick_monitors(all_monitors, args.monitor)
     except ValueError as exc:
@@ -298,22 +95,14 @@ def main() -> int:
             print(f"  slot {i:02d}: target monitor {mon + 1} ({x},{y}) {w}x{h}")
         return 0
 
-    stop = threading.Event()
-    tiler = threading.Thread(
-        target=tile_loop,
-        kwargs={
-            "expected": args.count,
-            "monitors": target_monitors,
-            "cols": args.cols,
-            "rows": args.rows,
-            "gap": args.gap,
-            "stop": stop,
-            "interval": 1.5,
-            "lock_windows": not args.no_lock_windows,
-        },
-        daemon=True,
+    stop, tiler = start_grid_tiler(
+        expected=args.count,
+        cols=args.cols,
+        rows=args.rows,
+        gap=args.gap,
+        monitor=args.monitor,
+        lock_windows=not args.no_lock_windows,
     )
-    tiler.start()
 
     if args.tile_only:
         try:
@@ -338,6 +127,7 @@ def main() -> int:
         str(args.training_speed),
         "--skip-chunk",
         str(args.skip_chunk),
+        "--no-headless",
     ]
     if args.resume:
         cmd.extend(["--resume", args.resume])
