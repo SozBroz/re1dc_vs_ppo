@@ -100,7 +100,7 @@ def test_distributed_ppo_hyperparams_match_async_fleet() -> None:
         n_epochs=4,
         learning_rate=3e-4,
         gamma=0.995,
-        ent_coef=0.01,
+        ent_coef=0.015,
     )
 
 
@@ -135,7 +135,7 @@ def test_load_async_learner_transplants_missing_obs_key(tmp_path: Path) -> None:
         n_epochs=1,
         learning_rate=3e-4,
         gamma=0.995,
-        ent_coef=0.01,
+        ent_coef=0.015,
         device="cpu",
         verbose=0,
     )
