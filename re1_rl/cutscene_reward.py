@@ -1,7 +1,14 @@
-"""Cutscene exploration reward gating (per-episode unique ``room:cam`` keys)."""
+"""Cutscene exploration reward gating (per-episode unique keys).
+
+Door / room-change skips use ``room:cam`` (blocks re-crossing the same door).
+
+Same-room scripted beats (Barry talk, then Barry zombie kill on return) share a
+camera — those use ``room:cam:sN`` so a later beat still pays once.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from typing import Any
 
 from re1_rl.game_session import death_ui_from_ram, opening_phase_from_ram
@@ -27,14 +34,56 @@ OPENING_PHASES_NO_REWARD: frozenset[str] = frozenset(
 )
 
 
-def cutscene_key_from_state(state: dict[str, Any] | None) -> str | None:
-    """Stable per-episode id: ``room_code:cam_id`` at skip entry."""
+def cutscene_room_cam(state: dict[str, Any] | None) -> tuple[str, int] | None:
+    """``(room_id, cam_id)`` at skip entry, or None if unusable."""
     if not state:
         return None
     room = str(state.get("room_id", "") or "")
     if not room:
         return None
-    return f"{room}:{int(state.get('cam_id', 0))}"
+    return room, int(state.get("cam_id", 0))
+
+
+def same_room_cutscene_index(
+    room: str,
+    cam: int,
+    rewarded_cutscenes: Collection[str] | None,
+) -> int:
+    """Next ``sN`` index for same-room beats already claimed this episode."""
+    prefix = f"{room}:{int(cam)}:s"
+    best = -1
+    for key in rewarded_cutscenes or ():
+        if not str(key).startswith(prefix):
+            continue
+        suffix = str(key)[len(prefix) :]
+        if suffix.isdigit():
+            best = max(best, int(suffix))
+    return best + 1
+
+
+def cutscene_key_from_state(
+    state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None = None,
+    *,
+    rewarded_cutscenes: Collection[str] | None = None,
+) -> str | None:
+    """Stable per-episode id at skip entry.
+
+    Room-changing skips → ``room:cam``.
+    Same-room skips → ``room:cam:sN`` (N = next unused index in ``rewarded_cutscenes``).
+    """
+    base = cutscene_room_cam(state)
+    if base is None:
+        return None
+    room, cam = base
+    door_key = f"{room}:{cam}"
+    if new_state is None:
+        return door_key
+    new_room = str(new_state.get("room_id", "") or "")
+    if new_room and new_room != room:
+        return door_key
+    n = same_room_cutscene_index(room, cam, rewarded_cutscenes)
+    return f"{room}:{cam}:s{n}"
 
 
 def _ram_view_from_state(state: dict[str, Any]) -> dict[str, int | float]:
@@ -94,11 +143,16 @@ def qualify_cutscene_reward(
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any] | None,
     episode_start_hp: int = 0,
+    rewarded_cutscenes: Collection[str] | None = None,
 ) -> str | None:
     """Return cutscene key if this skip earns ``new_cutscene`` bonus, else None."""
     if int(skip_frames) < MIN_CUTSCENE_SKIP_FRAMES:
         return None
-    key = cutscene_key_from_state(prev_state)
+    key = cutscene_key_from_state(
+        prev_state,
+        new_state,
+        rewarded_cutscenes=rewarded_cutscenes,
+    )
     if key is None:
         return None
 
@@ -136,13 +190,16 @@ def cutscene_disqualify_reason(
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any] | None,
     episode_start_hp: int = 0,
+    rewarded_cutscenes: Collection[str] | None = None,
 ) -> str | None:
     """Human-readable reason when ``qualify_cutscene_reward`` returns None."""
     if int(skip_frames) < MIN_CUTSCENE_SKIP_FRAMES:
         return (
             f"skip_frames={int(skip_frames)} < {MIN_CUTSCENE_SKIP_FRAMES}"
         )
-    if cutscene_key_from_state(prev_state) is None:
+    if cutscene_key_from_state(
+        prev_state, new_state, rewarded_cutscenes=rewarded_cutscenes
+    ) is None:
         return "no room:cam key at skip entry"
     hp_before = int((prev_state or {}).get("hp", 0))
     hp_after = int((new_state or {}).get("hp", 0))

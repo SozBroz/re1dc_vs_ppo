@@ -24,12 +24,20 @@ from re1_rl.reward import NEW_CUTSCENE_BONUS, compute_reward
 from tests.test_scaffolding import make_planner, make_state
 
 
-def _qualify(prev, cur, *, skip_frames: int = MIN_CUTSCENE_SKIP_FRAMES, start_hp: int = 96):
+def _qualify(
+    prev,
+    cur,
+    *,
+    skip_frames: int = MIN_CUTSCENE_SKIP_FRAMES,
+    start_hp: int = 96,
+    rewarded_cutscenes=None,
+):
     return qualify_cutscene_reward(
         skip_frames=skip_frames,
         prev_state=prev,
         new_state=cur,
         episode_start_hp=start_hp,
+        rewarded_cutscenes=rewarded_cutscenes,
     )
 
 
@@ -37,7 +45,7 @@ def test_min_skip_frames():
     prev = make_state(room="105", cam_id=1, hp=96)
     cur = make_state(room="105", cam_id=1, hp=96)
     assert _qualify(prev, cur, skip_frames=19) is None
-    assert _qualify(prev, cur, skip_frames=20) == "105:1"
+    assert _qualify(prev, cur, skip_frames=20) == "105:1:s0"
 
 
 def test_damage_disqualifies():
@@ -91,7 +99,28 @@ def test_barry_scene_at_full_hp_still_pays():
         cam_id=1,
     )
     cur = make_state(room="106", hp=96, cam_id=2, scene_flag=0x80)
-    assert _qualify(prev, cur, skip_frames=120) == "106:1"
+    assert _qualify(prev, cur, skip_frames=120) == "106:1:s0"
+
+
+def test_same_room_second_cutscene_pays_new_sequence():
+    """Barry talk then Barry zombie on return: same room:cam, still pays once each."""
+    prev = make_state(room="105", cam_id=0, hp=96)
+    cur = make_state(room="105", cam_id=0, hp=96)
+    assert _qualify(prev, cur) == "105:0:s0"
+    assert _qualify(prev, cur, rewarded_cutscenes={"105:0:s0"}) == "105:0:s1"
+
+    planner = make_planner()
+    progress = ProgressTracker()
+    cur0 = dict(cur)
+    cur0["cutscene_key"] = "105:0:s0"
+    _, bd0 = compute_reward(prev, cur0, planner, progress=progress, return_breakdown=True)
+    assert bd0["new_cutscene"] == NEW_CUTSCENE_BONUS
+
+    cur1 = dict(cur)
+    cur1["cutscene_key"] = _qualify(prev, cur, rewarded_cutscenes=progress.rewarded_cutscenes)
+    assert cur1["cutscene_key"] == "105:0:s1"
+    _, bd1 = compute_reward(cur0, cur1, planner, progress=progress, return_breakdown=True)
+    assert bd1["new_cutscene"] == NEW_CUTSCENE_BONUS
 
 
 def test_opening_gameplay_teaser_excluded():

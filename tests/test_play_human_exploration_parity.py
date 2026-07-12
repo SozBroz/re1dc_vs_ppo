@@ -51,13 +51,18 @@ def test_cutscene_reward_needs_accumulated_skip_frames():
     from re1_rl.cutscene_reward import qualify_cutscene_reward
 
     cur30["cutscene_key"] = qualify_cutscene_reward(
-        skip_frames=30, prev_state=prev, new_state=cur30, episode_start_hp=96,
+        skip_frames=30,
+        prev_state=prev,
+        new_state=cur30,
+        episode_start_hp=96,
+        rewarded_cutscenes=progress.rewarded_cutscenes,
     )
+    assert cur30["cutscene_key"] == "105:1:s0"
     _, bd_ok = compute_reward(prev, cur30, planner, progress=progress, return_breakdown=True)
     assert bd_ok["new_cutscene"] == NEW_CUTSCENE_BONUS
 
     cur30b = dict(cur)
-    cur30b["cutscene_key"] = "105:1"
+    cur30b["cutscene_key"] = "105:1:s0"
     _, bd_dup = compute_reward(cur30, cur30b, planner, progress=progress, return_breakdown=True)
     assert bd_dup["new_cutscene"] == 0.0
 

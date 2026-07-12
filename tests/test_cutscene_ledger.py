@@ -24,3 +24,11 @@ def test_encode_cutscene_ledger_sets_seen_bits() -> None:
     assert v[idx_105_2] == 1.0
     assert v[idx_106_1] == 1.0
     assert float(v.sum()) == 2.0
+
+
+def test_encode_cutscene_ledger_matches_same_room_sequence_keys() -> None:
+    seen = {"105:2:s0", "105:2:s1"}
+    v = encode_cutscene_ledger(seen)
+    idx_105_2 = CUTSCENE_MILESTONE_KEYS.index("105:2")
+    assert v[idx_105_2] == 1.0
+    assert float(v.sum()) == 1.0

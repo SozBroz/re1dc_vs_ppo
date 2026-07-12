@@ -625,6 +625,7 @@ class RE1Env(gym.Env):
             prev_state=prev_state,
             new_state=new_state,
             episode_start_hp=int(getattr(self, "_episode_start_hp", 0)),
+            rewarded_cutscenes=self._progress.rewarded_cutscenes,
         )
 
     def _apply_post_skip_sync(self) -> None:

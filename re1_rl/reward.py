@@ -12,10 +12,15 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
+from re1_rl.item_todo import canonical_item
+from re1_rl.key_items import KEY_ITEM_NAMES
+
 if TYPE_CHECKING:
     from re1_rl.planner import WaypointPlanner
     from re1_rl.progress import ProgressTracker
     from re1_rl.room_graph import RoomGraph
+
+_KEY_ITEM_NAME_SET: frozenset[str] = frozenset(KEY_ITEM_NAMES)
 
 # Human-scale reward units: one route checkpoint = +1.0; step = 1/4000 of that.
 CHECKPOINT_REWARD = 1.0
@@ -31,7 +36,10 @@ NEW_CUTSCENE_BONUS = CHECKPOINT_REWARD
 # Legacy aliases kept for tests / telemetry that import old names.
 WAYPOINT_ROOM_BONUS = NEW_ROOM_BONUS
 
-ITEM_PICKUP_BONUS = CHECKPOINT_REWARD / 20
+# Junk / ammo / herbs: meaningful but well below a new room/cutscene.
+ITEM_PICKUP_BONUS = 0.15 * CHECKPOINT_REWARD
+# Keys / emblems / crests (room_items.json key_item=true).
+KEY_ITEM_PICKUP_BONUS = 0.5 * CHECKPOINT_REWARD
 # Softlock: below full chip+death (-3) and equal to terminal death (-1) so
 # suicide-to-escape-stagnation stays irrational. Fires on stagnation and on
 # door thrash (A↔B) via ProgressTracker.note_softlock_step.
@@ -131,6 +139,7 @@ def compute_reward(
         "retreat": 0.0,
         "wrong_room": 0.0,
         "item": 0.0,
+        "key_item": 0.0,
         "success_room": 0.0,
         "hp": 0.0,
         "death": 0.0,
@@ -197,8 +206,12 @@ def compute_reward(
         new_items = set(state["new_items"])
     else:
         new_items = set(state.get("inventory", [])) - set(prev_state.get("inventory", []))
-    for _item in new_items:
-        bd["item"] += ITEM_PICKUP_BONUS
+    for raw in new_items:
+        name = canonical_item(str(raw))
+        if name in _KEY_ITEM_NAME_SET:
+            bd["key_item"] += KEY_ITEM_PICKUP_BONUS
+        else:
+            bd["item"] += ITEM_PICKUP_BONUS
 
     prev_hp = int(prev_state.get("hp", 0))
     hp = int(state.get("hp", 0))
@@ -233,6 +246,7 @@ def compute_reward(
             bd["new_room"] != 0.0
             or bd["new_cutscene"] != 0.0
             or bd["item"] != 0.0
+            or bd["key_item"] != 0.0
             or bd["waypoint"] != 0.0
         )
         stagnation_hit, thrash_hit = progress.note_softlock_step(

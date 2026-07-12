@@ -891,36 +891,47 @@ def format_reward_panel(
         lines.append(f"Enemy {noun} ({enemy_kills}).")
         interesting = True
 
-    if breakdown.get("attack_miss", 0.0):
+    if breakdown.get("attack_miss", 0.0) and not quiet:
         lines.append("Attack missed (no enemy damage).")
         interesting = True
 
-    if breakdown.get("ammo_waste", 0.0):
+    if breakdown.get("ammo_waste", 0.0) and not quiet:
         lines.append("Wasted ammo on a miss.")
         interesting = True
 
-    if breakdown.get("item", 0.0):
+    if breakdown.get("key_item", 0.0):
         new_items = state.get("new_items") or []
         if new_items:
             names = ", ".join(_human_item(x) for x in new_items)
-            lines.append(f"Picked up {names} (route-relevant).")
+            lines.append(f"Picked up key item {names}.")
         else:
-            lines.append("Picked up a route-relevant item.")
+            lines.append("Picked up a key item.")
+        interesting = True
+    elif breakdown.get("item", 0.0):
+        new_items = state.get("new_items") or []
+        if new_items:
+            names = ", ".join(_human_item(x) for x in new_items)
+            lines.append(f"Picked up {names}.")
+        else:
+            lines.append("Picked up an item.")
         interesting = True
 
     hp_term = breakdown.get("hp", 0.0)
     if hp_term:
         hp = int(state.get("hp", 0))
         delta = int(hp - int(prev_state.get("hp", hp)))
-        lines.append(f"Took damage: {delta} HP (now {hp}/140).")
+        if hp_term < 0:
+            lines.append(f"Took damage: {delta} HP (now {hp}/140) [{hp_term:+.3f}].")
+        else:
+            lines.append(f"Healed: {delta:+d} HP (now {hp}/140) [{hp_term:+.3f}].")
         interesting = True
 
     if breakdown.get("death", 0.0):
-        lines.append("YOU DIED.")
+        lines.append(f"YOU DIED. [{breakdown['death']:+.3f}]")
         interesting = True
 
     if breakdown.get("softlock", 0.0):
-        lines.append("Idle penalty: stuck in this room too long.")
+        lines.append(f"Softlock / idle penalty [{breakdown['softlock']:+.3f}].")
         interesting = True
 
     if quiet and not interesting:
@@ -1442,11 +1453,31 @@ def human_advance(
 ) -> tuple[dict[str, Any], float, dict[str, float], Any, dict[str, Any]]:
     """One in-control decision: sticky hold for frame_skip frames (matches training)."""
     assert env._planner is not None
+    from re1_rl.pushable import (
+        FORWARD_ACTION,
+        RUN_FORWARD_ACTION,
+        forward_hold_frames,
+        update_forward_collision_stall,
+    )
+
     prev_wp = env._planner.waypoint_index
     sticky, pulse, pulse_hold = human_buttons_to_step(buttons)
     knife, attack = _human_combat_attempt(buttons)
+    # Match training: W / W+run extend to 20f when jammed on a pushable.
+    action_hint = RUN_FORWARD_ACTION if sticky.get("square") else FORWARD_ACTION
+    if not sticky.get("up"):
+        hold_n = env.frame_skip
+    else:
+        hold_n = forward_hold_frames(
+            env._prev_state,
+            action=action_hint,
+            frame_skip=env.frame_skip,
+            forward_collision_stall=bool(
+                getattr(env, "_forward_collision_stall", False)
+            ),
+        )
     env.bridge.step(
-        n=env.frame_skip,
+        n=hold_n,
         sticky=sticky,
         pulse=pulse,
         pulse_hold=pulse_hold,
@@ -1461,6 +1492,14 @@ def human_advance(
         knife=knife,
         attack=attack,
     )
+    if sticky.get("up"):
+        env._forward_collision_stall = update_forward_collision_stall(
+            env._prev_state,
+            state,
+            action=action_hint,
+        )
+    else:
+        env._forward_collision_stall = False
     if debug_combat and (knife or attack):
         prev_n = len(env._prev_state.get("enemies", []) or [])
         cur_n = len(state.get("enemies", []) or [])
@@ -1577,6 +1616,7 @@ def cutscene_skip_chunk(
         prev_state=entry_prev,
         new_state=state,
         episode_start_hp=int(getattr(env, "_episode_start_hp", 0)),
+        rewarded_cutscenes=env._progress.rewarded_cutscenes,
     )
     env._progress.record_in_control_step(
         state.get("room_id", ""),
@@ -1597,11 +1637,18 @@ def cutscene_skip_chunk(
             prev_state=entry_prev,
             new_state=state,
             episode_start_hp=int(getattr(env, "_episode_start_hp", 0)),
+            rewarded_cutscenes=env._progress.rewarded_cutscenes,
         )
         if why:
             print(f"[explore] cutscene skip unpaid: {why}", flush=True)
-        elif not state.get("cutscene_key"):
-            print("[explore] cutscene skip unpaid: duplicate room:cam this episode", flush=True)
+        elif state.get("cutscene_key"):
+            print(
+                f"[explore] cutscene skip unpaid: duplicate key "
+                f"{state['cutscene_key']!r} this episode",
+                flush=True,
+            )
+        else:
+            print("[explore] cutscene skip unpaid: no key", flush=True)
     env._prev_state = dict(state)
     if state["hp"] > 0:
         env._prev_hp = state["hp"]

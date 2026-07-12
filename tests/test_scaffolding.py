@@ -116,15 +116,16 @@ def test_new_cutscene_bonus_once_per_episode():
         prev_state=prev,
         new_state=cur,
         episode_start_hp=96,
+        rewarded_cutscenes=progress.rewarded_cutscenes,
     )
-    assert key == "105:2"
+    assert key == "105:2:s0"
     cur["cutscene_key"] = key
     _, bd0 = compute_reward(
         prev, cur, planner, progress=progress, return_breakdown=True,
     )
     assert bd0["new_cutscene"] == NEW_CUTSCENE_BONUS
 
-    cur2 = make_state(room="105", cam_id=2, step=3, cutscene_key="105:2")
+    cur2 = make_state(room="105", cam_id=2, step=3, cutscene_key="105:2:s0")
     _, bd1 = compute_reward(
         cur, cur2, planner, progress=progress, return_breakdown=True,
     )
@@ -137,8 +138,9 @@ def test_new_cutscene_bonus_once_per_episode():
         prev_state=prev3,
         new_state=cur3,
         episode_start_hp=96,
+        rewarded_cutscenes=progress.rewarded_cutscenes,
     )
-    assert key3 == "106:0"
+    assert key3 == "106:0:s0"
     cur3["cutscene_key"] = key3
     _, bd2 = compute_reward(
         cur2, cur3, planner, progress=progress, return_breakdown=True,
