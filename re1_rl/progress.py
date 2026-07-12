@@ -21,10 +21,8 @@ class ProgressTracker:
     _success_room_rewarded: bool = False
     _in_control_steps: dict[str, int] = field(default_factory=dict)
 
-    # Softlock anti-stall / anti-door-thrash (see reward.compute_reward).
-    _stagnation_steps: int = 0
-    _thrash_edge: frozenset[str] | None = None
-    _thrash_transitions: int = 0
+    # Idle contempt: emulated frames since last exploration progress (reward.compute_reward).
+    _stagnation_frames: int = 0
 
     def first_visit(
         self,
@@ -57,51 +55,27 @@ class ProgressTracker:
     def note_softlock_step(
         self,
         *,
-        room: str,
-        prev_room: str,
         made_progress: bool,
         softlock_threshold: int,
-        thrash_threshold: int,
-    ) -> tuple[bool, bool]:
-        """Update stagnation / door-thrash counters for one env step.
+        step_frames: int = 4,
+    ) -> bool:
+        """Emulated frames without exploration progress; periodic hit every threshold.
 
-        Returns ``(stagnation_hit, thrash_hit)``.
-
-        * Stagnation counts steps since the last progress event (new room,
-          item, waypoint, or cutscene). Periodic hit every ``softlock_threshold``.
-        * Thrash counts consecutive undirected room-edge oscillations (A↔B)
-          without progress; periodic hit every ``thrash_threshold`` transitions.
+        Progress is defined in ``compute_reward``: new room, new cutscene, or
+        new key item this step. Revisiting rooms or junk pickups do not reset.
+        Each env step advances stagnation by ``step_frames`` (macro steps count more).
         """
         if made_progress:
-            self._stagnation_steps = 0
-            self._thrash_edge = None
-            self._thrash_transitions = 0
-            return False, False
+            self._stagnation_frames = 0
+            return False
 
-        self._stagnation_steps += 1
-        stagnation_hit = (
-            softlock_threshold > 0
-            and self._stagnation_steps > 0
-            and self._stagnation_steps % softlock_threshold == 0
+        prev = self._stagnation_frames
+        self._stagnation_frames += max(int(step_frames), 0)
+        if softlock_threshold <= 0:
+            return False
+        return (self._stagnation_frames // softlock_threshold) > (
+            prev // softlock_threshold
         )
-
-        thrash_hit = False
-        room_s = str(room)
-        prev_s = str(prev_room)
-        if room_s and prev_s and room_s != prev_s:
-            edge = frozenset({prev_s, room_s})
-            if self._thrash_edge == edge:
-                self._thrash_transitions += 1
-            else:
-                self._thrash_edge = edge
-                self._thrash_transitions = 1
-            thrash_hit = (
-                thrash_threshold > 0
-                and self._thrash_transitions > 0
-                and self._thrash_transitions % thrash_threshold == 0
-            )
-
-        return stagnation_hit, thrash_hit
 
     def claim_waypoint_bonus(self, waypoint_index: int) -> bool:
         """True exactly once per waypoint index per episode."""

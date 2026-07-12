@@ -40,14 +40,10 @@ WAYPOINT_ROOM_BONUS = NEW_ROOM_BONUS
 ITEM_PICKUP_BONUS = 0.15 * CHECKPOINT_REWARD
 # Keys / emblems / crests (room_items.json key_item=true).
 KEY_ITEM_PICKUP_BONUS = 0.5 * CHECKPOINT_REWARD
-# Softlock: below full chip+death (-3) and equal to terminal death (-1) so
-# suicide-to-escape-stagnation stays irrational. Fires on stagnation and on
-# door thrash (A↔B) via ProgressTracker.note_softlock_step.
+# Idle contempt: no new room / cutscene / key item for SOFTLOCK_FRAME_THRESHOLD
+# emulated frames → periodic -1 (same magnitude as death; below full chip+death stack).
 SOFTLOCK_TIMEOUT_PENALTY = -1.0 * CHECKPOINT_REWARD
-SOFTLOCK_STEP_THRESHOLD = 2400
-# Undirected door transitions on the same edge without progress before thrash hit.
-# Periodic (every N) at the same penalty magnitude so thrash is worse than idling.
-SOFTLOCK_THRASH_TRANSITION_THRESHOLD = 8
+SOFTLOCK_FRAME_THRESHOLD = 9600
 
 ENEMY_DAMAGE_REWARD = CHECKPOINT_REWARD / 200
 ENEMY_KILL_REWARD = CHECKPOINT_REWARD / 50
@@ -118,7 +114,7 @@ def compute_reward(
     *,
     progress: ProgressTracker | None = None,
     graph: RoomGraph | None = None,
-    softlock_threshold: int = SOFTLOCK_STEP_THRESHOLD,
+    softlock_threshold: int = SOFTLOCK_FRAME_THRESHOLD,
     success_room: str | None = None,
     return_breakdown: bool = False,
 ) -> float | tuple[float, dict[str, float]]:
@@ -245,21 +241,14 @@ def compute_reward(
         made_progress = (
             bd["new_room"] != 0.0
             or bd["new_cutscene"] != 0.0
-            or bd["item"] != 0.0
             or bd["key_item"] != 0.0
-            or bd["waypoint"] != 0.0
         )
-        stagnation_hit, thrash_hit = progress.note_softlock_step(
-            room=room,
-            prev_room=prev_room,
+        if progress.note_softlock_step(
             made_progress=made_progress,
             softlock_threshold=softlock_threshold,
-            thrash_threshold=SOFTLOCK_THRASH_TRANSITION_THRESHOLD,
-        )
-        # Stack if both fire on the same step (rare); thrash alone matches idle hit.
-        n_hits = int(stagnation_hit) + int(thrash_hit)
-        if n_hits:
-            bd["softlock"] = SOFTLOCK_TIMEOUT_PENALTY * n_hits
+            step_frames=step_frames,
+        ):
+            bd["softlock"] = SOFTLOCK_TIMEOUT_PENALTY
 
     reward = float(sum(bd.values())) * REWARD_SCALE
     if return_breakdown:

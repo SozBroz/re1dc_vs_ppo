@@ -12,7 +12,7 @@ from collections.abc import Collection
 from typing import Any
 
 from re1_rl.game_session import death_ui_from_ram, opening_phase_from_ram
-from re1_rl.memory_map import PLAYER_HP_MAX
+from re1_rl.memory_map import PLAYER_HP_MAX, SCENE_FLAG_MASK
 from re1_rl.ram_skip import in_game_menu_from_ram
 
 # Emulated frames burned in skip_uncontrolled before a cutscene counts.
@@ -137,6 +137,27 @@ def cutscene_death_disqualified_from_state(
     return hp <= 0 or hp > int(PLAYER_HP_MAX)
 
 
+def examine_text_skip_disqualified(
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None,
+) -> bool:
+    """Locked-door / examine message: same room, idle scene — not exploration."""
+    if not prev_state or not new_state:
+        return False
+    room = str(prev_state.get("room_id", "") or "")
+    if not room or room != str(new_state.get("room_id", "") or ""):
+        return False
+    prev_sf = int(prev_state.get("scene_flag", 0))
+    new_sf = int(new_state.get("scene_flag", 0))
+    # Scripted scenes (Barry, Kenneth, …) move scene_flag off mansion idle.
+    if (prev_sf & SCENE_FLAG_MASK) or (new_sf & SCENE_FLAG_MASK):
+        return False
+    if prev_sf != new_sf:
+        return False
+    # Typical in-room idle while walking / at a door.
+    return (prev_sf & 0x7F) in (0, 0x80)
+
+
 def qualify_cutscene_reward(
     *,
     skip_frames: int,
@@ -181,6 +202,9 @@ def qualify_cutscene_reward(
     if in_game_menu_from_ram(_ram_view_from_state(new_state or {})):
         return None
 
+    if examine_text_skip_disqualified(prev_state, new_state):
+        return None
+
     return key
 
 
@@ -223,4 +247,6 @@ def cutscene_disqualify_reason(
         return "pause menu at skip entry"
     if in_game_menu_from_ram(_ram_view_from_state(new_state or {})):
         return "pause menu at skip exit"
+    if examine_text_skip_disqualified(prev_state, new_state):
+        return "examine / locked text (same room, idle scene)"
     return None
