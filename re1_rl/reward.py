@@ -259,10 +259,12 @@ def compute_reward(
             or bd["new_cutscene"] != 0.0
             or bd["key_item"] != 0.0
         )
-        progress.note_stagnation_step(
-            made_progress=made_progress,
-            step_frames=step_frames,
-        )
+        # Pause idle clock during cutscenes / doors (not in_control).
+        if made_progress or bool(state.get("in_control", True)):
+            progress.note_stagnation_step(
+                made_progress=made_progress,
+                step_frames=step_frames,
+            )
         if progress.stagnant_tax_active(grace_frames=STAGNANT_GRACE_FRAMES):
             bd["stagnant_step"] = STAGNANT_STEP_EXTRA_PENALTY * step_scale
 

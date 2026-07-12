@@ -354,10 +354,10 @@ def fill_rollout_buffer(model: MaskablePPO, merged: dict[str, Any]) -> MaskableD
         merged["last_values"],
         gamma=float(model.gamma),
     )
-    buffer.returns = torch.as_tensor(returns_np, device=model.device, dtype=torch.float32)
-    buffer.advantages = torch.as_tensor(
-        advantages_np, device=model.device, dtype=torch.float32
-    )
+    # SB3 expects numpy (n_steps, n_envs) until swap_and_flatten in buffer.get().
+    buffer.returns = returns_np.astype(np.float32, copy=False)
+    buffer.advantages = advantages_np.astype(np.float32, copy=False)
+    buffer.generator_ready = False
 
     return buffer
 
