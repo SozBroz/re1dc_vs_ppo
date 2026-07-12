@@ -43,26 +43,28 @@ def worker_rollout_from_actor_msg(
 ) -> WorkerRollout:
     """Build a 1-env ``WorkerRollout`` from an actor ``rollout`` pipe message."""
     rank = int(msg["rank"])
+    actual_steps = int(msg.get("n_steps", n_steps))
     last_values = policy.predict_values(_obs_batch_for_one(msg["last_obs"]))
-    obs = {k: np.expand_dims(v, axis=1) for k, v in msg["obs"].items()}
+    obs = {k: np.expand_dims(v[:actual_steps], axis=1) for k, v in msg["obs"].items()}
     masks = msg.get("action_masks")
     if masks is None:
         raise ValueError("actor rollout missing action_masks (fail closed)")
+    masks_arr = np.asarray(masks, dtype=np.bool_)[:actual_steps]
     # Prefer version stamped at horizon start (first act), not delivery-time policy.
     policy_version = int(msg.get("policy_version", policy.policy_version))
     return WorkerRollout(
         worker_id=f"{worker_id}:actor_{rank}",
         policy_version=policy_version,
         n_envs=1,
-        n_steps=n_steps,
+        n_steps=actual_steps,
         obs=obs,
-        actions=np.expand_dims(msg["actions"], 1),
-        rewards=np.expand_dims(msg["rewards"], 1),
-        dones=np.expand_dims(msg["dones"], 1),
-        values=np.expand_dims(msg["values"], 1),
-        log_probs=np.expand_dims(msg["log_probs"], 1),
+        actions=np.expand_dims(msg["actions"][:actual_steps], 1),
+        rewards=np.expand_dims(msg["rewards"][:actual_steps], 1),
+        dones=np.expand_dims(msg["dones"][:actual_steps], 1),
+        values=np.expand_dims(msg["values"][:actual_steps], 1),
+        log_probs=np.expand_dims(msg["log_probs"][:actual_steps], 1),
         last_values=last_values,
-        action_masks=np.expand_dims(np.asarray(masks, dtype=np.bool_), 1),
+        action_masks=np.expand_dims(masks_arr, 1),
         episode_infos=list(msg.get("episode_infos") or []),
     )
 
@@ -187,7 +189,10 @@ def _pack_and_deliver_rollouts(
         chunk, chunk_envs = [], 0
 
     for r in group:
-        if chunk and chunk_envs + r.n_envs > pack_max_envs:
+        if chunk and (
+            chunk_envs + r.n_envs > pack_max_envs
+            or chunk[0].n_steps != r.n_steps
+        ):
             _flush_chunk()
         chunk.append(r)
         chunk_envs += r.n_envs

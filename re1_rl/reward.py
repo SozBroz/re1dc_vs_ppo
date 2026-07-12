@@ -41,9 +41,13 @@ ITEM_PICKUP_BONUS = 0.15 * CHECKPOINT_REWARD
 # Keys / emblems / crests (room_items.json key_item=true).
 KEY_ITEM_PICKUP_BONUS = 0.5 * CHECKPOINT_REWARD
 # Idle contempt: no new room / cutscene / key item for SOFTLOCK_FRAME_THRESHOLD
-# emulated frames → periodic -1 (same magnitude as death; below full chip+death stack).
-SOFTLOCK_TIMEOUT_PENALTY = -1.0 * CHECKPOINT_REWARD
+# emulated frames → episode truncation (env). Per-step tax after STAGNANT_GRACE_FRAMES.
 SOFTLOCK_FRAME_THRESHOLD = 9600
+STAGNANT_GRACE_FRAMES = 2400
+# Extra step tax while stagnant (on top of STEP_PENALTY) after grace.
+STAGNANT_STEP_EXTRA_PENALTY = -CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT
+# Legacy alias — lump softlock removed; tests may import zero.
+SOFTLOCK_TIMEOUT_PENALTY = 0.0
 
 ENEMY_DAMAGE_REWARD = CHECKPOINT_REWARD / 200
 ENEMY_KILL_REWARD = CHECKPOINT_REWARD / 50
@@ -77,6 +81,17 @@ DIST_NORM = 4096.0
 
 # When False, compute_reward ignores checkpoint-path shaping and planner advances.
 ENABLE_CHECKPOINT_PATH = False
+
+
+def stagnation_episode_timeout(
+    progress: ProgressTracker | None,
+    *,
+    threshold: int = SOFTLOCK_FRAME_THRESHOLD,
+) -> bool:
+    """True when idle frames hit the stagnation episode cap (caller sets truncated)."""
+    if progress is None:
+        return False
+    return progress.stagnation_timed_out(threshold=threshold)
 
 
 def potential(
@@ -140,6 +155,7 @@ def compute_reward(
         "hp": 0.0,
         "death": 0.0,
         "softlock": 0.0,
+        "stagnant_step": 0.0,
         "enemy_damage": 0.0,
         "enemy_kill": 0.0,
         "attack_miss": 0.0,
@@ -243,12 +259,12 @@ def compute_reward(
             or bd["new_cutscene"] != 0.0
             or bd["key_item"] != 0.0
         )
-        if progress.note_softlock_step(
+        progress.note_stagnation_step(
             made_progress=made_progress,
-            softlock_threshold=softlock_threshold,
             step_frames=step_frames,
-        ):
-            bd["softlock"] = SOFTLOCK_TIMEOUT_PENALTY
+        )
+        if progress.stagnant_tax_active(grace_frames=STAGNANT_GRACE_FRAMES):
+            bd["stagnant_step"] = STAGNANT_STEP_EXTRA_PENALTY * step_scale
 
     reward = float(sum(bd.values())) * REWARD_SCALE
     if return_breakdown:

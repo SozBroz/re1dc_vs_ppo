@@ -930,8 +930,10 @@ def format_reward_panel(
         lines.append(f"YOU DIED. [{breakdown['death']:+.3f}]")
         interesting = True
 
-    if breakdown.get("softlock", 0.0):
-        lines.append(f"Softlock / idle penalty [{breakdown['softlock']:+.3f}].")
+    if breakdown.get("stagnant_step", 0.0):
+        lines.append(
+            f"Stagnant idle step tax [{breakdown['stagnant_step']:+.3f}]."
+        )
         interesting = True
 
     if quiet and not interesting:

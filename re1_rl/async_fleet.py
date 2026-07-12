@@ -13,22 +13,22 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 PPO_HYPERPARAMS: dict[str, Any] = dict(
-    n_steps=256,
+    n_steps=1024,
     batch_size=512,
     n_epochs=4,
     learning_rate=3e-4,
-    gamma=0.995,
+    gamma=0.998,
     ent_coef=0.01,
 )
 
 # Distributed 6-minute sync epochs: larger on-policy batches, gentler updates.
 # Used only by ``scripts/distributed_train_parallel.py`` (not monolithic async).
 DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
-    n_steps=256,
+    n_steps=1024,
     batch_size=2048,
     n_epochs=2,
     learning_rate=1e-4,
-    gamma=0.995,
+    gamma=0.998,
     ent_coef=0.01,
 )
 DEFAULT_SYNC_INTERVAL_S = 360.0
@@ -324,6 +324,26 @@ def _actor_process(
         episode_infos = []
         horizon_policy_version = 0
 
+    def _emit_rollout(n: int) -> None:
+        assert obs_bufs is not None and mask_bufs is not None
+        conn.send(
+            {
+                "t": "rollout",
+                "rank": rank,
+                "n_steps": int(n),
+                "obs": {k: v[:n].copy() for k, v in obs_bufs.items()},
+                "actions": actions[:n].copy(),
+                "rewards": rewards[:n].copy(),
+                "dones": dones[:n].copy(),
+                "values": values[:n].copy(),
+                "log_probs": log_probs[:n].copy(),
+                "action_masks": mask_bufs[:n].copy(),
+                "policy_version": horizon_policy_version,
+                "last_obs": obs,
+                "episode_infos": episode_infos,
+            }
+        )
+
     _reset_bufs()
 
     try:
@@ -371,25 +391,12 @@ def _actor_process(
             step_i += 1
 
             if done or trunc:
+                if step_i > 0:
+                    _emit_rollout(step_i)
+                    _reset_bufs()
                 obs, _ = env.reset()
-
-            if step_i >= n_steps:
-                conn.send(
-                    {
-                        "t": "rollout",
-                        "rank": rank,
-                        "obs": {k: v.copy() for k, v in obs_bufs.items()},
-                        "actions": actions.copy(),
-                        "rewards": rewards.copy(),
-                        "dones": dones.copy(),
-                        "values": values.copy(),
-                        "log_probs": log_probs.copy(),
-                        "action_masks": mask_bufs.copy(),
-                        "policy_version": horizon_policy_version,
-                        "last_obs": obs,
-                        "episode_infos": episode_infos,
-                    }
-                )
+            elif step_i >= n_steps:
+                _emit_rollout(n_steps)
                 _reset_bufs()
     finally:
         try:

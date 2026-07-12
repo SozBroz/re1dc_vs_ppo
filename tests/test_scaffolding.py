@@ -109,8 +109,8 @@ def test_new_cutscene_bonus_once_per_episode():
 
     planner = make_planner()
     progress = ProgressTracker()
-    prev = make_state(room="105", cam_id=2, step=1, hp=96)
-    cur = make_state(room="105", cam_id=2, step=2, hp=96)
+    prev = make_state(room="105", cam_id=2, step=1, hp=96, scene_flag=0x93)
+    cur = make_state(room="105", cam_id=2, step=2, hp=96, scene_flag=0x91)
     key = qualify_cutscene_reward(
         skip_frames=MIN_CUTSCENE_SKIP_FRAMES,
         prev_state=prev,
@@ -131,8 +131,8 @@ def test_new_cutscene_bonus_once_per_episode():
     )
     assert bd1["new_cutscene"] == 0.0
 
-    prev3 = make_state(room="106", cam_id=0, step=3, hp=96)
-    cur3 = make_state(room="106", cam_id=0, step=4, hp=96)
+    prev3 = make_state(room="106", cam_id=0, step=3, hp=96, scene_flag=0x93)
+    cur3 = make_state(room="106", cam_id=0, step=4, hp=96, scene_flag=0x91)
     key3 = qualify_cutscene_reward(
         skip_frames=MIN_CUTSCENE_SKIP_FRAMES,
         prev_state=prev3,
@@ -239,7 +239,7 @@ def test_damage_and_death_calibrated_to_waypoint():
     assert SURVIVAL_BUDGET_SCALED == pytest.approx(3.0 * CHECKPOINT_REWARD)
     assert NEAR_DEATH_DAMAGE_SCALED == pytest.approx(2.0)
     assert DEATH_PENALTY_SCALED == pytest.approx(1.0)
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-1.0)
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(0.0)
     assert HP_GAIN_SCALE == pytest.approx(0.8 * HP_LOSS_SCALE)
 
     full = make_state(hp=JILL_FINE_HP, step=1)

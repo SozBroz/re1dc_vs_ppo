@@ -80,7 +80,7 @@ from re1_rl.spatial_encoder import (
 )
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
-from re1_rl.reward import compute_reward, DEATH_PENALTY, REWARD_SCALE
+from re1_rl.reward import compute_reward, DEATH_PENALTY, REWARD_SCALE, stagnation_episode_timeout
 from re1_rl.room_graph import RoomGraph
 from re1_rl.knife_macro import execute_knife_macro, read_knife_hooks
 from re1_rl.sticky_input import StickyInputState
@@ -424,6 +424,12 @@ class RE1Env(gym.Env):
                 pass
         return encode_box(self._box_cache, in_box_room=in_box_room)
 
+    def _episode_truncated(self) -> bool:
+        max_ep = int(self._stage.get("max_steps", 3000))
+        if max_ep > 0 and self._step_count >= max_ep:
+            return True
+        return stagnation_episode_timeout(self._progress)
+
     def _build_obs(self, frame_obs: np.ndarray, state: dict[str, Any]) -> dict[str, np.ndarray]:
         assert self._encoder is not None and self._planner is not None
         self._sync_episode_history(state)
@@ -679,9 +685,7 @@ class RE1Env(gym.Env):
         if state.get("dead"):
             self._bg_death = True
         max_ep_steps = int(self._stage.get("max_steps", 3000))
-        self._skip_cache_truncated = (
-            max_ep_steps > 0 and self._step_count >= max_ep_steps
-        )
+        self._skip_cache_truncated = self._episode_truncated()
 
     def _fast_cutscene_step(
         self, action: int
@@ -701,10 +705,7 @@ class RE1Env(gym.Env):
                 np.zeros(FRAME_SHAPE, dtype=np.uint8),
                 self._prev_state or {"hp": 0, "room_id": "", "x": 0, "z": 0, "facing": 0},
             )
-        truncated = self._skip_cache_truncated or (
-            int(self._stage.get("max_steps", 3000)) > 0
-            and self._step_count >= int(self._stage.get("max_steps", 3000))
-        )
+        truncated = self._skip_cache_truncated
         info = {
             "room_id": self._prev_state.get("room_id"),
             "cutscene_skip": True,
@@ -1176,8 +1177,7 @@ class RE1Env(gym.Env):
             return_breakdown=True,
         )
         terminated = bool(state.get("dead"))
-        max_ep_steps = int(self._stage.get("max_steps", 3000))
-        truncated = max_ep_steps > 0 and self._step_count >= max_ep_steps
+        truncated = self._episode_truncated()
         obs = self._build_obs(frame_obs, state)
         info = {
             "room_id": state["room_id"],
@@ -1521,10 +1521,7 @@ class RE1Env(gym.Env):
             self._post_skip_bd = {}
 
         terminated = bool(state.get("dead"))
-        max_ep_steps = int(self._stage.get("max_steps", 3000))
-        truncated = (
-            max_ep_steps > 0 and self._step_count >= max_ep_steps
-        )
+        truncated = self._episode_truncated()
 
         hp_now = int(state["hp"])
         if hp_now > 0:

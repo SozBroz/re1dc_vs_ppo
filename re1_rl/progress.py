@@ -52,14 +52,17 @@ class ProgressTracker:
         """Reset per-room step counters so repeated hall objectives work."""
         self._in_control_steps.clear()
 
-    def note_softlock_step(
+    @property
+    def stagnation_frames(self) -> int:
+        return int(self._stagnation_frames)
+
+    def note_stagnation_step(
         self,
         *,
         made_progress: bool,
-        softlock_threshold: int,
         step_frames: int = 4,
-    ) -> bool:
-        """Emulated frames without exploration progress; periodic hit every threshold.
+    ) -> None:
+        """Advance idle clock when no exploration progress this step.
 
         Progress is defined in ``compute_reward``: new room, new cutscene, or
         new key item this step. Revisiting rooms or junk pickups do not reset.
@@ -67,15 +70,18 @@ class ProgressTracker:
         """
         if made_progress:
             self._stagnation_frames = 0
-            return False
-
-        prev = self._stagnation_frames
+            return
         self._stagnation_frames += max(int(step_frames), 0)
-        if softlock_threshold <= 0:
+
+    def stagnation_timed_out(self, *, threshold: int) -> bool:
+        """True once emulated idle frames reach the episode timeout threshold."""
+        if threshold <= 0:
             return False
-        return (self._stagnation_frames // softlock_threshold) > (
-            prev // softlock_threshold
-        )
+        return self._stagnation_frames >= int(threshold)
+
+    def stagnant_tax_active(self, *, grace_frames: int) -> bool:
+        """Per-step idle tax applies after the grace window."""
+        return self._stagnation_frames > int(grace_frames)
 
     def claim_waypoint_bonus(self, waypoint_index: int) -> bool:
         """True exactly once per waypoint index per episode."""

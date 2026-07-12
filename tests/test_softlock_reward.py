@@ -1,4 +1,4 @@
-"""Softlock: idle contempt when no new room / cutscene / key item."""
+"""Stagnation: grace window, per-step tax, episode timeout (no lump softlock)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,10 @@ from re1_rl.reward import (
     REFERENCE_STEP_FRAMES,
     SOFTLOCK_FRAME_THRESHOLD,
     SOFTLOCK_TIMEOUT_PENALTY,
+    STAGNANT_GRACE_FRAMES,
+    STAGNANT_STEP_EXTRA_PENALTY,
+    STEP_PENALTY,
+    stagnation_episode_timeout,
     compute_reward,
 )
 from tests.test_scaffolding import make_planner, make_state
@@ -24,7 +28,6 @@ def _step(
     prev,
     cur,
     *,
-    softlock_threshold=SOFTLOCK_FRAME_THRESHOLD,
     step_frames=REFERENCE_STEP_FRAMES,
 ):
     cur = dict(cur)
@@ -35,40 +38,58 @@ def _step(
         cur,
         make_planner(),
         progress=progress,
-        softlock_threshold=softlock_threshold,
         return_breakdown=True,
     )
 
 
-def test_dwell_past_threshold_fires_softlock():
-    """Sitting in one room with no progress hits softlock at the frame threshold."""
+def test_no_lump_softlock_penalty():
+    assert SOFTLOCK_TIMEOUT_PENALTY == 0.0
+
+
+def test_grace_period_no_stagnant_step_tax():
     progress = ProgressTracker()
     progress.first_visit("105")
-    threshold = 10
+    prev = make_state(room="105", step=0)
+    steps_to_grace = STAGNANT_GRACE_FRAMES // REFERENCE_STEP_FRAMES
+    for i in range(1, steps_to_grace + 1):
+        cur = make_state(room="105", step=i)
+        _, bd = _step(progress, prev, cur)
+        assert bd["stagnant_step"] == 0.0
+        assert bd["softlock"] == 0.0
+        prev = cur
+    assert progress.stagnation_frames == STAGNANT_GRACE_FRAMES
+
+
+def test_stagnant_step_tax_after_grace():
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    prev = make_state(room="105", step=0)
+    steps_past_grace = STAGNANT_GRACE_FRAMES // REFERENCE_STEP_FRAMES + 1
+    bd = None
+    for i in range(1, steps_past_grace + 1):
+        cur = make_state(room="105", step=i)
+        _, bd = _step(progress, prev, cur)
+        prev = cur
+    assert bd is not None
+    assert bd["stagnant_step"] == STAGNANT_STEP_EXTRA_PENALTY
+    assert bd["softlock"] == 0.0
+
+
+def test_stagnation_timeout_at_threshold():
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    threshold = 40
     step_frames = 4
     prev = make_state(room="105", step=0)
-    softlock_hits = 0
     for i in range(1, 20):
         cur = make_state(room="105", step=i)
-        _, bd = _step(
-            progress,
-            prev,
-            cur,
-            softlock_threshold=threshold,
-            step_frames=step_frames,
-        )
-        if bd["softlock"] != 0.0:
-            softlock_hits += 1
-            assert bd["softlock"] == SOFTLOCK_TIMEOUT_PENALTY
-        if softlock_hits:
-            break
+        _step(progress, prev, cur, step_frames=step_frames)
         prev = cur
-    assert softlock_hits == 1
-    assert progress._stagnation_frames >= threshold
+    assert stagnation_episode_timeout(progress, threshold=threshold)
+    assert progress.stagnation_frames >= threshold
 
 
-def test_room_loop_without_new_visits_still_hits_softlock():
-    """A→B→C→B→A with all rooms already seen still accumulates idle frames."""
+def test_room_loop_without_new_visits_accumulates_stagnation():
     progress = ProgressTracker()
     for r in ("105", "106", "104"):
         progress.first_visit(r)
@@ -76,23 +97,13 @@ def test_room_loop_without_new_visits_still_hits_softlock():
     step_frames = 4
     threshold = (len(path) - 1) * step_frames
     prev = make_state(room="105", step=0)
-    softlock_hits = 0
     for i, room in enumerate(path[1:], start=1):
         cur = make_state(room=room, step=i)
-        _, bd = _step(
-            progress,
-            prev,
-            cur,
-            softlock_threshold=threshold,
-            step_frames=step_frames,
-        )
-        if bd["softlock"] != 0.0:
-            softlock_hits += 1
-            assert bd["softlock"] == SOFTLOCK_TIMEOUT_PENALTY
+        _, bd = _step(progress, prev, cur, step_frames=step_frames)
         assert bd["new_room"] == 0.0
+        assert bd["softlock"] == 0.0
         prev = cur
-    assert softlock_hits == 1
-    assert progress._stagnation_frames == threshold
+    assert stagnation_episode_timeout(progress, threshold=threshold)
 
 
 def test_junk_item_pickup_does_not_reset_idle_timer():
@@ -100,10 +111,10 @@ def test_junk_item_pickup_does_not_reset_idle_timer():
     progress.first_visit("105")
     prev = make_state(room="105", step=0)
     cur = make_state(room="105", step=1, new_items=["green_herb"])
-    _, bd = _step(progress, prev, cur, softlock_threshold=20, step_frames=4)
+    _, bd = _step(progress, prev, cur, step_frames=4)
     assert bd["item"] == ITEM_PICKUP_BONUS
     assert bd["key_item"] == 0.0
-    assert progress._stagnation_frames == 4
+    assert progress.stagnation_frames == 4
 
 
 def test_key_item_pickup_resets_idle_timer():
@@ -112,14 +123,14 @@ def test_key_item_pickup_resets_idle_timer():
     prev = make_state(room="105", step=0)
     for i in range(1, 4):
         cur = make_state(room="105", step=i)
-        _step(progress, prev, cur, softlock_threshold=20, step_frames=4)
+        _step(progress, prev, cur, step_frames=4)
         prev = cur
-    assert progress._stagnation_frames == 12
+    assert progress.stagnation_frames == 12
     cur = make_state(room="105", step=4, new_items=["emblem"])
-    _, bd = _step(progress, prev, cur, softlock_threshold=20, step_frames=4)
+    _, bd = _step(progress, prev, cur, step_frames=4)
     assert bd["key_item"] > 0.0
-    assert bd["softlock"] == 0.0
-    assert progress._stagnation_frames == 0
+    assert bd["stagnant_step"] == 0.0
+    assert progress.stagnation_frames == 0
 
 
 def test_first_visits_reset_idle_timer():
@@ -129,35 +140,41 @@ def test_first_visits_reset_idle_timer():
     prev = make_state(room="105", step=0)
     for i, room in enumerate(path[1:], start=1):
         cur = make_state(room=room, step=i)
-        _, bd = _step(progress, prev, cur, softlock_threshold=10_000, step_frames=4)
-        assert bd["softlock"] == 0.0
+        _, bd = _step(progress, prev, cur, step_frames=4)
+        assert bd["stagnant_step"] == 0.0
         assert bd["new_room"] == NEW_ROOM_BONUS
         prev = cur
-    assert progress._stagnation_frames == 0
-
-
-def test_new_room_bonus_still_pays_once():
-    progress = ProgressTracker()
-    progress.first_visit("105")
-    prev = make_state(room="105", step=1)
-    cur = make_state(room="106", step=2)
-    _, bd0 = _step(progress, prev, cur)
-    assert bd0["new_room"] == NEW_ROOM_BONUS
-    assert bd0["softlock"] == 0.0
-    _, bd1 = _step(progress, cur, prev)
-    assert bd1["new_room"] == 0.0
+    assert progress.stagnation_frames == 0
 
 
 def test_long_step_advances_stagnation_proportionally():
-    """Macro steps burn more idle budget than a single hold-tick."""
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", step=0)
     short = make_state(room="105", step=1)
-    _step(progress, prev, short, softlock_threshold=10_000, step_frames=4)
-    assert progress._stagnation_frames == 4
+    _step(progress, prev, short, step_frames=4)
+    assert progress.stagnation_frames == 4
 
     progress._stagnation_frames = 0
     long_step = make_state(room="105", step=2)
-    _step(progress, short, long_step, softlock_threshold=10_000, step_frames=120)
-    assert progress._stagnation_frames == 120
+    _step(progress, short, long_step, step_frames=120)
+    assert progress.stagnation_frames == 120
+
+
+def test_full_stall_episode_return_order_of_magnitude():
+    """~2400 stagnant env steps: step + stagnant tax, no lump."""
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    prev = make_state(room="105", step=0)
+    total = 0.0
+    threshold = SOFTLOCK_FRAME_THRESHOLD
+    step_frames = REFERENCE_STEP_FRAMES
+    steps = threshold // step_frames
+    for i in range(1, steps + 1):
+        cur = make_state(room="105", step=i)
+        rew, _ = _step(progress, prev, cur, step_frames=step_frames)
+        total += rew
+        prev = cur
+    assert stagnation_episode_timeout(progress, threshold=threshold)
+    # Grace ~600 steps @ -0.0002, then ~1800 @ -0.0004 ≈ -0.84
+    assert -1.5 < total < -0.3
