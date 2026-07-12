@@ -5,8 +5,7 @@ cd /d D:\re1_rl
 set MACHINE_NAME=pking
 set LEARNER_HOST=192.168.0.111
 set BASE_PORT=5755
-REM Cap at 12 until RAM headroom proven (fleet_setup.md)
-set N_ENVS=12
+set N_ENVS=18
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
@@ -22,6 +21,8 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --sync-interval-s %SYNC_INTERVAL_S% ^
   --capture-checkpoints ^
   --no-headless ^
+  --screenshot-mmf ^
+  --inference-batch-max %N_ENVS% ^
   --tile-windows ^
-  --grid-cols 4 ^
+  --grid-cols 6 ^
   --grid-rows 3
