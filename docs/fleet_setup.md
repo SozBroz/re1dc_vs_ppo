@@ -75,7 +75,7 @@ python scripts/prune_checkpoints.py --keep 5
 
 **BizHawk visibility (fleet default):** only **pking** runs `--no-headless` with `--tile-windows` (4×3 grid) for savestate/screenshot/debug. WH2 learner + WH1 worker use `--headless`.
 
-Weight sync / experience: **6-minute epochs**. Remotes buffer rollouts, then once per `--sync-interval-s` (default **360**) upload a burst and pull weights. Learner **waits for all live workers** (heartbeat registry) to contribute that epoch, with `--epoch-grace-s` (default 120) so a dead box cannot stall forever. Remotes heartbeat every ~30s; no heartbeat for `--worker-liveness-s` (default 90) drops them from the expected set (pking can leave/rejoin freely). Gentler large-batch hyperparams (`DISTRIBUTED_EPOCH_HYPERPARAMS`). `max_staleness` default **2**.
+Weight sync / experience: **6-minute epochs**. Remotes buffer rollouts, then once per `--sync-interval-s` (default **360**) upload a burst and pull weights. Learner **waits for all live workers** (heartbeat registry) to contribute that epoch, with `--epoch-grace-s` (default 120) so a dead box cannot stall forever. Remotes heartbeat every ~30s; no heartbeat for `--worker-liveness-s` (default 90) drops them from the expected set (pking can leave/rejoin freely). Gentler large-batch hyperparams (`DISTRIBUTED_EPOCH_HYPERPARAMS`). `max_staleness` default **1**.
 
 **WH2 RAM budget (~32 GB):** 8 local EmuHawks (~7 GB) + learner/Python + **5–8 GB epoch ingest spike** must stay off the pagefile. Do not raise WH2 `--n-envs` without measuring free RAM at flush.
 

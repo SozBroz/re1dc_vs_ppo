@@ -21,6 +21,8 @@ class WorkerRollout:
     values: np.ndarray
     log_probs: np.ndarray
     last_values: np.ndarray
+    # (n_steps, n_envs, n_actions) bool — required for MaskablePPO train parity
+    action_masks: np.ndarray
     episode_infos: list[dict[str, Any]] = field(default_factory=list)
 
     def num_timesteps(self) -> int:

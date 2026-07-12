@@ -28,6 +28,7 @@ def _rollout(worker_id: str, version: int = 1) -> WorkerRollout:
         values=np.zeros((4, 1), dtype=np.float32),
         log_probs=np.zeros((4, 1), dtype=np.float32),
         last_values=np.zeros((1,), dtype=np.float32),
+        action_masks=np.ones((4, 1, 8), dtype=np.bool_),
     )
 
 
@@ -52,13 +53,13 @@ def test_epoch_waits_for_all_live_then_ready() -> None:
     assert st["ready"] is False
     assert set(st["missing"]) == {"workhorse2", "pking", "workhorse1"}
 
-    assert state.accept_rollout(_rollout("pking:actor_0"))
-    assert state.accept_rollout(_rollout("workhorse2"))
+    assert state.accept_rollout(_rollout("pking:actor_0"))[0]
+    assert state.accept_rollout(_rollout("workhorse2"))[0]
     st = state.epoch_status()
     assert st["ready"] is False
     assert st["missing"] == ["workhorse1"]
 
-    assert state.accept_rollout(_rollout("workhorse1:actor_1"))
+    assert state.accept_rollout(_rollout("workhorse1:actor_1"))[0]
     st = state.epoch_status()
     assert st["ready"] is True
     assert st["missing"] == []
@@ -99,3 +100,33 @@ def test_pking_can_rejoin_next_epoch() -> None:
     assert eid == 2
     assert "pking" in expected
     assert state.epoch_status()["ready"] is False
+
+
+def test_multiple_posts_same_worker_accepted() -> None:
+    store = WeightStore()
+    q: queue.Queue = queue.Queue()
+    state = LearnerState(store, q, machine_name="t", max_staleness=2, worker_liveness_s=60)
+    state.set_current_version(1)
+    state.register_worker("pking", n_envs=20)
+    state.begin_epoch()
+
+    def _partial(n_envs: int) -> WorkerRollout:
+        return WorkerRollout(
+            worker_id="pking",
+            policy_version=1,
+            n_envs=n_envs,
+            n_steps=4,
+            obs={"x": np.zeros((4, n_envs), dtype=np.float32)},
+            actions=np.zeros((4, n_envs), dtype=np.int64),
+            rewards=np.zeros((4, n_envs), dtype=np.float32),
+            dones=np.zeros((4, n_envs), dtype=np.bool_),
+            values=np.zeros((4, n_envs), dtype=np.float32),
+            log_probs=np.zeros((4, n_envs), dtype=np.float32),
+            last_values=np.zeros((n_envs,), dtype=np.float32),
+            action_masks=np.ones((4, n_envs, 8), dtype=np.bool_),
+        )
+
+    assert state.accept_rollout(_partial(16))[0]
+    assert state.accept_rollout(_partial(16))[0]
+    assert state.accept_rollout(_partial(4))[0]
+    assert q.qsize() == 3

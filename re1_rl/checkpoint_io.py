@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 _STEP_RE = re.compile(r"_(\d+)_steps\.zip$", re.IGNORECASE)
+_NUMBERED_RE = re.compile(r"^ppo_re1_\d+_steps\.zip$", re.IGNORECASE)
 
 # Total SB3 ``num_timesteps`` between checkpoint saves at n_envs=20.
 CHECKPOINT_INTERVAL_AT_20_ENVS = 40_000
@@ -31,6 +32,15 @@ def checkpoint_save_freq_vec_env(n_envs: int) -> int:
     """SB3 ``CheckpointCallback.save_freq`` (one vec-env step = n_envs timesteps)."""
     n = max(int(n_envs), 1)
     return max(checkpoint_timestep_interval(n) // n, 1)
+
+
+def checkpoint_due(
+    num_timesteps: int,
+    last_save_timesteps: int,
+    interval: int,
+) -> bool:
+    """True when ``num_timesteps`` has advanced by at least ``interval`` since last save."""
+    return int(num_timesteps) - int(last_save_timesteps) >= max(int(interval), 1)
 
 
 def zip_path(path: str | Path) -> Path:
@@ -157,6 +167,48 @@ def find_newest_checkpoint(ckpt_dir: str | Path) -> Path | None:
     return best[1] if best else None
 
 
+def is_convention_checkpoint(
+    path: Path,
+    *,
+    named_run: bool,
+    run_name: str = "",
+) -> bool:
+    """True for ``ppo_re1_<N>_steps.zip`` and run-scoped ``ppo_re1_final`` aliases."""
+    name = path.name
+    if _NUMBERED_RE.match(name):
+        return True
+    if named_run:
+        return name.lower() == f"ppo_re1_final_{run_name}.zip".lower()
+    return name.lower() == "ppo_re1_final.zip"
+
+
+def convention_checkpoint_candidates(
+    *,
+    project_root: Path,
+    ckpt_dir: Path,
+    named_run: bool,
+) -> list[Path]:
+    """All on-disk paths that may participate in auto-resume for this run."""
+    run_name = ckpt_dir.name if named_run else ""
+    root = project_root
+    candidates: list[Path] = []
+    if ckpt_dir.is_dir():
+        for p in ckpt_dir.glob("ppo_re1_*_steps.zip"):
+            if is_convention_checkpoint(p, named_run=named_run, run_name=run_name):
+                candidates.append(p)
+    if named_run:
+        candidates.append(root / "data" / f"ppo_re1_final_{run_name}.zip")
+    else:
+        candidates.append(root / "data" / "ppo_re1_final.zip")
+    ptr = read_latest_pointer(ckpt_dir)
+    if ptr and ptr.get("path"):
+        ptr_p = Path(str(ptr["path"]))
+        if not ptr_p.is_absolute():
+            ptr_p = root / ptr_p
+        candidates.append(zip_path(ptr_p))
+    return candidates
+
+
 def resolve_resume_path(
     resume: str | Path | None,
     *,
@@ -165,14 +217,16 @@ def resolve_resume_path(
 ) -> Path | None:
     """Pick the best loadable checkpoint for a new training run.
 
-    Explicit ``--resume`` wins when valid. Otherwise prefer the newest save
-    (``latest.json`` pointer, then newest mtime in ``ckpt_dir``) over a stale
-    ``ppo_re1_final.zip`` alias.
+    Explicit ``--resume`` wins when valid. Otherwise pick the newest valid
+    convention-named checkpoint by filesystem mtime (``ppo_re1_<N>_steps.zip``
+    or ``ppo_re1_final[_run].zip``), including ``latest.json`` pointer paths.
     """
     root = Path(project_root)
     ckpt_dir = Path(ckpt_dir or root / "data" / "checkpoints")
     default_ckpt_dir = root / "data" / "checkpoints"
     named_run = ckpt_dir.resolve() != default_ckpt_dir.resolve()
+    run_name = ckpt_dir.name if named_run else ""
+    global_legacy = (root / "data" / "ppo_re1_final.zip").resolve()
 
     if resume is not None and str(resume).lower() == "auto":
         resume = None
@@ -185,45 +239,27 @@ def resolve_resume_path(
         if is_valid_checkpoint(explicit):
             return explicit
 
-    candidates: list[Path] = []
-
-    ptr = read_latest_pointer(ckpt_dir)
-    if ptr and ptr.get("path"):
-        ptr_p = Path(str(ptr["path"]))
-        if not ptr_p.is_absolute():
-            ptr_p = root / ptr_p
-        candidates.append(zip_path(ptr_p))
-
-    newest = find_newest_checkpoint(ckpt_dir)
-    if newest is not None:
-        candidates.append(newest)
-
-    if named_run:
-        alias = zip_path(root / "data" / f"ppo_re1_final_{ckpt_dir.name}.zip")
-    else:
-        alias = zip_path(root / "data" / "ppo_re1_final.zip")
-    candidates.append(alias)
-
-    if resume:
-        p = Path(resume)
-        if not p.is_absolute():
-            p = root / p
-        candidates.append(zip_path(p))
-
-    best: tuple[int, float, Path] | None = None
+    best: tuple[float, Path] | None = None
     seen: set[str] = set()
-    for cand in candidates:
+    for cand in convention_checkpoint_candidates(
+        project_root=root,
+        ckpt_dir=ckpt_dir,
+        named_run=named_run,
+    ):
         key = str(cand.resolve()) if cand.exists() else str(cand)
         if key in seen:
             continue
         seen.add(key)
         if not is_valid_checkpoint(cand):
             continue
-        # Named runs must not resume from the global legacy alias.
-        if named_run and cand.resolve() == (root / "data" / "ppo_re1_final.zip").resolve():
+        if named_run and cand.resolve() == global_legacy:
             continue
-        steps = _steps_from_name(cand)
+        if not is_convention_checkpoint(cand, named_run=named_run, run_name=run_name):
+            continue
         mtime = cand.stat().st_mtime
-        if best is None or steps > best[0] or (steps == best[0] and mtime > best[1]):
-            best = (steps, mtime, cand)
+        steps = _steps_from_name(cand)
+        if best is None or mtime > best[0] or (
+            mtime == best[0] and steps > best[1]
+        ):
+            best = (mtime, steps, cand)
     return best[2] if best else None

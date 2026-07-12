@@ -23,7 +23,7 @@ def _stub_env(async_cutscene_skip: bool) -> RE1Env:
     env._bg_skip_thread = None
     env._skipping_flag = False
     env._bg_death = False
-    env._skip_cache_obs = {"frame": np.zeros((84, 84, 4), dtype=np.uint8)}
+    env._skip_cache_obs = {"frame": np.zeros((84, 77, 4), dtype=np.uint8)}
     env._skip_cache_state = None
     env._skip_cache_truncated = False
     env._stage = {"max_steps": 0}
@@ -57,7 +57,30 @@ def _stub_env(async_cutscene_skip: bool) -> RE1Env:
     env._ram_skip = MagicMock()
     env._sticky_input = MagicMock()
     env._sticky_input.apply.return_value = ({}, {}, None)
+    from gymnasium import spaces
+
+    env.action_space = spaces.Discrete(len(__import__("re1_rl.env", fromlist=["ACTION_NAMES"]).ACTION_NAMES))
+    env._prev_action = 0
     return env
+
+
+def test_action_masks_noop_only_during_skip() -> None:
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    # Stale prev_state still claims in_control — must not leak combat masks.
+    env._prev_state = {
+        "room_id": "105",
+        "hp": 96,
+        "x": 0,
+        "z": 0,
+        "facing": 0,
+        "in_control": True,
+    }
+    masks = env.action_masks()
+    assert masks.dtype == bool
+    assert int(masks.sum()) == 1
+    assert masks[0]
+    assert not masks[1:].any()
 
 
 def test_fast_cutscene_step_returns_immediately() -> None:
@@ -80,7 +103,7 @@ def test_fast_cutscene_step_terminates_on_zero_hp() -> None:
     env._skip_cache_state = {"dead": True, "hp": 0, "room_id": "105"}
     env._death_step = MagicMock(
         return_value=(
-            {"frame": np.zeros((84, 84, 4), dtype=np.uint8)},
+            {"frame": np.zeros((84, 77, 4), dtype=np.uint8)},
             0.0,
             True,
             False,
@@ -101,7 +124,7 @@ def test_fast_cutscene_step_polls_hp_when_cache_stale() -> None:
     env.bridge.read_ram.return_value = {"player_hp": 0}
     env._death_step = MagicMock(
         return_value=(
-            {"frame": np.zeros((84, 84, 4), dtype=np.uint8)},
+            {"frame": np.zeros((84, 77, 4), dtype=np.uint8)},
             0.0,
             True,
             False,
@@ -183,8 +206,8 @@ def test_sync_mode_still_calls_skip_uncontrolled(monkeypatch) -> None:
             "interaction_prompt": False,
         }
     )
-    env._push_frame = MagicMock(return_value=np.zeros((84, 84, 4), dtype=np.uint8))
-    env._build_obs = MagicMock(return_value={"frame": np.zeros((84, 84, 4), dtype=np.uint8)})
+    env._push_frame = MagicMock(return_value=np.zeros((84, 77, 4), dtype=np.uint8))
+    env._build_obs = MagicMock(return_value={"frame": np.zeros((84, 77, 4), dtype=np.uint8)})
     env._progress = MagicMock()
     env._planner.next_waypoint_room.return_value = "106"
     env._planner.waypoint_index = 0
@@ -244,8 +267,8 @@ def test_refresh_cache_does_not_consume_new_items() -> None:
             "interaction_prompt": False,
         }
     )
-    env._push_frame = MagicMock(return_value=np.zeros((84, 84, 4), dtype=np.uint8))
-    env._build_obs = MagicMock(return_value={"frame": np.zeros((84, 84, 4), dtype=np.uint8)})
+    env._push_frame = MagicMock(return_value=np.zeros((84, 77, 4), dtype=np.uint8))
+    env._build_obs = MagicMock(return_value={"frame": np.zeros((84, 77, 4), dtype=np.uint8)})
     env._progress = MagicMock()
     env._planner.next_waypoint_room.return_value = "106"
     env._planner.waypoint_index = 0

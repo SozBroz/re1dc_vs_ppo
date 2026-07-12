@@ -131,24 +131,18 @@ Before/after Enter pairs; reports single-bit flips in `0x800C8600–0x800C8800` 
 
 ---
 
-## RESULTS (operator fills after hunt)
-
-<!-- Leave blank until confirmed on hardware -->
+## RESULTS (confirmed 2026-07-12)
 
 | Field | Value |
 |-------|-------|
-| **Enemy table base (PS1 bus)** | |
-| **Slot stride** | `0x18C` (confirm / revise) |
-| **Slot 0 offset: X** | `+0x` |
-| **Slot 0 offset: Y** | `+0x` |
-| **Slot 0 offset: Z** | `+0x` |
-| **Slot 0 offset: HP** | `+0x` (`u16`) |
-| **Slot 0 offset: type** | `+0x` (`u8`) |
-| **Slot 0 offset: state/alive** | `+0x` (`u8`) |
-| **Max active slots** | |
-| **Persists across camera cut** | yes / no |
-| **Verified rooms** | |
-| **Evidence** | JSON path, screenshots, notes |
+| **Enemy table base (PS1 bus)** | `0x800C532C` (Gameshark zombie HP / first-zombie infinite) |
+| **Slot stride** | `0x18C` |
+| **Slot 0 offset: HP** | `+0x0` (`u16`) |
+| **Max active slots** | 6 (same as ASL) |
+| **Verified rooms** | 202 (zombies); **108 dog** QuickSave1 2026-07-12 — slot0 HP 19→0 one beretta, +kill reward PASS |
+| **Evidence** | Live beretta: ~12 HP/hit; kill clears slot; `probe_zombie_fire_rewards.py` PASS. Rejected `0x801141FC` (never moved on hits). |
+
+Coords / type / alive bytes still **unmapped** (HP-only decode for combat rewards).
 
 **Interaction prompt byte(s):**
 

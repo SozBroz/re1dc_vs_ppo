@@ -17,7 +17,7 @@ from re1_rl.async_fleet import PPO_HYPERPARAMS, load_async_learner
 from re1_rl.checkpoint_io import resolve_resume_path, write_latest_pointer
 from re1_rl.distributed.spaces import make_re1_policy_spaces, make_re1_spaces
 from re1_rl.distributed.weights import _SpaceHolderEnv
-from re1_rl.env import ACTION_NAMES
+from re1_rl.env import ACTION_NAMES, FRAME_SHAPE_CHW
 from re1_rl.episode_history import ACQUISITION_LOG_DIM, ROOM_HISTORY_DIM
 from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM
 from re1_rl.item_affordances import AFFORDANCES_DIM
@@ -99,20 +99,23 @@ def test_distributed_ppo_hyperparams_match_async_fleet() -> None:
         batch_size=512,
         n_epochs=4,
         learning_rate=3e-4,
-        gamma=0.99,
+        gamma=0.995,
         ent_coef=0.01,
     )
 
 
 def test_make_re1_policy_spaces_frame_is_chw() -> None:
     obs_space, _ = make_re1_policy_spaces()
-    assert obs_space["frame"].shape == (4, 84, 84)
+    assert obs_space["frame"].shape == FRAME_SHAPE_CHW
 
 
 def test_load_async_learner_fresh_uses_policy_chw_spaces() -> None:
+    from sb3_contrib import MaskablePPO
+
     model = load_async_learner(device="cpu", resume=None, tb_log=None)
+    assert isinstance(model, MaskablePPO)
     policy_obs, act_space = make_re1_policy_spaces()
-    assert model.observation_space["frame"].shape == (4, 84, 84)
+    assert model.observation_space["frame"].shape == FRAME_SHAPE_CHW
     assert set(model.observation_space.spaces.keys()) == set(policy_obs.spaces.keys())
     assert int(model.action_space.n) == int(act_space.n)
 
@@ -131,7 +134,7 @@ def test_load_async_learner_transplants_missing_obs_key(tmp_path: Path) -> None:
         batch_size=8,
         n_epochs=1,
         learning_rate=3e-4,
-        gamma=0.99,
+        gamma=0.995,
         ent_coef=0.01,
         device="cpu",
         verbose=0,
@@ -142,7 +145,7 @@ def test_load_async_learner_transplants_missing_obs_key(tmp_path: Path) -> None:
 
     model = load_async_learner(device="cpu", resume=ckpt, tb_log=None)
     assert "keys_held" in model.observation_space.spaces
-    assert model.observation_space["frame"].shape == (4, 84, 84)
+    assert model.observation_space["frame"].shape == FRAME_SHAPE_CHW
     assert set(model.observation_space.spaces.keys()) == set(policy_obs.spaces.keys())
     assert int(model.num_timesteps) == 1234
 

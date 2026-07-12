@@ -91,7 +91,11 @@ class InferencePolicy:
             with torch.no_grad():
                 dist = self._model.policy.get_distribution(obs_tensor)
                 logits = dist.distribution.logits.clone()
-                logits[~mask] = torch.finfo(logits.dtype).min
+                # Match sb3_contrib MaskableCategorical (-1e8), not dtype min,
+                # so collect logprobs align with MaskablePPO.evaluate_actions.
+                logits[~mask] = torch.tensor(
+                    -1e8, dtype=logits.dtype, device=logits.device
+                )
                 cat = torch.distributions.Categorical(logits=logits)
                 actions = cat.sample()
                 log_probs = cat.log_prob(actions)

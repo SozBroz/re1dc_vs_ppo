@@ -22,7 +22,9 @@ import numpy as np
 from re1_rl.async_fleet import (
     DEFAULT_SYNC_INTERVAL_S,
     _actor_process,
+    _drain_actor_messages,
     _obs_batch_for_one,
+    _serve_needs_batch,
     _wait_for_actor_spawn,
 )
 from re1_rl.distributed.inference_policy import InferencePolicy
@@ -43,9 +45,14 @@ def worker_rollout_from_actor_msg(
     rank = int(msg["rank"])
     last_values = policy.predict_values(_obs_batch_for_one(msg["last_obs"]))
     obs = {k: np.expand_dims(v, axis=1) for k, v in msg["obs"].items()}
+    masks = msg.get("action_masks")
+    if masks is None:
+        raise ValueError("actor rollout missing action_masks (fail closed)")
+    # Prefer version stamped at horizon start (first act), not delivery-time policy.
+    policy_version = int(msg.get("policy_version", policy.policy_version))
     return WorkerRollout(
         worker_id=f"{worker_id}:actor_{rank}",
-        policy_version=int(policy.policy_version),
+        policy_version=policy_version,
         n_envs=1,
         n_steps=n_steps,
         obs=obs,
@@ -55,6 +62,7 @@ def worker_rollout_from_actor_msg(
         values=np.expand_dims(msg["values"], 1),
         log_probs=np.expand_dims(msg["log_probs"], 1),
         last_values=last_values,
+        action_masks=np.expand_dims(np.asarray(masks, dtype=np.bool_), 1),
         episode_infos=list(msg.get("episode_infos") or []),
     )
 
@@ -87,6 +95,7 @@ def pack_rollouts(rollouts: list[WorkerRollout], *, worker_id: str) -> WorkerRol
         values=np.concatenate([r.values for r in rollouts], axis=1),
         log_probs=np.concatenate([r.log_probs for r in rollouts], axis=1),
         last_values=np.concatenate([r.last_values for r in rollouts], axis=0),
+        action_masks=np.concatenate([r.action_masks for r in rollouts], axis=1),
         episode_infos=[info for r in rollouts for info in r.episode_infos],
     )
 
@@ -96,16 +105,7 @@ def _serve_need(
     msg: dict[str, Any],
     policy: InferencePolicy,
 ) -> None:
-    obs_batch = _obs_batch_for_one(msg["obs"])
-    masks = msg.get("action_masks")
-    if masks is not None:
-        act, val, lp = policy.predict_masked(
-            obs_batch, np.asarray(masks, dtype=bool)
-        )
-    else:
-        act_a, val_a, lp_a = policy.predict_batch(obs_batch)
-        act, val, lp = int(act_a[0]), float(val_a[0]), float(lp_a[0])
-    conn.send({"t": "act", "action": act, "value": val, "logprob": lp})
+    _serve_needs_batch([(conn, msg)], policy, max_batch=1)
 
 
 def _deliver_local(
@@ -123,28 +123,76 @@ def _deliver_local(
     )
 
 
+_UPLOAD_RETRIES = 3
+_UPLOAD_RETRY_BACKOFF_S = (2.0, 5.0, 10.0)
+
+
+def _safe_upload(
+    client: WorkerClient,
+    machine_name: str,
+    rollout: WorkerRollout,
+    *,
+    retries: int = _UPLOAD_RETRIES,
+) -> bool:
+    """POST one packed rollout; retry transient network failures, then retain."""
+    import urllib.error
+
+    last_exc: BaseException | None = None
+    attempts = max(int(retries), 1)
+    for attempt in range(1, attempts + 1):
+        try:
+            return client.upload_rollout(rollout)
+        except (RuntimeError, TimeoutError, OSError, urllib.error.URLError) as exc:
+            last_exc = exc
+            if attempt >= attempts:
+                break
+            delay = _UPLOAD_RETRY_BACKOFF_S[
+                min(attempt - 1, len(_UPLOAD_RETRY_BACKOFF_S) - 1)
+            ]
+            log(
+                machine_name,
+                f"sync epoch upload error attempt {attempt}/{attempts} "
+                f"(retry in {delay:.0f}s): {exc}",
+            )
+            time.sleep(delay)
+    log(
+        machine_name,
+        f"sync epoch upload failed after {attempts} attempt(s) (will retain): {last_exc}",
+    )
+    return False
+
+
 def _pack_and_deliver_rollouts(
     group: list[WorkerRollout],
     *,
     worker_id: str,
     pack_max_envs: int,
     deliver,
-) -> int:
-    """Pack same-version rollouts into <=pack_max_envs chunks; return put count."""
+) -> tuple[int, list[WorkerRollout]]:
+    """Pack rollouts into POST chunks; return (delivered_count, retained actor-rollouts)."""
     chunk: list[WorkerRollout] = []
     chunk_envs = 0
     n_posts = 0
+    retained: list[WorkerRollout] = []
+
+    def _flush_chunk() -> None:
+        nonlocal chunk, chunk_envs, n_posts
+        if not chunk:
+            return
+        packed = pack_rollouts(chunk, worker_id=worker_id)
+        if deliver(packed):
+            n_posts += 1
+        else:
+            retained.extend(chunk)
+        chunk, chunk_envs = [], 0
+
     for r in group:
         if chunk and chunk_envs + r.n_envs > pack_max_envs:
-            deliver(pack_rollouts(chunk, worker_id=worker_id))
-            n_posts += 1
-            chunk, chunk_envs = [], 0
+            _flush_chunk()
         chunk.append(r)
         chunk_envs += r.n_envs
-    if chunk:
-        deliver(pack_rollouts(chunk, worker_id=worker_id))
-        n_posts += 1
-    return n_posts
+    _flush_chunk()
+    return n_posts, retained
 
 
 def _flush_remote_epoch(
@@ -156,33 +204,40 @@ def _flush_remote_epoch(
     worker_id: str,
     pack_max_envs: int = 16,
 ) -> list[WorkerRollout]:
-    """Upload buffered experience (burst), then pull weights once. Returns []."""
+    """Upload buffered experience (burst), then pull weights once.
+
+    Returns actor-rollouts that could not be delivered (learner reject / HTTP failure).
+    """
+    retained: list[WorkerRollout] = []
     if not buffered:
         log(machine_name, "sync epoch: no rollouts buffered; weight pull only")
     else:
         total_steps = sum(r.num_timesteps() for r in buffered)
-        # Pack into modest multi-env POSTs to avoid one giant HTTP body.
         by_ver: dict[int, list[WorkerRollout]] = {}
         for r in buffered:
             by_ver.setdefault(r.policy_version, []).append(r)
         n_posts = 0
         for ver, group in by_ver.items():
-            ver_posts = _pack_and_deliver_rollouts(
+            ver_posts, ver_retained = _pack_and_deliver_rollouts(
                 group,
                 worker_id=worker_id,
                 pack_max_envs=pack_max_envs,
-                deliver=client.upload_rollout,
+                deliver=lambda packed: _safe_upload(client, machine_name, packed),
             )
             n_posts += ver_posts
+            retained.extend(ver_retained)
             log(
                 machine_name,
                 f"sync epoch upload v{ver}: {len(group)} actor-rollouts "
-                f"in {ver_posts} POST(s)",
+                f"in {ver_posts} POST(s)"
+                + (f", retained {len(ver_retained)}" if ver_retained else ""),
             )
+        delivered = len(buffered) - len(retained)
         log(
             machine_name,
-            f"sync epoch flushed {len(buffered)} actor-rollouts "
-            f"({total_steps} steps, {n_posts} POSTs)",
+            f"sync epoch flushed {delivered}/{len(buffered)} actor-rollouts "
+            f"({total_steps} steps buffered, {n_posts} POSTs accepted)"
+            + (f"; retained {len(retained)} for retry" if retained else ""),
         )
 
     try:
@@ -206,43 +261,73 @@ def _flush_remote_epoch(
                 )
     except Exception as exc:
         log(machine_name, f"sync epoch weight pull error: {exc}")
-    return []
+    return retained
+
+
+def _local_deliver(rollout_sink: Any, rollout: WorkerRollout) -> bool:
+    put = rollout_sink.put
+    result = put(rollout)
+    return True if result is None else bool(result)
 
 
 def _flush_local_epoch(
     buffered: list[WorkerRollout],
     *,
-    rollout_sink: queue.Queue,
+    rollout_sink: Any,
     machine_name: str,
     worker_id: str,
+    policy: InferencePolicy | None = None,
+    weight_store: Any | None = None,
 ) -> list[WorkerRollout]:
+    retained: list[WorkerRollout] = []
     if not buffered:
         log(machine_name, "sync epoch (local): no rollouts buffered")
-        return []
-    total_steps = sum(r.num_timesteps() for r in buffered)
-    by_ver: dict[int, list[WorkerRollout]] = {}
-    for r in buffered:
-        by_ver.setdefault(r.policy_version, []).append(r)
-    n_posts = 0
-    for ver, group in by_ver.items():
-        ver_posts = _pack_and_deliver_rollouts(
-            group,
-            worker_id=worker_id,
-            pack_max_envs=16,
-            deliver=rollout_sink.put,
-        )
-        n_posts += ver_posts
+    else:
+        total_steps = sum(r.num_timesteps() for r in buffered)
+        by_ver: dict[int, list[WorkerRollout]] = {}
+        for r in buffered:
+            by_ver.setdefault(r.policy_version, []).append(r)
+        n_posts = 0
+        deliver = lambda packed: _local_deliver(rollout_sink, packed)
+        for ver, group in by_ver.items():
+            ver_posts, ver_retained = _pack_and_deliver_rollouts(
+                group,
+                worker_id=worker_id,
+                pack_max_envs=16,
+                deliver=deliver,
+            )
+            n_posts += ver_posts
+            retained.extend(ver_retained)
+            log(
+                machine_name,
+                f"sync epoch (local) v{ver}: {len(group)} actor-rollouts "
+                f"in {ver_posts} queue put(s)"
+                + (f", retained {len(ver_retained)}" if ver_retained else ""),
+            )
+        delivered = len(buffered) - len(retained)
         log(
             machine_name,
-            f"sync epoch (local) v{ver}: {len(group)} actor-rollouts "
-            f"in {ver_posts} queue put(s)",
+            f"sync epoch (local) flushed {delivered}/{len(buffered)} actor-rollouts "
+            f"({total_steps} steps buffered, {n_posts} puts accepted)"
+            + (f"; retained {len(retained)} for retry" if retained else ""),
         )
-    log(
-        machine_name,
-        f"sync epoch (local) flushed {len(buffered)} actor-rollouts "
-        f"({total_steps} steps, {n_posts} queue puts)",
-    )
-    return []
+
+    # Epoch-barrier weight sync only (no mid-horizon hot-swap).
+    if policy is not None and weight_store is not None:
+        try:
+            version = int(weight_store.policy_version)
+            if version > int(policy.policy_version):
+                state_dict = weight_store.get_state_dict()
+                if state_dict is not None:
+                    policy.load_from_state_dict(state_dict, version)
+                    log(
+                        machine_name,
+                        f"sync epoch (local) weight pull -> policy_version={version}",
+                    )
+        except Exception as exc:
+            log(machine_name, f"sync epoch (local) weight pull error: {exc}")
+
+    return retained
 
 
 def _shutdown_actors(
@@ -285,18 +370,23 @@ def run_async_worker_loop(
     heartbeat_s: float = 30.0,
     project_root: Path | None = None,
     headless: bool = True,
+    screenshot_mmf: bool | None = None,
+    inference_batch_max: int = 32,
+    weight_store: Any | None = None,
 ) -> None:
     """Spawn desync actors and serve local inference until ``stop_event``.
 
     Both local and remote workers buffer rollouts and flush every
-    ``sync_interval_s``. Remotes then pull weights; locals only enqueue.
+    ``sync_interval_s``. Remotes then pull weights; locals pull from
+    ``weight_store`` only at epoch flush (no mid-horizon hot-swap).
     Remotes also heartbeat so the learner can drop dead machines.
     """
     log(
         machine_name,
         f"async worker starting ({worker_id}, {n_envs} desync actors, "
         f"n_steps={n_steps}, sync_interval_s={sync_interval_s:.0f}, "
-        f"headless={headless})",
+        f"headless={headless}, screenshot_mmf={screenshot_mmf}, "
+        f"inference_batch_max={inference_batch_max})",
     )
     root = Path(project_root) if project_root else Path.cwd()
     best_log = root / "data" / "logs" / f"best_rooms_{machine_name}.jsonl"
@@ -330,6 +420,12 @@ def run_async_worker_loop(
     )
 
     try:
+        if not is_local and isinstance(rollout_sink, WorkerClient):
+            rollout_sink.register(worker_id, n_envs, is_local=False)
+            rollout_sink.heartbeat(worker_id, n_envs)
+            last_heartbeat = time.monotonic()
+            hb_thread.start()
+
         for rank in range(n_envs):
             parent_conn, child_conn = ctx.Pipe(duplex=True)
             proc = ctx.Process(
@@ -344,6 +440,7 @@ def run_async_worker_loop(
                     "stop_flag": stop_flag,
                     "capture_checkpoints": capture_checkpoints,
                     "headless": headless,
+                    "screenshot_mmf": screenshot_mmf,
                 },
                 name=f"dist-async-actor-{rank}",
             )
@@ -357,14 +454,6 @@ def run_async_worker_loop(
         for conn in parent_conns:
             conn.send({"t": "start"})
 
-        if not is_local and isinstance(rollout_sink, WorkerClient):
-            try:
-                rollout_sink.heartbeat(worker_id, n_envs)
-                last_heartbeat = time.monotonic()
-            except Exception as exc:
-                log(machine_name, f"initial heartbeat error: {exc}")
-            hb_thread.start()
-
         while not stop_event.is_set() and not stop_flag.value:
             if policy.policy_version <= 0:
                 time.sleep(0.1)
@@ -374,12 +463,14 @@ def run_async_worker_loop(
                 epoch_infos = [
                     info for r in buffered for info in (r.episode_infos or [])
                 ]
-                if is_local and isinstance(rollout_sink, queue.Queue):
+                if is_local:
                     buffered = _flush_local_epoch(
                         buffered,
                         rollout_sink=rollout_sink,
                         machine_name=machine_name,
                         worker_id=worker_id,
+                        policy=policy,
+                        weight_store=weight_store,
                     )
                 elif isinstance(rollout_sink, WorkerClient):
                     buffered = _flush_remote_epoch(
@@ -404,44 +495,49 @@ def run_async_worker_loop(
                     break
                 continue
 
-            for conn in ready:
-                if not conn.poll():
-                    continue
-                msg = conn.recv()
-                kind = msg.get("t")
-                if kind == "need":
-                    _serve_need(conn, msg, policy)
-                elif kind == "rollout":
-                    rollout = worker_rollout_from_actor_msg(
-                        msg,
-                        policy=policy,
-                        worker_id=worker_id,
-                        n_steps=n_steps,
-                    )
-                    local_steps += int(rollout.num_timesteps())
-                    progress.consume_infos(
-                        rollout.episode_infos,
-                        num_timesteps=local_steps,
-                    )
-                    buffered.append(rollout)
-                elif kind in ("spawn_progress", "spawned", "spawn_error"):
-                    continue
+            needs, rollouts = _drain_actor_messages(
+                ready,
+                parent_conns,
+                max_need_batch=inference_batch_max,
+            )
+            if needs:
+                _serve_needs_batch(needs, policy, max_batch=inference_batch_max)
+            for conn, msg in rollouts:
+                rollout = worker_rollout_from_actor_msg(
+                    msg,
+                    policy=policy,
+                    worker_id=worker_id,
+                    n_steps=n_steps,
+                )
+                local_steps += int(rollout.num_timesteps())
+                progress.consume_infos(
+                    rollout.episode_infos,
+                    num_timesteps=local_steps,
+                )
+                buffered.append(rollout)
 
         if buffered:
-            if is_local and isinstance(rollout_sink, queue.Queue):
-                _flush_local_epoch(
+            if is_local:
+                buffered = _flush_local_epoch(
                     buffered,
                     rollout_sink=rollout_sink,
                     machine_name=machine_name,
                     worker_id=worker_id,
+                    policy=policy,
+                    weight_store=weight_store,
                 )
             elif isinstance(rollout_sink, WorkerClient):
-                _flush_remote_epoch(
+                buffered = _flush_remote_epoch(
                     buffered,
                     client=rollout_sink,
                     policy=policy,
                     machine_name=machine_name,
                     worker_id=worker_id,
+                )
+            if buffered:
+                log(
+                    machine_name,
+                    f"shutdown flush retained {len(buffered)} actor-rollouts undelivered",
                 )
     finally:
         hb_stop.set()

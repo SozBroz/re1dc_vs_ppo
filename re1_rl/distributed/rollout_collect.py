@@ -37,21 +37,25 @@ def collect_rollout(
     dones = np.zeros((n_steps, n_envs), dtype=np.bool_)
     values = np.zeros((n_steps, n_envs), dtype=np.float32)
     log_probs = np.zeros((n_steps, n_envs), dtype=np.float32)
+    n_actions = int(vec_env.action_space.n)
+    action_masks = np.zeros((n_steps, n_envs, n_actions), dtype=np.bool_)
 
     episode_infos: list[dict[str, Any]] = []
 
     for step in range(n_steps):
         masks = _stack_action_masks(vec_env)
+        action_masks[step] = masks
         act, val, lp = policy.predict_masked_batch(obs, masks)
         actions[step] = act
         values[step] = val
         log_probs[step] = lp
 
+        for key in obs_bufs:
+            obs_bufs[key][step] = obs[key]
+
         obs, rew, done, infos = vec_env.step(act)
         rewards[step] = rew
         dones[step] = done
-        for key in obs_bufs:
-            obs_bufs[key][step] = obs[key]
         for info in infos:
             if info:
                 episode_infos.append(dict(info))
@@ -70,5 +74,6 @@ def collect_rollout(
         values=values,
         log_probs=log_probs,
         last_values=last_values,
+        action_masks=action_masks,
         episode_infos=episode_infos,
     )

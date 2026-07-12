@@ -30,6 +30,8 @@ from re1_rl.memory_map import (
     INTERACTION_PROMPT,
     INTERACTION_PROMPT_MASK,
     MESSAGE_FLAG,
+    PLAYER_ACTION_AUX,
+    PLAYER_ANIM_STATE,
     PLAYER_HP,
     PLAYER_POISON,
     ROOM_ID,
@@ -41,6 +43,10 @@ from re1_rl.memory_map import (
     decode_enemy_table,
     decode_inventory,
     enemy_table_fields,
+)
+from re1_rl.pushable import (
+    forward_hold_frames,
+    update_forward_collision_stall,
 )
 from re1_rl.ram_skip import RamSkipper, SKIP_POLL_RAM_FIELDS, needs_skip_from_ram
 from re1_rl.obs_encoder import (
@@ -96,6 +102,7 @@ from re1_rl.action_mask import (
     action_mask as build_action_mask,
 )
 from re1_rl.attack_macro import execute_attack_macro
+from re1_rl.options_menu_macro import dismiss_options_menu
 
 ACTION_NAMES = [
     "noop",
@@ -133,22 +140,54 @@ ACTION_BUTTON_MAP: dict[int, dict[str, bool]] = {
 for _idx in range(9, len(ACTION_NAMES)):
     ACTION_BUTTON_MAP[_idx] = {}
 
+# BizHawk RE1 screenshot is 240x350 RGB; left 18 + right 12 px are near-black
+# pillarbox. Pipeline: grayscale + resize FULL frame to 84x84 (bars included,
+# same as the original Atari-style square), THEN prune the bar columns so the
+# policy sees content only at 84x77. NatureCNN flatten drops 3136 -> 2688;
+# resume uses async_fleet compatible-weight transplant (conv reuse, linear reinit).
+PILLARBOX_LEFT = 18
+PILLARBOX_RIGHT = 12
+FRAME_SQUARE = 84
+# Bars on the 84-wide square (round of 18/350 and 12/350 of 84).
+PILLARBOX_LEFT_SQ = round(PILLARBOX_LEFT * FRAME_SQUARE / 350)  # 4
+PILLARBOX_RIGHT_SQ = round(PILLARBOX_RIGHT * FRAME_SQUARE / 350)  # 3
+FRAME_H = FRAME_SQUARE
+FRAME_W = FRAME_SQUARE - PILLARBOX_LEFT_SQ - PILLARBOX_RIGHT_SQ  # 77
+FRAME_STACK = 4
+FRAME_SHAPE = (FRAME_H, FRAME_W, FRAME_STACK)  # HWC channels-last (RE1Env)
+FRAME_SHAPE_CHW = (FRAME_STACK, FRAME_H, FRAME_W)  # SB3 / VecTransposeImage
 
-def _resize_frame(frame: np.ndarray, size: tuple[int, int] = (84, 84)) -> np.ndarray:
-    """RGB -> grayscale 84x84 (single channel). Pre-rendered RE1 backgrounds
-    carry almost no color signal; gray x4 stack matches the Atari recipe and
-    cuts conv input 3x."""
+
+def _prune_square_pillarbox(square: np.ndarray) -> np.ndarray:
+    """Drop fixed pillarbox columns from an 84-wide (HxW) gray/RGB frame."""
+    w = int(square.shape[1])
+    if w != FRAME_SQUARE:
+        return square
+    return square[:, PILLARBOX_LEFT_SQ : FRAME_SQUARE - PILLARBOX_RIGHT_SQ]
+
+
+def _resize_frame(
+    frame: np.ndarray, size: tuple[int, int] = (FRAME_SQUARE, FRAME_SQUARE)
+) -> np.ndarray:
+    """RGB -> grayscale -> 84x84 (bars in) -> prune bars -> HxW single channel.
+
+    ``size`` is OpenCV (width, height) for the intermediate square (default 84x84).
+    Output width is FRAME_W after prune. Pre-rendered RE1 backgrounds carry
+    almost no color signal; gray x4 stack matches the Atari recipe.
+    """
     import cv2
 
     gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-    return cv2.resize(gray, size, interpolation=cv2.INTER_AREA)[..., None]
+    square = cv2.resize(gray, size, interpolation=cv2.INTER_AREA)
+    pruned = _prune_square_pillarbox(square)
+    return pruned[..., None]
 
 
 class RE1Env(gym.Env):
     """Resident Evil 1 env wired to BizHawk (primary track).
 
     Observation dict:
-      frame   -- 84x84x4 grayscale stack (what the agent SEES)
+      frame   -- 84x77x4 grayscale stack (84x84 with bars, then prune columns)
       proprio -- 28 named floats: body state + anim history + poison
       goal    -- 24 named floats: planner compass/TODO (obs_encoder.GOAL_FIELDS)
     Use re1_rl.obs_encoder.format_obs_table(obs) to pretty-print any obs.
@@ -175,8 +214,8 @@ class RE1Env(gym.Env):
 
         self.observation_space = spaces.Dict(
             {
-                # 4 stacked grayscale frames, channels-last
-                "frame": spaces.Box(0, 255, shape=(84, 84, 4), dtype=np.uint8),
+                # 4 stacked grayscale frames, channels-last (84 high x 112 wide)
+                "frame": spaces.Box(0, 255, shape=FRAME_SHAPE, dtype=np.uint8),
                 "proprio": spaces.Box(-1.0, 1.0, shape=(PROPRIO_DIM,), dtype=np.float32),
                 "goal": spaces.Box(-2.0, 2.0, shape=(GOAL_DIM,), dtype=np.float32),
                 # egocentric items/enemies/exits (spatial_encoder.SPATIAL_FIELDS)
@@ -245,6 +284,7 @@ class RE1Env(gym.Env):
         self._step_count = 0
         self._prev_state: dict[str, Any] = {}
         self._prev_hp = 0
+        self._forward_collision_stall = False
         self._async_cutscene_skip = bool(async_cutscene_skip)
         self._bg_skip_stop = threading.Event()
         self._bg_skip_thread: threading.Thread | None = None
@@ -295,6 +335,8 @@ class RE1Env(gym.Env):
                 ("player_poison", PLAYER_POISON, "u8"),
                 ("scene_flag", SCENE_FLAG, "u8"),
                 ("msg_flag", MESSAGE_FLAG, "u8"),
+                ("player_anim", PLAYER_ANIM_STATE, "u8"),
+                ("player_aux", PLAYER_ACTION_AUX, "u8"),
             ]
         )
         ram = self.bridge.read_ram(fields)
@@ -342,6 +384,8 @@ class RE1Env(gym.Env):
             ),
             "poisoned": bool(int(ram.get("player_poison", 0))),
             "maps_files_flags": int(ram.get("maps_files_flags", 0)),
+            "player_anim": int(ram.get("player_anim", 0)),
+            "player_aux": int(ram.get("player_aux", 0)),
             "anim_history": list(getattr(self, "_anim_history", [])),
         }
 
@@ -468,6 +512,7 @@ class RE1Env(gym.Env):
                 pass
         self._sticky_input.reset()
         self._prev_action = None
+        self._forward_collision_stall = False
         self._use_phase = 0
         self._equip_phase = 0
         self._combine_phase = 0
@@ -652,7 +697,7 @@ class RE1Env(gym.Env):
         obs = self._skip_cache_obs
         if obs is None:
             obs = self._build_obs(
-                np.zeros((84, 84, 4), dtype=np.uint8),
+                np.zeros(FRAME_SHAPE, dtype=np.uint8),
                 self._prev_state or {"hp": 0, "room_id": "", "x": 0, "z": 0, "facing": 0},
             )
         truncated = self._skip_cache_truncated or (
@@ -714,7 +759,7 @@ class RE1Env(gym.Env):
         except (OSError, RuntimeError, ValueError):
             state = dict(self._prev_state)
             state["dead"] = True
-            frame_obs = self._frame_stack[-1] if self._frame_stack else np.zeros((84, 84, 4))
+            frame_obs = self._frame_stack[-1] if self._frame_stack else np.zeros(FRAME_SHAPE)
             if frame_obs.ndim == 2:
                 frame_obs = frame_obs[..., None]
             while len(self._frame_stack) < 4:
@@ -780,6 +825,21 @@ class RE1Env(gym.Env):
         self, action: int, *, reason: str
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         return self._episode_failure_step(action, reason=reason)
+
+    def _try_dismiss_options_menu(self) -> tuple[bool, dict[str, Any]]:
+        """Dismiss OPTIONS bug screen. Returns (recovered, report)."""
+        self._sticky_input.reset()
+        self._macro_active = True
+        try:
+            still, _frames, report = dismiss_options_menu(
+                self.bridge,
+                prev_hp=self._prev_hp,
+                episode_start_hp=getattr(self, "_episode_start_hp", 0),
+            )
+        finally:
+            self._macro_active = False
+            self._sticky_input.reset()
+        return (not still), report
 
     def _skip_uncontrolled(self, max_frames: int | None = None) -> tuple[int, bool]:
         """Wait at turbo speed until player control returns (doors, cutscenes)."""
@@ -1201,6 +1261,13 @@ class RE1Env(gym.Env):
         )
 
     def action_masks(self) -> np.ndarray:
+        # During async cutscene skip, only noop is legal — ignore stale
+        # _prev_state.in_control which can still look like combat control.
+        if self._async_cutscene_skip and self._skipping_flag:
+            mask = np.zeros(int(self.action_space.n), dtype=bool)
+            if mask.size > 0:
+                mask[0] = True
+            return mask
         anim = aux = recovery = None
         equipped = None
         inventory = None
@@ -1274,6 +1341,11 @@ class RE1Env(gym.Env):
             self._skipping_flag = False
             return self._death_step(action, died_during_skip=True, died_during_step=False)
         menu_reason = self._probe_outside_gameplay()
+        if menu_reason == "options_menu":
+            recovered, _options_report = self._try_dismiss_options_menu()
+            if recovered:
+                menu_reason = self._probe_outside_gameplay()
+            # If still options (or another failure), fall through to terminate.
         if menu_reason:
             return self._outside_gameplay_step(action, reason=menu_reason)
         if self._async_cutscene_skip and self._skipping_flag:
@@ -1353,8 +1425,17 @@ class RE1Env(gym.Env):
             sticky, pulse, pulse_hold = self._sticky_input.apply(
                 int(action), ACTION_BUTTON_MAP
             )
+            hold_n = forward_hold_frames(
+                self._prev_state,
+                action=int(action),
+                frame_skip=self.frame_skip,
+                forward_collision_stall=bool(
+                    getattr(self, "_forward_collision_stall", False)
+                ),
+            )
+            step_emulated_frames = hold_n
             _, died_during_step = self.bridge.step(
-                n=self.frame_skip,
+                n=hold_n,
                 sticky=sticky,
                 pulse=pulse,
                 pulse_hold=pulse_hold,
@@ -1410,6 +1491,10 @@ class RE1Env(gym.Env):
                 enemy_kills=enemy_kills,
             )
         menu_reason = self._probe_outside_gameplay()
+        if menu_reason == "options_menu":
+            recovered, options_dismiss_report = self._try_dismiss_options_menu()
+            if recovered:
+                menu_reason = self._probe_outside_gameplay()
         if menu_reason:
             return self._outside_gameplay_step(action, reason=menu_reason)
         self._visited.update(state["room_id"], state["x"], state["z"])
@@ -1473,6 +1558,7 @@ class RE1Env(gym.Env):
             "died_during_step": died_during_step,
             "inventory": state["inventory_slots"],
             "new_items": state["new_items"],
+            "ever_held": sorted(self._items.ever_held),
             "item_todo": self._items.progress(),  # (acquired, total)
             "next_item": (self._items.next_needed().item
                           if self._items.next_needed() else None),
@@ -1488,6 +1574,11 @@ class RE1Env(gym.Env):
         }
         if breakdown.get("success_room", 0) > 0:
             info["gallery_flawless"] = not damage_taken
+        self._forward_collision_stall = update_forward_collision_stall(
+            self._prev_state,
+            state,
+            action=int(action),
+        )
         self._prev_state = state
         if state["hp"] > 0:
             self._prev_hp = state["hp"]
@@ -1496,7 +1587,7 @@ class RE1Env(gym.Env):
     def render(self):
         if self._frame_stack:
             return self._frame_stack[-1]
-        return np.zeros((84, 84, 3), dtype=np.uint8)
+        return np.zeros((FRAME_H, FRAME_W, 3), dtype=np.uint8)
 
     def close(self):
         self._stop_bg_skip()

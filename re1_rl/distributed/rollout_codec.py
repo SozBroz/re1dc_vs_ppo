@@ -48,6 +48,7 @@ def encode_rollout(rollout: WorkerRollout) -> bytes:
         "obs_keys": list(obs_rest.keys()),
         "frame_compressed": frame_blob is not None,
         "frame_shape": frame_shape,
+        "has_action_masks": True,
     }
     npz = BytesIO()
     save_kwargs: dict[str, np.ndarray] = {
@@ -57,6 +58,7 @@ def encode_rollout(rollout: WorkerRollout) -> bytes:
         "values": rollout.values,
         "log_probs": rollout.log_probs,
         "last_values": rollout.last_values,
+        "action_masks": np.asarray(rollout.action_masks, dtype=np.bool_),
     }
     for key, arr in obs_rest.items():
         save_kwargs[f"obs__{key}"] = arr
@@ -103,6 +105,10 @@ def decode_rollout(data: bytes) -> WorkerRollout:
         raise ValueError("truncated rollout payload")
 
     with np.load(BytesIO(npz_bytes), allow_pickle=False) as loaded:
+        if "action_masks" not in loaded.files:
+            raise ValueError(
+                "rollout missing action_masks (fail closed — upgrade workers)"
+            )
         obs: dict[str, np.ndarray] = {}
         for key in meta["obs_keys"]:
             obs[key] = loaded[f"obs__{key}"]
@@ -125,5 +131,6 @@ def decode_rollout(data: bytes) -> WorkerRollout:
             values=loaded["values"],
             log_probs=loaded["log_probs"],
             last_values=loaded["last_values"],
+            action_masks=np.asarray(loaded["action_masks"], dtype=np.bool_),
             episode_infos=list(meta.get("episode_infos") or []),
         )

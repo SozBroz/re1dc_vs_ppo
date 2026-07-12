@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.checkpoint_io import (
+    checkpoint_due,
     checkpoint_save_freq_vec_env,
     checkpoint_timestep_interval,
     find_latest_checkpoint,
@@ -115,8 +116,36 @@ def test_resolve_resume_auto_like_none(tmp_path: Path) -> None:
     assert resolved == good.resolve()
 
 
+def test_resolve_resume_prefers_freshest_mtime_over_higher_steps(
+    tmp_path: Path,
+) -> None:
+    import os
+    import time
+
+    ckpt_dir = tmp_path / "data" / "checkpoints" / "reward_tune_1040k"
+    high_old = ckpt_dir / "ppo_re1_11160000_steps.zip"
+    _make_fake_ckpt(high_old)
+    alias = tmp_path / "data" / "ppo_re1_final_reward_tune_1040k.zip"
+    _make_fake_ckpt(alias)
+    time.sleep(0.02)
+    os.utime(alias, None)
+    write_latest_pointer(ckpt_dir, alias)
+
+    resolved = resolve_resume_path(None, project_root=tmp_path, ckpt_dir=ckpt_dir)
+    assert resolved == alias.resolve()
+
+
 def test_checkpoint_interval_scales_with_n_envs() -> None:
     assert checkpoint_timestep_interval(20) == 40_000
     assert checkpoint_timestep_interval(12) == 24_000
     assert checkpoint_save_freq_vec_env(20) == 2_000
     assert checkpoint_save_freq_vec_env(12) == 2_000
+
+
+def test_checkpoint_due_uses_num_timesteps_not_n_calls() -> None:
+    interval = checkpoint_timestep_interval(20)
+    assert not checkpoint_due(0, 0, interval)
+    assert not checkpoint_due(interval - 1, 0, interval)
+    assert checkpoint_due(interval, 0, interval)
+    assert not checkpoint_due(interval + 10, interval, interval)
+    assert checkpoint_due(2 * interval, interval, interval)

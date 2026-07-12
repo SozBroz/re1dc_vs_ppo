@@ -1,7 +1,7 @@
 """Validate grayscale obs + cutscene auto-skip through a real door.
 
 Drives the env with the known door script (turn ~170deg, walk, interact) and
-asserts: obs is 84x84x4, the door transition is fast-forwarded by
+asserts: obs is 84x77x4, the door transition is fast-forwarded by
 _skip_uncontrolled, room flips 105 -> 106, and the waypoint bonus fires.
 """
 
@@ -38,7 +38,7 @@ def main() -> int:
         project_root="D:/re1_rl",
     )
     obs, _ = env.reset()
-    assert obs["frame"].shape == (84, 84, 4), obs["frame"].shape
+    assert obs["frame"].shape == (84, 77, 4), obs["frame"].shape
     print(f"obs frame shape ok: {obs['frame'].shape}", flush=True)
 
     # ~170 deg left at 6.4 units/frame, frame_skip=8 -> 38 turn actions

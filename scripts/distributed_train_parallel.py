@@ -34,8 +34,12 @@ from re1_rl.async_fleet import (  # noqa: E402
     PPO_HYPERPARAMS,
     load_async_learner,
 )
-from re1_rl.distributed.learner_server import LearnerState, start_learner_server  # noqa: E402
-from re1_rl.distributed.learner_train import train_on_rollouts  # noqa: E402
+from re1_rl.distributed.learner_server import (  # noqa: E402
+    LearnerRolloutSink,
+    LearnerState,
+    start_learner_server,
+)
+from re1_rl.distributed.learner_train import pull_rollout_queue, train_on_rollouts  # noqa: E402
 from re1_rl.distributed.log_util import log  # noqa: E402
 from re1_rl.distributed.spaces import make_re1_policy_spaces  # noqa: E402
 from re1_rl.distributed.weight_store import WeightStore  # noqa: E402
@@ -43,7 +47,6 @@ from re1_rl.distributed.weights import export_policy_state_dict  # noqa: E402
 from re1_rl.distributed.worker_client import WorkerClient  # noqa: E402
 from re1_rl.distributed.async_worker_runtime import run_async_worker_loop  # noqa: E402
 from re1_rl.distributed.worker_runtime import (  # noqa: E402
-    _local_weight_sync_loop,
     warmup_local_policy,
     warmup_remote_policy,
 )
@@ -83,10 +86,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--max-staleness",
         type=int,
-        default=2,
+        default=1,
         help=(
             "reject rollouts older than current_version - K "
-            "(default 2: allow one missed epoch under clock skew)"
+            "(default 1: current or previous epoch only)"
         ),
     )
     ap.add_argument("--warmup-timeout", type=float, default=600.0,
@@ -141,6 +144,18 @@ def build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="EmuHawk --gdi/--chromeless + invisible cutscene skip (default on)",
+    )
+    ap.add_argument(
+        "--screenshot-mmf",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="BizHawk MMF screenshot transport (default: on for Windows)",
+    )
+    ap.add_argument(
+        "--inference-batch-max",
+        type=int,
+        default=32,
+        help="max actor obs per GPU inference batch (default 32)",
     )
     ap.add_argument(
         "--tile-windows",
@@ -230,7 +245,7 @@ def _run_local_worker(
     args: argparse.Namespace,
     *,
     weight_store: WeightStore,
-    rollout_queue: queue.Queue,
+    rollout_sink: LearnerRolloutSink,
     stop_event: threading.Event,
     device: str,
     learner_state: LearnerState | None = None,
@@ -243,8 +258,6 @@ def _run_local_worker(
     sync_interval = float(args.sync_interval_s)
     if args.weight_sync_poll_s is not None:
         sync_interval = float(args.weight_sync_poll_s)
-
-    sync_stop = threading.Event()
 
     def _warmup_then_run() -> None:
         try:
@@ -267,15 +280,8 @@ def _run_local_worker(
                 is_local=True,
             )
 
-        sync_thread = threading.Thread(
-            target=_local_weight_sync_loop,
-            args=(weight_store, policy),
-            kwargs={"machine_name": args.machine_name, "stop_event": sync_stop},
-            name="local-weight-sync",
-            daemon=True,
-        )
-        sync_thread.start()
-
+        # Local weights sync only at epoch flush inside run_async_worker_loop
+        # (no mid-horizon _local_weight_sync_loop hot-swap).
         try:
             run_async_worker_loop(
                 policy,
@@ -289,14 +295,16 @@ def _run_local_worker(
                 skip_chunk=int(args.skip_chunk),
                 capture_checkpoints=bool(args.capture_checkpoints),
                 stop_event=stop_event,
-                rollout_sink=rollout_queue,
+                rollout_sink=rollout_sink,
                 is_local=True,
+                weight_store=weight_store,
                 sync_interval_s=sync_interval,
                 project_root=PROJECT_ROOT,
                 headless=bool(args.headless),
+                screenshot_mmf=args.screenshot_mmf,
+                inference_batch_max=int(args.inference_batch_max),
             )
         finally:
-            sync_stop.set()
             if learner_state is not None:
                 learner_state.unregister_worker(worker_id)
 
@@ -352,6 +360,8 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
             sync_interval_s=sync_interval,
             project_root=PROJECT_ROOT,
             headless=bool(args.headless),
+            screenshot_mmf=args.screenshot_mmf,
+            inference_batch_max=int(args.inference_batch_max),
         )
     except KeyboardInterrupt:
         log(args.machine_name, "remote worker interrupted")
@@ -364,11 +374,11 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
 
 def _run_learner(args: argparse.Namespace) -> int:
     import torch
-    from stable_baselines3.common.callbacks import CheckpointCallback
+    from stable_baselines3.common.callbacks import BaseCallback
 
     from re1_rl.checkpoint_io import (
         atomic_model_save,
-        checkpoint_save_freq_vec_env,
+        checkpoint_timestep_interval,
         write_latest_pointer,
     )
 
@@ -413,6 +423,7 @@ def _run_learner(args: argparse.Namespace) -> int:
         max_staleness=args.max_staleness,
         worker_liveness_s=float(args.worker_liveness_s),
     )
+    local_rollout_sink = LearnerRolloutSink(learner_state)
 
     http_server, _http_thread = start_learner_server(
         learner_state,
@@ -432,7 +443,7 @@ def _run_learner(args: argparse.Namespace) -> int:
         _run_local_worker(
             args,
             weight_store=weight_store,
-            rollout_queue=rollout_queue,
+            rollout_sink=local_rollout_sink,
             stop_event=stop_event,
             device=device,
             learner_state=learner_state,
@@ -440,24 +451,49 @@ def _run_learner(args: argparse.Namespace) -> int:
     else:
         log(args.machine_name, "local worker disabled (--no-local-worker)")
 
-    class AtomicCheckpointCallback(CheckpointCallback):
-        def _on_step(self) -> bool:
-            if self.n_calls % self.save_freq != 0:
-                return True
-            from re1_rl.checkpoint_io import atomic_model_save, write_latest_pointer
+    class TimestepAtomicCheckpointCallback(BaseCallback):
+        """Save numbered zips from ``model.num_timesteps``, not once-per-epoch n_calls."""
 
-            model_path = self._checkpoint_path(extension="zip")
+        def __init__(
+            self,
+            *,
+            save_timestep_interval: int,
+            save_path: str,
+            name_prefix: str = "ppo_re1",
+            verbose: int = 0,
+        ) -> None:
+            super().__init__(verbose)
+            self.save_timestep_interval = max(int(save_timestep_interval), 1)
+            self.save_path = save_path
+            self.name_prefix = name_prefix
+            self._last_save_timesteps = 0
+
+        def _on_step(self) -> bool:
+            assert self.model is not None
+            from re1_rl.checkpoint_io import (
+                atomic_model_save,
+                checkpoint_due,
+                write_latest_pointer,
+            )
+
+            steps = int(self.model.num_timesteps)
+            if not checkpoint_due(steps, self._last_save_timesteps, self.save_timestep_interval):
+                return True
+            model_path = f"{self.save_path}/{self.name_prefix}_{steps}_steps"
             saved = atomic_model_save(self.model, model_path)
-            write_latest_pointer(self.save_path, saved)
+            write_latest_pointer(self.save_path, saved, steps=steps)
+            self._last_save_timesteps = steps
             if self.verbose >= 2:
                 log(args.machine_name, f"checkpoint saved {saved}")
             return True
 
+    fleet_n_envs = int(args.n_envs)  # local envs; remotes increase throughput but interval scales local
     callbacks = [
-        AtomicCheckpointCallback(
-            save_freq=checkpoint_save_freq_vec_env(args.n_envs),
+        TimestepAtomicCheckpointCallback(
+            save_timestep_interval=checkpoint_timestep_interval(fleet_n_envs),
             save_path=str(ckpt_dir),
             name_prefix="ppo_re1",
+            verbose=2,
         ),
         metrics_cb.get_callback(),
     ]
@@ -542,36 +578,59 @@ def _run_learner(args: argparse.Namespace) -> int:
                     f"{status['missing']} (live={status['n_live']})",
                 )
 
+            merged_envs = sum(r.n_envs for r in pending)
+            log(
+                args.machine_name,
+                f"epoch train prep: {len(pending)} rollouts "
+                f"pending_steps={pending_steps} merged_envs={merged_envs}",
+            )
+
             batch_infos: list[dict[str, Any]] = []
             for rollout in pending:
                 batch_infos.extend(rollout.episode_infos)
-            trained = train_on_rollouts(model, pending)
-            version = weight_store.publish(export_policy_state_dict(model))
-            learner_state.set_current_version(version)
-            log(
-                args.machine_name,
-                f"epoch train {trained} steps from {len(pending)} rollouts "
-                f"contributors={status['contributors']} -> "
-                f"policy_version={version} total={model.num_timesteps}",
-            )
-            progress.consume_infos(batch_infos, num_timesteps=int(model.num_timesteps))
-            progress.log_rollout_end(
-                model,
-                num_timesteps=int(model.num_timesteps),
-                episode_infos=batch_infos,
-            )
-            for cb in callbacks:
-                cb.on_rollout_end()
-                cb.on_step()
-            pending.clear()
-            pending_steps = 0
-            epoch_id, expected = learner_state.begin_epoch()
-            epoch_t0 = time.monotonic()
-            waiting_for_fleet = False
-            log(
-                args.machine_name,
-                f"epoch {epoch_id} started; expected={expected or '(none yet)'}",
-            )
+            try:
+                trained = train_on_rollouts(
+                    model,
+                    pending,
+                    machine_name=args.machine_name,
+                )
+                version = weight_store.publish(export_policy_state_dict(model))
+                learner_state.set_current_version(version)
+                log(
+                    args.machine_name,
+                    f"epoch train {trained} steps from {len(pending)} rollouts "
+                    f"merged_envs={merged_envs} contributors={status['contributors']} -> "
+                    f"policy_version={version} total={model.num_timesteps}",
+                )
+                progress.consume_infos(batch_infos, num_timesteps=int(model.num_timesteps))
+                progress.log_rollout_end(
+                    model,
+                    num_timesteps=int(model.num_timesteps),
+                    episode_infos=batch_infos,
+                )
+                for cb in callbacks:
+                    cb.on_rollout_end()
+                    cb.on_step()
+            except Exception as exc:
+                log(args.machine_name, f"epoch train failed: {exc}")
+                raise
+            finally:
+                pending.clear()
+                pending_steps = 0
+                epoch_id, expected = learner_state.begin_epoch()
+                epoch_t0 = time.monotonic()
+                waiting_for_fleet = False
+                pull_rollout_queue(
+                    rollout_queue,
+                    pending,
+                    machine_name=args.machine_name,
+                )
+                pending_steps = sum(r.num_timesteps() for r in pending)
+                log(
+                    args.machine_name,
+                    f"epoch {epoch_id} started; expected={expected or '(none yet)'} "
+                    f"carried_pending_steps={pending_steps}",
+                )
 
     except KeyboardInterrupt:
         log(args.machine_name, "learner interrupted")

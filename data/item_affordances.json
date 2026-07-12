@@ -1,16 +1,75 @@
 {
   "armor_key": {
-    "door_edges": [],
-    "notes": "Armor room",
+    "door_edges": [
+      {
+        "door_id": "109->114",
+        "from_room": "109",
+        "to_room": "114"
+      },
+      {
+        "door_id": "101->102",
+        "from_room": "101",
+        "to_room": "102"
+      },
+      {
+        "door_id": "204->205",
+        "from_room": "204",
+        "to_room": "205"
+      },
+      {
+        "door_id": "204->20D",
+        "from_room": "204",
+        "to_room": "20D"
+      },
+      {
+        "door_id": "207->208",
+        "from_room": "207",
+        "to_room": "208"
+      },
+      {
+        "door_id": "106->111",
+        "from_room": "106",
+        "to_room": "111"
+      }
+    ],
+    "notes": "ER: six armor-carving doors. Pickup on greenhouse plaque after chemical.",
+    "pickup_rooms": [
+      "10C"
+    ],
     "rooms": [
-      "10C",
-      "205"
+      "109",
+      "101",
+      "204",
+      "207",
+      "106",
+      "114",
+      "102",
+      "205",
+      "20D",
+      "208",
+      "111",
+      "10C"
+    ],
+    "use_rooms": [
+      "109",
+      "101",
+      "204",
+      "207",
+      "106"
     ]
   },
   "battery": {
     "door_edges": [],
     "notes": "on chair",
+    "pickup_rooms": [
+      "219",
+      "500"
+    ],
     "rooms": [
+      "219",
+      "500"
+    ],
+    "use_rooms": [
       "219",
       "500"
     ]
@@ -18,133 +77,285 @@
   "blue_jewel": {
     "door_edges": [],
     "notes": "Insert blue jewel in tiger eye; statue slides to reveal crest",
+    "pickup_rooms": [
+      "202"
+    ],
     "rooms": [
       "10D",
       "202"
+    ],
+    "use_rooms": [
+      "10D"
     ]
   },
   "chemical": {
     "door_edges": [],
-    "notes": "Pour chemical into greenhouse pump to kill vines on crest",
+    "notes": "herbicide chemicals",
+    "pickup_rooms": [
+      "11B"
+    ],
     "rooms": [
-      "10C",
+      "11B"
+    ],
+    "use_rooms": [
       "11B"
     ]
   },
   "control_room_key": {
     "door_edges": [],
     "notes": "drain bathtub",
+    "pickup_rooms": [
+      "402"
+    ],
     "rooms": [
+      "402"
+    ],
+    "use_rooms": [
       "402"
     ]
   },
   "doom_book_1": {
     "door_edges": [],
     "notes": "Standard: inside Doom Book 1; open book at fountain (coffin note disputed)",
+    "pickup_rooms": [],
     "rooms": [
+      "507"
+    ],
+    "use_rooms": [
       "507"
     ]
   },
   "doom_book_2": {
     "door_edges": [],
     "notes": "Standard: inside Doom Book 2; open book at fountain (desk placement disputed)",
+    "pickup_rooms": [
+      "305"
+    ],
     "rooms": [
-      "305",
+      "506",
+      "305"
+    ],
+    "use_rooms": [
       "506"
     ]
   },
   "dorm_key_002": {
     "door_edges": [],
     "notes": "on table near wasp nest",
+    "pickup_rooms": [
+      "408"
+    ],
     "rooms": [
+      "408"
+    ],
+    "use_rooms": [
       "408"
     ]
   },
   "dorm_key_003": {
     "door_edges": [],
     "notes": "sparkle on shelf",
+    "pickup_rooms": [
+      "410"
+    ],
     "rooms": [
+      "410"
+    ],
+    "use_rooms": [
       "410"
     ]
   },
   "eagle_medal": {
     "door_edges": [],
     "notes": "inside coffin",
+    "pickup_rooms": [
+      "507"
+    ],
     "rooms": [
+      "507"
+    ],
+    "use_rooms": [
       "507"
     ]
   },
   "emblem": {
     "door_edges": [],
-    "notes": "Wooden emblem: bar piano chain; gold swap at 10F alcove",
+    "notes": "ER wooden Emblem: place in Bar secret alcove to replace gold (not trapped). Pickup: dining fireplace.",
+    "pickup_rooms": [
+      "105"
+    ],
     "rooms": [
-      "105",
+      "10F",
+      "105"
+    ],
+    "use_rooms": [
       "10F"
     ]
   },
   "empty_bottle": {
     "door_edges": [],
     "notes": "V-Jolt prep",
+    "pickup_rooms": [
+      "409"
+    ],
     "rooms": [
+      "409"
+    ],
+    "use_rooms": [
       "409"
     ]
   },
   "flare": {
     "door_edges": [],
     "notes": "Barry ending item",
+    "pickup_rooms": [
+      "302",
+      "50B"
+    ],
     "rooms": [
+      "302",
+      "50B"
+    ],
+    "use_rooms": [
       "302",
       "50B"
     ]
   },
   "gold_emblem": {
     "door_edges": [],
-    "notes": "Dining fireplace reveals shield_key",
+    "notes": "ER: use on dining fireplace slot \u2192 clock reveals shield_key. Pickup: Bar secret alcove after piano + wooden emblem.",
+    "pickup_rooms": [
+      "10F"
+    ],
     "rooms": [
       "105",
       "10F"
+    ],
+    "use_rooms": [
+      "105"
     ]
   },
   "helmet_key": {
-    "door_edges": [],
-    "notes": "fireplace after boss",
-    "rooms": [
+    "door_edges": [
+      {
+        "door_id": "10A->119",
+        "from_room": "10A",
+        "to_room": "119"
+      },
+      {
+        "door_id": "201->215",
+        "from_room": "201",
+        "to_room": "215"
+      },
+      {
+        "door_id": "20B->20C",
+        "from_room": "20B",
+        "to_room": "20C"
+      }
+    ],
+    "notes": "ER: Courtyard Study, Trophy Room, Lesson Room doors. Pickup: Plant 42 fireplace.",
+    "pickup_rooms": [
       "40C"
+    ],
+    "rooms": [
+      "10A",
+      "201",
+      "20B",
+      "119",
+      "215",
+      "20C",
+      "40C"
+    ],
+    "use_rooms": [
+      "10A",
+      "201",
+      "20B"
     ]
   },
   "hex_crank": {
     "door_edges": [],
     "notes": "On wall in boulder alcove (same gate as second MO disc)",
+    "pickup_rooms": [
+      "30A"
+    ],
     "rooms": [
       "305",
       "306",
-      "30A",
+      "30B",
+      "30A"
+    ],
+    "use_rooms": [
+      "305",
+      "306",
       "30B"
     ]
   },
   "lab_key_1": {
     "door_edges": [],
     "notes": "on shelf; ITEM_IDS 0x37 names this lab_key_1",
+    "pickup_rooms": [
+      "50E"
+    ],
     "rooms": [
+      "50E"
+    ],
+    "use_rooms": [
       "50E"
     ]
   },
   "lighter": {
     "door_edges": [],
     "notes": "Light candles, push left bookcase, enter secret cabinet room",
+    "pickup_rooms": [
+      "209"
+    ],
     "rooms": [
-      "209",
+      "20B",
+      "20F",
+      "209"
+    ],
+    "use_rooms": [
       "20B",
       "20F"
     ]
   },
   "lockpick": {
-    "door_edges": [],
-    "notes": "Locked desks; Barry gives in tea room",
+    "door_edges": [
+      {
+        "door_id": "107->108",
+        "from_room": "107",
+        "to_room": "108"
+      },
+      {
+        "door_id": "104->10F",
+        "from_room": "104",
+        "to_room": "10F"
+      },
+      {
+        "door_id": "103->10E",
+        "from_room": "103",
+        "to_room": "10E"
+      }
+    ],
+    "notes": "ER: three sword-carving doors + desk drawers (Vacant/Dressing/Room001/Room003). Barry gives in Main Hall after tea-room zombie.",
+    "pickup_rooms": [
+      "106"
+    ],
     "rooms": [
       "102",
+      "111",
+      "401",
+      "40A",
+      "107",
       "104",
-      "106",
+      "103",
+      "108",
+      "10F",
+      "10E",
+      "106"
+    ],
+    "use_rooms": [
+      "102",
       "111",
       "401",
       "40A"
@@ -153,32 +364,61 @@
   "mo_disc": {
     "door_edges": [],
     "notes": "Decoded at MO terminal, not a floor pickup",
-    "rooms": [
+    "pickup_rooms": [
       "213",
       "217",
       "306",
-      "30B",
+      "30B"
+    ],
+    "rooms": [
+      "508",
+      "213",
+      "217",
+      "306",
+      "30B"
+    ],
+    "use_rooms": [
       "508"
     ]
   },
   "moon_crest": {
     "door_edges": [],
     "notes": "after Yawn 1",
+    "pickup_rooms": [
+      "210"
+    ],
     "rooms": [
+      "210"
+    ],
+    "use_rooms": [
       "210"
     ]
   },
   "music_notes": {
     "door_edges": [],
-    "notes": "Play piano with music notes; swap wooden emblem for gold in secret alcove",
+    "notes": "behind movable bookcase",
+    "pickup_rooms": [
+      "10F"
+    ],
     "rooms": [
+      "10F"
+    ],
+    "use_rooms": [
       "10F"
     ]
   },
   "pass_number": {
     "door_edges": [],
     "notes": "pool table code 345 (Jill)",
+    "pickup_rooms": [
+      "404",
+      "508"
+    ],
     "rooms": [
+      "404",
+      "508"
+    ],
+    "use_rooms": [
       "404",
       "508"
     ]
@@ -186,103 +426,217 @@
   "red_book": {
     "door_edges": [],
     "notes": "on bed",
+    "pickup_rooms": [
+      "401"
+    ],
     "rooms": [
+      "401"
+    ],
+    "use_rooms": [
       "401"
     ]
   },
   "red_jewel": {
     "door_edges": [],
     "notes": "deer head with lights off",
+    "pickup_rooms": [
+      "215"
+    ],
     "rooms": [
+      "215"
+    ],
+    "use_rooms": [
       "215"
     ]
   },
   "serum": {
     "door_edges": [],
     "notes": "Search Richard's body twice after giving him serum (pillar passage)",
-    "rooms": [
+    "pickup_rooms": [
       "100",
-      "102",
+      "102"
+    ],
+    "rooms": [
+      "20D",
+      "100",
+      "102"
+    ],
+    "use_rooms": [
       "20D"
     ]
   },
   "shield_key": {
-    "door_edges": [],
-    "notes": "Helmet-key doors across mansion",
+    "door_edges": [
+      {
+        "door_id": "20E->210",
+        "from_room": "20E",
+        "to_room": "210"
+      }
+    ],
+    "notes": "ER: opens Attic Entry\u2192Attic only. Pickup behind dining clock after gold_emblem.",
+    "pickup_rooms": [
+      "105"
+    ],
     "rooms": [
-      "105",
-      "10C",
-      "10D",
-      "117"
+      "20E",
+      "210",
+      "105"
+    ],
+    "use_rooms": [
+      "20E"
     ]
   },
   "slides": {
     "door_edges": [],
     "notes": "projector room",
+    "pickup_rooms": [
+      "510"
+    ],
     "rooms": [
+      "510"
+    ],
+    "use_rooms": [
       "510"
     ]
   },
   "square_crank": {
     "door_edges": [],
     "notes": "top shelf via stepladder",
+    "pickup_rooms": [
+      "11B"
+    ],
     "rooms": [
+      "11B"
+    ],
+    "use_rooms": [
       "11B"
     ]
   },
   "star_crest": {
     "door_edges": [],
     "notes": "crow painting puzzle",
+    "pickup_rooms": [
+      "117"
+    ],
     "rooms": [
+      "117"
+    ],
+    "use_rooms": [
       "117"
     ]
   },
   "sun_crest": {
     "door_edges": [],
     "notes": "statue puzzle cabinet",
+    "pickup_rooms": [
+      "205"
+    ],
     "rooms": [
+      "205"
+    ],
+    "use_rooms": [
       "205"
     ]
   },
   "sword_key": {
-    "door_edges": [],
-    "notes": "Chris-only in standard; kept for data completeness",
+    "door_edges": [
+      {
+        "door_id": "107->108",
+        "from_room": "107",
+        "to_room": "108"
+      },
+      {
+        "door_id": "104->10F",
+        "from_room": "104",
+        "to_room": "10F"
+      },
+      {
+        "door_id": "103->10E",
+        "from_room": "103",
+        "to_room": "10E"
+      }
+    ],
+    "notes": "Chris-only. Same three doors Jill opens with lockpick. Pickup: Mansion Save Room bed.",
+    "pickup_rooms": [
+      "100"
+    ],
     "rooms": [
-      "20D"
+      "107",
+      "104",
+      "103",
+      "108",
+      "10F",
+      "10E",
+      "100"
+    ],
+    "use_rooms": [
+      "107",
+      "104",
+      "103"
     ]
   },
   "umb_no2": {
     "door_edges": [],
     "notes": "shelves",
+    "pickup_rooms": [
+      "409"
+    ],
     "rooms": [
+      "409"
+    ],
+    "use_rooms": [
       "409"
     ]
   },
   "umb_no4": {
     "door_edges": [],
     "notes": "shelves",
+    "pickup_rooms": [
+      "409"
+    ],
     "rooms": [
+      "409"
+    ],
+    "use_rooms": [
       "409"
     ]
   },
   "water": {
     "door_edges": [],
     "notes": "sink",
+    "pickup_rooms": [
+      "409"
+    ],
     "rooms": [
+      "409"
+    ],
+    "use_rooms": [
       "409"
     ]
   },
   "wind_crest": {
     "door_edges": [],
     "notes": "blue jewel on tiger eye",
+    "pickup_rooms": [
+      "10D"
+    ],
     "rooms": [
+      "10D"
+    ],
+    "use_rooms": [
       "10D"
     ]
   },
   "wolf_medal": {
     "door_edges": [],
     "notes": "on desk",
+    "pickup_rooms": [
+      "506"
+    ],
     "rooms": [
+      "506"
+    ],
+    "use_rooms": [
       "506"
     ]
   }

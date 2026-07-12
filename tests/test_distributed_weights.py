@@ -97,7 +97,7 @@ def test_learner_http_weights_and_rollout() -> None:
             n_envs=1,
             n_steps=2,
             obs={
-                "frame": np.zeros((2, 1, 84, 84, 4), dtype=np.uint8),
+                "frame": np.zeros((2, 1, 84, 77, 4), dtype=np.uint8),
                 "proprio": np.zeros((2, 1, PROPRIO_DIM), dtype=np.float32),
                 "goal": np.zeros((2, 1, GOAL_DIM), dtype=np.float32),
                 "spatial": np.zeros((2, 1, 119), dtype=np.float32),
@@ -110,6 +110,7 @@ def test_learner_http_weights_and_rollout() -> None:
             values=np.zeros((2, 1), dtype=np.float32),
             log_probs=np.zeros((2, 1), dtype=np.float32),
             last_values=np.zeros((1,), dtype=np.float32),
+            action_masks=np.ones((2, 1, 10), dtype=np.bool_),
         )
         req = urllib.request.Request(
             base + "/rollout",
@@ -133,6 +134,7 @@ def test_learner_http_weights_and_rollout() -> None:
             values=rollout.values,
             log_probs=rollout.log_probs,
             last_values=rollout.last_values,
+            action_masks=rollout.action_masks,
         )
         req2 = urllib.request.Request(
             base + "/rollout",

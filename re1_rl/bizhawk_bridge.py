@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import mmap
 import socket
+import sys
 import threading
 import time
 from typing import Any
@@ -37,12 +39,18 @@ class BizHawkClient:
         timeout: float = 30.0,
         screenshot_path: str = DEFAULT_SCREENSHOT_PATH,
         connect_timeout: float | None = None,
+        screenshot_mmf: bool | None = None,
     ) -> None:
         self.host = host
         self.port = port
         self.timeout = timeout
         self.connect_timeout = connect_timeout if connect_timeout is not None else timeout
         self.screenshot_path = screenshot_path
+        if screenshot_mmf is None:
+            screenshot_mmf = sys.platform == "win32"
+        self.screenshot_mmf = bool(screenshot_mmf)
+        self.mmf_name = f"re1_screenshot_{port}"
+        self._screenshot_mmf_disabled = False
         self._server: socket.socket | None = None
         self._client: socket.socket | None = None
         self._lock = threading.Lock()
@@ -369,17 +377,42 @@ class BizHawkClient:
         except (OSError, ConnectionError):
             pass
 
-    def screenshot(self, path: str | None = None) -> np.ndarray:
-        """Ask BizHawk to write a PNG, then read it back as RGB uint8 (H,W,3).
+    @staticmethod
+    def _decode_png_bytes(raw: bytes) -> np.ndarray:
+        import cv2
 
-        File-based transfer avoids base64-over-socket issues and works across
-        BizHawk builds. ``path`` defaults to the shared frame file the Lua
-        client writes to.
-        """
+        arr = np.frombuffer(raw, dtype=np.uint8)
+        bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if bgr is None:
+            raise ValueError("Failed to decode screenshot PNG bytes from BizHawk")
+        return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+
+    def _screenshot_from_mmf(self) -> np.ndarray:
+        resp = self._request(
+            {
+                "cmd": "screenshot_mmf",
+                "mmf_name": self.mmf_name,
+                "port": self.port,
+            }
+        )
+        if not resp.get("ok"):
+            raise RuntimeError(resp.get("error", "screenshot_mmf failed"))
+        name = str(resp.get("mmf_name") or self.mmf_name)
+        size = int(resp["size"])
+        mm = mmap.mmap(-1, size, tagname=name, access=mmap.ACCESS_READ)
+        try:
+            raw = mm.read(size)
+        finally:
+            mm.close()
+        return self._decode_png_bytes(raw)
+
+    def _screenshot_from_file(self, path: str | None = None) -> np.ndarray:
+        """Ask BizHawk to write a PNG, then read it back as RGB uint8 (H,W,3)."""
+        import cv2
+
         shot_path = path or self.screenshot_path
         resp = self._request({"cmd": "screenshot", "path": shot_path})
         written = resp.get("path", shot_path)
-        import cv2
 
         # BizHawk writes asynchronously; retry briefly for the file to appear.
         bgr = None
@@ -391,3 +424,16 @@ class BizHawkClient:
         if bgr is None:
             raise ValueError(f"Failed to read screenshot PNG from BizHawk at {written}")
         return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+
+    def screenshot(self, path: str | None = None) -> np.ndarray:
+        """Return RGB uint8 (H,W,3).
+
+        On Windows, default transport is BizHawk MMF (no per-step _frame_*.png).
+        Falls back to file PNG once if MMF read fails.
+        """
+        if self.screenshot_mmf and not self._screenshot_mmf_disabled:
+            try:
+                return self._screenshot_from_mmf()
+            except (OSError, RuntimeError, ValueError):
+                self._screenshot_mmf_disabled = True
+        return self._screenshot_from_file(path)

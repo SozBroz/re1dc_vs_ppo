@@ -7,10 +7,13 @@ the throughput constraint, not GPU inference, so we widen for free:
 - NatureCNN output 256 -> 512 (Nature DQN width)
 - pi/vf MLP trunks 2x64 -> 2x256
 
-2.10M params total (vs ~0.93M default). See docs/nn_architecture_and_encoding.md #5.
+Frame is 84x77x4 (HWC): full BizHawk frame is resized to 84x84 (pillarbox
+bars included), then bar columns are pruned (4+3 px). SB3 VecTransposeImage
+feeds NatureCNN (4, 84, 77); flatten after convs is 2688 (was 3136 at 84x84).
+Resume auto-transplants compatible tensors via async_fleet.
 
 Obs keys and their extractor paths (SB3 CombinedExtractor):
-  frame   84x84x4 uint8   -> NatureCNN -> 512
+  frame   84x77x4 uint8   -> NatureCNN -> 512
   proprio (28,) float32   -> flatten
   goal    (27,) float32   -> flatten
   spatial (128,) float32  -> flatten (egocentric items/enemies/exits/interactables)
@@ -31,8 +34,8 @@ Obs keys and their extractor paths (SB3 CombinedExtractor):
 Fusion input = 512 + 28 + 27 + 128 + 256 + 128 + 34 + 16 + 65 + 9 + 12 + 37 + 40 + 16 + 12 + 16 = 1336 -> 2x256 pi/vf trunks.
 
 NOTE: PPO.load() restores the architecture stored in the checkpoint zip, so
-resuming an old 2x64 checkpoint keeps the old sizing. Widening requires a
-fresh run (or a manual weight transplant).
+resuming an old 84x84 / 2x64 checkpoint keeps the old sizing. Frame-shape
+or widen changes require a weight transplant (see scripts/transplant_*.py).
 """
 from __future__ import annotations
 

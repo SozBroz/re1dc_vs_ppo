@@ -202,7 +202,7 @@ def test_explain_obs_names_every_slot():
     planner = make_planner()
     s = make_state()
     obs = {
-        "frame": np.zeros((84, 84, 4), dtype=np.uint8),
+        "frame": np.zeros((84, 77, 4), dtype=np.uint8),
         "proprio": enc.encode_proprio(s, prev_hp=96),
         "goal": enc.encode_goal(s, planner),
     }
@@ -217,11 +217,15 @@ def test_damage_and_death_calibrated_to_waypoint():
     from re1_rl.reward import (
         CHECKPOINT_REWARD,
         DEATH_PENALTY_SCALED,
+        HP_GAIN_SCALE,
+        HP_LOSS_SCALE,
         JILL_FINE_HP,
         NEAR_DEATH_DAMAGE_SCALED,
         REWARD_SCALE,
+        SOFTLOCK_TIMEOUT_PENALTY,
         STEPS_PER_CHECKPOINT,
         STEP_PENALTY,
+        SURVIVAL_BUDGET_SCALED,
         WAYPOINT_ROOM_BONUS,
         compute_reward,
     )
@@ -230,6 +234,11 @@ def test_damage_and_death_calibrated_to_waypoint():
     progress = ProgressTracker()
     assert WAYPOINT_ROOM_BONUS * REWARD_SCALE == NEW_ROOM_BONUS == CHECKPOINT_REWARD == 1.0
     assert STEP_PENALTY * REWARD_SCALE == pytest.approx(-CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT)
+    assert SURVIVAL_BUDGET_SCALED == pytest.approx(3.0 * CHECKPOINT_REWARD)
+    assert NEAR_DEATH_DAMAGE_SCALED == pytest.approx(2.0)
+    assert DEATH_PENALTY_SCALED == pytest.approx(1.0)
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-1.0)
+    assert HP_GAIN_SCALE == pytest.approx(0.8 * HP_LOSS_SCALE)
 
     full = make_state(hp=JILL_FINE_HP, step=1)
     near_death = make_state(hp=1, step=2)
@@ -247,6 +256,16 @@ def test_damage_and_death_calibrated_to_waypoint():
     assert bd_death["death"] * REWARD_SCALE == pytest.approx(-DEATH_PENALTY_SCALED)
     assert bd_death["hp"] * REWARD_SCALE == pytest.approx(
         -NEAR_DEATH_DAMAGE_SCALED * JILL_FINE_HP / (JILL_FINE_HP - 1)
+    )
+
+    # Full Fine→1 chip then full heal back: heal recovers 80% of chip magnitude.
+    hurt = make_state(hp=1, step=20)
+    healed = make_state(hp=JILL_FINE_HP, step=21)
+    _, bd_heal = compute_reward(
+        hurt, healed, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd_heal["hp"] * REWARD_SCALE == pytest.approx(
+        0.8 * NEAR_DEATH_DAMAGE_SCALED
     )
 
 

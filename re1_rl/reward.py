@@ -32,8 +32,14 @@ NEW_CUTSCENE_BONUS = CHECKPOINT_REWARD
 WAYPOINT_ROOM_BONUS = NEW_ROOM_BONUS
 
 ITEM_PICKUP_BONUS = CHECKPOINT_REWARD / 20
-SOFTLOCK_TIMEOUT_PENALTY = -2.5 * CHECKPOINT_REWARD
+# Softlock: below full chip+death (-3) and equal to terminal death (-1) so
+# suicide-to-escape-stagnation stays irrational. Fires on stagnation and on
+# door thrash (A↔B) via ProgressTracker.note_softlock_step.
+SOFTLOCK_TIMEOUT_PENALTY = -1.0 * CHECKPOINT_REWARD
 SOFTLOCK_STEP_THRESHOLD = 2400
+# Undirected door transitions on the same edge without progress before thrash hit.
+# Periodic (every N) at the same penalty magnitude so thrash is worse than idling.
+SOFTLOCK_THRASH_TRANSITION_THRESHOLD = 8
 
 ENEMY_DAMAGE_REWARD = CHECKPOINT_REWARD / 200
 ENEMY_KILL_REWARD = CHECKPOINT_REWARD / 50
@@ -42,13 +48,18 @@ KNIFE_MISS_PENALTY = ATTACK_MISS_PENALTY
 AMMO_WASTE_PENALTY = 2.0 * STEP_PENALTY
 
 JILL_FINE_HP = 96
-NEAR_DEATH_DAMAGE_SCALED = 0.5 * CHECKPOINT_REWARD
-DEATH_PENALTY_SCALED = 7.0 * CHECKPOINT_REWARD
+# Survival budget: full Fine→1 chip + death terminal = -3× checkpoint.
+# 2/3 on dense HP loss, 1/3 on episode-end death.
+SURVIVAL_BUDGET_SCALED = 3.0 * CHECKPOINT_REWARD
+NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # 2.0
+DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # 1.0
 DEATH_PENALTY = -DEATH_PENALTY_SCALED
 
 REWARD_SCALE = 1.0
 
 HP_LOSS_SCALE = NEAR_DEATH_DAMAGE_SCALED / (JILL_FINE_HP - 1)
+# Heal recovers ~80% of the damage channel so chip-then-herb is not free.
+HP_GAIN_SCALE = 0.8 * HP_LOSS_SCALE
 
 # Disabled checkpoint-path terms (exported for tests that assert they stay off).
 WRONG_ROOM_PENALTY = -0.5 * CHECKPOINT_REWARD
@@ -194,6 +205,9 @@ def compute_reward(
     hp_delta = hp - prev_hp
     if hp_delta < 0:
         bd["hp"] = HP_LOSS_SCALE * hp_delta
+    elif hp_delta > 0 and prev_hp > 0:
+        # Ignore bogus HP jumps from menu/cutscene init (prev_hp==0).
+        bd["hp"] = HP_GAIN_SCALE * hp_delta
 
     if state.get("dead"):
         bd["death"] = DEATH_PENALTY
@@ -214,13 +228,24 @@ def compute_reward(
         if ammo_spent > 0:
             bd["ammo_waste"] = AMMO_WASTE_PENALTY * min(ammo_spent, 4)
 
-    if (
-        room == prev_room
-        and not state.get("dead")
-        and int(state.get("step", 0)) > 0
-        and int(state.get("step", 0)) % softlock_threshold == 0
-    ):
-        bd["softlock"] = SOFTLOCK_TIMEOUT_PENALTY
+    if progress is not None and not state.get("dead"):
+        made_progress = (
+            bd["new_room"] != 0.0
+            or bd["new_cutscene"] != 0.0
+            or bd["item"] != 0.0
+            or bd["waypoint"] != 0.0
+        )
+        stagnation_hit, thrash_hit = progress.note_softlock_step(
+            room=room,
+            prev_room=prev_room,
+            made_progress=made_progress,
+            softlock_threshold=softlock_threshold,
+            thrash_threshold=SOFTLOCK_THRASH_TRANSITION_THRESHOLD,
+        )
+        # Stack if both fire on the same step (rare); thrash alone matches idle hit.
+        n_hits = int(stagnation_hit) + int(thrash_hit)
+        if n_hits:
+            bd["softlock"] = SOFTLOCK_TIMEOUT_PENALTY * n_hits
 
     reward = float(sum(bd.values())) * REWARD_SCALE
     if return_breakdown:

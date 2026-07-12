@@ -138,6 +138,7 @@ def make_env(
     skip_chunk: int = 600,
     async_cutscene_skip: bool = True,
     headless: bool = True,
+    screenshot_mmf: bool | None = None,
     spawn_progress: Callable[[str], None] | None = None,
 ):
     """Factory executed INSIDE the subprocess worker."""
@@ -157,7 +158,12 @@ def make_env(
         _phase(f"port {port}: starting bridge")
         # keyed by port (not rank) so concurrent runs never share files
         shot = str(PROJECT_ROOT / "data" / f"_frame_{port}.png")
-        bridge = BizHawkClient(port=port, timeout=300.0, screenshot_path=shot)
+        bridge = BizHawkClient(
+            port=port,
+            timeout=300.0,
+            screenshot_path=shot,
+            screenshot_mmf=screenshot_mmf,
+        )
         bridge.start_server()
 
         stagger_s = min(rank * 1.0, 15.0)
@@ -293,6 +299,18 @@ def main() -> int:
         default=True,
         help="EmuHawk --gdi/--chromeless + invisible cutscene skip (default on)",
     )
+    ap.add_argument(
+        "--screenshot-mmf",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="BizHawk MMF screenshot transport (default: on for Windows)",
+    )
+    ap.add_argument(
+        "--inference-batch-max",
+        type=int,
+        default=32,
+        help="max actor obs per GPU inference batch in async fleet (default 32)",
+    )
     args = ap.parse_args()
 
     import torch
@@ -361,6 +379,8 @@ def main() -> int:
                 device=device,
                 tb_log=tb_log,
                 headless=bool(args.headless),
+                screenshot_mmf=args.screenshot_mmf,
+                inference_batch_max=int(args.inference_batch_max),
             )
         except KeyboardInterrupt:
             print("[train] interrupted", flush=True)
@@ -384,6 +404,7 @@ def main() -> int:
                 training_speed=int(args.training_speed),
                 skip_chunk=int(args.skip_chunk),
                 headless=bool(args.headless),
+                screenshot_mmf=args.screenshot_mmf,
             )
             for i in range(args.n_envs)
         ],

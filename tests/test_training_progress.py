@@ -33,6 +33,20 @@ def test_slim_progress_info_drops_state() -> None:
     assert "state" not in slim
 
 
+def test_slim_progress_info_keeps_pickups() -> None:
+    slim = slim_progress_info(
+        {
+            "room_id": "10F",
+            "new_items": ["emblem"],
+            "ever_held": ["knife", "beretta", "emblem"],
+            "state": {"noise": 1},
+        }
+    )
+    assert slim["new_items"] == ["emblem"]
+    assert slim["ever_held"] == ["knife", "beretta", "emblem"]
+    assert "state" not in slim
+
+
 def test_tracker_first_room_and_rollout_summary(capsys) -> None:
     tracker = TrainingProgressTracker(machine_name="t")
     tracker.consume_infos(
@@ -87,3 +101,36 @@ def test_tracker_episode_best_rooms(tmp_path: Path, capsys) -> None:
     assert note["room_ids"] == ["105", "106"]
     latest = best_path.with_name("best_rooms_t_latest.json")
     assert latest.is_file()
+
+
+def test_tracker_logs_weapon_and_key_pickups(capsys) -> None:
+    tracker = TrainingProgressTracker(machine_name="t")
+    tracker.consume_infos(
+        [
+            {
+                "room_id": "10F",
+                "new_items": ["emblem"],
+                "ever_held": ["knife", "beretta", "emblem"],
+                "reward_breakdown": {},
+            }
+        ],
+        num_timesteps=300,
+    )
+    tracker.consume_infos(
+        [
+            {
+                "room_id": "10F",
+                "visited_rooms": ["105", "10F"],
+                "n_rooms_visited": 2,
+                "ever_held": ["knife", "beretta", "emblem"],
+                "episode": {"r": 1.0, "l": 40},
+                "reward_breakdown": {},
+            }
+        ],
+        num_timesteps=400,
+    )
+    out = capsys.readouterr().out
+    assert "first pickup key=emblem" in out
+    assert "keys=['emblem']" in out
+    assert "weapons=['beretta', 'knife']" in out
+    assert "emblem" in tracker.items_seen

@@ -5,7 +5,7 @@ from __future__ import annotations
 import gymnasium as gym
 from gymnasium import spaces
 
-from re1_rl.env import ACTION_NAMES
+from re1_rl.env import ACTION_NAMES, FRAME_SHAPE, FRAME_SHAPE_CHW
 from re1_rl.episode_history import ACQUISITION_LOG_DIM, ROOM_HISTORY_DIM
 from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, INVENTORY_OBS_DIM, PROPRIO_DIM, ROOM_VISITED_DIM
 from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM
@@ -20,7 +20,7 @@ from re1_rl.spatial_encoder import SPATIAL_DIM, VISITED_SHAPE
 def make_re1_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
     observation_space = spaces.Dict(
         {
-            "frame": spaces.Box(0, 255, shape=(84, 84, 4), dtype="uint8"),
+            "frame": spaces.Box(0, 255, shape=FRAME_SHAPE, dtype="uint8"),
             "proprio": spaces.Box(-1.0, 1.0, shape=(PROPRIO_DIM,), dtype="float32"),
             "goal": spaces.Box(-2.0, 2.0, shape=(GOAL_DIM,), dtype="float32"),
             "spatial": spaces.Box(-2.0, 2.0, shape=(SPATIAL_DIM,), dtype="float32"),
@@ -48,7 +48,7 @@ def make_re1_policy_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
     """Policy-side spaces: frame is CHW (matches SB3 / VecTransposeImage training)."""
     obs_space, act_space = make_re1_spaces()
     frame = obs_space.spaces["frame"]
-    chw_frame = frame.__class__(low=0, high=255, shape=(4, 84, 84), dtype=frame.dtype)
+    chw_frame = frame.__class__(low=0, high=255, shape=FRAME_SHAPE_CHW, dtype=frame.dtype)
     policy_obs_space = obs_space.__class__(
         {**obs_space.spaces, "frame": chw_frame}
     )

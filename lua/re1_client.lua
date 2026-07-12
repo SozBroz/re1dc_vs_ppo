@@ -66,6 +66,43 @@ end
 
 -- Default only; Python usually passes an explicit screenshot path per port.
 local SHOT_PATH = SCRIPT_DIR .. "../data/_frame.png"
+
+local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+local function base64_encode(data)
+    return ((data:gsub(".", function(x)
+        local r, bits = "", x:byte()
+        for i = 8, 1, -1 do
+            r = r .. (bits % 2 ^ i - bits % 2 ^ (i - 1) > 0 and "1" or "0")
+        end
+        return r
+    end) .. "0000"):gsub("%d%d%d?%d?%d?%d?%d?%d?", function(x)
+        if #x < 6 then
+            return ""
+        end
+        local c = 0
+        for i = 1, 6 do
+            c = c + (x:sub(i, i) == "1" and 2 ^ (6 - i) or 0)
+        end
+        return B64:sub(c + 1, c + 1)
+    end) .. ({ "", "==", "=" })[#data % 3 + 1])
+end
+
+local function mmf_capture(mmf_name)
+    if comm.mmfSetFilename then
+        comm.mmfSetFilename(mmf_name)
+    end
+    if not comm.mmfScreenshot then
+        return nil, 0, "mmfScreenshot unavailable"
+    end
+    local size = tonumber(comm.mmfScreenshot()) or 0
+    if size <= 0 then
+        return nil, 0, "mmfScreenshot returned size 0"
+    end
+    local got = comm.mmfGetFilename and comm.mmfGetFilename() or mmf_name
+    return got, size, nil
+end
+
 do
   local marker = SCRIPT_DIR .. "../data/logs/_lua_script_dir.txt"
   local f = io.open(marker, "w")
@@ -623,6 +660,44 @@ local function handle_command(cmd)
             gui.addmessage("")
         end
         return { ok = true, path = path }
+
+    elseif op == "screenshot_b64" then
+        -- Benchmark: MMF capture, Lua reads PNG bytes, base64 in JSON (no _frame_*.png).
+        local mmf_name = cmd.mmf_name or ("re1_screenshot_" .. tostring(cmd.port or 0))
+        local got, size, err = mmf_capture(mmf_name)
+        if err then
+            return { ok = false, error = err }
+        end
+        local png_bytes = ""
+        if comm.mmfReadBytes then
+            local bytes = comm.mmfReadBytes(got, size)
+            if type(bytes) == "table" then
+                local parts = {}
+                for i = 0, size - 1 do
+                    local b = bytes[i]
+                    if b == nil then
+                        break
+                    end
+                    parts[#parts + 1] = string.char(b)
+                end
+                png_bytes = table.concat(parts)
+            end
+        elseif comm.mmfRead then
+            png_bytes = comm.mmfRead(got, size) or ""
+        end
+        if png_bytes == nil or #png_bytes == 0 then
+            return { ok = false, error = "mmf read returned empty PNG" }
+        end
+        return { ok = true, png_b64 = base64_encode(png_bytes), size = size }
+
+    elseif op == "screenshot_mmf" then
+        -- Benchmark: MMF capture; Python reads tag via mmap (no _frame_*.png).
+        local mmf_name = cmd.mmf_name or ("re1_screenshot_" .. tostring(cmd.port or 0))
+        local got, size, err = mmf_capture(mmf_name)
+        if err then
+            return { ok = false, error = err }
+        end
+        return { ok = true, mmf_name = got, size = size }
 
     elseif op == "speed" then
         client.speedmode(cmd.percent or 100)

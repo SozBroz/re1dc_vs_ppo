@@ -1,4 +1,4 @@
-"""Fleet training progression: rooms, waypoints, gallery (sync + async)."""
+"""Fleet training progression: rooms, waypoints, gallery, item pickups."""
 
 from __future__ import annotations
 
@@ -8,6 +8,22 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from stable_baselines3 import PPO
+
+from re1_rl.key_items import KEY_ITEM_NAMES
+from re1_rl.memory_map import ITEM_IDS, WEAPON_ITEM_IDS
+
+_WEAPON_NAMES: frozenset[str] = frozenset(
+    ITEM_IDS[i] for i in WEAPON_ITEM_IDS if i in ITEM_IDS
+)
+_KEY_ITEM_NAME_SET: frozenset[str] = frozenset(KEY_ITEM_NAMES)
+
+
+def _classify_item(name: str) -> str:
+    if name in _WEAPON_NAMES:
+        return "weapon"
+    if name in _KEY_ITEM_NAME_SET:
+        return "key"
+    return "item"
 
 
 def slim_progress_info(info: dict[str, Any]) -> dict[str, Any]:
@@ -34,6 +50,12 @@ def slim_progress_info(info: dict[str, Any]) -> dict[str, Any]:
         out["gallery_flawless"] = info["gallery_flawless"]
     if info.get("episode_failure") is not None:
         out["episode_failure"] = info.get("episode_failure")
+    new_items = info.get("new_items")
+    if new_items:
+        out["new_items"] = list(new_items)
+    ever_held = info.get("ever_held")
+    if ever_held is not None:
+        out["ever_held"] = list(ever_held)
     return out
 
 
@@ -42,6 +64,15 @@ def _visited_from_info(info: dict[str, Any]) -> list[str]:
     if raw is None:
         return []
     return sorted({str(r) for r in raw if r is not None and str(r)})
+
+
+def _items_from_info(info: dict[str, Any]) -> list[str]:
+    raw = info.get("ever_held")
+    if raw is None:
+        raw = info.get("new_items")
+    if raw is None:
+        return []
+    return sorted({str(x) for x in raw if x})
 
 
 class TrainingProgressTracker:
@@ -58,9 +89,11 @@ class TrainingProgressTracker:
         self.machine_name = machine_name or "local"
         self.best_waypoint = 0
         self.rooms_seen: set[str] = set()
+        self.items_seen: set[str] = set()
         self.episodes = 0
         self.new_room_hits = 0
         self.cutscene_hits = 0
+        self.pickup_hits = 0
         # Best single-episode room exploration on this machine/process.
         self.best_episode_n_rooms = 0
         self.best_episode_room_ids: list[str] = []
@@ -89,6 +122,34 @@ class TrainingProgressTracker:
                         f"at step {num_timesteps}",
                         flush=True,
                     )
+            for item in info.get("new_items") or []:
+                name = str(item)
+                self.pickup_hits += 1
+                kind = _classify_item(name)
+                if name not in self.items_seen:
+                    self.items_seen.add(name)
+                    print(
+                        f"[{self.prefix}] first pickup {kind}={name} "
+                        f"room={info.get('room_id')} "
+                        f"at step {num_timesteps}",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"[{self.prefix}] pickup {kind}={name} "
+                        f"room={info.get('room_id')} "
+                        f"at step {num_timesteps}",
+                        flush=True,
+                    )
+            for item in _items_from_info(info):
+                if item not in self.items_seen:
+                    self.items_seen.add(item)
+                    kind = _classify_item(item)
+                    print(
+                        f"[{self.prefix}] first held {kind}={item} "
+                        f"at step {num_timesteps}",
+                        flush=True,
+                    )
             bd = info.get("reward_breakdown") or {}
             if bd.get("new_room", 0) > 0:
                 self.new_room_hits += 1
@@ -101,14 +162,18 @@ class TrainingProgressTracker:
     def _on_episode_end(self, info: dict[str, Any], *, num_timesteps: int) -> None:
         ep = info.get("episode") or {}
         rooms = _visited_from_info(info)
+        items = _items_from_info(info)
         n_rooms = int(info.get("n_rooms_visited") or len(rooms))
         rew = float(ep.get("r", float("nan")))
         length = int(ep.get("l", 0) or 0)
         failure = info.get("episode_failure")
         port = info.get("bridge_port")
+        keys = [i for i in items if _classify_item(i) == "key"]
+        weapons = [i for i in items if _classify_item(i) == "weapon"]
         print(
             f"[episode] machine={self.machine_name} port={port} "
             f"rooms={n_rooms} ids={rooms} "
+            f"keys={keys} weapons={weapons} items={items} "
             f"rew={rew:.3f} len={length} "
             f"wp={int(info.get('max_waypoint', 0) or 0)} "
             f"fail={failure!r} steps={num_timesteps}",
@@ -119,12 +184,26 @@ class TrainingProgressTracker:
             self.best_episode_room_ids = list(rooms)
             print(
                 f"[PB-rooms] machine={self.machine_name} best episode "
-                f"rooms={n_rooms} ids={rooms}",
+                f"rooms={n_rooms} ids={rooms} keys={keys} weapons={weapons}",
                 flush=True,
             )
-            self._persist_best_episode(num_timesteps=num_timesteps, info=info)
+            self._persist_best_episode(
+                num_timesteps=num_timesteps,
+                info=info,
+                items=items,
+                keys=keys,
+                weapons=weapons,
+            )
 
-    def _persist_best_episode(self, *, num_timesteps: int, info: dict[str, Any]) -> None:
+    def _persist_best_episode(
+        self,
+        *,
+        num_timesteps: int,
+        info: dict[str, Any],
+        items: list[str],
+        keys: list[str],
+        weapons: list[str],
+    ) -> None:
         if self.best_log_path is None:
             return
         try:
@@ -134,6 +213,9 @@ class TrainingProgressTracker:
                 "machine": self.machine_name,
                 "n_rooms": self.best_episode_n_rooms,
                 "room_ids": self.best_episode_room_ids,
+                "items": items,
+                "keys": keys,
+                "weapons": weapons,
                 "max_waypoint": int(info.get("max_waypoint", 0) or 0),
                 "bridge_port": info.get("bridge_port"),
                 "num_timesteps": int(num_timesteps),
@@ -177,7 +259,9 @@ class TrainingProgressTracker:
             f"ep_rew={mean_rew:.3f} ep_len={mean_len:.0f} "
             f"new_room_hits={self.new_room_hits} "
             f"cutscene_hits={self.cutscene_hits} "
+            f"pickup_hits={self.pickup_hits} "
             f"rooms={sorted(self.rooms_seen)} "
+            f"items={sorted(self.items_seen)} "
             f"best_ep_rooms={self.best_episode_n_rooms} "
             f"best_ep_ids={self.best_episode_room_ids}",
             flush=True,
@@ -185,6 +269,8 @@ class TrainingProgressTracker:
         logger = getattr(model, "logger", None) if model is not None else None
         if logger is not None:
             logger.record("re1/rooms_seen", len(self.rooms_seen))
+            logger.record("re1/items_seen", len(self.items_seen))
             logger.record("re1/new_room_hits", self.new_room_hits)
             logger.record("re1/cutscene_hits", self.cutscene_hits)
+            logger.record("re1/pickup_hits", self.pickup_hits)
             logger.record("re1/best_episode_rooms", self.best_episode_n_rooms)

@@ -41,6 +41,8 @@ class StickyInputState:
         elif action == INTERACT_ACTION:
             # Full-step Cross hold (shelf push, examine). Two consecutive interact
             # steps with latched movement = 8 emulated frames (matches human play).
+            # Forward/run into a pushable uses pushable.PUSHABLE_HOLD_FRAMES (20)
+            # via RE1Env / play_human — not this pulse path.
             pulse_hold = dict(button_map.get(action, {}))
         elif action in PULSE_ACTIONS:
             pulse = dict(button_map.get(action, {}))

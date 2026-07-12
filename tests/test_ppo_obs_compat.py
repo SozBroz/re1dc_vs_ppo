@@ -17,7 +17,7 @@ from gymnasium import spaces
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from re1_rl.env import ACTION_NAMES
+from re1_rl.env import ACTION_NAMES, FRAME_SHAPE
 from re1_rl.episode_history import ACQUISITION_LOG_DIM, ROOM_HISTORY_DIM
 from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, INVENTORY_OBS_DIM, PROPRIO_DIM, ROOM_VISITED_DIM
 from re1_rl.policy_config import POLICY_KWARGS
@@ -35,7 +35,7 @@ class StubRE1Env(gym.Env):
         super().__init__()
         self.observation_space = spaces.Dict(
             {
-                "frame": spaces.Box(0, 255, shape=(84, 84, 4), dtype=np.uint8),
+                "frame": spaces.Box(0, 255, shape=FRAME_SHAPE, dtype=np.uint8),
                 "proprio": spaces.Box(-1.0, 1.0, shape=(PROPRIO_DIM,), dtype=np.float32),
                 "goal": spaces.Box(-2.0, 2.0, shape=(GOAL_DIM,), dtype=np.float32),
                 "spatial": spaces.Box(-2.0, 2.0, shape=(SPATIAL_DIM,), dtype=np.float32),

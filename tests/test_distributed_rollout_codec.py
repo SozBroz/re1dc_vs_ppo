@@ -16,13 +16,14 @@ from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, PROPRIO_DIM
 
 def _sample_rollout() -> WorkerRollout:
     n_steps, n_envs = 4, 2
+    n_actions = 10
     return WorkerRollout(
         worker_id="test-worker",
         policy_version=3,
         n_envs=n_envs,
         n_steps=n_steps,
         obs={
-            "frame": np.random.randint(0, 255, (n_steps, n_envs, 84, 84, 4), dtype=np.uint8),
+            "frame": np.random.randint(0, 255, (n_steps, n_envs, 84, 77, 4), dtype=np.uint8),
             "proprio": np.random.randn(n_steps, n_envs, PROPRIO_DIM).astype(np.float32),
             "goal": np.random.randn(n_steps, n_envs, GOAL_DIM).astype(np.float32),
             "spatial": np.random.randn(n_steps, n_envs, 119).astype(np.float32),
@@ -35,6 +36,7 @@ def _sample_rollout() -> WorkerRollout:
         values=np.random.randn(n_steps, n_envs).astype(np.float32),
         log_probs=np.random.randn(n_steps, n_envs).astype(np.float32),
         last_values=np.random.randn(n_envs).astype(np.float32),
+        action_masks=np.ones((n_steps, n_envs, n_actions), dtype=np.bool_),
         episode_infos=[{"room_id": "101"}],
     )
 
@@ -51,6 +53,57 @@ def test_rollout_codec_roundtrip() -> None:
         assert np.array_equal(restored.obs[key], original.obs[key])
     assert np.array_equal(restored.actions, original.actions)
     assert np.array_equal(restored.last_values, original.last_values)
+    assert np.array_equal(restored.action_masks, original.action_masks)
+
+
+def test_rollout_codec_rejects_missing_masks() -> None:
+    """Fail closed: payloads without action_masks must not decode."""
+    import io
+    import json
+    import struct
+    import zlib
+
+    from re1_rl.distributed import rollout_codec as rc
+
+    original = _sample_rollout()
+    # Build a v2 payload manually without action_masks in npz.
+    obs_rest, frame_blob, frame_shape = rc._compress_obs_arrays(original.obs)
+    meta = {
+        "worker_id": original.worker_id,
+        "policy_version": original.policy_version,
+        "n_envs": original.n_envs,
+        "n_steps": original.n_steps,
+        "episode_infos": original.episode_infos,
+        "obs_keys": list(obs_rest.keys()),
+        "frame_compressed": frame_blob is not None,
+        "frame_shape": frame_shape,
+    }
+    npz = io.BytesIO()
+    save_kwargs = {
+        "actions": original.actions,
+        "rewards": original.rewards,
+        "dones": original.dones,
+        "values": original.values,
+        "log_probs": original.log_probs,
+        "last_values": original.last_values,
+    }
+    for key, arr in obs_rest.items():
+        save_kwargs[f"obs__{key}"] = arr
+    np.savez_compressed(npz, **save_kwargs)
+    meta_bytes = json.dumps(meta).encode("utf-8")
+    npz_bytes = npz.getvalue()
+    frame_bytes = frame_blob or b""
+    blob = (
+        rc._MAGIC
+        + struct.pack("<BIII", 2, len(meta_bytes), len(npz_bytes), len(frame_bytes))
+        + meta_bytes
+        + npz_bytes
+        + frame_bytes
+    )
+    import pytest
+
+    with pytest.raises(ValueError, match="action_masks"):
+        decode_rollout(blob)
 
 
 def test_rollout_codec_v2_frame_roundtrip() -> None:

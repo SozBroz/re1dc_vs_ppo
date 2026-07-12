@@ -120,7 +120,10 @@ class WorkerClient:
         if code == 200:
             return True
         if code == 409:
-            log(self.machine_name, "rollout rejected as stale by learner")
+            log(
+                self.machine_name,
+                f"rollout rejected by learner ({resp[:120]!r}); keeping buffered for retry",
+            )
             return False
         raise RuntimeError(f"POST /rollout failed with HTTP {code}: {resp[:200]!r}")
 

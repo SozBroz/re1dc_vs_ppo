@@ -70,6 +70,8 @@ PLAYER_FACING = 0x800C5198  # u16; 0..4095 angle, left turn decreases
 # scripts/hunt_player_knife_anim.py on jill_control_fresh.State].
 # 0x12 + aux 0x04 = crouched knife aim; press cross only in this state.
 # 0x13 = late recovery; 0x00/0x00 = idle (next action allowed).
+# 0x01 = walk pressed into a collider; 0x10 + gs 0x80800044 = shelf/object push
+# (bar bookcase probe 2026-07-10). See re1_rl/pushable.py.
 PLAYER_ANIM_STATE = 0x800C51AA  # u8; 0=idle, 0x12/0x13=knife swing/recovery
 PLAYER_ACTION_AUX = 0x800C51A9  # u8; 0=idle, 0x04=knife active
 PLAYER_RECOVERY_TIMER = 0x800C51B0  # u8; counts down 13→0 during recovery
@@ -189,16 +191,17 @@ CUTSCENE_TURBO_RESTORE = 0x0044
 MESSAGE_FLAG = 0x800C8665
 MESSAGE_FLAG_MASK = 0x80
 
-# --- Enemy table [HUNT PENDING — see docs/enemy_ram_hunt.md] ---
-# PC lead (RE1-Autosplitter, MediaKite build): Enemy1..6 HP at 0x8353BC with
-# 0x18C (396-byte) stride between slots. The GOG->PS1 linear map (-0x7211C0)
-# is verified only for the save block; applying it to the enemy heap gives
-# 0x801141FC as a LOW-confidence candidate. Enabled for combat rewards until
-# hunt confirms or relocates — see docs/enemy_ram_hunt.md.
-ENEMY_TABLE_BASE: int | None = 0x801141FC
-ENEMY_SLOT_STRIDE = 0x18C  # hypothesis from the autosplitter spacing
+# --- Enemy table [CONFIRMED 2026-07-12 live fire hunt] ---
+# Gameshark "First Zombie Has Infinite Health" / "Zombie Health (House)" use
+# 0x800C532C. Live beretta fire on QuickSave1 (room 202): u16 there drops by
+# ~12 per hit; second living enemy at +0x18C tracks the same. MediaKite ASL
+# heap map 0x801141FC was WRONG (never changed on hits) — combat rewards were
+# silent because decode_enemy_table read garbage there.
+ENEMY_TABLE_BASE: int | None = 0x800C532C
+ENEMY_SLOT_STRIDE = 0x18C  # confirmed: GS first zombie + second slot
 ENEMY_TABLE_SLOTS = 6
-# Per-slot field offsets within a 0x18C struct; ASL lists HP at slot base.
+# Per-slot HP at struct base (ASL / GS). Cap rejects empty-slot garbage.
+ENEMY_HP_MAX_PLAUSIBLE = 2000
 ENEMY_FIELD_OFFSETS: dict[str, tuple[int, str]] = {
     "hp": (0, "u16"),
 }
@@ -224,7 +227,7 @@ def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
     for slot in range(ENEMY_TABLE_SLOTS):
         vals = {f: int(ram.get(f"enemy{slot}_{f}", 0)) for f in ENEMY_FIELD_OFFSETS}
         hp = vals.get("hp", 0)
-        if hp <= 0:
+        if hp <= 0 or hp > ENEMY_HP_MAX_PLAUSIBLE:
             continue
         vals["slot"] = slot
         vals["alive"] = 1

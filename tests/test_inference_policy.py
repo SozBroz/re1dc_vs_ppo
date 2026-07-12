@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from re1_rl.distributed.inference_policy import InferencePolicy
 from re1_rl.distributed.obs_preprocess import prepare_obs_for_policy
 from re1_rl.distributed.spaces import make_re1_spaces
+from re1_rl.env import FRAME_H, FRAME_SHAPE, FRAME_SHAPE_CHW, FRAME_W
 
 
 def _chw_obs_space():
@@ -19,7 +20,7 @@ def _chw_obs_space():
     chw_space = obs_space.spaces["frame"].__class__(
         low=0,
         high=255,
-        shape=(4, 84, 84),
+        shape=FRAME_SHAPE_CHW,
         dtype=np.uint8,
     )
     policy_obs_space = obs_space.__class__(
@@ -33,7 +34,7 @@ def _hwc_batch(policy_obs_space, n_envs: int = 1):
     for key, space in policy_obs_space.spaces.items():
         if key == "frame":
             # Env-native HWC; prepare_obs_for_policy transposes to CHW.
-            batch[key] = np.zeros((n_envs, 84, 84, 4), dtype=np.uint8)
+            batch[key] = np.zeros((n_envs, FRAME_H, FRAME_W, FRAME_SHAPE[2]), dtype=np.uint8)
         else:
             batch[key] = np.zeros((n_envs, *space.shape), dtype=space.dtype)
     return batch
@@ -50,9 +51,9 @@ def test_inference_policy_accepts_hwc_frame_batch() -> None:
 
 def test_prepare_obs_transposes_batched_frame() -> None:
     policy_obs_space, _ = _chw_obs_space()
-    hwc = np.zeros((2, 84, 84, 4), dtype=np.uint8)
+    hwc = np.zeros((2, FRAME_H, FRAME_W, FRAME_SHAPE[2]), dtype=np.uint8)
     out = prepare_obs_for_policy({"frame": hwc}, policy_obs_space)
-    assert out["frame"].shape == (2, 4, 84, 84)
+    assert out["frame"].shape == (2, *FRAME_SHAPE_CHW)
 
 
 def test_predict_masked_batch_never_samples_illegal() -> None:

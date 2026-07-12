@@ -46,6 +46,7 @@ class LearnerState:
         self.epoch_id = 0
         self.epoch_contributors: set[str] = set()
         self.epoch_expected: set[str] = set()
+        self.rollouts_rejected_duplicate = 0
 
     def set_current_version(self, version: int) -> None:
         with self.lock:
@@ -148,6 +149,18 @@ class LearnerState:
             self.epoch_expected = set(live.keys())
             return self.epoch_id, sorted(self.epoch_expected)
 
+    def accept_rollout(self, rollout: WorkerRollout) -> tuple[bool, str]:
+        wid = base_worker_id(rollout.worker_id)
+        with self.lock:
+            min_ok = self.current_policy_version - self.max_staleness
+            if rollout.policy_version < min_ok:
+                self.rollouts_rejected += 1
+                return False, "stale_policy_version"
+            self.rollouts_accepted += 1
+            self.epoch_contributors.add(wid)
+        self.rollout_queue.put(rollout)
+        return True, "ok"
+
     def epoch_status(self) -> dict[str, Any]:
         with self.lock:
             live = self._prune_and_list_live_unlocked()
@@ -166,16 +179,21 @@ class LearnerState:
                 "n_expected": len(expected),
             }
 
-    def accept_rollout(self, rollout: WorkerRollout) -> bool:
-        with self.lock:
-            min_ok = self.current_policy_version - self.max_staleness
-            if rollout.policy_version < min_ok:
-                self.rollouts_rejected += 1
-                return False
-            self.rollouts_accepted += 1
-            self.epoch_contributors.add(base_worker_id(rollout.worker_id))
-        self.rollout_queue.put(rollout)
-        return True
+
+class LearnerRolloutSink:
+    """Local worker deliver() target: same ingest gates as HTTP /rollout."""
+
+    def __init__(self, state: LearnerState) -> None:
+        self._state = state
+
+    def put(self, rollout: WorkerRollout) -> bool:
+        ok, reason = self._state.accept_rollout(rollout)
+        if not ok:
+            log(
+                self._state.machine_name,
+                f"local rollout not queued ({reason}) from {rollout.worker_id}",
+            )
+        return ok
 
 
 class _LearnerHandler(BaseHTTPRequestHandler):
@@ -239,6 +257,7 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "workers": dict(self.state.workers),
                     "rollouts_accepted": self.state.rollouts_accepted,
                     "rollouts_rejected": self.state.rollouts_rejected,
+                    "rollouts_rejected_duplicate": self.state.rollouts_rejected_duplicate,
                     "epoch": epoch,
                 }
             self._send_json(200, payload)
@@ -292,10 +311,11 @@ class _LearnerHandler(BaseHTTPRequestHandler):
             except (ValueError, KeyError, OSError) as exc:
                 self._send_json(400, {"error": f"bad rollout: {exc}"})
                 return
-            if self.state.accept_rollout(rollout):
+            accepted, reason = self.state.accept_rollout(rollout)
+            if accepted:
                 self._send_json(200, {"accepted": True})
             else:
-                self._send_json(409, {"accepted": False, "reason": "stale policy_version"})
+                self._send_json(409, {"accepted": False, "reason": reason})
             return
 
         self._send_json(404, {"error": "not found"})

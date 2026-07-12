@@ -38,6 +38,111 @@ def _obs_batch_for_one(obs: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     return {k: np.expand_dims(v, 0) for k, v in obs.items()}
 
 
+def _obs_batch_for_many(need_msgs: list[dict[str, Any]]) -> dict[str, np.ndarray]:
+    """Stack per-env obs dicts into one batch (n_envs, ...)."""
+    if not need_msgs:
+        raise ValueError("empty need_msgs")
+    parts = [_obs_batch_for_one(msg["obs"]) for msg in need_msgs]
+    return {key: np.concatenate([part[key] for part in parts], axis=0) for key in parts[0]}
+
+
+def _serve_needs_batch(
+    pairs: list[tuple[Connection, dict[str, Any]]],
+    policy: Any,
+    *,
+    max_batch: int = 32,
+) -> None:
+    """Answer one or more actor ``need`` messages with batched inference."""
+    if not pairs:
+        return
+    chunk_size = max(1, int(max_batch))
+    for start in range(0, len(pairs), chunk_size):
+        chunk = pairs[start : start + chunk_size]
+        msgs = [msg for _, msg in chunk]
+        obs_batch = _obs_batch_for_many(msgs)
+        masks_list = [msg.get("action_masks") for msg in msgs]
+        if any(m is None for m in masks_list):
+            for conn, msg in chunk:
+                obs_one = _obs_batch_for_one(msg["obs"])
+                masks = msg.get("action_masks")
+                policy_version = int(getattr(policy, "policy_version", 0) or 0)
+                if masks is not None:
+                    act, val, lp = policy.predict_masked(
+                        obs_one, np.asarray(masks, dtype=bool)
+                    )
+                else:
+                    act_a, val_a, lp_a = policy.predict_batch(obs_one)
+                    act, val, lp = int(act_a[0]), float(val_a[0]), float(lp_a[0])
+                conn.send(
+                    {
+                        "t": "act",
+                        "action": act,
+                        "value": val,
+                        "logprob": lp,
+                        "policy_version": policy_version,
+                    }
+                )
+            continue
+        masks = np.asarray(masks_list, dtype=bool)
+        actions, values, log_probs = policy.predict_masked_batch(obs_batch, masks)
+        policy_version = int(getattr(policy, "policy_version", 0) or 0)
+        for i, (conn, _) in enumerate(chunk):
+            conn.send(
+                {
+                    "t": "act",
+                    "action": int(actions[i]),
+                    "value": float(values[i]),
+                    "logprob": float(log_probs[i]),
+                    "policy_version": policy_version,
+                }
+            )
+
+
+def _drain_actor_messages(
+    ready: list[Connection],
+    all_conns: list[Connection],
+    *,
+    max_need_batch: int,
+    batch_window_s: float = 0.002,
+) -> tuple[list[tuple[Connection, dict[str, Any]]], list[tuple[Connection, dict[str, Any]]]]:
+    """Collect ``need`` / ``rollout`` messages; briefly coalesce stray needs."""
+    needs: list[tuple[Connection, dict[str, Any]]] = []
+    rollouts: list[tuple[Connection, dict[str, Any]]] = []
+
+    def _take(conn: Connection) -> None:
+        while conn.poll():
+            msg = conn.recv()
+            kind = msg.get("t")
+            if kind == "need":
+                needs.append((conn, msg))
+            elif kind == "rollout":
+                rollouts.append((conn, msg))
+
+    for conn in ready:
+        _take(conn)
+
+    if (
+        needs
+        and batch_window_s > 0
+        and len(needs) < max(1, int(max_need_batch))
+    ):
+        deadline = time.monotonic() + batch_window_s
+        while time.monotonic() < deadline and len(needs) < max(1, int(max_need_batch)):
+            got = False
+            for conn in all_conns:
+                if conn.poll():
+                    got = True
+                    msg = conn.recv()
+                    kind = msg.get("t")
+                    if kind == "need":
+                        needs.append((conn, msg))
+                    elif kind == "rollout":
+                        rollouts.append((conn, msg))
+            if not got:
+                time.sleep(0.0002)
+
+    return needs, rollouts
+
 def _policy_obs_and_act_spaces():
     from re1_rl.distributed.spaces import make_re1_policy_spaces
 
@@ -74,12 +179,12 @@ def _copy_compatible_policy_weights(src_policy, dst_policy) -> int:
 
 
 def _transplant_into_current_spaces(model, *, tb_log: str | None, hp: dict):
-    from stable_baselines3 import PPO
+    from sb3_contrib import MaskablePPO
 
     from re1_rl.distributed.weights import _SpaceHolderEnv
 
     policy_obs, act_space = _policy_obs_and_act_spaces()
-    fresh = PPO(
+    fresh = MaskablePPO(
         "MultiInputPolicy",
         _SpaceHolderEnv(policy_obs, act_space),
         **hp,
@@ -95,7 +200,8 @@ def _transplant_into_current_spaces(model, *, tb_log: str | None, hp: dict):
 
 
 def load_async_learner(*, device: str, resume: Path | None, tb_log: str | None):
-    """PPO learner shell; accepts PPO or MaskablePPO checkpoint zips."""
+    """MaskablePPO learner shell; accepts PPO or MaskablePPO checkpoint zips."""
+    from sb3_contrib import MaskablePPO
     from stable_baselines3 import PPO
 
     from re1_rl.distributed.weights import _SpaceHolderEnv
@@ -105,31 +211,37 @@ def load_async_learner(*, device: str, resume: Path | None, tb_log: str | None):
     if tb_log:
         hp["tensorboard_log"] = tb_log
 
+    def _fresh_maskable(obs_space=None, act_space=None):
+        policy_obs_space, default_act = _policy_obs_and_act_spaces()
+        return MaskablePPO(
+            "MultiInputPolicy",
+            _SpaceHolderEnv(
+                obs_space if obs_space is not None else policy_obs_space,
+                act_space if act_space is not None else default_act,
+            ),
+            **hp,
+        )
+
     if resume is not None and resume.is_file():
         loaded = None
+        load_kind = "MaskablePPO"
         try:
-            loaded = PPO.load(str(resume), device=device)
-            load_kind = "PPO"
+            loaded = MaskablePPO.load(str(resume), device=device)
+            load_kind = "MaskablePPO"
         except (TypeError, ValueError, RuntimeError):
             try:
-                from sb3_contrib import MaskablePPO
-
-                maskable = MaskablePPO.load(str(resume), device=device)
-                loaded = PPO(
-                    "MultiInputPolicy",
-                    _SpaceHolderEnv(maskable.observation_space, maskable.action_space),
-                    **hp,
-                )
-                _copy_compatible_policy_weights(maskable.policy, loaded.policy)
-                loaded.num_timesteps = int(maskable.num_timesteps)
-                load_kind = "MaskablePPO"
+                plain = PPO.load(str(resume), device=device)
+                loaded = _fresh_maskable(plain.observation_space, plain.action_space)
+                _copy_compatible_policy_weights(plain.policy, loaded.policy)
+                loaded.num_timesteps = int(plain.num_timesteps)
+                load_kind = "PPO"
             except (TypeError, ValueError, RuntimeError) as exc:
                 raise RuntimeError(f"failed to load resume checkpoint {resume}") from exc
 
         if tb_log:
             loaded.tensorboard_log = tb_log
         print(
-            f"[train:async] resumed {load_kind} from {resume} "
+            f"[train:async] resumed {load_kind} into MaskablePPO from {resume} "
             f"(num_timesteps={loaded.num_timesteps})",
             flush=True,
         )
@@ -139,12 +251,7 @@ def load_async_learner(*, device: str, resume: Path | None, tb_log: str | None):
             )
         return loaded
 
-    policy_obs_space, act_space = _policy_obs_and_act_spaces()
-    return PPO(
-        "MultiInputPolicy",
-        _SpaceHolderEnv(policy_obs_space, act_space),
-        **hp,
-    )
+    return _fresh_maskable()
 
 
 def _actor_process(
@@ -159,6 +266,7 @@ def _actor_process(
     stop_flag: mp.synchronize.Synchronized,
     capture_checkpoints: bool,
     headless: bool = True,
+    screenshot_mmf: bool | None = None,
 ) -> None:
     from scripts.train_parallel import make_env
     from re1_rl.training_progress import slim_progress_info
@@ -173,6 +281,7 @@ def _actor_process(
             skip_chunk=skip_chunk,
             async_cutscene_skip=True,
             headless=headless,
+            screenshot_mmf=screenshot_mmf,
             spawn_progress=lambda phase: conn.send(
                 {"t": "spawn_progress", "rank": rank, "phase": phase}
             ),
@@ -193,6 +302,7 @@ def _actor_process(
     obs, _ = env.reset()
 
     obs_bufs: dict[str, np.ndarray] | None = None
+    mask_bufs: np.ndarray | None = None
     actions = np.zeros(n_steps, dtype=np.int64)
     rewards = np.zeros(n_steps, dtype=np.float32)
     dones = np.zeros(n_steps, dtype=np.bool_)
@@ -200,23 +310,29 @@ def _actor_process(
     log_probs = np.zeros(n_steps, dtype=np.float32)
     episode_infos: list[dict[str, Any]] = []
     step_i = 0
+    horizon_policy_version = 0
 
     def _reset_bufs() -> None:
-        nonlocal obs_bufs, step_i, episode_infos
+        nonlocal obs_bufs, mask_bufs, step_i, episode_infos, horizon_policy_version
         obs_bufs = {
             k: np.zeros((n_steps, *env.observation_space[k].shape), dtype=env.observation_space[k].dtype)
             for k in env.observation_space.spaces
         }
+        n_actions = int(env.action_space.n)
+        mask_bufs = np.zeros((n_steps, n_actions), dtype=np.bool_)
         step_i = 0
         episode_infos = []
+        horizon_policy_version = 0
 
     _reset_bufs()
 
     try:
         while not stop_flag.value:
             req: dict[str, Any] = {"t": "need", "rank": rank, "obs": obs}
+            masks_now = None
             if hasattr(env, "action_masks"):
-                req["action_masks"] = env.action_masks()
+                masks_now = np.asarray(env.action_masks(), dtype=bool)
+                req["action_masks"] = masks_now
             conn.send(req)
             msg = conn.recv()
             if msg.get("t") == "stop":
@@ -225,16 +341,31 @@ def _actor_process(
                 continue
 
             action = int(msg["action"])
-            assert obs_bufs is not None
-            for key in obs_bufs:
-                obs_bufs[key][step_i] = obs[key]
-            actions[step_i] = action
-            values[step_i] = float(msg["value"])
-            log_probs[step_i] = float(msg["logprob"])
+            value = float(msg["value"])
+            logprob = float(msg["logprob"])
+            if step_i == 0:
+                horizon_policy_version = int(msg.get("policy_version", 0) or 0)
 
+            obs_before = obs
+            masks_before = masks_now
             obs, rew, done, trunc, info = env.step(action)
             if info:
                 episode_infos.append(slim_progress_info(info))
+
+            # Exclude pure cutscene-skip ticks from the PPO buffer (zero reward,
+            # frozen obs). Post-skip credit lands on the next live control step.
+            if info.get("cutscene_skip") and not (done or trunc):
+                continue
+
+            assert obs_bufs is not None and mask_bufs is not None
+            for key in obs_bufs:
+                obs_bufs[key][step_i] = obs_before[key]
+            if masks_before is None:
+                masks_before = np.ones(int(env.action_space.n), dtype=bool)
+            mask_bufs[step_i] = masks_before
+            actions[step_i] = action
+            values[step_i] = value
+            log_probs[step_i] = logprob
             rewards[step_i] = float(rew)
             dones[step_i] = bool(done or trunc)
             step_i += 1
@@ -253,6 +384,8 @@ def _actor_process(
                         "dones": dones.copy(),
                         "values": values.copy(),
                         "log_probs": log_probs.copy(),
+                        "action_masks": mask_bufs.copy(),
+                        "policy_version": horizon_policy_version,
                         "last_obs": obs,
                         "episode_infos": episode_infos,
                     }
@@ -339,6 +472,8 @@ def run_async_fleet_training(
     device: str,
     tb_log: str,
     headless: bool = True,
+    screenshot_mmf: bool | None = None,
+    inference_batch_max: int = 32,
 ) -> int:
     from re1_rl.checkpoint_io import (
         atomic_model_save,
@@ -378,7 +513,8 @@ def run_async_fleet_training(
     print(
         f"[train:async] {n_envs} desync actors, target={train_steps} steps, "
         f"batch_threshold={batch_threshold}, "
-        f"checkpoint_every={save_interval} steps, headless={headless}",
+        f"checkpoint_every={save_interval} steps, headless={headless}, "
+        f"screenshot_mmf={screenshot_mmf}, inference_batch_max={inference_batch_max}",
         flush=True,
     )
 
@@ -403,6 +539,7 @@ def run_async_fleet_training(
                 "stop_flag": stop_flag,
                 "capture_checkpoints": capture_checkpoints,
                 "headless": headless,
+                "screenshot_mmf": screenshot_mmf,
             },
             name=f"async-actor-{rank}",
         )
@@ -430,44 +567,37 @@ def run_async_fleet_training(
                     break
                 continue
 
-            for conn in ready:
-                if not conn.poll():
-                    continue
-                msg = conn.recv()
-                if msg["t"] == "need":
-                    obs_batch = _obs_batch_for_one(msg["obs"])
-                    masks = msg.get("action_masks")
-                    if masks is not None:
-                        act, val, lp = policy.predict_masked(
-                            obs_batch, np.asarray(masks, dtype=bool)
-                        )
-                    else:
-                        act, val, lp = policy.predict_batch(obs_batch)
-                        act, val, lp = int(act[0]), float(val[0]), float(lp[0])
-                    conn.send(
-                        {"t": "act", "action": act, "value": val, "logprob": lp}
+            needs, rollouts = _drain_actor_messages(
+                ready,
+                parent_conns,
+                max_need_batch=inference_batch_max,
+            )
+            if needs:
+                _serve_needs_batch(needs, policy, max_batch=inference_batch_max)
+            for conn, msg in rollouts:
+                rank = int(msg["rank"])
+                last_values = policy.predict_values(_obs_batch_for_one(msg["last_obs"]))
+                obs = {k: np.expand_dims(v, axis=1) for k, v in msg["obs"].items()}
+                pending.append(
+                    WorkerRollout(
+                        worker_id=f"actor_{rank}",
+                        policy_version=int(msg.get("policy_version", policy_version)),
+                        n_envs=1,
+                        n_steps=n_steps,
+                        obs=obs,
+                        actions=np.expand_dims(msg["actions"], 1),
+                        rewards=np.expand_dims(msg["rewards"], 1),
+                        dones=np.expand_dims(msg["dones"], 1),
+                        values=np.expand_dims(msg["values"], 1),
+                        log_probs=np.expand_dims(msg["log_probs"], 1),
+                        last_values=last_values,
+                        action_masks=np.expand_dims(
+                            np.asarray(msg["action_masks"], dtype=np.bool_), 1
+                        ),
+                        episode_infos=list(msg.get("episode_infos") or []),
                     )
-                elif msg["t"] == "rollout":
-                    rank = int(msg["rank"])
-                    last_values = policy.predict_values(_obs_batch_for_one(msg["last_obs"]))
-                    obs = {k: np.expand_dims(v, axis=1) for k, v in msg["obs"].items()}
-                    pending.append(
-                        WorkerRollout(
-                            worker_id=f"actor_{rank}",
-                            policy_version=policy_version,
-                            n_envs=1,
-                            n_steps=n_steps,
-                            obs=obs,
-                            actions=np.expand_dims(msg["actions"], 1),
-                            rewards=np.expand_dims(msg["rewards"], 1),
-                            dones=np.expand_dims(msg["dones"], 1),
-                            values=np.expand_dims(msg["values"], 1),
-                            log_probs=np.expand_dims(msg["log_probs"], 1),
-                            last_values=last_values,
-                            episode_infos=list(msg.get("episode_infos") or []),
-                        )
-                    )
-                    pending_steps += n_steps
+                )
+                pending_steps += n_steps
 
             if pending_steps < batch_threshold:
                 continue
