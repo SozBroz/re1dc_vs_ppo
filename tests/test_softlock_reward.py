@@ -11,7 +11,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
-    DEATH_PENALTY_SCALED,
     ITEM_PICKUP_BONUS,
     NEW_ROOM_BONUS,
     REFERENCE_STEP_FRAMES,
@@ -20,7 +19,6 @@ from re1_rl.reward import (
     SOFTLOCK_TIMEOUT_PENALTY,
     STAGNANT_GRACE_FRAMES,
     STAGNANT_STEP_EXTRA_PENALTY,
-    STEP_PENALTY,
     stagnation_episode_timeout,
     compute_reward,
     softlock_reward_from_breakdown,
@@ -49,8 +47,8 @@ def _step(
     )
 
 
-def test_softlock_is_eighty_percent_of_death():
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-0.8 * DEATH_PENALTY_SCALED)
+def test_softlock_is_minus_one_checkpoint():
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-1.0)
     assert softlock_reward_from_breakdown(
         {"softlock": SOFTLOCK_TIMEOUT_PENALTY}
     ) == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY * REWARD_SCALE)
@@ -195,5 +193,5 @@ def test_full_stall_episode_includes_bulk_softlock():
         prev = cur
     assert stagnation_episode_timeout(progress, threshold=threshold)
     assert softlock_sum == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY * REWARD_SCALE)
-    # Dense tax ~-0.84 plus lump -0.8
+    # Dense tax ~-0.84 plus lump -1.0
     assert -2.5 < total < -1.0

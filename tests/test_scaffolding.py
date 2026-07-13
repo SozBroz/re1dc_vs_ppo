@@ -236,10 +236,10 @@ def test_damage_and_death_calibrated_to_waypoint():
     progress = ProgressTracker()
     assert WAYPOINT_ROOM_BONUS * REWARD_SCALE == NEW_ROOM_BONUS == CHECKPOINT_REWARD == 1.0
     assert STEP_PENALTY * REWARD_SCALE == pytest.approx(-CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT)
-    assert SURVIVAL_BUDGET_SCALED == pytest.approx(3.0 * CHECKPOINT_REWARD)
-    assert NEAR_DEATH_DAMAGE_SCALED == pytest.approx(2.0)
-    assert DEATH_PENALTY_SCALED == pytest.approx(1.0)
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-0.8 * DEATH_PENALTY_SCALED)
+    assert SURVIVAL_BUDGET_SCALED == pytest.approx(1.0 * CHECKPOINT_REWARD)
+    assert NEAR_DEATH_DAMAGE_SCALED == pytest.approx((2.0 / 3.0) * CHECKPOINT_REWARD)
+    assert DEATH_PENALTY_SCALED == pytest.approx((1.0 / 3.0) * CHECKPOINT_REWARD)
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-1.0 * CHECKPOINT_REWARD)
     assert HP_GAIN_SCALE == pytest.approx(0.8 * HP_LOSS_SCALE)
 
     full = make_state(hp=JILL_FINE_HP, step=1)

@@ -44,8 +44,8 @@ def test_mc_bootstrap_incomplete_rollout():
 
 def test_dual_gamma_softlock_uses_long_horizon():
     """Main channel γ=0.99; softlock lump γ=0.998 on the terminal step only."""
-    rewards = np.array([[0.1], [0.1], [-0.7]], dtype=np.float32)  # includes softlock
-    softlock = np.array([[0.0], [0.0], [-0.8]], dtype=np.float32)
+    rewards = np.array([[0.1], [0.1], [-0.9]], dtype=np.float32)  # includes softlock
+    softlock = np.array([[0.0], [0.0], [-1.0]], dtype=np.float32)
     dones = np.array([[False], [False], [True]], dtype=np.bool_)
     values = np.zeros_like(rewards)
     last_values = np.array([0.0], dtype=np.float32)
@@ -58,12 +58,12 @@ def test_dual_gamma_softlock_uses_long_horizon():
         gamma_main=0.99,
         gamma_softlock=0.998,
     )
-    # Softlock contribution at t=0: (-0.8) * 0.998^2
-    soft_at_0 = -0.8 * (0.998**2)
-    # Main rewards: 0.1, 0.1, 0.1  (total - softlock = -0.7 - (-0.8) = 0.1)
+    # Softlock contribution at t=0: (-1.0) * 0.998^2
+    soft_at_0 = -1.0 * (0.998**2)
+    # Main rewards: 0.1, 0.1, 0.1  (total - softlock = -0.9 - (-1.0) = 0.1)
     main_at_0 = 0.1 + 0.99 * (0.1 + 0.99 * 0.1)
     assert returns[0, 0] == pytest.approx(main_at_0 + soft_at_0)
-    assert returns[2, 0] == pytest.approx(0.1 + (-0.8))
+    assert returns[2, 0] == pytest.approx(0.1 + (-1.0))
 
 
 def test_normalize_advantages_safe_single_element_is_zero():
