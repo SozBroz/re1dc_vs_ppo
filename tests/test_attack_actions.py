@@ -347,6 +347,7 @@ def test_attack_macro_settles_after_locomotion() -> None:
         (0, 0, 0),
     ]
     hook_iter = iter(hook_seq)
+    inv_reads = {"n": 0}
 
     def read_ram(fields):
         names = {f[0] for f in fields}
@@ -355,7 +356,11 @@ def test_attack_macro_settles_after_locomotion() -> None:
         if "player_hp" in names:
             return {"player_hp": 96}
         if any(n.startswith("inv_slot_") for n in names):
-            return {n: 0x020F if n == "inv_slot_0" else 0 for n in names}
+            inv_reads["n"] += 1
+            # First _ammo_count is pre-shot; later reads show one round spent.
+            # Packing: high byte = qty, low byte = item id (beretta 0x02).
+            raw = 0x0F02 if inv_reads["n"] <= 1 else 0x0E02
+            return {n: raw if n == "inv_slot_0" else 0 for n in names}
         try:
             a, x, r = next(hook_iter)
         except StopIteration:
@@ -376,8 +381,152 @@ def test_attack_macro_settles_after_locomotion() -> None:
     )
     assert not died
     assert report["outcome"] == "ok"
+    assert report["ammo_spent"] == 1
     assert report["macro_path"] == "ranged:beretta"
     assert frames > 0
+
+
+def test_standing_gun_buttons_strip_aim_down() -> None:
+    from re1_rl.attack_macro import standing_gun_buttons
+
+    assert standing_gun_buttons({"r1": True, "down": True, "up": True}) == {"r1": True}
+    assert standing_gun_buttons(
+        {"r1": True, "cross": True, "down": True, "left": True, "square": True}
+    ) == {"r1": True, "cross": True}
+    assert standing_gun_buttons({"down": True}) == {}
+
+
+def test_ranged_macro_strips_down_from_pad_and_sticky() -> None:
+    from unittest.mock import MagicMock
+
+    import re1_rl.attack_macro as am
+
+    bridge = MagicMock()
+    bridge.step.return_value = (0, False)
+    hook_seq = [
+        (0, 0, 0),
+        (0, 0, 0),
+        (0x12, 0x03, 0),
+        (0x13, 0x03, 0),
+        (0x13, 0x03, 0),
+        (0x14, 0x03, 0),
+        (0x14, 0x03, 0),
+        (0x13, 0x03, 0),
+        (0, 0, 0),
+    ]
+    hook_iter = iter(hook_seq)
+    inv_reads = {"n": 0}
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "equipped_weapon_id" in names:
+            return {"equipped_weapon_id": 0x02}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        if any(n.startswith("inv_slot_") for n in names):
+            inv_reads["n"] += 1
+            raw = 0x0F02 if inv_reads["n"] <= 1 else 0x0E02
+            return {n: raw if n == "inv_slot_0" else 0 for n in names}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0, 0, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    bridge.read_ram.side_effect = read_ram
+    # Contaminate module pads + sticky the way a buggy caller / watch script might.
+    am.AIM_BUTTONS.clear()
+    am.AIM_BUTTONS.update({"r1": True, "down": True, "up": True})
+    am.FIRE_BUTTONS.clear()
+    am.FIRE_BUTTONS.update({"r1": True, "cross": True, "down": True, "left": True})
+    try:
+        died, _frames, report = execute_attack_macro(
+            bridge,
+            empty_sticky={
+                "up": False,
+                "down": True,
+                "left": True,
+                "right": False,
+                "square": True,
+            },
+            prev_hp=96,
+            episode_start_hp=96,
+        )
+    finally:
+        am.AIM_BUTTONS.clear()
+        am.AIM_BUTTONS.update({"r1": True})
+        am.FIRE_BUTTONS.clear()
+        am.FIRE_BUTTONS.update({"r1": True, "cross": True})
+
+    assert not died
+    assert report["outcome"] == "ok"
+    assert report["ammo_spent"] == 1
+    for call in bridge.step.call_args_list:
+        kwargs = call.kwargs
+        sticky = kwargs.get("sticky") or {}
+        assert sticky.get("down") is not True
+        assert sticky.get("up") is not True
+        assert sticky.get("left") is not True
+        assert sticky.get("right") is not True
+        assert sticky.get("square") is not True
+        for btn in kwargs.get("frame_buttons") or []:
+            assert "down" not in btn or not btn["down"]
+            assert "up" not in btn or not btn["up"]
+            assert "left" not in btn or not btn["left"]
+            assert "right" not in btn or not btn["right"]
+            assert "square" not in btn or not btn["square"]
+
+
+def test_ranged_dry_fire_not_ok() -> None:
+    """Fire anim without ammo decrement (floor-aim style) must not report ok."""
+    from unittest.mock import MagicMock
+
+    bridge = MagicMock()
+    bridge.step.return_value = (0, False)
+    hook_seq = [
+        (0, 0, 0),
+        (0, 0, 0),
+        (0x12, 0x03, 0),
+        (0x13, 0x03, 0),
+        (0x13, 0x03, 0),
+        (0x14, 0x03, 0),
+        (0x14, 0x03, 0),
+        (0x13, 0x03, 0),
+        (0, 0, 0),
+    ]
+    hook_iter = iter(hook_seq)
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "equipped_weapon_id" in names:
+            return {"equipped_weapon_id": 0x02}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        if any(n.startswith("inv_slot_") for n in names):
+            # Ammo never drops — simulates R1+Down floor aim.
+            return {n: 0x0F02 if n == "inv_slot_0" else 0 for n in names}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0, 0, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    bridge.read_ram.side_effect = read_ram
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    _died, _frames, report = execute_attack_macro(
+        bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
+    )
+    assert report["saw_fire_anim"] is True
+    assert report["ammo_spent"] == 0
+    assert report["outcome"] == "dry_fire"
 
 
 def test_attack_knife_uses_crouch_macro_path(monkeypatch) -> None:

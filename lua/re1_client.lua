@@ -458,7 +458,13 @@ local function handle_command(cmd)
         local pulse_off = tonumber(cmd.pulse_off) or 2
         local pulse_from = tonumber(cmd.pulse_from) or 1
         local pulse_through = cmd.pulse_through == true
-        if use_sticky then
+        -- frame_buttons macros (knife / standing gun) own the pad: never inherit
+        -- latched walk / aim-down from a prior env step (R1+Down = floor aim).
+        if use_frame_buttons then
+            for k, _ in pairs(STICKY) do
+                STICKY[k] = false
+            end
+        elseif use_sticky then
             for k, v in pairs(cmd.sticky) do
                 if STICKY[k] ~= nil then
                     STICKY[k] = v == true

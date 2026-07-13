@@ -34,6 +34,7 @@ from re1_rl.memory_map import (
     ITEM_IDS,
     WEAPON_ITEM_IDS,
 )
+from re1_rl.sticky_input import STICKY_KEYS
 
 KNIFE_WEAPON_ID = 0x01
 
@@ -42,8 +43,28 @@ AIM_ANIM_STABLE = 0x13
 FIRE_ANIM = 0x14
 GUN_AUX_TRACK = 0x03
 
+# Standing gun pad only — never up/down/left/right (RE1: R1+Down = floor aim).
+RANGED_FACE_KEYS = frozenset({"r1", "cross"})
+
 AIM_BUTTONS = {"r1": True}
 FIRE_BUTTONS = {"r1": True, "cross": True}
+
+
+def standing_gun_buttons(buttons: dict[str, bool] | None) -> dict[str, bool]:
+    """Keep only standing-gun face buttons; strip aim-up / aim-down / strafe."""
+    if not buttons:
+        return {}
+    return {k: True for k in RANGED_FACE_KEYS if buttons.get(k)}
+
+
+def cleared_movement_sticky(sticky: dict[str, bool] | None = None) -> dict[str, bool]:
+    """All direction/run latches off — ranged macros must not inherit walk/aim-down."""
+    out = {k: False for k in STICKY_KEYS}
+    if sticky:
+        for k, v in sticky.items():
+            if k not in STICKY_KEYS:
+                out[k] = bool(v) and k in RANGED_FACE_KEYS
+    return out
 
 MAX_SETTLE_FRAMES = 20
 MAX_AIM_FRAMES = 120
@@ -229,13 +250,22 @@ def _execute_ranged_attack_macro(
     weapon_id: int,
     weapon: str | None,
 ) -> tuple[bool, int, dict[str, Any]]:
-    """Standing R1 aim + fire for beretta, shotgun, magnum, etc."""
+    """Standing R1 aim + fire for beretta, shotgun, magnum, etc.
+
+    Robust to aim-down / sticky movement: directions are stripped from every
+    pad frame and movement sticky is force-cleared so R1+Down cannot floor-aim.
+    """
     report = _empty_report(weapon_id, weapon)
     report["macro_path"] = f"ranged:{weapon or weapon_id}"
 
+    # Never inherit walk / aim-down latch from the prior env step.
+    empty_sticky = cleared_movement_sticky(empty_sticky)
+    aim_pad = standing_gun_buttons(AIM_BUTTONS)
+    fire_pad = standing_gun_buttons(FIRE_BUTTONS)
+
     max_aim, max_recovery = frame_budget(weapon or "")
     ammo_before = _ammo_count(bridge, weapon_id)
-    neutral = {k: False for k in empty_sticky}
+    neutral: dict[str, bool] = {}
     total = 0
     trail: list[str] = []
 
@@ -247,20 +277,27 @@ def _execute_ranged_attack_macro(
         return anim, aux, rec
 
     def _finish(outcome: str, died: bool) -> tuple[bool, int, dict[str, Any]]:
-        report["outcome"] = outcome
         report["frames"] = total
         report["trail"] = list(trail)
+        spent = 0
         try:
-            report["ammo_spent"] = max(0, ammo_before - _ammo_count(bridge, weapon_id))
+            spent = max(0, ammo_before - _ammo_count(bridge, weapon_id))
         except (OSError, RuntimeError, KeyError, TypeError):
             pass
+        report["ammo_spent"] = spent
+        # Floor-aim / jammed pad can flash fire anim (0x14) without spending a
+        # round — never grade that as a successful gun attack.
+        if outcome == "ok" and spent <= 0:
+            report["outcome"] = "dry_fire"
+        else:
+            report["outcome"] = outcome
         return died, total, report
 
     def _step(buttons: dict[str, bool]) -> bool:
         nonlocal total
         died = _step_one_frame(
             bridge,
-            buttons,
+            standing_gun_buttons(buttons),
             empty_sticky=empty_sticky,
             echo_joypad=False,
             prev_hp=prev_hp,
@@ -307,7 +344,7 @@ def _execute_ranged_attack_macro(
     while stable_run < MIN_BUTTON_PHASE_FRAMES:
         if aim_wait >= max_aim:
             return _finish("aim_timeout", False)
-        if _step(AIM_BUTTONS):
+        if _step(aim_pad):
             return _finish("death", True)
         aim_wait += 1
         anim, aux, rec = _observe()
@@ -316,7 +353,7 @@ def _execute_ranged_attack_macro(
         stable_run = stable_run + 1 if is_gun_aim_stable(anim, aux, rec) else 0
 
     for _ in range(MIN_FIRE_HOLD_FRAMES):
-        if _step(FIRE_BUTTONS):
+        if _step(fire_pad):
             return _finish("death", True)
         anim, aux, _rec = _observe()
         if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
@@ -333,7 +370,7 @@ def _execute_ranged_attack_macro(
             break
         if not is_gun_attack_track(anim, aux):
             return _finish("recovery_interrupt", False)
-        if _step(AIM_BUTTONS):
+        if _step(aim_pad):
             return _finish("death", True)
         rec_wait += 1
     else:

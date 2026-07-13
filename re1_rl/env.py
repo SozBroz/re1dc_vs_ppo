@@ -1470,10 +1470,14 @@ class RE1Env(gym.Env):
             self._sticky_input.apply(0, ACTION_BUTTON_MAP)
             self._macro_active = True
             try:
+                from re1_rl.attack_macro import cleared_movement_sticky
+
                 died_during_step, step_emulated_frames, attack_report = (
                     execute_attack_macro(
                         self.bridge,
-                        empty_sticky=self._sticky_input.as_dict(),
+                        empty_sticky=cleared_movement_sticky(
+                            self._sticky_input.as_dict()
+                        ),
                         prev_hp=self._prev_hp,
                         episode_start_hp=getattr(self, "_episode_start_hp", 0),
                     )
