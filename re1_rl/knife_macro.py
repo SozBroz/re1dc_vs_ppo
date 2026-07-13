@@ -1021,7 +1021,13 @@ def _step_one_frame(
         echo_joypad=echo_joypad,
     )
     if died:
-        return True
+        # Lua aborts the batch on a one-frame HP==0; confirm before treating as death
+        # (false positives happen at low HP near downed zombies).
+        if _macro_player_died(
+            bridge, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        ):
+            return True
+        return False
     return _macro_player_died(
         bridge, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )

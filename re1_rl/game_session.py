@@ -270,6 +270,23 @@ def episode_death_signal_from_ram(
     )
 
 
+def confirm_midstep_death_abort(
+    ram: dict[str, int | float],
+    *,
+    episode_start_hp: int = 0,
+    prev_hp: int = 0,
+) -> str | None:
+    """Confirm a Lua/skip ``HP==0`` abort should end the episode.
+
+    Mid-step HP can flicker to 0 for a frame (damage resolve, grab edge cases)
+    while Jill is still alive — common when low HP near a downed Kenneth zombie.
+    Only return a failure reason when post-abort RAM still says dead / death UI.
+    """
+    return episode_failure_reason(
+        ram, episode_start_hp=episode_start_hp, prev_hp=prev_hp
+    )
+
+
 def episode_failure_reason(
     ram: dict[str, int | float],
     *,

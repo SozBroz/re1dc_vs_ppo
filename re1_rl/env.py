@@ -157,6 +157,18 @@ FRAME_STACK = 4
 FRAME_SHAPE = (FRAME_H, FRAME_W, FRAME_STACK)  # HWC channels-last (RE1Env)
 FRAME_SHAPE_CHW = (FRAME_STACK, FRAME_H, FRAME_W)  # SB3 / VecTransposeImage
 
+# Episode failures that mean "Jill died / title escape" — confirm before ending
+# when seen at step entry (HP can flicker to 0 for one frame in low-HP combat).
+_DEATH_FAILURE_REASONS = frozenset(
+    {
+        "hp_death",
+        "scripted_death_hp",
+        "death_screen_ui",
+        "death_continue_screen",
+        "death_room_overlay",
+        "title_mode_select",
+    }
+)
 
 def _prune_square_pillarbox(square: np.ndarray) -> np.ndarray:
     """Drop fixed pillarbox columns from an 84-wide (HxW) gray/RGB frame."""
@@ -666,16 +678,49 @@ class RE1Env(gym.Env):
         """Lightweight HP poll while async skip is burning (dog/hunter scenes)."""
         if self._skip_cache_state and self._skip_cache_state.get("dead"):
             return True
+        # Require two consecutive zero-HP reads so a one-frame flicker does not
+        # abort cutscene skip (false episode end near low-HP combat).
         try:
             hp_ram = self.bridge.read_ram([("player_hp", PLAYER_HP, "u16")])
             hp = int(hp_ram.get("player_hp", 0))
         except (OSError, RuntimeError, ValueError):
             return False
-        return player_died(
-            hp,
-            prev_hp=self._prev_hp,
-            episode_start_hp=getattr(self, "_episode_start_hp", 0),
-        )
+        start_hp = getattr(self, "_episode_start_hp", 0)
+        if not player_died(hp, prev_hp=self._prev_hp, episode_start_hp=start_hp):
+            return False
+        try:
+            hp_ram2 = self.bridge.read_ram([("player_hp", PLAYER_HP, "u16")])
+            hp2 = int(hp_ram2.get("player_hp", 0))
+        except (OSError, RuntimeError, ValueError):
+            return True
+        return player_died(hp2, prev_hp=self._prev_hp, episode_start_hp=start_hp)
+
+    def _confirm_death_after_abort(self) -> str | None:
+        """After mid-step/skip HP abort: keep episode alive unless death sticks."""
+        reason = self._probe_episode_failure()
+        if reason is not None:
+            return reason
+        try:
+            self.bridge.frameadvance(4)
+        except (OSError, RuntimeError, ValueError):
+            pass
+        reason = self._probe_episode_failure()
+        if reason is not None:
+            return reason
+        try:
+            ram = self._failure_ram_probe()
+            port = getattr(self.bridge, "port", None)
+            print(
+                f"[death_false_positive] port={port} "
+                f"hp={int(ram.get('player_hp', -1))} "
+                f"gs=0x{int(ram.get('game_state', 0)):08X} "
+                f"mode=0x{int(ram.get('game_mode', 0)):02X} "
+                f"room={int(ram.get('stage_id', 0)) + 1}{int(ram.get('room_id', 0)):02X}",
+                flush=True,
+            )
+        except (OSError, RuntimeError, ValueError):
+            print("[death_false_positive] (ram probe failed)", flush=True)
+        return None
 
     def _refresh_skip_cache(self) -> None:
         rgb = self.bridge.screenshot()
@@ -692,8 +737,12 @@ class RE1Env(gym.Env):
         self, action: int
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         if self._poll_death_during_skip():
-            self._skipping_flag = False
-            return self._death_step(action, died_during_skip=True, died_during_step=False)
+            death = self._death_step(
+                action, died_during_skip=True, died_during_step=False
+            )
+            if death is not None:
+                self._skipping_flag = False
+                return death
         self._step_count += 1
         if self._skip_cache_obs is None:
             try:
@@ -812,8 +861,14 @@ class RE1Env(gym.Env):
 
     def _death_step(
         self, action: int, *, died_during_skip: bool, died_during_step: bool
-    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
-        reason = self._probe_episode_failure() or "hp_death"
+    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]] | None:
+        """Terminate on confirmed death. Return None if mid-step abort was a flicker."""
+        if died_during_step or died_during_skip:
+            reason = self._confirm_death_after_abort()
+            if reason is None:
+                return None
+        else:
+            reason = self._probe_episode_failure() or "hp_death"
         return self._episode_failure_step(
             action,
             reason=reason,
@@ -1151,9 +1206,11 @@ class RE1Env(gym.Env):
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         """Inventory submenu step; contempt scales with ``step_emulated_frames``."""
         if died:
-            return self._death_step(
+            death = self._death_step(
                 action, died_during_skip=False, died_during_step=True
             )
+            if death is not None:
+                return death
         assert self._planner is not None
         self._step_count += 1
         self._sample_anim_history()
@@ -1340,14 +1397,25 @@ class RE1Env(gym.Env):
         self._start_bg_skip()
         if self._bg_death:
             self._bg_death = False
-            self._skipping_flag = False
-            return self._death_step(action, died_during_skip=True, died_during_step=False)
+            death = self._death_step(
+                action, died_during_skip=True, died_during_step=False
+            )
+            if death is not None:
+                self._skipping_flag = False
+                return death
         menu_reason = self._probe_outside_gameplay()
         if menu_reason == "options_menu":
             recovered, _options_report = self._try_dismiss_options_menu()
             if recovered:
                 menu_reason = self._probe_outside_gameplay()
             # If still options (or another failure), fall through to terminate.
+        if menu_reason in _DEATH_FAILURE_REASONS:
+            death = self._death_step(
+                action, died_during_skip=False, died_during_step=True
+            )
+            if death is not None:
+                return death
+            menu_reason = None
         if menu_reason:
             return self._outside_gameplay_step(action, reason=menu_reason)
         if self._async_cutscene_skip and self._skipping_flag:
@@ -1443,10 +1511,13 @@ class RE1Env(gym.Env):
                 pulse_hold=pulse_hold,
             )
         if died_during_step:
-            self._skipping_flag = False
-            return self._death_step(
+            death = self._death_step(
                 action, died_during_skip=False, died_during_step=True
             )
+            if death is not None:
+                self._skipping_flag = False
+                return death
+            died_during_step = False
 
         if self._async_cutscene_skip and self._probe_needs_skip():
             self._skipping_flag = True
@@ -1457,9 +1528,12 @@ class RE1Env(gym.Env):
         if not self._async_cutscene_skip:
             skipped, died_during_skip = self._skip_uncontrolled()
             if died_during_skip:
-                return self._death_step(
+                death = self._death_step(
                     action, died_during_skip=True, died_during_step=False
                 )
+                if death is not None:
+                    return death
+                died_during_skip = False
 
         self._step_count += 1
         self._sample_anim_history()

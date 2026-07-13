@@ -210,3 +210,23 @@ def test_options_menu_does_not_false_positive_dining() -> None:
 
 def test_normal_play_not_failure() -> None:
     assert episode_failure_reason(_ram(), episode_start_hp=96, prev_hp=96) is None
+
+
+def test_midstep_hp_abort_rejected_when_still_alive() -> None:
+    """Lua saw HP==0 mid-batch but post-abort RAM still shows living Jill."""
+    from re1_rl.game_session import confirm_midstep_death_abort
+
+    ram = _ram(player_hp=12, game_state=0x80800000, game_mode=IN_CONTROL_MASK)
+    assert (
+        confirm_midstep_death_abort(ram, episode_start_hp=96, prev_hp=12) is None
+    )
+
+
+def test_midstep_hp_abort_confirmed_when_hp_stays_zero() -> None:
+    from re1_rl.game_session import confirm_midstep_death_abort
+
+    ram = _ram(player_hp=0, game_state=0x80800000, game_mode=IN_CONTROL_MASK)
+    assert (
+        confirm_midstep_death_abort(ram, episode_start_hp=96, prev_hp=12)
+        == "hp_death"
+    )
