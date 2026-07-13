@@ -34,6 +34,7 @@ from re1_rl.async_fleet import (  # noqa: E402
     PPO_HYPERPARAMS,
     load_async_learner,
 )
+from re1_rl.reward import SOFTLOCK_GAMMA  # noqa: E402
 from re1_rl.distributed.learner_server import (  # noqa: E402
     LearnerRolloutSink,
     LearnerState,
@@ -255,7 +256,8 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         f"epoch hyperparams lr={DISTRIBUTED_EPOCH_HYPERPARAMS['learning_rate']} "
         f"batch_size={DISTRIBUTED_EPOCH_HYPERPARAMS['batch_size']} "
         f"n_epochs={DISTRIBUTED_EPOCH_HYPERPARAMS['n_epochs']} "
-        f"gamma={DISTRIBUTED_EPOCH_HYPERPARAMS['gamma']}",
+        f"gamma={DISTRIBUTED_EPOCH_HYPERPARAMS['gamma']} "
+        f"gamma_softlock={SOFTLOCK_GAMMA}",
     )
     return model, ckpt_dir
 

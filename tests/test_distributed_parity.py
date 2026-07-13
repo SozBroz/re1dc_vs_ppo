@@ -99,7 +99,7 @@ def test_distributed_ppo_hyperparams_match_async_fleet() -> None:
         batch_size=512,
         n_epochs=4,
         learning_rate=3e-4,
-        gamma=0.998,
+        gamma=0.99,
         ent_coef=0.01,
     )
 

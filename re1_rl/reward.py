@@ -46,8 +46,6 @@ SOFTLOCK_FRAME_THRESHOLD = 9600
 STAGNANT_GRACE_FRAMES = 2400
 # Extra step tax while stagnant (on top of STEP_PENALTY) after grace.
 STAGNANT_STEP_EXTRA_PENALTY = -CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT
-# Legacy alias — lump softlock removed; tests may import zero.
-SOFTLOCK_TIMEOUT_PENALTY = 0.0
 
 ENEMY_DAMAGE_REWARD = CHECKPOINT_REWARD / 200
 ENEMY_KILL_REWARD = CHECKPOINT_REWARD / 50
@@ -62,8 +60,14 @@ SURVIVAL_BUDGET_SCALED = 3.0 * CHECKPOINT_REWARD
 NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # 2.0
 DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # 1.0
 DEATH_PENALTY = -DEATH_PENALTY_SCALED
+# Bulk "did nothing" terminal (truncation). Dual-γ channel uses SOFTLOCK_GAMMA.
+SOFTLOCK_TIMEOUT_PENALTY = -0.8 * DEATH_PENALTY_SCALED
 
 REWARD_SCALE = 1.0
+
+# Dual discount: dense/main rewards at RL_GAMMA; softlock lump at SOFTLOCK_GAMMA.
+RL_GAMMA = 0.99
+SOFTLOCK_GAMMA = 0.998
 
 HP_LOSS_SCALE = NEAR_DEATH_DAMAGE_SCALED / (JILL_FINE_HP - 1)
 # Heal recovers ~80% of the damage channel so chip-then-herb is not free.
@@ -267,8 +271,17 @@ def compute_reward(
             )
         if progress.stagnant_tax_active(grace_frames=STAGNANT_GRACE_FRAMES):
             bd["stagnant_step"] = STAGNANT_STEP_EXTRA_PENALTY * step_scale
+        if progress.stagnation_timed_out(threshold=softlock_threshold):
+            bd["softlock"] = SOFTLOCK_TIMEOUT_PENALTY
 
     reward = float(sum(bd.values())) * REWARD_SCALE
     if return_breakdown:
         return reward, bd
     return reward
+
+
+def softlock_reward_from_breakdown(breakdown: dict[str, float] | None) -> float:
+    """Scaled softlock channel contribution (0 when absent)."""
+    if not breakdown:
+        return 0.0
+    return float(breakdown.get("softlock", 0.0)) * REWARD_SCALE

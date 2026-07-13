@@ -59,6 +59,7 @@ def encode_rollout(rollout: WorkerRollout) -> bytes:
         "log_probs": rollout.log_probs,
         "last_values": rollout.last_values,
         "action_masks": np.asarray(rollout.action_masks, dtype=np.bool_),
+        "rewards_softlock": rollout.softlock_rewards(),
     }
     for key, arr in obs_rest.items():
         save_kwargs[f"obs__{key}"] = arr
@@ -119,6 +120,11 @@ def decode_rollout(data: bytes) -> WorkerRollout:
             obs[_FRAME_KEY] = _decompress_frame(frame_bytes, list(shape))
         elif _FRAME_KEY in meta.get("obs_keys", []):
             obs[_FRAME_KEY] = loaded[f"obs__{_FRAME_KEY}"]
+        softlock = (
+            loaded["rewards_softlock"]
+            if "rewards_softlock" in loaded.files
+            else np.zeros_like(loaded["rewards"], dtype=np.float32)
+        )
         return WorkerRollout(
             worker_id=str(meta["worker_id"]),
             policy_version=int(meta["policy_version"]),
@@ -133,4 +139,5 @@ def decode_rollout(data: bytes) -> WorkerRollout:
             last_values=loaded["last_values"],
             action_masks=np.asarray(loaded["action_masks"], dtype=np.bool_),
             episode_infos=list(meta.get("episode_infos") or []),
+            rewards_softlock=np.asarray(softlock, dtype=np.float32),
         )

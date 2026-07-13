@@ -1,17 +1,21 @@
-"""Stagnation: grace window, per-step tax, episode timeout (no lump softlock)."""
+"""Stagnation: grace window, per-step tax, bulk softlock at timeout."""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
+    DEATH_PENALTY_SCALED,
     ITEM_PICKUP_BONUS,
     NEW_ROOM_BONUS,
     REFERENCE_STEP_FRAMES,
+    REWARD_SCALE,
     SOFTLOCK_FRAME_THRESHOLD,
     SOFTLOCK_TIMEOUT_PENALTY,
     STAGNANT_GRACE_FRAMES,
@@ -19,6 +23,7 @@ from re1_rl.reward import (
     STEP_PENALTY,
     stagnation_episode_timeout,
     compute_reward,
+    softlock_reward_from_breakdown,
 )
 from tests.test_scaffolding import make_planner, make_state
 
@@ -29,6 +34,7 @@ def _step(
     cur,
     *,
     step_frames=REFERENCE_STEP_FRAMES,
+    softlock_threshold=SOFTLOCK_FRAME_THRESHOLD,
 ):
     cur = dict(cur)
     cur.setdefault("step_emulated_frames", step_frames)
@@ -38,12 +44,16 @@ def _step(
         cur,
         make_planner(),
         progress=progress,
+        softlock_threshold=softlock_threshold,
         return_breakdown=True,
     )
 
 
-def test_no_lump_softlock_penalty():
-    assert SOFTLOCK_TIMEOUT_PENALTY == 0.0
+def test_softlock_is_eighty_percent_of_death():
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-0.8 * DEATH_PENALTY_SCALED)
+    assert softlock_reward_from_breakdown(
+        {"softlock": SOFTLOCK_TIMEOUT_PENALTY}
+    ) == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY * REWARD_SCALE)
 
 
 def test_grace_period_no_stagnant_step_tax():
@@ -75,18 +85,22 @@ def test_stagnant_step_tax_after_grace():
     assert bd["softlock"] == 0.0
 
 
-def test_stagnation_timeout_at_threshold():
+def test_stagnation_timeout_applies_bulk_softlock():
     progress = ProgressTracker()
     progress.first_visit("105")
     threshold = 40
     step_frames = 4
     prev = make_state(room="105", step=0)
-    for i in range(1, 20):
+    bd = None
+    for i in range(1, 11):
         cur = make_state(room="105", step=i)
-        _step(progress, prev, cur, step_frames=step_frames)
+        _, bd = _step(
+            progress, prev, cur, step_frames=step_frames, softlock_threshold=threshold
+        )
         prev = cur
     assert stagnation_episode_timeout(progress, threshold=threshold)
-    assert progress.stagnation_frames >= threshold
+    assert bd is not None
+    assert bd["softlock"] == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY)
 
 
 def test_room_loop_without_new_visits_accumulates_stagnation():
@@ -99,7 +113,9 @@ def test_room_loop_without_new_visits_accumulates_stagnation():
     prev = make_state(room="105", step=0)
     for i, room in enumerate(path[1:], start=1):
         cur = make_state(room=room, step=i)
-        _, bd = _step(progress, prev, cur, step_frames=step_frames)
+        _, bd = _step(
+            progress, prev, cur, step_frames=step_frames, softlock_threshold=10_000
+        )
         assert bd["new_room"] == 0.0
         assert bd["softlock"] == 0.0
         prev = cur
@@ -161,20 +177,23 @@ def test_long_step_advances_stagnation_proportionally():
     assert progress.stagnation_frames == 120
 
 
-def test_full_stall_episode_return_order_of_magnitude():
-    """~2400 stagnant env steps: step + stagnant tax, no lump."""
+def test_full_stall_episode_includes_bulk_softlock():
+    """~2400 stagnant env steps: step + stagnant tax + terminal softlock lump."""
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", step=0)
     total = 0.0
+    softlock_sum = 0.0
     threshold = SOFTLOCK_FRAME_THRESHOLD
     step_frames = REFERENCE_STEP_FRAMES
     steps = threshold // step_frames
     for i in range(1, steps + 1):
         cur = make_state(room="105", step=i)
-        rew, _ = _step(progress, prev, cur, step_frames=step_frames)
+        rew, bd = _step(progress, prev, cur, step_frames=step_frames)
         total += rew
+        softlock_sum += bd["softlock"] * REWARD_SCALE
         prev = cur
     assert stagnation_episode_timeout(progress, threshold=threshold)
-    # Grace ~600 steps @ -0.0002, then ~1800 @ -0.0004 ≈ -0.84
-    assert -1.5 < total < -0.3
+    assert softlock_sum == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY * REWARD_SCALE)
+    # Dense tax ~-0.84 plus lump -0.8
+    assert -2.5 < total < -1.0

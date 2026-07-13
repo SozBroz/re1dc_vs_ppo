@@ -24,6 +24,13 @@ class WorkerRollout:
     # (n_steps, n_envs, n_actions) bool — required for MaskablePPO train parity
     action_masks: np.ndarray
     episode_infos: list[dict[str, Any]] = field(default_factory=list)
+    # Softlock lump channel (dual-γ); None → treat as zeros (legacy payloads).
+    rewards_softlock: np.ndarray | None = None
 
     def num_timesteps(self) -> int:
         return int(self.n_envs * self.n_steps)
+
+    def softlock_rewards(self) -> np.ndarray:
+        if self.rewards_softlock is None:
+            return np.zeros_like(self.rewards, dtype=np.float32)
+        return np.asarray(self.rewards_softlock, dtype=np.float32)

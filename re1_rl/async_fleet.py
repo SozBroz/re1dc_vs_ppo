@@ -12,12 +12,14 @@ import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
+from re1_rl.reward import RL_GAMMA
+
 PPO_HYPERPARAMS: dict[str, Any] = dict(
     n_steps=1024,
     batch_size=512,
     n_epochs=4,
     learning_rate=3e-4,
-    gamma=0.998,
+    gamma=RL_GAMMA,
     ent_coef=0.01,
 )
 
@@ -28,7 +30,7 @@ DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     batch_size=2048,
     n_epochs=2,
     learning_rate=1e-4,
-    gamma=0.998,
+    gamma=RL_GAMMA,
     ent_coef=0.01,
 )
 DEFAULT_SYNC_INTERVAL_S = 360.0
@@ -269,6 +271,7 @@ def _actor_process(
     screenshot_mmf: bool | None = None,
 ) -> None:
     from scripts.train_parallel import make_env
+    from re1_rl.reward import softlock_reward_from_breakdown
     from re1_rl.training_progress import slim_progress_info
 
     try:
@@ -305,6 +308,7 @@ def _actor_process(
     mask_bufs: np.ndarray | None = None
     actions = np.zeros(n_steps, dtype=np.int64)
     rewards = np.zeros(n_steps, dtype=np.float32)
+    rewards_softlock = np.zeros(n_steps, dtype=np.float32)
     dones = np.zeros(n_steps, dtype=np.bool_)
     values = np.zeros(n_steps, dtype=np.float32)
     log_probs = np.zeros(n_steps, dtype=np.float32)
@@ -334,6 +338,7 @@ def _actor_process(
                 "obs": {k: v[:n].copy() for k, v in obs_bufs.items()},
                 "actions": actions[:n].copy(),
                 "rewards": rewards[:n].copy(),
+                "rewards_softlock": rewards_softlock[:n].copy(),
                 "dones": dones[:n].copy(),
                 "values": values[:n].copy(),
                 "log_probs": log_probs[:n].copy(),
@@ -387,6 +392,9 @@ def _actor_process(
             values[step_i] = value
             log_probs[step_i] = logprob
             rewards[step_i] = float(rew)
+            rewards_softlock[step_i] = softlock_reward_from_breakdown(
+                (info or {}).get("reward_breakdown")
+            )
             dones[step_i] = bool(done or trunc)
             step_i += 1
 
@@ -602,6 +610,15 @@ def run_async_fleet_training(
                             np.asarray(msg["action_masks"], dtype=np.bool_), 1
                         ),
                         episode_infos=list(msg.get("episode_infos") or []),
+                        rewards_softlock=np.expand_dims(
+                            np.asarray(
+                                msg.get("rewards_softlock")
+                                if msg.get("rewards_softlock") is not None
+                                else np.zeros_like(msg["rewards"]),
+                                dtype=np.float32,
+                            ),
+                            1,
+                        ),
                     )
                 )
                 pending_steps += n_steps
