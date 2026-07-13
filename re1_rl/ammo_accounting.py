@@ -7,7 +7,7 @@ from re1_rl.memory_map import WEAPON_ITEM_IDS
 # Reserve ammo item id per weapon (None = knife / no ammo item).
 WEAPON_AMMO_ITEM: dict[int, int | None] = {
     0x01: None,
-    0x02: 0x02,  # beretta clips share id 0x02
+    0x02: 0x0B,  # beretta + spare handgun_bullets
     0x03: 0x0C,  # shotgun + shells
     0x04: 0x0D,  # colt python dumdum
     0x05: 0x0E,  # colt python magnum
@@ -20,7 +20,7 @@ WEAPON_AMMO_ITEM: dict[int, int | None] = {
 
 # Rounds the weapon slot itself can hold after a COMBINE reload (PS1 DC).
 WEAPON_CLIP_CAPACITY: dict[int, int] = {
-    0x02: 60,  # same as stack cap — handgun qty is ammo count
+    0x02: 15,  # PS1 DC handgun magazine (live combine QuickSave0)
     0x03: 7,
     0x04: 6,
     0x05: 6,
@@ -43,18 +43,13 @@ def total_fireable_ammo(
     if wid not in WEAPON_ITEM_IDS:
         return 0
     ammo_id = WEAPON_AMMO_ITEM.get(wid)
-    if ammo_id is None:
-        return 0
     total = 0
     for item_id, qty in inventory:
         iid = int(item_id) & 0xFF
         q = int(qty)
         if q <= 0:
             continue
-        if wid == 0x02:
-            if iid == 0x02:
-                total += q
-        elif iid == wid or iid == ammo_id:
+        if iid == wid or (ammo_id is not None and iid == int(ammo_id)):
             total += q
     return total
 

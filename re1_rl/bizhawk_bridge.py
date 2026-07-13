@@ -159,6 +159,40 @@ class BizHawkClient:
         resp = self._request({"cmd": "read_block", "addr": int(address), "count": int(count)})
         return [int(b) for b in resp.get("bytes", [])]
 
+    def list_domains(self) -> list[dict[str, Any]]:
+        """Return BizHawk memory domains ``[{name, size}, ...]``."""
+        resp = self._request({"cmd": "list_domains"})
+        return list(resp.get("domains") or [])
+
+    def read_domain(self, domain: str, address: int, count: int) -> list[int]:
+        """Dump ``count`` bytes from a named memory domain (domain-local offset)."""
+        resp = self._request(
+            {
+                "cmd": "read_domain",
+                "domain": str(domain),
+                "addr": int(address),
+                "count": int(count),
+            }
+        )
+        return [int(b) for b in resp.get("bytes", [])]
+
+    def write_domain(self, domain: str, address: int, data: bytes | list[int]) -> None:
+        """Write bytes into a named memory domain (domain-local offset)."""
+        raw = list(data) if not isinstance(data, list) else [int(b) & 0xFF for b in data]
+        # Chunk to keep JSON payloads manageable.
+        chunk = 512
+        for i in range(0, len(raw), chunk):
+            resp = self._request(
+                {
+                    "cmd": "write_domain",
+                    "domain": str(domain),
+                    "addr": int(address) + i,
+                    "bytes": raw[i : i + chunk],
+                }
+            )
+            if not resp.get("ok"):
+                raise RuntimeError(resp.get("error", "write_domain failed"))
+
     def write_ram(
         self,
         fields: list[tuple[str, int, str, int]],

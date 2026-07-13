@@ -383,6 +383,40 @@ local function handle_command(cmd)
         end
         return { ok = true, addr = cmd.addr, bytes = bytes }
 
+    elseif op == "list_domains" then
+        local names = memory.getmemorydomainlist()
+        local out = {}
+        for i, name in ipairs(names) do
+            local size = 0
+            local ok, sz = pcall(memory.getmemorydomainsize, name)
+            if ok and type(sz) == "number" then
+                size = sz
+            end
+            out[i] = { name = name, size = size }
+        end
+        return { ok = true, domains = out }
+
+    elseif op == "read_domain" then
+        -- Raw domain read: cmd.domain, cmd.addr (domain offset), cmd.count
+        local domain = cmd.domain or "MainRAM"
+        local addr = tonumber(cmd.addr) or 0
+        local count = tonumber(cmd.count) or 0
+        local bytes = {}
+        for i = 0, count - 1 do
+            bytes[i + 1] = memory.readbyte(addr + i, domain)
+        end
+        return { ok = true, domain = domain, addr = addr, bytes = bytes }
+
+    elseif op == "write_domain" then
+        -- cmd.domain, cmd.addr, cmd.bytes = array of u8
+        local domain = cmd.domain or "MainRAM"
+        local addr = tonumber(cmd.addr) or 0
+        local bytes = cmd.bytes or {}
+        for i, b in ipairs(bytes) do
+            memory.writebyte(addr + i - 1, tonumber(b) % 256, domain)
+        end
+        return { ok = true }
+
     elseif op == "buttons" then
         apply_buttons(cmd.buttons)
         return { ok = true }

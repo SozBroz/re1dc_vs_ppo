@@ -10,7 +10,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from re1_rl.distributed.learner_train import compute_episode_mc_returns
+from re1_rl.distributed.learner_train import (
+    _normalize_advantages_safe,
+    compute_episode_mc_returns,
+)
 
 
 def test_mc_single_complete_episode():
@@ -36,3 +39,17 @@ def test_mc_bootstrap_incomplete_rollout():
     )
     assert returns[1, 0] == pytest.approx(1.0 + 0.5 * 5.0)
     assert returns[0, 0] == pytest.approx(1.0 + 0.5 * returns[1, 0])
+
+
+def test_normalize_advantages_safe_single_element_is_zero():
+    adv = np.array([[3.0]], dtype=np.float32)
+    out = _normalize_advantages_safe(adv)
+    assert out.shape == adv.shape
+    assert out[0, 0] == pytest.approx(0.0)
+
+
+def test_normalize_advantages_safe_population_std():
+    adv = np.array([[1.0], [3.0]], dtype=np.float32)
+    out = _normalize_advantages_safe(adv)
+    assert out[0, 0] == pytest.approx(-1.0)
+    assert out[1, 0] == pytest.approx(1.0)

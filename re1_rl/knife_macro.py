@@ -7,13 +7,17 @@ can be invisible to the game.
 Default path (``use_ram_gates=True``): RAM-gated macro using hunt-confirmed
 player animation bytes (see ``memory_map``):
   0. Release all buttons; wait until settled (neutral idle or weapon-ready standing).
-     If crouch aim (0x12/0x04/0) appears during settle, skip the aim phase.
-  1. Hold R1+down until crouch-knife aim (anim 0x12, aux 0x04).
-  2. Press cross on the first frame after aim is stable (2 emu frames).
-  3. Hold cross through minimum swing duration, then R1+down through recovery
-     until anim/aux return idle (0).
-  4. Abort early (release buttons) if Jill enters a non-knife animation
-     (likely hit/stagger) or crouch aim never stabilizes (cannot swing).
+     Cope with mid-swing / crouch_post / locomotion entry by draining under a
+     neutral pad. If crouch aim appears during settle, skip the aim phase.
+  1. Hold R1+down until crouch-knife aim (anim 0x12, aux 0x04). Brief
+     locomotion during aim is tolerated; other foreign anims are not.
+  2. Press cross after aim is stable; **hold cross until slash anim 0x14**
+     (standing knife). Aim-hold 0x13 alone is NOT a swing — do not release
+     cross early on a fixed timer or logs will lie.
+  3. Release cross; hold R1+down through recovery until idle / post-swing tail.
+  4. Abort immediately (release buttons) on foreign/hurt/grab anims — never
+     wait out a zombie bite — or if crouch aim never stabilizes / slash never
+     appears.
 
 RAM-gated runs validate animation hooks each frame. Mismatches log as
 ``[knife_anim] port=...`` (disable with env ``KNIFE_ANIM_LOG=0``).
@@ -48,8 +52,11 @@ KNIFE_RECOVERY_GAME_FRAMES = 11
 CROUCH_KNIFE_AIM_ANIM = 0x12
 CROUCH_KNIFE_ACTIVE_AUX = 0x04
 KNIFE_RECOVERY_ANIM = 0x13
-STANDING_KNIFE_ANIM = 0x14  # seen during some swings; still knife track
+STANDING_KNIFE_ANIM = 0x14  # REAL slash (live probe); not optional cosmetics
 CROUCH_KNIFE_POST_ANIM = 0x15  # crouch settle after swing (live QA, aux 0x04)
+
+# KNIFE_RECOVERY_ANIM (0x13) is ambiguous: prolonged aim-hold reaches 0x13
+# without ever swinging. Live probe: only 0x14 proves a slash fired.
 
 # Standing weapon-idle hooks seen before knife aim in live fleet (not knife track bytes).
 STANDING_PRE_KNIFE_HOOKS: frozenset[tuple[int, int]] = frozenset(
@@ -70,7 +77,9 @@ STANDING_PRE_KNIFE_HOOKS: frozenset[tuple[int, int]] = frozenset(
 MIN_BUTTON_PHASE_FRAMES = 2
 
 # Max emulated frames to wait in settle (neutral or crouch aim) before abort.
-KNIFE_SETTLE_MAX_WAIT_FRAMES = 32
+KNIFE_SETTLE_MAX_WAIT_FRAMES = 48
+# Extra settle budget when entering already mid-swing / recovery (drain, then aim).
+KNIFE_SETTLE_MID_SWING_MAX_WAIT_FRAMES = 72
 
 # Allowed deviation when comparing observed swing/recovery anim frame counts.
 KNIFE_ANIM_FRAME_TOLERANCE = 2
@@ -110,6 +119,10 @@ _SETTLE_OK = frozenset(
         "locomotion",
         "crouch_transitional",
         "crouch_aim",
+        # Post-swing crouch hold / recovery tail: neutral pad drains to idle.
+        "crouch_post",
+        "swing_recovery",
+        "standing_knife",
     }
 )
 _AIM_OK = frozenset(
@@ -123,6 +136,8 @@ _AIM_OK = frozenset(
         "standing_recovery_latch",
         "standing_knife",
         "swing_recovery",
+        # Brief walk residue after settle before crouch aim locks.
+        "locomotion",
     }
 )
 _SWING_OK = frozenset(
@@ -163,7 +178,14 @@ def expected_swing_recovery_emu_frames(
 
 
 def _is_swing_anim_label(label: str) -> bool:
-    return label in ("standing_knife", "swing_recovery")
+    """True slash anim only — 0x13 aim-hold must not count."""
+    return label == "standing_knife"
+
+
+def is_knife_slash_anim(anim: int, aux: int, recovery: int = 0) -> bool:
+    """True when Jill is in the real knife slash (0x14), not aim-hold 0x13."""
+    del recovery
+    return anim == STANDING_KNIFE_ANIM and aux in (0, CROUCH_KNIFE_ACTIVE_AUX)
 
 
 def _is_recovery_anim_label(label: str) -> bool:
@@ -269,6 +291,32 @@ def is_knife_settle_complete(anim: int, aux: int, recovery: int) -> bool:
     )
 
 
+def is_knife_locomotion(anim: int, aux: int) -> bool:
+    """Walk/run residue — settle/aim may drain this; swing must not."""
+    return anim == 0x06 and aux == 0
+
+
+def is_knife_mid_swing_state(anim: int, aux: int, recovery: int) -> bool:
+    """Already on the swing/recovery track (entry can drain, then re-aim)."""
+    del recovery  # recovery timer varies; anim/aux define the track
+    if anim == STANDING_KNIFE_ANIM and aux in (0, CROUCH_KNIFE_ACTIVE_AUX):
+        return True
+    if anim == KNIFE_RECOVERY_ANIM and aux in (0, CROUCH_KNIFE_ACTIVE_AUX):
+        return True
+    if anim == CROUCH_KNIFE_POST_ANIM and aux == CROUCH_KNIFE_ACTIVE_AUX:
+        return True
+    return False
+
+
+def is_knife_foreign_anim(anim: int, aux: int, recovery: int) -> bool:
+    """Hurt/grab/bite/cutscene — release immediately; never wait these out."""
+    if is_knife_settle_wait_state(anim, aux, recovery):
+        return False
+    if is_knife_macro_track(anim, aux, recovery):
+        return False
+    return True
+
+
 def is_knife_settle_wait_state(anim: int, aux: int, recovery: int) -> bool:
     """RAM states expected while neutral pad drains before aim."""
     if is_knife_settle_complete(anim, aux, recovery):
@@ -277,9 +325,14 @@ def is_knife_settle_wait_state(anim: int, aux: int, recovery: int) -> bool:
         return True
     if is_standing_recovery_latch(anim, aux, recovery):
         return True
-    if anim == 0x06 and aux == 0:
+    if is_knife_locomotion(anim, aux):
         return True
     if anim == CROUCH_KNIFE_AIM_ANIM and aux in (0, CROUCH_KNIFE_ACTIVE_AUX):
+        return True
+    # Successful swings often end on recovery tail (0x13/0x04/0) then crouch_post
+    # (0x15/0x04). Aborting here skips the next swing (live knife_hook_qa).
+    # Mid-swing entry (0x14) also drains under neutral before re-aiming.
+    if is_knife_mid_swing_state(anim, aux, recovery):
         return True
     return False
 
@@ -313,7 +366,7 @@ def classify_knife_anim(anim: int, aux: int, recovery: int) -> str:
         return "crouch_transitional"
     if anim == CROUCH_KNIFE_POST_ANIM and aux == CROUCH_KNIFE_ACTIVE_AUX:
         return "crouch_post"
-    if anim == 0x06 and aux == 0:
+    if is_knife_locomotion(anim, aux):
         return "locomotion"
     return "foreign"
 
@@ -376,9 +429,9 @@ class KnifeAnimValidator:
         label = classify_knife_anim(anim, aux, recovery)
         if label == "crouch_aim":
             self.saw_crouch_aim = True
-        if label in ("swing_recovery", "standing_knife"):
+        # Real slash only (0x14). Aim-hold 0x13 must NOT set swing_anim.
+        if label == "standing_knife" or is_knife_slash_anim(anim, aux, recovery):
             self.saw_swing_anim = True
-        if label == "standing_knife":
             self._standing_knife_frames += 1
         if label == "swing_recovery":
             self._swing_recovery_frames += 1
@@ -392,6 +445,10 @@ class KnifeAnimValidator:
                 self._swing_anim_frames += 1
             else:
                 self._recovery_anim_frames += 1
+            self._knife_anim_since_aim += 1
+        elif self.saw_swing_anim and label == "swing_recovery":
+            # Post-slash 0x13 drain counts toward recovery budget.
+            self._recovery_anim_frames += 1
             self._knife_anim_since_aim += 1
 
         hooks = format_knife_hooks(anim, aux, recovery)
@@ -410,15 +467,25 @@ class KnifeAnimValidator:
             if not self.saw_crouch_aim:
                 self._issue("macro finished without ever seeing crouch_aim")
             if not self.saw_swing_anim:
-                self._issue("macro finished without swing_recovery/standing_knife")
+                self._issue(
+                    "macro finished without standing_knife slash (0x14) — "
+                    "0x13 aim-hold alone is not a swing"
+                )
             if not self.saw_idle_end:
                 self._issue("macro finished without idle tail (0/0/0)")
-            self._check_swing_frame_count(where="macro_end")
-            self._check_recovery_frame_count(where="macro_end")
+            # Slash length varies; recovery is neutral-drain and no longer fixed 11gf.
+            if self.saw_swing_anim:
+                pass  # real 0x14 seen — do not fail on old 0x13 frame budgets
+            else:
+                self._check_swing_frame_count(where="macro_end")
+                self._check_recovery_frame_count(where="macro_end")
         elif self.phase in ("swing", "recovery"):
-            self._check_swing_frame_count(where=f"abort_{outcome}")
-            if self.phase == "recovery":
-                self._check_recovery_frame_count(where=f"abort_{outcome}")
+            if self.saw_swing_anim:
+                pass
+            else:
+                self._check_swing_frame_count(where=f"abort_{outcome}")
+                if self.phase == "recovery":
+                    self._check_recovery_frame_count(where=f"abort_{outcome}")
         if self._issues:
             self._emit_summary(outcome=outcome, died=died, frames=frames)
         return self.report(outcome=outcome, died=died, frames=frames)
@@ -426,16 +493,21 @@ class KnifeAnimValidator:
     def report(self, *, outcome: str, died: bool, frames: int) -> dict[str, Any]:
         swing_tol = _frame_count_tolerance(self._expect_swing)
         rec_tol = _frame_count_tolerance(self._expect_recovery)
-        swing_ok = (
-            self._expect_swing - swing_tol
-            <= self._swing_anim_frames
-            <= self._expect_swing + swing_tol
-        )
-        recovery_ok = (
-            self._expect_recovery - rec_tol
-            <= self._recovery_anim_frames
-            <= self._expect_recovery + rec_tol
-        )
+        if self.saw_swing_anim:
+            # Real 0x14 slash: variable length; ignore legacy 0x13 frame budgets.
+            swing_ok = True
+            recovery_ok = True
+        else:
+            swing_ok = (
+                self._expect_swing - swing_tol
+                <= self._swing_anim_frames
+                <= self._expect_swing + swing_tol
+            )
+            recovery_ok = (
+                self._expect_recovery - rec_tol
+                <= self._recovery_anim_frames
+                <= self._expect_recovery + rec_tol
+            )
         return {
             "outcome": outcome,
             "died": bool(died),
@@ -600,8 +672,15 @@ def is_knife_macro_interrupted(
     swing_started: bool,
     swing_frames: int = 0,
     min_swing_frames: int = 0,
+    allow_locomotion: bool = False,
 ) -> bool:
-    """True when the player left the knife state machine (likely hit/stagger)."""
+    """True when the player left the knife state machine (likely hit/stagger).
+
+    Foreign/hurt/grab anims always interrupt (caller must release immediately).
+    ``allow_locomotion``: aim phase may briefly see walk residue after settle.
+    """
+    if allow_locomotion and is_knife_locomotion(anim, aux):
+        return False
     if is_knife_macro_track(anim, aux, recovery):
         if swing_started and is_knife_animation_idle(anim, aux, recovery):
             # Hold cross through min_swing even if RAM briefly hits idle (turbo gaps).
@@ -1003,11 +1082,19 @@ def _execute_knife_macro_ram_gated(
     entry_standing_ready = is_standing_pre_knife_idle(
         entry_anim, entry_aux, entry_recovery
     )
+    entry_mid_swing = is_knife_mid_swing_state(
+        entry_anim, entry_aux, entry_recovery
+    )
 
     neutral = {k: False for k in empty_sticky}
-    max_settle_wait = KNIFE_SETTLE_MAX_WAIT_FRAMES
+    max_settle_wait = (
+        KNIFE_SETTLE_MID_SWING_MAX_WAIT_FRAMES
+        if entry_mid_swing
+        else KNIFE_SETTLE_MAX_WAIT_FRAMES
+    )
 
     # Phase 0: release all buttons until settled (0/0/0 or weapon-ready standing).
+    # Mid-swing / crouch_post entry drains under neutral; foreign/hurt aborts now.
     settle_run = 0
     early_aim_run = 0
     settle_wait = 0
@@ -1041,9 +1128,10 @@ def _execute_knife_macro_ram_gated(
         settle_wait += 1
         anim, aux, recovery = read_knife_hooks(bridge)
         anim_val.observe(anim, aux, recovery)
-        if not is_knife_settle_wait_state(anim, aux, recovery):
+        if is_knife_foreign_anim(anim, aux, recovery):
             anim_val._issue(
-                f"interrupted during settle ({format_knife_hooks(anim, aux, recovery)})"
+                f"foreign anim during settle — release "
+                f"({format_knife_hooks(anim, aux, recovery)})"
             )
             return _abort(total, outcome="aborted_interrupt")
         if is_crouch_knife_aim_ready(anim, aux, recovery):
@@ -1090,10 +1178,16 @@ def _execute_knife_macro_ram_gated(
             anim, aux, recovery = read_knife_hooks(bridge)
             anim_val.observe(anim, aux, recovery)
             if is_knife_macro_interrupted(
-                anim, aux, recovery, aim_achieved=False, swing_started=False
+                anim,
+                aux,
+                recovery,
+                aim_achieved=False,
+                swing_started=False,
+                allow_locomotion=True,
             ):
                 anim_val._issue(
-                    f"interrupted during aim ({format_knife_hooks(anim, aux, recovery)})"
+                    f"foreign anim during aim — release "
+                    f"({format_knife_hooks(anim, aux, recovery)})"
                 )
                 return _abort(total, outcome="aborted_interrupt")
             if is_crouch_knife_aim_ready(anim, aux, recovery):
@@ -1108,13 +1202,22 @@ def _execute_knife_macro_ram_gated(
         )
         return _abort(total, outcome="aim_timeout")
 
-    # Phase 2: cross on first frame after stable crouch aim; hold through swing.
+    # Phase 2: hold cross until REAL slash anim 0x14 (not aim-hold 0x13).
+    # Live probe: releasing cross before ~frame 22 of continuous aim yields
+    # 0x13 only and no visible swing; logs used to lie by treating 0x13 as swung.
     if not aim_precooked:
         anim_val.set_phase("swing")
     swing_frames = 0
-    saw_swing_recovery_anim = False
+    saw_slash = False
     swing_idle_streak = 0
-    while swing_frames < min_swing:
+    max_swing_wait = max(min_swing * 5, 48)
+    while not saw_slash:
+        if swing_frames >= max_swing_wait:
+            anim_val._issue(
+                f"no slash (0x14) after {swing_frames} cross frames "
+                f"(last {format_knife_hooks(anim, aux, recovery)})"
+            )
+            return _abort(total, outcome="no_slash")
         if total >= max_total:
             anim_val._issue(f"swing phase exceeded max_total={max_total}")
             return _abort(total, outcome="swing_timeout")
@@ -1130,31 +1233,32 @@ def _execute_knife_macro_ram_gated(
         swing_frames += 1
         total += 1
         anim, aux, recovery = read_knife_hooks(bridge)
-        if anim == KNIFE_RECOVERY_ANIM and recovery > 0:
-            saw_swing_recovery_anim = True
         anim_val.observe(anim, aux, recovery)
+        if is_knife_slash_anim(anim, aux, recovery):
+            saw_slash = True
+            break
         if not is_knife_macro_track(anim, aux, recovery):
             anim_val._issue(
-                f"interrupted during swing ({format_knife_hooks(anim, aux, recovery)})"
+                f"foreign anim during swing — release "
+                f"({format_knife_hooks(anim, aux, recovery)})"
             )
             return _abort(total, outcome="aborted_interrupt")
         if is_knife_animation_idle(anim, aux, recovery):
             swing_idle_streak += 1
-            if (
-                swing_frames >= min_swing
-                and swing_idle_streak >= aim_ready_streak
-                and not saw_swing_recovery_anim
-            ):
+            if swing_idle_streak >= aim_ready_streak and swing_frames >= min_swing:
                 anim_val._issue(
-                    f"interrupted during swing ({format_knife_hooks(anim, aux, recovery)})"
+                    f"idle during swing before slash — release "
+                    f"({format_knife_hooks(anim, aux, recovery)})"
                 )
                 return _abort(total, outcome="aborted_interrupt")
         else:
             swing_idle_streak = 0
 
-    # Phase 3: R1+down (no cross) until animation returns idle.
+    # Phase 3: release cross AND aim — neutral pad lets 0x14 finish.
+    # Holding R1+down after the slash locks Jill in standing_knife for a long time.
+    # Do not end recovery while still on 0x14 — wait for 0x13 / crouch_post / idle.
     anim_val.set_phase("recovery")
-    max_recovery_wait = max(recovery_game * scale * 4, 32)
+    max_recovery_wait = max(recovery_game * scale * 4, 64)
     recovery_wait = 0
     recovered = False
     while total < max_total and recovery_wait < max_recovery_wait:
@@ -1163,28 +1267,27 @@ def _execute_knife_macro_ram_gated(
         ):
             return _death(total)
         anim, aux, recovery = read_knife_hooks(bridge)
-        if anim == KNIFE_RECOVERY_ANIM and recovery > 0:
-            saw_swing_recovery_anim = True
         anim_val.observe(anim, aux, recovery)
         if is_knife_animation_idle(anim, aux, recovery):
             recovered = True
             break
-        if (
-            saw_swing_recovery_anim
-            and is_knife_swing_recovery_tail(anim, aux, recovery)
-        ):
+        if saw_slash and is_knife_swing_recovery_tail(anim, aux, recovery):
+            recovered = True
+            break
+        if saw_slash and anim == CROUCH_KNIFE_POST_ANIM and aux == CROUCH_KNIFE_ACTIVE_AUX:
             recovered = True
             break
         if is_knife_macro_interrupted(
             anim, aux, recovery, aim_achieved=True, swing_started=True
         ):
             anim_val._issue(
-                f"interrupted during recovery ({format_knife_hooks(anim, aux, recovery)})"
+                f"foreign anim during recovery — release "
+                f"({format_knife_hooks(anim, aux, recovery)})"
             )
             return _abort(total, outcome="aborted_interrupt")
         if _step_one_frame(
             bridge,
-            AIM_BUTTONS,
+            neutral,
             empty_sticky=empty_sticky,
             echo_joypad=echo_joypad,
             prev_hp=prev_hp,

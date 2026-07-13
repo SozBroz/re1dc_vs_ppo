@@ -10,9 +10,12 @@ from typing import Any
 
 import numpy as np
 
-from re1_rl.cutscene_ledger import CUTSCENE_MILESTONE_KEYS
+from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM, CUTSCENE_MILESTONE_KEYS
 from re1_rl.episode_history import EpisodeHistory
 from re1_rl.item_todo import canonical_item
+
+# Same-room sequenced keys can exceed milestone slots; clip for a stable scalar.
+CUTSCENE_COUNT_NORM = float(max(CUTSCENE_LEDGER_DIM, 16))
 
 MILESTONE_FEATURE_NAMES: tuple[str, ...] = (
     "on_2f",
@@ -27,6 +30,7 @@ MILESTONE_FEATURE_NAMES: tuple[str, ...] = (
     "dining_revisit",
     "rooms_in_deque_frac",
     "main_hall_in_history",
+    "cutscenes_hit_this_run",
 )
 
 MILESTONE_DIM = len(MILESTONE_FEATURE_NAMES)
@@ -65,6 +69,7 @@ def encode_milestones(
     episode_history: EpisodeHistory,
     cutscene_ledger: np.ndarray,
     ever_held: set[str] | frozenset[str] | None,
+    cutscenes_hit: int = 0,
 ) -> np.ndarray:
     v = np.zeros(MILESTONE_DIM, dtype=np.float32)
     rooms = [rid for rid, _ in episode_history.room_deque.entries]
@@ -94,4 +99,5 @@ def encode_milestones(
     cap = float(episode_history.room_deque.capacity)
     v[10] = min(len(rooms), int(cap)) / cap
     v[11] = 1.0 if _MAIN_HALL in rooms else 0.0
+    v[12] = min(max(int(cutscenes_hit), 0), int(CUTSCENE_COUNT_NORM)) / CUTSCENE_COUNT_NORM
     return v

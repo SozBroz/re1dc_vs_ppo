@@ -40,7 +40,7 @@ This is defensible DRL: the agent still learns \( \pi(a \mid s) \) and \( V(s) \
 | `GAME_TIMER` | `0x800C867C` | u32 | Global play timer | **CONFIRMED** |
 | `LAB_TIMER` | `0x800C867A` | u16/u32 | Lab section timer | **CONFIRMED** |
 | `DOOR_FLAGS` | `0x800C86B4` | u32 bitfield | Door unlock state | **CONFIRMED** (exists) |
-| `ITEM_BOX_BASE` | `0x800C8724` | 2 B/slot | `(id, qty)` per slot | **CONFIRMED** |
+| `ITEM_BOX_BASE` | `0x800C8724` | 2 B/slot | `(id, qty)` per slot; code uses 16 slots today | **CONFIRMED** base; **NOTE 2026-07-12 (deferred):** live dump shows **48** slots contiguous to `INVENTORY_BASE` (`0x800C8784`); UI scroll can park items past index 15 |
 | `MAPS_FILES_FLAGS` | `0x800C8714` | bitfield | Map pickup flags | **CONFIRMED** |
 | `PLAYER_X` / `PLAYER_Y` / `PLAYER_Z` | `0x800C5158/5C/60` | s16 | world units; ~64–162/frame walking | **CONFIRMED** (verify_pos.py walk trace) |
 | `PLAYER_FACING` | `0x800C5198` | u16 | 0–4095 angle (0x1000 = full circle) | **CONFIRMED** |

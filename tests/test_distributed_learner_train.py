@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import torch
 from sb3_contrib import MaskablePPO
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -108,3 +109,15 @@ def test_fill_buffer_stores_action_masks() -> None:
         merged["n_envs"],
         N_ACTIONS,
     )
+
+
+def test_train_survives_trailing_size_one_minibatch() -> None:
+    """Regression: 2049 samples @ batch 2048 poisons MaskablePPO advantage std."""
+    model = _tiny_model()
+    model.batch_size = 4
+    model.normalize_advantage = True
+    # 9 env-steps -> minibatches 4 + 4 + 1 (the trailing 1 used to NaN std).
+    steps = train_on_rollouts(model, [_fake_rollout(n_steps=3, n_envs=3)])
+    assert steps == 9
+    for param in model.policy.parameters():
+        assert torch.isfinite(param).all()

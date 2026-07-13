@@ -1,9 +1,16 @@
 """ITEM-screen inventory macros (equip / use / combine).
 
 START opens the ITEM screen from gameplay (hunt 2026-07-07). Cursor homes on
-slot 0 each open. Submenu: cross opens; USE/EQUIP is the top entry; COMBINE is
-one ``down`` then cross. Only item-box deposit/withdraw may RAM-cheat; these
-macros drive real buttons.
+slot 0 each open. Submenu (cross opens) examples:
+
+  Weapons: EQUIP → CHECK → COMBN
+  Spray / ammo: USE → CHECK → COMBN
+
+COMBN is selected by reading ``ITEM_SUBMENU_CURSOR`` / ``ITEM_SUBMENU_N_ENTRIES``
+and tapping ``down`` until the cursor is on the last entry (live hunt 2026-07-12),
+not by a hardcoded down count.
+
+Only item-box deposit/withdraw may RAM-cheat; these macros drive real buttons.
 
 Navigation grid (Jill, 8 slots):
   0  1
@@ -23,6 +30,8 @@ from re1_rl.memory_map import (
     INVENTORY_BASE,
     INVENTORY_SLOTS,
     IN_CONTROL_MASK,
+    ITEM_SUBMENU_CURSOR,
+    ITEM_SUBMENU_N_ENTRIES,
     PLAYER_HP,
     PLAYER_POISON,
     player_died,
@@ -41,8 +50,29 @@ EQUIP_SUBMENU_CROSS_FRAMES = 15
 EQUIP_SUBMENU_SETTLE_FRAMES = 15
 CLOSE_START_FRAMES = 12
 CLOSE_ITEM_SETTLE_FRAMES = 30
+# Failsafe if RAM cursor never reaches last entry.
+COMBINE_CURSOR_MAX_DOWNS = 8
 
 SubmenuEntry = Literal["use", "equip", "combine"]
+
+
+def read_item_submenu_cursor(client: Any) -> tuple[int, int]:
+    """Return ``(cursor_index, n_entries)`` for the open ITEM action submenu."""
+    ram = client.read_ram(
+        [
+            ("submenu_cursor", ITEM_SUBMENU_CURSOR, "u8"),
+            ("submenu_n_entries", ITEM_SUBMENU_N_ENTRIES, "u8"),
+        ]
+    )
+    return int(ram.get("submenu_cursor", 0)), int(ram.get("submenu_n_entries", 0))
+
+
+def combine_submenu_target_index(n_entries: int) -> int:
+    """COMBN is the last submenu entry (weapon / spray / ammo live check)."""
+    n = int(n_entries)
+    if n <= 0:
+        return 0
+    return n - 1
 
 
 def slot_nav_moves(from_slot: int, to_slot: int) -> list[str]:
@@ -251,7 +281,14 @@ def _pick_submenu_entry(
     *,
     prev_hp: int,
     episode_start_hp: int,
+    combine_downs: int | None = None,
 ) -> tuple[bool, int]:
+    """Open ITEM submenu and confirm ``entry``.
+
+    For ``combine``, prefer live RAM: read submenu cursor / entry count and
+    tap ``down`` until the last entry (COMBN) is highlighted. Pass
+    ``combine_downs`` to force a fixed down count (tests / offline fakes).
+    """
     frames = 0
     died, f = _tap(
         client,
@@ -273,33 +310,61 @@ def _pick_submenu_entry(
     if died:
         return True, frames
 
-    pick_buttons: dict[str, bool]
     if entry == "combine":
-        pick_buttons = {"down": True}
-    else:
-        pick_buttons = {"cross": True}
-
-    died, f = _tap(
-        client,
-        pick_buttons,
-        frames=SUBMENU_TAP_FRAMES,
-        prev_hp=prev_hp,
-        episode_start_hp=episode_start_hp,
-    )
-    frames += f
-    if died:
-        return True, frames
-    died, f = _wait(
-        client,
-        frames=SUBMENU_SETTLE_FRAMES,
-        prev_hp=prev_hp,
-        episode_start_hp=episode_start_hp,
-    )
-    frames += f
-    if died:
-        return True, frames
-
-    if entry == "combine":
+        if combine_downs is not None:
+            downs_plan = max(0, int(combine_downs))
+            for _ in range(downs_plan):
+                died, f = _tap(
+                    client,
+                    {"down": True},
+                    frames=MOVE_TAP_FRAMES,
+                    prev_hp=prev_hp,
+                    episode_start_hp=episode_start_hp,
+                )
+                frames += f
+                if died:
+                    return True, frames
+                died, f = _wait(
+                    client,
+                    frames=MOVE_SETTLE_FRAMES,
+                    prev_hp=prev_hp,
+                    episode_start_hp=episode_start_hp,
+                )
+                frames += f
+                if died:
+                    return True, frames
+        else:
+            try:
+                cursor, n_entries = read_item_submenu_cursor(client)
+                target = combine_submenu_target_index(n_entries)
+            except (OSError, RuntimeError, AttributeError, TypeError, ValueError, KeyError):
+                cursor, target = 0, 2
+            downs = 0
+            while cursor < target and downs < COMBINE_CURSOR_MAX_DOWNS:
+                died, f = _tap(
+                    client,
+                    {"down": True},
+                    frames=MOVE_TAP_FRAMES,
+                    prev_hp=prev_hp,
+                    episode_start_hp=episode_start_hp,
+                )
+                frames += f
+                if died:
+                    return True, frames
+                died, f = _wait(
+                    client,
+                    frames=MOVE_SETTLE_FRAMES,
+                    prev_hp=prev_hp,
+                    episode_start_hp=episode_start_hp,
+                )
+                frames += f
+                if died:
+                    return True, frames
+                downs += 1
+                try:
+                    cursor, _n = read_item_submenu_cursor(client)
+                except (OSError, RuntimeError, AttributeError, TypeError, ValueError, KeyError):
+                    cursor = downs
         died, f = _tap(
             client,
             {"cross": True},
@@ -317,6 +382,26 @@ def _pick_submenu_entry(
             episode_start_hp=episode_start_hp,
         )
         frames += f
+        return died, frames
+
+    # use / equip: confirm top entry
+    died, f = _tap(
+        client,
+        {"cross": True},
+        frames=SUBMENU_TAP_FRAMES,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+    )
+    frames += f
+    if died:
+        return True, frames
+    died, f = _wait(
+        client,
+        frames=SUBMENU_SETTLE_FRAMES,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+    )
+    frames += f
     return died, frames
 
 
@@ -528,7 +613,9 @@ def execute_combine_macro(
     episode_start_hp: int,
 ) -> tuple[bool, int, dict[str, Any]]:
     """COMBINE items in ``slot_a`` then ``slot_b`` (ordered)."""
-    inv_before = read_inventory_ids(client)
+    from re1_rl.item_box import read_inventory
+
+    inv_before = read_inventory(client)
     frames = 0
     died, f, cursor = open_item_screen(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
@@ -545,7 +632,10 @@ def execute_combine_macro(
         return True, frames, {"ok": False, "reason": "died", "slot_a": slot_a, "slot_b": slot_b}
 
     died, f = _pick_submenu_entry(
-        client, "combine", prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        client,
+        "combine",
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
     )
     frames += f
     if died:
@@ -582,9 +672,10 @@ def execute_combine_macro(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
     frames += f
-    inv_after = read_inventory_ids(client)
+    inv_after = read_inventory(client)
     ram = client.read_ram([("game_mode", GAME_MODE, "u8")])
     in_control = bool(int(ram.get("game_mode", 0)) & IN_CONTROL_MASK)
+    # Qty-only reloads (empty beretta + bullets) keep the same item ids.
     changed = inv_before != inv_after
     ok = not died and in_control and changed
     return (

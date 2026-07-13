@@ -119,52 +119,79 @@ def test_deposit_from_empty_slot_refused():
     assert not ok and reason == "empty_slot"
 
 
-def test_deposit_with_full_box_refused_when_no_merge():
+def test_deposit_with_full_box_refused_when_no_empty_slot():
     inv = [(0x02, 15)] + [(0, 0)] * 7
-    box = [(0x0B, 1)] * BOX_SLOTS
+    box = [(0x41, 1)] * BOX_SLOTS
     ok, reason = can_deposit(inv, box, 0)
     assert not ok and reason == "box_full"
 
 
-def test_deposit_merges_when_box_has_no_empty_slot():
-    inv = [(0x02, 10)] + [(0, 0)] * 7
-    box = [(0x0B, 1)] * BOX_SLOTS
-    box[0] = (0x02, 50)
+def test_deposit_does_not_merge_into_existing_same_id_stack():
+    """Deposit uses first empty slot only — even if a same-id stack has room."""
+    inv = [(0x0B, 10)] + [(0, 0)] * 7
+    box = [(0x0B, 50)] + [(0, 0)] * (BOX_SLOTS - 1)
     ok, reason = can_deposit(inv, box, 0)
     assert ok and reason == ""
     new_inv, new_box, moved = plan_deposit(inv, box, 0)
     assert moved == 10
-    assert new_box[0] == (0x02, 60)
+    assert new_box[0] == (0x0B, 50)  # untouched
+    assert new_box[1] == (0x0B, 10)  # first empty
     assert new_inv[0] == (0, 0)
 
 
+def test_deposit_never_overwrites_occupied_box_slots():
+    inv = [(0x02, 9), (0x41, 1), (0x0B, 30)] + [(0, 0)] * 5
+    box = [(0, 0)] * BOX_SLOTS
+    box[3] = (0x01, 0)  # knife parked mid-list
+    box[7] = (0x0C, 5)
+    new_inv, new_box, moved = plan_deposit(inv, box, 0)
+    assert moved == 9
+    assert new_box[0] == (0x02, 9)
+    assert new_box[3] == (0x01, 0)
+    assert new_box[7] == (0x0C, 5)
+    # deposit remaining items into next empties
+    new_inv, new_box, moved = plan_deposit(new_inv, new_box, 1)
+    assert moved == 1
+    assert new_box[1] == (0x41, 1)
+    assert new_box[3] == (0x01, 0)
+    assert new_box[7] == (0x0C, 5)
+    new_inv, new_box, moved = plan_deposit(new_inv, new_box, 2)
+    assert moved == 30
+    assert new_box[2] == (0x0B, 30)
+    assert new_box[3] == (0x01, 0)
+    assert new_box[7] == (0x0C, 5)
+    assert new_inv[0] == (0, 0) and new_inv[1] == (0, 0) and new_inv[2] == (0, 0)
+
+
+def test_apply_deposit_full_same_id_stack_uses_empty_not_merge():
+    inv = [(0x0B, 50)] + [(0, 0)] * 7
+    box = [(0x0B, 50)] + [(0, 0)] * (BOX_SLOTS - 1)
+    bridge = FakeBridge(inventory=inv, box=box)
+    result = apply_deposit(bridge, 0, equipped_weapon_id=0x02)
+    assert result["ok"] is True
+    assert result["moved"] == (0x0B, 50)
+    assert result["unequipped"] is False
+    # box[0] unchanged; new stack in box[1]
+    assert bridge.blocks[ITEM_BOX_BASE][0:4] == [0x0B, 50, 0x0B, 50]
+
+
 def test_withdraw_merges_handgun_partial_overflow():
-    inv = [(0x02, 50)] + [(0, 0)] * 7
-    box = [(0x02, 15)] + [(0, 0)] * (BOX_SLOTS - 1)
+    inv = [(0x0B, 50)] + [(0, 0)] * 7
+    box = [(0x0B, 15)] + [(0, 0)] * (BOX_SLOTS - 1)
     ok, _ = can_withdraw(inv, box, 0)
     assert ok
     new_box, new_inv, moved = plan_withdraw(inv, box, 0)
     assert moved == 10
-    assert new_inv[0] == (0x02, 60)
-    assert new_box[0] == (0x02, 5)
+    assert new_inv[0] == (0x0B, 60)
+    assert new_box[0] == (0x0B, 5)
 
 
 def test_withdraw_to_full_inventory_allowed_when_merge_fits():
     inv = [(0x01, 1)] * INVENTORY_SLOTS
-    inv[0] = (0x02, 50)
-    box = [(0x02, 15)] + [(0, 0)] * (BOX_SLOTS - 1)
+    inv[0] = (0x0B, 50)
+    box = [(0x0B, 15)] + [(0, 0)] * (BOX_SLOTS - 1)
     ok, reason = can_withdraw(inv, box, 0)
     assert ok and reason == ""
-
-
-def test_apply_partial_deposit_does_not_unequip():
-    inv = [(0x02, 50)] + [(0, 0)] * 7
-    box = [(0x02, 50)] + [(0, 0)] * (BOX_SLOTS - 1)
-    bridge = FakeBridge(inventory=inv, box=box)
-    result = apply_deposit(bridge, 0, equipped_weapon_id=0x02)
-    assert result["ok"] is True
-    assert result["moved"] == (0x02, 10)
-    assert result["unequipped"] is False
 
 
 def test_withdraw_happy_path():
@@ -205,14 +232,14 @@ def test_withdraw_empty_box_slot_refused():
 
 def test_plan_functions_leave_gaps_no_compaction():
     inv = [(0x01, 1), (0, 0), (0x02, 15), (0, 0), (0, 0), (0, 0), (0, 0), (0, 0)]
-    box = [(0, 0), (0x0B, 1)] + [(0, 0)] * (BOX_SLOTS - 2)
+    box = [(0, 0), (0x41, 1)] + [(0, 0)] * (BOX_SLOTS - 2)
 
     new_inv, new_box, moved = plan_deposit(inv, box, 2)
     assert moved == 15
     assert new_inv[2] == (0, 0)
     assert new_inv[0] == (0x01, 1)
     assert new_box[0] == (0x02, 15)
-    assert new_box[1] == (0x0B, 1)
+    assert new_box[1] == (0x41, 1)
 
     inv2 = [(0x01, 1), (0, 0), (0, 0), (0x04, 1), (0, 0), (0, 0), (0, 0), (0, 0)]
     box2 = [(0x0C, 5), (0, 0)] + [(0, 0)] * (BOX_SLOTS - 2)
@@ -242,7 +269,7 @@ def test_apply_deposit_unequips_equipped_weapon():
 
 
 def test_apply_deposit_does_not_unequip_other_item():
-    inv = [(0x0B, 1)] + [(0, 0)] * 7
+    inv = [(0x41, 1)] + [(0, 0)] * 7
     box = _empty_box()
     bridge = FakeBridge(inventory=inv, box=box)
     result = apply_deposit(bridge, 0, equipped_weapon_id=0x02)

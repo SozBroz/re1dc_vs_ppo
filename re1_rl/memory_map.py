@@ -57,6 +57,10 @@ GAME_TIMER = 0x800C867C  # [CONFIRMED]
 LAB_TIMER = 0x800C867A  # [CONFIRMED]
 DOOR_FLAGS = 0x800C86B4  # bitfield, 4 bytes [CONFIRMED]
 ITEM_BOX_BASE = 0x800C8724  # 2 bytes per slot: item_id, qty [CONFIRMED]
+# NOTE (2026-07-12, deferred): live QS5 dump shows the box array runs 48 slots
+# (96 bytes) contiguously into INVENTORY_BASE @ 0x800C8784 — sparse UI scroll can
+# park items past index 15 (e.g. knife at box[45]). Code still uses BOX_SLOTS=16
+# until we widen withdraw actions; do not treat “first 16 empty” as “box empty”.
 MAPS_FILES_FLAGS = 0x800C8714  # [CONFIRMED]
 # Player entity block [CONFIRMED via live walk trace 2026-07-02, verify_pos.py]:
 # X/Z step ~64-162 units per frame while walking; facing full circle = 4096
@@ -125,6 +129,14 @@ EQUIPPED_SLOT_INDEX_1BASED = 0x800C8689  # u8; 1-based inventory slot, 0 = none
 # 0x00, beretta slot1 -> 0x01 across menu equips; not independently isolated].
 EQUIPPED_SLOT_INDEX = 0x800C50BE  # u8
 
+# ITEM-screen action submenu (live hunt QuickSave0 2026-07-12):
+# After cross opens EQUIP/USE/CHECK/COMBN list:
+#   0x800B7FE9 = number of entries (u8)
+#   0x800B7FF4 = highlighted index (u8, 0-based)
+# Across weapon / spray / ammo, COMBN is the last entry.
+ITEM_SUBMENU_N_ENTRIES = 0x800B7FE9  # u8
+ITEM_SUBMENU_CURSOR = 0x800B7FF4  # u8
+
 # Item ids that count as weapons for action masking / attack macros.
 WEAPON_ITEM_IDS: frozenset[int] = frozenset(
     {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x6F, 0x70}
@@ -137,6 +149,8 @@ WEAPON_ITEM_IDS: frozenset[int] = frozenset(
 # knife / beretta qty 15 / first_aid_spray_alt qty 1.
 INVENTORY_BASE = 0x800C8784
 INVENTORY_SLOTS = 8
+# ITEM-screen grid icons are NOT refreshed by writing INVENTORY_BASE alone.
+# They live in BizHawk GPURAM; see re1_rl.inventory_icons (hunt 2026-07-12).
 
 # PC GOG savedatN.dat inventory block (2 bytes per slot: id, qty)
 PC_SAVE_INVENTORY_OFFSET = 0x320
@@ -270,7 +284,9 @@ ITEM_IDS: dict[int, str] = {
     0x08: "bazooka_explosive",
     0x09: "bazooka_flame",
     0x0A: "rocket_launcher",
-    0x0B: "first_aid_spray",
+    # Live QuickSave0 inventory: id 0x0B qty 30 renders as "Handgun Bullets"
+    # (was mislabeled first_aid_spray). First Aid Spray is 0x41.
+    0x0B: "handgun_bullets",
     0x0C: "shotgun_shells",
     0x0D: "dumdum_rounds",
     0x0E: "magnum_rounds",

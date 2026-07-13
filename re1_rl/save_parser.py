@@ -18,7 +18,8 @@ def parse_inventory_from_bytes(data: bytes, offset: int = PC_SAVE_INVENTORY_OFFS
       - Offset 0x320, 11 slots × 2 bytes (item_id, qty).
       - Empty slot = 00 00; non-contiguous empties occur (e.g. slot 7 empty, slot 8 filled).
       - Trailing sentinel often 09 FF after last item slot.
-      - PC item IDs align with PS1 table for common items (0x02 beretta, 0x0B first_aid, etc.).
+      - PC item IDs align with PS1 for common guns (0x02 beretta); PS1 spare
+        handgun ammo is 0x0B (handgun_bullets), First Aid Spray is 0x41.
     """
     slots: list[tuple[str, int]] = []
     pos = offset

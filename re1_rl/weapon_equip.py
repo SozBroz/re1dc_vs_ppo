@@ -116,14 +116,17 @@ def slot_legal_for_equip(
     equipped_weapon_id: int | None,
     equipped_slot_0based: int | None,
 ) -> bool:
-    """Legal equip: equippable weapon in slot, present (knife qty 0 -> policy 99), not held."""
+    """Legal equip: equippable weapon in slot, not already held.
+
+    Empty guns (qty 0) stay equippable — ammo may sit in a spare pile
+    (e.g. handgun_bullets 0x0B) and get COMBINE-loaded afterward. Knife RAM
+    qty 0 is still a real item.
+    """
     del equipped_slot_0based
     if slot < 0 or slot >= len(inventory):
         return False
-    item_id, qty = inventory[slot]
+    item_id, _qty = inventory[slot]
     if int(item_id) not in EQUIPPABLE_WEAPON_IDS:
-        return False
-    if policy_item_qty(int(item_id), int(qty)) <= 0:
         return False
     return not weapon_already_equipped(equipped_weapon_id, int(item_id))
 

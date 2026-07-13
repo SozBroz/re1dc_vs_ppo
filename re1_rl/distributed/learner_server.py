@@ -12,6 +12,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from re1_rl.distributed.log_util import log
+from re1_rl.distributed.relevance_gate import DEFAULT_RELEVANCE_MAX_AGE
 from re1_rl.distributed.rollout_codec import decode_rollout
 from re1_rl.distributed.rollout_types import WorkerRollout
 from re1_rl.distributed.weight_store import WeightStore
@@ -31,18 +32,37 @@ class LearnerState:
         machine_name: str,
         max_staleness: int,
         worker_liveness_s: float = 90.0,
+        relevance_gate: bool = False,
+        relevance_max_age: int | None = None,
     ) -> None:
         self.weight_store = weight_store
         self.rollout_queue = rollout_queue
         self.machine_name = machine_name
         self.max_staleness = max_staleness
         self.worker_liveness_s = float(worker_liveness_s)
+        # Soft-accept stale (version behind max_staleness) up to relevance_max_age;
+        # train_on_rollouts applies the π_new/π_old ownership gate.
+        self.relevance_gate = bool(relevance_gate)
+        self.relevance_max_age = int(
+            relevance_max_age
+            if relevance_max_age is not None
+            else max(int(max_staleness), DEFAULT_RELEVANCE_MAX_AGE)
+        )
         self.current_policy_version = 0
         self.lock = threading.Lock()
         # worker_id -> {n_envs, hostname, last_seen, is_local}
         self.workers: dict[str, dict[str, Any]] = {}
         self.rollouts_accepted = 0
         self.rollouts_rejected = 0
+        self.rollouts_stale_queued = 0  # accepted for train-time relevance gate
+        self.relevance_kept = 0
+        self.relevance_dropped = 0
+        # Env-step accounting for pitch % (ingest + relevance gate).
+        self.steps_accepted = 0
+        self.steps_rejected_ingest = 0
+        self.steps_stale_queued = 0
+        self.steps_relevance_kept = 0
+        self.steps_relevance_dropped = 0
         self.epoch_id = 0
         self.epoch_contributors: set[str] = set()
         self.epoch_expected: set[str] = set()
@@ -151,15 +171,66 @@ class LearnerState:
 
     def accept_rollout(self, rollout: WorkerRollout) -> tuple[bool, str]:
         wid = base_worker_id(rollout.worker_id)
+        steps = int(rollout.num_timesteps())
         with self.lock:
             min_ok = self.current_policy_version - self.max_staleness
             if rollout.policy_version < min_ok:
+                if self.relevance_gate:
+                    min_gated = self.current_policy_version - self.relevance_max_age
+                    if rollout.policy_version >= min_gated:
+                        self.rollouts_accepted += 1
+                        self.rollouts_stale_queued += 1
+                        self.steps_accepted += steps
+                        self.steps_stale_queued += steps
+                        self.epoch_contributors.add(wid)
+                        self.rollout_queue.put(rollout)
+                        return True, "stale_queued_for_relevance_gate"
                 self.rollouts_rejected += 1
+                self.steps_rejected_ingest += steps
                 return False, "stale_policy_version"
             self.rollouts_accepted += 1
+            self.steps_accepted += steps
             self.epoch_contributors.add(wid)
         self.rollout_queue.put(rollout)
         return True, "ok"
+
+    def record_relevance_stats(
+        self,
+        *,
+        kept: int,
+        dropped: int,
+        steps_kept: int = 0,
+        steps_dropped: int = 0,
+    ) -> None:
+        with self.lock:
+            self.relevance_kept += int(kept)
+            self.relevance_dropped += int(dropped)
+            self.steps_relevance_kept += int(steps_kept)
+            self.steps_relevance_dropped += int(steps_dropped)
+
+    def pitch_summary(self) -> dict[str, Any]:
+        """Cumulative ingest/gate pitch accounting (env-steps)."""
+        with self.lock:
+            accepted = int(self.steps_accepted)
+            ingest_rej = int(self.steps_rejected_ingest)
+            gate_drop = int(self.steps_relevance_dropped)
+            pitched = ingest_rej + gate_drop
+            # Denominator: everything that tried to enter training usefully.
+            denom = accepted + ingest_rej
+            return {
+                "steps_accepted": accepted,
+                "steps_rejected_ingest": ingest_rej,
+                "steps_stale_queued": int(self.steps_stale_queued),
+                "steps_relevance_kept": int(self.steps_relevance_kept),
+                "steps_relevance_dropped": gate_drop,
+                "steps_pitched": pitched,
+                "pitch_pct": (100.0 * pitched / denom) if denom > 0 else 0.0,
+                "rollouts_accepted": int(self.rollouts_accepted),
+                "rollouts_rejected": int(self.rollouts_rejected),
+                "rollouts_stale_queued": int(self.rollouts_stale_queued),
+                "relevance_kept": int(self.relevance_kept),
+                "relevance_dropped": int(self.relevance_dropped),
+            }
 
     def epoch_status(self) -> dict[str, Any]:
         with self.lock:
@@ -191,7 +262,14 @@ class LearnerRolloutSink:
         if not ok:
             log(
                 self._state.machine_name,
-                f"local rollout not queued ({reason}) from {rollout.worker_id}",
+                f"local rollout not queued ({reason}) from {rollout.worker_id} "
+                f"(+{rollout.num_timesteps()})",
+            )
+        elif reason == "stale_queued_for_relevance_gate":
+            log(
+                self._state.machine_name,
+                f"local rollout soft-queued ({reason}) from {rollout.worker_id} "
+                f"v{rollout.policy_version} (+{rollout.num_timesteps()})",
             )
         return ok
 
@@ -248,7 +326,10 @@ class _LearnerHandler(BaseHTTPRequestHandler):
 
         if path == "/status":
             version, _ = self.state.weight_store.snapshot()
+            # epoch_status / pitch_summary each take state.lock — must not call
+            # them while already holding it (threading.Lock is not re-entrant).
             epoch = self.state.epoch_status()
+            pitch = self.state.pitch_summary()
             with self.state.lock:
                 payload = {
                     "policy_version": version,
@@ -258,6 +339,12 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "rollouts_accepted": self.state.rollouts_accepted,
                     "rollouts_rejected": self.state.rollouts_rejected,
                     "rollouts_rejected_duplicate": self.state.rollouts_rejected_duplicate,
+                    "rollouts_stale_queued": self.state.rollouts_stale_queued,
+                    "relevance_gate": self.state.relevance_gate,
+                    "relevance_max_age": self.state.relevance_max_age,
+                    "relevance_kept": self.state.relevance_kept,
+                    "relevance_dropped": self.state.relevance_dropped,
+                    "pitch": pitch,
                     "epoch": epoch,
                 }
             self._send_json(200, payload)

@@ -470,6 +470,7 @@ class RE1Env(gym.Env):
                 episode_history=self._episode_history,
                 cutscene_ledger=cutscene_ledger,
                 ever_held=self._items.ever_held,
+                cutscenes_hit=len(self._progress.rewarded_cutscenes),
             ),
             "maps_files": encode_maps_files_flags(state.get("maps_files_flags")),
         }

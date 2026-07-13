@@ -186,6 +186,48 @@ def compute_episode_mc_returns(
     return returns, advantages
 
 
+def _normalize_advantages_safe(advantages: np.ndarray) -> np.ndarray:
+    """Whitening with population std; single-element batches become zero advantage.
+
+    MaskablePPO re-normalizes per minibatch without SB3's ``len(advantages) > 1``
+    guard. A trailing minibatch of size 1 (e.g. 2049 samples @ batch 2048) yields
+    NaN std and poisons weights.
+    """
+    adv = np.asarray(advantages, dtype=np.float32)
+    if adv.size <= 1:
+        return np.zeros_like(adv, dtype=np.float32)
+    mean = float(np.mean(adv))
+    std = float(np.std(adv))
+    if not np.isfinite(mean) or not np.isfinite(std) or std < 1e-8:
+        return (adv - mean).astype(np.float32, copy=False)
+    return ((adv - mean) / (std + 1e-8)).astype(np.float32, copy=False)
+
+
+def _validate_merged_rollout_finite(merged: dict[str, Any]) -> None:
+    for key in ("rewards", "values", "log_probs", "last_values", "actions"):
+        arr = merged[key]
+        if not np.isfinite(arr).all():
+            raise ValueError(f"non-finite values in merged {key}")
+    for key, arr in merged["obs"].items():
+        if np.issubdtype(arr.dtype, np.floating) and not np.isfinite(arr).all():
+            raise ValueError(f"non-finite obs[{key!r}]")
+
+
+def _policy_weights_finite(model: MaskablePPO) -> bool:
+    for param in model.policy.parameters():
+        if not torch.isfinite(param).all():
+            return False
+    return True
+
+
+def _snapshot_policy_state_dict(model: MaskablePPO) -> dict[str, torch.Tensor]:
+    return {k: v.detach().cpu().clone() for k, v in model.policy.state_dict().items()}
+
+
+def _restore_policy_state_dict(model: MaskablePPO, snapshot: dict[str, torch.Tensor]) -> None:
+    device = model.device
+    restored = {k: v.to(device) for k, v in snapshot.items()}
+    model.policy.load_state_dict(restored)
 
 
 
@@ -354,8 +396,12 @@ def fill_rollout_buffer(model: MaskablePPO, merged: dict[str, Any]) -> MaskableD
         merged["last_values"],
         gamma=float(model.gamma),
     )
+    if not np.isfinite(returns_np).all() or not np.isfinite(advantages_np).all():
+        raise ValueError("non-finite MC returns or advantages")
     # SB3 expects numpy (n_steps, n_envs) until swap_and_flatten in buffer.get().
     buffer.returns = returns_np.astype(np.float32, copy=False)
+    if getattr(model, "normalize_advantage", False):
+        advantages_np = _normalize_advantages_safe(advantages_np)
     buffer.advantages = advantages_np.astype(np.float32, copy=False)
     buffer.generator_ready = False
 
@@ -385,6 +431,17 @@ def _train_one_version(
 
     version = int(merged["policy_version"])
 
+    timesteps = n_steps * n_envs
+    if timesteps < 2:
+        if machine_name:
+            log(
+                machine_name,
+                f"skip train group policy_version={version} "
+                f"n_envs={n_envs} n_steps={n_steps} (<2 samples)",
+            )
+        merged.clear()
+        return 0
+
     if machine_name:
 
         log(
@@ -393,17 +450,27 @@ def _train_one_version(
 
             f"merge_rollouts: policy_version={version} n_envs={n_envs} "
 
-            f"n_steps={n_steps} timesteps={n_envs * n_steps}",
+            f"n_steps={n_steps} timesteps={timesteps}",
 
         )
 
+    _validate_merged_rollout_finite(merged)
     model.rollout_buffer = fill_rollout_buffer(model, merged)
 
     ensure_training_logger(model)
 
-    model.train()
-
-    timesteps = n_steps * n_envs
+    saved_norm_adv = bool(getattr(model, "normalize_advantage", False))
+    model.normalize_advantage = False
+    weight_snapshot = _snapshot_policy_state_dict(model)
+    try:
+        model.train()
+        if not _policy_weights_finite(model):
+            raise RuntimeError("policy weights non-finite after train()")
+    except Exception:
+        _restore_policy_state_dict(model, weight_snapshot)
+        raise
+    finally:
+        model.normalize_advantage = saved_norm_adv
 
     model.num_timesteps += int(timesteps)
 
@@ -429,13 +496,119 @@ def train_on_rollouts(
 
     machine_name: str = "",
 
+    current_policy_version: int | None = None,
+
+    max_staleness: int = 1,
+
+    relevance_gate: bool = False,
+
+    relevance_config: Any | None = None,
+
+    learner_state: Any | None = None,
+
 ) -> int:
 
-    """Train PPO on rollouts, grouped by policy_version and rollout length."""
+    """Train PPO on rollouts, grouped by policy_version and rollout length.
+
+    When ``relevance_gate`` is True and ``current_policy_version`` is set, rollouts
+    older than ``current - max_staleness`` are kept only if π_new still owns enough
+    of the logged actions (see ``relevance_gate`` module). Fresh rollouts pass
+    through unchanged. NaN / non-finite ratios fail closed at the transition level.
+    """
 
     if not rollouts:
 
         return 0
+
+    if relevance_gate and current_policy_version is not None:
+
+        from re1_rl.distributed.relevance_gate import (
+
+            RelevanceGateConfig,
+
+            filter_stale_rollouts,
+
+        )
+
+
+
+        cfg = relevance_config or RelevanceGateConfig()
+
+        before = len(rollouts)
+
+        kept, gate_stats, _details = filter_stale_rollouts(
+
+            model,
+
+            rollouts,
+
+            current_policy_version=int(current_policy_version),
+
+            max_staleness=int(max_staleness),
+
+            config=cfg,
+
+        )
+
+        if learner_state is not None and hasattr(learner_state, "record_relevance_stats"):
+
+            learner_state.record_relevance_stats(
+
+                kept=gate_stats.kept,
+
+                dropped=gate_stats.dropped,
+
+                steps_kept=gate_stats.steps_kept,
+
+                steps_dropped=gate_stats.steps_dropped,
+
+            )
+
+        if machine_name and gate_stats.considered:
+
+            step_total = gate_stats.steps_kept + gate_stats.steps_dropped
+
+            step_keep = (
+                float(gate_stats.steps_kept) / float(step_total) if step_total else 0.0
+            )
+
+            log(
+
+                machine_name,
+
+                "relevance_gate: "
+
+                f"considered={gate_stats.considered} kept={gate_stats.kept} "
+
+                f"dropped={gate_stats.dropped} "
+
+                f"steps_kept={gate_stats.steps_kept} "
+
+                f"steps_dropped={gate_stats.steps_dropped} "
+
+                f"step_keep_rate={step_keep:.3f} "
+
+                f"tx_pass={gate_stats.transitions_pass}/"
+
+                f"{gate_stats.transitions_total} "
+
+                f"keep_rate={gate_stats.as_dict()['relevance_keep_rate']:.3f} "
+
+                f"(batch {before}->{len(kept)})",
+
+            )
+
+        dropped = [r for r in rollouts if id(r) not in {id(x) for x in kept}]
+
+        if dropped:
+
+            _release_rollout_arrays(dropped)
+
+        rollouts = kept
+
+        if not rollouts:
+
+            return 0
 
     groups = group_rollouts_for_train(rollouts)
 
@@ -545,7 +718,17 @@ def run_learner_loop(
 
         try:
 
-            trained_steps = train_on_rollouts(model, pending, machine_name=machine_name)
+            trained_steps = train_on_rollouts(
+                model,
+                pending,
+                machine_name=machine_name,
+                current_policy_version=int(
+                    getattr(learner_state, "current_policy_version", 0) or 0
+                ),
+                max_staleness=int(getattr(learner_state, "max_staleness", 1) or 1),
+                relevance_gate=bool(getattr(learner_state, "relevance_gate", False)),
+                learner_state=learner_state,
+            )
 
             version = weight_store.publish(export_policy_state_dict(model))
 

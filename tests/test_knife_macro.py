@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from re1_rl.env import ACTION_BUTTON_MAP, ACTION_NAMES
 from re1_rl.knife_macro import (
     KNIFE_SETTLE_MAX_WAIT_FRAMES,
+    KNIFE_SETTLE_MID_SWING_MAX_WAIT_FRAMES,
     KNIFE_AIM_GAME_FRAMES,
     KNIFE_FRAME_SCALE,
     KNIFE_MACRO_FRAMES,
@@ -24,6 +25,10 @@ from re1_rl.knife_macro import (
     is_crouch_knife_aim_ready,
     is_idle_recovery_latch,
     is_knife_animation_idle,
+    is_knife_foreign_anim,
+    is_knife_locomotion,
+    is_knife_mid_swing_state,
+    is_knife_slash_anim,
     is_knife_swing_recovery_tail,
     is_knife_macro_interrupted,
     is_knife_macro_track,
@@ -38,6 +43,55 @@ from re1_rl.knife_macro import (
     read_knife_hooks,
 )
 from re1_rl.sticky_input import KNIFE_ACTION, StickyInputState
+
+
+def test_knife_slash_anim_is_0x14_not_0x13() -> None:
+    assert is_knife_slash_anim(0x14, 0x04, 8)
+    assert is_knife_slash_anim(0x14, 0x00, 0)
+    assert not is_knife_slash_anim(0x13, 0x04, 13)
+    assert not is_knife_slash_anim(0x12, 0x04, 0)
+
+
+def test_ram_gated_no_slash_when_only_aim_hold_0x13() -> None:
+    """0x13 aim-hold must not report outcome=ok / swing_anim (false swing logs)."""
+    bridge = MagicMock()
+    bridge.step.return_value = (0, False)
+    # Aim then only 0x13 forever — old bug treated this as swung.
+    hook_seq = [(0, 0, 0), (0, 0, 0), (0x12, 0x04, 0), (0x12, 0x04, 0)] + [
+        (0x13, 0x04, 8)
+    ] * 80
+    hook_iter = iter(hook_seq)
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0x13, 0x04, 8)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    bridge.read_ram.side_effect = read_ram
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, _frames = execute_knife_macro(
+        bridge,
+        empty_sticky=empty,
+        phases=(1, 1, 1),
+        scale=2,
+        use_ram_gates=True,
+        prev_hp=96,
+        episode_start_hp=96,
+    )
+    assert not died
+    report = bridge.last_knife_anim_report
+    assert report["outcome"] in ("no_slash", "swing_timeout")
+    assert report["swing_anim"] is False
+    assert report["outcome"] != "ok"
 
 
 def test_knife_macro_covers_full_21_game_frame_animation() -> None:
@@ -195,7 +249,8 @@ def test_ram_gated_waits_through_idle_recovery_latch() -> None:
         (0x12, 0x04, 0),
         (0x12, 0x04, 0),
         (0x13, 0x04, 2),
-        (0x13, 0x04, 2),
+        (0x14, 0x04, 8),  # real slash
+        (0x14, 0x04, 4),
         (0x13, 0x04, 0),
         (0, 0, 0),
     ]
@@ -243,7 +298,8 @@ def test_ram_gated_waits_through_standing_idle_hook() -> None:
         (0x12, 0x04, 0),
         (0x12, 0x04, 0),
         (0x13, 0x04, 2),
-        (0x13, 0x04, 2),
+        (0x14, 0x04, 8),  # real slash
+        (0x14, 0x04, 4),
         (0x13, 0x04, 0),
         (0, 0, 0),
     ]
@@ -291,7 +347,8 @@ def test_ram_gated_waits_through_standing_recovery_latch() -> None:
         (0x12, 0x04, 0),
         (0x12, 0x04, 0),
         (0x13, 0x04, 2),
-        (0x13, 0x04, 2),
+        (0x14, 0x04, 8),  # real slash
+        (0x14, 0x04, 4),
         (0x13, 0x04, 0),
         (0, 0, 0),
     ]
@@ -341,7 +398,174 @@ def test_knife_settle_wait_state_covers_locomotion_and_latches() -> None:
     assert is_knife_settle_wait_state(0x0D, 0x01, 0)
     assert is_knife_settle_wait_state(0x06, 0x00, 0)
     assert is_knife_settle_wait_state(0x12, 0x04, 0)
+    # Post-swing crouch hold must not abort settle (consecutive swings).
+    assert is_knife_settle_wait_state(0x15, 0x04, 0)
+    assert is_knife_settle_wait_state(0x13, 0x04, 0)
+    assert is_knife_settle_wait_state(0x13, 0x04, 3)
+    # Mid-swing entry drains under neutral.
+    assert is_knife_settle_wait_state(0x14, 0x00, 0)
+    assert is_knife_settle_wait_state(0x14, 0x04, 2)
     assert not is_knife_settle_wait_state(0x20, 0x00, 0)
+    assert is_knife_foreign_anim(0x20, 0x00, 0)
+    assert not is_knife_foreign_anim(0x14, 0x04, 0)
+    assert not is_knife_foreign_anim(0x06, 0x00, 0)
+    assert is_knife_mid_swing_state(0x14, 0x04, 0)
+    assert is_knife_locomotion(0x06, 0x00)
+    assert not is_knife_macro_interrupted(
+        0x06, 0x00, 0, aim_achieved=False, swing_started=False, allow_locomotion=True
+    )
+    assert is_knife_macro_interrupted(
+        0x06, 0x00, 0, aim_achieved=False, swing_started=False, allow_locomotion=False
+    )
+
+
+def test_ram_gated_settles_through_standing_knife_mid_swing() -> None:
+    """Entry mid-swing (0x14) must drain under settle, then aim/swing — not abort."""
+    bridge = MagicMock()
+    bridge.step.return_value = (0, False)
+    hook_seq = [
+        (0x14, 0x04, 4),  # mid-swing entry
+        (0x14, 0x04, 2),
+        (0x13, 0x04, 0),  # recovery tail
+        (0, 0, 0),
+        (0, 0, 0),
+        (0x12, 0x04, 0),
+        (0x12, 0x04, 0),
+        (0x13, 0x04, 2),
+        (0x14, 0x04, 8),  # real slash
+        (0x14, 0x04, 4),
+        (0x13, 0x04, 0),
+        (0, 0, 0),
+    ]
+    hook_iter = iter(hook_seq)
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0, 0, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    bridge.read_ram.side_effect = read_ram
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, _frames = execute_knife_macro(
+        bridge,
+        empty_sticky=empty,
+        phases=(1, 1, 1),
+        scale=2,
+        use_ram_gates=True,
+        prev_hp=96,
+        episode_start_hp=96,
+    )
+    assert not died
+    report = bridge.last_knife_anim_report
+    assert report["outcome"] == "ok"
+    assert report["crouch_aim"] is True
+
+
+def test_ram_gated_aim_tolerates_brief_locomotion() -> None:
+    bridge = MagicMock()
+    bridge.step.return_value = (0, False)
+    hook_seq = [
+        (0, 0, 0),  # entry
+        (0, 0, 0),  # settle
+        (0, 0, 0),  # settle complete
+        (0x06, 0x00, 0),  # walk residue during aim
+        (0x06, 0x00, 0),
+        (0x12, 0x04, 0),
+        (0x12, 0x04, 0),
+        (0x13, 0x04, 2),
+        (0x14, 0x04, 8),  # real slash
+        (0x14, 0x04, 4),
+        (0x13, 0x04, 0),
+        (0, 0, 0),
+    ]
+    hook_iter = iter(hook_seq)
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0, 0, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    bridge.read_ram.side_effect = read_ram
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, _frames = execute_knife_macro(
+        bridge,
+        empty_sticky=empty,
+        phases=(1, 1, 1),
+        scale=2,
+        use_ram_gates=True,
+        prev_hp=96,
+        episode_start_hp=96,
+    )
+    assert not died
+    assert bridge.last_knife_anim_report["outcome"] == "ok"
+
+
+def test_ram_gated_settles_through_crouch_post_then_swings() -> None:
+    """Entry crouch_post used to abort settle; must drain to idle then aim/swing."""
+    bridge = MagicMock()
+    bridge.step.return_value = (0, False)
+    hook_seq = [
+        (0x15, 0x04, 0),  # entry / settle wait
+        (0x15, 0x04, 0),
+        (0, 0, 0),  # drained idle
+        (0, 0, 0),
+        (0x12, 0x04, 0),  # aim
+        (0x12, 0x04, 0),
+        (0x13, 0x04, 2),
+        (0x14, 0x04, 8),  # real slash
+        (0x14, 0x04, 4),
+        (0x13, 0x04, 0),  # recovery tail
+        (0, 0, 0),
+    ]
+    hook_iter = iter(hook_seq)
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0, 0, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    bridge.read_ram.side_effect = read_ram
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, _frames = execute_knife_macro(
+        bridge,
+        empty_sticky=empty,
+        phases=(1, 1, 1),
+        scale=2,
+        use_ram_gates=True,
+        prev_hp=96,
+        episode_start_hp=96,
+    )
+    assert not died
+    report = bridge.last_knife_anim_report
+    assert report["outcome"] == "ok"
+    assert report["crouch_aim"] is True
 
 
 def test_knife_settle_complete_includes_standing_weapon_idle() -> None:
@@ -359,7 +583,8 @@ def test_ram_gated_settles_on_standing_idle_without_neutral_idle() -> None:
         (0x12, 0x04, 0),
         (0x12, 0x04, 0),
         (0x13, 0x04, 2),
-        (0x13, 0x04, 2),
+        (0x14, 0x04, 8),  # real slash
+        (0x14, 0x04, 4),
         (0x13, 0x04, 0),
         (0, 0, 0),
     ]
@@ -402,7 +627,8 @@ def test_ram_gated_skips_aim_when_crouch_aim_during_settle() -> None:
         (0x12, 0x04, 0),
         (0x12, 0x04, 0),
         (0x13, 0x04, 2),
-        (0x13, 0x04, 2),
+        (0x14, 0x04, 8),  # real slash
+        (0x14, 0x04, 4),
         (0x13, 0x04, 0),
         (0, 0, 0),
     ]
@@ -451,7 +677,8 @@ def test_ram_gated_holds_swing_through_transient_idle() -> None:
         (0x12, 0x04, 2),
         (0, 0, 0),
         (0x13, 0x04, 2),
-        (0x13, 0x04, 2),
+        (0x14, 0x04, 8),  # real slash
+        (0x14, 0x04, 4),
         (0x13, 0x04, 0),
         (0, 0, 0),
     ]
@@ -505,7 +732,8 @@ def test_ram_gated_skips_settle_when_entry_standing_idle_then_recovery_latch() -
         (0x12, 0x04, 0),
         (0x12, 0x04, 0),
         (0x13, 0x04, 2),
-        (0x13, 0x04, 2),
+        (0x14, 0x04, 8),  # real slash
+        (0x14, 0x04, 4),
         (0x13, 0x04, 0),
         (0, 0, 0),
     ]
@@ -596,6 +824,52 @@ def test_ram_gated_aborts_on_hit_animation_during_aim() -> None:
     )
     assert not died
     assert bridge.step.call_count <= 3
+    assert bridge.last_knife_anim_report["outcome"] == "aborted_interrupt"
+    # Must release (neutral) — do not hold aim/swing through a bite.
+    released = False
+    for call in bridge.step.call_args_list:
+        for frame in call.kwargs.get("frame_buttons") or []:
+            if frame == {} or not any(frame.values()):
+                released = True
+            assert not frame.get("cross"), "must not swing through foreign/hurt anim"
+    assert released
+
+
+def test_ram_gated_does_not_wait_out_bite_during_settle() -> None:
+    """Bite/grab mid-settle: release immediately; never drain the hurt anim."""
+    bridge = MagicMock()
+    bridge.step.return_value = (0, False)
+    # One settle frame of locomotion, then foreign bite — abort, don't spin on 0x20.
+    hook_reads = iter(
+        [(0x06, 0x00, 0), (0x20, 0x00, 0)] + [(0x20, 0x00, 0)] * 80
+    )
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        a, x, r = next(hook_reads)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    bridge.read_ram.side_effect = read_ram
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, frames = execute_knife_macro(
+        bridge,
+        empty_sticky=empty,
+        phases=(1, 1, 1),
+        scale=2,
+        use_ram_gates=True,
+        prev_hp=96,
+        episode_start_hp=96,
+    )
+    assert not died
+    assert frames < 10
+    assert bridge.last_knife_anim_report["outcome"] == "aborted_interrupt"
+    assert KNIFE_SETTLE_MID_SWING_MAX_WAIT_FRAMES > KNIFE_SETTLE_MAX_WAIT_FRAMES
 
 
 def test_ram_gated_aborts_when_crouch_aim_never_ready() -> None:

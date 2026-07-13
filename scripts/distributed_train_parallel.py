@@ -89,8 +89,45 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help=(
             "reject rollouts older than current_version - K "
-            "(default 1: current or previous epoch only)"
+            "(default 1: current or previous epoch only). "
+            "With --relevance-gate, versions in (K, relevance_max_age] are "
+            "soft-queued and filtered by π_new ownership at train time."
         ),
+    )
+    ap.add_argument(
+        "--relevance-gate",
+        action="store_true",
+        help=(
+            "soft-accept stale rollouts up to --relevance-max-age and keep only "
+            "those where π_new/π_old stays within the ratio clip (train-time gate)"
+        ),
+    )
+    ap.add_argument(
+        "--relevance-max-age",
+        type=int,
+        default=None,
+        help=(
+            "when --relevance-gate: hard-reject only if version < current - age "
+            "(default max(max_staleness, 8))"
+        ),
+    )
+    ap.add_argument(
+        "--relevance-ratio-clip",
+        type=float,
+        default=2.0,
+        help="keep transition if π_new/π_old in [1/c, c] (default 2.0)",
+    )
+    ap.add_argument(
+        "--relevance-keep-frac",
+        type=float,
+        default=0.5,
+        help="keep stale rollout if at least this fraction of transitions pass (default 0.5)",
+    )
+    ap.add_argument(
+        "--relevance-prob-floor",
+        type=float,
+        default=1e-8,
+        help="drop transition if π_new(a|s) is below this floor (default 1e-8)",
     )
     ap.add_argument("--warmup-timeout", type=float, default=600.0,
                     help="seconds to wait for learner weights on worker start")
@@ -185,7 +222,10 @@ def _build_learner_model(args: argparse.Namespace, device: str):
     resume_path = resolve_resume_path(
         args.resume, project_root=PROJECT_ROOT, ckpt_dir=ckpt_dir,
     )
-    if args.resume and resume_path is None:
+    explicit_resume = (
+        args.resume is not None and str(args.resume).lower() not in ("auto", "")
+    )
+    if explicit_resume and resume_path is None:
         raise RuntimeError(f"no valid checkpoint for --resume {args.resume!r}")
 
     tb_log = str(PROJECT_ROOT / "logs" / "tb")
@@ -392,6 +432,8 @@ def _run_learner(args: argparse.Namespace) -> int:
         args.machine_name,
         f"learner starting: sync_interval_s={sync_interval:.0f} "
         f"batch_threshold={args.batch_threshold} max_staleness={args.max_staleness} "
+        f"relevance_gate={args.relevance_gate} "
+        f"relevance_max_age={args.relevance_max_age} "
         f"total_steps={step_label} cuda={torch.cuda.is_available()}",
     )
 
@@ -422,6 +464,8 @@ def _run_learner(args: argparse.Namespace) -> int:
         machine_name=args.machine_name,
         max_staleness=args.max_staleness,
         worker_liveness_s=float(args.worker_liveness_s),
+        relevance_gate=bool(args.relevance_gate),
+        relevance_max_age=args.relevance_max_age,
     )
     local_rollout_sink = LearnerRolloutSink(learner_state)
 
@@ -589,10 +633,24 @@ def _run_learner(args: argparse.Namespace) -> int:
             for rollout in pending:
                 batch_infos.extend(rollout.episode_infos)
             try:
+                from re1_rl.distributed.relevance_gate import RelevanceGateConfig
+
+                relevance_cfg = None
+                if args.relevance_gate:
+                    relevance_cfg = RelevanceGateConfig(
+                        ratio_clip=float(args.relevance_ratio_clip),
+                        prob_floor=float(args.relevance_prob_floor),
+                        keep_frac=float(args.relevance_keep_frac),
+                    )
                 trained = train_on_rollouts(
                     model,
                     pending,
                     machine_name=args.machine_name,
+                    current_policy_version=int(learner_state.current_policy_version),
+                    max_staleness=int(args.max_staleness),
+                    relevance_gate=bool(args.relevance_gate),
+                    relevance_config=relevance_cfg,
+                    learner_state=learner_state,
                 )
                 version = weight_store.publish(export_policy_state_dict(model))
                 learner_state.set_current_version(version)
@@ -601,6 +659,20 @@ def _run_learner(args: argparse.Namespace) -> int:
                     f"epoch train {trained} steps from {len(pending)} rollouts "
                     f"merged_envs={merged_envs} contributors={status['contributors']} -> "
                     f"policy_version={version} total={model.num_timesteps}",
+                )
+                pitch = learner_state.pitch_summary()
+                log(
+                    args.machine_name,
+                    "pitch_summary: "
+                    f"pitch_pct={pitch['pitch_pct']:.1f}% "
+                    f"pitched_steps={pitch['steps_pitched']} "
+                    f"(ingest_reject={pitch['steps_rejected_ingest']} "
+                    f"+ relevance_drop={pitch['steps_relevance_dropped']}) "
+                    f"accepted_steps={pitch['steps_accepted']} "
+                    f"stale_queued_steps={pitch['steps_stale_queued']} "
+                    f"relevance_kept_steps={pitch['steps_relevance_kept']} "
+                    f"packets_rej={pitch['rollouts_rejected']} "
+                    f"packets_stale_q={pitch['rollouts_stale_queued']}",
                 )
                 progress.consume_infos(batch_infos, num_timesteps=int(model.num_timesteps))
                 progress.log_rollout_end(
@@ -650,9 +722,18 @@ def _run_learner(args: argparse.Namespace) -> int:
 
         final_alias = zip_path(PROJECT_ROOT / "data" / f"ppo_re1_final{suffix}")
         try:
-            saved = atomic_model_save(model, final_alias)
-            write_latest_pointer(ckpt_dir, saved)
-            log(args.machine_name, f"saved {saved}")
+            from re1_rl.distributed.learner_train import _policy_weights_finite
+
+            if _policy_weights_finite(model):
+                saved = atomic_model_save(model, final_alias)
+                write_latest_pointer(ckpt_dir, saved)
+                log(args.machine_name, f"saved {saved}")
+            else:
+                log(args.machine_name, "skip final save (non-finite policy weights)")
+                latest = find_latest_checkpoint(ckpt_dir)
+                if latest is not None and is_valid_checkpoint(latest):
+                    atomic_copy_checkpoint(latest, final_alias)
+                    log(args.machine_name, f"restored final alias from {latest}")
         except OSError as exc:
             log(args.machine_name, f"final save failed: {exc}")
             latest = find_latest_checkpoint(ckpt_dir)

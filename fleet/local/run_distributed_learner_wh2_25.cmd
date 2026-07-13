@@ -23,6 +23,7 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --capture-checkpoints ^
   --sync-interval-s %SYNC_INTERVAL_S% ^
   --max-staleness 1 ^
+  --relevance-gate ^
   --resume auto ^
   --headless ^
   --screenshot-mmf ^

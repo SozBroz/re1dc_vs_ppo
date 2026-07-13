@@ -1,8 +1,9 @@
 """RE1 Jill inventory / item-box stack limits and merge transfers.
 
-PS1 Director's Cut RAM uses (item_id, qty) per slot. Handgun reserve ammo
-stacks on ``beretta`` (0x02); separate ammo ids (``shotgun_shells``, etc.)
-stack on themselves. Unique / health / weapon items do not merge (limit 1).
+PS1 Director's Cut RAM uses (item_id, qty) per slot. Handgun spare ammo is
+``handgun_bullets`` (0x0B); the beretta slot (0x02) holds loaded clip qty.
+Separate ammo ids (``shotgun_shells``, etc.) stack on themselves. Unique /
+health / weapon items do not merge (limit 1).
 
 Limits are derived from RE1 PC HD exe patches (kTeo, residentevilmodding
 thread 13857) with PS1 handgun cap 60 (Rebirth item-box seed + in-game
@@ -16,7 +17,8 @@ from re1_rl.memory_map import WEAPON_ITEM_IDS
 
 # Stackable ammo / fuel: max qty per slot (u8-clamped).
 STACK_LIMITS: dict[int, int] = {
-    0x02: 60,  # beretta / handgun bullets (PS1; PC HD default 50)
+    0x02: 15,  # beretta loaded clip (PS1 DC magazine)
+    0x0B: 60,  # spare handgun_bullets pile
     0x0C: 15,  # shotgun shells (PC HD)
     0x0D: 10,  # dumdum rounds (PC HD handcannon)
     0x0E: 10,  # magnum rounds (PC HD)
@@ -28,7 +30,7 @@ STACK_LIMITS: dict[int, int] = {
 
 # Health / spray / mixed herbs — one per slot (RE1 DC combine menu).
 HEALTH_ITEM_IDS = frozenset({
-    0x0B, 0x41, 0x42,
+    0x41, 0x42,
     0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B,
 })
 
@@ -50,6 +52,23 @@ def stack_limit(item_id: int) -> int:
 
 def is_stackable(item_id: int) -> bool:
     return stack_limit(item_id) > 1
+
+
+def effective_transfer_qty(item_id: int, qty: int) -> int:
+    """Units available to move from a slot.
+
+    PS1 knife (and empty-magazine weapons) keep ``qty == 0`` while occupying a
+    slot; treat those as one transferable unit.
+    """
+    iid = int(item_id) & 0xFF
+    if iid == 0:
+        return 0
+    q = int(qty)
+    if q > 0:
+        return q
+    if iid in WEAPON_ITEM_IDS:
+        return 1
+    return 0
 
 
 def _first_empty_slot(slots: list[tuple[int, int]]) -> int | None:
@@ -79,17 +98,18 @@ def max_transferable(
     qty: int,
 ) -> int:
     """How many units from a source stack can enter ``dst`` (merge or new slot)."""
-    if item_id == 0 or qty <= 0:
+    avail = effective_transfer_qty(item_id, qty)
+    if avail <= 0:
         return 0
     limit = stack_limit(item_id)
     merge = _first_merge_slot(dst, item_id)
     if merge is not None:
         room = limit - int(dst[merge][1])
-        return min(int(qty), room)
+        return min(avail, room)
     empty = _first_empty_slot(dst)
     if empty is None:
         return 0
-    return min(int(qty), limit)
+    return min(avail, limit)
 
 
 def apply_stack_transfer(
@@ -109,7 +129,8 @@ def apply_stack_transfer(
         return new_src, new_dst, 0
 
     item_id, qty = new_src[src_index]
-    if item_id == 0 or qty <= 0:
+    avail = effective_transfer_qty(item_id, qty)
+    if avail <= 0:
         return new_src, new_dst, 0
 
     moved = max_transferable(new_dst, item_id, qty)
@@ -124,11 +145,14 @@ def apply_stack_transfer(
     else:
         empty = _first_empty_slot(new_dst)
         assert empty is not None
-        new_dst[empty] = (item_id, moved)
+        # Preserve knife/empty-weapon RAM qty 0 when moving the whole slot.
+        write_qty = moved if int(qty) > 0 else int(qty)
+        new_dst[empty] = (item_id, write_qty)
 
-    remaining = int(qty) - moved
+    remaining = avail - moved
     if remaining > 0:
-        new_src[src_index] = (item_id, remaining)
+        # Partial moves only happen for qty>0 stacks.
+        new_src[src_index] = (item_id, remaining if int(qty) > 0 else 0)
     else:
         new_src[src_index] = (0, 0)
 

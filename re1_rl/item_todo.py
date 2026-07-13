@@ -23,8 +23,11 @@ from typing import Any, Iterable
 # all MO-disc TODO entries after the first pickup (RAM has no per-disc id).
 ITEM_ALIASES: dict[str, str] = {
     "wooden_emblem": "emblem",
-    "handgun_clips": "clip",
-    "handgun_clip": "clip",
+    "handgun_clips": "handgun_bullets",
+    "handgun_clip": "handgun_bullets",
+    "clip": "handgun_bullets",
+    "handgun_bullets": "handgun_bullets",
+    "first_aid_spray": "first_aid_spray_alt",
     "piano_notes": "music_notes",
     "room_002_key": "dorm_key_002",
     "room_003_key": "dorm_key_003",

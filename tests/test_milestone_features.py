@@ -34,3 +34,16 @@ def test_encode_milestones_lockpick() -> None:
         ever_held={"lockpick"},
     )
     assert v[5] == 1.0
+
+
+def test_encode_milestones_cutscenes_hit_this_run() -> None:
+    hist = EpisodeHistory()
+    hist.reset("105", step=0)
+    v = encode_milestones(
+        current_room="105",
+        episode_history=hist,
+        cutscene_ledger=np.zeros(16, dtype=np.float32),
+        ever_held=set(),
+        cutscenes_hit=4,
+    )
+    assert v[12] == 4 / 16.0

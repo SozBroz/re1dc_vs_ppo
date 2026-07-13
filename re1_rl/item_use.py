@@ -18,8 +18,7 @@ from re1_rl.memory_map import (
 
 # item_id -> (heal_hp, cures_poison). None = cannot USE (e.g. red herb alone).
 _USE_EFFECTS: dict[int, tuple[int, bool] | None] = {
-    0x0B: (PLAYER_HP_MAX, False),  # first_aid_spray — full heal
-    0x41: (PLAYER_HP_MAX, False),  # first_aid_spray_alt
+    0x41: (PLAYER_HP_MAX, False),  # first_aid_spray (PS1 id; 0x0B is handgun_bullets)
     0x42: (PLAYER_HP_MAX, True),   # serum — full + poison (story / lab)
     0x43: None,  # red herb alone
     0x44: (25, False),  # green
