@@ -15,6 +15,7 @@ from re1_rl.distributed.learner_train import (
     compute_dual_gamma_mc_returns,
     compute_episode_mc_returns,
 )
+from re1_rl.reward import SOFTLOCK_GAMMA
 
 
 def test_mc_single_complete_episode():
@@ -43,7 +44,7 @@ def test_mc_bootstrap_incomplete_rollout():
 
 
 def test_dual_gamma_softlock_uses_long_horizon():
-    """Main channel γ=0.99; softlock lump γ=0.998 on the terminal step only."""
+    """Main channel γ=0.99; softlock lump at SOFTLOCK_GAMMA on the terminal step only."""
     rewards = np.array([[0.1], [0.1], [-0.9]], dtype=np.float32)  # includes softlock
     softlock = np.array([[0.0], [0.0], [-1.0]], dtype=np.float32)
     dones = np.array([[False], [False], [True]], dtype=np.bool_)
@@ -56,10 +57,10 @@ def test_dual_gamma_softlock_uses_long_horizon():
         values,
         last_values,
         gamma_main=0.99,
-        gamma_softlock=0.998,
+        gamma_softlock=SOFTLOCK_GAMMA,
     )
-    # Softlock contribution at t=0: (-1.0) * 0.998^2
-    soft_at_0 = -1.0 * (0.998**2)
+    # Softlock contribution at t=0: (-1.0) * SOFTLOCK_GAMMA^2
+    soft_at_0 = -1.0 * (SOFTLOCK_GAMMA**2)
     # Main rewards: 0.1, 0.1, 0.1  (total - softlock = -0.9 - (-1.0) = 0.1)
     main_at_0 = 0.1 + 0.99 * (0.1 + 0.99 * 0.1)
     assert returns[0, 0] == pytest.approx(main_at_0 + soft_at_0)

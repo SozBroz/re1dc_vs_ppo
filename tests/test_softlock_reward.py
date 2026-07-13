@@ -176,7 +176,7 @@ def test_long_step_advances_stagnation_proportionally():
 
 
 def test_full_stall_episode_includes_bulk_softlock():
-    """~2400 stagnant env steps: step + stagnant tax + terminal softlock lump."""
+    """Full stall to SOFTLOCK_FRAME_THRESHOLD: step + stagnant tax + terminal softlock lump."""
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", step=0)
@@ -193,5 +193,5 @@ def test_full_stall_episode_includes_bulk_softlock():
         prev = cur
     assert stagnation_episode_timeout(progress, threshold=threshold)
     assert softlock_sum == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY * REWARD_SCALE)
-    # Dense tax ~-0.84 plus lump -1.0
-    assert -2.5 < total < -1.0
+    # Dense step+stagnant tax ~-2.04 plus lump -1.0 over the 6-minute window
+    assert -4.0 < total < -2.5
