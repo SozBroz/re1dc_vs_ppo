@@ -1,13 +1,13 @@
 @echo off
-REM workhorse2 learner — 28 local envs (MMF screenshots)
+REM workhorse2 learner — 27 local envs (MMF screenshots); sync 180
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE=workhorse2
 set RUN=reward_tune_1040k
-set N_ENVS=28
+set N_ENVS=27
 set BASE_PORT=5555
 set LEARNER_PORT=8765
-set SYNC_INTERVAL_S=360
+set SYNC_INTERVAL_S=180
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role learner ^
@@ -27,4 +27,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --resume auto ^
   --headless ^
   --screenshot-mmf ^
+  --n-steps 512 ^
   --inference-batch-max %N_ENVS% >> data\logs\learner_wh2_25.log 2>&1

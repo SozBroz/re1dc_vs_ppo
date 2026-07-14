@@ -1,11 +1,11 @@
 @echo off
-REM pking dev box — visible grid for savestate/screenshot/debug (only non-headless fleet box)
+REM pking → WH2 learner — visible grid for savestate/screenshot/debug
 setlocal
 cd /d D:\re1_rl
 set MACHINE_NAME=pking
-set LEARNER_HOST=192.168.0.160
+set LEARNER_HOST=192.168.0.111
 set BASE_PORT=5755
-set N_ENVS=18
+set N_ENVS=20
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=180
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
@@ -25,5 +25,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --n-steps 512 ^
   --inference-batch-max %N_ENVS% ^
   --tile-windows ^
-  --grid-cols 6 ^
-  --grid-rows 3
+  --grid-cols 5 ^
+  --grid-rows 4

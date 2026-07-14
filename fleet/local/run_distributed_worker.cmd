@@ -6,7 +6,7 @@ if "%MACHINE_NAME%"=="" set MACHINE_NAME=workhorse1
 if "%LEARNER_HOST%"=="" set LEARNER_HOST=192.168.0.111
 if "%N_ENVS%"=="" set N_ENVS=12
 if "%BASE_PORT%"=="" set BASE_PORT=5655
-if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
+if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=180
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role worker ^
@@ -20,4 +20,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --skip-chunk 600 ^
   --sync-interval-s %SYNC_INTERVAL_S% ^
   --capture-checkpoints ^
+  --n-steps 512 ^
   --headless
