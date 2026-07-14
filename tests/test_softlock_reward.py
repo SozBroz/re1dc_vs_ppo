@@ -193,5 +193,5 @@ def test_full_stall_episode_includes_bulk_softlock():
         prev = cur
     assert stagnation_episode_timeout(progress, threshold=threshold)
     assert softlock_sum == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY * REWARD_SCALE)
-    # Dense step+stagnant tax ~-2.04 plus lump -1.0 over the 6-minute window
-    assert -4.0 < total < -2.5
+    # Dense step+stagnant tax ~-4.2 plus lump -1.0 over the 12-minute window
+    assert -6.5 < total < -4.0

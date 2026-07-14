@@ -35,7 +35,9 @@ class WaypointPlanner:
         self._terminal_goal_room = str(terminal_goal_room) if terminal_goal_room else None
         self._index = 0
 
-        if self._route_step_seqs:
+        # Explicit route_steps (including []) wins: empty list = no waypoints.
+        # Only the legacy None path falls back to the full route JSON.
+        if route_steps is not None:
             self._waypoint_ids = [
                 str(self.step_by_seq(seq).get("room_id", ""))
                 for seq in self._route_step_seqs

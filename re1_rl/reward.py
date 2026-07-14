@@ -42,8 +42,8 @@ ITEM_PICKUP_BONUS = 0.15 * CHECKPOINT_REWARD
 KEY_ITEM_PICKUP_BONUS = 0.5 * CHECKPOINT_REWARD
 # Idle contempt: no new room / cutscene / key item for SOFTLOCK_FRAME_THRESHOLD
 # emulated frames → episode truncation (env). Per-step tax after STAGNANT_GRACE_FRAMES.
-# 21600 = 6 min wall-clock @ 60 emulated fps (PS1 NTSC / BizHawk).
-SOFTLOCK_FRAME_THRESHOLD = 6 * 60 * 60
+# 43200 = 12 min wall-clock @ 60 emulated fps (PS1 NTSC / BizHawk).
+SOFTLOCK_FRAME_THRESHOLD = 12 * 60 * 60
 STAGNANT_GRACE_FRAMES = 2400
 # Extra step tax while stagnant (on top of STEP_PENALTY) after grace.
 STAGNANT_STEP_EXTRA_PENALTY = -CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT
@@ -68,9 +68,9 @@ REWARD_SCALE = 1.0
 
 # Dual discount: dense/main rewards at RL_GAMMA; softlock lump at SOFTLOCK_GAMMA.
 # Softlock γ preserves the old 9600-frame @ 0.998 timeout-window reach:
-#   0.998^(9600/4) == SOFTLOCK_GAMMA^(21600/4)  ⇒  SOFTLOCK_GAMMA = 0.998^(4/9).
+#   0.998^(9600/4) == SOFTLOCK_GAMMA^(43200/4)  ⇒  SOFTLOCK_GAMMA = 0.998^(2/9).
 RL_GAMMA = 0.99
-SOFTLOCK_GAMMA = 0.998 ** (4 / 9)  # ≈ 0.999111
+SOFTLOCK_GAMMA = 0.998 ** (2 / 9)  # ≈ 0.999555
 
 HP_LOSS_SCALE = NEAR_DEATH_DAMAGE_SCALED / (JILL_FINE_HP - 1)
 # Heal recovers ~80% of the damage channel so chip-then-herb is not free.
