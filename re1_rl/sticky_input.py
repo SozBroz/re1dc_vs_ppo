@@ -8,6 +8,8 @@ FACE_KEYS = ("cross", "triangle", "circle", "r1", "r2", "l1", "l2")
 # quickturn — tap within a step, never latched across steps
 QUICKTURN_ACTION = 6
 INTERACT_ACTION = 7
+# Cross hold for shelf push / examine — longer than a normal frame_skip batch.
+INTERACT_HOLD_EXTRA_FRAMES = 10
 PULSE_ACTIONS = frozenset({QUICKTURN_ACTION})
 # knife_swing uses re1_rl.knife_macro (phased aim/swing/recovery script);
 # clears sticky here only
@@ -41,7 +43,7 @@ class StickyInputState:
         elif action == INTERACT_ACTION:
             # Full-step Cross hold (shelf push, examine). Two consecutive interact
             # steps with latched movement = 8 emulated frames (matches human play).
-            # Forward/run into a pushable uses pushable.PUSHABLE_HOLD_FRAMES (20)
+            # Forward/run into a pushable uses pushable.PUSHABLE_HOLD_FRAMES (30)
             # via RE1Env / play_human — not this pulse path.
             pulse_hold = dict(button_map.get(action, {}))
         elif action in PULSE_ACTIONS:

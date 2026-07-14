@@ -897,6 +897,12 @@ class RE1Env(gym.Env):
         finally:
             self._macro_active = False
             self._sticky_input.reset()
+        if still:
+            port = getattr(self.bridge, "port", "?")
+            print(
+                f"[options_dismiss_fail] port={port} report={report}",
+                flush=True,
+            )
         return (not still), report
 
     def _skip_uncontrolled(self, max_frames: int | None = None) -> tuple[int, bool]:
@@ -1496,6 +1502,8 @@ class RE1Env(gym.Env):
                 pulse_hold=pulse_hold,
             )
         else:
+            from re1_rl.sticky_input import INTERACT_ACTION, INTERACT_HOLD_EXTRA_FRAMES
+
             sticky, pulse, pulse_hold = self._sticky_input.apply(
                 int(action), ACTION_BUTTON_MAP
             )
@@ -1507,6 +1515,8 @@ class RE1Env(gym.Env):
                     getattr(self, "_forward_collision_stall", False)
                 ),
             )
+            if int(action) == INTERACT_ACTION:
+                hold_n = max(hold_n, self.frame_skip + INTERACT_HOLD_EXTRA_FRAMES)
             step_emulated_frames = hold_n
             _, died_during_step = self.bridge.step(
                 n=hold_n,

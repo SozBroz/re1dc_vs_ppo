@@ -384,6 +384,13 @@ def outside_gameplay_reason(
     return None
 
 
+def pause_or_options_menu_from_ram(ram: dict[str, int | float]) -> bool:
+    """Legacy CONFIG trap: in-control byte set but active-play mask clear."""
+    mode = int(ram.get("game_mode", 0))
+    gs = int(ram.get("game_state", 0))
+    return _is_pause_or_options_menu(ram, mode=mode, gs=gs)
+
+
 def _is_pause_or_options_menu(
     ram: dict[str, int | float],
     *,

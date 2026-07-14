@@ -7,26 +7,25 @@ unless we recover. Live hunt on QuickSave8 (2026-07-14):
   - OPTIONS ``gs=0x80808000`` ignores directional cursor nudges.
   - **Start** backs out to the parent pause menu ``0x40808000``.
   - From pause: normalize cursor with **Up**, select **CONTINUE** or **EXIT**
-    with **Cross**, verify Jill can move again.
-
-Older QuickSave1 path (R-R-X) still works when the OPTIONS subtree has a live
-cursor; we always route through pause-menu EXIT selection now because it
-recovers from scrambled highlight positions.
+    with **Cross**.
+  - Legacy ``gs=0x00000080`` pause/options trap must not skip dismiss (was a
+    false ``cleared`` before 2026-07-14).
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from re1_rl.game_session import options_menu_from_ram
+from re1_rl.game_session import (
+    options_menu_from_ram,
+    pause_or_options_menu_from_ram,
+)
 from re1_rl.memory_map import (
     CHARACTER_ID,
     GAME_MODE,
     GAME_STATE,
     MESSAGE_FLAG,
     PLAYER_HP,
-    PLAYER_X,
-    PLAYER_Z,
     ROOM_ID,
     SCENE_FLAG,
     STAGE_ID,
@@ -38,10 +37,9 @@ TAP_FRAMES = 8
 SETTLE_FRAMES = 20
 START_TAP_FRAMES = 12
 START_SETTLE_FRAMES = 24
-PAUSE_MENU_NORMALIZE_UPS = 16
+PAUSE_MENU_NORMALIZE_UPS = 20
 PAUSE_DISMISS_ROW_ORDER = (0, 5, 4, 1, 2, 3)
-MOVE_PROBE_FRAMES = 48
-MAX_ATTEMPTS = 3
+MAX_ATTEMPTS = 5
 
 _RAM_FIELDS = [
     ("player_hp", PLAYER_HP, "u16"),
@@ -60,9 +58,17 @@ def read_options_ram(client: Any) -> dict[str, int]:
     return {k: int(v) for k, v in raw.items()}
 
 
-def still_trapped_in_menu(ram: dict[str, int | float]) -> bool:
-    """True while OPTIONS or the parent pause tree still owns the session."""
-    return bool(options_menu_from_ram(ram) or pause_menu_tree_from_ram(ram))
+def still_trapped_in_menu(
+    ram: dict[str, int | float],
+    *,
+    episode_start_hp: int = 0,
+) -> bool:
+    """True while OPTIONS, pause tree, or legacy pause/options owns the session."""
+    if options_menu_from_ram(ram) or pause_menu_tree_from_ram(ram):
+        return True
+    if int(episode_start_hp) > 0 and pause_or_options_menu_from_ram(ram):
+        return True
+    return False
 
 
 def _step(
@@ -113,34 +119,13 @@ def _tap_then_settle(
     return died, total
 
 
-def _read_pos(client: Any) -> tuple[int, int]:
-    raw = client.read_ram(
-        [
-            ("x", PLAYER_X, "s16"),
-            ("z", PLAYER_Z, "s16"),
-        ]
-    )
-    return int(raw["x"]), int(raw["z"])
-
-
-def _can_move(client: Any, *, prev_hp: int, episode_start_hp: int) -> bool:
-    """True when at least one movement input changes X/Z (not a menu ghost state)."""
-    x0, z0 = _read_pos(client)
-    for direction in ("up", "down", "left", "right"):
-        died, _ = _step(
-            client,
-            {direction: True},
-            frames=MOVE_PROBE_FRAMES,
-            prev_hp=prev_hp,
-            episode_start_hp=episode_start_hp,
-        )
-        if died:
-            return False
-        x1, z1 = _read_pos(client)
-        if x1 != x0 or z1 != z0:
-            ram = read_options_ram(client)
-            return not still_trapped_in_menu(ram)
-    return False
+def _recovered_from_trap(
+    ram: dict[str, int | float],
+    *,
+    episode_start_hp: int,
+) -> bool:
+    """Menu trap cleared in RAM (movement optional — wall wedge is ok)."""
+    return not still_trapped_in_menu(ram, episode_start_hp=episode_start_hp)
 
 
 def _back_out_of_options(
@@ -161,13 +146,81 @@ def _back_out_of_options(
     return died, frames
 
 
+def _try_legacy_options_rrx(
+    client: Any,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int]:
+    """QuickSave1 path: R-R-X clears OPTIONS, then Start closes pause."""
+    frames_used = 0
+    if not options_menu_from_ram(read_options_ram(client)):
+        return False, 0
+    for btn_name in ("right", "right", "cross"):
+        died, n = _tap_then_settle(
+            client,
+            {btn_name: True},
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames_used += n
+        if died:
+            return False, frames_used
+    ram = read_options_ram(client)
+    if pause_menu_tree_from_ram(ram):
+        died, n = _tap_then_settle(
+            client,
+            {"start": True},
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            tap_frames=START_TAP_FRAMES,
+            settle_frames=START_SETTLE_FRAMES,
+        )
+        frames_used += n
+        if died:
+            return False, frames_used
+    ram = read_options_ram(client)
+    if _recovered_from_trap(ram, episode_start_hp=episode_start_hp):
+        return True, frames_used
+    return False, frames_used
+
+
+def _open_pause_from_trap(
+    client: Any,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int]:
+    """Start from OPTIONS or legacy pause/options — lands on pause tree."""
+    frames_used = 0
+    ram = read_options_ram(client)
+    if options_menu_from_ram(ram):
+        died, n = _back_out_of_options(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames_used += n
+        return died, frames_used
+    if pause_or_options_menu_from_ram(ram) and not pause_menu_tree_from_ram(ram):
+        died, n = _tap_then_settle(
+            client,
+            {"start": True},
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            tap_frames=START_TAP_FRAMES,
+            settle_frames=START_SETTLE_FRAMES,
+        )
+        frames_used += n
+        return died, frames_used
+    return False, frames_used
+
+
 def _dismiss_pause_menu(
     client: Any,
     *,
     prev_hp: int,
     episode_start_hp: int,
 ) -> tuple[bool, int, int | None]:
-    """Try pause-menu rows until gameplay returns and movement works."""
+    """Try pause-menu rows until gameplay returns."""
     frames_used = 0
     for row in PAUSE_DISMISS_ROW_ORDER:
         for _ in range(PAUSE_MENU_NORMALIZE_UPS):
@@ -225,9 +278,7 @@ def _dismiss_pause_menu(
                 return False, frames_used, None
             continue
 
-        if not still_trapped_in_menu(ram) and _can_move(
-            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
-        ):
+        if _recovered_from_trap(ram, episode_start_hp=episode_start_hp):
             return True, frames_used, row
 
     return False, frames_used, None
@@ -248,7 +299,7 @@ def dismiss_options_menu(
     frames_used = 0
     report: dict[str, Any] = {
         "attempts": 0,
-        "sequence": ["start", "up", "down", "cross"],
+        "sequence": ["start", "up", "down", "cross", "rrx"],
         "cleared": False,
     }
     ram0 = read_options_ram(client)
@@ -257,26 +308,37 @@ def dismiss_options_menu(
         "game_mode": ram0.get("game_mode"),
         "room_id": ram0.get("room_id"),
     }
-    if not still_trapped_in_menu(ram0):
+    if not still_trapped_in_menu(ram0, episode_start_hp=episode_start_hp):
         report["cleared"] = True
         report["skipped"] = True
         return False, 0, report
 
     for attempt in range(int(max_attempts)):
         report["attempts"] = attempt + 1
-        ram = read_options_ram(client)
-        if options_menu_from_ram(ram):
-            died, n = _back_out_of_options(
-                client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
-            )
-            frames_used += n
-            if died:
-                report["died"] = True
-                report["ram_after"] = read_options_ram(client)
-                return True, frames_used, report
+
+        ok, n = _try_legacy_options_rrx(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames_used += n
+        if ok:
+            report["cleared"] = True
+            report["path"] = "legacy_rrx"
+            report["ram_after"] = read_options_ram(client)
+            return False, frames_used, report
+
+        died, n = _open_pause_from_trap(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames_used += n
+        if died:
+            report["died"] = True
+            report["ram_after"] = read_options_ram(client)
+            return True, frames_used, report
 
         ram = read_options_ram(client)
-        if pause_menu_tree_from_ram(ram) or options_menu_from_ram(ram):
+        if pause_menu_tree_from_ram(ram) or still_trapped_in_menu(
+            ram, episode_start_hp=episode_start_hp
+        ):
             cleared, n, row = _dismiss_pause_menu(
                 client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
             )
@@ -285,18 +347,28 @@ def dismiss_options_menu(
                 report["exit_row"] = row
             if cleared:
                 report["cleared"] = True
+                report["path"] = "pause_rows"
                 report["ram_after"] = read_options_ram(client)
                 return False, frames_used, report
 
         ram = read_options_ram(client)
-        if not still_trapped_in_menu(ram):
+        if _recovered_from_trap(ram, episode_start_hp=episode_start_hp):
             report["cleared"] = True
-            report["ram_after"] = {
-                "game_state": ram.get("game_state"),
-                "game_mode": ram.get("game_mode"),
-                "room_id": ram.get("room_id"),
-            }
+            report["path"] = "implicit_clear"
+            report["ram_after"] = read_options_ram(client)
             return False, frames_used, report
+
+        died, n = _tap_then_settle(
+            client,
+            {"circle": True},
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames_used += n
+        if died:
+            report["died"] = True
+            report["ram_after"] = read_options_ram(client)
+            return True, frames_used, report
 
     ram = read_options_ram(client)
     report["ram_after"] = {
@@ -304,6 +376,6 @@ def dismiss_options_menu(
         "game_mode": ram.get("game_mode"),
         "room_id": ram.get("room_id"),
     }
-    trapped = still_trapped_in_menu(ram)
+    trapped = still_trapped_in_menu(ram, episode_start_hp=episode_start_hp)
     report["cleared"] = not trapped
     return trapped, frames_used, report

@@ -6,7 +6,7 @@ from typing import Any
 
 # Live probe 2026-07-10 (QuickSave0 bar bookcase): push engages at ~15 continuous
 # Up frames while collision-stalled. Training frame_skip=4 needs a longer hold.
-PUSHABLE_HOLD_FRAMES = 20
+PUSHABLE_HOLD_FRAMES = 30
 
 # game_state while the push animation / slide is active
 PUSH_GAME_STATE = 0x80800044

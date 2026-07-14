@@ -16,7 +16,7 @@ from re1_rl.memory_map import (
 )
 from re1_rl.options_menu_macro import dismiss_options_menu, still_trapped_in_menu
 from re1_rl.ram_skip import pause_menu_tree_from_ram
-from re1_rl.game_session import options_menu_from_ram
+from re1_rl.game_session import options_menu_from_ram, pause_or_options_menu_from_ram
 
 
 def test_still_trapped_detects_options_and_pause() -> None:
@@ -36,7 +36,16 @@ def test_still_trapped_detects_options_and_pause() -> None:
         "scene_flag": 0x80,
     }
     assert pause_menu_tree_from_ram(pause)
-    assert still_trapped_in_menu(pause)
+    assert still_trapped_in_menu(pause, episode_start_hp=96)
+
+    legacy = {
+        "game_state": 0x00000080,
+        "game_mode": 0x80,
+        "msg_flag": 0,
+        "scene_flag": 0x80,
+    }
+    assert pause_or_options_menu_from_ram(legacy)
+    assert still_trapped_in_menu(legacy, episode_start_hp=96)
 
     play = {
         "game_state": 0x80800000,
@@ -44,7 +53,7 @@ def test_still_trapped_detects_options_and_pause() -> None:
         "msg_flag": 0,
         "scene_flag": 0x80,
     }
-    assert not still_trapped_in_menu(play)
+    assert not still_trapped_in_menu(play, episode_start_hp=96)
 
 
 def test_dismiss_start_pause_up_cross_to_gameplay() -> None:
