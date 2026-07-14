@@ -43,10 +43,13 @@ def test_mc_bootstrap_incomplete_rollout():
     assert returns[0, 0] == pytest.approx(1.0 + 0.5 * returns[1, 0])
 
 
-def test_dual_gamma_softlock_uses_long_horizon():
-    """Main channel γ=0.99; softlock lump at SOFTLOCK_GAMMA on the terminal step only."""
-    rewards = np.array([[0.1], [0.1], [-0.9]], dtype=np.float32)  # includes softlock
-    softlock = np.array([[0.0], [0.0], [-1.0]], dtype=np.float32)
+def test_dual_gamma_softlock_spread_sums_over_horizon():
+    """Main channel γ=0.99; softlock spread per step @ γ=1 sums to the lump."""
+    n = 3
+    lump = -1.0
+    per = lump / n
+    rewards = np.full((n, 1), per, dtype=np.float32)
+    softlock = np.full((n, 1), per, dtype=np.float32)
     dones = np.array([[False], [False], [True]], dtype=np.bool_)
     values = np.zeros_like(rewards)
     last_values = np.array([0.0], dtype=np.float32)
@@ -59,12 +62,8 @@ def test_dual_gamma_softlock_uses_long_horizon():
         gamma_main=0.99,
         gamma_softlock=SOFTLOCK_GAMMA,
     )
-    # Softlock contribution at t=0: (-1.0) * SOFTLOCK_GAMMA^2
-    soft_at_0 = -1.0 * (SOFTLOCK_GAMMA**2)
-    # Main rewards: 0.1, 0.1, 0.1  (total - softlock = -0.9 - (-1.0) = 0.1)
-    main_at_0 = 0.1 + 0.99 * (0.1 + 0.99 * 0.1)
-    assert returns[0, 0] == pytest.approx(main_at_0 + soft_at_0)
-    assert returns[2, 0] == pytest.approx(0.1 + (-1.0))
+    assert returns[0, 0] == pytest.approx(lump)
+    assert returns[2, 0] == pytest.approx(per)
 
 
 def test_normalize_advantages_safe_single_element_is_zero():

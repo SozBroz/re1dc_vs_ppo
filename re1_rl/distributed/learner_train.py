@@ -38,6 +38,8 @@ from re1_rl.distributed.weight_store import WeightStore
 
 from re1_rl.distributed.weights import export_policy_state_dict
 
+from re1_rl.reward import SOFTLOCK_GAMMA, spread_softlock_contempt_over_horizon
+
 from re1_rl.training_metrics_log import ensure_training_logger
 
 
@@ -326,6 +328,13 @@ def merge_rollouts(rollouts: list[WorkerRollout]) -> dict[str, Any]:
 
     action_masks = np.concatenate([r.action_masks for r in rollouts], axis=1)
 
+    spread_softlock_contempt_over_horizon(
+        rewards,
+        rewards_softlock,
+        dones,
+        horizon=n_steps,
+    )
+
     episode_starts = _episode_starts_from_dones(dones)
 
 
@@ -431,8 +440,6 @@ def fill_rollout_buffer(model: MaskablePPO, merged: dict[str, Any]) -> MaskableD
         )
 
     last_values = torch.as_tensor(merged["last_values"], device=model.device)
-
-    from re1_rl.reward import SOFTLOCK_GAMMA
 
     softlock = merged.get("rewards_softlock")
     if softlock is None:

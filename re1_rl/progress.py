@@ -23,8 +23,6 @@ class ProgressTracker:
 
     # Idle contempt: emulated frames since last exploration progress (reward.compute_reward).
     _stagnation_frames: int = 0
-    # Accrued |stagnant_step| this idle stretch (capped by CONTEMPT_BUDGET_SCALED).
-    _contempt_accrued: float = 0.0
 
     def first_visit(
         self,
@@ -72,32 +70,14 @@ class ProgressTracker:
         """
         if made_progress:
             self._stagnation_frames = 0
-            self._contempt_accrued = 0.0
             return
         self._stagnation_frames += max(int(step_frames), 0)
-
-    def contempt_accrued(self) -> float:
-        return float(self._contempt_accrued)
-
-    def remaining_contempt_budget(self, budget: float) -> float:
-        return max(0.0, float(budget) - float(self._contempt_accrued))
-
-    def accrue_contempt(self, amount: float, *, budget: float) -> float:
-        """Apply up to ``amount`` of contempt cost; returns amount actually applied."""
-        want = max(0.0, float(amount))
-        got = min(want, self.remaining_contempt_budget(budget))
-        self._contempt_accrued += got
-        return got
 
     def stagnation_timed_out(self, *, threshold: int) -> bool:
         """True once emulated idle frames reach the episode timeout threshold."""
         if threshold <= 0:
             return False
         return self._stagnation_frames >= int(threshold)
-
-    def stagnant_tax_active(self, *, grace_frames: int) -> bool:
-        """Per-step idle tax applies after the grace window."""
-        return self._stagnation_frames > int(grace_frames)
 
     def claim_waypoint_bonus(self, waypoint_index: int) -> bool:
         """True exactly once per waypoint index per episode."""
