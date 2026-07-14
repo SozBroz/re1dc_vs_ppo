@@ -22,7 +22,7 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --capture-checkpoints ^
   --no-headless ^
   --screenshot-mmf ^
-  --n-steps 512 ^
+  --n-steps 768 ^
   --inference-batch-max %N_ENVS% ^
   --tile-windows ^
   --grid-cols 5 ^

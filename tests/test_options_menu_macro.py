@@ -8,7 +8,12 @@ from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from re1_rl.memory_map import OPTIONS_MENU_GAME_MODE, OPTIONS_MENU_GAME_STATE
+from re1_rl.memory_map import (
+    OPTIONS_MENU_GAME_MODE,
+    OPTIONS_MENU_GAME_STATE,
+    PLAYER_X,
+    PLAYER_Z,
+)
 from re1_rl.options_menu_macro import dismiss_options_menu, still_trapped_in_menu
 from re1_rl.ram_skip import pause_menu_tree_from_ram
 from re1_rl.game_session import options_menu_from_ram
@@ -42,23 +47,27 @@ def test_still_trapped_detects_options_and_pause() -> None:
     assert not still_trapped_in_menu(play)
 
 
-def test_dismiss_sequence_right_right_cross_then_start() -> None:
-    """Mock client: OPTIONS -> pause after RRX -> play after Start."""
+def test_dismiss_start_pause_up_cross_to_gameplay() -> None:
+    """Mock client: OPTIONS -> pause after Start -> play after Up+Cross."""
     client = MagicMock()
-    # read_ram returns evolve across calls
-    phase = {"n": 0}
+    phase = {"n": 0, "x": 100, "z": 200}
 
     def read_ram(fields):
+        names = [f[0] for f in fields]
+        if names == ["player_hp"]:
+            return {"player_hp": 96}
+        if set(names) == {"x", "z"}:
+            return {"x": phase["x"], "z": phase["z"]}
+
         n = phase["n"]
-        if n < 4:
-            # still on options for initial reads + during first taps
+        if n < 2:
             gs, mode = OPTIONS_MENU_GAME_STATE, OPTIONS_MENU_GAME_MODE
-        elif n < 8:
+        elif n < 6:
             gs, mode = 0x40808000, 0x40
         else:
             gs, mode = 0x80800000, 0x80
         phase["n"] += 1
-        vals = {
+        return {
             "player_hp": 96,
             "stage_id": 1,
             "room_id": 17,
@@ -68,28 +77,23 @@ def test_dismiss_sequence_right_right_cross_then_start() -> None:
             "msg_flag": 0,
             "scene_flag": 0x80,
         }
-        # support both full field list and hp-only
-        if len(fields) == 1 and fields[0][0] == "player_hp":
-            return {"player_hp": 96}
-        return vals
 
     def step(buttons=None, n=1):
-        # advance phase roughly when we see start
         buttons = buttons or {}
         if buttons.get("start"):
-            phase["n"] = max(phase["n"], 8)
-        elif buttons.get("cross") and phase["n"] < 8:
-            phase["n"] = max(phase["n"], 4)
+            phase["n"] = max(phase["n"], 2)
+        elif buttons.get("cross"):
+            phase["n"] = max(phase["n"], 6)
+            phase["x"] += 8
         return None, False
 
     client.read_ram.side_effect = read_ram
     client.step.side_effect = step
 
     still, frames, report = dismiss_options_menu(
-        client, prev_hp=96, episode_start_hp=96, max_attempts=2
+        client, prev_hp=96, episode_start_hp=96, max_attempts=1
     )
     assert still is False
     assert report["cleared"] is True
-    assert "right" in report["sequence"] and "cross" in report["sequence"]
-    assert "start" in report["sequence"]
+    assert "start" in report["sequence"] and "cross" in report["sequence"]
     assert frames > 0

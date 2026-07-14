@@ -1404,11 +1404,11 @@ class RE1Env(gym.Env):
                 self._skipping_flag = False
                 return death
         menu_reason = self._probe_outside_gameplay()
-        if menu_reason == "options_menu":
+        if menu_reason in {"options_menu", "pause_or_options_menu"}:
             recovered, _options_report = self._try_dismiss_options_menu()
             if recovered:
                 menu_reason = self._probe_outside_gameplay()
-            # If still options (or another failure), fall through to terminate.
+            # If still trapped (or another failure), fall through to terminate.
         if menu_reason in _DEATH_FAILURE_REASONS:
             death = self._death_step(
                 action, died_during_skip=False, died_during_step=True
@@ -1571,7 +1571,7 @@ class RE1Env(gym.Env):
                 enemy_kills=enemy_kills,
             )
         menu_reason = self._probe_outside_gameplay()
-        if menu_reason == "options_menu":
+        if menu_reason in {"options_menu", "pause_or_options_menu"}:
             recovered, options_dismiss_report = self._try_dismiss_options_menu()
             if recovered:
                 menu_reason = self._probe_outside_gameplay()

@@ -1,14 +1,17 @@
 """Dismiss in-game OPTIONS / CONFIG menu (bug on some door transitions).
 
 RE1 Director's Cut can open the OPTIONS screen on certain room transitions
-(notably Terrace Entry). Training previously treated that as episode failure
-+ death penalty. Instead dismiss with DualShock-style inputs (BizHawk names):
+(notably Terrace Entry). Training treats lingering menu traps as episode failure
+unless we recover. Live hunt on QuickSave8 (2026-07-14):
 
-  Right, Right, Cross (P1 X)  — select Exit on OPTIONS
-  Start                       — close parent pause/ITEM menu Exit returns to
+  - OPTIONS ``gs=0x80808000`` ignores directional cursor nudges.
+  - **Start** backs out to the parent pause menu ``0x40808000``.
+  - From pause: normalize cursor with **Up**, select **CONTINUE** or **EXIT**
+    with **Cross**, verify Jill can move again.
 
-Live validation 2026-07-12 QuickSave1 (``gs=0x80808000``): R-R-X clears
-OPTIONS into pause (``0x40808000``); short Start returns to movable gameplay.
+Older QuickSave1 path (R-R-X) still works when the OPTIONS subtree has a live
+cursor; we always route through pause-menu EXIT selection now because it
+recovers from scrambled highlight positions.
 """
 
 from __future__ import annotations
@@ -22,6 +25,8 @@ from re1_rl.memory_map import (
     GAME_STATE,
     MESSAGE_FLAG,
     PLAYER_HP,
+    PLAYER_X,
+    PLAYER_Z,
     ROOM_ID,
     SCENE_FLAG,
     STAGE_ID,
@@ -31,8 +36,11 @@ from re1_rl.ram_skip import pause_menu_tree_from_ram
 
 TAP_FRAMES = 8
 SETTLE_FRAMES = 20
-START_TAP_FRAMES = 4
-START_SETTLE_FRAMES = 60
+START_TAP_FRAMES = 12
+START_SETTLE_FRAMES = 24
+PAUSE_MENU_NORMALIZE_UPS = 16
+PAUSE_DISMISS_ROW_ORDER = (0, 5, 4, 1, 2, 3)
+MOVE_PROBE_FRAMES = 48
 MAX_ATTEMPTS = 3
 
 _RAM_FIELDS = [
@@ -105,6 +113,126 @@ def _tap_then_settle(
     return died, total
 
 
+def _read_pos(client: Any) -> tuple[int, int]:
+    raw = client.read_ram(
+        [
+            ("x", PLAYER_X, "s16"),
+            ("z", PLAYER_Z, "s16"),
+        ]
+    )
+    return int(raw["x"]), int(raw["z"])
+
+
+def _can_move(client: Any, *, prev_hp: int, episode_start_hp: int) -> bool:
+    """True when at least one movement input changes X/Z (not a menu ghost state)."""
+    x0, z0 = _read_pos(client)
+    for direction in ("up", "down", "left", "right"):
+        died, _ = _step(
+            client,
+            {direction: True},
+            frames=MOVE_PROBE_FRAMES,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        if died:
+            return False
+        x1, z1 = _read_pos(client)
+        if x1 != x0 or z1 != z0:
+            ram = read_options_ram(client)
+            return not still_trapped_in_menu(ram)
+    return False
+
+
+def _back_out_of_options(
+    client: Any,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int]:
+    """OPTIONS subtree -> parent pause menu via Start."""
+    died, frames = _tap_then_settle(
+        client,
+        {"start": True},
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+        tap_frames=START_TAP_FRAMES,
+        settle_frames=START_SETTLE_FRAMES,
+    )
+    return died, frames
+
+
+def _dismiss_pause_menu(
+    client: Any,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int, int | None]:
+    """Try pause-menu rows until gameplay returns and movement works."""
+    frames_used = 0
+    for row in PAUSE_DISMISS_ROW_ORDER:
+        for _ in range(PAUSE_MENU_NORMALIZE_UPS):
+            died, n = _tap_then_settle(
+                client,
+                {"up": True},
+                prev_hp=prev_hp,
+                episode_start_hp=episode_start_hp,
+            )
+            frames_used += n
+            if died:
+                return False, frames_used, None
+
+        for _ in range(int(row)):
+            died, n = _tap_then_settle(
+                client,
+                {"down": True},
+                prev_hp=prev_hp,
+                episode_start_hp=episode_start_hp,
+            )
+            frames_used += n
+            if died:
+                return False, frames_used, None
+
+        died, n = _tap_then_settle(
+            client,
+            {"cross": True},
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            tap_frames=START_TAP_FRAMES,
+            settle_frames=START_SETTLE_FRAMES,
+        )
+        frames_used += n
+        if died:
+            return False, frames_used, None
+
+        died, n = _step(
+            client,
+            {},
+            frames=30,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames_used += n
+        if died:
+            return False, frames_used, None
+
+        ram = read_options_ram(client)
+        if options_menu_from_ram(ram):
+            died, n = _back_out_of_options(
+                client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+            )
+            frames_used += n
+            if died:
+                return False, frames_used, None
+            continue
+
+        if not still_trapped_in_menu(ram) and _can_move(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        ):
+            return True, frames_used, row
+
+    return False, frames_used, None
+
+
 def dismiss_options_menu(
     client: Any,
     *,
@@ -120,7 +248,7 @@ def dismiss_options_menu(
     frames_used = 0
     report: dict[str, Any] = {
         "attempts": 0,
-        "sequence": ["right", "right", "cross", "start"],
+        "sequence": ["start", "up", "down", "cross"],
         "cleared": False,
     }
     ram0 = read_options_ram(client)
@@ -129,42 +257,36 @@ def dismiss_options_menu(
         "game_mode": ram0.get("game_mode"),
         "room_id": ram0.get("room_id"),
     }
-    if not options_menu_from_ram(ram0) and not pause_menu_tree_from_ram(ram0):
+    if not still_trapped_in_menu(ram0):
         report["cleared"] = True
         report["skipped"] = True
         return False, 0, report
 
     for attempt in range(int(max_attempts)):
         report["attempts"] = attempt + 1
-        if options_menu_from_ram(read_options_ram(client)):
-            for btn_name in ("right", "right", "cross"):
-                died, n = _tap_then_settle(
-                    client,
-                    {btn_name: True},
-                    prev_hp=prev_hp,
-                    episode_start_hp=episode_start_hp,
-                )
-                frames_used += n
-                if died:
-                    report["died"] = True
-                    report["ram_after"] = read_options_ram(client)
-                    return True, frames_used, report
-
         ram = read_options_ram(client)
-        if pause_menu_tree_from_ram(ram):
-            died, n = _tap_then_settle(
-                client,
-                {"start": True},
-                prev_hp=prev_hp,
-                episode_start_hp=episode_start_hp,
-                tap_frames=START_TAP_FRAMES,
-                settle_frames=START_SETTLE_FRAMES,
+        if options_menu_from_ram(ram):
+            died, n = _back_out_of_options(
+                client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
             )
             frames_used += n
             if died:
                 report["died"] = True
                 report["ram_after"] = read_options_ram(client)
                 return True, frames_used, report
+
+        ram = read_options_ram(client)
+        if pause_menu_tree_from_ram(ram) or options_menu_from_ram(ram):
+            cleared, n, row = _dismiss_pause_menu(
+                client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+            )
+            frames_used += n
+            if row is not None:
+                report["exit_row"] = row
+            if cleared:
+                report["cleared"] = True
+                report["ram_after"] = read_options_ram(client)
+                return False, frames_used, report
 
         ram = read_options_ram(client)
         if not still_trapped_in_menu(ram):

@@ -24,5 +24,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --capture-checkpoints ^
   --headless ^
   --screenshot-mmf ^
-  --n-steps 512 ^
+  --n-steps 768 ^
   --inference-batch-max %N_ENVS% >> data\logs\worker_workhorse2.log 2>&1
