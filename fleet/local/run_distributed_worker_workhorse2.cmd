@@ -1,13 +1,14 @@
 @echo off
-REM Optional separate WH2 remote-style worker (loopback). Prefer learner --role learner
-REM with co-located local worker (no HTTP). Kept for debugging.
+REM workhorse2 remote worker — 32 envs, learner on WH1 (192.168.0.160)
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE_NAME=workhorse2
-set LEARNER_HOST=127.0.0.1
-set N_ENVS=8
+set LEARNER_HOST=192.168.0.160
 set BASE_PORT=5555
-set SYNC_INTERVAL_S=360
+set N_ENVS=32
+set SYNC_INTERVAL_S=180
+
+if not exist data\logs mkdir data\logs
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role worker ^
@@ -20,4 +21,8 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --training-speed 6400 ^
   --skip-chunk 600 ^
   --sync-interval-s %SYNC_INTERVAL_S% ^
-  --capture-checkpoints
+  --capture-checkpoints ^
+  --headless ^
+  --screenshot-mmf ^
+  --n-steps 512 ^
+  --inference-batch-max %N_ENVS% >> data\logs\worker_workhorse2.log 2>&1

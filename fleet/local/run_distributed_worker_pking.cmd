@@ -3,10 +3,10 @@ REM pking dev box — visible grid for savestate/screenshot/debug (only non-head
 setlocal
 cd /d D:\re1_rl
 set MACHINE_NAME=pking
-set LEARNER_HOST=192.168.0.111
+set LEARNER_HOST=192.168.0.160
 set BASE_PORT=5755
 set N_ENVS=18
-if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
+if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=180
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role worker ^
@@ -22,6 +22,7 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --capture-checkpoints ^
   --no-headless ^
   --screenshot-mmf ^
+  --n-steps 512 ^
   --inference-batch-max %N_ENVS% ^
   --tile-windows ^
   --grid-cols 6 ^
