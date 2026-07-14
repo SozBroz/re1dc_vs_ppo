@@ -45,14 +45,6 @@ KEY_ITEM_PICKUP_BONUS = 0.5 * CHECKPOINT_REWARD
 # 43200 = 12 min wall-clock @ 60 emulated fps (PS1 NTSC / BizHawk).
 SOFTLOCK_FRAME_THRESHOLD = 12 * 60 * 60
 STAGNANT_GRACE_FRAMES = 2400
-# Extra step tax while stagnant (on top of STEP_PENALTY) after grace.
-STAGNANT_STEP_EXTRA_PENALTY = -CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT
-
-ENEMY_DAMAGE_REWARD = CHECKPOINT_REWARD / 200
-ENEMY_KILL_REWARD = CHECKPOINT_REWARD / 50
-ATTACK_MISS_PENALTY = STEP_PENALTY
-KNIFE_MISS_PENALTY = ATTACK_MISS_PENALTY
-AMMO_WASTE_PENALTY = 2.0 * STEP_PENALTY
 
 JILL_FINE_HP = 96
 # Survival budget: full Fine→1 chip + death terminal = −1× checkpoint.
@@ -61,8 +53,18 @@ SURVIVAL_BUDGET_SCALED = 1.0 * CHECKPOINT_REWARD
 NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.6667
 DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.3333
 DEATH_PENALTY = -DEATH_PENALTY_SCALED
-# Bulk "did nothing" terminal (truncation). Dual-γ channel uses SOFTLOCK_GAMMA.
-SOFTLOCK_TIMEOUT_PENALTY = -1.0 * CHECKPOINT_REWARD
+# Doing-nothing contempt must not exceed death (else suicide beats softlock).
+# Shared budget: dense stagnant tax draws first; terminal softlock gets the remainder.
+CONTEMPT_BUDGET_SCALED = DEATH_PENALTY_SCALED
+SOFTLOCK_TIMEOUT_PENALTY = -CONTEMPT_BUDGET_SCALED
+# Nominal per-step idle tax (capped by remaining CONTEMPT_BUDGET_SCALED).
+STAGNANT_STEP_EXTRA_PENALTY = -CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT
+
+ENEMY_DAMAGE_REWARD = CHECKPOINT_REWARD / 200
+ENEMY_KILL_REWARD = CHECKPOINT_REWARD / 50
+ATTACK_MISS_PENALTY = STEP_PENALTY
+KNIFE_MISS_PENALTY = ATTACK_MISS_PENALTY
+AMMO_WASTE_PENALTY = 2.0 * STEP_PENALTY
 
 REWARD_SCALE = 1.0
 
@@ -273,9 +275,14 @@ def compute_reward(
                 step_frames=step_frames,
             )
         if progress.stagnant_tax_active(grace_frames=STAGNANT_GRACE_FRAMES):
-            bd["stagnant_step"] = STAGNANT_STEP_EXTRA_PENALTY * step_scale
+            want = -STAGNANT_STEP_EXTRA_PENALTY * step_scale
+            got = progress.accrue_contempt(want, budget=CONTEMPT_BUDGET_SCALED)
+            bd["stagnant_step"] = -got
         if progress.stagnation_timed_out(threshold=softlock_threshold):
-            bd["softlock"] = SOFTLOCK_TIMEOUT_PENALTY
+            rem = progress.remaining_contempt_budget(CONTEMPT_BUDGET_SCALED)
+            if rem > 0.0:
+                progress.accrue_contempt(rem, budget=CONTEMPT_BUDGET_SCALED)
+                bd["softlock"] = -rem
 
     reward = float(sum(bd.values())) * REWARD_SCALE
     if return_breakdown:

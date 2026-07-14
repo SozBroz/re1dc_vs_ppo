@@ -11,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
+    CONTEMPT_BUDGET_SCALED,
+    DEATH_PENALTY_SCALED,
     ITEM_PICKUP_BONUS,
     NEW_ROOM_BONUS,
     REFERENCE_STEP_FRAMES,
@@ -47,8 +49,9 @@ def _step(
     )
 
 
-def test_softlock_is_minus_one_checkpoint():
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-1.0)
+def test_softlock_matches_death_budget():
+    assert CONTEMPT_BUDGET_SCALED == pytest.approx(DEATH_PENALTY_SCALED)
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-DEATH_PENALTY_SCALED)
     assert softlock_reward_from_breakdown(
         {"softlock": SOFTLOCK_TIMEOUT_PENALTY}
     ) == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY * REWARD_SCALE)
@@ -98,7 +101,31 @@ def test_stagnation_timeout_applies_bulk_softlock():
         prev = cur
     assert stagnation_episode_timeout(progress, threshold=threshold)
     assert bd is not None
+    # No dense tax before grace → full contempt budget goes to softlock.
     assert bd["softlock"] == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY)
+
+
+def test_contempt_never_exceeds_death_budget():
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    prev = make_state(room="105", step=0)
+    stagnant_sum = 0.0
+    softlock_sum = 0.0
+    threshold = SOFTLOCK_FRAME_THRESHOLD
+    step_frames = REFERENCE_STEP_FRAMES
+    steps = threshold // step_frames
+    for i in range(1, steps + 1):
+        cur = make_state(room="105", step=i)
+        _, bd = _step(progress, prev, cur, step_frames=step_frames)
+        stagnant_sum += bd["stagnant_step"]
+        softlock_sum += bd["softlock"]
+        prev = cur
+    assert stagnation_episode_timeout(progress, threshold=threshold)
+    contempt = -(stagnant_sum + softlock_sum)
+    assert contempt == pytest.approx(CONTEMPT_BUDGET_SCALED)
+    assert contempt <= DEATH_PENALTY_SCALED + 1e-9
+    # Long stall spends the budget on dense tax; softlock remainder is ~0.
+    assert softlock_sum == pytest.approx(0.0, abs=1e-9)
 
 
 def test_room_loop_without_new_visits_accumulates_stagnation():
@@ -145,6 +172,7 @@ def test_key_item_pickup_resets_idle_timer():
     assert bd["key_item"] > 0.0
     assert bd["stagnant_step"] == 0.0
     assert progress.stagnation_frames == 0
+    assert progress.contempt_accrued() == 0.0
 
 
 def test_first_visits_reset_idle_timer():
@@ -173,25 +201,3 @@ def test_long_step_advances_stagnation_proportionally():
     long_step = make_state(room="105", step=2)
     _step(progress, short, long_step, step_frames=120)
     assert progress.stagnation_frames == 120
-
-
-def test_full_stall_episode_includes_bulk_softlock():
-    """Full stall to SOFTLOCK_FRAME_THRESHOLD: step + stagnant tax + terminal softlock lump."""
-    progress = ProgressTracker()
-    progress.first_visit("105")
-    prev = make_state(room="105", step=0)
-    total = 0.0
-    softlock_sum = 0.0
-    threshold = SOFTLOCK_FRAME_THRESHOLD
-    step_frames = REFERENCE_STEP_FRAMES
-    steps = threshold // step_frames
-    for i in range(1, steps + 1):
-        cur = make_state(room="105", step=i)
-        rew, bd = _step(progress, prev, cur, step_frames=step_frames)
-        total += rew
-        softlock_sum += bd["softlock"] * REWARD_SCALE
-        prev = cur
-    assert stagnation_episode_timeout(progress, threshold=threshold)
-    assert softlock_sum == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY * REWARD_SCALE)
-    # Dense step+stagnant tax ~-4.2 plus lump -1.0 over the 12-minute window
-    assert -6.5 < total < -4.0

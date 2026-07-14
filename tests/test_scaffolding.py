@@ -239,7 +239,7 @@ def test_damage_and_death_calibrated_to_waypoint():
     assert SURVIVAL_BUDGET_SCALED == pytest.approx(1.0 * CHECKPOINT_REWARD)
     assert NEAR_DEATH_DAMAGE_SCALED == pytest.approx((2.0 / 3.0) * CHECKPOINT_REWARD)
     assert DEATH_PENALTY_SCALED == pytest.approx((1.0 / 3.0) * CHECKPOINT_REWARD)
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-1.0 * CHECKPOINT_REWARD)
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-DEATH_PENALTY_SCALED)
     assert HP_GAIN_SCALE == pytest.approx(0.8 * HP_LOSS_SCALE)
 
     full = make_state(hp=JILL_FINE_HP, step=1)
