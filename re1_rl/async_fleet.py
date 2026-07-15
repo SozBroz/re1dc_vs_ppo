@@ -20,7 +20,7 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
     n_epochs=4,
     learning_rate=3e-4,
     gamma=RL_GAMMA,
-    ent_coef=0.01,
+    ent_coef=0.04,
 )
 
 # Distributed 6-minute sync epochs: larger on-policy batches, gentler updates.
@@ -31,7 +31,7 @@ DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     n_epochs=2,
     learning_rate=1e-4,
     gamma=RL_GAMMA,
-    ent_coef=0.01,
+    ent_coef=0.04,
 )
 DEFAULT_SYNC_INTERVAL_S = 360.0
 

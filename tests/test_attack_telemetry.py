@@ -37,24 +37,52 @@ def test_counters_accumulate() -> None:
     assert tel.misses_by_outcome["aim_timeout"] == 1
 
 
-def test_missed_attack_prints_line(capsys) -> None:
+def test_missed_attack_prints_swing_line(capsys) -> None:
     tel = AttackTelemetry(port="biz")
     report = {
         "issues": ["swing too short", "no crouch aim", "extra"],
         "pre_state": {"hooks": "0/0/0", "label": "idle"},
+        "frames": 42,
     }
     tel.record(
-        "knife",
+        "knife_swing",
         "knife",
         "no_damage",
         macro_report=report,
         state=_state(room_id="105"),
+        reward=-0.003,
+        reward_breakdown={"step": -0.003, "enemy_damage": 0.0, "enemy_kill": 0.0},
     )
     out = capsys.readouterr().out
-    assert "[attack_fail] port=biz weapon=knife outcome=no_damage" in out
+    assert "[attack_swing] port=biz action=knife_swing weapon=knife hit=0" in out
+    assert "outcome=no_damage" in out
     assert "room=105" in out
+    assert "reward=-0.003000" in out
     assert "issues=3 hooks=0/0/0" in out
     assert "swing too short; no crouch aim; extra" in out
+
+
+def test_hit_attack_prints_swing_line(capsys) -> None:
+    tel = AttackTelemetry(port=9)
+    tel.record(
+        "attack",
+        "beretta",
+        "hit",
+        enemy_damage=20,
+        enemy_kills=1,
+        ammo_spent=1,
+        state=_state(),
+        reward=0.3,
+        reward_breakdown={
+            "step": -0.01,
+            "enemy_damage": 0.1,
+            "enemy_kill": 0.2,
+        },
+    )
+    out = capsys.readouterr().out
+    assert "[attack_swing] port=9 action=attack weapon=beretta hit=1" in out
+    assert "dmg=20 kills=1" in out
+    assert "bd_kill=+0.200000" in out
 
 
 def test_attack_log_zero_silences(monkeypatch, capsys) -> None:

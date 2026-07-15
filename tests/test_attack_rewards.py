@@ -1,4 +1,4 @@
-"""Attack-miss and ammo-waste reward terms (no emulator)."""
+"""Attack-miss flags still attach to state; reward no longer penalizes misses."""
 
 from __future__ import annotations
 
@@ -9,10 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
-    AMMO_WASTE_PENALTY,
-    ATTACK_MISS_PENALTY,
     ENEMY_DAMAGE_REWARD,
-    KNIFE_MISS_PENALTY,
+    ENEMY_KILL_REWARD,
     REFERENCE_STEP_FRAMES,
     STEP_PENALTY,
     compute_reward,
@@ -20,7 +18,7 @@ from re1_rl.reward import (
 from tests.test_scaffolding import make_planner, make_state
 
 
-def test_attack_missed_triggers_attack_miss_penalty() -> None:
+def test_attack_missed_no_extra_penalty() -> None:
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -29,13 +27,12 @@ def test_attack_missed_triggers_attack_miss_penalty() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["attack_miss"] == ATTACK_MISS_PENALTY
-    assert bd["attack_miss"] == STEP_PENALTY
+    assert bd["attack_miss"] == 0.0
     assert bd["ammo_waste"] == 0.0
     assert bd["step"] == STEP_PENALTY * (42 / REFERENCE_STEP_FRAMES)
 
 
-def test_knife_swing_missed_back_compat() -> None:
+def test_knife_swing_missed_no_extra_penalty() -> None:
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -43,11 +40,11 @@ def test_knife_swing_missed_back_compat() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["attack_miss"] == KNIFE_MISS_PENALTY
+    assert bd["attack_miss"] == 0.0
     assert bd["ammo_waste"] == 0.0
 
 
-def test_ammo_waste_on_ranged_miss() -> None:
+def test_ammo_spent_on_miss_no_waste_penalty() -> None:
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -56,23 +53,11 @@ def test_ammo_waste_on_ranged_miss() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["attack_miss"] == ATTACK_MISS_PENALTY
-    assert bd["ammo_waste"] == AMMO_WASTE_PENALTY * 3
+    assert bd["attack_miss"] == 0.0
+    assert bd["ammo_waste"] == 0.0
 
 
-def test_ammo_waste_capped_at_four_rounds() -> None:
-    planner = make_planner()
-    prev = make_state(hp=96, step=1)
-    cur = make_state(hp=96, step=2)
-    cur["attack_missed"] = True
-    cur["ammo_spent"] = 9
-    _, bd = compute_reward(
-        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
-    )
-    assert bd["ammo_waste"] == AMMO_WASTE_PENALTY * 4
-
-
-def test_no_ammo_waste_without_miss() -> None:
+def test_no_ammo_waste_without_miss_flag() -> None:
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -84,7 +69,7 @@ def test_no_ammo_waste_without_miss() -> None:
     assert bd["ammo_waste"] == 0.0
 
 
-def test_hit_no_attack_miss_or_ammo_waste() -> None:
+def test_hit_rewards_unchanged() -> None:
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -97,6 +82,18 @@ def test_hit_no_attack_miss_or_ammo_waste() -> None:
     assert bd["attack_miss"] == 0.0
     assert bd["ammo_waste"] == 0.0
     assert reward == sum(bd.values())
+
+
+def test_enemy_kill_reward_is_point_two() -> None:
+    assert ENEMY_KILL_REWARD == 0.2
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    cur["enemy_kills"] = 1
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["enemy_kill"] == 0.2
 
 
 def test_breakdown_keys_present() -> None:

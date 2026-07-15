@@ -1,6 +1,6 @@
-"""Verbose failed-attack logging for hierarchical RE1 control.
+"""Attack macro logging and per-episode counters for hierarchical RE1 control.
 
-Standalone module — ``env`` calls :class:`AttackTelemetry` after attack macros.
+``env`` calls :class:`AttackTelemetry` after each knife/attack macro and reward.
 Disable console output with env var ``ATTACK_LOG=0`` (mirrors ``KNIFE_ANIM_LOG``).
 """
 
@@ -10,7 +10,7 @@ import os
 from collections import Counter
 from typing import Any
 
-# Log failed attacks when truthy (default on). Set ATTACK_LOG=0 to silence.
+# Log every attack swing when truthy (default on). Set ATTACK_LOG=0 to silence.
 ATTACK_LOG_ENABLED = os.environ.get("ATTACK_LOG", "1").strip().lower() not in (
     "0",
     "false",
@@ -30,7 +30,7 @@ _MISS_OUTCOMES = frozenset(
 
 
 class AttackTelemetry:
-    """Per-episode attack counters and structured miss logging."""
+    """Per-episode attack counters and structured swing logging."""
 
     def __init__(self, port: Any = "?") -> None:
         self.port = port
@@ -54,8 +54,10 @@ class AttackTelemetry:
         enemy_kills: int = 0,
         ammo_spent: int = 0,
         state: dict | None = None,
+        reward: float | None = None,
+        reward_breakdown: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Record one attack attempt; print on miss when logging is enabled."""
+        """Record one attack attempt; log every swing when logging is enabled."""
         self.attacks_total += 1
         weapon_label = weapon or "?"
         state = state or {}
@@ -75,13 +77,20 @@ class AttackTelemetry:
             self.attacks_missed += 1
             self.misses_by_weapon[weapon_label] += 1
             self.misses_by_outcome[outcome] += 1
-            self._log_miss(
-                weapon=weapon_label,
-                outcome=outcome,
-                ammo_spent=int(ammo_spent),
-                state=state,
-                macro_report=macro_report,
-            )
+
+        self._log_swing(
+            action_name=action_name,
+            weapon=weapon_label,
+            outcome=outcome,
+            hit=is_hit,
+            ammo_spent=int(ammo_spent),
+            enemy_damage=int(enemy_damage),
+            enemy_kills=int(enemy_kills),
+            state=state,
+            macro_report=macro_report,
+            reward=reward,
+            reward_breakdown=reward_breakdown,
+        )
 
         return {
             "action_name": action_name,
@@ -98,7 +107,7 @@ class AttackTelemetry:
         total = self.attacks_total
         hit_rate = self.attacks_hit / total if total else 0.0
         return {
-            "attacks_total": self.attacks_total,
+            "attacks_total": total,
             "attacks_hit": self.attacks_hit,
             "attacks_missed": self.attacks_missed,
             "hit_rate": hit_rate,
@@ -106,14 +115,20 @@ class AttackTelemetry:
             "misses_by_outcome": dict(self.misses_by_outcome),
         }
 
-    def _log_miss(
+    def _log_swing(
         self,
         *,
+        action_name: str,
         weapon: str,
         outcome: str,
+        hit: bool,
         ammo_spent: int,
+        enemy_damage: int,
+        enemy_kills: int,
         state: dict,
         macro_report: dict | None,
+        reward: float | None,
+        reward_breakdown: dict[str, float] | None,
     ) -> None:
         if not ATTACK_LOG_ENABLED:
             return
@@ -122,16 +137,24 @@ class AttackTelemetry:
         issues = report.get("issues") or []
         pre_state = report.get("pre_state") or {}
         hooks = pre_state.get("hooks", "?")
+        frames = report.get("frames", "?")
         room = state.get("room_id", "?")
         x = state.get("x", "?")
         z = state.get("z", "?")
         enemies = state.get("enemies") or []
+        bd = reward_breakdown or {}
+        rew_s = "?" if reward is None else f"{float(reward):+.6f}"
+        step_r = bd.get("step", 0.0)
+        dmg_r = bd.get("enemy_damage", 0.0)
+        kill_r = bd.get("enemy_kill", 0.0)
 
         print(
-            f"[attack_fail] port={self.port} weapon={weapon} outcome={outcome} "
-            f"dmg=0 kills=0 ammo_spent={ammo_spent} room={room} "
-            f"pos=({x},{z}) enemies={len(enemies)} "
-            f"issues={len(issues)} hooks={hooks}",
+            f"[attack_swing] port={self.port} action={action_name} weapon={weapon} "
+            f"hit={int(hit)} outcome={outcome} dmg={enemy_damage} kills={enemy_kills} "
+            f"ammo={ammo_spent} reward={rew_s} step={step_r:+.6f} "
+            f"bd_enemy_dmg={dmg_r:+.6f} bd_kill={kill_r:+.6f} "
+            f"room={room} pos=({x},{z}) enemies={len(enemies)} "
+            f"frames={frames} issues={len(issues)} hooks={hooks}",
             flush=True,
         )
         if issues:

@@ -7,7 +7,23 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from re1_rl.enemy_combat import apply_combat_step_fields, enemy_combat_delta, enemy_hp_by_slot
+from re1_rl.enemy_combat import (
+    alive_enemy_count,
+    apply_combat_step_fields,
+    enemy_combat_delta,
+    enemy_hp_by_slot,
+)
+
+
+def test_alive_enemy_count() -> None:
+    enemies = [
+        {"slot": 0, "hp": 80, "alive": True},
+        {"slot": 1, "hp": 0, "alive": True},
+        {"slot": 2, "hp": 10, "alive": False},
+    ]
+    assert alive_enemy_count(enemies) == 1
+    assert alive_enemy_count([]) == 0
+    assert alive_enemy_count(None) == 0
 
 
 def test_enemy_hp_by_slot_skips_dead() -> None:

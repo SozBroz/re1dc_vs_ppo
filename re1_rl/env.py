@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,7 @@ import numpy as np
 from gymnasium import spaces
 
 from re1_rl.bizhawk_bridge import BizHawkClient
-from re1_rl.enemy_combat import apply_combat_step_fields
+from re1_rl.enemy_combat import alive_enemy_count, apply_combat_step_fields
 from re1_rl.game_session import (
     episode_death_signal_from_ram,
     episode_failure_reason,
@@ -103,6 +104,11 @@ from re1_rl.action_mask import (
 )
 from re1_rl.attack_macro import execute_attack_macro
 from re1_rl.options_menu_macro import dismiss_options_menu
+
+# Mask knife/attack when live RAM shows no living enemies (set 0 to debug combat).
+MASK_ATTACK_WITHOUT_ENEMIES = os.environ.get(
+    "MASK_ATTACK_WITHOUT_ENEMIES", "1"
+).strip().lower() not in ("0", "false", "no", "off")
 
 ACTION_NAMES = [
     "noop",
@@ -1294,6 +1300,8 @@ class RE1Env(gym.Env):
         attack_report: dict[str, Any] | None,
         enemy_damage: int,
         enemy_kills: int,
+        reward: float,
+        reward_breakdown: dict[str, float],
     ) -> None:
         try:
             from re1_rl.attack_telemetry import AttackTelemetry
@@ -1323,6 +1331,8 @@ class RE1Env(gym.Env):
             enemy_kills=enemy_kills,
             ammo_spent=int(state.get("ammo_spent", 0)),
             state=state,
+            reward=reward,
+            reward_breakdown=reward_breakdown,
         )
 
     def action_masks(self) -> np.ndarray:
@@ -1389,6 +1399,8 @@ class RE1Env(gym.Env):
             poisoned=bool(state.get("poisoned", False)),
             episode_start_hp=int(getattr(self, "_episode_start_hp", 0) or 0),
             in_control=bool(state.get("in_control", True)),
+            alive_enemies_in_room=alive_enemy_count(state.get("enemies")),
+            mask_combat_without_enemies=MASK_ATTACK_WITHOUT_ENEMIES,
         )
 
     def step(self, action: int):
@@ -1573,13 +1585,6 @@ class RE1Env(gym.Env):
         if attack_report is not None:
             state["ammo_spent"] = int(attack_report.get("ammo_spent", 0))
             state["attack_weapon"] = attack_report.get("weapon")
-        if knife or attack:
-            self._record_attack_telemetry(
-                action, state,
-                attack_report=attack_report,
-                enemy_damage=enemy_damage,
-                enemy_kills=enemy_kills,
-            )
         menu_reason = self._probe_outside_gameplay()
         if menu_reason in {"options_menu", "pause_or_options_menu"}:
             recovered, options_dismiss_report = self._try_dismiss_options_menu()
@@ -1608,6 +1613,17 @@ class RE1Env(gym.Env):
                 breakdown[k] = breakdown.get(k, 0.0) + v
             self._post_skip_reward = 0.0
             self._post_skip_bd = {}
+
+        if knife or attack:
+            self._record_attack_telemetry(
+                action,
+                state,
+                attack_report=attack_report,
+                enemy_damage=enemy_damage,
+                enemy_kills=enemy_kills,
+                reward=reward,
+                reward_breakdown=breakdown,
+            )
 
         terminated = bool(state.get("dead"))
         truncated = self._episode_truncated()

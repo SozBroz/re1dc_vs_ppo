@@ -12,7 +12,6 @@ from re1_rl.reward import (
     CHECKPOINT_REWARD,
     ENEMY_DAMAGE_REWARD,
     ENEMY_KILL_REWARD,
-    KNIFE_MISS_PENALTY,
     REFERENCE_STEP_FRAMES,
     STEPS_PER_CHECKPOINT,
     STEP_PENALTY,
@@ -39,7 +38,7 @@ def test_enemy_damage_and_kill_rewards() -> None:
     assert bd["enemy_kill"] == ENEMY_KILL_REWARD
 
 
-def test_knife_miss_extra_contempt() -> None:
+def test_knife_miss_only_scaled_step_contempt() -> None:
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -48,8 +47,7 @@ def test_knife_miss_extra_contempt() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["attack_miss"] == KNIFE_MISS_PENALTY
-    assert bd["attack_miss"] == STEP_PENALTY
+    assert bd["attack_miss"] == 0.0
     assert bd["step"] == STEP_PENALTY * (42 / REFERENCE_STEP_FRAMES)
 
 

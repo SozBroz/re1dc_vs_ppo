@@ -60,10 +60,11 @@ CONTEMPT_BUDGET_SCALED = DEATH_PENALTY_SCALED
 SOFTLOCK_TIMEOUT_PENALTY = -CONTEMPT_BUDGET_SCALED
 
 ENEMY_DAMAGE_REWARD = CHECKPOINT_REWARD / 200
-ENEMY_KILL_REWARD = CHECKPOINT_REWARD / 50
-ATTACK_MISS_PENALTY = STEP_PENALTY
-KNIFE_MISS_PENALTY = ATTACK_MISS_PENALTY
-AMMO_WASTE_PENALTY = 2.0 * STEP_PENALTY
+ENEMY_KILL_REWARD = 0.2 * CHECKPOINT_REWARD
+# Legacy names kept for imports/tests; miss penalties disabled (step scale only).
+ATTACK_MISS_PENALTY = 0.0
+KNIFE_MISS_PENALTY = 0.0
+AMMO_WASTE_PENALTY = 0.0
 
 REWARD_SCALE = 1.0
 
@@ -249,15 +250,6 @@ def compute_reward(
     enemy_kills = int(state.get("enemy_kills", 0) or 0)
     if enemy_kills > 0:
         bd["enemy_kill"] = ENEMY_KILL_REWARD * enemy_kills
-
-    attack_missed = bool(
-        state.get("attack_missed") or state.get("knife_swing_missed")
-    )
-    if attack_missed:
-        bd["attack_miss"] = ATTACK_MISS_PENALTY
-        ammo_spent = int(state.get("ammo_spent", 0) or 0)
-        if ammo_spent > 0:
-            bd["ammo_waste"] = AMMO_WASTE_PENALTY * min(ammo_spent, 4)
 
     if progress is not None and not state.get("dead"):
         made_progress = (

@@ -104,8 +104,38 @@ def test_attack_masked_during_recovery() -> None:
         N_ACTIONS, None,
         player_anim=0, player_aux=0, player_recovery=5,
         equipped_weapon_id=0x02,
+        alive_enemies_in_room=1,
     )
     assert not m[ATTACK_ACTION]
+
+
+def test_combat_masked_without_enemies_in_room() -> None:
+    m = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x01,
+        player_anim=0,
+        player_aux=0,
+        player_recovery=0,
+        alive_enemies_in_room=0,
+    )
+    assert not m[KNIFE_SWING_ACTION]
+    assert not m[ATTACK_ACTION]
+
+
+def test_combat_mask_disabled_for_debug() -> None:
+    m = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x01,
+        player_anim=0,
+        player_aux=0,
+        player_recovery=0,
+        alive_enemies_in_room=0,
+        mask_combat_without_enemies=False,
+    )
+    assert m[KNIFE_SWING_ACTION]
+    assert m[ATTACK_ACTION]
 
 
 def test_equip_mask_two_step() -> None:

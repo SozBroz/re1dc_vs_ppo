@@ -5,6 +5,17 @@ from __future__ import annotations
 from typing import Any
 
 
+def alive_enemy_count(enemies: list[dict[str, Any]] | None) -> int:
+    """Living enemies in the live RAM table (hp > 0)."""
+    n = 0
+    for ent in enemies or []:
+        if not ent.get("alive", True):
+            continue
+        if int(ent.get("hp", 0)) > 0:
+            n += 1
+    return n
+
+
 def enemy_hp_by_slot(enemies: list[dict[str, Any]]) -> dict[int, int]:
     """Map enemy table slot index -> HP (living enemies only)."""
     out: dict[int, int] = {}

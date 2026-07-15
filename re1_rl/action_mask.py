@@ -75,6 +75,8 @@ def action_mask(
     poisoned: bool = False,
     episode_start_hp: int | None = None,
     in_control: bool = True,
+    alive_enemies_in_room: int | None = None,
+    mask_combat_without_enemies: bool = True,
 ) -> np.ndarray:
     """Return bool mask (True = legal) for MaskablePPO / ActionMasker."""
     del prev_action
@@ -105,14 +107,18 @@ def action_mask(
             int(player_anim), int(player_aux), int(player_recovery)
         )
 
+    enemies_present = True
+    if mask_combat_without_enemies and alive_enemies_in_room is not None:
+        enemies_present = int(alive_enemies_in_room) > 0
+
     if not in_submenu and KNIFE_SWING_ACTION < n_actions:
-        legal = anim_ready
+        legal = anim_ready and enemies_present
         if equipped_weapon_id is not None:
             legal = legal and int(equipped_weapon_id) == KNIFE_ID
         mask[KNIFE_SWING_ACTION] = legal
 
     if not in_submenu and ATTACK_ACTION < n_actions:
-        legal = anim_ready
+        legal = anim_ready and enemies_present
         if equipped_weapon_id is not None:
             wid = int(equipped_weapon_id)
             legal = legal and wid in EQUIPPABLE_WEAPON_IDS
