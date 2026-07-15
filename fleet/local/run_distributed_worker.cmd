@@ -3,7 +3,7 @@ REM Remote worker — set MACHINE and LEARNER_HOST per box
 setlocal
 cd /d D:\re1_rl
 if "%MACHINE_NAME%"=="" set MACHINE_NAME=workhorse1
-if "%LEARNER_HOST%"=="" set LEARNER_HOST=192.168.0.111
+if "%LEARNER_HOST%"=="" set LEARNER_HOST=192.168.0.116
 if "%N_ENVS%"=="" set N_ENVS=12
 if "%BASE_PORT%"=="" set BASE_PORT=5655
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=180
