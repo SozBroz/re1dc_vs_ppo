@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 # BizHawk MainRAM domain offset = PS1 bus address - 0x80000000
 PS1_MAINRAM_BASE = 0x80000000
 
