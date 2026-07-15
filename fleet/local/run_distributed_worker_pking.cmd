@@ -3,7 +3,7 @@ REM pking → WH2 learner — visible grid for savestate/screenshot/debug
 setlocal
 cd /d D:\re1_rl
 set MACHINE_NAME=pking
-set LEARNER_HOST=192.168.0.111
+set LEARNER_HOST=192.168.0.116
 set BASE_PORT=5755
 set N_ENVS=20
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=180

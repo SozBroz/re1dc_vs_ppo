@@ -4,7 +4,7 @@ REM Yesterday: registered over HTTP but EmuHawk/Lua never connected from SSH ses
 setlocal
 cd /d D:\re1_rl
 set MACHINE_NAME=workhorse1
-set LEARNER_HOST=192.168.0.111
+set LEARNER_HOST=192.168.0.116
 set BASE_PORT=5655
 set N_ENVS=8
 set SYNC_INTERVAL_S=180

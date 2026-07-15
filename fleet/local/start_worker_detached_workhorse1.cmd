@@ -10,10 +10,10 @@ taskkill /F /IM python.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 
 set MACHINE_NAME=workhorse1
-set LEARNER_HOST=192.168.0.111
+set LEARNER_HOST=192.168.0.116
 set BASE_PORT=5655
 set N_ENVS=8
 set SYNC_INTERVAL_S=360
 
-start "WH1-worker" /MIN cmd /c "cd /d D:\re1_rl && set MACHINE_NAME=workhorse1&& set LEARNER_HOST=192.168.0.111&& set BASE_PORT=5655&& set N_ENVS=8&& set SYNC_INTERVAL_S=360&& fleet\local\run_distributed_worker.cmd >> data\logs\worker_workhorse1.log 2>&1"
+start "WH1-worker" /MIN cmd /c "cd /d D:\re1_rl && set MACHINE_NAME=workhorse1&& set LEARNER_HOST=192.168.0.116&& set BASE_PORT=5655&& set N_ENVS=8&& set SYNC_INTERVAL_S=360&& fleet\local\run_distributed_worker.cmd >> data\logs\worker_workhorse1.log 2>&1"
 echo Started WH1 worker detached. Tail: type data\logs\worker_workhorse1.log
