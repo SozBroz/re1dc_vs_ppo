@@ -13,7 +13,7 @@ import numpy as np
 from gymnasium import spaces
 
 from re1_rl.bizhawk_bridge import BizHawkClient
-from re1_rl.enemy_combat import alive_enemy_count, apply_combat_step_fields
+from re1_rl.enemy_combat import apply_combat_step_fields, combat_enemy_count
 from re1_rl.game_session import (
     episode_death_signal_from_ram,
     episode_failure_reason,
@@ -1302,6 +1302,7 @@ class RE1Env(gym.Env):
         enemy_kills: int,
         reward: float,
         reward_breakdown: dict[str, float],
+        prev_state: dict[str, Any] | None = None,
     ) -> None:
         try:
             from re1_rl.attack_telemetry import AttackTelemetry
@@ -1333,6 +1334,7 @@ class RE1Env(gym.Env):
             state=state,
             reward=reward,
             reward_breakdown=reward_breakdown,
+            prev_state=prev_state,
         )
 
     def action_masks(self) -> np.ndarray:
@@ -1399,7 +1401,7 @@ class RE1Env(gym.Env):
             poisoned=bool(state.get("poisoned", False)),
             episode_start_hp=int(getattr(self, "_episode_start_hp", 0) or 0),
             in_control=bool(state.get("in_control", True)),
-            alive_enemies_in_room=alive_enemy_count(state.get("enemies")),
+            alive_enemies_in_room=combat_enemy_count(state.get("enemies")),
             mask_combat_without_enemies=MASK_ATTACK_WITHOUT_ENEMIES,
         )
 
@@ -1623,6 +1625,7 @@ class RE1Env(gym.Env):
                 enemy_kills=enemy_kills,
                 reward=reward,
                 reward_breakdown=breakdown,
+                prev_state=self._prev_state,
             )
 
         terminated = bool(state.get("dead"))

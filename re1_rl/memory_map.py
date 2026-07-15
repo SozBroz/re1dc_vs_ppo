@@ -216,9 +216,22 @@ ENEMY_SLOT_STRIDE = 0x18C  # confirmed: GS first zombie + second slot
 ENEMY_TABLE_SLOTS = 6
 # Per-slot HP at struct base (ASL / GS). Cap rejects empty-slot garbage.
 ENEMY_HP_MAX_PLAUSIBLE = 2000
+# Off-map pool slots park near ~(30000, 30000); in-room entities use map scale.
+ENEMY_POOL_COORD_ABS_MAX = 20000
+# Knife/gun mask: enemy within this world distance of the player.
+ENEMY_COMBAT_NEAR_DIST = 8000
 ENEMY_FIELD_OFFSETS: dict[str, tuple[int, str]] = {
     "hp": (0, "u16"),
+    "x": (0xDE, "s16"),
+    "z": (0xE0, "s16"),
+    "active_byte": (0xEC, "u8"),
 }
+
+
+def enemy_coords_in_room_band(x: int, z: int) -> bool:
+    """Reject off-map pool coordinates (stale HP ghosts)."""
+    ax, az = abs(int(x)), abs(int(z))
+    return ax < ENEMY_POOL_COORD_ABS_MAX and az < ENEMY_POOL_COORD_ABS_MAX
 
 
 def enemy_table_fields() -> list[tuple[str, int, str]]:
@@ -234,17 +247,28 @@ def enemy_table_fields() -> list[tuple[str, int, str]]:
 
 
 def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
-    """[{x, z, type_id, hp, alive, ...}] for live slots from an enemy read."""
+    """[{x, z, hp, alive, in_room, combat_near, ...}] from enemy table RAM."""
+    import math
+
     out: list[dict[str, int]] = []
     if ENEMY_TABLE_BASE is None or not ENEMY_FIELD_OFFSETS:
         return out
+    px = int(ram.get("player_x", 0))
+    pz = int(ram.get("player_z", 0))
     for slot in range(ENEMY_TABLE_SLOTS):
         vals = {f: int(ram.get(f"enemy{slot}_{f}", 0)) for f in ENEMY_FIELD_OFFSETS}
         hp = vals.get("hp", 0)
         if hp <= 0 or hp > ENEMY_HP_MAX_PLAUSIBLE:
             continue
+        x = int(vals.get("x", 0))
+        z = int(vals.get("z", 0))
+        in_room = enemy_coords_in_room_band(x, z)
+        dist = math.hypot(px - x, pz - z)
+        combat_near = in_room and dist < ENEMY_COMBAT_NEAR_DIST
         vals["slot"] = slot
-        vals["alive"] = 1
+        vals["alive"] = 1 if in_room else 0
+        vals["in_room"] = 1 if in_room else 0
+        vals["combat_near"] = 1 if combat_near else 0
         out.append(vals)
     return out
 

@@ -84,14 +84,33 @@ def test_proprio_enemy_count_wired():
 
 
 def test_enemy_table_fields_mapped() -> None:
-    """HP at slot base -> six RAM fields and decode with slot index."""
+    """HP/x/z/active at slot offsets -> decode with in-room + combat flags."""
     fields = enemy_table_fields()
-    assert len(fields) == 6
-    ram = {f"enemy{i}_hp": 100 if i == 1 else 0 for i in range(6)}
+    assert len(fields) == 6 * len({"hp", "x", "z", "active_byte"})
+    ram = {
+        "player_x": 7000,
+        "player_z": 15000,
+        "enemy0_hp": 46,
+        "enemy0_x": 3150,
+        "enemy0_z": 13400,
+        "enemy0_active_byte": 0,
+        "enemy1_hp": 54,
+        "enemy1_x": 23809,
+        "enemy1_z": 25057,
+        "enemy1_active_byte": 0,
+    }
+    for i in range(6):
+        if i not in (0, 1):
+            ram[f"enemy{i}_hp"] = 0
     decoded = decode_enemy_table(ram)
-    assert len(decoded) == 1
-    assert decoded[0]["slot"] == 1
-    assert decoded[0]["hp"] == 100
+    assert len(decoded) == 2
+    by_slot = {int(e["slot"]): e for e in decoded}
+    assert by_slot[0]["in_room"] == 1
+    assert by_slot[0]["combat_near"] == 1
+    assert by_slot[0]["alive"] == 1
+    assert by_slot[1]["in_room"] == 0
+    assert by_slot[1]["combat_near"] == 0
+    assert by_slot[1]["alive"] == 0
 
 
 if __name__ == "__main__":
