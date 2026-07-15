@@ -54,6 +54,7 @@ class AttackTelemetry:
         enemy_kills: int = 0,
         ammo_spent: int = 0,
         state: dict | None = None,
+        prev_state: dict | None = None,
         reward: float | None = None,
         reward_breakdown: dict[str, float] | None = None,
     ) -> dict[str, Any]:
@@ -87,6 +88,7 @@ class AttackTelemetry:
             enemy_damage=int(enemy_damage),
             enemy_kills=int(enemy_kills),
             state=state,
+            prev_state=prev_state,
             macro_report=macro_report,
             reward=reward,
             reward_breakdown=reward_breakdown,
@@ -126,6 +128,7 @@ class AttackTelemetry:
         enemy_damage: int,
         enemy_kills: int,
         state: dict,
+        prev_state: dict | None,
         macro_report: dict | None,
         reward: float | None,
         reward_breakdown: dict[str, float] | None,
@@ -159,3 +162,13 @@ class AttackTelemetry:
         )
         if issues:
             print("; ".join(str(i) for i in issues[:3]), flush=True)
+        try:
+            from re1_rl.attack_log_context import (
+                build_attack_log_context,
+                format_attack_context_line,
+            )
+
+            ctx = build_attack_log_context(prev_state, state)
+            print(format_attack_context_line(ctx), flush=True)
+        except (ImportError, TypeError, ValueError, KeyError):
+            pass
