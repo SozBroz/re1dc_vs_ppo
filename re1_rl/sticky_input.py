@@ -10,6 +10,8 @@ QUICKTURN_ACTION = 6
 INTERACT_ACTION = 7
 # Cross hold for shelf push / examine — longer than a normal frame_skip batch.
 INTERACT_HOLD_EXTRA_FRAMES = 10
+# TODO: interact hold is frame_skip + EXTRA (14 frames at skip=4). Consider
+# tap/release/tap/release (~8 frames) instead; stride ring samples mid-hold today.
 PULSE_ACTIONS = frozenset({QUICKTURN_ACTION})
 # knife_swing uses re1_rl.knife_macro (phased aim/swing/recovery script);
 # clears sticky here only

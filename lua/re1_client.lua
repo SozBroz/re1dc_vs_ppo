@@ -115,6 +115,34 @@ if console and console.log then
   console.log("re1_client: SCRIPT_DIR=" .. SCRIPT_DIR)
 end
 
+local function mmf_png_b64(mmf_name)
+    local got, size, err = mmf_capture(mmf_name)
+    if err or not got or size <= 0 then
+        return nil, nil
+    end
+    local png_bytes = ""
+    if comm.mmfReadBytes then
+        local bytes = comm.mmfReadBytes(got, size)
+        if type(bytes) == "table" then
+            local parts = {}
+            for i = 0, size - 1 do
+                local b = bytes[i]
+                if b == nil then
+                    break
+                end
+                parts[#parts + 1] = string.char(b)
+            end
+            png_bytes = table.concat(parts)
+        end
+    elseif comm.mmfRead then
+        png_bytes = comm.mmfRead(got, size) or ""
+    end
+    if png_bytes == nil or #png_bytes == 0 then
+        return nil, nil
+    end
+    return emu.framecount(), base64_encode(png_bytes)
+end
+
 local function ps1_to_mainram(addr)
     return addr - 0x80000000
 end
@@ -132,6 +160,18 @@ local function read_field(addr, dtype)
     else
         error("unsupported dtype: " .. tostring(dtype))
     end
+end
+
+local PLAYER_ANIM_STATE = 0x800C51AA
+local PLAYER_ACTION_AUX = 0x800C51A9
+local PLAYER_RECOVERY_TIMER = 0x800C51B0
+
+local function read_anim_hooks()
+    return {
+        read_field(PLAYER_ANIM_STATE, "u8"),
+        read_field(PLAYER_ACTION_AUX, "u8"),
+        read_field(PLAYER_RECOVERY_TIMER, "u8"),
+    }
 end
 
 local function write_field(addr, dtype, value)
@@ -479,6 +519,12 @@ local function handle_command(cmd)
         -- verify BizHawk actually delivered the schedule (input-delivery QA).
         local echo = cmd.echo_joypad == true
         local joypad_echo = {}
+        local ring_stride = tonumber(cmd.ring_stride) or 0
+        local capture_final = cmd.capture_final == true
+        local mmf_name = cmd.mmf_name or ("re1_screenshot_" .. tostring(cmd.port or 0))
+        local ring_frames = {}
+        local ring_png_b64 = {}
+        local ring_anim = {}
         if hp_off then
             local hp = memory.read_u16_le(hp_off, "MainRAM")
             if hp > 0 then
@@ -506,6 +552,15 @@ local function handle_command(cmd)
             end
             apply_patches()
             emu.frameadvance()
+            if ring_stride > 0 and (i % ring_stride == 0) then
+                local fc, b64 = mmf_png_b64(mmf_name)
+                if fc and b64 then
+                    ring_frames[#ring_frames + 1] = fc
+                    ring_png_b64[#ring_png_b64 + 1] = b64
+                    local hooks = read_anim_hooks()
+                    ring_anim[#ring_anim + 1] = { hooks[1], hooks[2], hooks[3] }
+                end
+            end
             if echo then
                 local j = joypad.get()
                 local held = {}
@@ -537,6 +592,22 @@ local function handle_command(cmd)
             frame = emu.framecount(),
             death_during_step = death_during_step,
         }
+        if capture_final then
+            local fc, b64 = mmf_png_b64(mmf_name)
+            if fc and b64 then
+                ring_frames[#ring_frames + 1] = fc
+                ring_png_b64[#ring_png_b64 + 1] = b64
+                local hooks = read_anim_hooks()
+                ring_anim[#ring_anim + 1] = { hooks[1], hooks[2], hooks[3] }
+            end
+        end
+        if #ring_frames > 0 then
+            resp.ring_frames = setmetatable(ring_frames, { __jsontype = "array" })
+            resp.ring_png_b64 = setmetatable(ring_png_b64, { __jsontype = "array" })
+            if #ring_anim > 0 then
+                resp.ring_anim = setmetatable(ring_anim, { __jsontype = "array" })
+            end
+        end
         if echo then
             -- dkjson needs a hint to keep this an array when frames aborted early
             resp.joypad_echo = setmetatable(joypad_echo, { __jsontype = "array" })

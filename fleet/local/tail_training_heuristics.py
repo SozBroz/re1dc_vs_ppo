@@ -8,16 +8,17 @@ fleet lines:
   [PB-rooms]  new personal-best room count on that machine
   [progress]  first room visit, pickups, first-held items
   [rollout]   epoch/rollout aggregates (best_ep_rooms, hit counters, room set)
-  [attack_swing]  every knife/attack macro with reward breakdown (hit=0/1)
 
 Optional:
+  --include-attacks  also show ``[attack_swing]`` / ``[attack_fail]`` macro lines
   --include-trains   also show learner ``epoch train ...`` / ``epoch train failed``
 
 Usage (from D:\\re1_rl on pking):
   python fleet/local/tail_training_heuristics.py
   python fleet/local/tail_training_heuristics.py --last 40
+  python fleet/local/tail_training_heuristics.py --last 40 --include-trains
   python fleet/local/tail_training_heuristics.py --last 20 --no-follow
-  python fleet/local/tail_training_heuristics.py --include-trains
+  python fleet/local/tail_training_heuristics.py --include-attacks --include-trains
 """
 
 from __future__ import annotations
@@ -39,11 +40,13 @@ DEFAULT_SOURCES: tuple[tuple[str, str | None, Path], ...] = (
 )
 
 # Heuristic tags emitted by training_progress.TrainingProgressTracker.
-HEURISTIC_RES: tuple[re.Pattern[str], ...] = (
+BASE_HEURISTIC_RES: tuple[re.Pattern[str], ...] = (
     re.compile(r"\[episode\]"),
     re.compile(r"\[PB-rooms\]"),
     re.compile(r"\[progress\]"),
     re.compile(r"\[rollout\].*ep_rew="),
+)
+ATTACK_RES: tuple[re.Pattern[str], ...] = (
     re.compile(r"\[attack_swing\]"),
     re.compile(r"\[attack_fail\]"),  # legacy; pre-attack_swing logs
 )
@@ -53,8 +56,16 @@ TRAIN_RES: tuple[re.Pattern[str], ...] = (
 )
 
 
-def line_matches(line: str, *, include_trains: bool) -> bool:
-    if any(rx.search(line) for rx in HEURISTIC_RES):
+def _heuristic_res(*, include_attacks: bool) -> tuple[re.Pattern[str], ...]:
+    if include_attacks:
+        return BASE_HEURISTIC_RES + ATTACK_RES
+    return BASE_HEURISTIC_RES
+
+
+def line_matches(
+    line: str, *, include_trains: bool, include_attacks: bool
+) -> bool:
+    if any(rx.search(line) for rx in _heuristic_res(include_attacks=include_attacks)):
         return True
     return include_trains and any(rx.search(line) for rx in TRAIN_RES)
 
@@ -63,41 +74,49 @@ def encode_powershell(script: str) -> str:
     return base64.b64encode(script.encode("utf-16-le")).decode("ascii")
 
 
-def _ps_match_clause(*, include_trains: bool) -> str:
+def _ps_match_clause(*, include_trains: bool, include_attacks: bool) -> str:
     clauses = [
         "$_ -match '\\[episode\\]'",
         "$_ -match '\\[PB-rooms\\]'",
         "$_ -match '\\[progress\\]'",
         "$_ -match '\\[rollout\\].*ep_rew='",
-        "$_ -match '\\[attack_swing\\]'",
-        "$_ -match '\\[attack_fail\\]'",
     ]
+    if include_attacks:
+        clauses.append("$_ -match '\\[attack_swing\\]'")
+        clauses.append("$_ -match '\\[attack_fail\\]'")
     if include_trains:
         clauses.append("$_ -match 'epoch train \\d+ steps'")
         clauses.append("$_ -match 'epoch train failed'")
     return " -or ".join(clauses)
 
 
-def recent_local(path: Path, count: int, *, include_trains: bool) -> list[str]:
+def recent_local(
+    path: Path, count: int, *, include_trains: bool, include_attacks: bool
+) -> list[str]:
     if not path.is_file():
         return []
     matched: list[str] = []
     with path.open("r", encoding="utf-8", errors="replace") as handle:
         for line in handle:
-            if line_matches(line, include_trains=include_trains):
+            if line_matches(
+                line, include_trains=include_trains, include_attacks=include_attacks
+            ):
                 matched.append(line.rstrip("\n\r"))
     return matched[-count:]
 
 
-def recent_remote(host: str, path: Path, count: int, *, include_trains: bool) -> list[str]:
+def recent_remote(
+    host: str, path: Path, count: int, *, include_trains: bool, include_attacks: bool
+) -> list[str]:
     # findstr is coarse; we re-filter with line_matches below.
-    needles = [
+    needles = (
         'findstr /C:"[episode]" /C:"[PB-rooms]" /C:"[progress]" /C:"[rollout]"'
-        ' /C:"[attack_swing]" /C:"[attack_fail]"',
-    ]
+    )
+    if include_attacks:
+        needles += ' /C:"[attack_swing]" /C:"[attack_fail]"'
     if include_trains:
-        needles[0] += ' /C:"epoch train"'
-    remote_cmd = f'{needles[0]} "{path}"'
+        needles += ' /C:"epoch train"'
+    remote_cmd = f'{needles} "{path}"'
     try:
         proc = subprocess.run(
             ["ssh", host, remote_cmd],
@@ -112,7 +131,9 @@ def recent_remote(host: str, path: Path, count: int, *, include_trains: bool) ->
         return []
     matched: list[str] = []
     for line in proc.stdout.splitlines():
-        if line_matches(line, include_trains=include_trains):
+        if line_matches(
+            line, include_trains=include_trains, include_attacks=include_attacks
+        ):
             matched.append(line.rstrip("\n\r"))
     return matched[-count:]
 
@@ -153,7 +174,12 @@ def emit(label: str, line: str) -> None:
 
 
 def follow_local(
-    label: str, path: Path, out_q: queue.Queue[str], *, include_trains: bool
+    label: str,
+    path: Path,
+    out_q: queue.Queue[str],
+    *,
+    include_trains: bool,
+    include_attacks: bool,
 ) -> None:
     while not path.is_file():
         out_q.put(f"__status__:{label}:waiting for {path}")
@@ -165,15 +191,25 @@ def follow_local(
             if not line:
                 time.sleep(0.2)
                 continue
-            if line_matches(line, include_trains=include_trains):
+            if line_matches(
+                line, include_trains=include_trains, include_attacks=include_attacks
+            ):
                 out_q.put(f"{label}\t{line.rstrip()}")
 
 
 def follow_remote(
-    label: str, host: str, path: Path, out_q: queue.Queue[str], *, include_trains: bool
+    label: str,
+    host: str,
+    path: Path,
+    out_q: queue.Queue[str],
+    *,
+    include_trains: bool,
+    include_attacks: bool,
 ) -> None:
     ps_path = str(path).replace("'", "''")
-    match = _ps_match_clause(include_trains=include_trains)
+    match = _ps_match_clause(
+        include_trains=include_trains, include_attacks=include_attacks
+    )
     script = (
         f"$p = '{ps_path}'; "
         "while (-not (Test-Path -LiteralPath $p)) { Start-Sleep -Seconds 2 }; "
@@ -191,7 +227,9 @@ def follow_remote(
     assert proc.stdout is not None
     for line in proc.stdout:
         line = line.rstrip("\n\r")
-        if line and line_matches(line, include_trains=include_trains):
+        if line and line_matches(
+            line, include_trains=include_trains, include_attacks=include_attacks
+        ):
             out_q.put(f"{label}\t{line}")
     err = proc.stderr.read() if proc.stderr is not None else ""
     if err.strip():
@@ -203,12 +241,24 @@ def print_recent(
     count: int,
     *,
     include_trains: bool,
+    include_attacks: bool,
 ) -> None:
     for label, host, path in sources:
         if host is None:
-            lines = recent_local(path, count, include_trains=include_trains)
+            lines = recent_local(
+                path,
+                count,
+                include_trains=include_trains,
+                include_attacks=include_attacks,
+            )
         else:
-            lines = recent_remote(host, path, count, include_trains=include_trains)
+            lines = recent_remote(
+                host,
+                path,
+                count,
+                include_trains=include_trains,
+                include_attacks=include_attacks,
+            )
         print(f"=== {label} (last {count}) ===", flush=True)
         if not lines:
             print(f"[{label}] (no recent heuristic lines)", flush=True)
@@ -232,6 +282,11 @@ def main() -> int:
         help="snapshot only; do not stream new lines",
     )
     parser.add_argument(
+        "--include-attacks",
+        action="store_true",
+        help="also show [attack_swing] / [attack_fail] macro lines",
+    )
+    parser.add_argument(
         "--include-trains",
         action="store_true",
         help="also show learner epoch train success/fail lines",
@@ -239,7 +294,12 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.last > 0:
-        print_recent(DEFAULT_SOURCES, args.last, include_trains=args.include_trains)
+        print_recent(
+            DEFAULT_SOURCES,
+            args.last,
+            include_trains=args.include_trains,
+            include_attacks=args.include_attacks,
+        )
         if args.no_follow:
             return 0
         print("", flush=True)
@@ -253,6 +313,7 @@ def main() -> int:
                 "path": path,
                 "out_q": out_q,
                 "include_trains": args.include_trains,
+                "include_attacks": args.include_attacks,
             }
         else:
             target = follow_remote
@@ -262,12 +323,15 @@ def main() -> int:
                 "path": path,
                 "out_q": out_q,
                 "include_trains": args.include_trains,
+                "include_attacks": args.include_attacks,
             }
         threading.Thread(
             target=target, kwargs=kwargs, daemon=True, name=f"tail-{label}"
         ).start()
 
-    modes = "episode/PB/progress/rollout/attack"
+    modes = "episode/PB/progress/rollout"
+    if args.include_attacks:
+        modes += "/attack"
     if args.include_trains:
         modes += "/epoch-train"
     print(

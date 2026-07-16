@@ -159,8 +159,8 @@ PILLARBOX_LEFT_SQ = round(PILLARBOX_LEFT * FRAME_SQUARE / 350)  # 4
 PILLARBOX_RIGHT_SQ = round(PILLARBOX_RIGHT * FRAME_SQUARE / 350)  # 3
 FRAME_H = FRAME_SQUARE
 FRAME_W = FRAME_SQUARE - PILLARBOX_LEFT_SQ - PILLARBOX_RIGHT_SQ  # 77
-FRAME_STACK = 4
-FRAME_SHAPE = (FRAME_H, FRAME_W, FRAME_STACK)  # HWC channels-last (RE1Env)
+from re1_rl.frame_ring import FRAME_SHAPE, FRAME_STACK
+
 FRAME_SHAPE_CHW = (FRAME_STACK, FRAME_H, FRAME_W)  # SB3 / VecTransposeImage
 
 # Episode failures that mean "Jill died / title escape" — confirm before ending
@@ -404,30 +404,13 @@ class RE1Env(gym.Env):
             "maps_files_flags": int(ram.get("maps_files_flags", 0)),
             "player_anim": int(ram.get("player_anim", 0)),
             "player_aux": int(ram.get("player_aux", 0)),
-            "anim_history": list(getattr(self, "_anim_history", [])),
+            "anim_history": self.bridge.build_anim_history(),
         }
 
     def _init_anim_history(self) -> None:
-        from re1_rl.knife_macro import read_knife_hooks
-
-        try:
-            hooks = read_knife_hooks(self.bridge)
-        except (OSError, RuntimeError, ValueError):
-            hooks = (0, 0, 0)
-        self._anim_history = [hooks] * 4
-
-    def _sample_anim_history(self) -> None:
-        from re1_rl.knife_macro import read_knife_hooks
-
-        try:
-            hooks = read_knife_hooks(self.bridge)
-        except (OSError, RuntimeError, ValueError):
-            hooks = (0, 0, 0)
-        if not hasattr(self, "_anim_history"):
-            self._anim_history = []
-        self._anim_history.append(hooks)
-        while len(self._anim_history) > 4:
-            self._anim_history.pop(0)
+        self.bridge.anim_ring.clear()
+        if self.bridge.emulated_frame >= 0:
+            self.bridge.record_anim_at(self.bridge.emulated_frame)
 
     def _box_obs(self, state: dict[str, Any]) -> np.ndarray:
         """Encode item-box contents; refresh the RAM cache in box rooms."""
@@ -500,14 +483,13 @@ class RE1Env(gym.Env):
             new_items=state.get("new_items") or [],
         )
 
-    def _push_frame(self, rgb: np.ndarray) -> np.ndarray:
-        small = _resize_frame(rgb)
-        self._frame_stack.append(small)
-        while len(self._frame_stack) > 4:
-            self._frame_stack.pop(0)
-        while len(self._frame_stack) < 4:
-            self._frame_stack.insert(0, small)
-        return np.concatenate(self._frame_stack, axis=-1)
+    def _capture_step_obs(self) -> np.ndarray:
+        """Store the live framebuffer at ``emulated_frame`` and build [t-12..t]."""
+        if self.bridge.emulated_frame >= 0:
+            fc = self.bridge.emulated_frame
+            self.bridge.frame_ring.store_rgb(fc, self.bridge.screenshot())
+            self.bridge.record_anim_at(fc)
+        return self.bridge.build_frame_stack()
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)
@@ -547,13 +529,19 @@ class RE1Env(gym.Env):
 
         self._step_count = 0
         self._frame_stack = []
+        self.bridge.frame_ring.clear()
+        self.bridge.anim_ring.clear()
+        self.bridge.attack_pins.clear()
         self._progress = ProgressTracker()
         self._visited.reset()
         self._box_cache = None
         if getattr(self, "_attack_telemetry", None) is not None:
             self._attack_telemetry.reset_episode()
         rgb = self.bridge.screenshot()
-        frame_obs = self._push_frame(rgb)
+        if self.bridge.emulated_frame >= 0:
+            self.bridge.frame_ring.store_rgb(self.bridge.emulated_frame, rgb)
+            self.bridge.record_anim_at(self.bridge.emulated_frame)
+        frame_obs = self.bridge.build_frame_stack()
         self._prev_hp = 0
         state = self._read_state()
         self._seed_episode_progress(state)
@@ -651,6 +639,7 @@ class RE1Env(gym.Env):
             new_state=new_state,
             episode_start_hp=int(getattr(self, "_episode_start_hp", 0)),
             rewarded_cutscenes=self._progress.rewarded_cutscenes,
+            visited_rooms=self._progress.visited_rooms,
         )
 
     def _apply_post_skip_sync(self) -> None:
@@ -729,8 +718,7 @@ class RE1Env(gym.Env):
         return None
 
     def _refresh_skip_cache(self) -> None:
-        rgb = self.bridge.screenshot()
-        frame_obs = self._push_frame(rgb)
+        frame_obs = self._capture_step_obs()
         state = self._read_state(track_items=False)
         self._skip_cache_state = state
         self._skip_cache_obs = self._build_obs(frame_obs, state)
@@ -809,20 +797,16 @@ class RE1Env(gym.Env):
         self._sticky_input.reset()
         self._step_count += 1
         try:
-            rgb = self.bridge.screenshot()
-            frame_obs = self._push_frame(rgb)
+            frame_obs = self._capture_step_obs()
             state = self._read_state()
             state = dict(state)
             state["dead"] = True
         except (OSError, RuntimeError, ValueError):
             state = dict(self._prev_state)
             state["dead"] = True
-            frame_obs = self._frame_stack[-1] if self._frame_stack else np.zeros(FRAME_SHAPE)
-            if frame_obs.ndim == 2:
-                frame_obs = frame_obs[..., None]
-            while len(self._frame_stack) < 4:
-                self._frame_stack.append(frame_obs)
-            frame_obs = np.concatenate(self._frame_stack[-4:], axis=-1)
+            frame_obs = self.bridge.build_frame_stack()
+            if frame_obs.shape != FRAME_SHAPE:
+                frame_obs = np.zeros(FRAME_SHAPE, dtype=np.uint8)
         reward, breakdown = self._death_penalty()
         obs = self._build_obs(frame_obs, state)
         opening_phase = reason if reason.startswith(
@@ -1225,9 +1209,7 @@ class RE1Env(gym.Env):
                 return death
         assert self._planner is not None
         self._step_count += 1
-        self._sample_anim_history()
-        rgb = self.bridge.screenshot()
-        frame_obs = self._push_frame(rgb)
+        frame_obs = self._capture_step_obs()
         state = self._read_state()
         state = dict(state)
         state["step_emulated_frames"] = int(step_emulated_frames)
@@ -1514,6 +1496,8 @@ class RE1Env(gym.Env):
                 sticky=sticky,
                 pulse=pulse,
                 pulse_hold=pulse_hold,
+                ring_stride=0,
+                capture_final=True,
             )
         else:
             from re1_rl.sticky_input import INTERACT_ACTION, INTERACT_HOLD_EXTRA_FRAMES
@@ -1532,11 +1516,14 @@ class RE1Env(gym.Env):
             if int(action) == INTERACT_ACTION:
                 hold_n = max(hold_n, self.frame_skip + INTERACT_HOLD_EXTRA_FRAMES)
             step_emulated_frames = hold_n
+            stride = 4 if hold_n > self.frame_skip else 0
             _, died_during_step = self.bridge.step(
                 n=hold_n,
                 sticky=sticky,
                 pulse=pulse,
                 pulse_hold=pulse_hold,
+                ring_stride=stride,
+                capture_final=True,
             )
         if died_during_step:
             death = self._death_step(
@@ -1564,9 +1551,7 @@ class RE1Env(gym.Env):
                 died_during_skip = False
 
         self._step_count += 1
-        self._sample_anim_history()
-        rgb = self.bridge.screenshot()
-        frame_obs = self._push_frame(rgb)
+        frame_obs = self.bridge.build_frame_stack()
         state = self._read_state()
         if died_during_skip or died_during_step:
             state = dict(state)
@@ -1691,8 +1676,9 @@ class RE1Env(gym.Env):
         return obs, reward, terminated, truncated, info
 
     def render(self):
-        if self._frame_stack:
-            return self._frame_stack[-1]
+        plane = self.bridge.frame_ring.plane_at(self.bridge.emulated_frame)
+        if plane is not None:
+            return plane
         return np.zeros((FRAME_H, FRAME_W, 3), dtype=np.uint8)
 
     def close(self):

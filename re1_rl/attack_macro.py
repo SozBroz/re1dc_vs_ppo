@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
+from re1_rl.frame_ring import FrameRingBuffer
 from re1_rl.knife_macro import (
     KNIFE_AIM_GAME_FRAMES,
     KNIFE_FRAME_SCALE,
@@ -241,6 +242,22 @@ def _execute_knife_attack_macro(
     return died, int(frames), report
 
 
+def _bridge_uses_frame_ring(bridge: Any) -> bool:
+    return isinstance(getattr(bridge, "frame_ring", None), FrameRingBuffer)
+
+
+def macro_swing_frame(bridge: Any) -> bool:
+    """True on the emulated frame where knife slash or gun fire anim is active."""
+    from re1_rl.knife_macro import is_knife_slash_anim
+
+    anim, aux, recovery = read_knife_hooks(bridge)
+    if is_knife_slash_anim(anim, aux, recovery):
+        return True
+    if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
+        return True
+    return False
+
+
 def _execute_ranged_attack_macro(
     bridge: Any,
     *,
@@ -406,19 +423,26 @@ def execute_attack_macro(
     episode_start_hp: int = 0,
 ) -> tuple[bool, int, dict[str, Any]]:
     """Dispatch to the weapon-specific attack macro."""
-    weapon_id = read_equipped_weapon(bridge)
-    weapon = equipped_weapon_name(weapon_id)
-    if weapon is None or weapon_id not in WEAPON_ITEM_IDS:
-        report = _empty_report(weapon_id, weapon)
-        report["outcome"] = "no_weapon"
-        return False, 0, report
+    pins = getattr(bridge, "attack_pins", None)
+    if pins is not None and _bridge_uses_frame_ring(bridge):
+        pins.begin(bridge)
+    try:
+        weapon_id = read_equipped_weapon(bridge)
+        weapon = equipped_weapon_name(weapon_id)
+        if weapon is None or weapon_id not in WEAPON_ITEM_IDS:
+            report = _empty_report(weapon_id, weapon)
+            report["outcome"] = "no_weapon"
+            return False, 0, report
 
-    handler = _WEAPON_ATTACK_HANDLERS.get(weapon_id, _execute_ranged_attack_macro)
-    return handler(
-        bridge,
-        empty_sticky=empty_sticky,
-        prev_hp=prev_hp,
-        episode_start_hp=episode_start_hp,
-        weapon_id=weapon_id,
-        weapon=weapon,
-    )
+        handler = _WEAPON_ATTACK_HANDLERS.get(weapon_id, _execute_ranged_attack_macro)
+        return handler(
+            bridge,
+            empty_sticky=empty_sticky,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            weapon_id=weapon_id,
+            weapon=weapon,
+        )
+    finally:
+        if pins is not None and pins.active:
+            pins.finish(bridge)

@@ -1,0 +1,33 @@
+{
+  "workhorse1": {
+    "hostname": "ai_machine",
+    "role": "remote_worker",
+    "lan_ip": "192.168.0.203",
+    "repo": "D:\\re1_rl",
+    "worker_base_port": 5655,
+    "worker_n_envs": 8
+  },
+  "workhorse2": {
+    "hostname": "workhorse2",
+    "role": "learner_and_local_worker",
+    "lan_ip": "192.168.0.116",
+    "repo": "C:\\Users\\sshuser\\re1_rl",
+    "learner_port": 8765,
+    "learner_base_port": 5555,
+    "learner_n_envs": 27
+  },
+  "pking": {
+    "role": "remote_worker",
+    "worker_base_port": 5755,
+    "worker_n_envs": 20
+  },
+  "network": {
+    "gateway": "192.168.0.1",
+    "prefix_length": 24,
+    "dns": ["192.168.0.1", "1.1.1.1"]
+  },
+  "retired_ips": {
+    "workhorse1": "192.168.0.160",
+    "workhorse2": "192.168.0.111"
+  }
+}

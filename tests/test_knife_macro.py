@@ -163,6 +163,8 @@ def test_execute_knife_macro_uses_frame_schedule() -> None:
         sticky=empty,
         frame_buttons=schedule,
         echo_joypad=False,
+        ring_stride=4,
+        capture_final=True,
     )
 
 

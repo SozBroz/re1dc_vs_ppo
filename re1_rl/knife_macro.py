@@ -997,6 +997,13 @@ def probe_standing_aim_hooks(
     return samples
 
 
+from re1_rl.frame_ring import FrameRingBuffer
+
+
+def _bridge_uses_frame_ring(bridge: Any) -> bool:
+    return isinstance(getattr(bridge, "frame_ring", None), FrameRingBuffer)
+
+
 def _macro_player_died(
     bridge: Any, *, prev_hp: int, episode_start_hp: int
 ) -> bool:
@@ -1020,6 +1027,11 @@ def _step_one_frame(
         frame_buttons=[buttons],
         echo_joypad=echo_joypad,
     )
+    pins = getattr(bridge, "attack_pins", None)
+    if pins is not None and pins.active and _bridge_uses_frame_ring(bridge):
+        from re1_rl.attack_macro import macro_swing_frame
+
+        pins.after_frame(bridge, is_swing=macro_swing_frame(bridge))
     if died:
         # Lua aborts the batch on a one-frame HP==0; confirm before treating as death
         # (false positives happen at low HP near downed zombies).
@@ -1338,6 +1350,8 @@ def _execute_knife_macro_fixed(
         sticky=empty_sticky,
         frame_buttons=schedule,
         echo_joypad=echo_joypad,
+        ring_stride=4,
+        capture_final=True,
     )
     if echo_joypad and not died:
         echo = getattr(bridge, "last_step_echo", None)
@@ -1367,32 +1381,41 @@ def execute_knife_macro(
     episode_start_hp: int = 0,
 ) -> tuple[bool, int]:
     """Run knife input; return (died, emulated_frames_burned)."""
-    if use_ram_gates:
-        aim_g, swing_g, rec_g = (
-            phases
-            if phases is not None
-            else (
-                KNIFE_AIM_GAME_FRAMES,
-                KNIFE_SWING_GAME_FRAMES,
-                KNIFE_RECOVERY_GAME_FRAMES,
+    pins = getattr(bridge, "attack_pins", None)
+    own_pins = False
+    if pins is not None and not pins.active and _bridge_uses_frame_ring(bridge):
+        pins.begin(bridge)
+        own_pins = True
+    try:
+        if use_ram_gates:
+            aim_g, swing_g, rec_g = (
+                phases
+                if phases is not None
+                else (
+                    KNIFE_AIM_GAME_FRAMES,
+                    KNIFE_SWING_GAME_FRAMES,
+                    KNIFE_RECOVERY_GAME_FRAMES,
+                )
             )
-        )
-        sc = scale if scale is not None else KNIFE_FRAME_SCALE
-        return _execute_knife_macro_ram_gated(
+            sc = scale if scale is not None else KNIFE_FRAME_SCALE
+            return _execute_knife_macro_ram_gated(
+                bridge,
+                empty_sticky=empty_sticky,
+                aim_game=aim_g,
+                swing_game=swing_g,
+                recovery_game=rec_g,
+                scale=sc,
+                echo_joypad=echo_joypad,
+                prev_hp=prev_hp,
+                episode_start_hp=episode_start_hp,
+            )
+        return _execute_knife_macro_fixed(
             bridge,
             empty_sticky=empty_sticky,
-            aim_game=aim_g,
-            swing_game=swing_g,
-            recovery_game=rec_g,
-            scale=sc,
+            phases=phases,
+            scale=scale,
             echo_joypad=echo_joypad,
-            prev_hp=prev_hp,
-            episode_start_hp=episode_start_hp,
         )
-    return _execute_knife_macro_fixed(
-        bridge,
-        empty_sticky=empty_sticky,
-        phases=phases,
-        scale=scale,
-        echo_joypad=echo_joypad,
-    )
+    finally:
+        if own_pins and pins is not None:
+            pins.finish(bridge)
