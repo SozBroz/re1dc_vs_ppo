@@ -15,12 +15,9 @@ import numpy as np
 from pathlib import Path
 
 from re1_rl.frame_ring import (
-    AnimRingBuffer,
     AttackFramePins,
-    AnimHooks,
     FRAME_SHAPE,
     FrameRingBuffer,
-    ZERO_HOOKS,
     decode_png_b64,
 )
 from re1_rl.memory_map import DEFAULT_RAM_FIELDS, PLAYER_HP
@@ -67,7 +64,6 @@ class BizHawkClient:
         self.last_step_echo: list[str] | None = None
         self.emulated_frame: int = -1
         self.frame_ring = FrameRingBuffer()
-        self.anim_ring = AnimRingBuffer()
         self.attack_pins = AttackFramePins()
 
     # ------------------------------------------------------------------
@@ -273,50 +269,25 @@ class BizHawkClient:
         resp = self._request({"cmd": "frameadvance", "n": int(n)})
         self.emulated_frame = int(resp.get("frame", -1))
         self.frame_ring.note_frame(self.emulated_frame)
-        self.anim_ring.note_frame(self.emulated_frame)
         return self.emulated_frame
-
-    def record_anim_at(
-        self, frame_count: int, hooks: AnimHooks | None = None
-    ) -> None:
-        if frame_count < 0:
-            return
-        if hooks is None:
-            from re1_rl.knife_macro import read_knife_hooks
-
-            try:
-                hooks = read_knife_hooks(self)
-            except (OSError, RuntimeError, ValueError, KeyError, TypeError):
-                hooks = ZERO_HOOKS
-        self.anim_ring.store(int(frame_count), hooks)
 
     def _ingest_ring_captures(self, resp: dict[str, Any]) -> None:
         frames = resp.get("ring_frames")
         blobs = resp.get("ring_png_b64")
-        anims = resp.get("ring_anim")
         if not isinstance(frames, list) or not isinstance(blobs, list):
             return
-        for i, (fc, b64) in enumerate(zip(frames, blobs)):
+        for fc, b64 in zip(frames, blobs):
             if not b64:
                 continue
             try:
-                frame_count = int(fc)
-                self.frame_ring.store_rgb(frame_count, decode_png_b64(str(b64)))
+                self.frame_ring.store_rgb(int(fc), decode_png_b64(str(b64)))
             except (ValueError, TypeError, OSError):
                 continue
-            if isinstance(anims, list) and i < len(anims):
-                entry = anims[i]
-                if isinstance(entry, list) and len(entry) >= 3:
-                    self.anim_ring.store(
-                        frame_count,
-                        (int(entry[0]), int(entry[1]), int(entry[2])),
-                    )
 
     def capture_final_ring_frame(self) -> None:
         if self.emulated_frame < 0:
             return
         self.frame_ring.store_rgb(self.emulated_frame, self.screenshot())
-        self.record_anim_at(self.emulated_frame)
 
     def build_frame_stack(self) -> np.ndarray:
         if self.attack_pins.ready():
@@ -324,13 +295,6 @@ class BizHawkClient:
         if self.emulated_frame < 0:
             return np.zeros(FRAME_SHAPE, dtype=np.uint8)
         return self.frame_ring.stack_at(self.emulated_frame)
-
-    def build_anim_history(self) -> list[AnimHooks]:
-        if self.attack_pins.ready():
-            return self.attack_pins.anim_history(self.anim_ring, self.emulated_frame)
-        if self.emulated_frame < 0:
-            return [ZERO_HOOKS] * 4
-        return self.anim_ring.history_at(self.emulated_frame)
 
     def step(
         self,
@@ -411,7 +375,6 @@ class BizHawkClient:
         self._ingest_ring_captures(resp)
         self.emulated_frame = int(resp.get("frame", -1))
         self.frame_ring.note_frame(self.emulated_frame)
-        self.anim_ring.note_frame(self.emulated_frame)
         if capture_final:
             self.capture_final_ring_frame()
         return (

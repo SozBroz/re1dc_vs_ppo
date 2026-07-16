@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import argparse
 import base64
+import json
+import os
 import queue
 import re
 import subprocess
@@ -38,6 +40,9 @@ DEFAULT_SOURCES: tuple[tuple[str, str | None, Path], ...] = (
     ("wh1", "workhorse1", Path(r"D:\re1_rl\data\logs\worker_workhorse1.log")),
     ("wh2", "workhorse2", Path(r"C:\Users\sshuser\re1_rl\data\logs\learner_wh2_25.log")),
 )
+
+REMOTE_TAIL_LINES = 50_000
+FLEET_HOSTS_JSON = Path(__file__).resolve().parents[1] / "fleet_hosts.json"
 
 # Heuristic tags emitted by training_progress.TrainingProgressTracker.
 BASE_HEURISTIC_RES: tuple[re.Pattern[str], ...] = (
@@ -74,6 +79,40 @@ def encode_powershell(script: str) -> str:
     return base64.b64encode(script.encode("utf-16-le")).decode("ascii")
 
 
+def _load_fleet_ips() -> dict[str, str]:
+    ips: dict[str, str] = {}
+    if FLEET_HOSTS_JSON.is_file():
+        try:
+            data = json.loads(FLEET_HOSTS_JSON.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        else:
+            for key in ("workhorse1", "workhorse2"):
+                entry = data.get(key)
+                if isinstance(entry, dict):
+                    ip = entry.get("lan_ip")
+                    if isinstance(ip, str) and ip:
+                        ips[key] = ip
+    for key, env_name in (
+        ("workhorse1", "FLEET_WH1_HOST"),
+        ("workhorse2", "FLEET_WH2_HOST"),
+    ):
+        env_ip = os.environ.get(env_name, "").strip()
+        if env_ip:
+            ips[key] = env_ip
+    return ips
+
+
+def resolve_ssh_host(host: str) -> str:
+    """Map fleet alias to sshuser@<lan_ip>; pass through user@host targets."""
+    if "@" in host:
+        return host
+    ip = _load_fleet_ips().get(host)
+    if ip:
+        return f"sshuser@{ip}"
+    return host
+
+
 def _ps_match_clause(*, include_trains: bool, include_attacks: bool) -> str:
     clauses = [
         "$_ -match '\\[episode\\]'",
@@ -108,26 +147,37 @@ def recent_local(
 def recent_remote(
     host: str, path: Path, count: int, *, include_trains: bool, include_attacks: bool
 ) -> list[str]:
-    # findstr is coarse; we re-filter with line_matches below.
-    needles = (
-        'findstr /C:"[episode]" /C:"[PB-rooms]" /C:"[progress]" /C:"[rollout]"'
+    ssh_target = resolve_ssh_host(host)
+    ps_path = str(path).replace("'", "''")
+    match = _ps_match_clause(
+        include_trains=include_trains, include_attacks=include_attacks
     )
-    if include_attacks:
-        needles += ' /C:"[attack_swing]" /C:"[attack_fail]"'
-    if include_trains:
-        needles += ' /C:"epoch train"'
-    remote_cmd = f'{needles} "{path}"'
+    script = (
+        f"$p = '{ps_path}'; "
+        "if (-not (Test-Path -LiteralPath $p)) { exit 2 }; "
+        f"Get-Content -LiteralPath $p -Tail {REMOTE_TAIL_LINES} | "
+        f"Where-Object {{ {match} }}"
+    )
+    encoded = encode_powershell(script)
     try:
         proc = subprocess.run(
-            ["ssh", host, remote_cmd],
+            [
+                "ssh",
+                ssh_target,
+                "powershell",
+                "-NoProfile",
+                "-EncodedCommand",
+                encoded,
+            ],
             check=False,
             capture_output=True,
             text=True,
             errors="replace",
+            timeout=120,
         )
-    except FileNotFoundError:
+    except (FileNotFoundError, subprocess.TimeoutExpired):
         return []
-    if proc.returncode not in (0, 1):
+    if proc.returncode != 0:
         return []
     matched: list[str] = []
     for line in proc.stdout.splitlines():
@@ -217,7 +267,14 @@ def follow_remote(
     )
     encoded = encode_powershell(script)
     proc = subprocess.Popen(
-        ["ssh", host, "powershell", "-NoProfile", "-EncodedCommand", encoded],
+        [
+            "ssh",
+            resolve_ssh_host(host),
+            "powershell",
+            "-NoProfile",
+            "-EncodedCommand",
+            encoded,
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,

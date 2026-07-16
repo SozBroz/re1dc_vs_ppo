@@ -120,64 +120,6 @@ class FrameRingBuffer:
         return np.concatenate(planes, axis=-1)
 
 
-class AnimRingBuffer:
-    """Sparse store of (anim, aux, recovery) keyed by emulated frame index."""
-
-    STRIDE = FrameRingBuffer.STRIDE
-
-    def __init__(self) -> None:
-        self._hooks: dict[int, AnimHooks] = {}
-        self._latest_frame: int | None = None
-
-    def clear(self) -> None:
-        self._hooks.clear()
-        self._latest_frame = None
-
-    def note_frame(self, frame_count: int) -> None:
-        if frame_count >= 0:
-            self._latest_frame = int(frame_count)
-
-    def store(self, frame_count: int, hooks: AnimHooks) -> None:
-        if frame_count < 0:
-            return
-        self._hooks[int(frame_count)] = hooks
-        self._latest_frame = int(frame_count)
-
-    def hooks_at(self, frame_count: int) -> AnimHooks | None:
-        if frame_count in self._hooks:
-            return self._hooks[frame_count]
-        best: int | None = None
-        for fc in self._hooks:
-            if fc <= frame_count and (best is None or fc > best):
-                best = fc
-        if best is not None:
-            return self._hooks[best]
-        for fc in sorted(self._hooks):
-            return self._hooks[fc]
-        return None
-
-    def history_at(self, frame_count: int) -> list[AnimHooks]:
-        """Last four samples at t-12, t-8, t-4, t (same keys as ``stack_at``)."""
-        keys = (
-            frame_count - 3 * self.STRIDE,
-            frame_count - 2 * self.STRIDE,
-            frame_count - self.STRIDE,
-            frame_count,
-        )
-        out: list[AnimHooks] = []
-        for key in keys:
-            hooks = self.hooks_at(key)
-            out.append(hooks if hooks is not None else ZERO_HOOKS)
-        if not self._hooks:
-            return [ZERO_HOOKS] * FRAME_STACK
-        first = self.hooks_at(min(self._hooks))
-        if first is not None:
-            for i, hooks in enumerate(out):
-                if hooks == ZERO_HOOKS:
-                    out[i] = first
-        return out
-
-
 @dataclass
 class AttackFramePins:
     """Event captures for attack / knife macros: entry -> windup -> swing -> end."""
@@ -233,11 +175,8 @@ class AttackFramePins:
             return
         plane = resize_rgb_to_plane(bridge.screenshot())
         hooks = self._read_hooks(bridge)
-        anim_ring = getattr(bridge, "anim_ring", None)
         if ring is not None and fc >= 0:
             ring.store_plane(fc, plane)
-        if anim_ring is not None and fc >= 0:
-            anim_ring.store(fc, hooks)
         if is_swing and self.swing is None:
             self.swing = plane
             self.windup = self._prev if self._prev is not None else self.entry
@@ -255,11 +194,8 @@ class AttackFramePins:
         self.end_hooks = self._read_hooks(bridge)
         fc = int(getattr(bridge, "emulated_frame", -1))
         ring = getattr(bridge, "frame_ring", None)
-        anim_ring = getattr(bridge, "anim_ring", None)
         if ring is not None and fc >= 0:
             ring.store_plane(fc, self.end)
-        if anim_ring is not None and fc >= 0:
-            anim_ring.store(fc, self.end_hooks)
         self.active = False
 
     def ready(self) -> bool:
@@ -286,17 +222,13 @@ class AttackFramePins:
             out.append(plane if plane is not None else fallback)
         return np.concatenate(out, axis=-1)
 
-    def anim_history(self, ring: AnimRingBuffer, end_frame: int) -> list[AnimHooks]:
-        """Match ``stack_hwc`` event order: entry, windup, swing, end."""
-        end_h = self.end_hooks if self.end_hooks is not None else ring.hooks_at(end_frame)
-        swing_h = self.swing_hooks
-        if swing_h is None:
-            swing_h = ring.hooks_at(end_frame - FrameRingBuffer.STRIDE)
-        wind_h = self.windup_hooks
-        if wind_h is None:
-            wind_h = ring.hooks_at(end_frame - 2 * FrameRingBuffer.STRIDE)
-        if wind_h is None:
-            wind_h = self.entry_hooks
+    def macro_anim_history(self) -> list[AnimHooks]:
+        """Four anim samples aligned with macro frame pins: entry, windup, swing, end."""
+        if not self.ready():
+            return [ZERO_HOOKS] * FRAME_STACK
+        wind_h = self.windup_hooks if self.windup_hooks is not None else self.entry_hooks
+        swing_h = self.swing_hooks if self.swing_hooks is not None else wind_h
         entry_h = self.entry_hooks if self.entry_hooks is not None else wind_h
+        end_h = self.end_hooks if self.end_hooks is not None else swing_h
         hooks = [entry_h, wind_h, swing_h, end_h]
         return [h if h is not None else ZERO_HOOKS for h in hooks]

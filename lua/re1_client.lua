@@ -162,18 +162,6 @@ local function read_field(addr, dtype)
     end
 end
 
-local PLAYER_ANIM_STATE = 0x800C51AA
-local PLAYER_ACTION_AUX = 0x800C51A9
-local PLAYER_RECOVERY_TIMER = 0x800C51B0
-
-local function read_anim_hooks()
-    return {
-        read_field(PLAYER_ANIM_STATE, "u8"),
-        read_field(PLAYER_ACTION_AUX, "u8"),
-        read_field(PLAYER_RECOVERY_TIMER, "u8"),
-    }
-end
-
 local function write_field(addr, dtype, value)
     local off = ps1_to_mainram(addr)
     local v = tonumber(value)
@@ -524,7 +512,6 @@ local function handle_command(cmd)
         local mmf_name = cmd.mmf_name or ("re1_screenshot_" .. tostring(cmd.port or 0))
         local ring_frames = {}
         local ring_png_b64 = {}
-        local ring_anim = {}
         if hp_off then
             local hp = memory.read_u16_le(hp_off, "MainRAM")
             if hp > 0 then
@@ -557,8 +544,6 @@ local function handle_command(cmd)
                 if fc and b64 then
                     ring_frames[#ring_frames + 1] = fc
                     ring_png_b64[#ring_png_b64 + 1] = b64
-                    local hooks = read_anim_hooks()
-                    ring_anim[#ring_anim + 1] = { hooks[1], hooks[2], hooks[3] }
                 end
             end
             if echo then
@@ -597,16 +582,11 @@ local function handle_command(cmd)
             if fc and b64 then
                 ring_frames[#ring_frames + 1] = fc
                 ring_png_b64[#ring_png_b64 + 1] = b64
-                local hooks = read_anim_hooks()
-                ring_anim[#ring_anim + 1] = { hooks[1], hooks[2], hooks[3] }
             end
         end
         if #ring_frames > 0 then
             resp.ring_frames = setmetatable(ring_frames, { __jsontype = "array" })
             resp.ring_png_b64 = setmetatable(ring_png_b64, { __jsontype = "array" })
-            if #ring_anim > 0 then
-                resp.ring_anim = setmetatable(ring_anim, { __jsontype = "array" })
-            end
         end
         if echo then
             -- dkjson needs a hint to keep this an array when frames aborted early

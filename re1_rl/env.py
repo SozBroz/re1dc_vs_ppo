@@ -404,13 +404,39 @@ class RE1Env(gym.Env):
             "maps_files_flags": int(ram.get("maps_files_flags", 0)),
             "player_anim": int(ram.get("player_anim", 0)),
             "player_aux": int(ram.get("player_aux", 0)),
-            "anim_history": self.bridge.build_anim_history(),
+            "anim_history": list(getattr(self, "_anim_history", [])),
         }
 
     def _init_anim_history(self) -> None:
-        self.bridge.anim_ring.clear()
-        if self.bridge.emulated_frame >= 0:
-            self.bridge.record_anim_at(self.bridge.emulated_frame)
+        from re1_rl.knife_macro import read_knife_hooks
+
+        try:
+            hooks = read_knife_hooks(self.bridge)
+        except (OSError, RuntimeError, ValueError):
+            hooks = (0, 0, 0)
+        self._anim_history = [hooks] * 4
+
+    def _sample_anim_history(self) -> None:
+        from re1_rl.knife_macro import read_knife_hooks
+
+        try:
+            hooks = read_knife_hooks(self.bridge)
+        except (OSError, RuntimeError, ValueError):
+            hooks = (0, 0, 0)
+        if not hasattr(self, "_anim_history"):
+            self._anim_history = []
+        self._anim_history.append(hooks)
+        while len(self._anim_history) > 4:
+            self._anim_history.pop(0)
+
+    def _refresh_anim_history_before_obs(self) -> bool:
+        """Macro steps replace anim hist with pin captures; else one step sample."""
+        pins = self.bridge.attack_pins
+        if pins.ready():
+            self._anim_history = pins.macro_anim_history()
+            return True
+        self._sample_anim_history()
+        return False
 
     def _box_obs(self, state: dict[str, Any]) -> np.ndarray:
         """Encode item-box contents; refresh the RAM cache in box rooms."""
@@ -488,7 +514,6 @@ class RE1Env(gym.Env):
         if self.bridge.emulated_frame >= 0:
             fc = self.bridge.emulated_frame
             self.bridge.frame_ring.store_rgb(fc, self.bridge.screenshot())
-            self.bridge.record_anim_at(fc)
         return self.bridge.build_frame_stack()
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
@@ -530,7 +555,6 @@ class RE1Env(gym.Env):
         self._step_count = 0
         self._frame_stack = []
         self.bridge.frame_ring.clear()
-        self.bridge.anim_ring.clear()
         self.bridge.attack_pins.clear()
         self._progress = ProgressTracker()
         self._visited.reset()
@@ -540,7 +564,6 @@ class RE1Env(gym.Env):
         rgb = self.bridge.screenshot()
         if self.bridge.emulated_frame >= 0:
             self.bridge.frame_ring.store_rgb(self.bridge.emulated_frame, rgb)
-            self.bridge.record_anim_at(self.bridge.emulated_frame)
         frame_obs = self.bridge.build_frame_stack()
         self._prev_hp = 0
         state = self._read_state()
@@ -1209,7 +1232,10 @@ class RE1Env(gym.Env):
                 return death
         assert self._planner is not None
         self._step_count += 1
+        macro_pins = self._refresh_anim_history_before_obs()
         frame_obs = self._capture_step_obs()
+        if macro_pins:
+            self.bridge.attack_pins.clear()
         state = self._read_state()
         state = dict(state)
         state["step_emulated_frames"] = int(step_emulated_frames)
@@ -1551,7 +1577,10 @@ class RE1Env(gym.Env):
                 died_during_skip = False
 
         self._step_count += 1
+        macro_pins = self._refresh_anim_history_before_obs()
         frame_obs = self.bridge.build_frame_stack()
+        if macro_pins:
+            self.bridge.attack_pins.clear()
         state = self._read_state()
         if died_during_skip or died_during_step:
             state = dict(state)
