@@ -231,8 +231,16 @@ ENEMY_FIELD_OFFSETS: dict[str, tuple[int, str]] = {
 
 
 def enemy_coords_in_room_band(x: int, z: int) -> bool:
-    """Reject off-map pool coordinates (stale HP ghosts)."""
+    """Reject off-map pool coordinates (stale HP ghosts).
+
+    Also reject the null/origin park ``(0, 0)``: empty slots often keep a
+    plausible HP there, and with ``ENEMY_COMBAT_NEAR_DIST`` that ghost sits
+    "in range" of most early-mansion poses — unlocking endless miss macros
+    that crush fleet step/s.
+    """
     ax, az = abs(int(x)), abs(int(z))
+    if ax == 0 and az == 0:
+        return False
     return ax < ENEMY_POOL_COORD_ABS_MAX and az < ENEMY_POOL_COORD_ABS_MAX
 
 
@@ -250,8 +258,6 @@ def enemy_table_fields() -> list[tuple[str, int, str]]:
 
 def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
     """[{x, z, hp, alive, in_room, combat_near, ...}] from enemy table RAM."""
-    import math
-
     out: list[dict[str, int]] = []
     if ENEMY_TABLE_BASE is None or not ENEMY_FIELD_OFFSETS:
         return out

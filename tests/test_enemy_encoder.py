@@ -13,6 +13,7 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from re1_rl.enemy_combat import combat_enemy_count
 from re1_rl.memory_map import decode_enemy_table, enemy_table_fields
 from re1_rl.obs_encoder import PROPRIO_FIELDS, ObsEncoder
 from re1_rl.room_graph import RoomGraph
@@ -111,6 +112,26 @@ def test_enemy_table_fields_mapped() -> None:
     assert by_slot[1]["in_room"] == 0
     assert by_slot[1]["combat_near"] == 0
     assert by_slot[1]["alive"] == 0
+
+
+def test_origin_hp_ghost_not_combat_near() -> None:
+    """Empty-slot (0,0) ghosts must not arm knife/attack masks."""
+    ram = {
+        "player_x": 3836,
+        "player_z": 4369,
+        "enemy0_hp": 43,
+        "enemy0_x": 0,
+        "enemy0_z": 0,
+        "enemy0_active_byte": 0,
+    }
+    for i in range(1, 6):
+        ram[f"enemy{i}_hp"] = 0
+    decoded = decode_enemy_table(ram)
+    assert len(decoded) == 1
+    assert decoded[0]["in_room"] == 0
+    assert decoded[0]["alive"] == 0
+    assert decoded[0]["combat_near"] == 0
+    assert combat_enemy_count(decoded) == 0
 
 
 if __name__ == "__main__":
