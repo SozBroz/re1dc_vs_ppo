@@ -18,6 +18,11 @@ import numpy as np
 
 from re1_rl.ammo_accounting import can_fire_weapon
 from re1_rl.item_use import any_legal_use_slot, slot_legal_for_use
+from re1_rl.story_item_use import (
+    any_legal_story_use_slot,
+    legal_story_use_slots,
+    slot_legal_for_story_use,
+)
 from re1_rl.knife_macro import knife_action_ready
 from re1_rl.weapon_equip import (
     EQUIPPABLE_WEAPON_IDS,
@@ -44,6 +49,10 @@ WITHDRAW_ACTION_NAMES = [f"withdraw_box_{i}" for i in range(N_WITHDRAW_ACTIONS)]
 MENU_ACTION_NAMES = ["combine"] + [
     f"select_slot_{i}" for i in range(N_SELECT_SLOT)
 ]
+
+# Tank controls + interact: allowed while story USE is pending so Jill can turn
+# toward the interact point after opening the USE submenu.
+_STORY_USE_RECOVERY_ACTIONS = frozenset(range(8))
 
 
 def _submenu_active(
@@ -77,6 +86,10 @@ def action_mask(
     in_control: bool = True,
     alive_enemies_in_room: int | None = None,
     mask_combat_without_enemies: bool = True,
+    room_id: str | None = None,
+    player_x: float | int | None = None,
+    player_z: float | int | None = None,
+    rewarded_story_uses: set[str] | frozenset[str] | None = None,
 ) -> np.ndarray:
     """Return bool mask (True = legal) for MaskablePPO / ActionMasker."""
     del prev_action
@@ -159,14 +172,24 @@ def action_mask(
             mask[idx] = False
 
     if inventory is not None:
+        story_kwargs = {
+            "room": room_id,
+            "x": player_x,
+            "z": player_z,
+            "rewarded_site_ids": rewarded_story_uses,
+        }
+        story_legal = any_legal_story_use_slot(inventory, **story_kwargs)
+        story_slots = legal_story_use_slots(inventory, **story_kwargs)
         if not in_submenu:
             if USE_ACTION < n_actions:
-                mask[USE_ACTION] = anim_ready and any_legal_use_slot(
+                heal_legal = any_legal_use_slot(
                     inventory,
                     current_hp=current_hp,
                     poisoned=poisoned,
                     episode_start_hp=episode_start_hp,
                 )
+                # Story USE: key item + stand position only (no anim_ready gate).
+                mask[USE_ACTION] = (anim_ready and heal_legal) or story_legal
             if EQUIP_ACTION < n_actions:
                 mask[EQUIP_ACTION] = anim_ready and any_legal_equip_slot(
                     inventory,
@@ -178,16 +201,22 @@ def action_mask(
 
                 mask[COMBINE_ACTION] = any_valid_combine(inventory)
         elif use_ph == 1:
+            if story_legal:
+                for idx in _STORY_USE_RECOVERY_ACTIONS:
+                    if idx < n_actions:
+                        mask[idx] = True
             for i in range(N_SELECT_SLOT):
                 idx = SELECT_SLOT_BASE + i
                 if idx < n_actions:
-                    mask[idx] = slot_legal_for_use(
+                    heal_slot = slot_legal_for_use(
                         inventory,
                         i,
                         current_hp=current_hp,
                         poisoned=poisoned,
                         episode_start_hp=episode_start_hp,
                     )
+                    story_slot = i in story_slots
+                    mask[idx] = heal_slot or story_slot
         elif equip_ph == 1:
             for i in range(N_SELECT_SLOT):
                 idx = SELECT_SLOT_BASE + i
