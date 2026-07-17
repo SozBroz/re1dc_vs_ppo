@@ -79,9 +79,32 @@ def test_apply_combat_step_fields_chip() -> None:
 
 
 def test_apply_combat_step_fields_kill() -> None:
-    prev = {"enemies": [{"slot": 0, "hp": 40}]}
-    cur = {"enemies": []}
+    prev = {"room_id": "104", "enemies": [{"slot": 0, "hp": 40}]}
+    cur = {"room_id": "104", "enemies": []}
     out = apply_combat_step_fields(prev, cur, attack=True)
     assert out["enemy_damage"] == 40
     assert out["enemy_kills"] == 1
     assert "attack_missed" not in out
+
+
+def test_room_change_does_not_count_unload_as_kill() -> None:
+    """Door exit unloads Kenneth/Barry — must not mint combat reward."""
+    prev = {
+        "room_id": "104",
+        "enemies": [{"slot": 0, "hp": 53}],
+    }
+    cur = {
+        "room_id": "105",
+        "enemies": [],
+    }
+    out = apply_combat_step_fields(prev, cur)
+    assert out["enemy_damage"] == 0
+    assert out["enemy_kills"] == 0
+    assert out["combat_events"] == []
+
+    # Re-enter tea room with Kenneth at full HP — still not a kill credit.
+    prev2 = {"room_id": "105", "enemies": [{"slot": 0, "hp": 80}]}
+    cur2 = {"room_id": "104", "enemies": [{"slot": 0, "hp": 53}]}
+    out2 = apply_combat_step_fields(prev2, cur2)
+    assert out2["enemy_damage"] == 0
+    assert out2["enemy_kills"] == 0

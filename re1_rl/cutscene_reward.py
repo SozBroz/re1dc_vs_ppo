@@ -238,21 +238,6 @@ def kenneth_tea_script_key(key: str) -> bool:
     return str(key).startswith(f"{TEA_ROOM}:") and ":s" in str(key)
 
 
-def opening_corridor_nonstory_cutscene_disqualified(key: str) -> bool:
-    """Dining/tea: only Barry ``105:0:sN`` and Kenneth ``104:*:sN`` may pay.
-
-    Multi-cam ``105:N:s0`` / door-settle scripts were minting unbounded
-    +NEW_CUTSCENE_BONUS and inverting returns vs real exploration
-    (2-room door farm >> 5+ room episodes).
-    """
-    k = str(key)
-    if k.startswith(f"{DINING_ROOM}:"):
-        return not barry_dining_cluster_key(k)
-    if k.startswith(f"{TEA_ROOM}:"):
-        return not kenneth_tea_script_key(k)
-    return False
-
-
 def same_room_script_key(key: str) -> bool:
     """Sequenced same-camera beat (``room:cam:sN``) — not a door ``room:cam`` key."""
     return ":s" in str(key)
@@ -271,17 +256,48 @@ def same_camera_sequel_script_key(
     return any(str(x).startswith(prefix) for x in (rewarded_cutscenes or ()))
 
 
+def opening_corridor_dialogue_script_key(
+    key: str,
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None,
+) -> bool:
+    """Dining/tea same-room ``:sN`` with real dialogue/script evidence.
+
+    Barry's walk-up talk often starts on cam 1/2 (not only cam 0) as msg-only
+    idle scene — must be examine-exempt. Idle examine spam (no msg/scene
+    movement) must stay blocked.
+    """
+    k = str(key)
+    if ":s" not in k:
+        return False
+    if not (k.startswith(f"{DINING_ROOM}:") or k.startswith(f"{TEA_ROOM}:")):
+        return False
+    prev_sf = int((prev_state or {}).get("scene_flag", 0) or 0)
+    new_sf = int((new_state or {}).get("scene_flag", 0) or 0)
+    if (prev_sf & SCENE_FLAG_MASK) or (new_sf & SCENE_FLAG_MASK):
+        return True
+    if prev_sf != new_sf:
+        return True
+    prev_msg = int((prev_state or {}).get("msg_flag", 0) or 0)
+    new_msg = int((new_state or {}).get("msg_flag", 0) or 0)
+    return prev_msg != new_msg
+
+
 def canonical_story_script_key(
     key: str,
     rewarded_cutscenes: Collection[str] | None = None,
+    *,
+    prev_state: dict[str, Any] | None = None,
+    new_state: dict[str, Any] | None = None,
 ) -> bool:
-    """Barry / Kenneth / same-camera sequel — examine-text exempt only.
+    """Barry / Kenneth / dining-tea dialogue / same-camera sequel — examine-exempt.
 
-    Do not blanket-exempt all dining ``:sN`` (interact spam would farm).
+    Do not blanket-exempt idle dining ``:sN`` (interact spam would farm).
     """
     return (
         barry_dining_cluster_key(key)
         or kenneth_tea_script_key(key)
+        or opening_corridor_dialogue_script_key(key, prev_state, new_state)
         or same_camera_sequel_script_key(key, rewarded_cutscenes)
     )
 
@@ -429,7 +445,12 @@ def qualify_cutscene_reward(
         examine_text_skip_disqualified(
             prev_state, new_state, skip_frames=int(skip_frames)
         )
-        and not canonical_story_script_key(key, rewarded_cutscenes)
+        and not canonical_story_script_key(
+            key,
+            rewarded_cutscenes,
+            prev_state=prev_state,
+            new_state=new_state,
+        )
         and not story_use_menu_cutscene_exempt(new_state)
     ):
         return None
@@ -460,9 +481,6 @@ def qualify_cutscene_reward(
         rewarded_cutscenes=rewarded_cutscenes,
         visited_rooms=visited_rooms,
     ):
-        return None
-
-    if opening_corridor_nonstory_cutscene_disqualified(key):
         return None
 
     return key
@@ -530,7 +548,12 @@ def cutscene_disqualify_reason(
         )
         if (
             key is None
-            or not canonical_story_script_key(key, rewarded_cutscenes)
+            or not canonical_story_script_key(
+                key,
+                rewarded_cutscenes,
+                prev_state=prev_state,
+                new_state=new_state,
+            )
         ) and not story_use_menu_cutscene_exempt(new_state):
             return "examine / locked text (same room, idle scene)"
     if room_change_cutscene_disqualified(prev_state, new_state):
@@ -560,8 +583,6 @@ def cutscene_disqualify_reason(
         visited_rooms=visited_rooms,
     ):
         return "dining<->tea room repeat (Kenneth / multi-cam door farm)"
-    if key is not None and opening_corridor_nonstory_cutscene_disqualified(key):
-        return "dining/tea non-story cutscene (Barry/Kenneth only)"
     return None
 
 

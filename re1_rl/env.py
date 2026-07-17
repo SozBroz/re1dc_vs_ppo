@@ -816,6 +816,8 @@ class RE1Env(gym.Env):
         self._prev_state = state
         self._cutscene_skip_entry_prev = None
         self._pending_skip_room_crossings = []
+        # Keep for monitor/harness gate panels after session counters reset.
+        self._last_settled_skip_frames = int(getattr(self, "_last_skip_frames", 0) or 0)
         self._last_skip_frames = 0
         if state["hp"] > 0:
             self._prev_hp = state["hp"]

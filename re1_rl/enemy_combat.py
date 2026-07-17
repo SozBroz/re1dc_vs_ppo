@@ -115,8 +115,20 @@ def apply_combat_step_fields(
     knife: bool = False,
     attack: bool = False,
 ) -> dict[str, Any]:
-    """Attach ``enemy_damage`` / ``enemy_kills`` (and miss flags) like ``env.step``."""
+    """Attach ``enemy_damage`` / ``enemy_kills`` (and miss flags) like ``env.step``.
+
+    Room changes unload the previous room's enemy table — that must not count as
+    kills (door-loop farm: exit tea room → Kenneth slot vanishes → +damage/+kill).
+    """
     out = dict(state)
+    prev_room = str(prev_state.get("room_id", "") or "")
+    curr_room = str(out.get("room_id", "") or "")
+    if prev_room and curr_room and prev_room != curr_room:
+        out["enemy_damage"] = 0
+        out["enemy_kills"] = 0
+        out["combat_events"] = []
+        return out
+
     prev_enemies = list(prev_state.get("enemies", []) or [])
     curr_enemies = list(out.get("enemies", []) or [])
     prev_enemy_hps = enemy_hp_by_slot(prev_enemies)

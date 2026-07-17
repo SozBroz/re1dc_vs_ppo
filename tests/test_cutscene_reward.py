@@ -456,6 +456,26 @@ def test_barry_msg_dialogue_short_skip_still_pays():
     ) == "105:0:s0"
 
 
+def test_barry_walkup_msg_on_cam1_short_skip_pays():
+    """Barry often starts on cam 1/2 — corridor dialogue evidence must reach qualify."""
+    prev = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80, msg_flag=0x00)
+    cur = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80, msg_flag=0x80)
+    assert _qualify(
+        prev,
+        cur,
+        skip_frames=25,
+        visited_rooms={"105"},
+    ) == "105:1:s0"
+    prev2 = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00)
+    cur2 = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x80)
+    assert _qualify(
+        prev2,
+        cur2,
+        skip_frames=25,
+        visited_rooms={"105"},
+    ) == "105:2:s0"
+
+
 def test_kenneth_pays_with_main_hall_visited():
     prev = make_state(room="104", cam_id=0, hp=96, scene_flag=0x84)
     cur = make_state(room="104", cam_id=0, hp=96, scene_flag=0x80)
@@ -480,7 +500,7 @@ def test_kenneth_msg_dialogue_short_skip_still_pays():
 
 
 def test_same_camera_second_dining_beat_pays_after_kenneth():
-    """Post-Kenneth: only Barry cam still pays; other dining cams are non-story."""
+    """Post-Kenneth: same-room cam changes still pay (Barry sequel + other cams)."""
     prev = make_state(room="105", cam_id=2, hp=96, scene_flag=0x93, msg_flag=0x80)
     cur = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00)
     assert _qualify(
@@ -489,7 +509,7 @@ def test_same_camera_second_dining_beat_pays_after_kenneth():
         skip_frames=25,
         rewarded_cutscenes={"105:0:s0", "104:0:s0"},
         visited_rooms={"105", "106", "104"},
-    ) is None
+    ) == "105:2:s0"
     prev_b = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93, msg_flag=0x80)
     cur_b = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)
     assert _qualify(
