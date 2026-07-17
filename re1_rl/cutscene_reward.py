@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from typing import Any
 
+from re1_rl.cutscene_ledger import _milestone_seen
 from re1_rl.game_session import death_ui_from_ram, opening_phase_from_ram
 from re1_rl.memory_map import PLAYER_HP_MAX, SCENE_FLAG_MASK
 from re1_rl.ram_skip import in_game_menu_from_ram
@@ -21,6 +22,15 @@ MIN_CUTSCENE_SKIP_FRAMES = 20
 # Boot / attract spans — never pay exploration cutscene bonus.
 # In-mansion Barry/Wesker scenes (``mansion_intro_*``) are real gameplay cutscenes
 # and pay once per room:cam like doors/Kenneth.
+# Kenneth tea-room zombie (104). Re-entering main hall (106) before this fires
+# Wesker dialogue and despawns Kenneth's handgun clips — do not reward that loop.
+KENNETH_CUTSCENE_MILESTONE = "104:0"
+MAIN_HALL_ROOM = "106"
+DINING_ROOM = "105"
+TEA_ROOM = "104"
+BARRY_DINING_CAM = 0
+BARRY_DINING_CLUSTER_PREFIX = f"{DINING_ROOM}:{BARRY_DINING_CAM}:s"
+
 OPENING_PHASES_NO_REWARD: frozenset[str] = frozenset(
     {
         "playstation_logo",
@@ -137,9 +147,171 @@ def cutscene_death_disqualified_from_state(
     return hp <= 0 or hp > int(PLAYER_HP_MAX)
 
 
+def kenneth_cutscene_seen(
+    rewarded_cutscenes: Collection[str] | None,
+    *,
+    visited_rooms: Collection[str] | None = None,
+) -> bool:
+    """True once the tea-room Kenneth zombie script beat paid this episode."""
+    del visited_rooms  # visit alone does not unlock main-hall rewards
+    seen = set(rewarded_cutscenes or ())
+    if any(str(k).startswith(f"{TEA_ROOM}:") and ":s" in str(k) for k in seen):
+        return True
+    return False
+
+
+def main_hall_new_room_gated(
+    room_id: str,
+    *,
+    rewarded_cutscenes: Collection[str] | None,
+    visited_rooms: Collection[str] | None = None,
+) -> bool:
+    """True when ``new_room`` must not pay for main hall yet (pre-Kenneth)."""
+    if str(room_id) != MAIN_HALL_ROOM:
+        return False
+    return not kenneth_cutscene_seen(
+        rewarded_cutscenes, visited_rooms=visited_rooms
+    )
+
+
+def dining_tea_corridor_repeat_disqualified(
+    *,
+    key: str,
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None,
+    rewarded_cutscenes: Collection[str] | None,
+    visited_rooms: Collection[str] | None,
+) -> bool:
+    """Block dining↔tea-room cutscene farm (multi-cam doors + Kenneth sN replay)."""
+    visited = {str(r) for r in (visited_rooms or ())}
+    if DINING_ROOM not in visited or TEA_ROOM not in visited:
+        return False
+
+    prev_r = str((prev_state or {}).get("room_id", "") or "")
+    new_r = str((new_state or {}).get("room_id", "") or "")
+    rewarded = {str(k) for k in (rewarded_cutscenes or ())}
+
+    if prev_r == DINING_ROOM and new_r == TEA_ROOM:
+        if any(k.startswith(f"{DINING_ROOM}:") for k in rewarded):
+            return True
+    if prev_r == TEA_ROOM and new_r == DINING_ROOM:
+        if any(
+            k.startswith(f"{TEA_ROOM}:") and ":s" not in k for k in rewarded
+        ):
+            return True
+
+    if str(key).startswith(f"{TEA_ROOM}:") and ":s" in str(key):
+        if any(k.startswith(f"{TEA_ROOM}:") and ":s" in k for k in rewarded):
+            return True
+
+    return False
+
+
+def kenneth_tea_script_key(key: str) -> bool:
+    """Tea-room Kenneth zombie script (``104:*:sN``)."""
+    return str(key).startswith(f"{TEA_ROOM}:") and ":s" in str(key)
+
+
+def same_room_script_key(key: str) -> bool:
+    """Sequenced same-camera beat (``room:cam:sN``) — not a door ``room:cam`` key."""
+    return ":s" in str(key)
+
+
+def same_camera_sequel_script_key(
+    key: str,
+    rewarded_cutscenes: Collection[str] | None,
+) -> bool:
+    """Second beat at a camera (``:s1``) after ``:s0`` already paid — examine-safe."""
+    k = str(key)
+    if not k.endswith(":s1"):
+        return False
+    base = k[: -len(":s1")]
+    prefix = base + ":s"
+    return any(str(x).startswith(prefix) for x in (rewarded_cutscenes or ()))
+
+
+def canonical_story_script_key(
+    key: str,
+    rewarded_cutscenes: Collection[str] | None = None,
+) -> bool:
+    """Barry / Kenneth / same-camera sequel — examine-text exempt only.
+
+    Do not blanket-exempt all dining ``:sN`` (interact spam would farm).
+    """
+    return (
+        barry_dining_cluster_key(key)
+        or kenneth_tea_script_key(key)
+        or same_camera_sequel_script_key(key, rewarded_cutscenes)
+    )
+
+
+def early_main_hall_before_kenneth_disqualified(
+    *,
+    key: str,
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None,
+    rewarded_cutscenes: Collection[str] | None,
+    visited_rooms: Collection[str] | None,
+) -> bool:
+    """Block main-hall cutscene keys only — not Barry/Kenneth in other rooms."""
+    del prev_state, new_state
+    if kenneth_cutscene_seen(rewarded_cutscenes, visited_rooms=visited_rooms):
+        return False
+    return str(key).startswith(f"{MAIN_HALL_ROOM}:")
+
+
+def barry_dining_cluster_key(key: str) -> bool:
+    """Barry talk + Barry zombie at dining cam 0 (``105:0:sN``)."""
+    return str(key).startswith(BARRY_DINING_CLUSTER_PREFIX)
+
+
+def pre_kenneth_dining_script_repeat_disqualified(
+    *,
+    key: str,
+    rewarded_cutscenes: Collection[str] | None,
+    visited_rooms: Collection[str] | None,
+) -> bool:
+    """Block post-hall Wesker dining beats; always allow Barry ``105:0:sN``."""
+    if kenneth_cutscene_seen(rewarded_cutscenes, visited_rooms=visited_rooms):
+        return False
+    if barry_dining_cluster_key(key):
+        return False
+    visited = {str(r) for r in (visited_rooms or ())}
+    if MAIN_HALL_ROOM not in visited:
+        return False
+    return str(key).startswith(f"{DINING_ROOM}:")
+
+
+def room_change_cutscene_disqualified(
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None,
+) -> bool:
+    """Room A -> door skip -> room B is discovery (``new_room``), not a script beat."""
+    if not prev_state or not new_state:
+        return False
+    prev_r = str(prev_state.get("room_id", "") or "")
+    new_r = str(new_state.get("room_id", "") or "")
+    return bool(prev_r and new_r and prev_r != new_r)
+
+
+def story_use_menu_cutscene_exempt(new_state: dict[str, Any] | None) -> bool:
+    """Successful story USE: exempt pause-menu and examine-text cutscene gates.
+
+    Only when ``story_use_success`` is set — failed USE macros must not earn
+    ``new_cutscene`` via this path.
+    """
+    return bool((new_state or {}).get("story_use_success"))
+
+
+# Same-room dialogue with message-flag movement (Barry, …) — not examine spam.
+SCRIPT_DIALOGUE_MIN_SKIP_FRAMES = 60
+
+
 def examine_text_skip_disqualified(
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any] | None,
+    *,
+    skip_frames: int = 0,
 ) -> bool:
     """Locked-door / examine message: same room, idle scene — not exploration."""
     if not prev_state or not new_state:
@@ -154,6 +326,13 @@ def examine_text_skip_disqualified(
         return False
     if prev_sf != new_sf:
         return False
+    msg_before = int(prev_state.get("msg_flag", 0))
+    msg_after = int(new_state.get("msg_flag", 0))
+    if (
+        msg_before != msg_after
+        and int(skip_frames) >= SCRIPT_DIALOGUE_MIN_SKIP_FRAMES
+    ):
+        return False
     # Typical in-room idle while walking / at a door.
     return (prev_sf & 0x7F) in (0, 0x80)
 
@@ -165,6 +344,7 @@ def qualify_cutscene_reward(
     new_state: dict[str, Any] | None,
     episode_start_hp: int = 0,
     rewarded_cutscenes: Collection[str] | None = None,
+    visited_rooms: Collection[str] | None = None,
 ) -> str | None:
     """Return cutscene key if this skip earns ``new_cutscene`` bonus, else None."""
     if int(skip_frames) < MIN_CUTSCENE_SKIP_FRAMES:
@@ -198,11 +378,47 @@ def qualify_cutscene_reward(
         return None
 
     if in_game_menu_from_ram(_ram_view_from_state(prev_state or {})):
-        return None
+        if not story_use_menu_cutscene_exempt(new_state):
+            return None
     if in_game_menu_from_ram(_ram_view_from_state(new_state or {})):
+        if not story_use_menu_cutscene_exempt(new_state):
+            return None
+
+    if (
+        examine_text_skip_disqualified(
+            prev_state, new_state, skip_frames=int(skip_frames)
+        )
+        and not canonical_story_script_key(key, rewarded_cutscenes)
+        and not story_use_menu_cutscene_exempt(new_state)
+    ):
         return None
 
-    if examine_text_skip_disqualified(prev_state, new_state):
+    if room_change_cutscene_disqualified(prev_state, new_state):
+        return None
+
+    if early_main_hall_before_kenneth_disqualified(
+        key=key,
+        prev_state=prev_state,
+        new_state=new_state,
+        rewarded_cutscenes=rewarded_cutscenes,
+        visited_rooms=visited_rooms,
+    ):
+        return None
+
+    if pre_kenneth_dining_script_repeat_disqualified(
+        key=key,
+        rewarded_cutscenes=rewarded_cutscenes,
+        visited_rooms=visited_rooms,
+    ):
+        return None
+
+    if dining_tea_corridor_repeat_disqualified(
+        key=key,
+        prev_state=prev_state,
+        new_state=new_state,
+        rewarded_cutscenes=rewarded_cutscenes,
+        visited_rooms=visited_rooms,
+    ):
         return None
 
     return key
@@ -215,6 +431,7 @@ def cutscene_disqualify_reason(
     new_state: dict[str, Any] | None,
     episode_start_hp: int = 0,
     rewarded_cutscenes: Collection[str] | None = None,
+    visited_rooms: Collection[str] | None = None,
 ) -> str | None:
     """Human-readable reason when ``qualify_cutscene_reward`` returns None."""
     if int(skip_frames) < MIN_CUTSCENE_SKIP_FRAMES:
@@ -244,9 +461,126 @@ def cutscene_disqualify_reason(
     if phase_after in OPENING_PHASES_NO_REWARD:
         return f"opening phase after {phase_after!r}"
     if in_game_menu_from_ram(_ram_view_from_state(prev_state or {})):
-        return "pause menu at skip entry"
+        if not story_use_menu_cutscene_exempt(new_state):
+            return "pause menu at skip entry"
     if in_game_menu_from_ram(_ram_view_from_state(new_state or {})):
-        return "pause menu at skip exit"
-    if examine_text_skip_disqualified(prev_state, new_state):
-        return "examine / locked text (same room, idle scene)"
+        if not story_use_menu_cutscene_exempt(new_state):
+            return "pause menu at skip exit"
+    if examine_text_skip_disqualified(
+        prev_state, new_state, skip_frames=int(skip_frames)
+    ):
+        key = cutscene_key_from_state(
+            prev_state, new_state, rewarded_cutscenes=rewarded_cutscenes
+        )
+        if (
+            key is None
+            or not canonical_story_script_key(key, rewarded_cutscenes)
+        ) and not story_use_menu_cutscene_exempt(new_state):
+            return "examine / locked text (same room, idle scene)"
+    if room_change_cutscene_disqualified(prev_state, new_state):
+        return "room-change door skip (same-room scripts only)"
+    key = cutscene_key_from_state(
+        prev_state, new_state, rewarded_cutscenes=rewarded_cutscenes
+    )
+    if key is not None and early_main_hall_before_kenneth_disqualified(
+        key=key,
+        prev_state=prev_state,
+        new_state=new_state,
+        rewarded_cutscenes=rewarded_cutscenes,
+        visited_rooms=visited_rooms,
+    ):
+        return "main hall before Kenneth (106 keys gated)"
+    if key is not None and pre_kenneth_dining_script_repeat_disqualified(
+        key=key,
+        rewarded_cutscenes=rewarded_cutscenes,
+        visited_rooms=visited_rooms,
+    ):
+        return "dining script after main hall (pre-Kenneth)"
+    if key is not None and dining_tea_corridor_repeat_disqualified(
+        key=key,
+        prev_state=prev_state,
+        new_state=new_state,
+        rewarded_cutscenes=rewarded_cutscenes,
+        visited_rooms=visited_rooms,
+    ):
+        return "dining<->tea room repeat (Kenneth / multi-cam door farm)"
     return None
+
+
+def format_cutscene_gate_panel(
+    *,
+    skip_frames: int,
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None,
+    episode_start_hp: int = 0,
+    rewarded_cutscenes: Collection[str] | None = None,
+    visited_rooms: Collection[str] | None = None,
+    qualified_key: str | None = None,
+    breakdown: dict[str, float] | None = None,
+) -> str:
+    """Terminal panel for cutscene reward gating (human monitor harness)."""
+    proposed = cutscene_key_from_state(
+        prev_state, new_state, rewarded_cutscenes=rewarded_cutscenes
+    )
+    if qualified_key is None:
+        qualified_key = qualify_cutscene_reward(
+            skip_frames=skip_frames,
+            prev_state=prev_state,
+            new_state=new_state,
+            episode_start_hp=episode_start_hp,
+            rewarded_cutscenes=rewarded_cutscenes,
+            visited_rooms=visited_rooms,
+        )
+    kenneth = kenneth_cutscene_seen(
+        rewarded_cutscenes, visited_rooms=visited_rooms
+    )
+    visited = sorted({str(r) for r in (visited_rooms or ())})
+    rewarded = sorted({str(k) for k in (rewarded_cutscenes or ())})
+    prev_r = str((prev_state or {}).get("room_id", "") or "")
+    new_r = str((new_state or {}).get("room_id", "") or "")
+    prev_cam = int((prev_state or {}).get("cam_id", 0) or 0)
+    new_cam = int((new_state or {}).get("cam_id", 0) or 0)
+    gate_blocked = bool(
+        proposed
+        and early_main_hall_before_kenneth_disqualified(
+            key=proposed,
+            prev_state=prev_state,
+            new_state=new_state,
+            rewarded_cutscenes=rewarded_cutscenes,
+            visited_rooms=visited_rooms,
+        )
+    )
+    paid = float((breakdown or {}).get("new_cutscene", 0.0))
+    why = cutscene_disqualify_reason(
+        skip_frames=skip_frames,
+        prev_state=prev_state,
+        new_state=new_state,
+        episode_start_hp=episode_start_hp,
+        rewarded_cutscenes=rewarded_cutscenes,
+        visited_rooms=visited_rooms,
+    )
+    lines = [
+        "[cutscene-gate]",
+        (
+            f"  skip_frames={int(skip_frames)}  "
+            f"prev={prev_r}:cam{prev_cam}  new={new_r}:cam{new_cam}"
+        ),
+        (
+            f"  proposed_key={proposed!r}  qualified={qualified_key!r}  "
+            f"paid new_cutscene={paid:+.1f}"
+        ),
+        (
+            f"  kenneth_seen={kenneth}  "
+            f"main_hall_pre_kenneth_gate={'BLOCK' if gate_blocked else 'open'}"
+        ),
+        f"  visited_rooms={visited}",
+        f"  rewarded_cutscenes={rewarded}",
+    ]
+    if paid <= 0.0:
+        if why:
+            lines.append(f"  unpaid_reason: {why}")
+        elif proposed and str(proposed) in rewarded:
+            lines.append(f"  unpaid_reason: duplicate key {proposed!r} this episode")
+        elif qualified_key is None and not why:
+            lines.append("  unpaid_reason: qualified key is None (no gate match)")
+    return "\n".join(lines)

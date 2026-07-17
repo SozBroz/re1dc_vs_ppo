@@ -2,7 +2,8 @@
 
 Exploration mode (checkpoint path disabled):
   - +CHECKPOINT_REWARD once per new room entered per episode
-  - +CHECKPOINT_REWARD once per new cutscene (room:cam skip segment) per episode
+  - +CHECKPOINT_REWARD once per same-room scripted cutscene (room:cam:sN) per episode
+  - Room-change door skips do not pay new_cutscene (discovery is new_room only)
   - Goal-vector checkpoint compass is zeroed in obs (see obs_encoder.encode_goal)
   - No waypoint / PBRS / wrong-room / retreat / success_room shaping
 """
@@ -16,6 +17,7 @@ import numpy as np
 
 from re1_rl.item_todo import canonical_item
 from re1_rl.key_items import KEY_ITEM_NAMES
+from re1_rl.memory_map import ITEM_IDS, WEAPON_ITEM_IDS
 
 if TYPE_CHECKING:
     from re1_rl.planner import WaypointPlanner
@@ -23,6 +25,9 @@ if TYPE_CHECKING:
     from re1_rl.room_graph import RoomGraph
 
 _KEY_ITEM_NAME_SET: frozenset[str] = frozenset(KEY_ITEM_NAMES)
+_WEAPON_NAME_SET: frozenset[str] = frozenset(
+    ITEM_IDS[i] for i in WEAPON_ITEM_IDS if i in ITEM_IDS
+)
 
 # Human-scale reward units: one route checkpoint = +1.0; step = 1/4000 of that.
 CHECKPOINT_REWARD = 1.0
@@ -42,7 +47,14 @@ WAYPOINT_ROOM_BONUS = NEW_ROOM_BONUS
 ITEM_PICKUP_BONUS = 0.15 * CHECKPOINT_REWARD
 # Keys / emblems / crests (room_items.json key_item=true).
 KEY_ITEM_PICKUP_BONUS = 0.5 * CHECKPOINT_REWARD
-# Idle contempt: no new room / cutscene / key item for SOFTLOCK_FRAME_THRESHOLD
+# Story inventory USE at a curated site (piano, fireplace, …).
+STORY_ITEM_USE_BONUS = CHECKPOINT_REWARD
+# 10F alcove: put gold_emblem back without leaving the wooden emblem (anti-hack).
+# Intended path is USE emblem (wooden) at the same stand → STORY_ITEM_USE_BONUS.
+GOLD_EMBLEM_RETURN_PENALTY = -2.0 * CHECKPOINT_REWARD
+# First pickup of a gun/knife-class weapon this episode (not ammo).
+NEW_WEAPON_PICKUP_BONUS = CHECKPOINT_REWARD
+# Idle contempt: no new room / cutscene / key item / weapon for SOFTLOCK_FRAME_THRESHOLD
 # emulated frames → episode truncation (env). Bulk softlock at timeout only
 # (spread across n_steps on the learner; no per-step stagnant tax).
 # 43200 = 12 min wall-clock @ 60 emulated fps (PS1 NTSC / BizHawk).
@@ -76,6 +88,18 @@ SOFTLOCK_GAMMA = 1.0
 HP_LOSS_SCALE = NEAR_DEATH_DAMAGE_SCALED / (JILL_FINE_HP - 1)
 # Heal recovers ~80% of the damage channel so chip-then-herb is not free.
 HP_GAIN_SCALE = 0.8 * HP_LOSS_SCALE
+# Log-shaped heal: small chips earn far less than linear; full Fine heal unchanged.
+HEAL_LOG_CURVE_EXPONENT = 6.0
+
+
+def hp_heal_reward(hp_delta: int) -> float:
+    """Heal reward with log compression on small amounts; caps at linear full heal."""
+    if hp_delta <= 0:
+        return 0.0
+    cap_delta = float(JILL_FINE_HP - 1)
+    d = min(float(hp_delta), cap_delta)
+    log_ratio = math.log1p(d) / math.log1p(cap_delta)
+    return HP_GAIN_SCALE * cap_delta * (log_ratio ** HEAL_LOG_CURVE_EXPONENT)
 
 # Disabled checkpoint-path terms (exported for tests that assert they stay off).
 WRONG_ROOM_PENALTY = -0.5 * CHECKPOINT_REWARD
@@ -159,6 +183,9 @@ def compute_reward(
         "wrong_room": 0.0,
         "item": 0.0,
         "key_item": 0.0,
+        "story_use": 0.0,
+        "gold_emblem_return": 0.0,
+        "new_weapon": 0.0,
         "success_room": 0.0,
         "hp": 0.0,
         "death": 0.0,
@@ -214,7 +241,17 @@ def compute_reward(
                         bd["wrong_room"] = WRONG_ROOM_PENALTY
 
     if room_changed and is_new_room:
-        bd["new_room"] = NEW_ROOM_BONUS
+        gated = False
+        if progress is not None:
+            from re1_rl.cutscene_reward import main_hall_new_room_gated
+
+            gated = main_hall_new_room_gated(
+                room,
+                rewarded_cutscenes=progress.rewarded_cutscenes,
+                visited_rooms=progress.visited_rooms,
+            )
+        if not gated:
+            bd["new_room"] = NEW_ROOM_BONUS
 
     cutscene_key = state.get("cutscene_key")
     if cutscene_key and progress is not None:
@@ -229,8 +266,18 @@ def compute_reward(
         name = canonical_item(str(raw))
         if name in _KEY_ITEM_NAME_SET:
             bd["key_item"] += KEY_ITEM_PICKUP_BONUS
+        elif name in _WEAPON_NAME_SET:
+            bd["new_weapon"] += NEW_WEAPON_PICKUP_BONUS
         else:
             bd["item"] += ITEM_PICKUP_BONUS
+
+    story_use_site = state.get("story_use_success")
+    if story_use_site and progress is not None:
+        if progress.claim_story_use_bonus(str(story_use_site)):
+            bd["story_use"] = STORY_ITEM_USE_BONUS
+
+    if state.get("gold_emblem_return"):
+        bd["gold_emblem_return"] = GOLD_EMBLEM_RETURN_PENALTY
 
     prev_hp = int(prev_state.get("hp", 0))
     hp = int(state.get("hp", 0))
@@ -239,7 +286,7 @@ def compute_reward(
         bd["hp"] = HP_LOSS_SCALE * hp_delta
     elif hp_delta > 0 and prev_hp > 0:
         # Ignore bogus HP jumps from menu/cutscene init (prev_hp==0).
-        bd["hp"] = HP_GAIN_SCALE * hp_delta
+        bd["hp"] = hp_heal_reward(hp_delta)
 
     if state.get("dead"):
         bd["death"] = DEATH_PENALTY
@@ -256,6 +303,8 @@ def compute_reward(
             bd["new_room"] != 0.0
             or bd["new_cutscene"] != 0.0
             or bd["key_item"] != 0.0
+            or bd["story_use"] != 0.0
+            or bd["new_weapon"] != 0.0
         )
         # Pause idle clock during cutscenes / doors (not in_control).
         if made_progress or bool(state.get("in_control", True)):

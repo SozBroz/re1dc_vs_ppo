@@ -27,13 +27,22 @@ import socket
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from re1_rl.env import RE1Env
+from re1_rl.action_mask import SELECT_SLOT_BASE, USE_ACTION
+from re1_rl.env import ACTION_NAMES, RE1Env
+from re1_rl.memory_map import ITEM_IDS
+from re1_rl.story_item_use import (
+    annotate_story_use_success,
+    legal_story_use_slots,
+    load_story_use_sites,
+    matching_story_sites,
+)
 from re1_rl.game_session import opening_phase_from_ram, outside_gameplay_reason
 from re1_rl.item_todo import canonical_item, canonicalize
 from re1_rl.obs_encoder import GOAL_FIELDS
@@ -47,7 +56,11 @@ from re1_rl.memory_map import (
     SCENE_FLAG,
     STAGE_ID,
 )
-from re1_rl.cutscene_reward import qualify_cutscene_reward, cutscene_disqualify_reason
+from re1_rl.cutscene_reward import (
+    cutscene_disqualify_reason,
+    format_cutscene_gate_panel,
+    qualify_cutscene_reward,
+)
 from re1_rl.enemy_combat import apply_combat_step_fields
 from re1_rl.ram_skip import RamSkipper, SKIP_POLL_RAM_FIELDS, in_control_from_ram, item_inventory_screen_from_ram, needs_skip_from_ram
 from re1_rl.sticky_input import human_buttons_to_step, human_step_gate
@@ -56,6 +69,7 @@ from re1_rl.reward import (
     REWARD_SCALE,
     NEW_CUTSCENE_BONUS,
     NEW_ROOM_BONUS,
+    NEW_WEAPON_PICKUP_BONUS,
     compute_reward,
 )
 from re1_rl.training_progress import TrainingProgressTracker
@@ -80,6 +94,233 @@ RAM_SCREEN_FIELDS: list[tuple[str, int, str]] = [
     ("character_id", CHARACTER_ID, "u8"),
     ("player_hp", PLAYER_HP, "u16"),
 ]
+
+
+_NAME_TO_ITEM_ID = {name: iid for iid, name in ITEM_IDS.items()}
+
+
+def _inventory_ids_from_state(state: dict[str, Any]) -> list[tuple[int, int]]:
+    inv = state.get("inventory_slots") or []
+    out: list[tuple[int, int]] = []
+    for row in inv:
+        if isinstance(row, (list, tuple)) and len(row) >= 2:
+            a, b = row[0], row[1]
+            if isinstance(a, str):
+                iid = _NAME_TO_ITEM_ID.get(a, 0)
+            else:
+                iid = int(a) & 0xFF
+            out.append((iid, int(b)))
+    while len(out) < 8:
+        out.append((0, 0))
+    return out
+
+
+def _read_policy_inventory(env: RE1Env) -> list[tuple[int, int]] | None:
+    try:
+        from re1_rl.item_box import read_inventory
+        from re1_rl.weapon_equip import policy_inventory
+
+        return policy_inventory(read_inventory(env.bridge))
+    except (OSError, RuntimeError, AttributeError, TypeError, ValueError, ImportError):
+        return None
+
+
+def _annotate_story_use(
+    env: RE1Env,
+    prev_state: dict[str, Any],
+    state: dict[str, Any],
+    inventory_before: list[tuple[int, int]] | None,
+    inventory_after: list[tuple[int, int]] | None,
+) -> dict[str, Any]:
+    return annotate_story_use_success(
+        state,
+        prev_state=prev_state,
+        inventory_before=inventory_before,
+        inventory_after=inventory_after,
+        rewarded_site_ids=env._progress.rewarded_story_uses,
+    )
+
+
+def format_story_mask_panel(env: RE1Env, state: dict[str, Any]) -> str:
+    """Legal mask + story USE affordance (key item at interact site)."""
+    mask = env.action_masks(state)
+    legal = [ACTION_NAMES[i] for i in range(len(mask)) if bool(mask[i])]
+    rewarded = set(env._progress.rewarded_story_uses)
+    inv_ids: list[tuple[int, int]] | None = None
+    try:
+        from re1_rl.item_box import read_inventory
+        from re1_rl.weapon_equip import policy_inventory
+
+        inv_ids = policy_inventory(read_inventory(env.bridge))
+    except (OSError, RuntimeError, AttributeError, TypeError, ValueError, ImportError):
+        inv_ids = None
+    if inv_ids is None:
+        inv_ids = _inventory_ids_from_state(state)
+    sites = matching_story_sites(
+        room=str(state.get("room_id", "")),
+        x=state.get("x"),
+        z=state.get("z"),
+        inventory=inv_ids,
+        rewarded_site_ids=rewarded,
+    )
+    slots = legal_story_use_slots(
+        inv_ids,
+        room=str(state.get("room_id", "")),
+        x=state.get("x"),
+        z=state.get("z"),
+        rewarded_site_ids=rewarded,
+    )
+    site_ids = [str(s["id"]) for s in sites] if sites else []
+    use_ph = int(getattr(env, "_use_phase", 0))
+    in_ctrl = bool(state.get("in_control", True))
+    skipping = bool(getattr(env, "_skipping_flag", False))
+    px = float(state.get("x") or 0)
+    pz = float(state.get("z") or 0)
+    room = str(state.get("room_id", ""))
+    notes_slots = [
+        f"slot{i}:{ITEM_IDS.get(iid, iid)}x{qty}"
+        for i, (iid, qty) in enumerate(inv_ids)
+        if int(iid) == 0x23 or str(ITEM_IDS.get(int(iid), "")) == "music_notes"
+    ]
+    lines = [
+        "[story-mask]",
+        (
+            f"  room={room} pos=({int(px)},{int(pz)}) "
+            f"facing={state.get('facing')} in_control={in_ctrl} skipping={skipping} "
+            f"use_phase={use_ph} use_legal={bool(mask[USE_ACTION])} legal_n={int(mask.sum())}"
+        ),
+        f"  music_notes_inv={notes_slots or 'none'}",
+        f"  story_sites={site_ids or 'none'} story_slots={slots}",
+    ]
+    for site in load_story_use_sites():
+        if str(site["room"]) != room:
+            continue
+        dist = math.hypot(px - float(site["x"]), pz - float(site["z"]))
+        in_range = dist <= float(site["radius"])
+        lines.append(
+            f"  dist {site['id']}: {dist:.0f}/{int(site['radius'])} "
+            f"{'IN' if in_range else 'out'}"
+        )
+    lines.append(f"  actions: {', '.join(legal) if legal else '(none)'}")
+    if not in_ctrl or skipping:
+        lines.append("  (not in_control — mask is noop-only until skip ends)")
+    if use_ph == 1:
+        slot_legal = [i for i in range(8) if bool(mask[SELECT_SLOT_BASE + i])]
+        lines.append(f"  use_phase=1 select_slots={slot_legal}")
+    return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class StoryUseAffordance:
+    use_legal: bool
+    site_ids: tuple[str, ...]
+    slots: tuple[int, ...]
+    in_control: bool
+    use_phase: int
+    room: str
+    pos: tuple[int, int]
+
+
+def snapshot_story_use_affordance(
+    env: RE1Env, state: dict[str, Any]
+) -> StoryUseAffordance:
+    mask = env.action_masks(state)
+    rewarded = set(env._progress.rewarded_story_uses)
+    inv_ids = _read_policy_inventory(env)
+    if inv_ids is None:
+        inv_ids = _inventory_ids_from_state(state)
+    room = str(state.get("room_id", ""))
+    sites = matching_story_sites(
+        room=room,
+        x=state.get("x"),
+        z=state.get("z"),
+        inventory=inv_ids,
+        rewarded_site_ids=rewarded,
+    )
+    slots = legal_story_use_slots(
+        inv_ids,
+        room=room,
+        x=state.get("x"),
+        z=state.get("z"),
+        rewarded_site_ids=rewarded,
+    )
+    return StoryUseAffordance(
+        use_legal=bool(mask[USE_ACTION]),
+        site_ids=tuple(str(s["id"]) for s in sites),
+        slots=tuple(int(s) for s in slots),
+        in_control=bool(state.get("in_control", True)),
+        use_phase=int(getattr(env, "_use_phase", 0)),
+        room=room,
+        pos=(int(state.get("x") or 0), int(state.get("z") or 0)),
+    )
+
+
+def maybe_log_story_use_affordance(
+    env: RE1Env,
+    state: dict[str, Any],
+    prev: StoryUseAffordance | None,
+) -> StoryUseAffordance:
+    """Edge-log when inventory USE for a story key becomes legal or stops."""
+    cur = snapshot_story_use_affordance(env, state)
+    if prev is None:
+        if cur.use_legal:
+            print(
+                f"[story-use] ON room={cur.room} pos={cur.pos} "
+                f"sites={list(cur.site_ids)} slots={list(cur.slots)} "
+                f"use_phase={cur.use_phase}",
+                flush=True,
+            )
+        elif cur.site_ids and cur.in_control:
+            print(
+                f"[story-use] NEAR room={cur.room} pos={cur.pos} "
+                f"sites={list(cur.site_ids)} slots={list(cur.slots)} "
+                f"(USE masked off: use_phase={cur.use_phase})",
+                flush=True,
+            )
+        return cur
+
+    affordance_key = (cur.use_legal, cur.site_ids, cur.slots, cur.use_phase)
+    prev_key = (prev.use_legal, prev.site_ids, prev.slots, prev.use_phase)
+    if affordance_key == prev_key:
+        return cur
+
+    if cur.use_legal and not prev.use_legal:
+        print(
+            f"[story-use] ON room={cur.room} pos={cur.pos} "
+            f"sites={list(cur.site_ids)} slots={list(cur.slots)} "
+            f"use_phase={cur.use_phase}",
+            flush=True,
+        )
+    elif not cur.use_legal and prev.use_legal:
+        reason = "out of range / no key / already used"
+        if not cur.in_control:
+            reason = "not in_control"
+        elif cur.use_phase == 1 and prev.use_phase == 0:
+            reason = "use submenu closed"
+        print(
+            f"[story-use] OFF room={cur.room} pos={cur.pos} "
+            f"(was sites={list(prev.site_ids)} slots={list(prev.slots)}) "
+            f"reason={reason}",
+            flush=True,
+        )
+    elif cur.use_legal and prev.use_legal:
+        print(
+            f"[story-use] UPDATE room={cur.room} pos={cur.pos} "
+            f"sites={list(prev.site_ids)}->{list(cur.site_ids)} "
+            f"slots={list(prev.slots)}->{list(cur.slots)} "
+            f"use_phase={prev.use_phase}->{cur.use_phase}",
+            flush=True,
+        )
+    elif not cur.use_legal and not prev.use_legal and (
+        cur.site_ids != prev.site_ids or cur.slots != prev.slots
+    ):
+        print(
+            f"[story-use] NEAR room={cur.room} pos={cur.pos} "
+            f"sites={list(cur.site_ids) or 'none'} "
+            f"(USE still blocked: in_control={cur.in_control})",
+            flush=True,
+        )
+    return cur
 
 
 def _poll_screen_ram(bridge: Any) -> dict[str, int]:
@@ -907,6 +1148,21 @@ def format_reward_panel(
         else:
             lines.append("Picked up a key item.")
         interesting = True
+    if breakdown.get("story_use", 0.0):
+        site = state.get("story_use_success", "")
+        lines.append(f"Story item USE bonus{f' ({site})' if site else ''}.")
+        interesting = True
+    elif breakdown.get("gold_emblem_return", 0.0):
+        lines.append("Gold emblem put back at 10F alcove (no wooden swap).")
+        interesting = True
+    elif breakdown.get("new_weapon", 0.0):
+        new_items = state.get("new_items") or []
+        if new_items:
+            names = ", ".join(_human_item(x) for x in new_items)
+            lines.append(f"Picked up new weapon {names}.")
+        else:
+            lines.append("Picked up a new weapon.")
+        interesting = True
     elif breakdown.get("item", 0.0):
         new_items = state.get("new_items") or []
         if new_items:
@@ -1004,6 +1260,8 @@ def _log_exploration_hit(
         )
     if breakdown.get("new_cutscene", 0) > 0:
         print(f"[{explore.prefix}] new_cutscene +{NEW_CUTSCENE_BONUS:.1f}", flush=True)
+    if breakdown.get("new_weapon", 0) > 0:
+        print(f"[{explore.prefix}] new_weapon +{NEW_WEAPON_PICKUP_BONUS:.1f}", flush=True)
     if breakdown.get("enemy_damage", 0) > 0:
         print(
             f"[{explore.prefix}] enemy_damage +{breakdown['enemy_damage']:.4f} "
@@ -1463,6 +1721,8 @@ def human_advance(
     )
 
     prev_wp = env._planner.waypoint_index
+    prev_state = dict(env._prev_state)
+    inv_before = _read_policy_inventory(env)
     sticky, pulse, pulse_hold = human_buttons_to_step(buttons)
     knife, attack = _human_combat_attempt(buttons)
     # Match training: W / W+run extend to 20f when jammed on a pushable.
@@ -1516,8 +1776,13 @@ def human_advance(
         bool(state.get("in_control", True)),
     )
 
+    inv_after = _read_policy_inventory(env)
+    state = _annotate_story_use(
+        env, prev_state, state, inv_before, inv_after
+    )
+
     reward, breakdown = compute_reward(
-        env._prev_state,
+        prev_state,
         state,
         env._planner,
         progress=env._progress,
@@ -1547,12 +1812,80 @@ def human_advance(
     return state, float(reward), breakdown, goal, info
 
 
+def _credit_skip_room_crossing(
+    env: RE1Env,
+    entry_prev: dict[str, Any],
+    state: dict[str, Any],
+    *,
+    stage: dict[str, Any],
+    explore: TrainingProgressTracker | None = None,
+    game_frames: int = 0,
+    quiet: bool = False,
+    rooms: dict[str, str] | None = None,
+    route_steps: list[int] | None = None,
+    steps_by_seq: dict[int, dict[str, Any]] | None = None,
+) -> tuple[dict[str, Any], int]:
+    """After a door crossing mid-skip: pay ``new_room``, restart script segment."""
+    if str(state.get("room_id", "")) == str(entry_prev.get("room_id", "")):
+        return entry_prev, int(getattr(env, "_cutscene_skip_frames", 0))
+
+    crossing = dict(state)
+    crossing["cutscene_key"] = None
+    env._progress.record_in_control_step(
+        str(crossing.get("room_id", "")),
+        bool(crossing.get("in_control", True)),
+    )
+    reward, breakdown = compute_reward(
+        entry_prev,
+        crossing,
+        env._planner,
+        progress=env._progress,
+        graph=env.graph,
+        success_room=stage.get("success_room"),
+        return_breakdown=True,
+    )
+    if explore is not None and (reward or breakdown):
+        reward_txt = format_reward_panel(
+            breakdown,
+            reward,
+            rooms=rooms or {},
+            route_steps=route_steps or [],
+            steps_by_seq=steps_by_seq or {},
+            planner=env._planner,
+            graph=env.graph,
+            prev_state=entry_prev,
+            state=crossing,
+            quiet=quiet,
+        )
+        if reward_txt:
+            print("--- door crossing ---", flush=True)
+            print(reward_txt, flush=True)
+        _log_exploration_hit(
+            explore,
+            state=crossing,
+            breakdown=breakdown,
+            step=game_frames,
+            env=env,
+        )
+    env._prev_state = dict(crossing)
+    env._cutscene_skip_entry_prev = dict(crossing)
+    env._cutscene_skip_frames = 0
+    return env._cutscene_skip_entry_prev, 0
+
+
 def cutscene_skip_chunk(
     env: RE1Env,
     *,
     stage: dict[str, Any],
     max_frames: int,
     debug: bool = False,
+    gate_log: bool = False,
+    explore: TrainingProgressTracker | None = None,
+    game_frames: int = 0,
+    quiet: bool = False,
+    rooms: dict[str, str] | None = None,
+    route_steps: list[int] | None = None,
+    steps_by_seq: dict[int, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], float, dict[str, float], Any, int]:
     """Fast-forward one chunk while not in player control.
 
@@ -1565,6 +1898,7 @@ def cutscene_skip_chunk(
         entry_prev = dict(env._prev_state)
         env._cutscene_skip_entry_prev = dict(entry_prev)
         env._cutscene_skip_frames = 0
+        env._skip_inventory_before = _read_policy_inventory(env)
     t0 = time.perf_counter()
     try:
         burned, _ = env._ram_skip.skip_uncontrolled(max_frames=max_frames)
@@ -1584,6 +1918,18 @@ def cutscene_skip_chunk(
     )
     state = env._read_state(track_items=True)
     state = dict(state)
+    entry_prev, env._cutscene_skip_frames = _credit_skip_room_crossing(
+        env,
+        entry_prev,
+        state,
+        stage=stage,
+        explore=explore,
+        game_frames=game_frames,
+        quiet=quiet,
+        rooms=rooms,
+        route_steps=route_steps,
+        steps_by_seq=steps_by_seq,
+    )
     still_skipping = needs_skip_from_ram(env.bridge.read_ram(SKIP_POLL_RAM_FIELDS))
 
     if debug:
@@ -1613,12 +1959,18 @@ def cutscene_skip_chunk(
         return state, 0.0, {}, None, burned
 
     skip_frames = int(getattr(env, "_cutscene_skip_frames", 0))
+    inv_after = _read_policy_inventory(env)
+    inv_before = getattr(env, "_skip_inventory_before", None)
+    state = _annotate_story_use(
+        env, entry_prev, state, inv_before, inv_after
+    )
     state["cutscene_key"] = qualify_cutscene_reward(
         skip_frames=skip_frames,
         prev_state=entry_prev,
         new_state=state,
         episode_start_hp=int(getattr(env, "_episode_start_hp", 0)),
         rewarded_cutscenes=env._progress.rewarded_cutscenes,
+        visited_rooms=env._progress.visited_rooms,
     )
     env._progress.record_in_control_step(
         state.get("room_id", ""),
@@ -1633,13 +1985,28 @@ def cutscene_skip_chunk(
         success_room=stage.get("success_room"),
         return_breakdown=True,
     )
-    if skip_frames > 0 and not breakdown.get("new_cutscene"):
+    if gate_log and skip_frames > 0:
+        print(
+            format_cutscene_gate_panel(
+                skip_frames=skip_frames,
+                prev_state=entry_prev,
+                new_state=state,
+                episode_start_hp=int(getattr(env, "_episode_start_hp", 0)),
+                rewarded_cutscenes=env._progress.rewarded_cutscenes,
+                visited_rooms=env._progress.visited_rooms,
+                qualified_key=state.get("cutscene_key"),
+                breakdown=breakdown,
+            ),
+            flush=True,
+        )
+    elif skip_frames > 0 and not breakdown.get("new_cutscene"):
         why = cutscene_disqualify_reason(
             skip_frames=skip_frames,
             prev_state=entry_prev,
             new_state=state,
             episode_start_hp=int(getattr(env, "_episode_start_hp", 0)),
             rewarded_cutscenes=env._progress.rewarded_cutscenes,
+            visited_rooms=env._progress.visited_rooms,
         )
         if why:
             print(f"[explore] cutscene skip unpaid: {why}", flush=True)
@@ -1656,6 +2023,7 @@ def cutscene_skip_chunk(
         env._prev_hp = state["hp"]
     env._cutscene_skip_frames = 0
     env._cutscene_skip_entry_prev = None
+    env._skip_inventory_before = None
     goal = env._encoder.encode_goal(  # type: ignore[union-attr]
         state,
         env._planner,
@@ -1796,9 +2164,25 @@ def main() -> int:
     )
     ap.add_argument("--quiet", action="store_true", help="Only print notable reward events")
     ap.add_argument(
+        "--deafen-step",
+        action="store_true",
+        help="zero step penalty in reward math (signal-only totals for cutscene verification)",
+    )
+    ap.add_argument(
+        "--cutscene-gate-log",
+        action="store_true",
+        help="print cutscene gate panel (keys, Kenneth block, visited/rewarded sets) after each skip",
+    )
+    ap.add_argument(
         "--no-ram-log",
         action="store_true",
         help="disable live RAM screen log (hp/gs/mode/room/outside on change)",
+    )
+    ap.add_argument(
+        "--mask-interval",
+        type=float,
+        default=0.0,
+        help="log legal mask + story USE sites every N seconds (0=off)",
     )
     ap.add_argument(
         "--input",
@@ -1827,6 +2211,11 @@ def main() -> int:
         help="kill any prior python listener on --port before binding (default on)",
     )
     args = ap.parse_args()
+    if args.deafen_step:
+        import re1_rl.reward as reward_mod
+
+        reward_mod.STEP_PENALTY = 0.0
+        print("[play] step penalty deafened (STEP_PENALTY=0)", flush=True)
     if args.training_parity:
         args.cutscene_speed = 6400
         args.cutscene_chunk = 600
@@ -2023,6 +2412,8 @@ def main() -> int:
         f5_down = False
         last_buttons: tuple[str, ...] = ()
         last_status_at = time.time()
+        last_mask_at = 0.0
+        story_affordance: StoryUseAffordance | None = None
         last_progress_print = -1
         ever_saw_input = False
         joypad_raw_dumped = False
@@ -2039,6 +2430,16 @@ def main() -> int:
                 "[play] RAM screen log ON — hp/gs/mode/room/outside on every change",
                 flush=True,
             )
+        if float(args.mask_interval) > 0:
+            print(
+                f"[play] story USE mask monitor ON — every {args.mask_interval}s",
+                flush=True,
+            )
+            print(format_story_mask_panel(env, state), flush=True)
+            print(flush=True)
+            last_mask_at = time.time()
+        print("[play] story USE affordance edge log ON ([story-use] ON/OFF)", flush=True)
+        story_affordance = maybe_log_story_use_affordance(env, state, story_affordance)
 
         hints = format_hints_panel(
             env, state, goal, rooms=rooms, route_steps=route_steps, steps_by_seq=steps_by_seq
@@ -2051,6 +2452,16 @@ def main() -> int:
         step_armed = True
         while running:
             ram_log.maybe_log(bridge)
+            mask_state = env._read_state()
+            story_affordance = maybe_log_story_use_affordance(
+                env, mask_state, story_affordance
+            )
+            if float(args.mask_interval) > 0:
+                now = time.time()
+                if now - last_mask_at >= float(args.mask_interval):
+                    print(format_story_mask_panel(env, mask_state), flush=True)
+                    print(flush=True)
+                    last_mask_at = now
             if not playing:
                 _interruptible_sleep(args.tick_ms / 1000.0)
 
@@ -2159,6 +2570,13 @@ def main() -> int:
                         stage=stage,
                         max_frames=int(args.cutscene_chunk),
                         debug=bool(args.debug_cutscene),
+                        gate_log=bool(args.cutscene_gate_log),
+                        explore=explore,
+                        game_frames=game_frames,
+                        quiet=args.quiet,
+                        rooms=rooms,
+                        route_steps=route_steps,
+                        steps_by_seq=steps_by_seq,
                     )
                     if burned > 0:
                         reward_txt = format_reward_panel(

@@ -623,6 +623,16 @@ class RE1Env(gym.Env):
                 continue
             if not self._skipping_flag:
                 self._last_skip_frames = 0
+                # Inventory snapshot for story USE / gold_emblem put-back annotate.
+                try:
+                    from re1_rl.item_box import read_inventory
+                    from re1_rl.weapon_equip import policy_inventory
+
+                    self._inventory_before_skip = policy_inventory(
+                        read_inventory(self.bridge)
+                    )
+                except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                    self._inventory_before_skip = None
             self._skipping_flag = True
             burned, died = self._ram_skip.skip_uncontrolled(
                 prev_hp=self._prev_hp,
@@ -667,15 +677,36 @@ class RE1Env(gym.Env):
 
     def _apply_post_skip_sync(self) -> None:
         """Credit pickups that finished while async skip was running."""
+        from re1_rl.story_item_use import annotate_story_use_success
+
         state = self._read_state(track_items=True)
         state = dict(state)
+        inv_after = None
+        inv_before = getattr(self, "_inventory_before_skip", None)
+        try:
+            from re1_rl.item_box import read_inventory
+            from re1_rl.weapon_equip import policy_inventory
+
+            inv_after = policy_inventory(read_inventory(self.bridge))
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            inv_after = None
+        # Sets story_use_success and/or gold_emblem_return from inv delta.
+        state = annotate_story_use_success(
+            state,
+            prev_state=self._prev_state,
+            inventory_before=inv_before,
+            inventory_after=inv_after,
+            rewarded_site_ids=self._progress.rewarded_story_uses,
+        )
+        self._inventory_before_skip = None
+        entry_prev = self._prev_state
         state["cutscene_key"] = self._qualify_cutscene_reward(
             int(getattr(self, "_last_skip_frames", 0)),
-            self._prev_state,
+            entry_prev,
             state,
         )
         reward, bd = compute_reward(
-            self._prev_state,
+            entry_prev,
             state,
             self._planner,
             progress=self._progress,
@@ -1345,7 +1376,7 @@ class RE1Env(gym.Env):
             prev_state=prev_state,
         )
 
-    def action_masks(self) -> np.ndarray:
+    def action_masks(self, state: dict[str, Any] | None = None) -> np.ndarray:
         # During async cutscene skip, only noop is legal — ignore stale
         # _prev_state.in_control which can still look like combat control.
         if self._async_cutscene_skip and self._skipping_flag:
@@ -1359,6 +1390,7 @@ class RE1Env(gym.Env):
         box = None
         in_box_room = False
         equipped_slot_0b = None
+        pose = dict(state if state is not None else (getattr(self, "_prev_state", {}) or {}))
         bridge = getattr(self, "bridge", None)
         if bridge is not None:
             try:
@@ -1378,7 +1410,7 @@ class RE1Env(gym.Env):
                 from re1_rl.item_box import is_box_room, read_box, read_inventory
                 from re1_rl.weapon_equip import policy_inventory
 
-                room = str(self._prev_state.get("room_id", ""))
+                room = str(pose.get("room_id", ""))
                 in_box_room = is_box_room(room)
                 inventory = read_inventory(bridge)
                 inventory = policy_inventory(inventory)
@@ -1389,7 +1421,10 @@ class RE1Env(gym.Env):
             except (OSError, RuntimeError, AttributeError, TypeError,
                     ValueError, ImportError):
                 pass
-        state = getattr(self, "_prev_state", {}) or {}
+        progress = getattr(self, "_progress", None)
+        rewarded_story_uses = (
+            progress.rewarded_story_uses if progress is not None else None
+        )
         return build_action_mask(
             int(self.action_space.n),
             self._prev_action,
@@ -1405,12 +1440,16 @@ class RE1Env(gym.Env):
             use_phase=int(getattr(self, "_use_phase", 0)),
             combine_phase=int(getattr(self, "_combine_phase", 0)),
             combine_slot_a=getattr(self, "_combine_slot_a", None),
-            current_hp=int(state.get("hp", 0)),
-            poisoned=bool(state.get("poisoned", False)),
+            current_hp=int(pose.get("hp", 0)),
+            poisoned=bool(pose.get("poisoned", False)),
             episode_start_hp=int(getattr(self, "_episode_start_hp", 0) or 0),
-            in_control=bool(state.get("in_control", True)),
-            alive_enemies_in_room=combat_enemy_count(state.get("enemies")),
+            in_control=bool(pose.get("in_control", True)),
+            alive_enemies_in_room=combat_enemy_count(pose.get("enemies")),
             mask_combat_without_enemies=MASK_ATTACK_WITHOUT_ENEMIES,
+            room_id=str(pose.get("room_id", "") or "") or None,
+            player_x=pose.get("x"),
+            player_z=pose.get("z"),
+            rewarded_story_uses=rewarded_story_uses,
         )
 
     def step(self, action: int):

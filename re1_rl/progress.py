@@ -18,6 +18,7 @@ class ProgressTracker:
     visited_at_route_seq: dict[str, int] = field(default_factory=dict)
     penalized_offroute_rooms: set[str] = field(default_factory=set)
     rewarded_cutscenes: set[str] = field(default_factory=set)
+    rewarded_story_uses: set[str] = field(default_factory=set)
     _success_room_rewarded: bool = False
     _in_control_steps: dict[str, int] = field(default_factory=dict)
 
@@ -64,8 +65,9 @@ class ProgressTracker:
     ) -> None:
         """Advance idle clock when no exploration progress this step.
 
-        Progress is defined in ``compute_reward``: new room, new cutscene, or
-        new key item this step. Revisiting rooms or junk pickups do not reset.
+        Progress is defined in ``compute_reward``: new room, new cutscene,
+        new key item, or new weapon this step. Revisiting rooms or junk
+        pickups do not reset.
         Each env step advances stagnation by ``step_frames`` (macro steps count more).
         """
         if made_progress:
@@ -102,6 +104,14 @@ class ProgressTracker:
         if not key or key in self.rewarded_cutscenes:
             return False
         self.rewarded_cutscenes.add(key)
+        return True
+
+    def claim_story_use_bonus(self, site_id: str) -> bool:
+        """True once per story USE site id per episode."""
+        key = str(site_id)
+        if not key or key in self.rewarded_story_uses:
+            return False
+        self.rewarded_story_uses.add(key)
         return True
 
     def claim_success_room_bonus(self, room_id: str, success_room: str | None) -> bool:

@@ -1,0 +1,35 @@
+{
+  "_notes": "Inventory USE sites (START -> slot -> Cross -> USE). Position-gated; one reward per site id per episode.",
+  "sites": [
+    {
+      "id": "music_notes@10F_piano",
+      "item": "music_notes",
+      "room": "10F",
+      "x": 9737,
+      "z": 8020,
+      "radius": 1500,
+      "consumes": true,
+      "notes": "Bar piano USE tile (empirical QuickSave1 2026-07-16; RDT trigger also at 8850/19300)"
+    },
+    {
+      "id": "emblem@10F_alcove",
+      "item": "emblem",
+      "room": "10F",
+      "x": 9750,
+      "z": 8600,
+      "radius": 1500,
+      "consumes": false,
+      "notes": "Secret alcove after piano — USE wooden emblem (same stand as gold_emblem pickup 9750/8600). Swap keeps gold; putting gold back alone is gold_emblem_return −2 (not this site)."
+    },
+    {
+      "id": "gold_emblem@105_fireplace",
+      "item": "gold_emblem",
+      "room": "105",
+      "x": 2900,
+      "z": 8100,
+      "radius": 1500,
+      "consumes": false,
+      "notes": "Dining fireplace — clock reveals shield key"
+    }
+  ]
+}
