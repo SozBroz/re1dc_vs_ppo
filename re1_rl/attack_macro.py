@@ -246,16 +246,18 @@ def _bridge_uses_frame_ring(bridge: Any) -> bool:
     return isinstance(getattr(bridge, "frame_ring", None), FrameRingBuffer)
 
 
-def macro_swing_frame(bridge: Any) -> bool:
-    """True on the emulated frame where knife slash or gun fire anim is active."""
+def is_macro_swing_anim(anim: int, aux: int, recovery: int = 0) -> bool:
+    """True when knife slash or gun fire anim bytes are active."""
     from re1_rl.knife_macro import is_knife_slash_anim
 
-    anim, aux, recovery = read_knife_hooks(bridge)
     if is_knife_slash_anim(anim, aux, recovery):
         return True
-    if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
-        return True
-    return False
+    return anim == FIRE_ANIM and aux == GUN_AUX_TRACK
+
+
+def macro_swing_frame(bridge: Any) -> bool:
+    """True on the emulated frame where knife slash or gun fire anim is active."""
+    return is_macro_swing_anim(*read_knife_hooks(bridge))
 
 
 def _execute_ranged_attack_macro(

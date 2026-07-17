@@ -1029,9 +1029,12 @@ def _step_one_frame(
     )
     pins = getattr(bridge, "attack_pins", None)
     if pins is not None and pins.active and _bridge_uses_frame_ring(bridge):
-        from re1_rl.attack_macro import macro_swing_frame
+        # One hooks read shared by swing detect + pin; non-swing frames skip MMF.
+        hooks = read_knife_hooks(bridge)
+        from re1_rl.attack_macro import is_macro_swing_anim
 
-        pins.after_frame(bridge, is_swing=macro_swing_frame(bridge))
+        if is_macro_swing_anim(*hooks):
+            pins.after_frame(bridge, is_swing=True, hooks=hooks)
     if died:
         # Lua aborts the batch on a one-frame HP==0; confirm before treating as death
         # (false positives happen at low HP near downed zombies).
@@ -1345,13 +1348,17 @@ def _execute_knife_macro_fixed(
     if scale is not None:
         kwargs["scale"] = scale
     schedule = build_knife_frame_buttons(**kwargs)
+    # When attack_pins are active, begin/finish already MMF-capture entry/end.
+    # Mid-hold Lua ring_stride PNG→b64 was pure duplicate cost.
+    pins = getattr(bridge, "attack_pins", None)
+    pin_obs = bool(pins is not None and pins.active and _bridge_uses_frame_ring(bridge))
     _, died = bridge.step(
         n=len(schedule),
         sticky=empty_sticky,
         frame_buttons=schedule,
         echo_joypad=echo_joypad,
-        ring_stride=4,
-        capture_final=True,
+        ring_stride=0 if pin_obs else 4,
+        capture_final=not pin_obs,
     )
     if echo_joypad and not died:
         echo = getattr(bridge, "last_step_echo", None)

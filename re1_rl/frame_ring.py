@@ -163,29 +163,37 @@ class AttackFramePins:
         self.entry = resize_rgb_to_plane(bridge.screenshot())
         self.entry_hooks = self._read_hooks(bridge)
 
-    def after_frame(self, bridge: Any, *, is_swing: bool) -> None:
+    def after_frame(
+        self,
+        bridge: Any,
+        *,
+        is_swing: bool,
+        hooks: AnimHooks | None = None,
+    ) -> None:
+        """Pin only the first swing frame (plus begin/finish).
+
+        Training used to also screenshot every ``STRIDE`` frames here — that
+        duplicated MMF captures for ring fill while the obs stack already comes
+        from entry/windup/swing/end pins. Skip non-swing frames entirely.
+        """
         if not self.active:
+            return
+        if not (is_swing and self.swing is None):
             return
         fc = int(getattr(bridge, "emulated_frame", -1))
         ring = getattr(bridge, "frame_ring", None)
-        capture = bool(is_swing and self.swing is None)
-        if not capture and fc >= 0 and fc % FrameRingBuffer.STRIDE == 0:
-            capture = True
-        if not capture:
-            return
         plane = resize_rgb_to_plane(bridge.screenshot())
-        hooks = self._read_hooks(bridge)
+        pinned_hooks = hooks if hooks is not None else self._read_hooks(bridge)
         if ring is not None and fc >= 0:
             ring.store_plane(fc, plane)
-        if is_swing and self.swing is None:
-            self.swing = plane
-            self.windup = self._prev if self._prev is not None else self.entry
-            self.swing_hooks = hooks
-            self.windup_hooks = (
-                self._prev_hooks if self._prev_hooks is not None else self.entry_hooks
-            )
+        self.swing = plane
+        self.windup = self._prev if self._prev is not None else self.entry
+        self.swing_hooks = pinned_hooks
+        self.windup_hooks = (
+            self._prev_hooks if self._prev_hooks is not None else self.entry_hooks
+        )
         self._prev = plane
-        self._prev_hooks = hooks
+        self._prev_hooks = pinned_hooks
 
     def finish(self, bridge: Any) -> None:
         if not self.active:

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import numpy as np
+from types import SimpleNamespace
 
+import numpy as np
 from re1_rl.frame_ring import AttackFramePins, FrameRingBuffer, FRAME_SHAPE
 
 
@@ -48,3 +49,44 @@ def test_attack_pins_macro_anim_history() -> None:
         (0x13, 0x04, 5),
         (0x00, 0x00, 0),
     ]
+
+
+def test_attack_pins_after_frame_screenshots_only_on_first_swing() -> None:
+    """Macros must not MMF-capture every STRIDE frame — only the swing pin."""
+    shots = {"n": 0}
+
+    def _shot() -> np.ndarray:
+        shots["n"] += 1
+        return np.full((240, 320, 3), shots["n"], dtype=np.uint8)
+
+    ring = FrameRingBuffer()
+    bridge = SimpleNamespace(
+        screenshot=_shot,
+        emulated_frame=0,
+        frame_ring=ring,
+        read_ram=lambda _fields: {
+            "player_anim": 0x14,
+            "player_action_aux": 0x04,
+            "player_recovery_timer": 0,
+        },
+    )
+    pins = AttackFramePins()
+    pins.begin(bridge)
+    assert shots["n"] == 1
+    # Non-swing / already-pinned frames must not screenshot.
+    for fc in (4, 8, 12):
+        bridge.emulated_frame = fc
+        pins.after_frame(bridge, is_swing=False)
+    assert shots["n"] == 1
+    bridge.emulated_frame = 16
+    pins.after_frame(bridge, is_swing=True, hooks=(0x14, 0x04, 0))
+    assert shots["n"] == 2
+    assert pins.swing is not None
+    # Second swing frame must not re-capture.
+    bridge.emulated_frame = 20
+    pins.after_frame(bridge, is_swing=True, hooks=(0x14, 0x04, 0))
+    assert shots["n"] == 2
+    pins.finish(bridge)
+    assert shots["n"] == 3
+    # Windup falls back to entry when mid-macro stride pins are disabled.
+    assert pins.windup is pins.entry

@@ -363,10 +363,7 @@ class BizHawkClient:
             req["ring_stride"] = int(ring_stride)
             req["mmf_name"] = self.mmf_name
             req["port"] = self.port
-        if capture_final:
-            req["capture_final"] = True
-            req["mmf_name"] = self.mmf_name
-            req["port"] = self.port
+        # Final frame: Python MMF screenshot only (avoids Lua mmf_png_b64 + duplicate).
         resp = self._request(req)
         echo_raw = resp.get("joypad_echo")
         self.last_step_echo = (
@@ -510,15 +507,31 @@ class BizHawkClient:
             raise ValueError(f"Failed to read screenshot PNG from BizHawk at {written}")
         return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
-    def screenshot(self, path: str | None = None) -> np.ndarray:
+    def screenshot(
+        self,
+        path: str | None = None,
+        *,
+        allow_file_fallback: bool = False,
+    ) -> np.ndarray:
         """Return RGB uint8 (H,W,3).
 
-        On Windows, default transport is BizHawk MMF (no per-step _frame_*.png).
-        Falls back to file PNG once if MMF read fails.
+        Training default: BizHawk MMF only (no ``_frame_*.png`` disk I/O).
+        File PNG is opt-in via ``allow_file_fallback=True`` for debug tools.
         """
-        if self.screenshot_mmf and not self._screenshot_mmf_disabled:
+        if self.screenshot_mmf:
+            if self._screenshot_mmf_disabled:
+                raise RuntimeError(
+                    "screenshot_mmf disabled after prior failure; refusing disk PNG "
+                    f"(port={self.port}). Restart env or fix MMF."
+                )
             try:
                 return self._screenshot_from_mmf()
-            except (OSError, RuntimeError, ValueError):
+            except (OSError, RuntimeError, ValueError) as exc:
                 self._screenshot_mmf_disabled = True
+                if allow_file_fallback:
+                    return self._screenshot_from_file(path)
+                raise RuntimeError(
+                    f"screenshot_mmf failed on port={self.port}; disk PNG fallback "
+                    "disabled for training throughput"
+                ) from exc
         return self._screenshot_from_file(path)
