@@ -38,8 +38,8 @@ def test_cutscene_reward_needs_accumulated_skip_frames():
     """Per-chunk 20f burns must not pay; 30f+ session total must."""
     planner = make_planner()
     progress = ProgressTracker()
-    prev = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80)
-    cur = make_state(room="105", cam_id=1, hp=96, scene_flag=0x93)
+    prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
+    cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93)
 
     cur20 = dict(cur)
     cur20["cutscene_key"] = None
@@ -57,12 +57,12 @@ def test_cutscene_reward_needs_accumulated_skip_frames():
         episode_start_hp=96,
         rewarded_cutscenes=progress.rewarded_cutscenes,
     )
-    assert cur30["cutscene_key"] == "105:1:s0"
+    assert cur30["cutscene_key"] == "105:0:s0"
     _, bd_ok = compute_reward(prev, cur30, planner, progress=progress, return_breakdown=True)
     assert bd_ok["new_cutscene"] == NEW_CUTSCENE_BONUS
 
     cur30b = dict(cur)
-    cur30b["cutscene_key"] = "105:1:s0"
+    cur30b["cutscene_key"] = "105:0:s0"
     _, bd_dup = compute_reward(cur30, cur30b, planner, progress=progress, return_breakdown=True)
     assert bd_dup["new_cutscene"] == 0.0
 

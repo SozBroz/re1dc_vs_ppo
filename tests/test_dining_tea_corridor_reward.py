@@ -112,6 +112,24 @@ def test_dining_same_cam_sn_farm_blocked_after_corridor_known():
     assert bd["new_cutscene"] == 0.0
 
 
+def test_dining_multicam_s0_farm_blocked():
+    """Walking cams in dining must not mint +1 per camera (door-loop inversion)."""
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    total = 0.0
+    for cam in range(1, 12):
+        prev = make_state(room="105", cam_id=cam, hp=96, scene_flag=0x93)
+        cur = make_state(room="105", cam_id=cam, hp=96, scene_flag=0x80)
+        _, bd = _reward_step(progress, prev, cur)
+        total += bd["new_cutscene"]
+    assert total == 0.0
+
+    prev_b = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93)
+    cur_b = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
+    _, bd_b = _reward_step(progress, prev_b, cur_b)
+    assert bd_b["new_cutscene"] == NEW_CUTSCENE_BONUS
+
+
 def test_async_post_skip_door_crossing_no_cutscene():
     """Training post-skip sync: 105→104 pays new_room only (harness parity)."""
     from unittest.mock import MagicMock

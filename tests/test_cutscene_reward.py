@@ -46,10 +46,10 @@ def _qualify(
 
 
 def test_min_skip_frames():
-    prev = make_state(room="105", cam_id=1, hp=96, scene_flag=0x93)
-    cur = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80)
+    prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93)
+    cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
     assert _qualify(prev, cur, skip_frames=19) is None
-    assert _qualify(prev, cur, skip_frames=20) == "105:1:s0"
+    assert _qualify(prev, cur, skip_frames=20) == "105:0:s0"
 
 
 def test_examine_locked_text_same_room_does_not_pay():
@@ -480,7 +480,7 @@ def test_kenneth_msg_dialogue_short_skip_still_pays():
 
 
 def test_same_camera_second_dining_beat_pays_after_kenneth():
-    """Post-Kenneth dining script at a non-Barry cam still pays when scene moves."""
+    """Post-Kenneth: only Barry cam still pays; other dining cams are non-story."""
     prev = make_state(room="105", cam_id=2, hp=96, scene_flag=0x93, msg_flag=0x80)
     cur = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00)
     assert _qualify(
@@ -489,7 +489,16 @@ def test_same_camera_second_dining_beat_pays_after_kenneth():
         skip_frames=25,
         rewarded_cutscenes={"105:0:s0", "104:0:s0"},
         visited_rooms={"105", "106", "104"},
-    ) == "105:2:s0"
+    ) is None
+    prev_b = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93, msg_flag=0x80)
+    cur_b = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)
+    assert _qualify(
+        prev_b,
+        cur_b,
+        skip_frames=25,
+        rewarded_cutscenes={"105:0:s0", "104:0:s0"},
+        visited_rooms={"105", "106", "104"},
+    ) == "105:0:s1"
 
 
 def test_dining_idle_examine_spam_not_exempt():

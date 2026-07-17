@@ -238,6 +238,21 @@ def kenneth_tea_script_key(key: str) -> bool:
     return str(key).startswith(f"{TEA_ROOM}:") and ":s" in str(key)
 
 
+def opening_corridor_nonstory_cutscene_disqualified(key: str) -> bool:
+    """Dining/tea: only Barry ``105:0:sN`` and Kenneth ``104:*:sN`` may pay.
+
+    Multi-cam ``105:N:s0`` / door-settle scripts were minting unbounded
+    +NEW_CUTSCENE_BONUS and inverting returns vs real exploration
+    (2-room door farm >> 5+ room episodes).
+    """
+    k = str(key)
+    if k.startswith(f"{DINING_ROOM}:"):
+        return not barry_dining_cluster_key(k)
+    if k.startswith(f"{TEA_ROOM}:"):
+        return not kenneth_tea_script_key(k)
+    return False
+
+
 def same_room_script_key(key: str) -> bool:
     """Sequenced same-camera beat (``room:cam:sN``) — not a door ``room:cam`` key."""
     return ":s" in str(key)
@@ -447,6 +462,9 @@ def qualify_cutscene_reward(
     ):
         return None
 
+    if opening_corridor_nonstory_cutscene_disqualified(key):
+        return None
+
     return key
 
 
@@ -542,6 +560,8 @@ def cutscene_disqualify_reason(
         visited_rooms=visited_rooms,
     ):
         return "dining<->tea room repeat (Kenneth / multi-cam door farm)"
+    if key is not None and opening_corridor_nonstory_cutscene_disqualified(key):
+        return "dining/tea non-story cutscene (Barry/Kenneth only)"
     return None
 
 
