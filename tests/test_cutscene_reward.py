@@ -25,6 +25,9 @@ from re1_rl.progress import ProgressTracker
 from re1_rl.reward import NEW_CUTSCENE_BONUS, NEW_ROOM_BONUS, compute_reward
 from tests.test_scaffolding import make_planner, make_state
 
+# Cutscene pay is gated until Kenneth (104:*:sN) has paid this episode.
+AFTER_KENNETH = frozenset({"104:0:s0"})
+
 
 def _qualify(
     prev,
@@ -45,11 +48,45 @@ def _qualify(
     )
 
 
+def test_pre_kenneth_blocks_all_cutscenes_except_kenneth():
+    """Imperator: no new_cutscene until Kenneth; Kenneth itself still pays."""
+    # Dining Barry / door cam — blocked.
+    prev_d = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
+    cur_d = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93)
+    assert _qualify(prev_d, cur_d, skip_frames=120) is None
+    # Kenneth tea-room script — pays with empty rewarded set.
+    prev_k = make_state(room="104", cam_id=0, hp=96, scene_flag=0x84)
+    cur_k = make_state(room="104", cam_id=0, hp=96, scene_flag=0x80)
+    assert (
+        _qualify(
+            prev_k,
+            cur_k,
+            skip_frames=120,
+            visited_rooms={"105", "106", "104"},
+        )
+        == "104:0:s0"
+    )
+    # After Kenneth, dining pays again.
+    assert (
+        _qualify(
+            prev_d,
+            cur_d,
+            skip_frames=120,
+            rewarded_cutscenes=AFTER_KENNETH,
+            visited_rooms={"105", "106", "104"},
+        )
+        == "105:0:s0"
+    )
+
+
 def test_min_skip_frames():
     prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93)
     cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
-    assert _qualify(prev, cur, skip_frames=19) is None
-    assert _qualify(prev, cur, skip_frames=20) == "105:0:s0"
+    assert _qualify(prev, cur, skip_frames=19, rewarded_cutscenes=AFTER_KENNETH) is None
+    assert (
+        _qualify(prev, cur, skip_frames=20, rewarded_cutscenes=AFTER_KENNETH)
+        == "105:0:s0"
+    )
 
 
 def test_examine_locked_text_same_room_does_not_pay():
@@ -59,9 +96,14 @@ def test_examine_locked_text_same_room_does_not_pay():
 
 
 def test_barry_scene_change_same_room_still_pays():
+    """Barry pays only after Kenneth (pre-Kenneth dining cutscenes gated)."""
     prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
     cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93)
-    assert _qualify(prev, cur, skip_frames=120) == "105:0:s0"
+    assert _qualify(prev, cur, skip_frames=120) is None
+    assert (
+        _qualify(prev, cur, skip_frames=120, rewarded_cutscenes=AFTER_KENNETH)
+        == "105:0:s0"
+    )
 
 
 def test_damage_disqualifies():
@@ -129,20 +171,30 @@ def test_same_room_second_cutscene_pays_new_sequence():
     """Barry talk then Barry zombie on return: same room:cam, still pays once each."""
     prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
     cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93)
-    assert _qualify(prev, cur) == "105:0:s0"
+    assert _qualify(prev, cur, rewarded_cutscenes=AFTER_KENNETH) == "105:0:s0"
     prev2 = make_state(room="105", cam_id=0, hp=96, scene_flag=0x91)
     cur2 = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
-    assert _qualify(prev2, cur2, rewarded_cutscenes={"105:0:s0"}) == "105:0:s1"
+    assert (
+        _qualify(
+            prev2,
+            cur2,
+            rewarded_cutscenes={*AFTER_KENNETH, "105:0:s0"},
+        )
+        == "105:0:s1"
+    )
 
     planner = make_planner()
     progress = ProgressTracker()
+    progress.rewarded_cutscenes.add("104:0:s0")
     cur0 = dict(cur)
     cur0["cutscene_key"] = "105:0:s0"
     _, bd0 = compute_reward(prev, cur0, planner, progress=progress, return_breakdown=True)
     assert bd0["new_cutscene"] == NEW_CUTSCENE_BONUS
 
     cur1 = dict(cur2)
-    cur1["cutscene_key"] = _qualify(prev2, cur2, rewarded_cutscenes=progress.rewarded_cutscenes)
+    cur1["cutscene_key"] = _qualify(
+        prev2, cur2, rewarded_cutscenes=progress.rewarded_cutscenes
+    )
     assert cur1["cutscene_key"] == "105:0:s1"
     _, bd1 = compute_reward(cur0, cur1, planner, progress=progress, return_breakdown=True)
     assert bd1["new_cutscene"] == NEW_CUTSCENE_BONUS
@@ -156,7 +208,7 @@ def test_same_room_cutscene_index_capped_after_s1():
         _qualify(
             prev,
             cur,
-            rewarded_cutscenes={"105:0:s0", "105:0:s1"},
+            rewarded_cutscenes={*AFTER_KENNETH, "105:0:s0", "105:0:s1"},
         )
         is None
     )
@@ -248,7 +300,10 @@ def test_story_use_from_menu_still_pays_cutscene():
     )
     cur = make_state(room="10F", cam_id=1, hp=96, scene_flag=0x93)
     cur["story_use_success"] = "music_notes@10F_piano"
-    assert _qualify(prev, cur, skip_frames=120) == "10F:1:s0"
+    assert (
+        _qualify(prev, cur, skip_frames=120, rewarded_cutscenes=AFTER_KENNETH)
+        == "10F:1:s0"
+    )
 
 
 def test_story_use_and_cutscene_both_pay_after_menu_skip():
@@ -278,9 +333,12 @@ def test_story_use_and_cutscene_both_pay_after_menu_skip():
         rewarded_site_ids=set(),
     )
     assert cur.get("story_use_success") == "music_notes@10F_piano"
-    cur["cutscene_key"] = _qualify(prev, cur, skip_frames=120)
+    cur["cutscene_key"] = _qualify(
+        prev, cur, skip_frames=120, rewarded_cutscenes=AFTER_KENNETH
+    )
     assert cur["cutscene_key"] == "10F:1:s0"
     progress = ProgressTracker()
+    progress.rewarded_cutscenes.add("104:0:s0")
     _, bd = compute_reward(
         prev, cur, make_planner(), progress=progress, return_breakdown=True
     )
@@ -320,9 +378,12 @@ def test_successful_music_notes_use_pays_cutscene_despite_idle_scene():
         rewarded_site_ids=set(),
     )
     assert cur.get("story_use_success") == "music_notes@10F_piano"
-    cur["cutscene_key"] = _qualify(prev, cur, skip_frames=357)
+    cur["cutscene_key"] = _qualify(
+        prev, cur, skip_frames=357, rewarded_cutscenes=AFTER_KENNETH
+    )
     assert cur["cutscene_key"] == "10F:1:s0"
     progress = ProgressTracker()
+    progress.rewarded_cutscenes.add("104:0:s0")
     _, bd = compute_reward(
         prev, cur, make_planner(), progress=progress, return_breakdown=True
     )
@@ -399,22 +460,43 @@ def test_room_change_door_skip_does_not_pay_cutscene():
     assert _qualify(prev, cur, skip_frames=508) is None
 
 
+def test_short_door_skip_reports_room_change_not_length():
+    """Patched doors burn few frames — unpaid reason must be door, not length."""
+    from re1_rl.cutscene_reward import cutscene_disqualify_reason, skip_session_kind
+
+    prev = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80)
+    cur = make_state(room="104", cam_id=0, hp=96, scene_flag=0x80)
+    assert skip_session_kind(prev, cur) == "door_room_change"
+    assert _qualify(prev, cur, skip_frames=4) is None
+    assert (
+        cutscene_disqualify_reason(
+            skip_frames=4, prev_state=prev, new_state=cur, episode_start_hp=96
+        )
+        == "room-change door skip (same-room scripts only)"
+    )
+
+
 def test_script_dialogue_msg_change_pays():
     prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)
     cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x80)
-    assert _qualify(prev, cur, skip_frames=120) == "105:0:s0"
+    assert _qualify(prev, cur, skip_frames=120) is None
+    assert (
+        _qualify(prev, cur, skip_frames=120, rewarded_cutscenes=AFTER_KENNETH)
+        == "105:0:s0"
+    )
 
 
 def test_dining_script_after_hall_blocked_until_kenneth():
     prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x91, msg_flag=0x00)
     cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x80)
+    # Hall visit alone is not enough — Kenneth must have paid.
     assert _qualify(
         prev,
         cur,
         skip_frames=120,
         rewarded_cutscenes={"105:0:s0"},
         visited_rooms={"105", "106"},
-    ) == "105:0:s1"
+    ) is None
     prev_w = make_state(room="105", cam_id=1, hp=96, scene_flag=0x91)
     cur_w = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80)
     assert _qualify(
@@ -423,6 +505,14 @@ def test_dining_script_after_hall_blocked_until_kenneth():
         skip_frames=120,
         rewarded_cutscenes=set(),
         visited_rooms={"105", "106"},
+    ) is None
+    # Wesker farm without ever visiting main hall (live shape).
+    assert _qualify(
+        prev_w,
+        cur_w,
+        skip_frames=120,
+        rewarded_cutscenes=set(),
+        visited_rooms={"105"},
     ) is None
     assert _qualify(
         prev,
@@ -434,6 +524,7 @@ def test_dining_script_after_hall_blocked_until_kenneth():
 
 
 def test_barry_cluster_pays_after_hall_visit():
+    """Barry cluster pays after Kenneth (hall visit alone insufficient)."""
     prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
     cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93)
     assert _qualify(
@@ -441,39 +532,182 @@ def test_barry_cluster_pays_after_hall_visit():
         cur,
         skip_frames=120,
         visited_rooms={"105", "106"},
+    ) is None
+    assert _qualify(
+        prev,
+        cur,
+        skip_frames=120,
+        rewarded_cutscenes=AFTER_KENNETH,
+        visited_rooms={"105", "106", "104"},
     ) == "105:0:s0"
 
 
 def test_barry_msg_dialogue_short_skip_still_pays():
-    """Barry talk is msg-only idle scene — exempt from 60-frame examine gate."""
+    """Msg-only Barry needs SCRIPT_DIALOGUE_MIN; shorter is interact/examine farm."""
     prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)
     cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x80)
-    assert _qualify(
-        prev,
-        cur,
-        skip_frames=25,
-        visited_rooms={"105", "106"},
-    ) == "105:0:s0"
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=25,
+            rewarded_cutscenes=AFTER_KENNETH,
+            visited_rooms={"105", "106", "104"},
+        )
+        is None
+    )
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=60,
+            rewarded_cutscenes=AFTER_KENNETH,
+            visited_rooms={"105", "106", "104"},
+        )
+        == "105:0:s0"
+    )
 
 
 def test_barry_walkup_msg_on_cam1_short_skip_pays():
-    """Barry often starts on cam 1/2 — corridor dialogue evidence must reach qualify."""
+    """Barry walk-up msg on cam 1/2: blocked pre-Kenneth (Wesker door farm).
+
+    Cam 0 msg dialogue still pays; cam 1/2 need Kenneth or scene movement.
+    """
     prev = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80, msg_flag=0x00)
     cur = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80, msg_flag=0x80)
-    assert _qualify(
-        prev,
-        cur,
-        skip_frames=25,
-        visited_rooms={"105"},
-    ) == "105:1:s0"
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=25,
+            visited_rooms={"105"},
+        )
+        is None
+    )
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=60,
+            visited_rooms={"105"},
+        )
+        is None
+    )
     prev2 = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00)
     cur2 = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x80)
-    assert _qualify(
-        prev2,
-        cur2,
-        skip_frames=25,
-        visited_rooms={"105"},
-    ) == "105:2:s0"
+    assert (
+        _qualify(
+            prev2,
+            cur2,
+            skip_frames=25,
+            visited_rooms={"105"},
+        )
+        is None
+    )
+    assert (
+        _qualify(
+            prev2,
+            cur2,
+            skip_frames=60,
+            visited_rooms={"105"},
+        )
+        is None
+    )
+    # Post-Kenneth: msg dialogue on cam 1/2 pays again.
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=60,
+            visited_rooms={"105", "104"},
+            rewarded_cutscenes={"104:0:s0"},
+        )
+        == "105:1:s0"
+    )
+
+
+def test_barry_idle_settle_pays_away_from_hall_door():
+    """Barry walk-up idle-settle: blocked pre-Kenneth; pays after Kenneth."""
+    from re1_rl.cutscene_reward import STORY_IDLE_SETTLE_MIN_SKIP_FRAMES
+
+    # Mid-dining (tea-door side), not hall-door Wesker zone.
+    prev = make_state(
+        room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00, x=15000, z=10000
+    )
+    cur = make_state(
+        room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00, x=15000, z=10000
+    )
+    assert _qualify(prev, cur, skip_frames=34, visited_rooms={"105"}) is None
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=STORY_IDLE_SETTLE_MIN_SKIP_FRAMES - 1,
+            visited_rooms={"105"},
+        )
+        is None
+    )
+    assert _qualify(prev, cur, skip_frames=1219, visited_rooms={"105"}) is None
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=1219,
+            rewarded_cutscenes=AFTER_KENNETH,
+            visited_rooms={"105", "104"},
+        )
+        == "105:2:s0"
+    )
+    # Cam0 scene change still pays after Kenneth.
+    prev_b = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
+    cur_b = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93)
+    assert _qualify(prev_b, cur_b, skip_frames=1223, visited_rooms={"105"}) is None
+    assert (
+        _qualify(
+            prev_b,
+            cur_b,
+            skip_frames=1223,
+            rewarded_cutscenes=AFTER_KENNETH,
+            visited_rooms={"105", "104"},
+        )
+        == "105:0:s0"
+    )
+
+
+def test_live_wesker_door_farm_pre_kenneth_blocked():
+    """Regression: dining→hall door interact spam before Kenneth (never visits 106)."""
+    # Default make_state pose is near 105→106 (Wesker zone).
+    prev = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00)
+    cur = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00)
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=1223,
+            visited_rooms={"105"},
+            rewarded_cutscenes=set(),
+        )
+        is None
+    )
+    # Explicit door coords (empirical 105→106).
+    prev_d = make_state(
+        room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00, x=30700, z=7200
+    )
+    cur_d = make_state(
+        room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00, x=30700, z=7200
+    )
+    assert _qualify(prev_d, cur_d, skip_frames=1223, visited_rooms={"105"}) is None
+    # After Kenneth, same shape at door may still be blocked by examine.
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=1223,
+            visited_rooms={"105", "104"},
+            rewarded_cutscenes={"104:0:s0"},
+        )
+        is None
+    )
 
 
 def test_kenneth_pays_with_main_hall_visited():
@@ -489,14 +723,38 @@ def test_kenneth_pays_with_main_hall_visited():
 
 
 def test_kenneth_msg_dialogue_short_skip_still_pays():
+    """Msg-only dialogue needs SCRIPT_DIALOGUE_MIN frames; scene beats stay short-ok."""
     prev = make_state(room="104", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)
     cur = make_state(room="104", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x40)
-    assert _qualify(
-        prev,
-        cur,
-        skip_frames=25,
-        visited_rooms={"105", "106", "104"},
-    ) == "104:0:s0"
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=25,
+            visited_rooms={"105", "106", "104"},
+        )
+        is None
+    )
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=60,
+            visited_rooms={"105", "106", "104"},
+        )
+        == "104:0:s0"
+    )
+    prev_s = make_state(room="104", cam_id=0, hp=96, scene_flag=0x84, msg_flag=0x00)
+    cur_s = make_state(room="104", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)
+    assert (
+        _qualify(
+            prev_s,
+            cur_s,
+            skip_frames=25,
+            visited_rooms={"105", "106", "104"},
+        )
+        == "104:0:s0"
+    )
 
 
 def test_same_camera_second_dining_beat_pays_after_kenneth():
@@ -534,20 +792,34 @@ def test_dining_idle_examine_spam_not_exempt():
     ) is None
 
 
+def test_barry_cam0_short_interact_msg_does_not_pay():
+    """Live farm: interact at dining cam0, skip_frames=34, mint 105:0:s0 — blocked."""
+    prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)
+    cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x80)
+    assert _qualify(prev, cur, skip_frames=34) is None
+    assert _qualify(prev, cur, skip_frames=34, visited_rooms={"105", "104"}) is None
+    # Pre-Kenneth: long msg still blocked. Post-Kenneth: pays.
+    assert _qualify(prev, cur, skip_frames=60) is None
+    assert (
+        _qualify(prev, cur, skip_frames=60, rewarded_cutscenes=AFTER_KENNETH)
+        == "105:0:s0"
+    )
+
+
 def test_same_camera_sequenced_beats_both_pay():
     prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)
     cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x80)
-    assert _qualify(prev, cur, skip_frames=25) == "105:0:s0"
+    assert _qualify(prev, cur, skip_frames=60, rewarded_cutscenes=AFTER_KENNETH) == "105:0:s0"
     assert _qualify(
         prev,
         cur,
-        skip_frames=25,
-        rewarded_cutscenes={"105:0:s0"},
+        skip_frames=60,
+        rewarded_cutscenes={*AFTER_KENNETH, "105:0:s0"},
     ) == "105:0:s1"
 
 
 def test_wesker_dining_cam_still_blocked_pre_kenneth():
-    """Examine exemption must not reopen Wesker dining before Kenneth."""
+    """Pre-Kenneth Wesker dining cams blocked with or without hall visit."""
     prev = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80, msg_flag=0x80)
     cur = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80, msg_flag=0x00)
     assert _qualify(
@@ -555,6 +827,12 @@ def test_wesker_dining_cam_still_blocked_pre_kenneth():
         cur,
         skip_frames=25,
         visited_rooms={"105", "106"},
+    ) is None
+    assert _qualify(
+        prev,
+        cur,
+        skip_frames=25,
+        visited_rooms={"105"},
     ) is None
 
 
@@ -568,6 +846,13 @@ def test_dining_return_skip_entry_same_room_blocked_after_hall():
         skip_frames=200,
         rewarded_cutscenes=set(),
         visited_rooms={"105", "106"},
+    ) is None
+    assert _qualify(
+        prev,
+        cur,
+        skip_frames=200,
+        rewarded_cutscenes=set(),
+        visited_rooms={"105"},
     ) is None
 
 

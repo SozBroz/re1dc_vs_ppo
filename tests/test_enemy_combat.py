@@ -29,12 +29,38 @@ def test_alive_enemy_count() -> None:
 
 def test_combat_enemy_count() -> None:
     enemies = [
-        {"slot": 0, "hp": 80, "combat_near": 1},
-        {"slot": 1, "hp": 50, "combat_near": 0},
-        {"slot": 2, "hp": 0, "combat_near": 1},
+        {"slot": 0, "hp": 80, "combat_near": 1, "knife_near": 1},
+        {"slot": 1, "hp": 50, "combat_near": 0, "knife_near": 0},
+        {"slot": 2, "hp": 0, "combat_near": 1, "knife_near": 1},
     ]
     assert combat_enemy_count(enemies) == 1
     assert combat_enemy_count([]) == 0
+
+
+def test_combat_enemy_count_knife_band() -> None:
+    """Knife band is tighter than gun; mid-range enemy arms gun only."""
+    enemies = [
+        {
+            "slot": 0,
+            "hp": 80,
+            "in_room": 1,
+            "combat_near": 1,
+            "knife_near": 0,
+            "dist": 6500,
+        },
+        {
+            "slot": 1,
+            "hp": 50,
+            "in_room": 1,
+            "combat_near": 1,
+            "knife_near": 1,
+            "dist": 1200,
+        },
+    ]
+    assert combat_enemy_count(enemies) == 2
+    assert combat_enemy_count(enemies, knife=True) == 1
+    assert combat_enemy_count(enemies, max_dist=5000) == 1
+    assert combat_enemy_count(enemies, max_dist=7000) == 2
 
 
 def test_enemy_hp_by_slot_skips_dead() -> None:
@@ -108,3 +134,17 @@ def test_room_change_does_not_count_unload_as_kill() -> None:
     out2 = apply_combat_step_fields(prev2, cur2)
     assert out2["enemy_damage"] == 0
     assert out2["enemy_kills"] == 0
+
+
+def test_interact_hp_flicker_does_not_pay_damage() -> None:
+    """Same-room HP drop without knife/attack (door interact) must not pay."""
+    prev = {"room_id": "105", "enemies": [{"slot": 0, "hp": 52}]}
+    cur = {"room_id": "105", "enemies": [{"slot": 0, "hp": 40}]}
+    out = apply_combat_step_fields(prev, cur)
+    assert out["enemy_damage"] == 0
+    assert out["enemy_kills"] == 0
+    assert out["combat_events"] == []
+    # Real hit still pays when attack/knife this step.
+    out_hit = apply_combat_step_fields(prev, cur, attack=True)
+    assert out_hit["enemy_damage"] == 12
+    assert out_hit["enemy_kills"] == 0

@@ -41,6 +41,25 @@ CURRICULUM = ROOT / "curriculum" / "m0_dining_to_main_hall.json"
 LOG = ROOT / "data" / "agent_ram_monitor.jsonl"
 
 
+def _round_nums(obj, ndigits: int = 5):
+    if isinstance(obj, bool) or obj is None:
+        return obj
+    if isinstance(obj, int):
+        return obj
+    if isinstance(obj, float):
+        return round(obj, ndigits)
+    if hasattr(obj, "item") and type(obj).__module__ == "numpy":
+        try:
+            return round(float(obj.item()), ndigits)
+        except (TypeError, ValueError):
+            return obj
+    if isinstance(obj, dict):
+        return {k: _round_nums(v, ndigits) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_round_nums(v, ndigits) for v in obj]
+    return obj
+
+
 def _snap(bridge: BizHawkClient, *, ep_hp: int) -> dict:
     from re1_rl.item_box import read_inventory
     from re1_rl.weapon_equip import read_equipped_slot_0based
@@ -146,27 +165,29 @@ def main() -> int:
             post = _snap(bridge, ep_hp=ep_hp)
             emu_f = int(info.get("state", {}).get("step_emulated_frames", 0))
             magic = info.get("magic_report") or {}
-            row = {
-                "step": step_i,
-                "action": action,
-                "action_name": ACTION_NAMES[action],
-                "reward": float(rew),
-                "episode_reward": episode_reward,
-                "session_reward": session_reward,
-                "rooms_visited": sorted(env.unwrapped._progress.visited_rooms),
-                "emu_frames": emu_f,
-                "wall_s": round(dt, 3),
-                "ram_pre": pre,
-                "ram_post": post,
-                "mask_pre": pre_mask,
-                "mask_post": _mask_bits(env),
-                "magic_report": magic,
-                "use_phase": info.get("use_phase"),
-                "equip_phase": info.get("equip_phase"),
-                "combine_phase": info.get("combine_phase"),
-                "terminated": term,
-                "truncated": trunc,
-            }
+            row = _round_nums(
+                {
+                    "step": step_i,
+                    "action": action,
+                    "action_name": ACTION_NAMES[action],
+                    "reward": float(rew),
+                    "episode_reward": episode_reward,
+                    "session_reward": session_reward,
+                    "rooms_visited": sorted(env.unwrapped._progress.visited_rooms),
+                    "emu_frames": emu_f,
+                    "wall_s": dt,
+                    "ram_pre": pre,
+                    "ram_post": post,
+                    "mask_pre": pre_mask,
+                    "mask_post": _mask_bits(env),
+                    "magic_report": magic,
+                    "use_phase": info.get("use_phase"),
+                    "equip_phase": info.get("equip_phase"),
+                    "combine_phase": info.get("combine_phase"),
+                    "terminated": term,
+                    "truncated": trunc,
+                }
+            )
             with LOG.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(row, default=str) + "\n")
 
@@ -197,13 +218,13 @@ def main() -> int:
                 f"[agent-ram] #{step_i:4d} {ACTION_NAMES[action]:<16} "
                 f"gm={post['game_mode']} hp={post['hp']:3d} "
                 f"eq=0x{post['equipped_weapon_id']:02X} "
-                f"emu_f={emu_f:3d} rew={rew:+.4f} "
+                f"emu_f={emu_f:3d} rew={float(rew):+.5f} "
                 f"{' '.join(flags)}",
                 flush=True,
             )
             print(
-                f"[agent-ram]        net_reward episode={episode_reward:+.4f} "
-                f"session={session_reward:+.4f} "
+                f"[agent-ram]        net_reward episode={episode_reward:+.5f} "
+                f"session={session_reward:+.5f} "
                 f"rooms={len(env.unwrapped._progress.visited_rooms)}",
                 flush=True,
             )
@@ -212,7 +233,7 @@ def main() -> int:
             if term or trunc:
                 print(
                     f"[agent-ram] episode end term={term} trunc={trunc} "
-                    f"net={episode_reward:+.4f} — reset",
+                    f"net={episode_reward:+.5f} — reset",
                     flush=True,
                 )
                 obs, _ = env.reset()

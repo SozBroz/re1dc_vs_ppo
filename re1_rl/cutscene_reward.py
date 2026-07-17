@@ -9,6 +9,7 @@ camera — those use ``room:cam:sN`` so a later beat still pays once
 
 from __future__ import annotations
 
+import math
 from collections.abc import Collection
 from typing import Any
 
@@ -36,6 +37,13 @@ DINING_ROOM = "105"
 TEA_ROOM = "104"
 BARRY_DINING_CAM = 0
 BARRY_DINING_CLUSTER_PREFIX = f"{DINING_ROOM}:{BARRY_DINING_CAM}:s"
+# Empirical 105→106 west double door (data/doors_empirical.json). Wesker fires
+# when interacting here before Kenneth; Barry walk-up is elsewhere in 105.
+DINING_HALL_DOOR_X = 30700
+DINING_HALL_DOOR_Z = 7200
+# Spawn (~31203,6892) sits inside this radius; Barry after walking into the
+# room does not.
+DINING_HALL_DOOR_RADIUS = 1800
 
 OPENING_PHASES_NO_REWARD: frozenset[str] = frozenset(
     {
@@ -238,6 +246,24 @@ def kenneth_tea_script_key(key: str) -> bool:
     return str(key).startswith(f"{TEA_ROOM}:") and ":s" in str(key)
 
 
+def pre_kenneth_all_cutscenes_disqualified(
+    *,
+    key: str,
+    rewarded_cutscenes: Collection[str] | None,
+    visited_rooms: Collection[str] | None = None,
+) -> bool:
+    """Block every cutscene payout until Kenneth pays — Kenneth itself exempt.
+
+    Imperator 2026-07-17: dining door / cam exploits farmed ``new_cutscene``
+    before the tea-room beat. Only ``104:*:sN`` may pay while Kenneth unseen.
+    """
+    if kenneth_cutscene_seen(rewarded_cutscenes, visited_rooms=visited_rooms):
+        return False
+    if kenneth_tea_script_key(key):
+        return False
+    return True
+
+
 def same_room_script_key(key: str) -> bool:
     """Sequenced same-camera beat (``room:cam:sN``) — not a door ``room:cam`` key."""
     return ":s" in str(key)
@@ -290,9 +316,11 @@ def canonical_story_script_key(
     prev_state: dict[str, Any] | None = None,
     new_state: dict[str, Any] | None = None,
 ) -> bool:
-    """Barry / Kenneth / dining-tea dialogue / same-camera sequel — examine-exempt.
+    """Barry / Kenneth / dining-tea dialogue / same-camera sequel markers.
 
-    Do not blanket-exempt idle dining ``:sN`` (interact spam would farm).
+    Used for diagnostics / story classification. Examine-text skips are blocked
+    outright in ``qualify_cutscene_reward`` (no cam-0 exemption) so interact
+    spam cannot mint ``new_cutscene``.
     """
     return (
         barry_dining_cluster_key(key)
@@ -322,21 +350,43 @@ def barry_dining_cluster_key(key: str) -> bool:
     return str(key).startswith(BARRY_DINING_CLUSTER_PREFIX)
 
 
+def near_dining_hall_door(state: dict[str, Any] | None) -> bool:
+    """True when pose is at the dining→main-hall door (Wesker trigger zone)."""
+    if not state:
+        return False
+    try:
+        x = float(state.get("x", 0) or 0)
+        z = float(state.get("z", 0) or 0)
+    except (TypeError, ValueError):
+        return False
+    return math.hypot(x - DINING_HALL_DOOR_X, z - DINING_HALL_DOOR_Z) <= float(
+        DINING_HALL_DOOR_RADIUS
+    )
+
+
 def pre_kenneth_dining_script_repeat_disqualified(
     *,
     key: str,
     rewarded_cutscenes: Collection[str] | None,
     visited_rooms: Collection[str] | None,
+    prev_state: dict[str, Any] | None = None,
+    new_state: dict[str, Any] | None = None,
 ) -> bool:
-    """Block post-hall Wesker dining beats; always allow Barry ``105:0:sN``."""
+    """Block pre-Kenneth Wesker door farm; allow Barry (cam0 + walk-up away from door).
+
+    Wesker is the dining→hall door interact (near 105→106). Barry walk-up is a
+    long same-room beat elsewhere in 105 (often cam1/2, idle endpoints).
+    """
     if kenneth_cutscene_seen(rewarded_cutscenes, visited_rooms=visited_rooms):
         return False
     if barry_dining_cluster_key(key):
         return False
-    visited = {str(r) for r in (visited_rooms or ())}
-    if MAIN_HALL_ROOM not in visited:
+    if not str(key).startswith(f"{DINING_ROOM}:"):
         return False
-    return str(key).startswith(f"{DINING_ROOM}:")
+    # Hall-door zone = Wesker (skill #2e). Away from door = Barry walk-up.
+    if near_dining_hall_door(prev_state) or near_dining_hall_door(new_state):
+        return True
+    return False
 
 
 def room_change_cutscene_disqualified(
@@ -362,6 +412,11 @@ def story_use_menu_cutscene_exempt(new_state: dict[str, Any] | None) -> bool:
 
 # Same-room dialogue with message-flag movement (Barry, …) — not examine spam.
 SCRIPT_DIALOGUE_MIN_SKIP_FRAMES = 60
+# Story scripts often settle with idle scene/msg at BOTH skip endpoints (live
+# Barry walk-up: 1223 frames @ 105 cam2, both ends 0x80). Interact/examine
+# farm is short (~34 frames). Existing examine unit cases use ~120 frames —
+# keep the idle-settle floor above that band.
+STORY_IDLE_SETTLE_MIN_SKIP_FRAMES = 300
 
 
 def examine_text_skip_disqualified(
@@ -378,7 +433,7 @@ def examine_text_skip_disqualified(
         return False
     prev_sf = int(prev_state.get("scene_flag", 0))
     new_sf = int(new_state.get("scene_flag", 0))
-    # Scripted scenes (Barry, Kenneth, …) move scene_flag off mansion idle.
+    # Scripted scenes (Barry, Kenneth, …) may move scene_flag mid-skip.
     if (prev_sf & SCENE_FLAG_MASK) or (new_sf & SCENE_FLAG_MASK):
         return False
     if prev_sf != new_sf:
@@ -390,6 +445,19 @@ def examine_text_skip_disqualified(
         and int(skip_frames) >= SCRIPT_DIALOGUE_MIN_SKIP_FRAMES
     ):
         return False
+    # Idle endpoints with no msg delta: short = examine/interact farm; long =
+    # story beat that returned to mansion idle (do not require endpoint evidence).
+    # Dining hall-door zone stays examine-blocked (Wesker). Barry walk-up is
+    # away from that door (live: 1219f @ cam2 after walking, not interact spam).
+    if int(skip_frames) >= STORY_IDLE_SETTLE_MIN_SKIP_FRAMES:
+        if room == TEA_ROOM:
+            pass  # keep tea idle-settle blocked; Kenneth moves scene_flag
+        elif room == DINING_ROOM and (
+            near_dining_hall_door(prev_state) or near_dining_hall_door(new_state)
+        ):
+            pass  # Wesker door farm
+        else:
+            return False
     # Typical in-room idle while walking / at a door.
     return (prev_sf & 0x7F) in (0, 0x80)
 
@@ -404,6 +472,10 @@ def qualify_cutscene_reward(
     visited_rooms: Collection[str] | None = None,
 ) -> str | None:
     """Return cutscene key if this skip earns ``new_cutscene`` bonus, else None."""
+    # Room A→B is door discovery (``new_room``), never a script beat — check
+    # before the length gate so short patched doors are not mislabeled.
+    if room_change_cutscene_disqualified(prev_state, new_state):
+        return None
     if int(skip_frames) < MIN_CUTSCENE_SKIP_FRAMES:
         return None
     key = cutscene_key_from_state(
@@ -445,17 +517,11 @@ def qualify_cutscene_reward(
         examine_text_skip_disqualified(
             prev_state, new_state, skip_frames=int(skip_frames)
         )
-        and not canonical_story_script_key(
-            key,
-            rewarded_cutscenes,
-            prev_state=prev_state,
-            new_state=new_state,
-        )
         and not story_use_menu_cutscene_exempt(new_state)
     ):
-        return None
-
-    if room_change_cutscene_disqualified(prev_state, new_state):
+        # Idle same-room examine / short msg: never pay. Cam-0 key exemptions
+        # farmed interact→cutscene (live: +1.0 for 105:0:s0 at skip_frames=34).
+        # Long idle-settle skips still clear via STORY_IDLE_SETTLE_MIN (Barry).
         return None
 
     if early_main_hall_before_kenneth_disqualified(
@@ -467,10 +533,19 @@ def qualify_cutscene_reward(
     ):
         return None
 
+    if pre_kenneth_all_cutscenes_disqualified(
+        key=key,
+        rewarded_cutscenes=rewarded_cutscenes,
+        visited_rooms=visited_rooms,
+    ):
+        return None
+
     if pre_kenneth_dining_script_repeat_disqualified(
         key=key,
         rewarded_cutscenes=rewarded_cutscenes,
         visited_rooms=visited_rooms,
+        prev_state=prev_state,
+        new_state=new_state,
     ):
         return None
 
@@ -496,6 +571,9 @@ def cutscene_disqualify_reason(
     visited_rooms: Collection[str] | None = None,
 ) -> str | None:
     """Human-readable reason when ``qualify_cutscene_reward`` returns None."""
+    # Structural door vs script before the length gate (patched doors are short).
+    if room_change_cutscene_disqualified(prev_state, new_state):
+        return "room-change door skip (same-room scripts only)"
     if int(skip_frames) < MIN_CUTSCENE_SKIP_FRAMES:
         return (
             f"skip_frames={int(skip_frames)} < {MIN_CUTSCENE_SKIP_FRAMES}"
@@ -543,21 +621,8 @@ def cutscene_disqualify_reason(
     if examine_text_skip_disqualified(
         prev_state, new_state, skip_frames=int(skip_frames)
     ):
-        key = cutscene_key_from_state(
-            prev_state, new_state, rewarded_cutscenes=rewarded_cutscenes
-        )
-        if (
-            key is None
-            or not canonical_story_script_key(
-                key,
-                rewarded_cutscenes,
-                prev_state=prev_state,
-                new_state=new_state,
-            )
-        ) and not story_use_menu_cutscene_exempt(new_state):
+        if not story_use_menu_cutscene_exempt(new_state):
             return "examine / locked text (same room, idle scene)"
-    if room_change_cutscene_disqualified(prev_state, new_state):
-        return "room-change door skip (same-room scripts only)"
     key = cutscene_key_from_state(
         prev_state, new_state, rewarded_cutscenes=rewarded_cutscenes
     )
@@ -569,12 +634,20 @@ def cutscene_disqualify_reason(
         visited_rooms=visited_rooms,
     ):
         return "main hall before Kenneth (106 keys gated)"
-    if key is not None and pre_kenneth_dining_script_repeat_disqualified(
+    if key is not None and pre_kenneth_all_cutscenes_disqualified(
         key=key,
         rewarded_cutscenes=rewarded_cutscenes,
         visited_rooms=visited_rooms,
     ):
-        return "dining script after main hall (pre-Kenneth)"
+        return "cutscene before Kenneth (only 104:*:sN may pay)"
+    if key is not None and pre_kenneth_dining_script_repeat_disqualified(
+        key=key,
+        rewarded_cutscenes=rewarded_cutscenes,
+        visited_rooms=visited_rooms,
+        prev_state=prev_state,
+        new_state=new_state,
+    ):
+        return "dining Wesker/hall-door zone before Kenneth"
     if key is not None and dining_tea_corridor_repeat_disqualified(
         key=key,
         prev_state=prev_state,
@@ -584,6 +657,16 @@ def cutscene_disqualify_reason(
     ):
         return "dining<->tea room repeat (Kenneth / multi-cam door farm)"
     return None
+
+
+def skip_session_kind(
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None,
+) -> str:
+    """Classify a settled skip: door room-change vs same-room script/examine."""
+    if room_change_cutscene_disqualified(prev_state, new_state):
+        return "door_room_change"
+    return "same_room_script"
 
 
 def format_cutscene_gate_panel(
@@ -601,6 +684,7 @@ def format_cutscene_gate_panel(
     proposed = cutscene_key_from_state(
         prev_state, new_state, rewarded_cutscenes=rewarded_cutscenes
     )
+    kind = skip_session_kind(prev_state, new_state)
     if qualified_key is None:
         qualified_key = qualify_cutscene_reward(
             skip_frames=skip_frames,
@@ -641,12 +725,12 @@ def format_cutscene_gate_panel(
     lines = [
         "[cutscene-gate]",
         (
-            f"  skip_frames={int(skip_frames)}  "
+            f"  kind={kind}  skip_frames={int(skip_frames)}  "
             f"prev={prev_r}:cam{prev_cam}  new={new_r}:cam{new_cam}"
         ),
         (
             f"  proposed_key={proposed!r}  qualified={qualified_key!r}  "
-            f"paid new_cutscene={paid:+.1f}"
+            f"paid new_cutscene={paid:+.5f}"
         ),
         (
             f"  kenneth_seen={kenneth}  "
@@ -662,4 +746,6 @@ def format_cutscene_gate_panel(
             lines.append(f"  unpaid_reason: duplicate key {proposed!r} this episode")
         elif qualified_key is None and not why:
             lines.append("  unpaid_reason: qualified key is None (no gate match)")
+        else:
+            lines.append("  unpaid_reason: (unknown)")
     return "\n".join(lines)

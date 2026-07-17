@@ -16,13 +16,31 @@ def alive_enemy_count(enemies: list[dict[str, Any]] | None) -> int:
     return n
 
 
-def combat_enemy_count(enemies: list[dict[str, Any]] | None) -> int:
-    """Enemies near enough to justify knife/attack (in-room + within combat range)."""
+def combat_enemy_count(
+    enemies: list[dict[str, Any]] | None,
+    *,
+    max_dist: float | None = None,
+    knife: bool = False,
+) -> int:
+    """Enemies near enough to justify knife/attack.
+
+    Default: ``combat_near`` (gun band, ``ENEMY_COMBAT_NEAR_DIST``).
+    ``knife=True`` uses ``knife_near`` (``ENEMY_KNIFE_COMBAT_NEAR_DIST``).
+    ``max_dist`` overrides both and requires ``in_room`` + stored ``dist``.
+    """
     n = 0
     for ent in enemies or []:
         if int(ent.get("hp", 0)) <= 0:
             continue
-        if int(ent.get("combat_near", 0)):
+        if max_dist is not None:
+            if not int(ent.get("in_room", ent.get("alive", 0))):
+                continue
+            if float(ent.get("dist", 1e18)) >= float(max_dist):
+                continue
+            n += 1
+            continue
+        flag = "knife_near" if knife else "combat_near"
+        if int(ent.get(flag, 0)):
             n += 1
     return n
 
@@ -119,11 +137,20 @@ def apply_combat_step_fields(
 
     Room changes unload the previous room's enemy table — that must not count as
     kills (door-loop farm: exit tea room → Kenneth slot vanishes → +damage/+kill).
+
+    HP flicker / despawn during interact / door / cutscene (no knife or attack
+    this step) must not pay either — live dining door interact minted +0.06.
     """
     out = dict(state)
     prev_room = str(prev_state.get("room_id", "") or "")
     curr_room = str(out.get("room_id", "") or "")
     if prev_room and curr_room and prev_room != curr_room:
+        out["enemy_damage"] = 0
+        out["enemy_kills"] = 0
+        out["combat_events"] = []
+        return out
+
+    if not knife and not attack:
         out["enemy_damage"] = 0
         out["enemy_kills"] = 0
         out["combat_events"] = []
@@ -138,7 +165,7 @@ def apply_combat_step_fields(
     out["enemy_damage"] = enemy_damage
     out["enemy_kills"] = enemy_kills
     out["combat_events"] = combat_events
-    if (knife or attack) and enemy_damage == 0 and enemy_kills == 0:
+    if enemy_damage == 0 and enemy_kills == 0:
         out["knife_swing_missed"] = knife
         out["attack_missed"] = attack
     return out
