@@ -148,6 +148,20 @@ def test_same_room_second_cutscene_pays_new_sequence():
     assert bd1["new_cutscene"] == NEW_CUTSCENE_BONUS
 
 
+def test_same_room_cutscene_index_capped_after_s1():
+    """scene_flag flicker must not mint unbounded :s2+: cutscene bonuses."""
+    prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x91)
+    cur = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
+    assert (
+        _qualify(
+            prev,
+            cur,
+            rewarded_cutscenes={"105:0:s0", "105:0:s1"},
+        )
+        is None
+    )
+
+
 def test_opening_gameplay_teaser_excluded():
     prev = make_state(
         room="106",

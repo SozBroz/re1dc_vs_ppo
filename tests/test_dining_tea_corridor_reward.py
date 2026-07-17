@@ -92,3 +92,54 @@ def test_dining_tea_loop_does_not_farm_cutscenes():
         total_repeat += bd6["new_cutscene"]
 
     assert total_repeat == 0.0
+
+
+def test_dining_same_cam_sn_farm_blocked_after_corridor_known():
+    """After corridor known, dining ``:s1+`` at non-Barry cams must not farm."""
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    progress.first_visit("104")
+    progress.rewarded_cutscenes.add("104:0:s0")
+    progress.rewarded_cutscenes.add("105:2:s0")
+
+    prev = make_state(room="105", cam_id=2, hp=96, scene_flag=0x93)
+    cur = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80)
+    cur["cutscene_key"] = _qualify(prev, cur, progress)
+    assert cur["cutscene_key"] is None
+    _, bd = compute_reward(
+        prev, cur, make_planner(), progress=progress, return_breakdown=True
+    )
+    assert bd["new_cutscene"] == 0.0
+
+
+def test_async_post_skip_door_crossing_no_cutscene():
+    """Training post-skip sync: 105→104 pays new_room only (harness parity)."""
+    from unittest.mock import MagicMock
+
+    from re1_rl.env import RE1Env
+    from re1_rl.reward import NEW_CUTSCENE_BONUS, NEW_ROOM_BONUS
+
+    env = RE1Env.__new__(RE1Env)
+    env._progress = ProgressTracker()
+    env._progress.first_visit("105")
+    env._planner = make_planner()
+    env.graph = None
+    env._stage = {"success_room": None}
+    env._episode_start_hp = 96
+    env._episode_min_hp = 96
+    env._post_skip_reward = 0.0
+    env._post_skip_bd = {}
+    env._last_skip_frames = 80
+    env._inventory_before_skip = None
+    env._pending_skip_room_crossings = []
+    env._cutscene_skip_entry_prev = make_state(
+        room="105", cam_id=2, hp=96, scene_flag=0x80
+    )
+    env._prev_state = dict(env._cutscene_skip_entry_prev)
+    env._read_state = MagicMock(
+        return_value=make_state(room="104", cam_id=0, hp=96, scene_flag=0x80)
+    )
+    env._apply_post_skip_sync()
+    assert env._post_skip_bd.get("new_room") == NEW_ROOM_BONUS
+    assert env._post_skip_bd.get("new_cutscene", 0.0) == 0.0
+    assert env._post_skip_bd.get("new_cutscene", 0.0) != NEW_CUTSCENE_BONUS

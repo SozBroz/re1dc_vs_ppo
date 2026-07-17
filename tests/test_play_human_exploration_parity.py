@@ -38,8 +38,8 @@ def test_cutscene_reward_needs_accumulated_skip_frames():
     """Per-chunk 20f burns must not pay; 30f+ session total must."""
     planner = make_planner()
     progress = ProgressTracker()
-    prev = make_state(room="105", cam_id=1, hp=96)
-    cur = make_state(room="105", cam_id=1, hp=96)
+    prev = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80)
+    cur = make_state(room="105", cam_id=1, hp=96, scene_flag=0x93)
 
     cur20 = dict(cur)
     cur20["cutscene_key"] = None

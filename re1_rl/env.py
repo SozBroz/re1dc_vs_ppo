@@ -325,6 +325,11 @@ class RE1Env(gym.Env):
         self._post_skip_sync = False
         self._post_skip_reward = 0.0
         self._post_skip_bd: dict[str, float] = {}
+        self._cutscene_skip_entry_prev: dict[str, Any] | None = None
+        # (entry_prev, crossing_state) queued by bg skip; credited on main thread.
+        self._pending_skip_room_crossings: list[
+            tuple[dict[str, Any], dict[str, Any]]
+        ] = []
 
     def _load_stage(self) -> None:
         with self.curriculum_path.open(encoding="utf-8") as f:
@@ -526,6 +531,8 @@ class RE1Env(gym.Env):
         self._post_skip_sync = False
         self._post_skip_reward = 0.0
         self._post_skip_bd = {}
+        self._cutscene_skip_entry_prev = None
+        self._pending_skip_room_crossings = []
         self._load_stage()
         assert self._planner is not None
 
@@ -623,6 +630,10 @@ class RE1Env(gym.Env):
                 continue
             if not self._skipping_flag:
                 self._last_skip_frames = 0
+                # Freeze skip-entry pose for reward gating (harness cutscene_skip_entry_prev).
+                self._cutscene_skip_entry_prev = (
+                    dict(self._prev_state) if self._prev_state else None
+                )
                 # Inventory snapshot for story USE / gold_emblem put-back annotate.
                 try:
                     from re1_rl.item_box import read_inventory
@@ -634,7 +645,11 @@ class RE1Env(gym.Env):
                 except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
                     self._inventory_before_skip = None
             self._skipping_flag = True
+            # Chunk like play_human cutscene_skip_chunk so mid-skip room crossings
+            # can restart the script segment (door = new_room, not new_cutscene).
+            chunk = int(getattr(self._ram_skip, "skip_chunk", 600) or 600)
             burned, died = self._ram_skip.skip_uncontrolled(
+                max_frames=chunk,
                 prev_hp=self._prev_hp,
                 episode_start_hp=getattr(self, "_episode_start_hp", 0),
             )
@@ -645,6 +660,11 @@ class RE1Env(gym.Env):
                 died = self._poll_death_during_skip()
             if died:
                 self._bg_death = True
+            # Detect door crossing on bg thread; credit on main thread only.
+            try:
+                self._note_async_skip_room_crossing()
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                pass
             if not self._probe_needs_skip():
                 self._skipping_flag = False
                 self._post_skip_sync = True
@@ -675,14 +695,89 @@ class RE1Env(gym.Env):
             visited_rooms=self._progress.visited_rooms,
         )
 
+    def _merge_post_skip_breakdown(
+        self, reward: float, bd: dict[str, float]
+    ) -> None:
+        self._post_skip_reward = float(
+            getattr(self, "_post_skip_reward", 0.0)
+        ) + float(reward)
+        merged = dict(getattr(self, "_post_skip_bd", {}) or {})
+        for k, v in bd.items():
+            merged[k] = float(merged.get(k, 0.0)) + float(v)
+        self._post_skip_bd = merged
+
+    def _note_async_skip_room_crossing(self) -> None:
+        """Bg-thread safe: queue door crossing + restart script segment counters."""
+        entry_prev = getattr(self, "_cutscene_skip_entry_prev", None)
+        if not entry_prev:
+            return
+        try:
+            state = self._read_state(track_items=False)
+        except (OSError, RuntimeError, ValueError):
+            return
+        if str(state.get("room_id", "")) == str(entry_prev.get("room_id", "")):
+            return
+        crossing = dict(state)
+        self._pending_skip_room_crossings.append((dict(entry_prev), crossing))
+        # Restart segment immediately so post-door script frames (Kenneth) accrue
+        # against the destination room — same as play_human mid-chunk credit.
+        self._cutscene_skip_entry_prev = dict(crossing)
+        self._last_skip_frames = 0
+
+    def _credit_async_skip_room_crossing(self) -> None:
+        """Harness parity: door mid-skip pays ``new_room`` only (main thread)."""
+        # Also catch a crossing on the final chunk if bg note missed it.
+        entry_prev = getattr(self, "_cutscene_skip_entry_prev", None)
+        if entry_prev is not None and not self._pending_skip_room_crossings:
+            try:
+                state = self._read_state(track_items=False)
+            except (OSError, RuntimeError, ValueError):
+                state = None
+            if state is not None and str(state.get("room_id", "")) != str(
+                entry_prev.get("room_id", "")
+            ):
+                self._pending_skip_room_crossings.append(
+                    (dict(entry_prev), dict(state))
+                )
+                self._cutscene_skip_entry_prev = dict(state)
+                self._last_skip_frames = 0
+
+        while self._pending_skip_room_crossings:
+            entry, crossing = self._pending_skip_room_crossings.pop(0)
+            crossing = dict(crossing)
+            crossing["cutscene_key"] = None
+            self._progress.record_in_control_step(
+                str(crossing.get("room_id", "")),
+                bool(crossing.get("in_control", True)),
+            )
+            reward, bd = compute_reward(
+                entry,
+                crossing,
+                self._planner,
+                progress=self._progress,
+                graph=self.graph,
+                success_room=self._stage.get("success_room"),
+                return_breakdown=True,
+            )
+            self._merge_post_skip_breakdown(float(reward), dict(bd))
+            self._prev_state = dict(crossing)
+
     def _apply_post_skip_sync(self) -> None:
-        """Credit pickups that finished while async skip was running."""
+        """Credit pickups / cutscenes that finished while async skip was running."""
+        from re1_rl.cutscene_reward import room_change_cutscene_disqualified
         from re1_rl.story_item_use import annotate_story_use_success
+
+        # Flush any door crossing (harness _credit_skip_room_crossing).
+        try:
+            self._credit_async_skip_room_crossing()
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            pass
 
         state = self._read_state(track_items=True)
         state = dict(state)
         inv_after = None
         inv_before = getattr(self, "_inventory_before_skip", None)
+        entry_prev = getattr(self, "_cutscene_skip_entry_prev", None) or self._prev_state
         try:
             from re1_rl.item_box import read_inventory
             from re1_rl.weapon_equip import policy_inventory
@@ -693,18 +788,21 @@ class RE1Env(gym.Env):
         # Sets story_use_success and/or gold_emblem_return from inv delta.
         state = annotate_story_use_success(
             state,
-            prev_state=self._prev_state,
+            prev_state=entry_prev,
             inventory_before=inv_before,
             inventory_after=inv_after,
             rewarded_site_ids=self._progress.rewarded_story_uses,
         )
         self._inventory_before_skip = None
-        entry_prev = self._prev_state
-        state["cutscene_key"] = self._qualify_cutscene_reward(
-            int(getattr(self, "_last_skip_frames", 0)),
-            entry_prev,
-            state,
-        )
+        # Room-change door skips: discovery is new_room only (never new_cutscene).
+        if room_change_cutscene_disqualified(entry_prev, state):
+            state["cutscene_key"] = None
+        else:
+            state["cutscene_key"] = self._qualify_cutscene_reward(
+                int(getattr(self, "_last_skip_frames", 0)),
+                entry_prev,
+                state,
+            )
         reward, bd = compute_reward(
             entry_prev,
             state,
@@ -714,9 +812,11 @@ class RE1Env(gym.Env):
             success_room=self._stage.get("success_room"),
             return_breakdown=True,
         )
-        self._post_skip_reward = float(reward)
-        self._post_skip_bd = dict(bd)
+        self._merge_post_skip_breakdown(float(reward), dict(bd))
         self._prev_state = state
+        self._cutscene_skip_entry_prev = None
+        self._pending_skip_room_crossings = []
+        self._last_skip_frames = 0
         if state["hp"] > 0:
             self._prev_hp = state["hp"]
         hp_now = int(state["hp"])
@@ -792,6 +892,11 @@ class RE1Env(gym.Env):
                 self._skipping_flag = False
                 return death
         self._step_count += 1
+        # Main-thread flush of door crossings noted by the bg skip worker.
+        try:
+            self._credit_async_skip_room_crossing()
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            pass
         if self._skip_cache_obs is None:
             try:
                 self._refresh_skip_cache()

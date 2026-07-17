@@ -3,7 +3,8 @@
 Door / room-change skips use ``room:cam`` (blocks re-crossing the same door).
 
 Same-room scripted beats (Barry talk, then Barry zombie kill on return) share a
-camera — those use ``room:cam:sN`` so a later beat still pays once.
+camera — those use ``room:cam:sN`` so a later beat still pays once
+(``MAX_SAME_ROOM_CUTSCENE_INDEX`` caps N; default allows s0 and s1 only).
 """
 
 from __future__ import annotations
@@ -18,6 +19,11 @@ from re1_rl.ram_skip import in_game_menu_from_ram
 
 # Emulated frames burned in skip_uncontrolled before a cutscene counts.
 MIN_CUTSCENE_SKIP_FRAMES = 20
+
+# Same-room scripted beats use ``room:cam:sN``. Cap N so scene_flag flicker /
+# dialogue loops cannot mint unbounded +NEW_CUTSCENE_BONUS in 104/105.
+# s0+s1 covers Barry talk then Barry-zombie return (see tests).
+MAX_SAME_ROOM_CUTSCENE_INDEX = 1
 
 # Boot / attract spans — never pay exploration cutscene bonus.
 # In-mansion Barry/Wesker scenes (``mansion_intro_*``) are real gameplay cutscenes
@@ -93,6 +99,8 @@ def cutscene_key_from_state(
     if new_room and new_room != room:
         return door_key
     n = same_room_cutscene_index(room, cam, rewarded_cutscenes)
+    if n > MAX_SAME_ROOM_CUTSCENE_INDEX:
+        return None
     return f"{room}:{cam}:s{n}"
 
 
@@ -182,7 +190,12 @@ def dining_tea_corridor_repeat_disqualified(
     rewarded_cutscenes: Collection[str] | None,
     visited_rooms: Collection[str] | None,
 ) -> bool:
-    """Block dining↔tea-room cutscene farm (multi-cam doors + Kenneth sN replay)."""
+    """Block dining↔tea-room cutscene farm (multi-cam doors + Kenneth sN replay).
+
+    Door re-crosses are also split by harness/training mid-skip room-crossing
+    credit (``new_room`` only, script segment reset) so settle frames do not
+    inherit the door span as a same-room ``room:cam:sN`` cutscene.
+    """
     visited = {str(r) for r in (visited_rooms or ())}
     if DINING_ROOM not in visited or TEA_ROOM not in visited:
         return False
@@ -203,6 +216,19 @@ def dining_tea_corridor_repeat_disqualified(
     if str(key).startswith(f"{TEA_ROOM}:") and ":s" in str(key):
         if any(k.startswith(f"{TEA_ROOM}:") and ":s" in k for k in rewarded):
             return True
+
+    # After the corridor is known, block unbounded same-cam dining sN farm
+    # (door settle re-triggers). First beat per cam (``:s0``) and Barry cluster
+    # still pay; ``:s1+`` at non-Barry cams does not.
+    if (
+        prev_r == DINING_ROOM
+        and new_r == DINING_ROOM
+        and str(key).startswith(f"{DINING_ROOM}:")
+        and ":s" in str(key)
+        and not barry_dining_cluster_key(key)
+        and not str(key).endswith(":s0")
+    ):
+        return True
 
     return False
 
@@ -441,6 +467,18 @@ def cutscene_disqualify_reason(
     if cutscene_key_from_state(
         prev_state, new_state, rewarded_cutscenes=rewarded_cutscenes
     ) is None:
+        base = cutscene_room_cam(prev_state)
+        if base is not None:
+            room, cam = base
+            new_room = str((new_state or {}).get("room_id", "") or "")
+            if not new_room or new_room == room:
+                n = same_room_cutscene_index(room, cam, rewarded_cutscenes)
+                if n > MAX_SAME_ROOM_CUTSCENE_INDEX:
+                    return (
+                        f"same-room cutscene index {n} > "
+                        f"MAX_SAME_ROOM_CUTSCENE_INDEX="
+                        f"{MAX_SAME_ROOM_CUTSCENE_INDEX}"
+                    )
         return "no room:cam key at skip entry"
     hp_before = int((prev_state or {}).get("hp", 0))
     hp_after = int((new_state or {}).get("hp", 0))
