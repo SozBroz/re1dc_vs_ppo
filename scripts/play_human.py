@@ -1155,6 +1155,9 @@ def format_reward_panel(
     elif breakdown.get("gold_emblem_return", 0.0):
         lines.append("Gold emblem put back at 10F alcove (no wooden swap).")
         interesting = True
+    elif breakdown.get("shotgun_return", 0.0):
+        lines.append("Shotgun put back on the wall.")
+        interesting = True
     elif breakdown.get("new_weapon", 0.0):
         new_items = state.get("new_items") or []
         if new_items:

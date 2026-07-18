@@ -51,6 +51,34 @@ def test_tracker_ever_held_survives_banking():
     assert "[x]" in checklist and "emblem" in checklist
 
 
+def test_tracker_repeat_pickups_by_positive_quantity_delta():
+    tracker = ItemTracker(
+        build_item_todo(ROUTE),
+        repeat_pickups=True,
+        once_only=frozenset({"emblem"}),
+        presence_only=frozenset({"beretta", "shotgun"}),
+    )
+    assert tracker.update(
+        [("beretta", 15), ("emblem", 1), ("green_herb", 1)]
+    ) == {"beretta", "emblem", "green_herb"}
+
+    # A second herb/bullet pickup pays; a weapon reload does not.
+    assert tracker.update(
+        [
+            ("beretta", 30),
+            ("emblem", 1),
+            ("green_herb", 2),
+            ("handgun_bullets", 15),
+        ]
+    ) == {"green_herb", "handgun_bullets"}
+
+    # Key-item re-grab remains once-only. Non-key re-grab is a pickup.
+    assert tracker.update([("beretta", 30)]) == set()
+    assert tracker.update(
+        [("beretta", 30), ("emblem", 1), ("green_herb", 1)]
+    ) == {"green_herb"}
+
+
 def test_room_items_remaining(tmp_path):
     table = {
         "_meta": {"source": "test"},

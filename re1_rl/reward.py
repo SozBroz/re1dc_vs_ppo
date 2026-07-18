@@ -52,8 +52,12 @@ STORY_ITEM_USE_BONUS = CHECKPOINT_REWARD
 # 10F alcove: put gold_emblem back without leaving the wooden emblem (anti-hack).
 # Intended path is USE emblem (wooden) at the same stand → STORY_ITEM_USE_BONUS.
 GOLD_EMBLEM_RETURN_PENALTY = -2.0 * CHECKPOINT_REWARD
-# First pickup of a gun/knife-class weapon this episode (not ammo).
+# Every physical pickup of a gun/knife-class weapon (not ammo).
 NEW_WEAPON_PICKUP_BONUS = CHECKPOINT_REWARD
+# The wall rack can toggle forever: taking the shotgun pays; replacing it
+# removes exactly that reward. Repeating the loop is net zero before step cost.
+SHOTGUN_RETURN_PENALTY = -NEW_WEAPON_PICKUP_BONUS
+SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # Idle contempt: no new room / cutscene / key item / weapon for SOFTLOCK_FRAME_THRESHOLD
 # emulated frames → episode truncation (env). Bulk softlock at timeout only
 # (spread across n_steps on the learner; no per-step stagnant tax).
@@ -185,6 +189,7 @@ def compute_reward(
         "key_item": 0.0,
         "story_use": 0.0,
         "gold_emblem_return": 0.0,
+        "shotgun_return": 0.0,
         "new_weapon": 0.0,
         "success_room": 0.0,
         "hp": 0.0,
@@ -270,6 +275,22 @@ def compute_reward(
             bd["new_weapon"] += NEW_WEAPON_PICKUP_BONUS
         else:
             bd["item"] += ITEM_PICKUP_BONUS
+
+    prev_inventory = {
+        canonical_item(str(name)) for name in prev_state.get("inventory", [])
+    }
+    inventory = {
+        canonical_item(str(name)) for name in state.get("inventory", [])
+    }
+    room = str(state.get("room_id", "") or "")
+    if (
+        room in SHOTGUN_RACK_ROOMS
+        and "shotgun" in prev_inventory
+        and "shotgun" not in inventory
+        and not state.get("dead")
+        and int(state.get("hp", 0) or 0) > 0
+    ):
+        bd["shotgun_return"] = SHOTGUN_RETURN_PENALTY
 
     story_use_site = state.get("story_use_success")
     if story_use_site and progress is not None:

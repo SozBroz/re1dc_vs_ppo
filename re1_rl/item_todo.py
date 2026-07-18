@@ -167,15 +167,45 @@ class ItemTracker:
     todo: list[TodoEntry]
     ever_held: set[str] = field(default_factory=set)
     inventory: list[tuple[str, int]] = field(default_factory=list)
+    repeat_pickups: bool = False
+    once_only: frozenset[str] = frozenset()
+    presence_only: frozenset[str] = frozenset()
+    last_newly_held: set[str] = field(default_factory=set)
+    last_reappeared: set[str] = field(default_factory=set)
 
     def update(self, inventory: list[tuple[str, int]]) -> set[str]:
-        """Feed the current inventory read; returns newly acquired item names
-        (canonicalized via ITEM_ALIASES)."""
+        """Return first-held names, or positive inventory deltas when enabled."""
+        prev_qty: dict[str, int] = {}
+        for name, qty in self.inventory:
+            canonical = canonical_item(name)
+            prev_qty[canonical] = prev_qty.get(canonical, 0) + max(int(qty), 0)
+        curr_qty: dict[str, int] = {}
+        for name, qty in inventory:
+            canonical = canonical_item(name)
+            curr_qty[canonical] = curr_qty.get(canonical, 0) + max(int(qty), 0)
         self.inventory = list(inventory)
-        names = {canonical_item(name) for name, _ in inventory}
+        names = set(curr_qty)
         new = names - self.ever_held
+        self.last_newly_held = set(new)
+        self.last_reappeared = {
+            name
+            for name, qty in curr_qty.items()
+            if qty > 0 and prev_qty.get(name, 0) <= 0
+        }
         self.ever_held |= new
-        return new
+        if not self.repeat_pickups:
+            return new
+        increased = {
+            name
+            for name, qty in curr_qty.items()
+            if qty > prev_qty.get(name, 0)
+        }
+        return {
+            name
+            for name in increased
+            if (name not in self.once_only or name in self.last_newly_held)
+            and (name not in self.presence_only or name in self.last_reappeared)
+        }
 
     def acquired(self) -> list[TodoEntry]:
         return [t for t in self.todo if t.item in self.ever_held]

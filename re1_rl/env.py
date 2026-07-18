@@ -67,7 +67,7 @@ from re1_rl.episode_history import (
 )
 from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM, encode_cutscene_ledger
 from re1_rl.item_affordances import AFFORDANCES_DIM, encode_affordances
-from re1_rl.key_items import KEYS_HELD_DIM, encode_keys_held
+from re1_rl.key_items import KEY_ITEM_NAMES, KEYS_HELD_DIM, encode_keys_held
 from re1_rl.maps_files import MAPS_FILES_DIM, encode_maps_files_flags
 from re1_rl.milestone_features import MILESTONE_DIM, encode_milestones
 from re1_rl.room_signature import ENEMY_ROSTER_DIM, RoomEnemyRoster
@@ -341,7 +341,19 @@ class RE1Env(gym.Env):
             route_steps=self._stage.get("route_steps"),
             terminal_goal_room=self._stage.get("success_room"),
         )
-        self._items = ItemTracker(todo=build_item_todo(route_path))
+        from re1_rl.memory_map import ITEM_IDS, WEAPON_ITEM_IDS
+
+        weapons = frozenset(
+            canonical_item(ITEM_IDS[item_id])
+            for item_id in WEAPON_ITEM_IDS
+            if item_id in ITEM_IDS
+        )
+        self._items = ItemTracker(
+            todo=build_item_todo(route_path),
+            repeat_pickups=True,
+            once_only=frozenset(KEY_ITEM_NAMES),
+            presence_only=weapons,
+        )
         self._encoder = ObsEncoder(
             self.project_root / "data" / "rooms.json",
             self.graph,
@@ -557,6 +569,11 @@ class RE1Env(gym.Env):
         self._combine_phase = 0
         self._combine_slot_a = None
         self._last_skip_frames = 0
+        self._last_settled_skip_frames = 0
+        self._last_settled_cutscene_key = None
+        self._last_settled_skip_prev = None
+        self._last_settled_skip_new = None
+        self._last_settled_skip_kind = None
         self._init_anim_history()
 
         self._step_count = 0
@@ -816,8 +833,15 @@ class RE1Env(gym.Env):
         self._prev_state = state
         self._cutscene_skip_entry_prev = None
         self._pending_skip_room_crossings = []
-        # Keep for monitor/harness gate panels after session counters reset.
+        # Stash for monitor/harness before session counters reset. Do not let
+        # gate panels fall back to step_emulated_frames (lies as "4 < 20").
+        from re1_rl.cutscene_reward import skip_session_kind
+
         self._last_settled_skip_frames = int(getattr(self, "_last_skip_frames", 0) or 0)
+        self._last_settled_cutscene_key = state.get("cutscene_key")
+        self._last_settled_skip_prev = dict(entry_prev) if entry_prev else None
+        self._last_settled_skip_new = dict(state)
+        self._last_settled_skip_kind = skip_session_kind(entry_prev, state)
         self._last_skip_frames = 0
         if state["hp"] > 0:
             self._prev_hp = state["hp"]
@@ -1532,6 +1556,7 @@ class RE1Env(gym.Env):
         rewarded_story_uses = (
             progress.rewarded_story_uses if progress is not None else None
         )
+        enemies = pose.get("enemies")
         return build_action_mask(
             int(self.action_space.n),
             self._prev_action,
@@ -1551,7 +1576,9 @@ class RE1Env(gym.Env):
             poisoned=bool(pose.get("poisoned", False)),
             episode_start_hp=int(getattr(self, "_episode_start_hp", 0) or 0),
             in_control=bool(pose.get("in_control", True)),
-            alive_enemies_in_room=combat_enemy_count(pose.get("enemies")),
+            alive_enemies_in_room=combat_enemy_count(enemies),
+            knife_enemies_near=combat_enemy_count(enemies, knife=True),
+            gun_enemies_near=combat_enemy_count(enemies),
             mask_combat_without_enemies=MASK_ATTACK_WITHOUT_ENEMIES,
             room_id=str(pose.get("room_id", "") or "") or None,
             player_x=pose.get("x"),
@@ -1688,13 +1715,14 @@ class RE1Env(gym.Env):
             if int(action) == INTERACT_ACTION:
                 hold_n = max(hold_n, self.frame_skip + INTERACT_HOLD_EXTRA_FRAMES)
             step_emulated_frames = hold_n
-            stride = 4 if hold_n > self.frame_skip else 0
+            # Mid-hold Lua ring_stride PNG→b64 is expensive and redundant with
+            # Python capture_final MMF (one shot at end of the hold).
             _, died_during_step = self.bridge.step(
                 n=hold_n,
                 sticky=sticky,
                 pulse=pulse,
                 pulse_hold=pulse_hold,
-                ring_stride=stride,
+                ring_stride=0,
                 capture_final=True,
             )
         if died_during_step:

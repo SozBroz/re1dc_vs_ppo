@@ -110,11 +110,12 @@ def _hits(breakdown: dict[str, Any] | None) -> dict[str, float]:
 
 # Exploration reward schema (skill re-exploration-rewards). Flag payouts that
 # defy the published buckets / hard exceptions — for operator triage only.
-_LARGE_OK = frozenset({"new_room", "new_cutscene", "key_item", "story_use"})
+_LARGE_OK = frozenset(
+    {"new_room", "new_cutscene", "key_item", "story_use", "new_weapon"}
+)
 _MODEST_OK = frozenset(
     {
         "item",
-        "new_weapon",  # skill: modest; code may still pay large — flag if >=0.5
         "enemy_damage",
         "enemy_kill",
     }
@@ -126,6 +127,7 @@ _IGNORE = frozenset(
         "death",
         "softlock",
         "gold_emblem_return",
+        "shotgun_return",
         "pbrs_graph",
         "pbrs_door",
         "waypoint",

@@ -179,7 +179,80 @@ def test_junk_item_pickup_does_not_reset_idle_timer():
     _, bd = _step(progress, prev, cur, step_frames=4)
     assert bd["item"] == ITEM_PICKUP_BONUS
     assert bd["key_item"] == 0.0
+    assert bd["new_weapon"] == 0.0
     assert progress.stagnation_frames == 4
+
+
+def test_weapon_pickup_resets_idle_timer():
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    prev = make_state(room="105", step=0)
+    for i in range(1, 4):
+        cur = make_state(room="105", step=i)
+        _step(progress, prev, cur, step_frames=4)
+        prev = cur
+    assert progress.stagnation_frames == 12
+    cur = make_state(room="115", step=4, new_items=["colt_python"])
+    _, bd = _step(progress, prev, cur, step_frames=4)
+    from re1_rl.reward import NEW_WEAPON_PICKUP_BONUS
+
+    assert bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS
+    assert bd["item"] == 0.0
+    assert bd["key_item"] == 0.0
+    assert progress.stagnation_frames == 0
+
+
+def test_shotgun_wall_loop_is_zero_sum_and_pickup_extends_episode():
+    from re1_rl.reward import (
+        NEW_WEAPON_PICKUP_BONUS,
+        SHOTGUN_RETURN_PENALTY,
+    )
+
+    progress = ProgressTracker()
+    progress.first_visit("115")
+    progress._stagnation_frames = 1234
+    empty = make_state(room="115", step=0, inventory=[])
+
+    held = make_state(
+        room="115",
+        step=1,
+        inventory=["shotgun"],
+        new_items=["shotgun"],
+    )
+    pickup_reward, pickup_bd = _step(
+        progress, empty, held, step_frames=0
+    )
+    assert pickup_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS
+    assert pickup_bd["shotgun_return"] == 0.0
+    assert progress.stagnation_frames == 0
+
+    returned = make_state(room="115", step=2, inventory=[], new_items=[])
+    return_reward, return_bd = _step(
+        progress, held, returned, step_frames=0
+    )
+    assert return_bd["new_weapon"] == 0.0
+    assert return_bd["shotgun_return"] == SHOTGUN_RETURN_PENALTY
+    assert pickup_reward + return_reward == 0.0
+
+    # A second take/replace cycle has the same exact zero-sum behavior.
+    pickup2, pickup2_bd = _step(
+        progress, returned, held, step_frames=0
+    )
+    return2, return2_bd = _step(
+        progress, held, returned, step_frames=0
+    )
+    assert pickup2_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS
+    assert return2_bd["shotgun_return"] == SHOTGUN_RETURN_PENALTY
+    assert pickup2 + return2 == 0.0
+
+
+def test_shotgun_removal_outside_rack_rooms_is_not_penalized():
+    progress = ProgressTracker()
+    progress.first_visit("203")
+    held = make_state(room="203", step=0, inventory=["shotgun"])
+    empty = make_state(room="203", step=1, inventory=[])
+    _, bd = _step(progress, held, empty, step_frames=0)
+    assert bd["shotgun_return"] == 0.0
 
 
 def test_key_item_pickup_resets_idle_timer():
@@ -205,7 +278,10 @@ def test_first_visits_reset_idle_timer():
     for i, room in enumerate(path[1:], start=1):
         cur = make_state(room=room, step=i)
         _, bd = _step(progress, prev, cur, step_frames=4)
-        assert bd["new_room"] == NEW_ROOM_BONUS
+        if room == "106":
+            assert bd["new_room"] == 0.0
+        else:
+            assert bd["new_room"] == NEW_ROOM_BONUS
         prev = cur
     assert progress.stagnation_frames == 0
 
