@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 import time
@@ -16,6 +17,7 @@ from re1_rl.env import RE1Env
 from re1_rl.item_todo import canonicalize
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import compute_reward
+from re1_rl.sticky_input import INTERACT_ACTION
 
 EMU = ROOT / "tools" / "BizHawk-2.11.1" / "EmuHawk.exe"
 ROM = ROOT / "roms" / "Resident Evil - Director's Cut.cue"
@@ -45,6 +47,16 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=7794)
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument("--state", type=Path, default=None)
+    parser.add_argument(
+        "--input-mode",
+        choices=("exact-pair", "macro", "macro-noop"),
+        default="exact-pair",
+    )
+    parser.add_argument(
+        "--log",
+        type=Path,
+        default=ROOT / "data" / "shotgun_reward_loop.jsonl",
+    )
     args = parser.parse_args()
 
     state_path = (args.state or newest_quicksave()).resolve()
@@ -94,52 +106,128 @@ def main() -> int:
         initial_has = "shotgun" in inventory_names(initial)
         print(
             f"[shotgun-loop] state={state_path.name} room={initial['room_id']} "
-            f"initial_shotgun={initial_has} duration={args.duration_s:.1f}s",
+            f"initial_shotgun={initial_has} duration={args.duration_s:.1f}s "
+            f"input_mode={args.input_mode} log={args.log}",
             flush=True,
         )
+        args.log.parent.mkdir(parents=True, exist_ok=True)
+        with args.log.open("a", encoding="utf-8") as log_file:
+            log_file.write(
+                json.dumps(
+                    {
+                        "event": "session_start",
+                        "time": time.time(),
+                        "state": state_path.name,
+                        "room": initial["room_id"],
+                        "initial_shotgun": initial_has,
+                        "input_mode": args.input_mode,
+                    }
+                )
+                + "\n"
+            )
 
         pickups = 0
         returns = 0
         steps = 0
         event_sum = 0.0
+        total_reward = 0.0
         last_event: str | None = None
         duplicate_events: list[tuple[int, str]] = []
         unexpected: list[tuple[int, dict[str, float]]] = []
-        deadline = time.monotonic() + float(args.duration_s)
+        deadline = (
+            time.monotonic() + float(args.duration_s)
+            if float(args.duration_s) > 0
+            else None
+        )
 
-        while time.monotonic() < deadline:
-            # Exact two-frame pair requested by the operator:
-            # frame 1 Cross down, frame 2 Cross released.
-            bridge.step(
-                n=1,
-                sticky={},
-                pulse=None,
-                pulse_hold={"cross": True},
-                ring_stride=0,
-                capture_final=False,
-            )
-            bridge.step(
-                n=1,
-                sticky={},
-                pulse=None,
-                pulse_hold=None,
-                ring_stride=0,
-                capture_final=False,
-            )
+        while deadline is None or time.monotonic() < deadline:
             steps += 1
-            current = env._read_state(track_items=True)
-            current["step_emulated_frames"] = 2
-            reward, raw_bd = compute_reward(
-                previous,
-                current,
-                env._planner,
-                progress=env._progress,
-                graph=env.graph,
-                success_room=env._stage.get("success_room"),
-                return_breakdown=True,
-            )
-            previous = dict(current)
+            if args.input_mode in {"macro", "macro-noop"}:
+                action = (
+                    INTERACT_ACTION
+                    if args.input_mode == "macro" or steps % 2 == 1
+                    else 0
+                )
+                _obs, reward, terminated, truncated, info = env.step(
+                    action
+                )
+                current = dict(info.get("state") or env._read_state(track_items=False))
+                raw_bd = dict(info.get("reward_breakdown") or {})
+                if terminated:
+                    raise RuntimeError(
+                        f"episode ended at step {steps}: "
+                        f"terminated={terminated} truncated={truncated}"
+                    )
+                if truncated:
+                    print(
+                        f"[shotgun-loop] diagnostic truncation at step={steps}; "
+                        "resetting stagnation clock to finish wall-clock probe",
+                        flush=True,
+                    )
+                    env._progress._stagnation_frames = 0
+            else:
+                # Exact two-frame pair: frame 1 Cross down, frame 2 released.
+                bridge.step(
+                    n=1,
+                    sticky={},
+                    pulse=None,
+                    pulse_hold={"cross": True},
+                    ring_stride=0,
+                    capture_final=False,
+                )
+                bridge.step(
+                    n=1,
+                    sticky={},
+                    pulse=None,
+                    pulse_hold=None,
+                    ring_stride=0,
+                    capture_final=False,
+                )
+                current = env._read_state(track_items=True)
+                current["step_emulated_frames"] = 2
+                reward, raw_bd = compute_reward(
+                    previous,
+                    current,
+                    env._planner,
+                    progress=env._progress,
+                    graph=env.graph,
+                    success_room=env._stage.get("success_room"),
+                    return_breakdown=True,
+                )
+                previous = dict(current)
             bd = {key: float(value) for key, value in raw_bd.items()}
+            total_reward += float(reward)
+            with args.log.open("a", encoding="utf-8") as log_file:
+                log_file.write(
+                    json.dumps(
+                        {
+                            "time": time.time(),
+                            "step": steps,
+                            "action": (
+                                "interact_macro"
+                                if args.input_mode == "macro"
+                                else (
+                                    "interact_macro"
+                                    if args.input_mode == "macro-noop"
+                                    and steps % 2 == 1
+                                    else (
+                                        "noop"
+                                        if args.input_mode == "macro-noop"
+                                        else "cross_press_release"
+                                    )
+                                )
+                            ),
+                            "reward": round(float(reward), 5),
+                            "total_reward": round(total_reward, 5),
+                            "breakdown": {
+                                key: round(value, 5) for key, value in bd.items()
+                            },
+                            "room": current.get("room_id"),
+                            "inventory": sorted(inventory_names(current)),
+                        }
+                    )
+                    + "\n"
+                )
             active = {
                 key: value
                 for key, value in bd.items()
@@ -173,7 +261,7 @@ def main() -> int:
                 print(
                     f"[shotgun-loop] step={steps} event={event} "
                     f"value={value:+.5f} reward={float(reward):+.5f} "
-                    f"room={current.get('room_id')}",
+                    f"total={total_reward:+.5f} room={current.get('room_id')}",
                     flush=True,
                 )
             if current.get("dead"):
@@ -205,7 +293,8 @@ def main() -> int:
         print(
             f"[shotgun-loop] {status} steps={steps} pickups={pickups} "
             f"returns={returns} final_shotgun={final_has} "
-            f"event_sum={event_sum:+.5f} room={final.get('room_id')} "
+            f"event_sum={event_sum:+.5f} total={total_reward:+.5f} "
+            f"room={final.get('room_id')} "
             f"in_control={final.get('in_control')}",
             flush=True,
         )

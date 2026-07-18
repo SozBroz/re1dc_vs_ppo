@@ -233,6 +233,12 @@ def test_shotgun_wall_loop_is_zero_sum_and_pickup_extends_episode():
     assert return_bd["new_weapon"] == 0.0
     assert return_bd["shotgun_return"] == SHOTGUN_RETURN_PENALTY
     assert pickup_reward + return_reward == 0.0
+    # Async post-skip can replay the same held->empty transition next step.
+    duplicate_return, duplicate_bd = _step(
+        progress, held, returned, step_frames=0
+    )
+    assert duplicate_bd["shotgun_return"] == 0.0
+    assert duplicate_return == 0.0
 
     # A second take/replace cycle has the same exact zero-sum behavior.
     pickup2, pickup2_bd = _step(

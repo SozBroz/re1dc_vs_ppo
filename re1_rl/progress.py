@@ -24,6 +24,9 @@ class ProgressTracker:
 
     # Idle contempt: emulated frames since last exploration progress (reward.compute_reward).
     _stagnation_frames: int = 0
+    # Async skip may present one inventory transition twice. A wall return pays
+    # once, then cannot pay again until shotgun possession is observed.
+    _shotgun_return_armed: bool | None = None
 
     def first_visit(
         self,

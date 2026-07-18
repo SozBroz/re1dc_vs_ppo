@@ -283,14 +283,25 @@ def compute_reward(
         canonical_item(str(name)) for name in state.get("inventory", [])
     }
     room = str(state.get("room_id", "") or "")
-    if (
+    shotgun_removed_at_rack = (
         room in SHOTGUN_RACK_ROOMS
         and "shotgun" in prev_inventory
         and "shotgun" not in inventory
         and not state.get("dead")
         and int(state.get("hp", 0) or 0) > 0
-    ):
+    )
+    if progress is not None:
+        if progress._shotgun_return_armed is None:
+            progress._shotgun_return_armed = "shotgun" in prev_inventory
+        if "shotgun" in inventory:
+            progress._shotgun_return_armed = True
+        shotgun_removed_at_rack = (
+            shotgun_removed_at_rack and progress._shotgun_return_armed
+        )
+    if shotgun_removed_at_rack:
         bd["shotgun_return"] = SHOTGUN_RETURN_PENALTY
+        if progress is not None:
+            progress._shotgun_return_armed = False
 
     story_use_site = state.get("story_use_success")
     if story_use_site and progress is not None:
