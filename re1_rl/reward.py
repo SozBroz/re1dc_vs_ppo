@@ -71,7 +71,7 @@ NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.6667
 DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.3333
 DEATH_PENALTY = -DEATH_PENALTY_SCALED
 # Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
-MAIN_HALL_BEFORE_KENNETH_PENALTY = -3.0
+MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.3
 # Doing-nothing contempt must not exceed death (else suicide beats softlock).
 # Ramp 3→12 min spends exactly this budget (no extra terminal lump).
 CONTEMPT_BUDGET_SCALED = DEATH_PENALTY_SCALED
@@ -388,7 +388,7 @@ def compute_reward(
         bd["hp"] = hp_heal_reward(hp_delta)
 
     # Actual death owns the ordinary death channel. Otherwise the sole Kenneth
-    # gate contributes exactly -3.0 once under its explicit telemetry key.
+    # gate contributes exactly -0.3 once under its explicit telemetry key.
     if state.get("dead"):
         bd["death"] = DEATH_PENALTY
     elif illegal_main_hall:

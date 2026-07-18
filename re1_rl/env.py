@@ -868,7 +868,7 @@ class RE1Env(gym.Env):
             )
             fail = self._illegal_main_hall_failure_reason(entry, crossing)
             if fail:
-                # No new_room / step shaping — exact -3.0 policy fail on flush.
+                # No new_room / step shaping — exact Kenneth-gate penalty on flush.
                 self._progress.first_visit(
                     str(crossing.get("room_id", "")),
                     at_waypoint=0,
