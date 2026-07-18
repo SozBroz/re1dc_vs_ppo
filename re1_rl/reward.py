@@ -58,9 +58,9 @@ SHOTGUN_RETURN_PENALTY = -NEW_WEAPON_PICKUP_BONUS
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # Idle contempt: no new room / cutscene / key item / weapon / story-use / gallery.
 # Grace then linear-rate ramp; episode truncates at SOFTLOCK_FRAME_THRESHOLD.
-# 43200 = 12 min wall-clock @ 60 emulated fps (PS1 NTSC / BizHawk).
-SOFTLOCK_FRAME_THRESHOLD = 12 * 60 * 60
-# First 3 min of no-progress: no extra idle tax (living step cost only).
+# 10800 = 3 min wall-clock @ 60 emulated fps (PS1 NTSC / BizHawk).
+SOFTLOCK_FRAME_THRESHOLD = 3 * 60 * 60
+# No-progress grace matches the truncate cap (no ramp room → bulk at timeout).
 CONTEMPT_GRACE_FRAMES = 3 * 60 * 60
 
 JILL_FINE_HP = 96
@@ -71,9 +71,9 @@ NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.6667
 DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.3333
 DEATH_PENALTY = -DEATH_PENALTY_SCALED
 # Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
-MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.3
+MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.1
 # Doing-nothing contempt must not exceed death (else suicide beats softlock).
-# Ramp 3→12 min spends exactly this budget (no extra terminal lump).
+# When threshold==grace, full budget lands on the truncate step.
 CONTEMPT_BUDGET_SCALED = DEATH_PENALTY_SCALED
 SOFTLOCK_TIMEOUT_PENALTY = -CONTEMPT_BUDGET_SCALED
 
@@ -398,7 +398,7 @@ def compute_reward(
         bd["hp"] = hp_heal_reward(hp_delta)
 
     # Actual death owns the ordinary death channel. Otherwise the sole Kenneth
-    # gate contributes exactly -0.3 once under its explicit telemetry key.
+    # gate contributes exactly -0.1 once under its explicit telemetry key.
     if state.get("dead"):
         bd["death"] = DEATH_PENALTY
     elif illegal_main_hall:

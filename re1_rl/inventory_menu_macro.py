@@ -60,6 +60,19 @@ COMBINE_CURSOR_MAX_DOWNS = 8
 SubmenuEntry = Literal["use", "equip", "combine"]
 
 
+def _item_menu_confirmed(client: Any) -> bool:
+    """True when RAM shows the START/ITEM pause tree (not OPTIONS)."""
+    from re1_rl.ram_skip import item_inventory_screen_from_ram
+
+    ram = client.read_ram(
+        [
+            ("game_mode", GAME_MODE, "u8"),
+            ("game_state", GAME_STATE, "u32"),
+        ]
+    )
+    return item_inventory_screen_from_ram(ram)
+
+
 def read_item_submenu_cursor(client: Any) -> tuple[int, int]:
     """Return ``(cursor_index, n_entries)`` for the open ITEM action submenu."""
     ram = client.read_ram(
@@ -161,9 +174,16 @@ def open_item_screen(
     *,
     prev_hp: int,
     episode_start_hp: int,
-) -> tuple[bool, int, int]:
-    """Open ITEM screen; cursor homes on slot 0. Returns (died, frames, cursor_slot)."""
+) -> tuple[bool, int, int, bool]:
+    """One Start tap to open ITEM; proceed only if RAM confirms the menu.
+
+    Returns ``(died, frames, cursor_slot, opened)``.
+    Does **not** spam Start — if hitstun ate the press, callers must release
+    without further menu inputs (and without a close Start that would open it).
+    """
     frames = 0
+    if _item_menu_confirmed(client):
+        return False, frames, 0, True
     for buttons, n in (({"start": True}, OPEN_START_FRAMES), ({}, OPEN_SETTLE_FRAMES)):
         died, f = _tap(
             client,
@@ -174,8 +194,9 @@ def open_item_screen(
         )
         frames += f
         if died:
-            return True, frames, 0
-    return False, frames, 0
+            return True, frames, 0, False
+    opened = _item_menu_confirmed(client)
+    return False, frames, 0, opened
 
 
 def close_item_screen(
@@ -554,12 +575,24 @@ def execute_equip_macro(
             },
         )
     frames = 0
-    died, f, cursor = open_item_screen(
+    died, f, cursor, opened = open_item_screen(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
     frames += f
     if died:
         return True, frames, {"ok": False, "reason": "died", "slot": slot}
+    if not opened:
+        return (
+            False,
+            frames,
+            {
+                "ok": False,
+                "reason": "item_menu_open_failed",
+                "slot": int(slot),
+                "item_id": target_id,
+                "frames": frames,
+            },
+        )
 
     died, f, cursor = _navigate_slot(
         client, cursor, int(slot), prev_hp=prev_hp, episode_start_hp=episode_start_hp
@@ -655,12 +688,24 @@ def execute_use_macro(
     inv_before = read_inventory(client)
     probe_before = read_story_use_probe(client)
     frames = 0
-    died, f, cursor = open_item_screen(
+    died, f, cursor, opened = open_item_screen(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
     frames += f
     if died:
         return True, frames, {"ok": False, "reason": "died", "slot": slot}
+    if not opened:
+        return (
+            False,
+            frames,
+            {
+                "ok": False,
+                "reason": "item_menu_open_failed",
+                "slot": int(slot),
+                "item_id": int(item_before),
+                "frames": frames,
+            },
+        )
 
     died, f, cursor = _navigate_slot(
         client, cursor, int(slot), prev_hp=prev_hp, episode_start_hp=episode_start_hp
@@ -758,12 +803,24 @@ def execute_combine_macro(
 
     inv_before = read_inventory(client)
     frames = 0
-    died, f, cursor = open_item_screen(
+    died, f, cursor, opened = open_item_screen(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
     frames += f
     if died:
         return True, frames, {"ok": False, "reason": "died", "slot_a": slot_a, "slot_b": slot_b}
+    if not opened:
+        return (
+            False,
+            frames,
+            {
+                "ok": False,
+                "reason": "item_menu_open_failed",
+                "slot_a": int(slot_a),
+                "slot_b": int(slot_b),
+                "frames": frames,
+            },
+        )
 
     died, f, cursor = _navigate_slot(
         client, cursor, int(slot_a), prev_hp=prev_hp, episode_start_hp=episode_start_hp

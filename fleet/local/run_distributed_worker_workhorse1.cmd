@@ -16,6 +16,9 @@ taskkill /F /IM EmuHawk.exe >nul 2>&1
 taskkill /F /IM python.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 
+REM Fresh heuristics log for this batch (truncate; do not delete).
+call "%~dp0flush_log.cmd" "D:\re1_rl\data\logs\worker_workhorse1.log"
+
 echo Starting WH1 worker: %N_ENVS% envs ports %BASE_PORT%+ -> learner %LEARNER_HOST%:8765
 echo Log: data\logs\worker_workhorse1.log
 call fleet\local\run_distributed_worker.cmd >> data\logs\worker_workhorse1.log 2>&1

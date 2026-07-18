@@ -57,11 +57,12 @@ def test_softlock_matches_death_budget():
 
 
 def test_grace_has_no_softlock_tax():
+    """Strictly under the 3 min cap: no softlock tax (cap frame is the truncate)."""
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", step=0)
     step_frames = REFERENCE_STEP_FRAMES
-    steps = CONTEMPT_GRACE_FRAMES // step_frames
+    steps = (CONTEMPT_GRACE_FRAMES // step_frames) - 1
     softlock_sum = 0.0
     for i in range(1, steps + 1):
         cur = make_state(room="105", step=i)
@@ -69,7 +70,7 @@ def test_grace_has_no_softlock_tax():
         softlock_sum += bd["softlock"]
         prev = cur
     assert progress.stagnation_frames == steps * step_frames
-    assert progress.stagnation_frames <= CONTEMPT_GRACE_FRAMES
+    assert progress.stagnation_frames < CONTEMPT_GRACE_FRAMES
     assert softlock_sum == pytest.approx(0.0)
 
 
@@ -93,15 +94,26 @@ def test_ramp_integral_equals_death_budget_not_survival():
     assert contempt < SURVIVAL_BUDGET_SCALED
 
 
-def test_contempt_spent_quadratic_mid_ramp():
+def test_contempt_spent_at_grace_equals_threshold():
+    """3 min truncate == grace: free before cap, full budget on the timeout frame."""
     grace = CONTEMPT_GRACE_FRAMES
     threshold = SOFTLOCK_FRAME_THRESHOLD
+    assert grace == threshold
+    assert contempt_spent_at(grace - 1) == pytest.approx(0.0)
+    assert contempt_spent_at(threshold) == pytest.approx(CONTEMPT_BUDGET_SCALED)
+
+
+def test_contempt_spent_quadratic_mid_ramp_when_ramp_exists():
+    grace = 100
+    threshold = 500
     ramp = threshold - grace
     mid = grace + ramp // 2
-    spent = contempt_spent_at(mid)
+    spent = contempt_spent_at(mid, grace=grace, threshold=threshold)
     assert spent == pytest.approx(CONTEMPT_BUDGET_SCALED * 0.25, rel=1e-6)
-    assert contempt_spent_at(grace) == pytest.approx(0.0)
-    assert contempt_spent_at(threshold) == pytest.approx(CONTEMPT_BUDGET_SCALED)
+    assert contempt_spent_at(grace, grace=grace, threshold=threshold) == pytest.approx(0.0)
+    assert contempt_spent_at(
+        threshold, grace=grace, threshold=threshold
+    ) == pytest.approx(CONTEMPT_BUDGET_SCALED)
 
 
 def test_short_threshold_falls_back_to_bulk_at_timeout():
@@ -309,12 +321,13 @@ def test_long_step_advances_stagnation_proportionally():
 
 
 def test_contempt_penalty_delta_monotonic():
-    g = CONTEMPT_GRACE_FRAMES
-    a = g + 1000
-    b = g + 2000
-    d1 = contempt_penalty_delta(g, a)
-    d2 = contempt_penalty_delta(a, b)
+    """With an explicit ramp window, later slices are steeper."""
+    grace = 100
+    threshold = 500
+    a = grace + 100
+    b = grace + 200
+    d1 = contempt_penalty_delta(grace, a, grace=grace, threshold=threshold)
+    d2 = contempt_penalty_delta(a, b, grace=grace, threshold=threshold)
     assert d1 < 0.0
     assert d2 < 0.0
-    # Later slices of the linear-rate ramp are steeper.
     assert abs(d2) > abs(d1)

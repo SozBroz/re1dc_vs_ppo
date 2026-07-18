@@ -11,6 +11,11 @@ set BASE_PORT=5555
 set LEARNER_PORT=8765
 set SYNC_INTERVAL_S=180
 
+if not exist data\logs mkdir data\logs
+REM Fresh heuristics log for this batch (truncate; do not delete).
+call "%~dp0flush_log.cmd" "C:\Users\sshuser\re1_rl\data\logs\learner_wh2_25.log"
+echo [%DATE% %TIME%] run_distributed_learner_wh2_25.cmd launching learner>> data\logs\learner_wh2_25.log
+
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role learner ^
   --machine-name %MACHINE% ^

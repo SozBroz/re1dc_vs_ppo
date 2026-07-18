@@ -69,7 +69,8 @@ class _RecordingClient:
             elif name == "game_mode":
                 out[name] = 0x40 if self.in_item_menu else 0x80
             elif name == "game_state":
-                out[name] = 0x00000080 if self.in_item_menu else 0x90808000
+                # ITEM pause tree (ram_skip.item_inventory_screen_from_ram).
+                out[name] = 0x40808000 if self.in_item_menu else 0x90808000
             elif name.startswith("inv_slot_"):
                 idx = int(name.split("_")[-1])
                 item_id = self.inv_ids[idx] if idx < len(self.inv_ids) else 0
@@ -125,6 +126,32 @@ def test_execute_equip_macro_closes_item_screen_with_start() -> None:
         + CLOSE_ITEM_SETTLE_FRAMES
     )
     assert frames >= expected_min
+
+
+def test_execute_equip_releases_if_start_does_not_open_menu() -> None:
+    """Hitstun ate Start: one attempt, confirm fail, no further menu inputs."""
+
+    class _DeafStartClient(_RecordingClient):
+        def step(self, buttons: dict[str, bool], n: int = 1):
+            self.steps.append((dict(buttons), int(n)))
+            # Start never opens ITEM (inputs eaten).
+            return {}, False
+
+    client = _DeafStartClient(
+        equipped_id=0, inv_ids=[0x01, 0x02], equip_target_slot=1,
+    )
+    died, frames, report = execute_equip_macro(
+        client, 1, prev_hp=96, episode_start_hp=96,
+    )
+    assert not died
+    assert report["ok"] is False
+    assert report["reason"] == "item_menu_open_failed"
+    assert frames == OPEN_START_FRAMES + OPEN_SETTLE_FRAMES
+    assert client.steps == [
+        ({"start": True}, OPEN_START_FRAMES),
+        ({}, OPEN_SETTLE_FRAMES),
+    ]
+    assert not any(b.get("cross") for b, _ in client.steps)
 
 
 def test_slot_nav_from_home_row() -> None:

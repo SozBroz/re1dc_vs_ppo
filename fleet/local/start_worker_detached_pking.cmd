@@ -14,6 +14,9 @@ powershell -NoProfile -Command ^
 
 timeout /t 2 /nobreak >nul
 
+REM Fresh heuristics log for this batch (truncate; do not delete).
+call "%~dp0flush_log.cmd" "D:\re1_rl\data\logs\worker_pking.log"
+
 start "pking-worker" /MIN cmd /c "cd /d D:\re1_rl && fleet\local\run_distributed_worker_pking.cmd >> data\logs\worker_pking.log 2>&1"
 
 echo Started pking worker detached. Tail: type data\logs\worker_pking.log
