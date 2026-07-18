@@ -86,7 +86,10 @@ class RE1WorldAwareExtractor(BaseFeaturesExtractor):
         if not isinstance(observation_space, spaces.Dict):
             raise TypeError(f"RE1WorldAwareExtractor expects Dict obs, got {type(observation_space)}")
 
-        root = Path(project_root or _DEFAULT_PROJECT_ROOT)
+        root = Path(project_root) if project_root else _DEFAULT_PROJECT_ROOT
+        if not (root / "data" / "rooms.json").is_file():
+            # Checkpoint may carry an absolute path from another machine.
+            root = _DEFAULT_PROJECT_ROOT
         catalog = WorldCatalog.from_files(root)
 
         flat_dim = 0
@@ -287,7 +290,9 @@ class RE1WorldAwareExtractor(BaseFeaturesExtractor):
 
 def reload_world_catalog_buffers(policy: nn.Module, project_root: str | Path | None = None) -> None:
     """Reload static almanac buffers from JSON so data wins over stale zip weights."""
-    root = Path(project_root or _DEFAULT_PROJECT_ROOT)
+    root = Path(project_root) if project_root else _DEFAULT_PROJECT_ROOT
+    if not (root / "data" / "rooms.json").is_file():
+        root = _DEFAULT_PROJECT_ROOT
     module: nn.Module = policy
     if hasattr(module, "policy"):
         module = module.policy

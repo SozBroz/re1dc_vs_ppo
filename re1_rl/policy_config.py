@@ -29,14 +29,11 @@ calls reload_world_catalog_buffers after resume.
 """
 from __future__ import annotations
 
-from pathlib import Path
-
 from re1_rl.features_extractor import RE1WorldAwareExtractor
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
+# Do not bake absolute project_root into checkpoints — WH1/WH2 paths differ.
 POLICY_KWARGS: dict = dict(
     net_arch=dict(pi=[256, 256], vf=[256, 256]),
     features_extractor_class=RE1WorldAwareExtractor,
-    features_extractor_kwargs=dict(cnn_output_dim=512, project_root=_PROJECT_ROOT),
+    features_extractor_kwargs=dict(cnn_output_dim=512),
 )
