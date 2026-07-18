@@ -108,10 +108,10 @@ def test_human_step_gate_one_chunk_per_press() -> None:
     assert human_step_gate({"up": True}, armed=True) == (True, False)
 
 
-def test_quickturn_pulses_not_sticky() -> None:
+def test_attack_up_slot_is_macro_not_pulse() -> None:
+    """Slot 6 is attack_up; no quickturn pulse buttons."""
     s = StickyInputState()
     s.apply(_idx("forward"), ACTION_BUTTON_MAP)
-    _, pulse, _ = s.apply(_idx("quickturn"), ACTION_BUTTON_MAP)
-    assert pulse == {"down": True, "square": True}
-    sticky, _, _ = s.apply(_idx("noop"), ACTION_BUTTON_MAP)
-    assert sticky["square"] is False
+    sticky, pulse, _ = s.apply(_idx("attack_up"), ACTION_BUTTON_MAP)
+    assert not pulse
+    assert sticky.get("square") is False

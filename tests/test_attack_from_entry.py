@@ -47,7 +47,8 @@ def test_attack_from_entry_mock_primary(scenario: str, weapon_id: int, weapon_na
     )
     assert result.report.get("outcome") not in HARD_FAIL_OUTCOMES
     if weapon_id == KNIFE_WEAPON_ID:
-        assert result.report.get("macro_path") == "knife_crouch"
+        assert result.report.get("macro_path") == "knife_neutral"
+        assert result.report.get("aim_mode") == "neutral"
     else:
         assert str(result.report.get("macro_path", "")).startswith("ranged:")
 
@@ -66,7 +67,6 @@ def test_entry_scenario_registry_covers_movement_variants() -> None:
     for required in (
         "neutral_idle",
         "after_run",
-        "after_quickturn",
         "locomotion_mid_run",
         "standing_recovery_latch",
     ):

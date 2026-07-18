@@ -181,6 +181,32 @@ class RamSkipper:
         self.skip_chunk = int(skip_chunk)
         self.use_engine_patches = bool(use_engine_patches)
         self.invisible_during_skip = bool(invisible_during_skip)
+        # Mid-skip peaks from Lua fast_forward (Kenneth 0x84, dialogue msg, …).
+        self.last_skip_peak_scene_flag: int | None = None
+        self.last_skip_peak_msg_flag: int | None = None
+
+    def clear_skip_script_peaks(self) -> None:
+        self.last_skip_peak_scene_flag = None
+        self.last_skip_peak_msg_flag = None
+
+    def note_skip_script_peaks(
+        self, *, peak_scene_flag: int | None = None, peak_msg_flag: int | None = None
+    ) -> None:
+        """Accumulate script evidence across skip chunks for cutscene qualify."""
+        from re1_rl.cutscene_reward import scene_flag_shows_script
+
+        if peak_scene_flag is not None:
+            ps = int(peak_scene_flag) & 0xFF
+            cur = self.last_skip_peak_scene_flag
+            if cur is None or (
+                scene_flag_shows_script(ps) and not scene_flag_shows_script(int(cur))
+            ):
+                self.last_skip_peak_scene_flag = ps
+        if peak_msg_flag is not None:
+            pm = int(peak_msg_flag) & 0xFF
+            cur_m = self.last_skip_peak_msg_flag
+            if cur_m is None or (pm != 0 and int(cur_m) == 0):
+                self.last_skip_peak_msg_flag = pm
 
     def install_engine_patches(self) -> None:
         """Door-skip + in-engine cutscene turbo (re-applied every frame by Lua)."""
@@ -225,10 +251,19 @@ class RamSkipper:
         turbo = max(int(self.cutscene_speed), 3200)
         burned = 0
         death_abort = False
+        # Seed peaks from the pre-burn poll (session may start already on 0x84).
+        self.note_skip_script_peaks(
+            peak_scene_flag=int(ram.get("scene_flag", 0) or 0),
+            peak_msg_flag=int(ram.get("msg_flag", 0) or 0),
+        )
         while burned < max_frames:
             ram = self.bridge.read_ram(SKIP_POLL_RAM_FIELDS)
             if not needs_skip_from_ram(ram):
                 break
+            self.note_skip_script_peaks(
+                peak_scene_flag=int(ram.get("scene_flag", 0) or 0),
+                peak_msg_flag=int(ram.get("msg_flag", 0) or 0),
+            )
             res = self.bridge.fast_forward(
                 min(max(1, int(chunk)), max_frames - burned),
                 mode_addr=GAME_MODE,
@@ -243,6 +278,11 @@ class RamSkipper:
                 death_hp_addr=PLAYER_HP,
                 abort_on_zero_hp=True,
             )
+            if "peak_scene_flag" in res or "peak_msg_flag" in res:
+                self.note_skip_script_peaks(
+                    peak_scene_flag=res.get("peak_scene_flag"),
+                    peak_msg_flag=res.get("peak_msg_flag"),
+                )
             step_burned = int(res["burned"])
             burned += step_burned
             if res.get("death_abort"):

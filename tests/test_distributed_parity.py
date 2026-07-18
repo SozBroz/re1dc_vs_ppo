@@ -125,19 +125,19 @@ def test_legacy_action_head_transplant_clones_attack_with_low_prior() -> None:
             super().__init__()
             self.action_net = nn.Linear(3, actions)
 
-    old = Policy(45)
-    new = Policy(46)
+    old = Policy(46)
+    new = Policy(47)
     with torch.no_grad():
-        old.action_net.weight.copy_(torch.arange(135).reshape(45, 3))
-        old.action_net.bias.copy_(torch.arange(45))
+        old.action_net.weight.copy_(torch.arange(138).reshape(46, 3))
+        old.action_net.bias.copy_(torch.arange(46))
 
     _copy_compatible_policy_weights(old, new)
 
-    assert torch.equal(new.action_net.weight[:45], old.action_net.weight)
-    assert torch.equal(new.action_net.bias[:45], old.action_net.bias)
-    assert torch.equal(new.action_net.weight[45], old.action_net.weight[9])
+    assert torch.equal(new.action_net.weight[:46], old.action_net.weight)
+    assert torch.equal(new.action_net.bias[:46], old.action_net.bias)
+    assert torch.equal(new.action_net.weight[46], old.action_net.weight[9])
     assert np.isclose(
-        float(new.action_net.bias[45].detach()),
+        float(new.action_net.bias[46].detach()),
         float(old.action_net.bias[9].detach()) - np.log(100.0),
     )
 

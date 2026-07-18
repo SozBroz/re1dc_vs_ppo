@@ -1,7 +1,7 @@
 @echo off
 REM workhorse2 learner — 32 local envs (MMF screenshots); sync 180
-REM Headroom: soak @27 peaked ~32GB used / 33GB free. Live @32: ~45GB used / ~19GB free,
-REM pages_input=0, pagefile~100MB. Train spikes historically +3-6GB python — still >12GB free.
+REM Headroom: @32 envs 10m soak peak ~41GB used / ~24GB free (pages_input~0).
+REM n_steps=1024 + batch_size=4096 staged for next restart (longer GAE, larger minibatches).
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE=workhorse2
@@ -29,5 +29,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --resume auto ^
   --headless ^
   --screenshot-mmf ^
-  --n-steps 768 ^
+  --n-steps 1024 ^
   --inference-batch-max %N_ENVS% >> data\logs\learner_wh2_25.log 2>&1

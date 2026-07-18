@@ -29,5 +29,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --resume auto ^
   --headless ^
   --screenshot-mmf ^
-  --n-steps 768 ^
+  --n-steps 1024 ^
   --inference-batch-max %N_ENVS% >> data\logs\learner_wh1.log 2>&1

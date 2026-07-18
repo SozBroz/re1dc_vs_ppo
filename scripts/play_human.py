@@ -587,8 +587,49 @@ KEY_BINDINGS: dict[str, str] = {
     "e": "cross",
     "r": "r1",  # aim
     "f": "fire_combo",  # r1 + cross
-    "x": "triangle",  # door-skip prompt
+    "x": "triangle",  # door-skip prompt (monitor mode remaps X → cross)
 }
+
+# Human monitor / exploration: movement + Cross only (no aim/fire/menu).
+MOVE_CROSS_BUTTONS = frozenset({"up", "down", "left", "right", "square", "cross"})
+
+
+def filter_move_cross_only(buttons: dict[str, bool]) -> dict[str, bool]:
+    """Keep tank-move + run + Cross; map Triangle (keyboard X) → Cross."""
+    if not buttons:
+        return {}
+    out = {k: bool(v) for k, v in buttons.items() if v}
+    if out.get("triangle"):
+        out["cross"] = True
+    return {k: True for k in MOVE_CROSS_BUTTONS if out.get(k)}
+
+
+def format_non_step_reward_line(
+    breakdown: dict[str, float],
+    reward: float,
+    state: dict[str, Any],
+) -> str | None:
+    """Compact non-step channels + live pose/HP (for reward monitors)."""
+    parts: list[str] = []
+    for src, raw in sorted(breakdown.items(), key=lambda kv: -abs(float(kv[1] or 0))):
+        if src == "step":
+            continue
+        try:
+            val = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if abs(val) < REWARD_EPS:
+            continue
+        parts.append(f"{src}={val:+.4f}")
+    if not parts and abs(float(reward)) < REWARD_EPS:
+        return None
+    mem = (
+        f"room={state.get('room_id')} hp={state.get('hp')} "
+        f"pos=({int(state.get('x') or 0)},{int(state.get('z') or 0)}) "
+        f"cam={state.get('cam_id')} ctrl={state.get('in_control')}"
+    )
+    body = " ".join(parts) if parts else f"total={float(reward):+.4f}"
+    return f"[non-step] {body} | {mem}"
 
 OBJ_ENGLISH = {
     "navigate": "Go there",
@@ -1282,6 +1323,17 @@ def _log_exploration_hit(
         print(f"[{explore.prefix}] enemy_kill +{breakdown['enemy_kill']:.4f}", flush=True)
 
 
+def skip_session_active(needs_skip: bool) -> bool:
+    """Whether a cutscene/dialogue skip session is still open.
+
+    Agent async skip settles only when ``needs_skip_from_ram`` clears.
+    Barry / mansion intro dialogue keeps the in-control bit SET — never use
+    ``in_control`` alone to end or restart a skip session (that fragmented
+    human skips into <300f chunks and unpaid Barry while the fleet paid).
+    """
+    return bool(needs_skip)
+
+
 def configure_ram_skip(
     env: RE1Env,
     speed: int,
@@ -1880,6 +1932,10 @@ def _credit_skip_room_crossing(
     env._prev_state = dict(crossing)
     env._cutscene_skip_entry_prev = dict(crossing)
     env._cutscene_skip_frames = 0
+    try:
+        env._ram_skip.clear_skip_script_peaks()
+    except AttributeError:
+        pass
     return env._cutscene_skip_entry_prev, 0
 
 
@@ -1905,10 +1961,16 @@ def cutscene_skip_chunk(
     assert env._planner is not None
     entry_prev = getattr(env, "_cutscene_skip_entry_prev", None)
     if entry_prev is None:
-        entry_prev = dict(env._prev_state)
+        # Live pose at skip arm — not stale walk state. Kenneth often sets
+        # scene_flag before the first burn; _prev_state can still be idle.
+        try:
+            entry_prev = dict(env._read_state())
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            entry_prev = dict(env._prev_state) if env._prev_state else {}
         env._cutscene_skip_entry_prev = dict(entry_prev)
         env._cutscene_skip_frames = 0
         env._skip_inventory_before = _read_policy_inventory(env)
+        env._ram_skip.clear_skip_script_peaks()
     t0 = time.perf_counter()
     try:
         burned, _ = env._ram_skip.skip_uncontrolled(max_frames=max_frames)
@@ -1974,6 +2036,14 @@ def cutscene_skip_chunk(
     state = _annotate_story_use(
         env, entry_prev, state, inv_before, inv_after
     )
+    from re1_rl.cutscene_reward import apply_skip_script_evidence
+
+    entry_prev = apply_skip_script_evidence(
+        entry_prev,
+        peak_scene_flag=getattr(env._ram_skip, "last_skip_peak_scene_flag", None),
+        peak_msg_flag=getattr(env._ram_skip, "last_skip_peak_msg_flag", None),
+    ) or entry_prev
+    env._cutscene_skip_entry_prev = dict(entry_prev)
     state["cutscene_key"] = qualify_cutscene_reward(
         skip_frames=skip_frames,
         prev_state=entry_prev,
@@ -2019,15 +2089,31 @@ def cutscene_skip_chunk(
             visited_rooms=env._progress.visited_rooms,
         )
         if why:
-            print(f"[explore] cutscene skip unpaid: {why}", flush=True)
+            print(
+                f"[explore] cutscene skip unpaid: {why} "
+                f"(skip_frames={skip_frames})",
+                flush=True,
+            )
         elif state.get("cutscene_key"):
             print(
                 f"[explore] cutscene skip unpaid: duplicate key "
-                f"{state['cutscene_key']!r} this episode",
+                f"{state['cutscene_key']!r} this episode "
+                f"(skip_frames={skip_frames})",
                 flush=True,
             )
         else:
-            print("[explore] cutscene skip unpaid: no key", flush=True)
+            print(
+                f"[explore] cutscene skip unpaid: no key "
+                f"(skip_frames={skip_frames})",
+                flush=True,
+            )
+    elif skip_frames > 0 and breakdown.get("new_cutscene"):
+        print(
+            f"[explore] cutscene paid key={state.get('cutscene_key')!r} "
+            f"skip_frames={skip_frames} "
+            f"new_cutscene={float(breakdown.get('new_cutscene', 0)):+.4f}",
+            flush=True,
+        )
     env._prev_state = dict(state)
     if state["hp"] > 0:
         env._prev_hp = state["hp"]
@@ -2083,7 +2169,7 @@ def print_banner(
     print(
         "RE1 human play harness — frozen in control until you press; release to re-arm.\n"
         f"Input: {input_mode}  |  Speed: {speed}%  |  "
-        f"{frame_skip} frames per press (repeat same move = {frame_skip * 2} latched)\n"
+        f"{frame_skip} frames per press (agent cadence; release to re-arm)\n"
         f"{cutscene_line}  |  idle poll: {tick_ms}ms\n"
         f"{pad_line}{kb_line}",
         flush=True,
@@ -2174,6 +2260,16 @@ def main() -> int:
     )
     ap.add_argument("--quiet", action="store_true", help="Only print notable reward events")
     ap.add_argument(
+        "--non-step-rewards",
+        action="store_true",
+        help="print compact non-step reward lines (excludes step contempt) with RAM pose",
+    )
+    ap.add_argument(
+        "--move-cross-only",
+        action="store_true",
+        help="accept only movement/run + Cross (keyboard X/Z/E → Cross; strip aim/fire)",
+    )
+    ap.add_argument(
         "--deafen-step",
         action="store_true",
         help="zero step penalty in reward math (signal-only totals for cutscene verification)",
@@ -2226,6 +2322,17 @@ def main() -> int:
 
         reward_mod.STEP_PENALTY = 0.0
         print("[play] step penalty deafened (STEP_PENALTY=0)", flush=True)
+    if args.move_cross_only:
+        print(
+            "[play] move+Cross only — WASD/arrows/Shift + X/Z/E (or pad Cross); "
+            f"each press holds {int(args.frame_skip)} emu frames",
+            flush=True,
+        )
+    if args.non_step_rewards:
+        print(
+            "[play] non-step reward monitor on (step channel omitted from [non-step] lines)",
+            flush=True,
+        )
     if args.training_parity:
         args.cutscene_speed = 6400
         args.cutscene_chunk = 600
@@ -2554,9 +2661,11 @@ def main() -> int:
 
             if not args.no_auto_cutscene_skip:
                 ctrl_ram = env.bridge.read_ram(SKIP_POLL_RAM_FIELDS)
-                if needs_skip_from_ram(ctrl_ram):
+                if skip_session_active(needs_skip_from_ram(ctrl_ram)):
                     playing = True
                     if not in_cutscene_mode:
+                        # New session only — never restart mid-dialogue while
+                        # needs_skip stays true (in_control stays set for Barry).
                         env._cutscene_skip_entry_prev = None
                         env._cutscene_skip_frames = 0
                         kind = (
@@ -2574,7 +2683,10 @@ def main() -> int:
                             flush=True,
                         )
                         in_cutscene_mode = True
-                    prev_for_panel = dict(env._prev_state)
+                    prev_for_panel = dict(
+                        getattr(env, "_cutscene_skip_entry_prev", None)
+                        or env._prev_state
+                    )
                     state, reward, breakdown, goal, burned = cutscene_skip_chunk(
                         env,
                         stage=stage,
@@ -2588,7 +2700,11 @@ def main() -> int:
                         route_steps=route_steps,
                         steps_by_seq=steps_by_seq,
                     )
-                    if burned > 0:
+                    post_ram = env.bridge.read_ram(SKIP_POLL_RAM_FIELDS)
+                    still_skipping = skip_session_active(
+                        needs_skip_from_ram(post_ram)
+                    )
+                    if burned > 0 and not still_skipping:
                         reward_txt = format_reward_panel(
                             breakdown,
                             reward,
@@ -2603,10 +2719,19 @@ def main() -> int:
                         )
                         if reward_txt:
                             print(
-                                f"--- skip chunk ({burned} frames) ---",
+                                f"--- skip settled ({burned}f this chunk) ---",
                                 flush=True,
                             )
                             print(reward_txt, flush=True)
+                        if args.non_step_rewards:
+                            non_step = format_non_step_reward_line(
+                                breakdown, reward, state
+                            )
+                            if non_step:
+                                print(
+                                    f"{non_step} | skip_settled chunk={burned}f",
+                                    flush=True,
+                                )
                         if reward or breakdown:
                             _log_exploration_hit(
                                 explore,
@@ -2615,9 +2740,6 @@ def main() -> int:
                                 step=game_frames,
                                 env=env,
                             )
-                        if turbo_on:
-                            # skip chunks restore --speed; keep turbo engaged
-                            env.bridge.set_speed(int(args.cutscene_speed))
                         game_frames += 1
                         last_status_at = time.time()
                         wp = env._planner.waypoint_index if env._planner else 0
@@ -2643,8 +2765,12 @@ def main() -> int:
                             )
                             last_room = room
                             last_wp = wp
-                        if state.get("in_control"):
-                            in_cutscene_mode = False
+                    if turbo_on:
+                        env.bridge.set_speed(int(args.cutscene_speed))
+                    # Agent parity: hold session open until needs_skip clears,
+                    # even while in_control remains set (Barry dialogue).
+                    if not still_skipping:
+                        in_cutscene_mode = False
                     continue
             elif in_cutscene_mode:
                 in_cutscene_mode = False
@@ -2667,6 +2793,8 @@ def main() -> int:
             buttons = _keys_to_buttons(kb) if use_keyboard and kb else {}
             if use_emuhawk_joypad:
                 buttons.update(_joypad_to_play_buttons(raw_pad))
+            if args.move_cross_only:
+                buttons = filter_move_cross_only(buttons)
             btn_key = tuple(sorted(buttons))
             if args.debug_input and btn_key != last_buttons:
                 print(f"[input] {btn_key or '(none)'}", flush=True)
@@ -2772,6 +2900,14 @@ def main() -> int:
             if reward_txt:
                 print(f"--- step {game_frames} ({env.frame_skip} frames) ---", flush=True)
                 print(reward_txt, flush=True)
+            if args.non_step_rewards:
+                non_step = format_non_step_reward_line(breakdown, reward, state)
+                if non_step:
+                    print(
+                        f"{non_step} | decision={game_frames} "
+                        f"chunk={env.frame_skip}f",
+                        flush=True,
+                    )
             if reward or breakdown:
                 _log_exploration_hit(
                     explore,

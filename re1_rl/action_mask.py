@@ -1,7 +1,9 @@
 """Legal action masks for RE1 discrete control.
 
 Action layout (env.ACTION_NAMES):
-  0-7   movement / interact (always legal)
+  0-5   movement
+  6     attack_up          — R1+Up high attack (old quickturn slot; DC has no QT)
+  7     interact
   8     knife_swing
   9     attack
   10    use               — open USE menu; then select_slot_N (2-step)
@@ -10,7 +12,7 @@ Action layout (env.ACTION_NAMES):
   20-35 withdraw_box_N
   36    combine            — open COMBINE menu; select_slot x2 (3-step)
   37-44 select_slot_N      — shared slot pick (use / equip / combine)
-  45    attack_up          — R1+Up directional attack macro
+  45    attack_down        — R1+Down crouch / floor-aim attack macro
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ from re1_rl.weapon_equip import (
     slot_legal_for_equip,
 )
 
+ATTACK_UP_ACTION = 6  # reuses former quickturn index
 KNIFE_SWING_ACTION = 8
 ATTACK_ACTION = 9
 USE_ACTION = 10
@@ -42,7 +45,7 @@ N_WITHDRAW_ACTIONS = 16
 COMBINE_ACTION = WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS  # 36
 SELECT_SLOT_BASE = COMBINE_ACTION + 1  # 37
 N_SELECT_SLOT = 8
-ATTACK_UP_ACTION = SELECT_SLOT_BASE + N_SELECT_SLOT  # 45
+ATTACK_DOWN_ACTION = SELECT_SLOT_BASE + N_SELECT_SLOT  # 45
 
 KNIFE_ID = 0x01
 
@@ -53,8 +56,10 @@ MENU_ACTION_NAMES = ["combine"] + [
 ]
 
 # Tank controls + interact: allowed while story USE is pending so Jill can turn
-# toward the interact point after opening the USE submenu.
-_STORY_USE_RECOVERY_ACTIONS = frozenset(range(8))
+# toward the interact point after opening the USE submenu. Combat macros excluded.
+_STORY_USE_RECOVERY_ACTIONS = frozenset(
+    i for i in range(8) if i != ATTACK_UP_ACTION
+)
 
 
 def _submenu_active(
@@ -169,6 +174,8 @@ def action_mask(
         mask[ATTACK_ACTION] = legal
         if ATTACK_UP_ACTION < n_actions:
             mask[ATTACK_UP_ACTION] = legal
+        if ATTACK_DOWN_ACTION < n_actions:
+            mask[ATTACK_DOWN_ACTION] = legal
 
     if not in_submenu:
         if inventory is not None and box is not None:

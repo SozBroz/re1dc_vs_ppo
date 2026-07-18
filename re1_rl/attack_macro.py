@@ -1,10 +1,15 @@
-"""Per-weapon attack macros for the unified ``attack`` action (index 9).
+"""Per-weapon attack macros for height-synced discrete combat actions.
 
-Dispatch:
-  - **knife (0x01)** → crouch ``knife_macro`` (R1+down aim/swing/recovery)
-  - **all other weapons** → standing ranged macro (R1 aim, R1+cross fire)
+Discrete actions (env):
+  - ``attack`` (9)      — **neutral** aim for every weapon
+  - ``attack_up`` (6)  — **high** (R1+Up) for every weapon (old quickturn slot)
+  - ``attack_down`` (45) — **crouch / floor** (R1+Down) for every weapon
 
-``knife_swing`` (index 8) still calls ``knife_macro`` directly from ``env``.
+Weapon paths:
+  - **knife** — standing R1 (neutral), R1+Up (high), crouch R1+Down (down)
+  - **guns**  — standing R1 (neutral), R1+Up (high), R1+Down floor-aim (down)
+
+``knife_swing`` (index 8) still calls crouch ``knife_macro`` directly from ``env``.
 """
 
 from __future__ import annotations
@@ -15,6 +20,7 @@ from typing import Any, Callable
 
 from re1_rl.frame_ring import FrameRingBuffer
 from re1_rl.knife_macro import (
+    CROUCH_KNIFE_ACTIVE_AUX,
     KNIFE_AIM_GAME_FRAMES,
     KNIFE_FRAME_SCALE,
     KNIFE_RECOVERY_GAME_FRAMES,
@@ -222,7 +228,7 @@ def _empty_report(weapon_id: int, weapon: str | None) -> dict[str, Any]:
     }
 
 
-def _execute_knife_attack_macro(
+def _execute_knife_attack_crouch_macro(
     bridge: Any,
     *,
     empty_sticky: dict[str, bool],
@@ -231,7 +237,7 @@ def _execute_knife_attack_macro(
     weapon_id: int,
     weapon: str | None,
 ) -> tuple[bool, int, dict[str, Any]]:
-    """Crouch knife path — never use standing R1-only gun logic on knife."""
+    """Crouch knife (R1+Down) — shared by ``attack_down`` and legacy callers."""
     died, frames = execute_knife_macro(
         bridge,
         empty_sticky=empty_sticky,
@@ -248,11 +254,125 @@ def _execute_knife_attack_macro(
     knife_report = getattr(bridge, "last_knife_anim_report", None) or {}
     report = _empty_report(weapon_id, weapon)
     report["macro_path"] = "knife_crouch"
+    report["aim_mode"] = "down"
     report["outcome"] = str(knife_report.get("outcome", "ok"))
     report["frames"] = int(frames)
     report["saw_fire_anim"] = report["outcome"] == "ok"
     report["knife_report"] = dict(knife_report)
     return died, int(frames), report
+
+
+def _execute_standing_knife_height_macro(
+    bridge: Any,
+    *,
+    empty_sticky: dict[str, bool],
+    prev_hp: int,
+    episode_start_hp: int,
+    weapon_id: int,
+    weapon: str | None,
+    aim_buttons: dict[str, bool],
+    swing_buttons: dict[str, bool],
+    macro_path: str,
+    aim_mode: str,
+) -> tuple[bool, int, dict[str, Any]]:
+    """Standing knife at a height: aim hold, RAM-gated Cross until 0x14 slash."""
+    report = _empty_report(weapon_id, weapon)
+    report["macro_path"] = macro_path
+    report["aim_mode"] = aim_mode
+    total = 0
+    trail: list[str] = []
+    max_aim = max(KNIFE_UP_AIM_FRAMES, 32)
+    max_swing = max(KNIFE_UP_CROSS_FRAMES * 12, 48)
+
+    def _observe() -> tuple[int, int, int]:
+        anim, aux, rec = read_knife_hooks(bridge)
+        trail.append(f"f{total}:anim=0x{anim:02X} aux=0x{aux:02X} rec={rec}")
+        if len(trail) > 16:
+            trail.pop(0)
+        return anim, aux, rec
+
+    def _step(buttons: dict[str, bool]) -> bool:
+        nonlocal total
+        died = _step_one_frame(
+            bridge,
+            buttons,
+            empty_sticky=empty_sticky,
+            echo_joypad=False,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        total += 1
+        return died
+
+    def _finish(outcome: str, died: bool) -> tuple[bool, int, dict[str, Any]]:
+        report["frames"] = total
+        report["trail"] = list(trail)
+        report["outcome"] = outcome
+        return died, total, report
+
+    for _ in range(max_aim):
+        if _step(aim_buttons):
+            return _finish("death", True)
+        _observe()
+
+    saw_slash = False
+    for _ in range(max_swing):
+        if _step(swing_buttons):
+            return _finish("death", True)
+        anim, aux, _rec = _observe()
+        if anim == FIRE_ANIM and aux in (0, CROUCH_KNIFE_ACTIVE_AUX):
+            report["saw_fire_anim"] = True
+            saw_slash = True
+            break
+    if not saw_slash:
+        return _finish("slash_timeout", False)
+
+    # Release Cross first while holding aim height, then R1, then neutral.
+    for _ in range(KNIFE_UP_RELEASE_STAGE_FRAMES):
+        if _step(aim_buttons):
+            return _finish("death", True)
+        _observe()
+    for _ in range(KNIFE_UP_RELEASE_STAGE_FRAMES):
+        if _step({"r1": True}):
+            return _finish("death", True)
+        _observe()
+
+    stable = 0
+    for _ in range(UP_RECOVERY_MAX_FRAMES):
+        if _step({}):
+            return _finish("death", True)
+        anim, aux, rec = _observe()
+        stable = stable + 1 if (anim == 0 and aux == 0 and rec == 0) else 0
+        if stable >= MIN_BUTTON_PHASE_FRAMES:
+            break
+    else:
+        return _finish("recovery_timeout", False)
+
+    return _finish("ok", False)
+
+
+def _execute_knife_attack_macro(
+    bridge: Any,
+    *,
+    empty_sticky: dict[str, bool],
+    prev_hp: int,
+    episode_start_hp: int,
+    weapon_id: int,
+    weapon: str | None,
+) -> tuple[bool, int, dict[str, Any]]:
+    """Standing-neutral knife: R1 aim + R1+Cross slash (no up/down)."""
+    return _execute_standing_knife_height_macro(
+        bridge,
+        empty_sticky=empty_sticky,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+        weapon_id=weapon_id,
+        weapon=weapon,
+        aim_buttons={"r1": True},
+        swing_buttons={"r1": True, "cross": True},
+        macro_path="knife_neutral",
+        aim_mode="neutral",
+    )
 
 
 def _bridge_uses_frame_ring(bridge: Any) -> bool:
@@ -561,12 +681,39 @@ def _execute_knife_attack_up_macro(
     weapon_id: int,
     weapon: str | None,
 ) -> tuple[bool, int, dict[str, Any]]:
-    """Empirically validated R1+Up high knife slash."""
+    """R1+Up high knife slash (RAM-gated Cross until 0x14)."""
+    return _execute_standing_knife_height_macro(
+        bridge,
+        empty_sticky=empty_sticky,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+        weapon_id=weapon_id,
+        weapon=weapon,
+        aim_buttons={"r1": True, "up": True},
+        swing_buttons={"r1": True, "up": True, "cross": True},
+        macro_path="knife_up",
+        aim_mode="up",
+    )
+
+
+def _execute_ranged_attack_down_macro(
+    bridge: Any,
+    *,
+    empty_sticky: dict[str, bool],
+    prev_hp: int,
+    episode_start_hp: int,
+    weapon_id: int,
+    weapon: str | None,
+) -> tuple[bool, int, dict[str, Any]]:
+    """R1+Down floor-aim shot with staged Cross, Down, then R1 release."""
     report = _empty_report(weapon_id, weapon)
-    report["macro_path"] = "knife_up"
-    report["aim_mode"] = "up"
+    report["macro_path"] = f"ranged_down:{weapon or weapon_id}"
+    report["aim_mode"] = "down"
+    ammo_before = _ammo_count(bridge, weapon_id)
     total = 0
     trail: list[str] = []
+    down_aim = {"r1": True, "down": True}
+    down_fire = {"r1": True, "down": True, "cross": True}
 
     def _observe() -> tuple[int, int, int]:
         anim, aux, rec = read_knife_hooks(bridge)
@@ -589,37 +736,60 @@ def _execute_knife_attack_up_macro(
         return died
 
     def _finish(outcome: str, died: bool) -> tuple[bool, int, dict[str, Any]]:
+        spent = max(0, ammo_before - _ammo_count(bridge, weapon_id))
         report["frames"] = total
         report["trail"] = list(trail)
-        report["outcome"] = outcome
+        report["ammo_spent"] = spent
+        report["outcome"] = "dry_fire" if outcome == "ok" and spent <= 0 else outcome
         return died, total, report
 
-    for _ in range(KNIFE_UP_AIM_FRAMES):
-        if _step({"r1": True, "up": True}):
-            return _finish("death", True)
-        _observe()
-
-    for _ in range(KNIFE_UP_CROSS_FRAMES):
-        if _step({"r1": True, "up": True, "cross": True}):
-            return _finish("death", True)
-        anim, aux, _rec = _observe()
-        if anim == FIRE_ANIM and aux == 0x04:
-            report["saw_fire_anim"] = True
-    if not report["saw_fire_anim"]:
-        return _finish("slash_timeout", False)
-
-    for _ in range(KNIFE_UP_RELEASE_STAGE_FRAMES):
-        if _step({"r1": True, "up": True}):
-            return _finish("death", True)
-        _observe()
-
-    for _ in range(KNIFE_UP_RELEASE_STAGE_FRAMES):
+    # R1 preamble then add Down — matches live crouch-entry probe (r1_first).
+    for _ in range(MIN_BUTTON_PHASE_FRAMES * 2):
         if _step({"r1": True}):
             return _finish("death", True)
         _observe()
 
     stable = 0
+    for _ in range(UP_AIM_MAX_FRAMES):
+        if _step(down_aim):
+            return _finish("death", True)
+        anim, aux, rec = _observe()
+        stable = stable + 1 if is_gun_aim_stable(anim, aux, rec) else 0
+        if stable >= MIN_BUTTON_PHASE_FRAMES:
+            break
+    else:
+        # Floor-aim may stay on raising (0x12) — still allow fire after hold.
+        pass
+
+    for _ in range(max(UP_FIRE_MAX_FRAMES * 4, MIN_FIRE_HOLD_FRAMES * 8)):
+        if _step(down_fire):
+            return _finish("death", True)
+        anim, aux, _rec = _observe()
+        if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
+            report["saw_fire_anim"] = True
+        if _ammo_count(bridge, weapon_id) < ammo_before:
+            report["saw_fire_anim"] = True
+            break
+    else:
+        return _finish("ammo_timeout", False)
+
     for _ in range(UP_RECOVERY_MAX_FRAMES):
+        if _step(down_aim):
+            return _finish("death", True)
+        anim, aux, rec = _observe()
+        if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
+            report["saw_fire_anim"] = True
+        if is_gun_aim_stable(anim, aux, rec) or (anim == 0 and aux == 0 and rec == 0):
+            if report["saw_fire_anim"]:
+                break
+
+    for _ in range(UP_LOWER_MAX_FRAMES):
+        if _step({"r1": True}):
+            return _finish("death", True)
+        _observe()
+
+    stable = 0
+    for _ in range(UP_HOLSTER_MAX_FRAMES):
         if _step({}):
             return _finish("death", True)
         anim, aux, rec = _observe()
@@ -627,13 +797,12 @@ def _execute_knife_attack_up_macro(
         if stable >= MIN_BUTTON_PHASE_FRAMES:
             break
     else:
-        return _finish("recovery_timeout", False)
+        return _finish("holster_timeout", False)
 
     return _finish("ok", False)
 
 
-# Per-weapon dispatch for the ``attack`` action. Knife is crouch; all PS1
-# ranged weapons share standing gun logic with per-name frame budgets.
+# Per-weapon dispatch for ``attack`` (neutral). Knife is standing; guns stand.
 _WEAPON_ATTACK_HANDLERS: dict[int, Callable[..., tuple[bool, int, dict[str, Any]]]] = {
     KNIFE_WEAPON_ID: _execute_knife_attack_macro,
     SHOTGUN_WEAPON_ID: _execute_shotgun_attack_macro,
@@ -650,7 +819,8 @@ def execute_attack_macro(
     prev_hp: int = 0,
     episode_start_hp: int = 0,
 ) -> tuple[bool, int, dict[str, Any]]:
-    """Dispatch to the weapon-specific attack macro."""
+    """Dispatch neutral (standing) attack for the equipped weapon."""
+    empty_sticky = cleared_movement_sticky(empty_sticky)
     pins = getattr(bridge, "attack_pins", None)
     if pins is not None and _bridge_uses_frame_ring(bridge):
         pins.begin(bridge)
@@ -660,10 +830,11 @@ def execute_attack_macro(
         if weapon is None or weapon_id not in WEAPON_ITEM_IDS:
             report = _empty_report(weapon_id, weapon)
             report["outcome"] = "no_weapon"
+            report["aim_mode"] = "neutral"
             return False, 0, report
 
         handler = _WEAPON_ATTACK_HANDLERS.get(weapon_id, _execute_ranged_attack_macro)
-        return handler(
+        died, frames, report = handler(
             bridge,
             empty_sticky=empty_sticky,
             prev_hp=prev_hp,
@@ -671,6 +842,8 @@ def execute_attack_macro(
             weapon_id=weapon_id,
             weapon=weapon,
         )
+        report.setdefault("aim_mode", "neutral")
+        return died, frames, report
     finally:
         if pins is not None and pins.active:
             pins.finish(bridge)
@@ -700,6 +873,44 @@ def execute_attack_up_macro(
             _execute_knife_attack_up_macro
             if weapon_id == KNIFE_WEAPON_ID
             else _execute_ranged_attack_up_macro
+        )
+        return handler(
+            bridge,
+            empty_sticky=empty_sticky,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            weapon_id=weapon_id,
+            weapon=weapon,
+        )
+    finally:
+        if pins is not None and pins.active:
+            pins.finish(bridge)
+
+
+def execute_attack_down_macro(
+    bridge: Any,
+    *,
+    empty_sticky: dict[str, bool],
+    prev_hp: int = 0,
+    episode_start_hp: int = 0,
+) -> tuple[bool, int, dict[str, Any]]:
+    """Dispatch crouch / floor-aim attack for the equipped weapon."""
+    empty_sticky = cleared_movement_sticky(empty_sticky)
+    pins = getattr(bridge, "attack_pins", None)
+    if pins is not None and _bridge_uses_frame_ring(bridge):
+        pins.begin(bridge)
+    try:
+        weapon_id = read_equipped_weapon(bridge)
+        weapon = equipped_weapon_name(weapon_id)
+        if weapon is None or weapon_id not in WEAPON_ITEM_IDS:
+            report = _empty_report(weapon_id, weapon)
+            report["outcome"] = "no_weapon"
+            report["aim_mode"] = "down"
+            return False, 0, report
+        handler = (
+            _execute_knife_attack_crouch_macro
+            if weapon_id == KNIFE_WEAPON_ID
+            else _execute_ranged_attack_down_macro
         )
         return handler(
             bridge,

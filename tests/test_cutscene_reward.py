@@ -685,6 +685,36 @@ def test_kenneth_pays_with_main_hall_visited():
     ) == "104:0:s0"
 
 
+def test_kenneth_idle_endpoints_pay_with_mid_skip_peak():
+    """Turbo Kenneth: idle→idle endpoints; Lua peak 0x84 must latch into entry."""
+    from re1_rl.cutscene_reward import apply_skip_script_evidence
+
+    prev = make_state(room="104", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)
+    cur = make_state(room="104", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=158,
+            visited_rooms={"105", "104"},
+            rewarded_cutscenes={"105:0:s0"},
+        )
+        is None
+    )
+    latched = apply_skip_script_evidence(prev, peak_scene_flag=0x84)
+    assert latched is not None and int(latched["scene_flag"]) == 0x84
+    assert (
+        _qualify(
+            latched,
+            cur,
+            skip_frames=158,
+            visited_rooms={"105", "104"},
+            rewarded_cutscenes={"105:0:s0"},
+        )
+        == "104:0:s0"
+    )
+
+
 def test_kenneth_msg_dialogue_short_skip_still_pays():
     """Msg-only dialogue needs SCRIPT_DIALOGUE_MIN frames; scene beats stay short-ok."""
     prev = make_state(room="104", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)

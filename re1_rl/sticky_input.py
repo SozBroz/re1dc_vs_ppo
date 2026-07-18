@@ -5,14 +5,15 @@ from __future__ import annotations
 STICKY_KEYS = ("up", "down", "left", "right", "square")
 FACE_KEYS = ("cross", "triangle", "circle", "r1", "r2", "l1", "l2")
 
-# quickturn — tap within a step, never latched across steps
+# Slot 6 is attack_up (macro); legacy name kept for probes that still import it.
 QUICKTURN_ACTION = 6
 INTERACT_ACTION = 7
 # Cross hold for shelf push / examine — longer than a normal frame_skip batch.
 INTERACT_HOLD_EXTRA_FRAMES = 10
 # Interact hold = frame_skip + EXTRA (18 frames at skip=8). Consider
 # tap/release/tap/release (~8 frames) instead if shelf probes allow.
-PULSE_ACTIONS = frozenset({QUICKTURN_ACTION})
+# No pulsed face actions remain (quickturn removed; attack_up is a macro).
+PULSE_ACTIONS: frozenset[int] = frozenset()
 # knife_swing uses re1_rl.knife_macro (phased aim/swing/recovery script);
 # clears sticky here only
 KNIFE_ACTION = 8

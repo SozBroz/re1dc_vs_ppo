@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.action_mask import (
     ATTACK_ACTION,
+    ATTACK_DOWN_ACTION,
     ATTACK_UP_ACTION,
     COMBINE_ACTION,
     DEPOSIT_ACTION_BASE,
@@ -24,6 +25,7 @@ from re1_rl.action_mask import (
 from re1_rl.attack_macro import (
     attack_possible,
     can_attack_with_ammo,
+    execute_attack_down_macro,
     execute_attack_macro,
     frame_budget,
     is_aim_stable,
@@ -36,7 +38,7 @@ from re1_rl.weapon_equip import (
     magic_equip_slot,
 )
 
-N_ACTIONS = ATTACK_UP_ACTION + 1  # 46
+N_ACTIONS = ATTACK_DOWN_ACTION + 1  # 46
 
 
 def test_action_layout_matches_env_names() -> None:
@@ -46,6 +48,7 @@ def test_action_layout_matches_env_names() -> None:
     assert ACTION_NAMES[KNIFE_SWING_ACTION] == "knife_swing"
     assert ACTION_NAMES[ATTACK_ACTION] == "attack"
     assert ACTION_NAMES[ATTACK_UP_ACTION] == "attack_up"
+    assert ACTION_NAMES[ATTACK_DOWN_ACTION] == "attack_down"
     assert ACTION_NAMES[USE_ACTION] == "use"
     assert ACTION_NAMES[EQUIP_ACTION] == "equip"
     assert ACTION_NAMES[DEPOSIT_ACTION_BASE] == "deposit_slot_0"
@@ -72,9 +75,10 @@ def test_attack_legal_with_beretta_ammo() -> None:
     )
     assert m[ATTACK_ACTION]
     assert m[ATTACK_UP_ACTION]
+    assert m[ATTACK_DOWN_ACTION]
 
 
-def test_attack_up_mask_always_matches_attack_mask() -> None:
+def test_attack_height_masks_always_match_attack_mask() -> None:
     cases = [
         {},
         {"equipped_weapon_id": 0},
@@ -113,6 +117,7 @@ def test_attack_up_mask_always_matches_attack_mask() -> None:
         }
         mask = action_mask(N_ACTIONS, None, **kwargs)
         assert mask[ATTACK_UP_ACTION] == mask[ATTACK_ACTION], overrides
+        assert mask[ATTACK_DOWN_ACTION] == mask[ATTACK_ACTION], overrides
 
 
 def test_knife_attack_legal_without_ammo_items() -> None:
@@ -614,7 +619,50 @@ def test_ranged_dry_fire_not_ok() -> None:
     assert report["outcome"] == "dry_fire"
 
 
-def test_attack_knife_uses_crouch_macro_path(monkeypatch) -> None:
+def test_attack_knife_uses_neutral_macro_path(monkeypatch) -> None:
+    from unittest.mock import MagicMock
+
+    bridge = MagicMock()
+    bridge.attack_pins = None
+    bridge.frame_ring = None
+    bridge.step.return_value = (0, False)
+    # Aim hold is >=32 observes; slash must start after that window.
+    hooks = iter(
+        [(0, 0, 0)] * 32
+        + [(0x14, 0x04, 0)] * 8
+        + [(0, 0, 0)] * 24
+    )
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "equipped_weapon_id" in names:
+            return {"equipped_weapon_id": 0x01}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        try:
+            a, x, r = next(hooks)
+        except StopIteration:
+            a, x, r = (0, 0, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    bridge.read_ram.side_effect = read_ram
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, _frames, report = execute_attack_macro(
+        bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
+    )
+    assert not died
+    assert report["macro_path"] == "knife_neutral"
+    assert report["aim_mode"] == "neutral"
+    assert report["weapon"] == "knife"
+    assert report["outcome"] == "ok"
+    assert report["saw_fire_anim"] is True
+
+
+def test_attack_down_knife_uses_crouch_macro_path(monkeypatch) -> None:
     from unittest.mock import MagicMock
 
     bridge = MagicMock()
@@ -625,12 +673,74 @@ def test_attack_knife_uses_crouch_macro_path(monkeypatch) -> None:
         return False, 42
 
     monkeypatch.setattr("re1_rl.attack_macro.execute_knife_macro", fake_knife)
-    empty = {k: False for k in ("up", "down", "left", "right", "r1", "cross")}
-    died, frames, report = execute_attack_macro(
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, frames, report = execute_attack_down_macro(
         bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
     )
     assert not died
     assert frames == 42
     assert report["macro_path"] == "knife_crouch"
+    assert report["aim_mode"] == "down"
     assert report["weapon"] == "knife"
     assert report["outcome"] == "ok"
+
+
+def test_attack_down_beretta_holds_down_and_spends_ammo() -> None:
+    from unittest.mock import MagicMock
+
+    bridge = MagicMock()
+    bridge.step.return_value = (0, False)
+    ammo = {"qty": 0x0F02}  # beretta packed qty
+    hook_seq = [
+        (0x12, 0x03, 0),
+        (0x13, 0x03, 0),
+        (0x13, 0x03, 0),
+        (0x14, 0x03, 0),
+        (0x14, 0x03, 0),
+        (0x13, 0x03, 0),
+        (0, 0, 0),
+        (0, 0, 0),
+    ]
+    hook_iter = iter(hook_seq * 8)
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "equipped_weapon_id" in names:
+            return {"equipped_weapon_id": 0x02}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        if any(n.startswith("inv_slot_") for n in names):
+            return {n: ammo["qty"] if n == "inv_slot_0" else 0 for n in names}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0, 0, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    def step(**kwargs):
+        for btn in kwargs.get("frame_buttons") or []:
+            if btn.get("cross") and btn.get("down") and btn.get("r1"):
+                # Spend one round after fire pad.
+                ammo["qty"] = 0x0E02
+        return (0, False)
+
+    bridge.read_ram.side_effect = read_ram
+    bridge.step.side_effect = step
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, _frames, report = execute_attack_down_macro(
+        bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
+    )
+    assert not died
+    assert report["aim_mode"] == "down"
+    assert report["outcome"] == "ok"
+    assert report["ammo_spent"] == 1
+    saw_down_fire = False
+    for call in bridge.step.call_args_list:
+        for btn in call.kwargs.get("frame_buttons") or []:
+            if btn.get("r1") and btn.get("down") and btn.get("cross"):
+                saw_down_fire = True
+    assert saw_down_fire

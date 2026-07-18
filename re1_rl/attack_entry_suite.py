@@ -29,6 +29,8 @@ HARD_FAIL_OUTCOMES = frozenset(
         "aim_timeout",
         "recovery_interrupt",
         "recovery_timeout",
+        "slash_timeout",
+        "ammo_timeout",
         "no_weapon",
         "aborted_interrupt",
     }
@@ -68,11 +70,6 @@ ENTRY_SCENARIOS: tuple[EntryScenario, ...] = (
     EntryScenario(
         "after_turn_right",
         setup=(("turn_right", 6), ("noop", 12)),
-        entry_hook=(0x02, 0x00, 0),
-    ),
-    EntryScenario(
-        "after_quickturn",
-        setup=(("quickturn", 1), ("noop", 16)),
         entry_hook=(0x02, 0x00, 0),
     ),
     EntryScenario(
@@ -168,8 +165,16 @@ def mock_hook_sequence_for_scenario(
     seq: list[tuple[int, int, int]] = [sc.entry_hook]
     seq.extend(sc.settle_prefix)
     if int(weapon_id) == KNIFE_WEAPON_ID:
-        # Crouch knife macro is exercised separately; marker hook only.
-        seq.extend([(0x12, 0x04, 0)] * 4)
+        # Standing-neutral knife observes once per aim frame, then Cross.
+        # Align slash hooks to begin exactly at the first Cross observe.
+        from re1_rl.attack_macro import KNIFE_UP_AIM_FRAMES
+
+        # Production standing knife aims max(KNIFE_UP_AIM_FRAMES, 32) frames.
+        aim_frames = max(int(KNIFE_UP_AIM_FRAMES), 32)
+        pad = max(0, aim_frames - len(seq))
+        seq.extend([(0, 0, 0)] * pad)
+        seq.extend([(0x14, 0x04, 0)] * 10)
+        seq.extend([(0, 0, 0)] * 20)
         return seq
     seq.extend(_ranged_success_tail())
     return seq
@@ -286,29 +291,16 @@ def evaluate_mock_attack(
 
     bridge.read_ram.side_effect = read_ram
     bridge.step.return_value = (0, False)
+    # MagicMock truthiness would fake active attack_pins / frame_ring and
+    # double-consume hook reads inside _step_one_frame.
+    bridge.attack_pins = None
+    bridge.frame_ring = None
     pre = {"hooks": format_hooks(*sc.entry_hook), "scenario": sc.name}
     ammo_before = default_ammo_for_weapon(weapon_id)
     empty = {k: False for k in ("up", "down", "left", "right", "square", "cross", "r1")}
-    if int(weapon_id) == KNIFE_WEAPON_ID:
-        bridge.last_knife_anim_report = {"outcome": "ok", "frames": 40}
-
-        def _fake_knife(*_a, **_k):
-            return False, 40
-
-        import re1_rl.attack_macro as am
-
-        orig = am.execute_knife_macro
-        am.execute_knife_macro = _fake_knife
-        try:
-            died, frames, report = execute_attack_macro(
-                bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
-            )
-        finally:
-            am.execute_knife_macro = orig
-    else:
-        died, frames, report = execute_attack_macro(
-            bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
-        )
+    died, frames, report = execute_attack_macro(
+        bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
+    )
     ammo_after = ammo_before - int(report.get("ammo_spent", 0))
     ok = (not died) and attack_succeeded(
         weapon_id, report, ammo_before=ammo_before, ammo_after=ammo_after,
@@ -347,7 +339,7 @@ def evaluate_live_attack(
     if not report and int(weapon_id) == KNIFE_WEAPON_ID:
         report = dict(getattr(env.bridge, "last_knife_anim_report", None) or {})
         report.setdefault("weapon", "knife")
-        report.setdefault("macro_path", "knife_crouch")
+        report.setdefault("macro_path", "knife_neutral")
     ammo_after = slot0_ammo(env.bridge, weapon_id)
     ok = attack_succeeded(
         weapon_id, report, ammo_before=ammo_before, ammo_after=ammo_after,

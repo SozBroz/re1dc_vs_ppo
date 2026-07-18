@@ -95,6 +95,7 @@ from re1_rl.knife_macro import execute_knife_macro, read_knife_hooks
 from re1_rl.sticky_input import StickyInputState
 from re1_rl.action_mask import (
     ATTACK_ACTION,
+    ATTACK_DOWN_ACTION,
     ATTACK_UP_ACTION,
     COMBINE_ACTION,
     DEPOSIT_ACTION_BASE,
@@ -111,7 +112,11 @@ from re1_rl.action_mask import (
     WITHDRAW_ACTION_NAMES,
     action_mask as build_action_mask,
 )
-from re1_rl.attack_macro import execute_attack_macro, execute_attack_up_macro
+from re1_rl.attack_macro import (
+    execute_attack_down_macro,
+    execute_attack_macro,
+    execute_attack_up_macro,
+)
 from re1_rl.options_menu_macro import dismiss_options_menu
 
 # Mask knife/attack when live RAM shows no living enemies (set 0 to debug combat).
@@ -126,7 +131,7 @@ ACTION_NAMES = [
     "turn_left",
     "turn_right",
     "run_forward",
-    "quickturn",
+    "attack_up",  # 6 — R1+Up high attack macro (reuses old quickturn slot; not on DC)
     "interact",
     "knife_swing",
     "attack",  # standing aim+fire macro, any equipped weapon
@@ -135,13 +140,13 @@ ACTION_NAMES = [
     *DEPOSIT_ACTION_NAMES,    # 12-19 box deposits (box rooms only)
     *WITHDRAW_ACTION_NAMES,   # 20-35 box withdrawals (box rooms only)
     *MENU_ACTION_NAMES,       # 36 combine + 37-44 select_slot_N
-    "attack_up",              # 45 R1+Up directional attack macro
+    "attack_down",            # 45 R1+Down crouch / floor-aim attack macro
 ]
 
 # Map discrete actions to friendly button names (translated to Nymashock core
 # names by lua/re1_client.lua BUTTON_MAP). Directions + square latch across
 # steps; face buttons pulse within each frame_skip batch. Macro / magic
-# actions (>= 8) own the joypad or write RAM directly — empty button sets.
+# actions own the joypad or write RAM directly — empty button sets.
 ACTION_BUTTON_MAP: dict[int, dict[str, bool]] = {
     0: {},  # noop
     1: {"up": True},
@@ -149,7 +154,7 @@ ACTION_BUTTON_MAP: dict[int, dict[str, bool]] = {
     3: {"left": True},
     4: {"right": True},
     5: {"up": True, "square": True},  # run forward (square = run in RE1)
-    6: {"down": True, "square": True},  # quickturn (DC: down+run)
+    6: {},  # attack_up macro (see execute_attack_up_macro)
     7: {"cross": True},  # interact / confirm
     8: {"r1": True, "down": True, "cross": True},  # knife_swing macro entry (not a blind pulse)
 }
@@ -706,10 +711,20 @@ class RE1Env(gym.Env):
                 continue
             if not self._skipping_flag:
                 self._last_skip_frames = 0
-                # Freeze skip-entry pose for reward gating (harness cutscene_skip_entry_prev).
-                self._cutscene_skip_entry_prev = (
-                    dict(self._prev_state) if self._prev_state else None
-                )
+                # Live skip-entry pose (harness parity). Stale _prev_state can be
+                # idle while Kenneth scene_flag is already 0x84.
+                try:
+                    self._cutscene_skip_entry_prev = dict(
+                        self._read_state(track_items=False)
+                    )
+                except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                    self._cutscene_skip_entry_prev = (
+                        dict(self._prev_state) if self._prev_state else None
+                    )
+                try:
+                    self._ram_skip.clear_skip_script_peaks()
+                except AttributeError:
+                    pass
                 # Inventory snapshot for story USE / gold_emblem put-back annotate.
                 try:
                     from re1_rl.item_box import read_inventory
@@ -799,6 +814,10 @@ class RE1Env(gym.Env):
         # against the destination room — same as play_human mid-chunk credit.
         self._cutscene_skip_entry_prev = dict(crossing)
         self._last_skip_frames = 0
+        try:
+            self._ram_skip.clear_skip_script_peaks()
+        except AttributeError:
+            pass
 
     def _illegal_main_hall_failure_reason(
         self,
@@ -906,6 +925,15 @@ class RE1Env(gym.Env):
         inv_after = None
         inv_before = getattr(self, "_inventory_before_skip", None)
         entry_prev = getattr(self, "_cutscene_skip_entry_prev", None) or self._prev_state
+        from re1_rl.cutscene_reward import apply_skip_script_evidence
+
+        entry_prev = apply_skip_script_evidence(
+            entry_prev,
+            peak_scene_flag=getattr(
+                self._ram_skip, "last_skip_peak_scene_flag", None
+            ),
+            peak_msg_flag=getattr(self._ram_skip, "last_skip_peak_msg_flag", None),
+        ) or entry_prev
         try:
             from re1_rl.item_box import read_inventory
             from re1_rl.weapon_equip import policy_inventory
@@ -1895,7 +1923,8 @@ class RE1Env(gym.Env):
         knife = int(action) == KNIFE_SWING_ACTION
         attack = int(action) == ATTACK_ACTION
         attack_up = int(action) == ATTACK_UP_ACTION
-        combat_attack = attack or attack_up
+        attack_down = int(action) == ATTACK_DOWN_ACTION
+        combat_attack = attack or attack_up or attack_down
         magic = self._is_magic_action(int(action))
         attack_report: dict[str, Any] | None = None
         magic_report: dict[str, Any] | None = None
@@ -1922,9 +1951,12 @@ class RE1Env(gym.Env):
             try:
                 from re1_rl.attack_macro import cleared_movement_sticky
 
-                attack_fn = (
-                    execute_attack_up_macro if attack_up else execute_attack_macro
-                )
+                if attack_up:
+                    attack_fn = execute_attack_up_macro
+                elif attack_down:
+                    attack_fn = execute_attack_down_macro
+                else:
+                    attack_fn = execute_attack_macro
                 died_during_step, step_emulated_frames, attack_report = (
                     attack_fn(
                         self.bridge,
@@ -1954,7 +1986,6 @@ class RE1Env(gym.Env):
             from re1_rl.sticky_input import (
                 INTERACT_ACTION,
                 INTERACT_HOLD_EXTRA_FRAMES,
-                QUICKTURN_ACTION,
             )
 
             sticky, pulse, pulse_hold = self._sticky_input.apply(
@@ -1971,15 +2002,6 @@ class RE1Env(gym.Env):
             if int(action) == INTERACT_ACTION:
                 hold_n = max(hold_n, self.frame_skip + INTERACT_HOLD_EXTRA_FRAMES)
             step_emulated_frames = hold_n
-            # Quickturn: one 2-frame pulse per RL step. Default 2-on/2-off would
-            # fire twice inside an 8-frame batch.
-            pulse_kwargs: dict = {}
-            if int(action) == QUICKTURN_ACTION and pulse:
-                pulse_on = 2
-                pulse_kwargs = {
-                    "pulse_frames_on": pulse_on,
-                    "pulse_frames_off": max(0, hold_n - pulse_on),
-                }
             # Mid-hold Lua ring_stride PNG→b64 is expensive and redundant with
             # Python capture_final MMF (one shot at end of the hold).
             _, died_during_step = self.bridge.step(
@@ -1989,7 +2011,6 @@ class RE1Env(gym.Env):
                 pulse_hold=pulse_hold,
                 ring_stride=0,
                 capture_final=True,
-                **pulse_kwargs,
             )
         if died_during_step:
             death = self._death_step(
@@ -2078,7 +2099,7 @@ class RE1Env(gym.Env):
             self._post_skip_reward = 0.0
             self._post_skip_bd = {}
 
-        if knife or attack:
+        if knife or combat_attack:
             self._record_attack_telemetry(
                 action,
                 state,

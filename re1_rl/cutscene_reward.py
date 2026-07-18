@@ -348,6 +348,42 @@ SCRIPT_DIALOGUE_MIN_SKIP_FRAMES = 60
 STORY_IDLE_SETTLE_MIN_SKIP_FRAMES = 300
 
 
+def scene_flag_shows_script(scene_flag: int) -> bool:
+    """True when scene_flag is not mansion idle (matches ram_skip scene_active)."""
+    sf = int(scene_flag) & 0xFF
+    if sf & SCENE_FLAG_MASK:
+        return True
+    return (sf & 0x7F) != 0
+
+
+def apply_skip_script_evidence(
+    entry: dict[str, Any] | None,
+    *,
+    peak_scene_flag: int | None = None,
+    peak_msg_flag: int | None = None,
+) -> dict[str, Any] | None:
+    """Fold mid-skip scene/msg peaks into skip-entry for cutscene qualify.
+
+    Turbo Kenneth often returns to idle 0x80 at both Python endpoints while
+    ``0x84`` only exists inside Lua ``fast_forward``. Without this latch, tea
+    room stays examine-blocked (idle-settle exemption is dining-only).
+    """
+    if not entry:
+        return entry
+    out = dict(entry)
+    if peak_scene_flag is not None:
+        peak_sf = int(peak_scene_flag) & 0xFF
+        entry_sf = int(out.get("scene_flag", 0) or 0) & 0xFF
+        if scene_flag_shows_script(peak_sf) and not scene_flag_shows_script(entry_sf):
+            out["scene_flag"] = peak_sf
+    if peak_msg_flag is not None:
+        peak_msg = int(peak_msg_flag) & 0xFF
+        entry_msg = int(out.get("msg_flag", 0) or 0) & 0xFF
+        if peak_msg != entry_msg and peak_msg != 0:
+            out["msg_flag"] = peak_msg
+    return out
+
+
 def examine_text_skip_disqualified(
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any] | None,

@@ -654,6 +654,35 @@ local function handle_command(cmd)
         local in_control, mode = ctl()
         local msg = msg_off and bit_set(msg_off, msg_mask) or false
         local scene = scene_active_read(scene_off)
+        -- Peak raw bytes for reward gating: Kenneth (0x84) often settles back to
+        -- idle 0x80 at both Python endpoints; qualify needs mid-skip evidence.
+        local peak_scene_flag = 0
+        local peak_msg_flag = 0
+        if scene_off then
+            peak_scene_flag = memory.readbyte(scene_off, "MainRAM")
+        end
+        if msg_off then
+            peak_msg_flag = memory.readbyte(msg_off, "MainRAM")
+        end
+        local function note_peaks()
+            if scene_off then
+                local sf = memory.readbyte(scene_off, "MainRAM")
+                if scene_active_byte(sf) then
+                    peak_scene_flag = sf
+                elseif peak_scene_flag == 0 then
+                    peak_scene_flag = sf
+                end
+            end
+            if msg_off then
+                local mf = memory.readbyte(msg_off, "MainRAM")
+                if bit_set(msg_off, msg_mask) then
+                    peak_msg_flag = mf
+                elseif peak_msg_flag == 0 then
+                    peak_msg_flag = mf
+                end
+            end
+        end
+        note_peaks()
         if hp_off then
             local hp = memory.read_u16_le(hp_off, "MainRAM")
             if hp > 0 then
@@ -698,6 +727,7 @@ local function handle_command(cmd)
                 in_control, mode = ctl()
                 msg = msg_off and bit_set(msg_off, msg_mask) or false
                 scene = scene_active_read(scene_off)
+                note_peaks()
                 if in_control and not msg and not scene then
                     settle = settle + 1
                     if settle >= settle_need then
@@ -722,6 +752,8 @@ local function handle_command(cmd)
             in_control = in_control,
             msg_open = msg,
             scene_active = scene,
+            peak_scene_flag = peak_scene_flag,
+            peak_msg_flag = peak_msg_flag,
             death_abort = death_abort,
             frame = emu.framecount(),
         }

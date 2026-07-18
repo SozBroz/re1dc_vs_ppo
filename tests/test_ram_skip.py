@@ -296,12 +296,16 @@ class FakeBridge:
                 break
             self.frame += 1
             burned += 1
+        peak_sf = 0x90 if (track_scene and self._scene_active()) else 0x80
+        peak_msg = MESSAGE_FLAG_MASK if (track_msg and self._msg_open()) else 0x00
         return {
             "burned": burned,
             "mode": IN_CONTROL_MASK if self._in_control() else 0x42,
             "in_control": self._in_control(),
             "msg_open": track_msg and self._msg_open(),
             "scene_active": track_scene and self._scene_active(),
+            "peak_scene_flag": peak_sf,
+            "peak_msg_flag": peak_msg,
             "death_abort": death_abort,
             "frame": self.frame,
         }
@@ -386,6 +390,17 @@ def test_kenneth_scene_skip_burns_frames() -> None:
     burned, _ = skipper.skip_uncontrolled(max_frames=600, chunk=16)
     assert burned == 40
     assert len(bridge.ff_calls) >= 1
+    assert skipper.last_skip_peak_scene_flag == 0x84
+
+
+def test_note_skip_script_peaks_prefers_kenneth_scene() -> None:
+    skipper = RamSkipper(FakeBridge(), training_speed=100, cutscene_speed=6400)
+    skipper.note_skip_script_peaks(peak_scene_flag=0x80, peak_msg_flag=0x00)
+    skipper.note_skip_script_peaks(peak_scene_flag=0x84, peak_msg_flag=0x00)
+    skipper.note_skip_script_peaks(peak_scene_flag=0x80, peak_msg_flag=0x00)
+    assert skipper.last_skip_peak_scene_flag == 0x84
+    skipper.clear_skip_script_peaks()
+    assert skipper.last_skip_peak_scene_flag is None
 
 
 def test_wait_respects_max_frames_cap() -> None:
