@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.env import ACTION_BUTTON_MAP, ACTION_NAMES
+from re1_rl.frame_ring import FrameRingBuffer
 from re1_rl.knife_macro import (
     KNIFE_SETTLE_MAX_WAIT_FRAMES,
     KNIFE_SETTLE_MID_SWING_MAX_WAIT_FRAMES,
@@ -163,7 +164,7 @@ def test_execute_knife_macro_uses_frame_schedule() -> None:
         sticky=empty,
         frame_buttons=schedule,
         echo_joypad=False,
-        ring_stride=4,
+        ring_stride=FrameRingBuffer.STRIDE,
         capture_final=True,
     )
 

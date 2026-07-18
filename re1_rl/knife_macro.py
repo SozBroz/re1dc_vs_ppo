@@ -32,6 +32,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
+from re1_rl.frame_ring import FrameRingBuffer
 from re1_rl.memory_map import (
     PLAYER_ACTION_AUX,
     PLAYER_ANIM_STATE,
@@ -1357,7 +1358,7 @@ def _execute_knife_macro_fixed(
         sticky=empty_sticky,
         frame_buttons=schedule,
         echo_joypad=echo_joypad,
-        ring_stride=0 if pin_obs else 4,
+        ring_stride=0 if pin_obs else FrameRingBuffer.STRIDE,
         capture_final=not pin_obs,
     )
     if echo_joypad and not died:

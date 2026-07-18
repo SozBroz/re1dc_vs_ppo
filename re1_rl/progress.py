@@ -68,7 +68,7 @@ class ProgressTracker:
         self,
         *,
         made_progress: bool,
-        step_frames: int = 4,
+        step_frames: int = 8,
     ) -> None:
         """Advance idle clock when no exploration progress this step.
 

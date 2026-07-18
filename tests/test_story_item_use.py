@@ -205,8 +205,8 @@ def test_story_use_reward_and_stagnation_reset() -> None:
         "hp": 96,
         "story_use_success": "music_notes@10F_piano",
         "in_control": True,
-        "step_emulated_frames": 4,
-        "reference_step_frames": 4,
+        "step_emulated_frames": 8,
+        "reference_step_frames": 8,
     }
     rew, bd = compute_reward(prev, cur, planner=None, progress=progress, return_breakdown=True)
     assert bd["story_use"] == STORY_ITEM_USE_BONUS
@@ -404,8 +404,8 @@ def test_annotate_emblem_alcove_pays_story_use() -> None:
             "hp": 96,
             "story_use_success": ALCOVE_EMBLEM_SITE_ID,
             "in_control": True,
-            "step_emulated_frames": 4,
-            "reference_step_frames": 4,
+            "step_emulated_frames": 8,
+            "reference_step_frames": 8,
         },
         planner=None,
         progress=progress,
@@ -453,8 +453,8 @@ def test_gold_only_put_back_pays_penalty() -> None:
             "hp": 96,
             "gold_emblem_return": True,
             "in_control": True,
-            "step_emulated_frames": 4,
-            "reference_step_frames": 4,
+            "step_emulated_frames": 8,
+            "reference_step_frames": 8,
         },
         planner=None,
         progress=progress,

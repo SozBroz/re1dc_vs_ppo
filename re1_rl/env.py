@@ -242,7 +242,7 @@ class RE1Env(gym.Env):
         self,
         curriculum_path: str | Path,
         bridge: BizHawkClient | None = None,
-        frame_skip: int = 4,
+        frame_skip: int = 8,
         project_root: str | Path | None = None,
         *,
         async_cutscene_skip: bool = False,
@@ -1903,7 +1903,11 @@ class RE1Env(gym.Env):
                 capture_final=True,
             )
         else:
-            from re1_rl.sticky_input import INTERACT_ACTION, INTERACT_HOLD_EXTRA_FRAMES
+            from re1_rl.sticky_input import (
+                INTERACT_ACTION,
+                INTERACT_HOLD_EXTRA_FRAMES,
+                QUICKTURN_ACTION,
+            )
 
             sticky, pulse, pulse_hold = self._sticky_input.apply(
                 int(action), ACTION_BUTTON_MAP
@@ -1919,6 +1923,15 @@ class RE1Env(gym.Env):
             if int(action) == INTERACT_ACTION:
                 hold_n = max(hold_n, self.frame_skip + INTERACT_HOLD_EXTRA_FRAMES)
             step_emulated_frames = hold_n
+            # Quickturn: one 2-frame pulse per RL step. Default 2-on/2-off would
+            # fire twice inside an 8-frame batch.
+            pulse_kwargs: dict = {}
+            if int(action) == QUICKTURN_ACTION and pulse:
+                pulse_on = 2
+                pulse_kwargs = {
+                    "pulse_frames_on": pulse_on,
+                    "pulse_frames_off": max(0, hold_n - pulse_on),
+                }
             # Mid-hold Lua ring_stride PNG→b64 is expensive and redundant with
             # Python capture_final MMF (one shot at end of the hold).
             _, died_during_step = self.bridge.step(
@@ -1928,6 +1941,7 @@ class RE1Env(gym.Env):
                 pulse_hold=pulse_hold,
                 ring_stride=0,
                 capture_final=True,
+                **pulse_kwargs,
             )
         if died_during_step:
             death = self._death_step(

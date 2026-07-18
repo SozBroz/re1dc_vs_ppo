@@ -53,7 +53,6 @@ def _stub_env(async_cutscene_skip: bool) -> RE1Env:
     env._enemy_fields = []
     env.bridge = MagicMock()
     env.frame_skip = 8
-    env.frame_skip = 4
     env._ram_skip = MagicMock()
     env._sticky_input = MagicMock()
     env._sticky_input.apply.return_value = ({}, {}, None)

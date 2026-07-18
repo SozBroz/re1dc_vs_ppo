@@ -200,11 +200,12 @@ def main() -> int:
                 flush=True,
             )
 
-        steps_at_4 = (hi + 3) // 4
+        skip = 8
+        steps_at_skip = (hi + skip - 1) // skip
         print(
             f"\n[min] MINIMUM continuous Up frames to START push: {hi}\n"
-            f"[min] At training frame_skip=4 that is {steps_at_4} consecutive "
-            f"forward step(s) ({steps_at_4}*4={steps_at_4*4} frames reserved).",
+            f"[min] At training frame_skip={skip} that is {steps_at_skip} consecutive "
+            f"forward step(s) ({steps_at_skip}*{skip}={steps_at_skip * skip} frames reserved).",
             flush=True,
         )
         return 0

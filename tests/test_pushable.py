@@ -35,18 +35,18 @@ def test_touching_pushable_by_stall_flag() -> None:
 def test_forward_hold_extends_when_jammed() -> None:
     state = {"game_state": 0x80800004, "player_anim": JAM_WALK_ANIM}
     assert (
-        forward_hold_frames(state, action=FORWARD_ACTION, frame_skip=4) == PUSHABLE_HOLD_FRAMES
+        forward_hold_frames(state, action=FORWARD_ACTION, frame_skip=8) == PUSHABLE_HOLD_FRAMES
     )
     assert (
-        forward_hold_frames(state, action=RUN_FORWARD_ACTION, frame_skip=4)
+        forward_hold_frames(state, action=RUN_FORWARD_ACTION, frame_skip=8)
         == PUSHABLE_HOLD_FRAMES
     )
-    assert forward_hold_frames(state, action=3, frame_skip=4) == 4  # turn_left
+    assert forward_hold_frames(state, action=3, frame_skip=8) == 8  # turn_left
 
 
 def test_forward_hold_normal_when_free() -> None:
     state = {"game_state": 0x80800004, "player_anim": 0, "x": 0, "z": 0}
-    assert forward_hold_frames(state, action=FORWARD_ACTION, frame_skip=4) == 4
+    assert forward_hold_frames(state, action=FORWARD_ACTION, frame_skip=8) == 8
 
 
 def test_update_forward_collision_stall() -> None:

@@ -2156,8 +2156,8 @@ def main() -> int:
     ap.add_argument(
         "--frame-skip",
         type=int,
-        default=4,
-        help="hold each input this many frames per decision (matches RE1Env / NN, default 4)",
+        default=8,
+        help="hold each input this many frames per decision (matches RE1Env / NN, default 8)",
     )
     ap.add_argument(
         "--port",

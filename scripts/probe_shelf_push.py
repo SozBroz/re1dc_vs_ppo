@@ -20,7 +20,7 @@ ROM = ROOT / "roms" / "Resident Evil - Director's Cut.cue"
 LUA = ROOT / "lua" / "re1_client.lua"
 STATE_DIR = ROOT / "tools" / "BizHawk-2.11.1" / "PSX" / "State"
 PORT = 7788
-FRAME_SKIP = 4
+FRAME_SKIP = 8
 N_STEPS = 60
 
 

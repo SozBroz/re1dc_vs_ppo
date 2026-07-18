@@ -54,7 +54,8 @@ def decode_png_b64(png_b64: str) -> np.ndarray:
 class FrameRingBuffer:
     """Sparse store of grayscale planes keyed by emulated frame index."""
 
-    STRIDE = 4
+    # Emulated frames between stack planes; match RE1Env.frame_skip baseline.
+    STRIDE = 8
 
     def __init__(self) -> None:
         self._planes: dict[int, np.ndarray] = {}

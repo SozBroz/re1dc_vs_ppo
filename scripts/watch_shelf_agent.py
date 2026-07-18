@@ -78,7 +78,7 @@ def main() -> int:
             bridge=bridge,
             project_root=ROOT,
             async_cutscene_skip=False,
-            frame_skip=4,
+            frame_skip=8,
         )
         obs, info = env.reset()
         # Drop into the shelf save (curriculum reset loads dining).

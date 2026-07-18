@@ -10,14 +10,16 @@ from re1_rl.frame_ring import AttackFramePins, FrameRingBuffer, FRAME_SHAPE
 
 def test_stack_at_stride_offsets() -> None:
     ring = FrameRingBuffer()
-    for fc in (4, 8, 12, 16):
+    stride = FrameRingBuffer.STRIDE
+    frames = tuple(stride * i for i in range(1, 5))
+    for fc in frames:
         ring.store_plane(fc, np.full((84, 77, 1), fc, dtype=np.uint8))
-    stack = ring.stack_at(16)
+    stack = ring.stack_at(frames[-1])
     assert stack.shape == FRAME_SHAPE
-    assert int(stack[0, 0, 0]) == 4
-    assert int(stack[0, 0, 1]) == 8
-    assert int(stack[0, 0, 2]) == 12
-    assert int(stack[0, 0, 3]) == 16
+    assert int(stack[0, 0, 0]) == frames[0]
+    assert int(stack[0, 0, 1]) == frames[1]
+    assert int(stack[0, 0, 2]) == frames[2]
+    assert int(stack[0, 0, 3]) == frames[3]
 
 
 def test_attack_pins_stack_order() -> None:

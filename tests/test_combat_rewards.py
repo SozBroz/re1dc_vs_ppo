@@ -20,7 +20,7 @@ from re1_rl.reward import (
 from tests.test_scaffolding import make_planner, make_state
 
 
-def test_step_penalty_halved_for_frame_skip_4() -> None:
+def test_step_penalty_constant() -> None:
     assert STEPS_PER_CHECKPOINT == 5000
     assert STEP_PENALTY == -CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT
 
@@ -84,7 +84,7 @@ def test_knife_hit_rewards_stack_on_scaled_step_contempt() -> None:
     reward, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["step"] == STEP_PENALTY * 10
+    assert bd["step"] == STEP_PENALTY * (40 / REFERENCE_STEP_FRAMES)
     assert bd["enemy_damage"] == ENEMY_DAMAGE_REWARD * 20
     assert bd["enemy_kill"] == ENEMY_KILL_REWARD
     assert bd["attack_miss"] == 0.0
