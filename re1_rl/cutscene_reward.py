@@ -9,7 +9,6 @@ camera — those use ``room:cam:sN`` so a later beat still pays once
 
 from __future__ import annotations
 
-import math
 from collections.abc import Collection
 from typing import Any
 
@@ -39,13 +38,6 @@ BARRY_DINING_CAM = 0
 BARRY_DINING_CLUSTER_PREFIX = f"{DINING_ROOM}:{BARRY_DINING_CAM}:s"
 # Telemetry / info key when illegal pre-Kenneth Main Hall entry terminates.
 ILLEGAL_MAIN_HALL_FAILURE_REASON = "main_hall_before_kenneth"
-# Empirical 105→106 west double door (data/doors_empirical.json). Hall-door
-# pose used by examine-text idle-settle anti-farm (not a Kenneth reward gate).
-DINING_HALL_DOOR_X = 30700
-DINING_HALL_DOOR_Z = 7200
-# Spawn (~31203,6892) sits inside this radius; Barry after walking into the
-# room does not.
-DINING_HALL_DOOR_RADIUS = 1800
 
 OPENING_PHASES_NO_REWARD: frozenset[str] = frozenset(
     {
@@ -326,20 +318,6 @@ def barry_dining_cluster_key(key: str) -> bool:
     return str(key).startswith(BARRY_DINING_CLUSTER_PREFIX)
 
 
-def near_dining_hall_door(state: dict[str, Any] | None) -> bool:
-    """True when pose is at the dining→main-hall door (Wesker trigger zone)."""
-    if not state:
-        return False
-    try:
-        x = float(state.get("x", 0) or 0)
-        z = float(state.get("z", 0) or 0)
-    except (TypeError, ValueError):
-        return False
-    return math.hypot(x - DINING_HALL_DOOR_X, z - DINING_HALL_DOOR_Z) <= float(
-        DINING_HALL_DOOR_RADIUS
-    )
-
-
 def room_change_cutscene_disqualified(
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any] | None,
@@ -398,15 +376,10 @@ def examine_text_skip_disqualified(
         return False
     # Idle endpoints with no msg delta: short = examine/interact farm; long =
     # story beat that returned to mansion idle (do not require endpoint evidence).
-    # Dining hall-door zone stays examine-blocked (Wesker). Barry walk-up is
-    # away from that door (live: 1219f @ cam2 after walking, not interact spam).
+    # Includes first Barry near dining spawn (idle settle both ends ~0x80).
     if int(skip_frames) >= STORY_IDLE_SETTLE_MIN_SKIP_FRAMES:
         if room == TEA_ROOM:
             pass  # keep tea idle-settle blocked; Kenneth moves scene_flag
-        elif room == DINING_ROOM and (
-            near_dining_hall_door(prev_state) or near_dining_hall_door(new_state)
-        ):
-            pass  # Wesker door farm
         else:
             return False
     # Typical in-room idle while walking / at a door.

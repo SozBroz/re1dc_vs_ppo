@@ -593,11 +593,11 @@ def test_barry_walkup_msg_on_cam1_pays_pre_kenneth():
     )
 
 
-def test_barry_idle_settle_pays_away_from_hall_door():
-    """Barry walk-up idle-settle away from hall door; short stays examine-blocked."""
+def test_barry_idle_settle_pays_including_spawn():
+    """Long dining idle-settle pays (first Barry); short stays examine-blocked."""
     from re1_rl.cutscene_reward import STORY_IDLE_SETTLE_MIN_SKIP_FRAMES
 
-    # Mid-dining (tea-door side), not hall-door Wesker zone.
+    # Mid-dining walk-up.
     prev = make_state(
         room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00, x=15000, z=10000
     )
@@ -623,6 +623,42 @@ def test_barry_idle_settle_pays_away_from_hall_door():
         )
         == "105:2:s0"
     )
+    # Fresh-spawn pose (~31203,6892): first Barry idle-settle must pay.
+    prev_spawn = make_state(
+        room="105",
+        cam_id=2,
+        hp=96,
+        scene_flag=0x80,
+        msg_flag=0x80,
+        x=31203,
+        z=6892,
+    )
+    cur_spawn = make_state(
+        room="105",
+        cam_id=2,
+        hp=96,
+        scene_flag=0x80,
+        msg_flag=0x80,
+        x=31203,
+        z=6892,
+    )
+    assert (
+        _qualify(
+            prev_spawn,
+            cur_spawn,
+            skip_frames=1223,
+            visited_rooms={"105"},
+        )
+        == "105:2:s0"
+    )
+    # Hall-door tile long idle-settle also pays (no dining door-radius carve-out).
+    prev_d = make_state(
+        room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00, x=30700, z=7200
+    )
+    cur_d = make_state(
+        room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00, x=30700, z=7200
+    )
+    assert _qualify(prev_d, cur_d, skip_frames=1223, visited_rooms={"105"}) == "105:2:s0"
     # Cam0 scene change pays without Kenneth.
     prev_b = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
     cur_b = make_state(room="105", cam_id=0, hp=96, scene_flag=0x93)
@@ -634,40 +670,6 @@ def test_barry_idle_settle_pays_away_from_hall_door():
             visited_rooms={"105"},
         )
         == "105:0:s0"
-    )
-
-
-def test_hall_door_idle_examine_still_blocked():
-    """Dining→hall door idle settle remains examine anti-farm (not Kenneth gate)."""
-    # Default make_state pose is near 105→106 (Wesker zone).
-    prev = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00)
-    cur = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00)
-    assert (
-        _qualify(
-            prev,
-            cur,
-            skip_frames=1223,
-            visited_rooms={"105"},
-            rewarded_cutscenes=set(),
-        )
-        is None
-    )
-    prev_d = make_state(
-        room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00, x=30700, z=7200
-    )
-    cur_d = make_state(
-        room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0x00, x=30700, z=7200
-    )
-    assert _qualify(prev_d, cur_d, skip_frames=1223, visited_rooms={"105"}) is None
-    assert (
-        _qualify(
-            prev,
-            cur,
-            skip_frames=1223,
-            visited_rooms={"105", "104"},
-            rewarded_cutscenes={"104:0:s0"},
-        )
-        is None
     )
 
 

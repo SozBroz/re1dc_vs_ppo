@@ -83,8 +83,9 @@ Anything that **stops Jill from moving** can look like a “cutscene” to the d
 | c | Interact that only puts text on screen |
 | d | Door / stairs transitions that load a new room (room pay is #1, not #2) |
 
-Hall-door idle examine settle near the dining→106 door remains blocked as
-generic examine/text anti-farm (not a Kenneth reward gate).
+Short same-room idle/examine skips remain blocked globally. Long dining
+idle-settle (≥ story floor) pays, including first Barry near spawn — there is
+**no** dining→106 door-radius carve-out.
 
 ### Not yet validated
 
