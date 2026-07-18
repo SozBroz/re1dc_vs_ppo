@@ -1,0 +1,311 @@
+{
+  "created": "2026-07-17T21:23:46",
+  "port": 7799,
+  "state": "D:\\re1_rl\\tools\\BizHawk-2.11.1\\PSX\\State\\Resident Evil - Director's Cut (USA).Nymashock.QuickSave3.State",
+  "state_mtime": "2026-07-17T21:11:41",
+  "trials": [
+    {
+      "tag": "slot3_yes",
+      "slot": 3,
+      "mode": "yes",
+      "opened": true,
+      "posed": {
+        "pos": [
+          19500,
+          7600
+        ],
+        "facing": 2048,
+        "cam": 0,
+        "msg_open": false,
+        "msg_flag": "0x00",
+        "hp": 16,
+        "gm": "0x80",
+        "gs": "0x80800000",
+        "room": "117"
+      },
+      "advance": {
+        "stage": "closed_after_advance",
+        "pages": 2
+      },
+      "confirmed_yes": false,
+      "final": {
+        "pos": [
+          19500,
+          7600
+        ],
+        "facing": 2048,
+        "cam": 0,
+        "msg_open": false,
+        "msg_flag": "0x00",
+        "hp": 16,
+        "gm": "0x80",
+        "gs": "0x80800000",
+        "room": "117"
+      },
+      "single_bit_sets": [],
+      "vs_baseline_single_bit_sets": [
+        {
+          "addr": "0x800C9BCC",
+          "bit": 3,
+          "before": 192,
+          "after": 200,
+          "xor": 8
+        }
+      ],
+      "note": "advance ended as closed_after_advance"
+    },
+    {
+      "tag": "slot3_yesno_only",
+      "slot": 3,
+      "mode": "yesno_only",
+      "opened": true,
+      "posed": {
+        "pos": [
+          19500,
+          7600
+        ],
+        "facing": 2048,
+        "cam": 0,
+        "msg_open": false,
+        "msg_flag": "0x00",
+        "hp": 16,
+        "gm": "0x80",
+        "gs": "0x80800000",
+        "room": "117"
+      },
+      "advance": {
+        "stage": "closed_after_advance",
+        "pages": 2
+      },
+      "confirmed_yes": false,
+      "final": {
+        "pos": [
+          19500,
+          7600
+        ],
+        "facing": 2048,
+        "cam": 0,
+        "msg_open": false,
+        "msg_flag": "0x00",
+        "hp": 16,
+        "gm": "0x80",
+        "gs": "0x80800000",
+        "room": "117"
+      },
+      "single_bit_sets": [],
+      "vs_baseline_single_bit_sets": [
+        {
+          "addr": "0x800C9BCC",
+          "bit": 3,
+          "before": 192,
+          "after": 200,
+          "xor": 8
+        }
+      ],
+      "note": "advance ended as closed_after_advance"
+    },
+    {
+      "tag": "slot2_yes",
+      "slot": 2,
+      "mode": "yes",
+      "opened": true,
+      "posed": {
+        "pos": [
+          16000,
+          7600
+        ],
+        "facing": 2048,
+        "cam": 0,
+        "msg_open": false,
+        "msg_flag": "0x00",
+        "hp": 16,
+        "gm": "0x80",
+        "gs": "0x80800000",
+        "room": "117"
+      },
+      "advance": {
+        "stage": "closed_after_advance",
+        "pages": 2
+      },
+      "confirmed_yes": false,
+      "final": {
+        "pos": [
+          16000,
+          7600
+        ],
+        "facing": 2048,
+        "cam": 0,
+        "msg_open": false,
+        "msg_flag": "0x00",
+        "hp": 16,
+        "gm": "0x80",
+        "gs": "0x80800000",
+        "room": "117"
+      },
+      "single_bit_sets": [],
+      "vs_baseline_single_bit_sets": [
+        {
+          "addr": "0x800C9BCC",
+          "bit": 3,
+          "before": 192,
+          "after": 200,
+          "xor": 8
+        }
+      ],
+      "note": "advance ended as closed_after_advance"
+    },
+    {
+      "tag": "slot6_yes",
+      "slot": 6,
+      "mode": "yes",
+      "opened": true,
+      "posed": {
+        "pos": [
+          10850,
+          5497
+        ],
+        "facing": 3072,
+        "cam": 0,
+        "msg_open": false,
+        "msg_flag": "0x00",
+        "hp": 16,
+        "gm": "0x80",
+        "gs": "0x80800000",
+        "room": "117"
+      },
+      "advance": {
+        "stage": "closed_after_advance",
+        "pages": 2
+      },
+      "confirmed_yes": false,
+      "final": {
+        "pos": [
+          10850,
+          5497
+        ],
+        "facing": 3072,
+        "cam": 0,
+        "msg_open": false,
+        "msg_flag": "0x00",
+        "hp": 16,
+        "gm": "0x80",
+        "gs": "0x80800000",
+        "room": "117"
+      },
+      "single_bit_sets": [],
+      "vs_baseline_single_bit_sets": [
+        {
+          "addr": "0x800C9BCC",
+          "bit": 3,
+          "before": 192,
+          "after": 200,
+          "xor": 8
+        }
+      ],
+      "note": "advance ended as closed_after_advance"
+    },
+    {
+      "tag": "slot3_examine_dismiss",
+      "slot": 3,
+      "mode": "examine_dismiss",
+      "opened": true,
+      "posed": {
+        "pos": [
+          19500,
+          7600
+        ],
+        "facing": 2048,
+        "cam": 0,
+        "msg_open": false,
+        "msg_flag": "0x00",
+        "hp": 16,
+        "gm": "0x80",
+        "gs": "0x80800000",
+        "room": "117"
+      },
+      "advance": {
+        "stage": "closed_after_advance",
+        "pages": 2
+      },
+      "final": {
+        "pos": [
+          19500,
+          7600
+        ],
+        "facing": 2048,
+        "cam": 0,
+        "msg_open": false,
+        "msg_flag": "0x00",
+        "hp": 16,
+        "gm": "0x80",
+        "gs": "0x80800000",
+        "room": "117"
+      },
+      "single_bit_sets": [],
+      "vs_baseline_single_bit_sets": [
+        {
+          "addr": "0x800C9BCC",
+          "bit": 3,
+          "before": 192,
+          "after": 200,
+          "xor": 8
+        }
+      ]
+    },
+    {
+      "tag": "slot8_yes",
+      "slot": 8,
+      "mode": "yes",
+      "opened": false,
+      "posed": {
+        "pos": [
+          2710,
+          4100
+        ],
+        "facing": 0,
+        "cam": 0,
+        "msg_open": false,
+        "msg_flag": "0x00",
+        "hp": 16,
+        "gm": "0x80",
+        "gs": "0x80800000",
+        "room": "117"
+      }
+    }
+  ],
+  "baseline": {
+    "pos": [
+      2900,
+      10000
+    ],
+    "facing": 0,
+    "cam": 0,
+    "msg_open": false,
+    "msg_flag": "0x00",
+    "hp": 16,
+    "gm": "0x80",
+    "gs": "0x80800000",
+    "room": "117"
+  },
+  "unique_progress_candidates": {
+    "only_slot3_yes": [],
+    "only_slot2_yes": [],
+    "only_slot6_yes": [],
+    "shared_all_yes": []
+  },
+  "final_reload": {
+    "pos": [
+      2900,
+      10000
+    ],
+    "facing": 0,
+    "cam": 0,
+    "msg_open": false,
+    "msg_flag": "0x00",
+    "hp": 16,
+    "gm": "0x80",
+    "gs": "0x80800000",
+    "room": "117"
+  },
+  "save_intact": true
+}

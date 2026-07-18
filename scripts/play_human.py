@@ -1148,6 +1148,13 @@ def format_reward_panel(
         else:
             lines.append("Picked up a key item.")
         interesting = True
+    gallery_reward = float(breakdown.get("gallery", 0.0))
+    if gallery_reward > 0.0:
+        lines.append("Correct Gallery portrait switch.")
+        interesting = True
+    elif gallery_reward < 0.0:
+        lines.append("Gallery partial-sequence reward clawed back.")
+        interesting = True
     if breakdown.get("story_use", 0.0):
         site = state.get("story_use_success", "")
         lines.append(f"Story item USE bonus{f' ({site})' if site else ''}.")

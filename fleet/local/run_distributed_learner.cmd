@@ -1,5 +1,5 @@
 @echo off
-REM Learner + local worker on workhorse2 (192.168.0.111)
+REM Learner + local worker on workhorse2 (192.168.0.116)
 setlocal
 cd /d D:\re1_rl
 set MACHINE=workhorse2

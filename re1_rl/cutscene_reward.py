@@ -29,16 +29,18 @@ MAX_SAME_ROOM_CUTSCENE_INDEX = 1
 # Boot / attract spans — never pay exploration cutscene bonus.
 # In-mansion Barry/Wesker scenes (``mansion_intro_*``) are real gameplay cutscenes
 # and pay once per room:cam like doors/Kenneth.
-# Kenneth tea-room zombie (104). Re-entering main hall (106) before this fires
-# Wesker dialogue and despawns Kenneth's handgun clips — do not reward that loop.
+# Kenneth tea-room zombie script (``104:*:sN``). Sole hard gate: transitioning
+# into Main Hall (106) before this beat has paid ends the episode (env).
 KENNETH_CUTSCENE_MILESTONE = "104:0"
 MAIN_HALL_ROOM = "106"
 DINING_ROOM = "105"
 TEA_ROOM = "104"
 BARRY_DINING_CAM = 0
 BARRY_DINING_CLUSTER_PREFIX = f"{DINING_ROOM}:{BARRY_DINING_CAM}:s"
-# Empirical 105→106 west double door (data/doors_empirical.json). Wesker fires
-# when interacting here before Kenneth; Barry walk-up is elsewhere in 105.
+# Telemetry / info key when illegal pre-Kenneth Main Hall entry terminates.
+ILLEGAL_MAIN_HALL_FAILURE_REASON = "main_hall_before_kenneth"
+# Empirical 105→106 west double door (data/doors_empirical.json). Hall-door
+# pose used by examine-text idle-settle anti-farm (not a Kenneth reward gate).
 DINING_HALL_DOOR_X = 30700
 DINING_HALL_DOOR_Z = 7200
 # Spawn (~31203,6892) sits inside this radius; Barry after walking into the
@@ -169,25 +171,32 @@ def kenneth_cutscene_seen(
     visited_rooms: Collection[str] | None = None,
 ) -> bool:
     """True once the tea-room Kenneth zombie script beat paid this episode."""
-    del visited_rooms  # visit alone does not unlock main-hall rewards
+    del visited_rooms  # visit alone is not the canonical Kenneth ledger mark
     seen = set(rewarded_cutscenes or ())
     if any(str(k).startswith(f"{TEA_ROOM}:") and ":s" in str(k) for k in seen):
         return True
     return False
 
 
-def main_hall_new_room_gated(
-    room_id: str,
+def illegal_main_hall_before_kenneth_transition(
+    prev_room: str,
+    room: str,
     *,
     rewarded_cutscenes: Collection[str] | None,
     visited_rooms: Collection[str] | None = None,
 ) -> bool:
-    """True when ``new_room`` must not pay for main hall yet (pre-Kenneth)."""
-    if str(room_id) != MAIN_HALL_ROOM:
+    """True on a transition *into* Main Hall (106) before Kenneth paid.
+
+    Does not fire for starting/resetting in 106, remaining in 106, or entering
+    106 after the canonical tea-room Kenneth beat (``104:*:sN``) has paid.
+    """
+    del visited_rooms
+    if str(room) != MAIN_HALL_ROOM:
         return False
-    return not kenneth_cutscene_seen(
-        rewarded_cutscenes, visited_rooms=visited_rooms
-    )
+    prev = str(prev_room or "")
+    if not prev or prev == MAIN_HALL_ROOM:
+        return False
+    return not kenneth_cutscene_seen(rewarded_cutscenes)
 
 
 def dining_tea_corridor_repeat_disqualified(
@@ -244,24 +253,6 @@ def dining_tea_corridor_repeat_disqualified(
 def kenneth_tea_script_key(key: str) -> bool:
     """Tea-room Kenneth zombie script (``104:*:sN``)."""
     return str(key).startswith(f"{TEA_ROOM}:") and ":s" in str(key)
-
-
-def pre_kenneth_all_cutscenes_disqualified(
-    *,
-    key: str,
-    rewarded_cutscenes: Collection[str] | None,
-    visited_rooms: Collection[str] | None = None,
-) -> bool:
-    """Block every cutscene payout until Kenneth pays — Kenneth itself exempt.
-
-    Imperator 2026-07-17: dining door / cam exploits farmed ``new_cutscene``
-    before the tea-room beat. Only ``104:*:sN`` may pay while Kenneth unseen.
-    """
-    if kenneth_cutscene_seen(rewarded_cutscenes, visited_rooms=visited_rooms):
-        return False
-    if kenneth_tea_script_key(key):
-        return False
-    return True
 
 
 def same_room_script_key(key: str) -> bool:
@@ -330,21 +321,6 @@ def canonical_story_script_key(
     )
 
 
-def early_main_hall_before_kenneth_disqualified(
-    *,
-    key: str,
-    prev_state: dict[str, Any] | None,
-    new_state: dict[str, Any] | None,
-    rewarded_cutscenes: Collection[str] | None,
-    visited_rooms: Collection[str] | None,
-) -> bool:
-    """Block main-hall cutscene keys only — not Barry/Kenneth in other rooms."""
-    del prev_state, new_state
-    if kenneth_cutscene_seen(rewarded_cutscenes, visited_rooms=visited_rooms):
-        return False
-    return str(key).startswith(f"{MAIN_HALL_ROOM}:")
-
-
 def barry_dining_cluster_key(key: str) -> bool:
     """Barry talk + Barry zombie at dining cam 0 (``105:0:sN``)."""
     return str(key).startswith(BARRY_DINING_CLUSTER_PREFIX)
@@ -362,31 +338,6 @@ def near_dining_hall_door(state: dict[str, Any] | None) -> bool:
     return math.hypot(x - DINING_HALL_DOOR_X, z - DINING_HALL_DOOR_Z) <= float(
         DINING_HALL_DOOR_RADIUS
     )
-
-
-def pre_kenneth_dining_script_repeat_disqualified(
-    *,
-    key: str,
-    rewarded_cutscenes: Collection[str] | None,
-    visited_rooms: Collection[str] | None,
-    prev_state: dict[str, Any] | None = None,
-    new_state: dict[str, Any] | None = None,
-) -> bool:
-    """Block pre-Kenneth Wesker door farm; allow Barry (cam0 + walk-up away from door).
-
-    Wesker is the dining→hall door interact (near 105→106). Barry walk-up is a
-    long same-room beat elsewhere in 105 (often cam1/2, idle endpoints).
-    """
-    if kenneth_cutscene_seen(rewarded_cutscenes, visited_rooms=visited_rooms):
-        return False
-    if barry_dining_cluster_key(key):
-        return False
-    if not str(key).startswith(f"{DINING_ROOM}:"):
-        return False
-    # Hall-door zone = Wesker (skill #2e). Away from door = Barry walk-up.
-    if near_dining_hall_door(prev_state) or near_dining_hall_door(new_state):
-        return True
-    return False
 
 
 def room_change_cutscene_disqualified(
@@ -524,31 +475,6 @@ def qualify_cutscene_reward(
         # Long idle-settle skips still clear via STORY_IDLE_SETTLE_MIN (Barry).
         return None
 
-    if early_main_hall_before_kenneth_disqualified(
-        key=key,
-        prev_state=prev_state,
-        new_state=new_state,
-        rewarded_cutscenes=rewarded_cutscenes,
-        visited_rooms=visited_rooms,
-    ):
-        return None
-
-    if pre_kenneth_all_cutscenes_disqualified(
-        key=key,
-        rewarded_cutscenes=rewarded_cutscenes,
-        visited_rooms=visited_rooms,
-    ):
-        return None
-
-    if pre_kenneth_dining_script_repeat_disqualified(
-        key=key,
-        rewarded_cutscenes=rewarded_cutscenes,
-        visited_rooms=visited_rooms,
-        prev_state=prev_state,
-        new_state=new_state,
-    ):
-        return None
-
     if dining_tea_corridor_repeat_disqualified(
         key=key,
         prev_state=prev_state,
@@ -626,28 +552,6 @@ def cutscene_disqualify_reason(
     key = cutscene_key_from_state(
         prev_state, new_state, rewarded_cutscenes=rewarded_cutscenes
     )
-    if key is not None and early_main_hall_before_kenneth_disqualified(
-        key=key,
-        prev_state=prev_state,
-        new_state=new_state,
-        rewarded_cutscenes=rewarded_cutscenes,
-        visited_rooms=visited_rooms,
-    ):
-        return "main hall before Kenneth (106 keys gated)"
-    if key is not None and pre_kenneth_all_cutscenes_disqualified(
-        key=key,
-        rewarded_cutscenes=rewarded_cutscenes,
-        visited_rooms=visited_rooms,
-    ):
-        return "cutscene before Kenneth (only 104:*:sN may pay)"
-    if key is not None and pre_kenneth_dining_script_repeat_disqualified(
-        key=key,
-        rewarded_cutscenes=rewarded_cutscenes,
-        visited_rooms=visited_rooms,
-        prev_state=prev_state,
-        new_state=new_state,
-    ):
-        return "dining Wesker/hall-door zone before Kenneth"
     if key is not None and dining_tea_corridor_repeat_disqualified(
         key=key,
         prev_state=prev_state,
@@ -703,15 +607,11 @@ def format_cutscene_gate_panel(
     new_r = str((new_state or {}).get("room_id", "") or "")
     prev_cam = int((prev_state or {}).get("cam_id", 0) or 0)
     new_cam = int((new_state or {}).get("cam_id", 0) or 0)
-    gate_blocked = bool(
-        proposed
-        and early_main_hall_before_kenneth_disqualified(
-            key=proposed,
-            prev_state=prev_state,
-            new_state=new_state,
-            rewarded_cutscenes=rewarded_cutscenes,
-            visited_rooms=visited_rooms,
-        )
+    illegal_hall = illegal_main_hall_before_kenneth_transition(
+        prev_r,
+        new_r,
+        rewarded_cutscenes=rewarded_cutscenes,
+        visited_rooms=visited_rooms,
     )
     paid = float((breakdown or {}).get("new_cutscene", 0.0))
     why = cutscene_disqualify_reason(
@@ -734,7 +634,7 @@ def format_cutscene_gate_panel(
         ),
         (
             f"  kenneth_seen={kenneth}  "
-            f"main_hall_pre_kenneth_gate={'BLOCK' if gate_blocked else 'open'}"
+            f"illegal_main_hall_entry={'FAIL' if illegal_hall else 'ok'}"
         ),
         f"  visited_rooms={visited}",
         f"  rewarded_cutscenes={rewarded}",

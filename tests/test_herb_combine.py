@@ -27,7 +27,7 @@ from re1_rl.herb_combine import (
 )
 from re1_rl.inventory_combine import apply_combine, plan_combine as plan_any_combine
 
-N_ACTIONS = 45
+N_ACTIONS = 46
 
 
 def _inv(*slots: tuple[int, int]) -> list[tuple[int, int]]:

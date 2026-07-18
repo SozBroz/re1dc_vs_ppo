@@ -11,11 +11,8 @@ query user
 echo --- free RAM ---
 powershell -NoProfile -Command " $o=Get-CimInstance Win32_OperatingSystem; '{0:N1} / {1:N1} GB free/total' -f ($o.FreePhysicalMemory/1MB),($o.TotalVisibleMemorySize/1MB)"
 echo --- learner health ---
-venv\Scripts\python.exe -c "from re1_rl.distributed.worker_client import WorkerClient; c=WorkerClient('192.168.0.111',8765,machine_name='probe',timeout=5); 
-try:
- print('health', c.health())
-except Exception as e:
- print('learner unreachable (start WH2 learner first):', type(e).__name__)"
+call "%~dp0..\fleet_hosts.cmd"
+venv\Scripts\python.exe -c "from re1_rl.distributed.worker_client import WorkerClient; import os; h=os.environ.get('FLEET_LEARNER_HOST','192.168.0.116'); c=WorkerClient(h,8765,machine_name='probe',timeout=5); print('health', c.health())"
 echo --- session note ---
 echo If STATE=Disc above, RDP into WH1 before starting the worker.
 echo --- leftover processes ---

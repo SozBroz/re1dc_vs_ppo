@@ -11,7 +11,7 @@ from re1_rl.action_mask import ATTACK_ACTION, COMBINE_ACTION, EQUIP_ACTION, SELE
 from re1_rl.ammo_accounting import can_fire_weapon, total_fireable_ammo
 from re1_rl.inventory_combine import apply_combine, plan_combine
 
-N_ACTIONS = 45
+N_ACTIONS = 46
 
 
 def _inv(*slots: tuple[int, int]) -> list[tuple[int, int]]:

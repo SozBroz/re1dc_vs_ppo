@@ -9,7 +9,7 @@ Usage (learner host — learner + local BizHawk fleet):
 
 Usage (remote worker only):
     python scripts/distributed_train_parallel.py --role worker --machine-name pc-b \\
-        --learner-host 192.168.0.160 --learner-port 8765
+        --learner-host 192.168.0.116 --learner-port 8765
 
 Single-machine dev (learner + local worker, no remote workers):
     python scripts/distributed_train_parallel.py --role both --machine-name devbox
@@ -48,6 +48,7 @@ from re1_rl.distributed.weights import export_policy_state_dict  # noqa: E402
 from re1_rl.distributed.worker_client import WorkerClient  # noqa: E402
 from re1_rl.distributed.async_worker_runtime import run_async_worker_loop  # noqa: E402
 from re1_rl.distributed.worker_runtime import (  # noqa: E402
+    run_synced_worker_loop,
     warmup_local_policy,
     warmup_remote_policy,
 )
@@ -194,6 +195,14 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=32,
         help="max actor obs per GPU inference batch (default 32)",
+    )
+    ap.add_argument(
+        "--synced-envs",
+        action="store_true",
+        help=(
+            "remote worker only: lockstep SubprocVecEnv instead of desync actors "
+            "(experiment; same epoch flush/weights)"
+        ),
     )
     ap.add_argument(
         "--tile-windows",
@@ -385,26 +394,46 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
         sync_interval = float(args.weight_sync_poll_s)
 
     try:
-        run_async_worker_loop(
-            policy,
-            machine_name=args.machine_name,
-            worker_id=worker_id,
-            n_envs=int(args.n_envs),
-            n_steps=int(args.n_steps),
-            curriculum=args.curriculum,
-            base_port=int(args.base_port),
-            training_speed=int(args.training_speed),
-            skip_chunk=int(args.skip_chunk),
-            capture_checkpoints=bool(args.capture_checkpoints),
-            stop_event=stop_event,
-            rollout_sink=client,
-            is_local=False,
-            sync_interval_s=sync_interval,
-            project_root=PROJECT_ROOT,
-            headless=bool(args.headless),
-            screenshot_mmf=args.screenshot_mmf,
-            inference_batch_max=int(args.inference_batch_max),
-        )
+        if bool(getattr(args, "synced_envs", False)):
+            run_synced_worker_loop(
+                policy,
+                machine_name=args.machine_name,
+                worker_id=worker_id,
+                n_envs=int(args.n_envs),
+                n_steps=int(args.n_steps),
+                curriculum=args.curriculum,
+                base_port=int(args.base_port),
+                training_speed=int(args.training_speed),
+                skip_chunk=int(args.skip_chunk),
+                capture_checkpoints=bool(args.capture_checkpoints),
+                stop_event=stop_event,
+                client=client,
+                sync_interval_s=sync_interval,
+                project_root=PROJECT_ROOT,
+                headless=bool(args.headless),
+                screenshot_mmf=args.screenshot_mmf,
+            )
+        else:
+            run_async_worker_loop(
+                policy,
+                machine_name=args.machine_name,
+                worker_id=worker_id,
+                n_envs=int(args.n_envs),
+                n_steps=int(args.n_steps),
+                curriculum=args.curriculum,
+                base_port=int(args.base_port),
+                training_speed=int(args.training_speed),
+                skip_chunk=int(args.skip_chunk),
+                capture_checkpoints=bool(args.capture_checkpoints),
+                stop_event=stop_event,
+                rollout_sink=client,
+                is_local=False,
+                sync_interval_s=sync_interval,
+                project_root=PROJECT_ROOT,
+                headless=bool(args.headless),
+                screenshot_mmf=args.screenshot_mmf,
+                inference_batch_max=int(args.inference_batch_max),
+            )
     except KeyboardInterrupt:
         log(args.machine_name, "remote worker interrupted")
     finally:

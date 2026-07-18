@@ -1,10 +1,10 @@
 @echo off
-REM workhorse1 remote worker — MUST run from interactive RDP/console, not bare SSH.
-REM Yesterday: registered over HTTP but EmuHawk/Lua never connected from SSH session.
+REM workhorse1 remote worker (192.168.0.203) — interactive desktop required for EmuHawk.
 setlocal
 cd /d D:\re1_rl
+call "%~dp0..\fleet_hosts.cmd"
 set MACHINE_NAME=workhorse1
-set LEARNER_HOST=192.168.0.116
+set LEARNER_HOST=%FLEET_LEARNER_HOST%
 set BASE_PORT=5655
 set N_ENVS=8
 set SYNC_INTERVAL_S=180

@@ -166,16 +166,34 @@ def _checkpoint_spaces_compatible(model) -> bool:
 
 
 def _copy_compatible_policy_weights(src_policy, dst_policy) -> int:
-    """Copy tensors that exist in both policies with identical shapes.
+    """Copy compatible tensors, expanding a legacy action head safely.
 
     ``strict=False`` still errors on shape mismatches for shared keys; filter first.
+    New action rows inherit ``attack`` semantics with a 100x lower prior.
     """
+    from re1_rl.action_mask import ATTACK_ACTION
+
     src = src_policy.state_dict()
     dst = dst_policy.state_dict()
     filtered = {
         k: v for k, v in src.items()
         if k in dst and tuple(dst[k].shape) == tuple(v.shape)
     }
+    for key in ("action_net.weight", "action_net.bias"):
+        if key not in src or key not in dst:
+            continue
+        old = src[key]
+        new = dst[key]
+        if old.ndim != new.ndim or old.shape[0] >= new.shape[0]:
+            continue
+        if old.ndim == 2 and old.shape[1:] != new.shape[1:]:
+            continue
+        expanded = new.clone()
+        expanded[: old.shape[0]] = old
+        expanded[old.shape[0] :] = old[ATTACK_ACTION]
+        if old.ndim == 1:
+            expanded[old.shape[0] :] -= float(np.log(100.0))
+        filtered[key] = expanded
     dst_policy.load_state_dict(filtered, strict=False)
     return len(filtered)
 

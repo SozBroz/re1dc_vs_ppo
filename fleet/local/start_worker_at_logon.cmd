@@ -17,7 +17,8 @@ goto pking
 
 :wh1
 set MACHINE_NAME=workhorse1
-set LEARNER_HOST=192.168.0.116
+call "%~dp0..\fleet_hosts.cmd"
+set LEARNER_HOST=%FLEET_LEARNER_HOST%
 set BASE_PORT=5655
 set N_ENVS=8
 set SYNC_INTERVAL_S=360
@@ -33,7 +34,8 @@ goto run_headless
 
 :pking
 set MACHINE_NAME=pking
-set LEARNER_HOST=192.168.0.116
+call "%~dp0..\fleet_hosts.cmd"
+set LEARNER_HOST=%FLEET_LEARNER_HOST%
 set BASE_PORT=5755
 set N_ENVS=12
 set SYNC_INTERVAL_S=360

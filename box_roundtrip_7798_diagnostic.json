@@ -1,0 +1,1071 @@
+{
+  "port": 7798,
+  "exact_resolved_path_printed_before_launch": "D:\\re1_rl\\tools\\BizHawk-2.11.1\\PSX\\State\\Resident Evil - Director's Cut (USA).Nymashock.QuickSave2.State",
+  "exact_mtime": "2026-07-17 21:06:05",
+  "before": {
+    "save": "D:\\re1_rl\\tools\\BizHawk-2.11.1\\PSX\\State\\Resident Evil - Director's Cut (USA).Nymashock.QuickSave2.State",
+    "save_name": "Resident Evil - Director's Cut (USA).Nymashock.QuickSave2.State",
+    "pose": {
+      "room_id": "118",
+      "x": 6165,
+      "y": 0,
+      "z": 8558,
+      "facing": 3496,
+      "cam_id": 0,
+      "hp": 16,
+      "in_control": true,
+      "game_state": 2155872256,
+      "game_mode": 128,
+      "scene_flag": 128,
+      "msg_flag": 0,
+      "interaction_prompt": false
+    },
+    "box_room": true,
+    "box_room_rule": [
+      "100",
+      "118",
+      "30E",
+      "403",
+      "502",
+      "50E",
+      "600",
+      "618"
+    ],
+    "inventory": [
+      {
+        "slot": 0,
+        "item_id": 1,
+        "item": "knife",
+        "qty": 0
+      },
+      {
+        "slot": 1,
+        "item_id": 2,
+        "item": "beretta",
+        "qty": 9
+      },
+      {
+        "slot": 2,
+        "item_id": 3,
+        "item": "shotgun",
+        "qty": 3
+      },
+      {
+        "slot": 3,
+        "item_id": 68,
+        "item": "green_herb",
+        "qty": 1
+      },
+      {
+        "slot": 4,
+        "item_id": 11,
+        "item": "handgun_bullets",
+        "qty": 15
+      },
+      {
+        "slot": 5,
+        "item_id": 11,
+        "item": "handgun_bullets",
+        "qty": 15
+      },
+      {
+        "slot": 6,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 7,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      }
+    ],
+    "box_0_15": [
+      {
+        "slot": 0,
+        "item_id": 38,
+        "item": "chemical",
+        "qty": 1
+      },
+      {
+        "slot": 1,
+        "item_id": 47,
+        "item": "ink_ribbon",
+        "qty": 2
+      },
+      {
+        "slot": 2,
+        "item_id": 31,
+        "item": "emblem",
+        "qty": 1
+      },
+      {
+        "slot": 3,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 4,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 5,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 6,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 7,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 8,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 9,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 10,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 11,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 12,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 13,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 14,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      },
+      {
+        "slot": 15,
+        "item_id": 0,
+        "item": "empty",
+        "qty": 0
+      }
+    ],
+    "mask": [
+      {
+        "index": 0,
+        "name": "noop",
+        "legal": true
+      },
+      {
+        "index": 1,
+        "name": "forward",
+        "legal": true
+      },
+      {
+        "index": 2,
+        "name": "back",
+        "legal": true
+      },
+      {
+        "index": 3,
+        "name": "turn_left",
+        "legal": true
+      },
+      {
+        "index": 4,
+        "name": "turn_right",
+        "legal": true
+      },
+      {
+        "index": 5,
+        "name": "run_forward",
+        "legal": true
+      },
+      {
+        "index": 6,
+        "name": "quickturn",
+        "legal": true
+      },
+      {
+        "index": 7,
+        "name": "interact",
+        "legal": true
+      },
+      {
+        "index": 8,
+        "name": "knife_swing",
+        "legal": false
+      },
+      {
+        "index": 9,
+        "name": "attack",
+        "legal": false
+      },
+      {
+        "index": 10,
+        "name": "use",
+        "legal": false
+      },
+      {
+        "index": 11,
+        "name": "equip",
+        "legal": true
+      },
+      {
+        "index": 12,
+        "name": "deposit_slot_0",
+        "legal": true
+      },
+      {
+        "index": 13,
+        "name": "deposit_slot_1",
+        "legal": true
+      },
+      {
+        "index": 14,
+        "name": "deposit_slot_2",
+        "legal": true
+      },
+      {
+        "index": 15,
+        "name": "deposit_slot_3",
+        "legal": true
+      },
+      {
+        "index": 16,
+        "name": "deposit_slot_4",
+        "legal": true
+      },
+      {
+        "index": 17,
+        "name": "deposit_slot_5",
+        "legal": true
+      },
+      {
+        "index": 18,
+        "name": "deposit_slot_6",
+        "legal": false
+      },
+      {
+        "index": 19,
+        "name": "deposit_slot_7",
+        "legal": false
+      },
+      {
+        "index": 20,
+        "name": "withdraw_box_0",
+        "legal": true
+      },
+      {
+        "index": 21,
+        "name": "withdraw_box_1",
+        "legal": true
+      },
+      {
+        "index": 22,
+        "name": "withdraw_box_2",
+        "legal": true
+      },
+      {
+        "index": 23,
+        "name": "withdraw_box_3",
+        "legal": false
+      },
+      {
+        "index": 24,
+        "name": "withdraw_box_4",
+        "legal": false
+      },
+      {
+        "index": 25,
+        "name": "withdraw_box_5",
+        "legal": false
+      },
+      {
+        "index": 26,
+        "name": "withdraw_box_6",
+        "legal": false
+      },
+      {
+        "index": 27,
+        "name": "withdraw_box_7",
+        "legal": false
+      },
+      {
+        "index": 28,
+        "name": "withdraw_box_8",
+        "legal": false
+      },
+      {
+        "index": 29,
+        "name": "withdraw_box_9",
+        "legal": false
+      },
+      {
+        "index": 30,
+        "name": "withdraw_box_10",
+        "legal": false
+      },
+      {
+        "index": 31,
+        "name": "withdraw_box_11",
+        "legal": false
+      },
+      {
+        "index": 32,
+        "name": "withdraw_box_12",
+        "legal": false
+      },
+      {
+        "index": 33,
+        "name": "withdraw_box_13",
+        "legal": false
+      },
+      {
+        "index": 34,
+        "name": "withdraw_box_14",
+        "legal": false
+      },
+      {
+        "index": 35,
+        "name": "withdraw_box_15",
+        "legal": false
+      },
+      {
+        "index": 36,
+        "name": "combine",
+        "legal": true
+      },
+      {
+        "index": 37,
+        "name": "select_slot_0",
+        "legal": false
+      },
+      {
+        "index": 38,
+        "name": "select_slot_1",
+        "legal": false
+      },
+      {
+        "index": 39,
+        "name": "select_slot_2",
+        "legal": false
+      },
+      {
+        "index": 40,
+        "name": "select_slot_3",
+        "legal": false
+      },
+      {
+        "index": 41,
+        "name": "select_slot_4",
+        "legal": false
+      },
+      {
+        "index": 42,
+        "name": "select_slot_5",
+        "legal": false
+      },
+      {
+        "index": 43,
+        "name": "select_slot_6",
+        "legal": false
+      },
+      {
+        "index": 44,
+        "name": "select_slot_7",
+        "legal": false
+      }
+    ],
+    "legal_deposits": [
+      {
+        "index": 12,
+        "name": "deposit_slot_0"
+      },
+      {
+        "index": 13,
+        "name": "deposit_slot_1"
+      },
+      {
+        "index": 14,
+        "name": "deposit_slot_2"
+      },
+      {
+        "index": 15,
+        "name": "deposit_slot_3"
+      },
+      {
+        "index": 16,
+        "name": "deposit_slot_4"
+      },
+      {
+        "index": 17,
+        "name": "deposit_slot_5"
+      }
+    ],
+    "legal_withdrawals": [
+      {
+        "index": 20,
+        "name": "withdraw_box_0"
+      },
+      {
+        "index": 21,
+        "name": "withdraw_box_1"
+      },
+      {
+        "index": 22,
+        "name": "withdraw_box_2"
+      }
+    ],
+    "deposit_transfer_checks": {
+      "deposit_slot_0": {
+        "can_transfer": true,
+        "reason": ""
+      },
+      "deposit_slot_1": {
+        "can_transfer": true,
+        "reason": ""
+      },
+      "deposit_slot_2": {
+        "can_transfer": true,
+        "reason": ""
+      },
+      "deposit_slot_3": {
+        "can_transfer": true,
+        "reason": ""
+      },
+      "deposit_slot_4": {
+        "can_transfer": true,
+        "reason": ""
+      },
+      "deposit_slot_5": {
+        "can_transfer": true,
+        "reason": ""
+      },
+      "deposit_slot_6": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "deposit_slot_7": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      }
+    },
+    "withdraw_transfer_checks": {
+      "withdraw_box_0": {
+        "can_transfer": true,
+        "reason": ""
+      },
+      "withdraw_box_1": {
+        "can_transfer": true,
+        "reason": ""
+      },
+      "withdraw_box_2": {
+        "can_transfer": true,
+        "reason": ""
+      },
+      "withdraw_box_3": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_4": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_5": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_6": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_7": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_8": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_9": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_10": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_11": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_12": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_13": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_14": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      },
+      "withdraw_box_15": {
+        "can_transfer": false,
+        "reason": "empty_slot"
+      }
+    }
+  },
+  "production_roundtrip": {
+    "deposit_action": {
+      "index": 15,
+      "name": "deposit_slot_3",
+      "legal_before": true,
+      "report": {
+        "ok": true,
+        "reason": "",
+        "moved": [
+          68,
+          1
+        ],
+        "unequipped": false
+      },
+      "reward": -0.0002,
+      "terminated": false,
+      "truncated": false
+    },
+    "corresponding_withdraw_action": {
+      "index": 23,
+      "name": "withdraw_box_3",
+      "legal_after_deposit": true,
+      "report": {
+        "ok": true,
+        "reason": "",
+        "moved": [
+          68,
+          1
+        ],
+        "unequipped": false
+      },
+      "reward": 0.1498,
+      "terminated": false,
+      "truncated": false
+    },
+    "mask_transition": {
+      "before": {
+        "deposit_slot_3": true,
+        "withdraw_box_3": false
+      },
+      "after_deposit": {
+        "deposit_slot_3": false,
+        "withdraw_box_3": true
+      },
+      "after_withdraw": {
+        "deposit_slot_3": true,
+        "withdraw_box_3": false
+      }
+    },
+    "before_snapshot": {
+      "inventory": [
+        {
+          "slot": 0,
+          "item_id": 1,
+          "item": "knife",
+          "qty": 0
+        },
+        {
+          "slot": 1,
+          "item_id": 2,
+          "item": "beretta",
+          "qty": 9
+        },
+        {
+          "slot": 2,
+          "item_id": 3,
+          "item": "shotgun",
+          "qty": 3
+        },
+        {
+          "slot": 3,
+          "item_id": 68,
+          "item": "green_herb",
+          "qty": 1
+        },
+        {
+          "slot": 4,
+          "item_id": 11,
+          "item": "handgun_bullets",
+          "qty": 15
+        },
+        {
+          "slot": 5,
+          "item_id": 11,
+          "item": "handgun_bullets",
+          "qty": 15
+        },
+        {
+          "slot": 6,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 7,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        }
+      ],
+      "box_0_15": [
+        {
+          "slot": 0,
+          "item_id": 38,
+          "item": "chemical",
+          "qty": 1
+        },
+        {
+          "slot": 1,
+          "item_id": 47,
+          "item": "ink_ribbon",
+          "qty": 2
+        },
+        {
+          "slot": 2,
+          "item_id": 31,
+          "item": "emblem",
+          "qty": 1
+        },
+        {
+          "slot": 3,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 4,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 5,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 6,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 7,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 8,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 9,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 10,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 11,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 12,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 13,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 14,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 15,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        }
+      ],
+      "in_control": true,
+      "game_mode": 128
+    },
+    "after_deposit_snapshot": {
+      "inventory": [
+        {
+          "slot": 0,
+          "item_id": 1,
+          "item": "knife",
+          "qty": 0
+        },
+        {
+          "slot": 1,
+          "item_id": 2,
+          "item": "beretta",
+          "qty": 9
+        },
+        {
+          "slot": 2,
+          "item_id": 3,
+          "item": "shotgun",
+          "qty": 3
+        },
+        {
+          "slot": 3,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 4,
+          "item_id": 11,
+          "item": "handgun_bullets",
+          "qty": 15
+        },
+        {
+          "slot": 5,
+          "item_id": 11,
+          "item": "handgun_bullets",
+          "qty": 15
+        },
+        {
+          "slot": 6,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 7,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        }
+      ],
+      "box_0_15": [
+        {
+          "slot": 0,
+          "item_id": 38,
+          "item": "chemical",
+          "qty": 1
+        },
+        {
+          "slot": 1,
+          "item_id": 47,
+          "item": "ink_ribbon",
+          "qty": 2
+        },
+        {
+          "slot": 2,
+          "item_id": 31,
+          "item": "emblem",
+          "qty": 1
+        },
+        {
+          "slot": 3,
+          "item_id": 68,
+          "item": "green_herb",
+          "qty": 1
+        },
+        {
+          "slot": 4,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 5,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 6,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 7,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 8,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 9,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 10,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 11,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 12,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 13,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 14,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 15,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        }
+      ],
+      "in_control": true,
+      "game_mode": 128
+    },
+    "after_withdraw_snapshot": {
+      "inventory": [
+        {
+          "slot": 0,
+          "item_id": 1,
+          "item": "knife",
+          "qty": 0
+        },
+        {
+          "slot": 1,
+          "item_id": 2,
+          "item": "beretta",
+          "qty": 9
+        },
+        {
+          "slot": 2,
+          "item_id": 3,
+          "item": "shotgun",
+          "qty": 3
+        },
+        {
+          "slot": 3,
+          "item_id": 68,
+          "item": "green_herb",
+          "qty": 1
+        },
+        {
+          "slot": 4,
+          "item_id": 11,
+          "item": "handgun_bullets",
+          "qty": 15
+        },
+        {
+          "slot": 5,
+          "item_id": 11,
+          "item": "handgun_bullets",
+          "qty": 15
+        },
+        {
+          "slot": 6,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 7,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        }
+      ],
+      "box_0_15": [
+        {
+          "slot": 0,
+          "item_id": 38,
+          "item": "chemical",
+          "qty": 1
+        },
+        {
+          "slot": 1,
+          "item_id": 47,
+          "item": "ink_ribbon",
+          "qty": 2
+        },
+        {
+          "slot": 2,
+          "item_id": 31,
+          "item": "emblem",
+          "qty": 1
+        },
+        {
+          "slot": 3,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 4,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 5,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 6,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 7,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 8,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 9,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 10,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 11,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 12,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 13,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 14,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        },
+        {
+          "slot": 15,
+          "item_id": 0,
+          "item": "empty",
+          "qty": 0
+        }
+      ],
+      "in_control": true,
+      "game_mode": 128
+    },
+    "checks": {
+      "deposit_exact_delta": true,
+      "final_roundtrip_equality": true,
+      "mask_transition_exact": true,
+      "magic_reports_ok": true,
+      "in_control_after_each": true,
+      "no_termination_or_timeout": true,
+      "no_unrelated_slot_corruption": true,
+      "no_quantity_duplication_or_loss": true,
+      "menu_closed_after_each": true
+    }
+  },
+  "verdict": {
+    "status": "PASS",
+    "reason": "all production round-trip checks passed"
+  }
+}

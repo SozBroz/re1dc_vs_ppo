@@ -64,6 +64,10 @@ ITEM_BOX_BASE = 0x800C8724  # 2 bytes per slot: item_id, qty [CONFIRMED]
 # park items past index 15 (e.g. knife at box[45]). Code still uses BOX_SLOTS=16
 # until we widen withdraw actions; do not treat “first 16 empty” as “box empty”.
 MAPS_FILES_FLAGS = 0x800C8714  # [CONFIRMED]
+# Large Gallery (117) cradle-to-grave sequence. Correct Yes presses overwrite
+# this byte with a step-specific one-hot; an out-of-order Yes clears it to 0.
+GALLERY_PROGRESS = 0x800C3008  # u8 [CONFIRMED live, QuickSave3, 2026-07-17]
+GALLERY_CONFIRM = 0x800C3009  # u8; changes on any portrait Yes confirmation
 # Player entity block [CONFIRMED via live walk trace 2026-07-02, verify_pos.py]:
 # X/Z step ~64-162 units per frame while walking; facing full circle = 4096
 # (0x1000), turning ~192/quarter-second. Y is elevation (0 on ground floor).
@@ -221,7 +225,10 @@ ENEMY_HP_MAX_PLAUSIBLE = 2000
 # Off-map pool slots park near ~(30000, 30000); in-room entities use map scale.
 ENEMY_POOL_COORD_ABS_MAX = 20000
 # Knife/gun mask: enemy within this world distance of the player.
+# Gun keeps the wide envelope; knife is tighter but still generous vs
+# typical hit distances (~700–1500) so mid-room melee stays legal.
 ENEMY_COMBAT_NEAR_DIST = 8000
+ENEMY_KNIFE_COMBAT_NEAR_DIST = 5000
 ENEMY_FIELD_OFFSETS: dict[str, tuple[int, str]] = {
     "hp": (0, "u16"),
     "x": (0xDE, "s16"),
@@ -273,10 +280,13 @@ def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
         in_room = enemy_coords_in_room_band(x, z)
         dist = math.hypot(px - x, pz - z)
         combat_near = in_room and dist < ENEMY_COMBAT_NEAR_DIST
+        knife_near = in_room and dist < ENEMY_KNIFE_COMBAT_NEAR_DIST
         vals["slot"] = slot
         vals["alive"] = 1 if in_room else 0
         vals["in_room"] = 1 if in_room else 0
         vals["combat_near"] = 1 if combat_near else 0
+        vals["knife_near"] = 1 if knife_near else 0
+        vals["dist"] = int(dist)
         out.append(vals)
     return out
 
@@ -393,6 +403,8 @@ DEFAULT_RAM_FIELDS: list[tuple[str, int, str]] = [
     ("lab_timer", LAB_TIMER, "u16"),
     ("door_flags", DOOR_FLAGS, "u32"),
     ("maps_files_flags", MAPS_FILES_FLAGS, "u16"),
+    ("gallery_progress", GALLERY_PROGRESS, "u8"),
+    ("gallery_confirm", GALLERY_CONFIRM, "u8"),
     ("player_x", PLAYER_X, "s16"),
     ("player_y", PLAYER_Y, "s16"),
     ("player_z", PLAYER_Z, "s16"),

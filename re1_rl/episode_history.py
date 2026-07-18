@@ -19,7 +19,9 @@ ROOM_DEQUE_K = 32
 # valid_fraction + K × (room_index_norm, steps_since_norm)
 ROOM_HISTORY_DIM = 1 + ROOM_DEQUE_K * 2
 
-ACQUISITION_LOG_K = 4
+# Cover most of a Jill Standard run's pickup sequence (catalog has 121 rows).
+# Pair with keys_held / future pickup_active for set-membership; this is order.
+ACQUISITION_LOG_K = 60
 # valid_fraction + K × (item_id_norm, room_index_norm)
 ACQUISITION_LOG_DIM = 1 + ACQUISITION_LOG_K * 2
 

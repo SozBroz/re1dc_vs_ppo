@@ -20,6 +20,7 @@ from re1_rl.story_item_use import (
     ALCOVE_EMBLEM_SITE_ID,
     any_legal_story_use_slot,
     gold_emblem_return_detected,
+    legal_story_use_slots,
     load_story_use_sites,
     matching_story_sites,
     slot_legal_for_story_use,
@@ -28,7 +29,7 @@ from re1_rl.story_item_use import (
     annotate_story_use_success,
 )
 
-N_ACTIONS = 45
+N_ACTIONS = 46
 MUSIC_NOTES_ID = 0x23
 EMBLEM_ID = 0x1F
 GOLD_EMBLEM_ID = 0x20
@@ -558,6 +559,68 @@ def test_fireplace_gold_emblem_site_still_works() -> None:
     )
     assert out.get("story_use_success") == "gold_emblem@105_fireplace"
     assert not out.get("gold_emblem_return")
+
+
+def test_fireplace_site_covers_latest_quicksave4_pose() -> None:
+    """Latest QS4 2026-07-17 22:03:09.497: 105 (3746,8186), gold in slot 3."""
+    load_story_use_sites.cache_clear()
+    inv = _inv(
+        (0x01, 0),  # knife
+        (0x02, 15),  # beretta
+        (0x41, 1),  # first_aid_spray_alt
+        (GOLD_EMBLEM_ID, 1),
+        (0x0B, 15),  # handgun_bullets
+    )
+    px, pz = 3746, 8186
+    sites = matching_story_sites(
+        room="105", x=px, z=pz, inventory=inv, rewarded_site_ids=set()
+    )
+    assert [s["id"] for s in sites] == ["gold_emblem@105_fireplace"]
+    assert legal_story_use_slots(
+        inv, room="105", x=px, z=pz, rewarded_site_ids=set()
+    ) == [3]
+    assert any_legal_story_use_slot(
+        inv, room="105", x=px, z=pz, rewarded_site_ids=set()
+    )
+    mask = action_mask(
+        N_ACTIONS,
+        None,
+        inventory=inv,
+        current_hp=96,
+        poisoned=False,
+        episode_start_hp=96,
+        in_control=True,
+        room_id="105",
+        player_x=px,
+        player_z=pz,
+        rewarded_story_uses=set(),
+        use_phase=0,
+    )
+    assert bool(mask[USE_ACTION])
+    submenu_mask = action_mask(
+        N_ACTIONS,
+        None,
+        inventory=inv,
+        current_hp=96,
+        poisoned=False,
+        episode_start_hp=96,
+        in_control=True,
+        room_id="105",
+        player_x=px,
+        player_z=pz,
+        rewarded_story_uses=set(),
+        use_phase=1,
+    )
+    assert bool(submenu_mask[SELECT_SLOT_BASE + 3])
+    assert not bool(submenu_mask[SELECT_SLOT_BASE + 2])
+    # Once rewarded, site stays masked off.
+    assert not any_legal_story_use_slot(
+        inv,
+        room="105",
+        x=px,
+        z=pz,
+        rewarded_site_ids={"gold_emblem@105_fireplace"},
+    )
 
 
 def test_music_notes_piano_unaffected_by_alcove_logic() -> None:

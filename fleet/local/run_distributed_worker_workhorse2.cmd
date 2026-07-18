@@ -1,9 +1,10 @@
 @echo off
-REM workhorse2 remote worker — 32 envs, learner on WH1 (192.168.0.160)
+REM workhorse2 as remote-only worker (legacy; learner normally runs on WH2).
 setlocal
 cd /d C:\Users\sshuser\re1_rl
+call "%~dp0..\fleet_hosts.cmd"
 set MACHINE_NAME=workhorse2
-set LEARNER_HOST=192.168.0.160
+set LEARNER_HOST=%FLEET_LEARNER_HOST%
 set BASE_PORT=5555
 set N_ENVS=32
 set SYNC_INTERVAL_S=180
@@ -14,7 +15,7 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role worker ^
   --machine-name %MACHINE_NAME% ^
   --learner-host %LEARNER_HOST% ^
-  --learner-port 8765 ^
+  --learner-port %FLEET_LEARNER_PORT% ^
   --n-envs %N_ENVS% ^
   --base-port %BASE_PORT% ^
   --total-steps 0 ^

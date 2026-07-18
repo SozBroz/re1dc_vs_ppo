@@ -6,6 +6,7 @@ import numpy as np
 
 from re1_rl.episode_history import (
     ACQUISITION_LOG_DIM,
+    ACQUISITION_LOG_K,
     ROOM_DEQUE_K,
     ROOM_HISTORY_DIM,
     EpisodeHistory,
@@ -66,10 +67,10 @@ def test_acquisition_log_records_pickups() -> None:
     enc = hist.encode(current_step=11, room_index={"101": 7}, max_episode_steps=48000)
     assert enc["history"].shape == (ROOM_HISTORY_DIM,)
     assert enc["acquisitions"].shape == (ACQUISITION_LOG_DIM,)
-    assert enc["acquisitions"][0] == 0.5  # 2 of 4 slots filled
+    assert np.isclose(enc["acquisitions"][0], 2 / float(ACQUISITION_LOG_K))
     # shield_key = 0x35 = 53
-    assert enc["acquisitions"][1] == 53 / 0x4B
-    assert enc["acquisitions"][2] == 7 / 128.0
+    assert np.isclose(enc["acquisitions"][1], 53 / 0x4B)
+    assert np.isclose(enc["acquisitions"][2], 7 / 128.0)
 
 
 def test_obs_keys_have_no_path_leakage_names() -> None:
@@ -98,5 +99,6 @@ def test_obs_keys_have_no_path_leakage_names() -> None:
     assert GOAL_DIM == 27
     assert INVENTORY_OBS_DIM == 16
     assert ROOM_HISTORY_DIM == 65
-    assert ACQUISITION_LOG_DIM == 9
+    assert ACQUISITION_LOG_K == 60
+    assert ACQUISITION_LOG_DIM == 1 + 60 * 2
     assert ENEMY_ROSTER_DIM == 12

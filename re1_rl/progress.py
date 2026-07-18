@@ -27,6 +27,10 @@ class ProgressTracker:
     # Async skip may present one inventory transition twice. A wall return pays
     # once, then cannot pay again until shotgun possession is observed.
     _shotgun_return_armed: bool | None = None
+    gallery_step_index: int = 0
+    gallery_pending_reward: float = 0.0
+    gallery_completed: bool = False
+    gallery_needs_reentry: bool = False
 
     def first_visit(
         self,
@@ -116,6 +120,78 @@ class ProgressTracker:
             return False
         self.rewarded_story_uses.add(key)
         return True
+
+    def gallery_step_reward(
+        self,
+        *,
+        prev_room: str,
+        room: str,
+        prev_raw: int,
+        raw: int,
+        prev_confirm: int,
+        confirm: int,
+        star_crest_held: bool,
+    ) -> float:
+        """Pay ordered Gallery steps; claw back partial rewards on reset/exit."""
+        from re1_rl.gallery_puzzle import (
+            GALLERY_ROOM_ID,
+            GALLERY_STEP_REWARD,
+            completed_steps,
+        )
+
+        if self.gallery_completed:
+            return 0.0
+        if star_crest_held:
+            self.gallery_completed = True
+            self.gallery_pending_reward = 0.0
+            return 0.0
+
+        entered = str(prev_room) != GALLERY_ROOM_ID and str(room) == GALLERY_ROOM_ID
+        left = str(prev_room) == GALLERY_ROOM_ID and str(room) != GALLERY_ROOM_ID
+        if entered and self.gallery_needs_reentry:
+            self.gallery_needs_reentry = False
+            self.gallery_step_index = completed_steps(raw)
+            self.gallery_pending_reward = 0.0
+            return 0.0
+
+        if left:
+            clawback = -self.gallery_pending_reward
+            self.gallery_needs_reentry = True
+            self.gallery_step_index = 0
+            self.gallery_pending_reward = 0.0
+            return clawback
+        if str(room) != GALLERY_ROOM_ID:
+            return 0.0
+        if self.gallery_needs_reentry:
+            return 0.0
+
+        prev_count = completed_steps(prev_raw)
+        count = completed_steps(raw)
+        if self.gallery_step_index == 0 and self.gallery_pending_reward == 0.0:
+            self.gallery_step_index = prev_count
+
+        if int(raw) != int(prev_raw) and count == self.gallery_step_index + 1:
+            self.gallery_step_index = count
+            self.gallery_pending_reward += GALLERY_STEP_REWARD
+            return GALLERY_STEP_REWARD
+
+        wrong_reset = int(raw) == 0 and int(prev_raw) != 0
+        wrong_first = (
+            int(raw) == 0
+            and int(prev_raw) == 0
+            and int(confirm) != int(prev_confirm)
+            and int(confirm) != 0
+        )
+        unexpected_transition = (
+            int(raw) != int(prev_raw) and count != self.gallery_step_index
+        )
+        if wrong_reset or wrong_first or unexpected_transition:
+            clawback = -self.gallery_pending_reward
+            self.gallery_step_index = 0
+            self.gallery_pending_reward = 0.0
+            self.gallery_needs_reentry = True
+            return clawback
+        return 0.0
 
     def claim_success_room_bonus(self, room_id: str, success_room: str | None) -> bool:
         """True once per episode on first arrival in ``success_room``."""

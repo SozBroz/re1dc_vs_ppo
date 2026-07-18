@@ -5,18 +5,20 @@ from __future__ import annotations
 import queue
 import threading
 import time
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import Any
 
-from stable_baselines3.common.vec_env import VecEnv
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv
 
+from re1_rl.async_fleet import DEFAULT_SYNC_INTERVAL_S
+from re1_rl.distributed.async_worker_runtime import _flush_remote_epoch
 from re1_rl.distributed.inference_policy import InferencePolicy
 from re1_rl.distributed.log_util import log
 from re1_rl.distributed.rollout_collect import collect_rollout
+from re1_rl.distributed.rollout_types import WorkerRollout
 from re1_rl.distributed.weight_store import WeightStore
 from re1_rl.distributed.worker_client import WorkerClient
-
-if TYPE_CHECKING:
-    pass
+from re1_rl.training_progress import TrainingProgressTracker
 
 
 def _local_weight_sync_loop(
@@ -137,17 +139,19 @@ def run_worker_loop(
     """Legacy SubprocVecEnv loop (unused by distributed entry; kept for tests).
 
     Remote full weight sync is background-only via ``_remote_weight_sync_loop``.
+    Resets the vec env at the start of every horizon (legacy behavior).
     """
     log(machine_name, f"worker loop started ({worker_id}, {vec_env.num_envs} envs)")
     while not stop_event.is_set():
         if policy.policy_version <= 0:
             time.sleep(0.1)
             continue
-        rollout = collect_rollout(
+        rollout, _obs = collect_rollout(
             vec_env,
             policy,
             n_steps=n_steps,
             worker_id=worker_id,
+            obs=None,
         )
         if is_local:
             assert isinstance(rollout_sink, queue.Queue)
@@ -167,3 +171,175 @@ def run_worker_loop(
                     f"({rollout.num_timesteps()} steps)",
                 )
     log(machine_name, "worker loop stopped")
+
+
+def make_synced_vec_env(
+    *,
+    n_envs: int,
+    curriculum: str,
+    base_port: int,
+    training_speed: int,
+    skip_chunk: int,
+    capture_checkpoints: bool,
+    headless: bool,
+    screenshot_mmf: bool | None,
+) -> SubprocVecEnv:
+    """Build lockstep SubprocVecEnv with the same make_env knobs as desync actors."""
+    from scripts.train_parallel import make_env
+
+    return SubprocVecEnv(
+        [
+            make_env(
+                rank,
+                curriculum,
+                base_port,
+                capture_checkpoints=capture_checkpoints,
+                training_speed=training_speed,
+                skip_chunk=skip_chunk,
+                async_cutscene_skip=True,
+                headless=headless,
+                screenshot_mmf=screenshot_mmf,
+            )
+            for rank in range(n_envs)
+        ]
+    )
+
+
+def run_synced_worker_loop(
+    policy: InferencePolicy,
+    *,
+    machine_name: str,
+    worker_id: str,
+    n_envs: int,
+    n_steps: int,
+    curriculum: str,
+    base_port: int,
+    training_speed: int,
+    skip_chunk: int,
+    capture_checkpoints: bool,
+    stop_event: threading.Event,
+    client: WorkerClient,
+    sync_interval_s: float = DEFAULT_SYNC_INTERVAL_S,
+    heartbeat_s: float = 30.0,
+    project_root: Path | None = None,
+    headless: bool = True,
+    screenshot_mmf: bool | None = None,
+) -> None:
+    """Remote worker: lockstep SubprocVecEnv + same epoch flush/weight pull as async.
+
+    Episodes continue across horizons (no reset every ``n_steps``). Heartbeat and
+    ``sync_interval_s`` flush match ``run_async_worker_loop`` so the learner epoch
+    barrier stays healthy.
+    """
+    log(
+        machine_name,
+        f"synced SubprocVecEnv worker starting ({worker_id}, {n_envs} lockstep envs, "
+        f"n_steps={n_steps}, sync_interval_s={sync_interval_s:.0f}, "
+        f"headless={headless}, screenshot_mmf={screenshot_mmf})",
+    )
+    root = Path(project_root) if project_root else Path.cwd()
+    best_log = root / "data" / "logs" / f"best_rooms_{machine_name}.jsonl"
+    progress = TrainingProgressTracker(
+        prefix=f"progress:{machine_name}",
+        machine_name=machine_name,
+        best_log_path=best_log,
+    )
+    buffered: list[WorkerRollout] = []
+    local_steps = 0
+    epoch_t0 = time.monotonic()
+    hb_stop = threading.Event()
+    obs: dict[str, Any] | None = None
+    vec_env: SubprocVecEnv | None = None
+
+    def _heartbeat_loop() -> None:
+        while not hb_stop.is_set() and not stop_event.is_set():
+            try:
+                client.heartbeat(worker_id, n_envs)
+            except Exception as exc:
+                log(machine_name, f"heartbeat error: {exc}")
+            hb_stop.wait(heartbeat_s)
+
+    hb_thread = threading.Thread(
+        target=_heartbeat_loop, name="synced-worker-heartbeat", daemon=True
+    )
+
+    try:
+        client.register(worker_id, n_envs, is_local=False)
+        client.heartbeat(worker_id, n_envs)
+        hb_thread.start()
+
+        vec_env = make_synced_vec_env(
+            n_envs=n_envs,
+            curriculum=curriculum,
+            base_port=base_port,
+            training_speed=training_speed,
+            skip_chunk=skip_chunk,
+            capture_checkpoints=capture_checkpoints,
+            headless=headless,
+            screenshot_mmf=screenshot_mmf,
+        )
+        log(machine_name, f"synced SubprocVecEnv fleet ready ({n_envs} envs)")
+
+        while not stop_event.is_set():
+            if policy.policy_version <= 0:
+                time.sleep(0.1)
+                continue
+
+            if (time.monotonic() - epoch_t0) >= sync_interval_s:
+                epoch_infos = [
+                    info for r in buffered for info in (r.episode_infos or [])
+                ]
+                buffered = _flush_remote_epoch(
+                    buffered,
+                    client=client,
+                    policy=policy,
+                    machine_name=machine_name,
+                    worker_id=worker_id,
+                )
+                if epoch_infos:
+                    progress.log_rollout_end(
+                        None,
+                        num_timesteps=local_steps,
+                        episode_infos=epoch_infos,
+                    )
+                epoch_t0 = time.monotonic()
+
+            rollout, obs = collect_rollout(
+                vec_env,
+                policy,
+                n_steps=n_steps,
+                worker_id=worker_id,
+                obs=obs,
+            )
+            local_steps += int(rollout.num_timesteps())
+            progress.consume_infos(
+                rollout.episode_infos,
+                num_timesteps=local_steps,
+            )
+            buffered.append(rollout)
+
+        if buffered:
+            buffered = _flush_remote_epoch(
+                buffered,
+                client=client,
+                policy=policy,
+                machine_name=machine_name,
+                worker_id=worker_id,
+            )
+            if buffered:
+                log(
+                    machine_name,
+                    f"shutdown flush retained {len(buffered)} rollouts undelivered",
+                )
+    finally:
+        hb_stop.set()
+        try:
+            client.unregister(worker_id)
+        except Exception:
+            pass
+        if vec_env is not None:
+            try:
+                vec_env.close()
+            except Exception:
+                pass
+        log(machine_name, "synced SubprocVecEnv worker loop stopped")

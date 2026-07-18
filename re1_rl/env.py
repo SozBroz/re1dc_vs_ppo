@@ -81,12 +81,19 @@ from re1_rl.spatial_encoder import (
 )
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
-from re1_rl.reward import compute_reward, DEATH_PENALTY, REWARD_SCALE, stagnation_episode_timeout
+from re1_rl.reward import (
+    compute_reward,
+    DEATH_PENALTY,
+    MAIN_HALL_BEFORE_KENNETH_PENALTY,
+    REWARD_SCALE,
+    stagnation_episode_timeout,
+)
 from re1_rl.room_graph import RoomGraph
 from re1_rl.knife_macro import execute_knife_macro, read_knife_hooks
 from re1_rl.sticky_input import StickyInputState
 from re1_rl.action_mask import (
     ATTACK_ACTION,
+    ATTACK_UP_ACTION,
     COMBINE_ACTION,
     DEPOSIT_ACTION_BASE,
     DEPOSIT_ACTION_NAMES,
@@ -102,7 +109,7 @@ from re1_rl.action_mask import (
     WITHDRAW_ACTION_NAMES,
     action_mask as build_action_mask,
 )
-from re1_rl.attack_macro import execute_attack_macro
+from re1_rl.attack_macro import execute_attack_macro, execute_attack_up_macro
 from re1_rl.options_menu_macro import dismiss_options_menu
 
 # Mask knife/attack when live RAM shows no living enemies (set 0 to debug combat).
@@ -126,6 +133,7 @@ ACTION_NAMES = [
     *DEPOSIT_ACTION_NAMES,    # 12-19 box deposits (box rooms only)
     *WITHDRAW_ACTION_NAMES,   # 20-35 box withdrawals (box rooms only)
     *MENU_ACTION_NAMES,       # 36 combine + 37-44 select_slot_N
+    "attack_up",              # 45 R1+Up directional attack macro
 ]
 
 # Map discrete actions to friendly button names (translated to Nymashock core
@@ -294,6 +302,7 @@ class RE1Env(gym.Env):
         self._items = ItemTracker(todo=[])
         self._box_cache: list[tuple[int, int]] | None = None
         self._use_phase = 0
+        self._inventory_before_use: list[tuple[int, int]] | None = None
         self._equip_phase = 0
         self._combine_phase = 0
         self._combine_slot_a: int | None = None
@@ -330,6 +339,8 @@ class RE1Env(gym.Env):
         self._pending_skip_room_crossings: list[
             tuple[dict[str, Any], dict[str, Any]]
         ] = []
+        # Illegal pre-Kenneth Main Hall entry — flushed as episode failure.
+        self._pending_episode_failure: str | None = None
 
     def _load_stage(self) -> None:
         with self.curriculum_path.open(encoding="utf-8") as f:
@@ -419,6 +430,8 @@ class RE1Env(gym.Env):
             ),
             "poisoned": bool(int(ram.get("player_poison", 0))),
             "maps_files_flags": int(ram.get("maps_files_flags", 0)),
+            "gallery_progress": int(ram.get("gallery_progress", 0)),
+            "gallery_confirm": int(ram.get("gallery_confirm", 0)),
             "player_anim": int(ram.get("player_anim", 0)),
             "player_aux": int(ram.get("player_aux", 0)),
             "anim_history": list(getattr(self, "_anim_history", [])),
@@ -484,11 +497,13 @@ class RE1Env(gym.Env):
             max_episode_steps=max_ep,
         )
         cutscene_ledger = encode_cutscene_ledger(self._progress.rewarded_cutscenes)
+        goal_state = dict(state)
+        goal_state["gallery_needs_reentry"] = self._progress.gallery_needs_reentry
         return {
             "frame": frame_obs,
             "proprio": self._encoder.encode_proprio(state, self._prev_hp),
             "goal": self._encoder.encode_goal(
-                state, self._planner,
+                goal_state, self._planner,
                 item_tracker=self._items, room_items=self.room_items,
             ),
             "spatial": self._spatial.encode(
@@ -545,6 +560,7 @@ class RE1Env(gym.Env):
         self._post_skip_bd = {}
         self._cutscene_skip_entry_prev = None
         self._pending_skip_room_crossings = []
+        self._pending_episode_failure = None
         self._load_stage()
         assert self._planner is not None
 
@@ -565,6 +581,7 @@ class RE1Env(gym.Env):
         self._prev_action = None
         self._forward_collision_stall = False
         self._use_phase = 0
+        self._inventory_before_use = None
         self._equip_phase = 0
         self._combine_phase = 0
         self._combine_slot_a = None
@@ -741,6 +758,46 @@ class RE1Env(gym.Env):
         self._cutscene_skip_entry_prev = dict(crossing)
         self._last_skip_frames = 0
 
+    def _illegal_main_hall_failure_reason(
+        self,
+        prev_state: dict[str, Any] | None,
+        state: dict[str, Any] | None,
+    ) -> str | None:
+        """Death-equivalent policy fail: enter 106 before Kenneth paid.
+
+        Returns None when Jill is already dead on this step (real death path
+        owns the single death penalty).
+        """
+        from re1_rl.cutscene_reward import (
+            ILLEGAL_MAIN_HALL_FAILURE_REASON,
+            illegal_main_hall_before_kenneth_transition,
+        )
+
+        if not prev_state or not state:
+            return None
+        if state.get("dead"):
+            return None
+        if illegal_main_hall_before_kenneth_transition(
+            str(prev_state.get("room_id", "") or ""),
+            str(state.get("room_id", "") or ""),
+            rewarded_cutscenes=self._progress.rewarded_cutscenes,
+            visited_rooms=self._progress.visited_rooms,
+        ):
+            return ILLEGAL_MAIN_HALL_FAILURE_REASON
+        return None
+
+    def _flush_pending_episode_failure(
+        self, action: int
+    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]] | None:
+        reason = getattr(self, "_pending_episode_failure", None)
+        if not reason:
+            return None
+        self._pending_episode_failure = None
+        self._post_skip_reward = 0.0
+        self._post_skip_bd = {}
+        self._skipping_flag = False
+        return self._episode_failure_step(action, reason=reason)
+
     def _credit_async_skip_room_crossing(self) -> None:
         """Harness parity: door mid-skip pays ``new_room`` only (main thread)."""
         # Also catch a crossing on the final chunk if bg note missed it.
@@ -767,6 +824,18 @@ class RE1Env(gym.Env):
                 str(crossing.get("room_id", "")),
                 bool(crossing.get("in_control", True)),
             )
+            fail = self._illegal_main_hall_failure_reason(entry, crossing)
+            if fail:
+                # No new_room / step shaping — exact -3.0 policy fail on flush.
+                self._progress.first_visit(
+                    str(crossing.get("room_id", "")),
+                    at_waypoint=0,
+                    at_route_seq=None,
+                )
+                self._pending_episode_failure = fail
+                self._prev_state = dict(crossing)
+                self._pending_skip_room_crossings.clear()
+                return
             reward, bd = compute_reward(
                 entry,
                 crossing,
@@ -811,6 +880,18 @@ class RE1Env(gym.Env):
             rewarded_site_ids=self._progress.rewarded_story_uses,
         )
         self._inventory_before_skip = None
+        fail = self._illegal_main_hall_failure_reason(entry_prev, state)
+        if fail:
+            self._progress.first_visit(
+                str(state.get("room_id", "")),
+                at_waypoint=0,
+                at_route_seq=None,
+            )
+            self._pending_episode_failure = fail
+            self._prev_state = state
+            self._cutscene_skip_entry_prev = None
+            self._pending_skip_room_crossings = []
+            return
         # Room-change door skips: discovery is new_room only (never new_cutscene).
         if room_change_cutscene_disqualified(entry_prev, state):
             state["cutscene_key"] = None
@@ -917,12 +998,18 @@ class RE1Env(gym.Env):
             if death is not None:
                 self._skipping_flag = False
                 return death
+        pending = self._flush_pending_episode_failure(action)
+        if pending is not None:
+            return pending
         self._step_count += 1
         # Main-thread flush of door crossings noted by the bg skip worker.
         try:
             self._credit_async_skip_room_crossing()
         except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
             pass
+        pending = self._flush_pending_episode_failure(action)
+        if pending is not None:
+            return pending
         if self._skip_cache_obs is None:
             try:
                 self._refresh_skip_cache()
@@ -946,6 +1033,21 @@ class RE1Env(gym.Env):
     def _death_penalty(self) -> tuple[float, dict[str, float]]:
         breakdown = {"death": DEATH_PENALTY}
         return float(DEATH_PENALTY * REWARD_SCALE), breakdown
+
+    def _episode_failure_penalty(
+        self, reason: str
+    ) -> tuple[float, dict[str, float]]:
+        from re1_rl.cutscene_reward import ILLEGAL_MAIN_HALL_FAILURE_REASON
+
+        if reason == ILLEGAL_MAIN_HALL_FAILURE_REASON:
+            breakdown = {
+                ILLEGAL_MAIN_HALL_FAILURE_REASON: MAIN_HALL_BEFORE_KENNETH_PENALTY
+            }
+            return (
+                float(MAIN_HALL_BEFORE_KENNETH_PENALTY * REWARD_SCALE),
+                breakdown,
+            )
+        return self._death_penalty()
 
     def _failure_ram_probe(self) -> dict[str, int]:
         return self.bridge.read_ram(
@@ -992,7 +1094,7 @@ class RE1Env(gym.Env):
             frame_obs = self.bridge.build_frame_stack()
             if frame_obs.shape != FRAME_SHAPE:
                 frame_obs = np.zeros(FRAME_SHAPE, dtype=np.uint8)
-        reward, breakdown = self._death_penalty()
+        reward, breakdown = self._episode_failure_penalty(reason)
         obs = self._build_obs(frame_obs, state)
         opening_phase = reason if reason.startswith(
             (
@@ -1108,6 +1210,12 @@ class RE1Env(gym.Env):
         from re1_rl.inventory_menu_macro import execute_use_macro
         from re1_rl.item_box import read_inventory
         from re1_rl.item_use import any_legal_use_slot, slot_legal_for_use
+        from re1_rl.story_item_use import (
+            any_legal_story_use_slot,
+            slot_legal_for_story_use,
+            story_site_for_slot,
+        )
+        from re1_rl.weapon_equip import policy_inventory
 
         if self._use_phase == 0 and action != USE_ACTION:
             if SELECT_SLOT_BASE <= action < SELECT_SLOT_BASE + N_SELECT_SLOT:
@@ -1121,20 +1229,35 @@ class RE1Env(gym.Env):
         state = getattr(self, "_prev_state", {}) or {}
         inventory: list[tuple[int, int]] | None = None
         try:
-            inventory = read_inventory(self.bridge)
+            inventory = policy_inventory(read_inventory(self.bridge))
         except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
             pass
         current_hp = int(state.get("hp", 0))
         poisoned = bool(state.get("poisoned", False))
         episode_start_hp = int(getattr(self, "_episode_start_hp", 0) or 0)
+        room_id = str(state.get("room_id", "") or "") or None
+        player_x = state.get("x")
+        player_z = state.get("z")
+        rewarded_story = getattr(self, "_progress", None)
+        rewarded_site_ids = (
+            rewarded_story.rewarded_story_uses if rewarded_story is not None else None
+        )
+        story_kwargs = {
+            "room": room_id,
+            "x": player_x,
+            "z": player_z,
+            "rewarded_site_ids": rewarded_site_ids,
+        }
+        heal_legal = any_legal_use_slot(
+            inventory or [],
+            current_hp=current_hp,
+            poisoned=poisoned,
+            episode_start_hp=episode_start_hp,
+        )
+        story_legal = any_legal_story_use_slot(inventory or [], **story_kwargs)
 
         if self._use_phase == 0:
-            if not any_legal_use_slot(
-                inventory or [],
-                current_hp=current_hp,
-                poisoned=poisoned,
-                episode_start_hp=episode_start_hp,
-            ):
+            if not heal_legal and not story_legal:
                 return self._submenu_step(
                     action,
                     step_emulated_frames=self.frame_skip,
@@ -1155,24 +1278,39 @@ class RE1Env(gym.Env):
                 step_emulated_frames=self.frame_skip,
                 magic_report={"ok": False, "reason": "use_abort"},
             )
-        if not slot_legal_for_use(
+        heal_ok = slot_legal_for_use(
             inventory or [],
             int(slot),
             current_hp=current_hp,
             poisoned=poisoned,
             episode_start_hp=episode_start_hp,
-        ):
+        )
+        story_ok = slot_legal_for_story_use(
+            inventory or [],
+            int(slot),
+            **story_kwargs,
+        )
+        if not heal_ok and not story_ok:
             return self._submenu_step(
                 action,
                 step_emulated_frames=self.frame_skip,
                 magic_report={"ok": False, "reason": "use_slot_not_legal"},
             )
+        story_site = None
+        if story_ok and inventory is not None:
+            story_site = story_site_for_slot(
+                inventory,
+                int(slot),
+                **story_kwargs,
+            )
+        self._inventory_before_use = list(inventory) if inventory is not None else None
         try:
             died, frames, magic_report = execute_use_macro(
                 self.bridge,
                 int(slot),
                 prev_hp=self._prev_hp,
                 episode_start_hp=getattr(self, "_episode_start_hp", 0),
+                story_site=story_site,
             )
         except (OSError, RuntimeError, ValueError) as exc:
             died, frames = False, self.frame_skip
@@ -1402,6 +1540,33 @@ class RE1Env(gym.Env):
         state = dict(state)
         state["step_emulated_frames"] = int(step_emulated_frames)
         state["reference_step_frames"] = self.frame_skip
+        inv_before = getattr(self, "_inventory_before_use", None)
+        if inv_before is not None:
+            from re1_rl.item_box import read_inventory
+            from re1_rl.story_item_use import annotate_story_use_success
+            from re1_rl.weapon_equip import policy_inventory
+
+            try:
+                inv_after = policy_inventory(read_inventory(self.bridge))
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                inv_after = None
+            state = annotate_story_use_success(
+                state,
+                prev_state=self._prev_state,
+                inventory_before=inv_before,
+                inventory_after=inv_after,
+                rewarded_site_ids=self._progress.rewarded_story_uses,
+            )
+            # Macro ok is authoritative when annotate misses a non-consuming USE.
+            report = magic_report or {}
+            if (
+                not state.get("story_use_success")
+                and report.get("ok")
+                and report.get("reason") == "story_use_ok"
+                and report.get("story_use_site")
+            ):
+                state["story_use_success"] = str(report["story_use_site"])
+            self._inventory_before_use = None
         self._visited.update(state["room_id"], state["x"], state["z"])
         self._progress.record_in_control_step(
             state.get("room_id", ""),
@@ -1604,6 +1769,9 @@ class RE1Env(gym.Env):
             if death is not None:
                 self._skipping_flag = False
                 return death
+        pending = self._flush_pending_episode_failure(action)
+        if pending is not None:
+            return pending
         menu_reason = self._probe_outside_gameplay()
         if menu_reason in {"options_menu", "pause_or_options_menu"}:
             recovered, _options_report = self._try_dismiss_options_menu()
@@ -1629,6 +1797,9 @@ class RE1Env(gym.Env):
             except (OSError, RuntimeError, ValueError):
                 self._post_skip_reward = 0.0
                 self._post_skip_bd = {}
+            pending = self._flush_pending_episode_failure(action)
+            if pending is not None:
+                return pending
 
         if getattr(self, "_use_phase", 0) > 0 or int(action) == USE_ACTION:
             use_step = self._handle_use_action(int(action))
@@ -1647,6 +1818,8 @@ class RE1Env(gym.Env):
 
         knife = int(action) == KNIFE_SWING_ACTION
         attack = int(action) == ATTACK_ACTION
+        attack_up = int(action) == ATTACK_UP_ACTION
+        combat_attack = attack or attack_up
         magic = self._is_magic_action(int(action))
         attack_report: dict[str, Any] | None = None
         magic_report: dict[str, Any] | None = None
@@ -1667,14 +1840,17 @@ class RE1Env(gym.Env):
                 )
             finally:
                 self._macro_active = False
-        elif attack:
+        elif combat_attack:
             self._sticky_input.apply(0, ACTION_BUTTON_MAP)
             self._macro_active = True
             try:
                 from re1_rl.attack_macro import cleared_movement_sticky
 
+                attack_fn = (
+                    execute_attack_up_macro if attack_up else execute_attack_macro
+                )
                 died_during_step, step_emulated_frames, attack_report = (
-                    execute_attack_macro(
+                    attack_fn(
                         self.bridge,
                         empty_sticky=cleared_movement_sticky(
                             self._sticky_input.as_dict()
@@ -1763,7 +1939,7 @@ class RE1Env(gym.Env):
             self._prev_state,
             state,
             knife=knife,
-            attack=attack,
+            attack=combat_attack,
         )
         enemy_damage = int(state.get("enemy_damage", 0))
         enemy_kills = int(state.get("enemy_kills", 0))
@@ -1782,6 +1958,14 @@ class RE1Env(gym.Env):
                 menu_reason = self._probe_outside_gameplay()
         if menu_reason:
             return self._outside_gameplay_step(action, reason=menu_reason)
+        fail = self._illegal_main_hall_failure_reason(self._prev_state, state)
+        if fail:
+            self._progress.first_visit(
+                str(state.get("room_id", "")),
+                at_waypoint=0,
+                at_route_seq=None,
+            )
+            return self._episode_failure_step(action, reason=fail)
         self._visited.update(state["room_id"], state["x"], state["z"])
         self._progress.record_in_control_step(
             state.get("room_id", ""),

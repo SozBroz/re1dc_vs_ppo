@@ -1,0 +1,6947 @@
+{
+  "created": "2026-07-17T21:22:30",
+  "port": 7799,
+  "state": "D:\\re1_rl\\tools\\BizHawk-2.11.1\\PSX\\State\\Resident Evil - Director's Cut (USA).Nymashock.QuickSave3.State",
+  "state_mtime": "2026-07-17 21:11:41",
+  "state_bytes": 1417894,
+  "canonical_order_slots": [
+    3,
+    5,
+    6,
+    4,
+    2,
+    7,
+    8
+  ],
+  "canonical_order_names": [
+    "newborn baby",
+    "infant",
+    "lively boy",
+    "young man",
+    "tired middle-aged man",
+    "bold-looking old man",
+    "The end of life"
+  ],
+  "trials": [
+    {
+      "tag": "A_native_examine_only",
+      "opened": false,
+      "posed": {
+        "label": "reload",
+        "room": "117",
+        "stage_id": 0,
+        "room_id_raw": 23,
+        "pos": [
+          2900,
+          0,
+          10000
+        ],
+        "pos2": [
+          2900,
+          10000
+        ],
+        "facing": 0,
+        "cam_id": 0,
+        "hp": 16,
+        "game_mode": "0x80",
+        "in_control": true,
+        "game_state": "0x80800000",
+        "scene_flag": "0x80",
+        "msg_flag": "0x00",
+        "msg_open": false,
+        "door_flags": "0x80400800",
+        "inventory": [
+          {
+            "name": "knife",
+            "qty": 0
+          },
+          {
+            "name": "beretta",
+            "qty": 9
+          },
+          {
+            "name": "shotgun",
+            "qty": 3
+          },
+          {
+            "name": "green_herb",
+            "qty": 1
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          }
+        ],
+        "text_fp": "1:4849:2326"
+      },
+      "note": "native Cross did not open MESSAGE"
+    },
+    {
+      "tag": "B_slot3_yes",
+      "slot": 3,
+      "label": "newborn baby",
+      "rdt_msg": 134,
+      "rdt_flag_param": 7,
+      "aot": [
+        19500,
+        7200
+      ],
+      "stand": {
+        "x": 19500,
+        "z": 7600,
+        "facing": 2048
+      },
+      "posed": {
+        "label": "B_slot3_yes_posed",
+        "room": "117",
+        "stage_id": 0,
+        "room_id_raw": 23,
+        "pos": [
+          19500,
+          0,
+          7600
+        ],
+        "pos2": [
+          19500,
+          7600
+        ],
+        "facing": 2048,
+        "cam_id": 0,
+        "hp": 16,
+        "game_mode": "0x80",
+        "in_control": true,
+        "game_state": "0x80800000",
+        "scene_flag": "0x80",
+        "msg_flag": "0x00",
+        "msg_open": false,
+        "door_flags": "0x80400800",
+        "inventory": [
+          {
+            "name": "knife",
+            "qty": 0
+          },
+          {
+            "name": "beretta",
+            "qty": 9
+          },
+          {
+            "name": "shotgun",
+            "qty": 3
+          },
+          {
+            "name": "green_herb",
+            "qty": 1
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          }
+        ],
+        "text_fp": "1:4849:2326"
+      },
+      "result": {
+        "opened": true,
+        "closed_after_advance": true,
+        "confirm": true,
+        "after": {
+          "label": "page_1_after",
+          "room": "117",
+          "stage_id": 0,
+          "room_id_raw": 23,
+          "pos": [
+            19500,
+            0,
+            7600
+          ],
+          "pos2": [
+            19500,
+            7600
+          ],
+          "facing": 2048,
+          "cam_id": 0,
+          "hp": 16,
+          "game_mode": "0x80",
+          "in_control": true,
+          "game_state": "0x80800000",
+          "scene_flag": "0x80",
+          "msg_flag": "0x00",
+          "msg_open": false,
+          "door_flags": "0x80400800",
+          "inventory": [
+            {
+              "name": "knife",
+              "qty": 0
+            },
+            {
+              "name": "beretta",
+              "qty": 9
+            },
+            {
+              "name": "shotgun",
+              "qty": 3
+            },
+            {
+              "name": "green_herb",
+              "qty": 1
+            },
+            {
+              "name": "handgun_bullets",
+              "qty": 15
+            },
+            {
+              "name": "handgun_bullets",
+              "qty": 15
+            }
+          ],
+          "text_fp": "0:4903:2283"
+        }
+      },
+      "pages_fps": [
+        "191:5154:3033",
+        "320:5418:3453"
+      ],
+      "final": {
+        "label": "B_slot3_yes_final",
+        "room": "117",
+        "stage_id": 0,
+        "room_id_raw": 23,
+        "pos": [
+          19500,
+          0,
+          7600
+        ],
+        "pos2": [
+          19500,
+          7600
+        ],
+        "facing": 2048,
+        "cam_id": 0,
+        "hp": 16,
+        "game_mode": "0x80",
+        "in_control": true,
+        "game_state": "0x80800000",
+        "scene_flag": "0x80",
+        "msg_flag": "0x00",
+        "msg_open": false,
+        "door_flags": "0x80400800",
+        "inventory": [
+          {
+            "name": "knife",
+            "qty": 0
+          },
+          {
+            "name": "beretta",
+            "qty": 9
+          },
+          {
+            "name": "shotgun",
+            "qty": 3
+          },
+          {
+            "name": "green_herb",
+            "qty": 1
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          }
+        ],
+        "text_fp": "0:4903:2283"
+      },
+      "flag_flips_vs_baseline": [
+        {
+          "addr": "0x800C867A",
+          "before": 147,
+          "after": 17,
+          "xor": 130,
+          "bits_set": [],
+          "bits_cleared": [
+            1,
+            7
+          ]
+        },
+        {
+          "addr": "0x800C867B",
+          "before": 83,
+          "after": 26,
+          "xor": 73,
+          "bits_set": [
+            3
+          ],
+          "bits_cleared": [
+            0,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C867C",
+          "before": 117,
+          "after": 123,
+          "xor": 14,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2
+          ]
+        },
+        {
+          "addr": "0x800C8B94",
+          "before": 40,
+          "after": 144,
+          "xor": 184,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B95",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B96",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B98",
+          "before": 120,
+          "after": 148,
+          "xor": 236,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8B99",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9A",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B9C",
+          "before": 40,
+          "after": 152,
+          "xor": 176,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9D",
+          "before": 52,
+          "after": 139,
+          "xor": 191,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9E",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA4",
+          "before": 224,
+          "after": 160,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA5",
+          "before": 72,
+          "after": 139,
+          "xor": 195,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA8",
+          "before": 48,
+          "after": 164,
+          "xor": 148,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BA9",
+          "before": 73,
+          "after": 139,
+          "xor": 194,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BAC",
+          "before": 16,
+          "after": 168,
+          "xor": 184,
+          "bits_set": [
+            3,
+            5,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BAD",
+          "before": 75,
+          "after": 139,
+          "xor": 192,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB0",
+          "before": 160,
+          "after": 172,
+          "xor": 12,
+          "bits_set": [
+            2,
+            3
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BB1",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB4",
+          "before": 240,
+          "after": 176,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB5",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB8",
+          "before": 56,
+          "after": 180,
+          "xor": 140,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BB9",
+          "before": 67,
+          "after": 139,
+          "xor": 200,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BBC",
+          "before": 104,
+          "after": 184,
+          "xor": 208,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBD",
+          "before": 69,
+          "after": 139,
+          "xor": 206,
+          "bits_set": [
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC0",
+          "before": 200,
+          "after": 188,
+          "xor": 116,
+          "bits_set": [
+            2,
+            4,
+            5
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC1",
+          "before": 68,
+          "after": 139,
+          "xor": 207,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC4",
+          "before": 240,
+          "after": 192,
+          "xor": 48,
+          "bits_set": [],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC5",
+          "before": 55,
+          "after": 139,
+          "xor": 188,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC8",
+          "before": 64,
+          "after": 196,
+          "xor": 132,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BC9",
+          "before": 56,
+          "after": 139,
+          "xor": 179,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BCC",
+          "before": 152,
+          "after": 200,
+          "xor": 80,
+          "bits_set": [
+            6
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BCD",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD0",
+          "before": 232,
+          "after": 204,
+          "xor": 36,
+          "bits_set": [
+            2
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD1",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD4",
+          "before": 8,
+          "after": 208,
+          "xor": 216,
+          "bits_set": [
+            4,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BD5",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BD6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BD8",
+          "before": 120,
+          "after": 212,
+          "xor": 172,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD9",
+          "before": 237,
+          "after": 139,
+          "xor": 102,
+          "bits_set": [
+            1
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BDC",
+          "before": 248,
+          "after": 216,
+          "xor": 32,
+          "bits_set": [],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BDD",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE0",
+          "before": 120,
+          "after": 220,
+          "xor": 164,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BE1",
+          "before": 227,
+          "after": 139,
+          "xor": 104,
+          "bits_set": [
+            3
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE4",
+          "before": 88,
+          "after": 224,
+          "xor": 184,
+          "bits_set": [
+            5,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE5",
+          "before": 229,
+          "after": 139,
+          "xor": 110,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE8",
+          "before": 24,
+          "after": 228,
+          "xor": 252,
+          "bits_set": [
+            2,
+            5,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE9",
+          "before": 228,
+          "after": 139,
+          "xor": 111,
+          "bits_set": [
+            0,
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BED",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BF0",
+          "before": 72,
+          "after": 236,
+          "xor": 164,
+          "bits_set": [
+            2,
+            5,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BF1",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BF2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        }
+      ],
+      "flag_flips_trial": [
+        {
+          "addr": "0x800C867A",
+          "before": 100,
+          "after": 17,
+          "xor": 117,
+          "bits_set": [
+            0,
+            4
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C867B",
+          "before": 94,
+          "after": 26,
+          "xor": 68,
+          "bits_set": [],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C867C",
+          "before": 117,
+          "after": 123,
+          "xor": 14,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2
+          ]
+        }
+      ],
+      "progressish_single_bit_sets": [],
+      "scan_byte_delta_count": 3
+    },
+    {
+      "tag": "C_slot2_wrong_yes",
+      "slot": 2,
+      "label": "tired middle-aged man",
+      "rdt_msg": 133,
+      "rdt_flag_param": 6,
+      "aot": [
+        16000,
+        7200
+      ],
+      "stand": {
+        "x": 16000,
+        "z": 7600,
+        "facing": 2048
+      },
+      "posed": {
+        "label": "C_slot2_wrong_yes_posed",
+        "room": "117",
+        "stage_id": 0,
+        "room_id_raw": 23,
+        "pos": [
+          16000,
+          0,
+          7600
+        ],
+        "pos2": [
+          16000,
+          7600
+        ],
+        "facing": 2048,
+        "cam_id": 0,
+        "hp": 16,
+        "game_mode": "0x80",
+        "in_control": true,
+        "game_state": "0x80800000",
+        "scene_flag": "0x80",
+        "msg_flag": "0x00",
+        "msg_open": false,
+        "door_flags": "0x80400800",
+        "inventory": [
+          {
+            "name": "knife",
+            "qty": 0
+          },
+          {
+            "name": "beretta",
+            "qty": 9
+          },
+          {
+            "name": "shotgun",
+            "qty": 3
+          },
+          {
+            "name": "green_herb",
+            "qty": 1
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          }
+        ],
+        "text_fp": "1:4849:2326"
+      },
+      "result": {
+        "opened": true,
+        "closed_after_advance": true,
+        "confirm": true,
+        "after": {
+          "label": "page_1_after",
+          "room": "117",
+          "stage_id": 0,
+          "room_id_raw": 23,
+          "pos": [
+            16000,
+            0,
+            7600
+          ],
+          "pos2": [
+            16000,
+            7600
+          ],
+          "facing": 2048,
+          "cam_id": 0,
+          "hp": 16,
+          "game_mode": "0x80",
+          "in_control": true,
+          "game_state": "0x80800000",
+          "scene_flag": "0x80",
+          "msg_flag": "0x00",
+          "msg_open": false,
+          "door_flags": "0x80400800",
+          "inventory": [
+            {
+              "name": "knife",
+              "qty": 0
+            },
+            {
+              "name": "beretta",
+              "qty": 9
+            },
+            {
+              "name": "shotgun",
+              "qty": 3
+            },
+            {
+              "name": "green_herb",
+              "qty": 1
+            },
+            {
+              "name": "handgun_bullets",
+              "qty": 15
+            },
+            {
+              "name": "handgun_bullets",
+              "qty": 15
+            }
+          ],
+          "text_fp": "0:4903:2283"
+        }
+      },
+      "pages_fps": [
+        "281:5312:3299",
+        "320:5418:3453"
+      ],
+      "final": {
+        "label": "C_slot2_wrong_yes_final",
+        "room": "117",
+        "stage_id": 0,
+        "room_id_raw": 23,
+        "pos": [
+          16000,
+          0,
+          7600
+        ],
+        "pos2": [
+          16000,
+          7600
+        ],
+        "facing": 2048,
+        "cam_id": 0,
+        "hp": 16,
+        "game_mode": "0x80",
+        "in_control": true,
+        "game_state": "0x80800000",
+        "scene_flag": "0x80",
+        "msg_flag": "0x00",
+        "msg_open": false,
+        "door_flags": "0x80400800",
+        "inventory": [
+          {
+            "name": "knife",
+            "qty": 0
+          },
+          {
+            "name": "beretta",
+            "qty": 9
+          },
+          {
+            "name": "shotgun",
+            "qty": 3
+          },
+          {
+            "name": "green_herb",
+            "qty": 1
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          }
+        ],
+        "text_fp": "0:4903:2283"
+      },
+      "flag_flips_vs_baseline": [
+        {
+          "addr": "0x800C867A",
+          "before": 147,
+          "after": 224,
+          "xor": 115,
+          "bits_set": [
+            5,
+            6
+          ],
+          "bits_cleared": [
+            0,
+            1,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C867B",
+          "before": 83,
+          "after": 99,
+          "xor": 48,
+          "bits_set": [
+            5
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C867C",
+          "before": 117,
+          "after": 124,
+          "xor": 9,
+          "bits_set": [
+            3
+          ],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8B94",
+          "before": 40,
+          "after": 144,
+          "xor": 184,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B95",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B96",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B98",
+          "before": 120,
+          "after": 148,
+          "xor": 236,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8B99",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9A",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B9C",
+          "before": 40,
+          "after": 152,
+          "xor": 176,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9D",
+          "before": 52,
+          "after": 139,
+          "xor": 191,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9E",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA4",
+          "before": 224,
+          "after": 160,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA5",
+          "before": 72,
+          "after": 139,
+          "xor": 195,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA8",
+          "before": 48,
+          "after": 164,
+          "xor": 148,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BA9",
+          "before": 73,
+          "after": 139,
+          "xor": 194,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BAC",
+          "before": 16,
+          "after": 168,
+          "xor": 184,
+          "bits_set": [
+            3,
+            5,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BAD",
+          "before": 75,
+          "after": 139,
+          "xor": 192,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB0",
+          "before": 160,
+          "after": 172,
+          "xor": 12,
+          "bits_set": [
+            2,
+            3
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BB1",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB4",
+          "before": 240,
+          "after": 176,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB5",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB8",
+          "before": 56,
+          "after": 180,
+          "xor": 140,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BB9",
+          "before": 67,
+          "after": 139,
+          "xor": 200,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BBC",
+          "before": 104,
+          "after": 184,
+          "xor": 208,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBD",
+          "before": 69,
+          "after": 139,
+          "xor": 206,
+          "bits_set": [
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC0",
+          "before": 200,
+          "after": 188,
+          "xor": 116,
+          "bits_set": [
+            2,
+            4,
+            5
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC1",
+          "before": 68,
+          "after": 139,
+          "xor": 207,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC4",
+          "before": 240,
+          "after": 192,
+          "xor": 48,
+          "bits_set": [],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC5",
+          "before": 55,
+          "after": 139,
+          "xor": 188,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC8",
+          "before": 64,
+          "after": 196,
+          "xor": 132,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BC9",
+          "before": 56,
+          "after": 139,
+          "xor": 179,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BCC",
+          "before": 152,
+          "after": 200,
+          "xor": 80,
+          "bits_set": [
+            6
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BCD",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD0",
+          "before": 232,
+          "after": 204,
+          "xor": 36,
+          "bits_set": [
+            2
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD1",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD4",
+          "before": 8,
+          "after": 208,
+          "xor": 216,
+          "bits_set": [
+            4,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BD5",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BD6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BD8",
+          "before": 120,
+          "after": 212,
+          "xor": 172,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD9",
+          "before": 237,
+          "after": 139,
+          "xor": 102,
+          "bits_set": [
+            1
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BDC",
+          "before": 248,
+          "after": 216,
+          "xor": 32,
+          "bits_set": [],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BDD",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE0",
+          "before": 120,
+          "after": 220,
+          "xor": 164,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BE1",
+          "before": 227,
+          "after": 139,
+          "xor": 104,
+          "bits_set": [
+            3
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE4",
+          "before": 88,
+          "after": 224,
+          "xor": 184,
+          "bits_set": [
+            5,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE5",
+          "before": 229,
+          "after": 139,
+          "xor": 110,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE8",
+          "before": 24,
+          "after": 228,
+          "xor": 252,
+          "bits_set": [
+            2,
+            5,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE9",
+          "before": 228,
+          "after": 139,
+          "xor": 111,
+          "bits_set": [
+            0,
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BED",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BF0",
+          "before": 72,
+          "after": 236,
+          "xor": 164,
+          "bits_set": [
+            2,
+            5,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BF1",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BF2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        }
+      ],
+      "flag_flips_trial": [
+        {
+          "addr": "0x800C867A",
+          "before": 100,
+          "after": 224,
+          "xor": 132,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2
+          ]
+        },
+        {
+          "addr": "0x800C867B",
+          "before": 94,
+          "after": 99,
+          "xor": 61,
+          "bits_set": [
+            0,
+            5
+          ],
+          "bits_cleared": [
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C867C",
+          "before": 117,
+          "after": 124,
+          "xor": 9,
+          "bits_set": [
+            3
+          ],
+          "bits_cleared": [
+            0
+          ]
+        }
+      ],
+      "progressish_single_bit_sets": [],
+      "scan_byte_delta_count": 4
+    },
+    {
+      "tag": "D_slot5_ooo_yes",
+      "slot": 5,
+      "label": "infant",
+      "rdt_msg": 136,
+      "rdt_flag_param": 9,
+      "aot": [
+        16000,
+        6100
+      ],
+      "stand": {
+        "x": 16350,
+        "z": 6100,
+        "facing": 3072
+      },
+      "posed": {
+        "label": "D_slot5_ooo_yes_posed",
+        "room": "117",
+        "stage_id": 0,
+        "room_id_raw": 23,
+        "pos": [
+          16350,
+          0,
+          5497
+        ],
+        "pos2": [
+          16350,
+          5497
+        ],
+        "facing": 3072,
+        "cam_id": 0,
+        "hp": 16,
+        "game_mode": "0x80",
+        "in_control": true,
+        "game_state": "0x80800000",
+        "scene_flag": "0x80",
+        "msg_flag": "0x00",
+        "msg_open": false,
+        "door_flags": "0x80400800",
+        "inventory": [
+          {
+            "name": "knife",
+            "qty": 0
+          },
+          {
+            "name": "beretta",
+            "qty": 9
+          },
+          {
+            "name": "shotgun",
+            "qty": 3
+          },
+          {
+            "name": "green_herb",
+            "qty": 1
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          }
+        ],
+        "text_fp": "1:4849:2326"
+      },
+      "result": {
+        "opened": true,
+        "closed_after_advance": true,
+        "confirm": true,
+        "after": {
+          "label": "page_1_after",
+          "room": "117",
+          "stage_id": 0,
+          "room_id_raw": 23,
+          "pos": [
+            16350,
+            0,
+            5497
+          ],
+          "pos2": [
+            16350,
+            5497
+          ],
+          "facing": 3072,
+          "cam_id": 0,
+          "hp": 16,
+          "game_mode": "0x80",
+          "in_control": true,
+          "game_state": "0x80800000",
+          "scene_flag": "0x80",
+          "msg_flag": "0x00",
+          "msg_open": false,
+          "door_flags": "0x80400800",
+          "inventory": [
+            {
+              "name": "knife",
+              "qty": 0
+            },
+            {
+              "name": "beretta",
+              "qty": 9
+            },
+            {
+              "name": "shotgun",
+              "qty": 3
+            },
+            {
+              "name": "green_herb",
+              "qty": 1
+            },
+            {
+              "name": "handgun_bullets",
+              "qty": 15
+            },
+            {
+              "name": "handgun_bullets",
+              "qty": 15
+            }
+          ],
+          "text_fp": "0:4903:2283"
+        }
+      },
+      "pages_fps": [
+        "175:5218:2994",
+        "320:5418:3453"
+      ],
+      "final": {
+        "label": "D_slot5_ooo_yes_final",
+        "room": "117",
+        "stage_id": 0,
+        "room_id_raw": 23,
+        "pos": [
+          16350,
+          0,
+          5497
+        ],
+        "pos2": [
+          16350,
+          5497
+        ],
+        "facing": 3072,
+        "cam_id": 0,
+        "hp": 16,
+        "game_mode": "0x80",
+        "in_control": true,
+        "game_state": "0x80800000",
+        "scene_flag": "0x80",
+        "msg_flag": "0x00",
+        "msg_open": false,
+        "door_flags": "0x80400800",
+        "inventory": [
+          {
+            "name": "knife",
+            "qty": 0
+          },
+          {
+            "name": "beretta",
+            "qty": 9
+          },
+          {
+            "name": "shotgun",
+            "qty": 3
+          },
+          {
+            "name": "green_herb",
+            "qty": 1
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          }
+        ],
+        "text_fp": "0:4903:2283"
+      },
+      "flag_flips_vs_baseline": [
+        {
+          "addr": "0x800C867A",
+          "before": 147,
+          "after": 235,
+          "xor": 120,
+          "bits_set": [
+            3,
+            5,
+            6
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C867B",
+          "before": 83,
+          "after": 120,
+          "xor": 43,
+          "bits_set": [
+            3,
+            5
+          ],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C867C",
+          "before": 117,
+          "after": 123,
+          "xor": 14,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2
+          ]
+        },
+        {
+          "addr": "0x800C8B94",
+          "before": 40,
+          "after": 144,
+          "xor": 184,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B95",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B96",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B98",
+          "before": 120,
+          "after": 148,
+          "xor": 236,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8B99",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9A",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B9C",
+          "before": 40,
+          "after": 152,
+          "xor": 176,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9D",
+          "before": 52,
+          "after": 139,
+          "xor": 191,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9E",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA4",
+          "before": 224,
+          "after": 160,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA5",
+          "before": 72,
+          "after": 139,
+          "xor": 195,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA8",
+          "before": 48,
+          "after": 164,
+          "xor": 148,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BA9",
+          "before": 73,
+          "after": 139,
+          "xor": 194,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BAC",
+          "before": 16,
+          "after": 168,
+          "xor": 184,
+          "bits_set": [
+            3,
+            5,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BAD",
+          "before": 75,
+          "after": 139,
+          "xor": 192,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB0",
+          "before": 160,
+          "after": 172,
+          "xor": 12,
+          "bits_set": [
+            2,
+            3
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BB1",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB4",
+          "before": 240,
+          "after": 176,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB5",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB8",
+          "before": 56,
+          "after": 180,
+          "xor": 140,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BB9",
+          "before": 67,
+          "after": 139,
+          "xor": 200,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BBC",
+          "before": 104,
+          "after": 184,
+          "xor": 208,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBD",
+          "before": 69,
+          "after": 139,
+          "xor": 206,
+          "bits_set": [
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC0",
+          "before": 200,
+          "after": 188,
+          "xor": 116,
+          "bits_set": [
+            2,
+            4,
+            5
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC1",
+          "before": 68,
+          "after": 139,
+          "xor": 207,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC4",
+          "before": 240,
+          "after": 192,
+          "xor": 48,
+          "bits_set": [],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC5",
+          "before": 55,
+          "after": 139,
+          "xor": 188,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC8",
+          "before": 64,
+          "after": 196,
+          "xor": 132,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BC9",
+          "before": 56,
+          "after": 139,
+          "xor": 179,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BCC",
+          "before": 152,
+          "after": 200,
+          "xor": 80,
+          "bits_set": [
+            6
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BCD",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD0",
+          "before": 232,
+          "after": 204,
+          "xor": 36,
+          "bits_set": [
+            2
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD1",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD4",
+          "before": 8,
+          "after": 208,
+          "xor": 216,
+          "bits_set": [
+            4,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BD5",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BD6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BD8",
+          "before": 120,
+          "after": 212,
+          "xor": 172,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD9",
+          "before": 237,
+          "after": 139,
+          "xor": 102,
+          "bits_set": [
+            1
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BDC",
+          "before": 248,
+          "after": 216,
+          "xor": 32,
+          "bits_set": [],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BDD",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE0",
+          "before": 120,
+          "after": 220,
+          "xor": 164,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BE1",
+          "before": 227,
+          "after": 139,
+          "xor": 104,
+          "bits_set": [
+            3
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE4",
+          "before": 88,
+          "after": 224,
+          "xor": 184,
+          "bits_set": [
+            5,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE5",
+          "before": 229,
+          "after": 139,
+          "xor": 110,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE8",
+          "before": 24,
+          "after": 228,
+          "xor": 252,
+          "bits_set": [
+            2,
+            5,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE9",
+          "before": 228,
+          "after": 139,
+          "xor": 111,
+          "bits_set": [
+            0,
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BED",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BF0",
+          "before": 72,
+          "after": 236,
+          "xor": 164,
+          "bits_set": [
+            2,
+            5,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BF1",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BF2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        }
+      ],
+      "flag_flips_trial": [
+        {
+          "addr": "0x800C867A",
+          "before": 100,
+          "after": 235,
+          "xor": 143,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2
+          ]
+        },
+        {
+          "addr": "0x800C867B",
+          "before": 94,
+          "after": 120,
+          "xor": 38,
+          "bits_set": [
+            5
+          ],
+          "bits_cleared": [
+            1,
+            2
+          ]
+        },
+        {
+          "addr": "0x800C867C",
+          "before": 117,
+          "after": 123,
+          "xor": 14,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2
+          ]
+        }
+      ],
+      "progressish_single_bit_sets": [],
+      "scan_byte_delta_count": 3
+    },
+    {
+      "tag": "E_slot6_yes",
+      "slot": 6,
+      "label": "lively boy",
+      "rdt_msg": 137,
+      "rdt_flag_param": 10,
+      "aot": [
+        10500,
+        6100
+      ],
+      "stand": {
+        "x": 10850,
+        "z": 6100,
+        "facing": 3072
+      },
+      "posed": {
+        "label": "E_slot6_yes_posed",
+        "room": "117",
+        "stage_id": 0,
+        "room_id_raw": 23,
+        "pos": [
+          10850,
+          0,
+          5497
+        ],
+        "pos2": [
+          10850,
+          5497
+        ],
+        "facing": 3072,
+        "cam_id": 0,
+        "hp": 16,
+        "game_mode": "0x80",
+        "in_control": true,
+        "game_state": "0x80800000",
+        "scene_flag": "0x80",
+        "msg_flag": "0x00",
+        "msg_open": false,
+        "door_flags": "0x80400800",
+        "inventory": [
+          {
+            "name": "knife",
+            "qty": 0
+          },
+          {
+            "name": "beretta",
+            "qty": 9
+          },
+          {
+            "name": "shotgun",
+            "qty": 3
+          },
+          {
+            "name": "green_herb",
+            "qty": 1
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          }
+        ],
+        "text_fp": "1:4849:2326"
+      },
+      "result": {
+        "opened": true,
+        "closed_after_advance": true,
+        "confirm": true,
+        "after": {
+          "label": "page_1_after",
+          "room": "117",
+          "stage_id": 0,
+          "room_id_raw": 23,
+          "pos": [
+            10850,
+            0,
+            5497
+          ],
+          "pos2": [
+            10850,
+            5497
+          ],
+          "facing": 3072,
+          "cam_id": 0,
+          "hp": 16,
+          "game_mode": "0x80",
+          "in_control": true,
+          "game_state": "0x80800000",
+          "scene_flag": "0x80",
+          "msg_flag": "0x00",
+          "msg_open": false,
+          "door_flags": "0x80400800",
+          "inventory": [
+            {
+              "name": "knife",
+              "qty": 0
+            },
+            {
+              "name": "beretta",
+              "qty": 9
+            },
+            {
+              "name": "shotgun",
+              "qty": 3
+            },
+            {
+              "name": "green_herb",
+              "qty": 1
+            },
+            {
+              "name": "handgun_bullets",
+              "qty": 15
+            },
+            {
+              "name": "handgun_bullets",
+              "qty": 15
+            }
+          ],
+          "text_fp": "0:4903:2283"
+        }
+      },
+      "pages_fps": [
+        "180:5250:3037",
+        "320:5418:3453"
+      ],
+      "final": {
+        "label": "E_slot6_yes_final",
+        "room": "117",
+        "stage_id": 0,
+        "room_id_raw": 23,
+        "pos": [
+          10850,
+          0,
+          5497
+        ],
+        "pos2": [
+          10850,
+          5497
+        ],
+        "facing": 3072,
+        "cam_id": 0,
+        "hp": 16,
+        "game_mode": "0x80",
+        "in_control": true,
+        "game_state": "0x80800000",
+        "scene_flag": "0x80",
+        "msg_flag": "0x00",
+        "msg_open": false,
+        "door_flags": "0x80400800",
+        "inventory": [
+          {
+            "name": "knife",
+            "qty": 0
+          },
+          {
+            "name": "beretta",
+            "qty": 9
+          },
+          {
+            "name": "shotgun",
+            "qty": 3
+          },
+          {
+            "name": "green_herb",
+            "qty": 1
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          }
+        ],
+        "text_fp": "0:4903:2283"
+      },
+      "flag_flips_vs_baseline": [
+        {
+          "addr": "0x800C867A",
+          "before": 147,
+          "after": 94,
+          "xor": 205,
+          "bits_set": [
+            2,
+            3,
+            6
+          ],
+          "bits_cleared": [
+            0,
+            7
+          ]
+        },
+        {
+          "addr": "0x800C867B",
+          "before": 83,
+          "after": 54,
+          "xor": 101,
+          "bits_set": [
+            2,
+            5
+          ],
+          "bits_cleared": [
+            0,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C867C",
+          "before": 117,
+          "after": 123,
+          "xor": 14,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2
+          ]
+        },
+        {
+          "addr": "0x800C8B94",
+          "before": 40,
+          "after": 144,
+          "xor": 184,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B95",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B96",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B98",
+          "before": 120,
+          "after": 148,
+          "xor": 236,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8B99",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9A",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B9C",
+          "before": 40,
+          "after": 152,
+          "xor": 176,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9D",
+          "before": 52,
+          "after": 139,
+          "xor": 191,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9E",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA4",
+          "before": 224,
+          "after": 160,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA5",
+          "before": 72,
+          "after": 139,
+          "xor": 195,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA8",
+          "before": 48,
+          "after": 164,
+          "xor": 148,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BA9",
+          "before": 73,
+          "after": 139,
+          "xor": 194,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BAC",
+          "before": 16,
+          "after": 168,
+          "xor": 184,
+          "bits_set": [
+            3,
+            5,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BAD",
+          "before": 75,
+          "after": 139,
+          "xor": 192,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB0",
+          "before": 160,
+          "after": 172,
+          "xor": 12,
+          "bits_set": [
+            2,
+            3
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BB1",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB4",
+          "before": 240,
+          "after": 176,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB5",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB8",
+          "before": 56,
+          "after": 180,
+          "xor": 140,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BB9",
+          "before": 67,
+          "after": 139,
+          "xor": 200,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BBC",
+          "before": 104,
+          "after": 184,
+          "xor": 208,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBD",
+          "before": 69,
+          "after": 139,
+          "xor": 206,
+          "bits_set": [
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC0",
+          "before": 200,
+          "after": 188,
+          "xor": 116,
+          "bits_set": [
+            2,
+            4,
+            5
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC1",
+          "before": 68,
+          "after": 139,
+          "xor": 207,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC4",
+          "before": 240,
+          "after": 192,
+          "xor": 48,
+          "bits_set": [],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC5",
+          "before": 55,
+          "after": 139,
+          "xor": 188,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC8",
+          "before": 64,
+          "after": 196,
+          "xor": 132,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BC9",
+          "before": 56,
+          "after": 139,
+          "xor": 179,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BCC",
+          "before": 152,
+          "after": 200,
+          "xor": 80,
+          "bits_set": [
+            6
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BCD",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD0",
+          "before": 232,
+          "after": 204,
+          "xor": 36,
+          "bits_set": [
+            2
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD1",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD4",
+          "before": 8,
+          "after": 208,
+          "xor": 216,
+          "bits_set": [
+            4,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BD5",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BD6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BD8",
+          "before": 120,
+          "after": 212,
+          "xor": 172,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD9",
+          "before": 237,
+          "after": 139,
+          "xor": 102,
+          "bits_set": [
+            1
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BDC",
+          "before": 248,
+          "after": 216,
+          "xor": 32,
+          "bits_set": [],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BDD",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE0",
+          "before": 120,
+          "after": 220,
+          "xor": 164,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BE1",
+          "before": 227,
+          "after": 139,
+          "xor": 104,
+          "bits_set": [
+            3
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE4",
+          "before": 88,
+          "after": 224,
+          "xor": 184,
+          "bits_set": [
+            5,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE5",
+          "before": 229,
+          "after": 139,
+          "xor": 110,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE8",
+          "before": 24,
+          "after": 228,
+          "xor": 252,
+          "bits_set": [
+            2,
+            5,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE9",
+          "before": 228,
+          "after": 139,
+          "xor": 111,
+          "bits_set": [
+            0,
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BED",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BF0",
+          "before": 72,
+          "after": 236,
+          "xor": 164,
+          "bits_set": [
+            2,
+            5,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BF1",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BF2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        }
+      ],
+      "flag_flips_trial": [
+        {
+          "addr": "0x800C867A",
+          "before": 100,
+          "after": 94,
+          "xor": 58,
+          "bits_set": [
+            1,
+            3,
+            4
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C867B",
+          "before": 94,
+          "after": 54,
+          "xor": 104,
+          "bits_set": [
+            5
+          ],
+          "bits_cleared": [
+            3,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C867C",
+          "before": 117,
+          "after": 123,
+          "xor": 14,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2
+          ]
+        }
+      ],
+      "progressish_single_bit_sets": [],
+      "scan_byte_delta_count": 4
+    },
+    {
+      "tag": "F_slot3_yesno_only",
+      "slot": 3,
+      "label": "newborn baby",
+      "rdt_msg": 134,
+      "rdt_flag_param": 7,
+      "aot": [
+        19500,
+        7200
+      ],
+      "stand": {
+        "x": 19500,
+        "z": 7600,
+        "facing": 2048
+      },
+      "posed": {
+        "label": "F_slot3_yesno_only_posed",
+        "room": "117",
+        "stage_id": 0,
+        "room_id_raw": 23,
+        "pos": [
+          19500,
+          0,
+          7600
+        ],
+        "pos2": [
+          19500,
+          7600
+        ],
+        "facing": 2048,
+        "cam_id": 0,
+        "hp": 16,
+        "game_mode": "0x80",
+        "in_control": true,
+        "game_state": "0x80800000",
+        "scene_flag": "0x80",
+        "msg_flag": "0x00",
+        "msg_open": false,
+        "door_flags": "0x80400800",
+        "inventory": [
+          {
+            "name": "knife",
+            "qty": 0
+          },
+          {
+            "name": "beretta",
+            "qty": 9
+          },
+          {
+            "name": "shotgun",
+            "qty": 3
+          },
+          {
+            "name": "green_herb",
+            "qty": 1
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          }
+        ],
+        "text_fp": "1:4849:2326"
+      },
+      "result": {
+        "opened": true,
+        "closed_after_advance": true,
+        "confirm": false,
+        "after": {
+          "label": "page_1_after",
+          "room": "117",
+          "stage_id": 0,
+          "room_id_raw": 23,
+          "pos": [
+            19500,
+            0,
+            7600
+          ],
+          "pos2": [
+            19500,
+            7600
+          ],
+          "facing": 2048,
+          "cam_id": 0,
+          "hp": 16,
+          "game_mode": "0x80",
+          "in_control": true,
+          "game_state": "0x80800000",
+          "scene_flag": "0x80",
+          "msg_flag": "0x00",
+          "msg_open": false,
+          "door_flags": "0x80400800",
+          "inventory": [
+            {
+              "name": "knife",
+              "qty": 0
+            },
+            {
+              "name": "beretta",
+              "qty": 9
+            },
+            {
+              "name": "shotgun",
+              "qty": 3
+            },
+            {
+              "name": "green_herb",
+              "qty": 1
+            },
+            {
+              "name": "handgun_bullets",
+              "qty": 15
+            },
+            {
+              "name": "handgun_bullets",
+              "qty": 15
+            }
+          ],
+          "text_fp": "0:4903:2283"
+        }
+      },
+      "pages_fps": [
+        "191:5154:3033",
+        "320:5418:3453"
+      ],
+      "final": {
+        "label": "F_slot3_yesno_only_final",
+        "room": "117",
+        "stage_id": 0,
+        "room_id_raw": 23,
+        "pos": [
+          19500,
+          0,
+          7600
+        ],
+        "pos2": [
+          19500,
+          7600
+        ],
+        "facing": 2048,
+        "cam_id": 0,
+        "hp": 16,
+        "game_mode": "0x80",
+        "in_control": true,
+        "game_state": "0x80800000",
+        "scene_flag": "0x80",
+        "msg_flag": "0x00",
+        "msg_open": false,
+        "door_flags": "0x80400800",
+        "inventory": [
+          {
+            "name": "knife",
+            "qty": 0
+          },
+          {
+            "name": "beretta",
+            "qty": 9
+          },
+          {
+            "name": "shotgun",
+            "qty": 3
+          },
+          {
+            "name": "green_herb",
+            "qty": 1
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          },
+          {
+            "name": "handgun_bullets",
+            "qty": 15
+          }
+        ],
+        "text_fp": "0:4903:2283"
+      },
+      "flag_flips_vs_baseline": [
+        {
+          "addr": "0x800C867A",
+          "before": 147,
+          "after": 17,
+          "xor": 130,
+          "bits_set": [],
+          "bits_cleared": [
+            1,
+            7
+          ]
+        },
+        {
+          "addr": "0x800C867B",
+          "before": 83,
+          "after": 26,
+          "xor": 73,
+          "bits_set": [
+            3
+          ],
+          "bits_cleared": [
+            0,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C867C",
+          "before": 117,
+          "after": 123,
+          "xor": 14,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2
+          ]
+        },
+        {
+          "addr": "0x800C8B94",
+          "before": 40,
+          "after": 144,
+          "xor": 184,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B95",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B96",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B98",
+          "before": 120,
+          "after": 148,
+          "xor": 236,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8B99",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9A",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B9C",
+          "before": 40,
+          "after": 152,
+          "xor": 176,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9D",
+          "before": 52,
+          "after": 139,
+          "xor": 191,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9E",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA4",
+          "before": 224,
+          "after": 160,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA5",
+          "before": 72,
+          "after": 139,
+          "xor": 195,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA8",
+          "before": 48,
+          "after": 164,
+          "xor": 148,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BA9",
+          "before": 73,
+          "after": 139,
+          "xor": 194,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BAC",
+          "before": 16,
+          "after": 168,
+          "xor": 184,
+          "bits_set": [
+            3,
+            5,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BAD",
+          "before": 75,
+          "after": 139,
+          "xor": 192,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB0",
+          "before": 160,
+          "after": 172,
+          "xor": 12,
+          "bits_set": [
+            2,
+            3
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BB1",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB4",
+          "before": 240,
+          "after": 176,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB5",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB8",
+          "before": 56,
+          "after": 180,
+          "xor": 140,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BB9",
+          "before": 67,
+          "after": 139,
+          "xor": 200,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BBC",
+          "before": 104,
+          "after": 184,
+          "xor": 208,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBD",
+          "before": 69,
+          "after": 139,
+          "xor": 206,
+          "bits_set": [
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC0",
+          "before": 200,
+          "after": 188,
+          "xor": 116,
+          "bits_set": [
+            2,
+            4,
+            5
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC1",
+          "before": 68,
+          "after": 139,
+          "xor": 207,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC4",
+          "before": 240,
+          "after": 192,
+          "xor": 48,
+          "bits_set": [],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC5",
+          "before": 55,
+          "after": 139,
+          "xor": 188,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC8",
+          "before": 64,
+          "after": 196,
+          "xor": 132,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BC9",
+          "before": 56,
+          "after": 139,
+          "xor": 179,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BCC",
+          "before": 152,
+          "after": 200,
+          "xor": 80,
+          "bits_set": [
+            6
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BCD",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD0",
+          "before": 232,
+          "after": 204,
+          "xor": 36,
+          "bits_set": [
+            2
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD1",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD4",
+          "before": 8,
+          "after": 208,
+          "xor": 216,
+          "bits_set": [
+            4,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BD5",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BD6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BD8",
+          "before": 120,
+          "after": 212,
+          "xor": 172,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD9",
+          "before": 237,
+          "after": 139,
+          "xor": 102,
+          "bits_set": [
+            1
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BDC",
+          "before": 248,
+          "after": 216,
+          "xor": 32,
+          "bits_set": [],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BDD",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE0",
+          "before": 120,
+          "after": 220,
+          "xor": 164,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BE1",
+          "before": 227,
+          "after": 139,
+          "xor": 104,
+          "bits_set": [
+            3
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE4",
+          "before": 88,
+          "after": 224,
+          "xor": 184,
+          "bits_set": [
+            5,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE5",
+          "before": 229,
+          "after": 139,
+          "xor": 110,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE8",
+          "before": 24,
+          "after": 228,
+          "xor": 252,
+          "bits_set": [
+            2,
+            5,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE9",
+          "before": 228,
+          "after": 139,
+          "xor": 111,
+          "bits_set": [
+            0,
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BED",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BF0",
+          "before": 72,
+          "after": 236,
+          "xor": 164,
+          "bits_set": [
+            2,
+            5,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BF1",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BF2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        }
+      ],
+      "flag_flips_trial": [
+        {
+          "addr": "0x800C867A",
+          "before": 100,
+          "after": 17,
+          "xor": 117,
+          "bits_set": [
+            0,
+            4
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C867B",
+          "before": 94,
+          "after": 26,
+          "xor": 68,
+          "bits_set": [],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C867C",
+          "before": 117,
+          "after": 123,
+          "xor": 14,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2
+          ]
+        }
+      ],
+      "progressish_single_bit_sets": [],
+      "scan_byte_delta_count": 3
+    },
+    {
+      "tag": "G_chain_3_then_5",
+      "steps": [
+        {
+          "slot": 3,
+          "label": "newborn baby",
+          "result": {
+            "opened": true,
+            "closed_after_advance": true,
+            "confirm": true,
+            "after": {
+              "label": "page_1_after",
+              "room": "117",
+              "stage_id": 0,
+              "room_id_raw": 23,
+              "pos": [
+                19500,
+                0,
+                7600
+              ],
+              "pos2": [
+                19500,
+                7600
+              ],
+              "facing": 2048,
+              "cam_id": 0,
+              "hp": 16,
+              "game_mode": "0x80",
+              "in_control": true,
+              "game_state": "0x80800000",
+              "scene_flag": "0x80",
+              "msg_flag": "0x00",
+              "msg_open": false,
+              "door_flags": "0x80400800",
+              "inventory": [
+                {
+                  "name": "knife",
+                  "qty": 0
+                },
+                {
+                  "name": "beretta",
+                  "qty": 9
+                },
+                {
+                  "name": "shotgun",
+                  "qty": 3
+                },
+                {
+                  "name": "green_herb",
+                  "qty": 1
+                },
+                {
+                  "name": "handgun_bullets",
+                  "qty": 15
+                },
+                {
+                  "name": "handgun_bullets",
+                  "qty": 15
+                }
+              ],
+              "text_fp": "0:4903:2283"
+            }
+          },
+          "final": {
+            "label": "G1_slot3_after",
+            "room": "117",
+            "stage_id": 0,
+            "room_id_raw": 23,
+            "pos": [
+              19500,
+              0,
+              7600
+            ],
+            "pos2": [
+              19500,
+              7600
+            ],
+            "facing": 2048,
+            "cam_id": 0,
+            "hp": 16,
+            "game_mode": "0x80",
+            "in_control": true,
+            "game_state": "0x80800000",
+            "scene_flag": "0x80",
+            "msg_flag": "0x00",
+            "msg_open": false,
+            "door_flags": "0x80400800",
+            "inventory": [
+              {
+                "name": "knife",
+                "qty": 0
+              },
+              {
+                "name": "beretta",
+                "qty": 9
+              },
+              {
+                "name": "shotgun",
+                "qty": 3
+              },
+              {
+                "name": "green_herb",
+                "qty": 1
+              },
+              {
+                "name": "handgun_bullets",
+                "qty": 15
+              },
+              {
+                "name": "handgun_bullets",
+                "qty": 15
+              }
+            ],
+            "text_fp": "0:4903:2283"
+          },
+          "flag_flips_trial": [
+            {
+              "addr": "0x800C867A",
+              "before": 100,
+              "after": 85,
+              "xor": 49,
+              "bits_set": [
+                0,
+                4
+              ],
+              "bits_cleared": [
+                5
+              ]
+            },
+            {
+              "addr": "0x800C867B",
+              "before": 94,
+              "after": 89,
+              "xor": 7,
+              "bits_set": [
+                0
+              ],
+              "bits_cleared": [
+                1,
+                2
+              ]
+            },
+            {
+              "addr": "0x800C867C",
+              "before": 117,
+              "after": 123,
+              "xor": 14,
+              "bits_set": [
+                1,
+                3
+              ],
+              "bits_cleared": [
+                2
+              ]
+            }
+          ],
+          "progressish": []
+        },
+        {
+          "slot": 5,
+          "label": "infant",
+          "result": {
+            "opened": true,
+            "closed_after_advance": true,
+            "confirm": true,
+            "after": {
+              "label": "page_1_after",
+              "room": "117",
+              "stage_id": 0,
+              "room_id_raw": 23,
+              "pos": [
+                16350,
+                0,
+                5497
+              ],
+              "pos2": [
+                16350,
+                5497
+              ],
+              "facing": 3072,
+              "cam_id": 0,
+              "hp": 16,
+              "game_mode": "0x80",
+              "in_control": true,
+              "game_state": "0x80800000",
+              "scene_flag": "0x80",
+              "msg_flag": "0x00",
+              "msg_open": false,
+              "door_flags": "0x80400800",
+              "inventory": [
+                {
+                  "name": "knife",
+                  "qty": 0
+                },
+                {
+                  "name": "beretta",
+                  "qty": 9
+                },
+                {
+                  "name": "shotgun",
+                  "qty": 3
+                },
+                {
+                  "name": "green_herb",
+                  "qty": 1
+                },
+                {
+                  "name": "handgun_bullets",
+                  "qty": 15
+                },
+                {
+                  "name": "handgun_bullets",
+                  "qty": 15
+                }
+              ],
+              "text_fp": "0:4903:2283"
+            }
+          },
+          "final": {
+            "label": "G2_slot5_after",
+            "room": "117",
+            "stage_id": 0,
+            "room_id_raw": 23,
+            "pos": [
+              16350,
+              0,
+              5497
+            ],
+            "pos2": [
+              16350,
+              5497
+            ],
+            "facing": 3072,
+            "cam_id": 0,
+            "hp": 16,
+            "game_mode": "0x80",
+            "in_control": true,
+            "game_state": "0x80800000",
+            "scene_flag": "0x80",
+            "msg_flag": "0x00",
+            "msg_open": false,
+            "door_flags": "0x80400800",
+            "inventory": [
+              {
+                "name": "knife",
+                "qty": 0
+              },
+              {
+                "name": "beretta",
+                "qty": 9
+              },
+              {
+                "name": "shotgun",
+                "qty": 3
+              },
+              {
+                "name": "green_herb",
+                "qty": 1
+              },
+              {
+                "name": "handgun_bullets",
+                "qty": 15
+              },
+              {
+                "name": "handgun_bullets",
+                "qty": 15
+              }
+            ],
+            "text_fp": "0:4903:2283"
+          },
+          "flag_flips_trial": [
+            {
+              "addr": "0x800C867A",
+              "before": 144,
+              "after": 192,
+              "xor": 80,
+              "bits_set": [
+                6
+              ],
+              "bits_cleared": [
+                4
+              ]
+            },
+            {
+              "addr": "0x800C867B",
+              "before": 122,
+              "after": 74,
+              "xor": 48,
+              "bits_set": [],
+              "bits_cleared": [
+                4,
+                5
+              ]
+            },
+            {
+              "addr": "0x800C867C",
+              "before": 123,
+              "after": 129,
+              "xor": 250,
+              "bits_set": [
+                7
+              ],
+              "bits_cleared": [
+                1,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ],
+          "progressish": []
+        }
+      ],
+      "cumulative_vs_start": [
+        {
+          "addr": "0x800C867A",
+          "before": 147,
+          "after": 192,
+          "xor": 83,
+          "bits_set": [
+            6
+          ],
+          "bits_cleared": [
+            0,
+            1,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C867B",
+          "before": 83,
+          "after": 74,
+          "xor": 25,
+          "bits_set": [
+            3
+          ],
+          "bits_cleared": [
+            0,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C867C",
+          "before": 117,
+          "after": 129,
+          "xor": 244,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8B94",
+          "before": 40,
+          "after": 144,
+          "xor": 184,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B95",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B96",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B98",
+          "before": 120,
+          "after": 148,
+          "xor": 236,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8B99",
+          "before": 47,
+          "after": 139,
+          "xor": 164,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9A",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8B9C",
+          "before": 40,
+          "after": 152,
+          "xor": 176,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9D",
+          "before": 52,
+          "after": 139,
+          "xor": 191,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8B9E",
+          "before": 15,
+          "after": 12,
+          "xor": 3,
+          "bits_set": [],
+          "bits_cleared": [
+            0,
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA4",
+          "before": 224,
+          "after": 160,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA5",
+          "before": 72,
+          "after": 139,
+          "xor": 195,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BA6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BA8",
+          "before": 48,
+          "after": 164,
+          "xor": 148,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BA9",
+          "before": 73,
+          "after": 139,
+          "xor": 194,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BAC",
+          "before": 16,
+          "after": 168,
+          "xor": 184,
+          "bits_set": [
+            3,
+            5,
+            7
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BAD",
+          "before": 75,
+          "after": 139,
+          "xor": 192,
+          "bits_set": [
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BAE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB0",
+          "before": 160,
+          "after": 172,
+          "xor": 12,
+          "bits_set": [
+            2,
+            3
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BB1",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB4",
+          "before": 240,
+          "after": 176,
+          "xor": 64,
+          "bits_set": [],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB5",
+          "before": 76,
+          "after": 139,
+          "xor": 199,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BB6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BB8",
+          "before": 56,
+          "after": 180,
+          "xor": 140,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BB9",
+          "before": 67,
+          "after": 139,
+          "xor": 200,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BBC",
+          "before": 104,
+          "after": 184,
+          "xor": 208,
+          "bits_set": [
+            4,
+            7
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBD",
+          "before": 69,
+          "after": 139,
+          "xor": 206,
+          "bits_set": [
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BBE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC0",
+          "before": 200,
+          "after": 188,
+          "xor": 116,
+          "bits_set": [
+            2,
+            4,
+            5
+          ],
+          "bits_cleared": [
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC1",
+          "before": 68,
+          "after": 139,
+          "xor": 207,
+          "bits_set": [
+            0,
+            1,
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BC2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC4",
+          "before": 240,
+          "after": 192,
+          "xor": 48,
+          "bits_set": [],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC5",
+          "before": 55,
+          "after": 139,
+          "xor": 188,
+          "bits_set": [
+            3,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BC6",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BC8",
+          "before": 64,
+          "after": 196,
+          "xor": 132,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BC9",
+          "before": 56,
+          "after": 139,
+          "xor": 179,
+          "bits_set": [
+            0,
+            1,
+            7
+          ],
+          "bits_cleared": [
+            4,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCA",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BCC",
+          "before": 152,
+          "after": 200,
+          "xor": 80,
+          "bits_set": [
+            6
+          ],
+          "bits_cleared": [
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BCD",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BCE",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD0",
+          "before": 232,
+          "after": 204,
+          "xor": 36,
+          "bits_set": [
+            2
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD1",
+          "before": 45,
+          "after": 139,
+          "xor": 166,
+          "bits_set": [
+            1,
+            7
+          ],
+          "bits_cleared": [
+            2,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD2",
+          "before": 14,
+          "after": 12,
+          "xor": 2,
+          "bits_set": [],
+          "bits_cleared": [
+            1
+          ]
+        },
+        {
+          "addr": "0x800C8BD4",
+          "before": 8,
+          "after": 208,
+          "xor": 216,
+          "bits_set": [
+            4,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3
+          ]
+        },
+        {
+          "addr": "0x800C8BD5",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BD6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BD8",
+          "before": 120,
+          "after": 212,
+          "xor": 172,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BD9",
+          "before": 237,
+          "after": 139,
+          "xor": 102,
+          "bits_set": [
+            1
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BDC",
+          "before": 248,
+          "after": 216,
+          "xor": 32,
+          "bits_set": [],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BDD",
+          "before": 234,
+          "after": 139,
+          "xor": 97,
+          "bits_set": [
+            0
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BDE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE0",
+          "before": 120,
+          "after": 220,
+          "xor": 164,
+          "bits_set": [
+            2,
+            7
+          ],
+          "bits_cleared": [
+            5
+          ]
+        },
+        {
+          "addr": "0x800C8BE1",
+          "before": 227,
+          "after": 139,
+          "xor": 104,
+          "bits_set": [
+            3
+          ],
+          "bits_cleared": [
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE4",
+          "before": 88,
+          "after": 224,
+          "xor": 184,
+          "bits_set": [
+            5,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE5",
+          "before": 229,
+          "after": 139,
+          "xor": 110,
+          "bits_set": [
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BE6",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BE8",
+          "before": 24,
+          "after": 228,
+          "xor": 252,
+          "bits_set": [
+            2,
+            5,
+            6,
+            7
+          ],
+          "bits_cleared": [
+            3,
+            4
+          ]
+        },
+        {
+          "addr": "0x800C8BE9",
+          "before": 228,
+          "after": 139,
+          "xor": 111,
+          "bits_set": [
+            0,
+            1,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEA",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BED",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BEE",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        },
+        {
+          "addr": "0x800C8BF0",
+          "before": 72,
+          "after": 236,
+          "xor": 164,
+          "bits_set": [
+            2,
+            5,
+            7
+          ],
+          "bits_cleared": []
+        },
+        {
+          "addr": "0x800C8BF1",
+          "before": 230,
+          "after": 139,
+          "xor": 109,
+          "bits_set": [
+            0,
+            3
+          ],
+          "bits_cleared": [
+            2,
+            5,
+            6
+          ]
+        },
+        {
+          "addr": "0x800C8BF2",
+          "before": 13,
+          "after": 12,
+          "xor": 1,
+          "bits_set": [],
+          "bits_cleared": [
+            0
+          ]
+        }
+      ]
+    }
+  ],
+  "notes": [],
+  "emuhawk_pid": 55360,
+  "baseline": {
+    "label": "reload",
+    "room": "117",
+    "stage_id": 0,
+    "room_id_raw": 23,
+    "pos": [
+      2900,
+      0,
+      10000
+    ],
+    "pos2": [
+      2900,
+      10000
+    ],
+    "facing": 0,
+    "cam_id": 0,
+    "hp": 16,
+    "game_mode": "0x80",
+    "in_control": true,
+    "game_state": "0x80800000",
+    "scene_flag": "0x80",
+    "msg_flag": "0x00",
+    "msg_open": false,
+    "door_flags": "0x80400800",
+    "inventory": [
+      {
+        "name": "knife",
+        "qty": 0
+      },
+      {
+        "name": "beretta",
+        "qty": 9
+      },
+      {
+        "name": "shotgun",
+        "qty": 3
+      },
+      {
+        "name": "green_herb",
+        "qty": 1
+      },
+      {
+        "name": "handgun_bullets",
+        "qty": 15
+      },
+      {
+        "name": "handgun_bullets",
+        "qty": 15
+      }
+    ],
+    "text_fp": "1:4849:2326"
+  },
+  "baseline_flag_sha_prefix": "ee6a12111141e8eeae462244121183ea",
+  "final_reload": {
+    "label": "reload",
+    "room": "117",
+    "stage_id": 0,
+    "room_id_raw": 23,
+    "pos": [
+      2900,
+      0,
+      10000
+    ],
+    "pos2": [
+      2900,
+      10000
+    ],
+    "facing": 0,
+    "cam_id": 0,
+    "hp": 16,
+    "game_mode": "0x80",
+    "in_control": true,
+    "game_state": "0x80800000",
+    "scene_flag": "0x80",
+    "msg_flag": "0x00",
+    "msg_open": false,
+    "door_flags": "0x80400800",
+    "inventory": [
+      {
+        "name": "knife",
+        "qty": 0
+      },
+      {
+        "name": "beretta",
+        "qty": 9
+      },
+      {
+        "name": "shotgun",
+        "qty": 3
+      },
+      {
+        "name": "green_herb",
+        "qty": 1
+      },
+      {
+        "name": "handgun_bullets",
+        "qty": 15
+      },
+      {
+        "name": "handgun_bullets",
+        "qty": 15
+      }
+    ],
+    "text_fp": "1:4849:2326"
+  },
+  "save_intact": true,
+  "yes_progress_compare": [
+    {
+      "tag": "B_slot3_yes",
+      "slot": 3,
+      "confirmed": null,
+      "progressish": []
+    },
+    {
+      "tag": "C_slot2_wrong_yes",
+      "slot": 2,
+      "confirmed": null,
+      "progressish": []
+    },
+    {
+      "tag": "D_slot5_ooo_yes",
+      "slot": 5,
+      "confirmed": null,
+      "progressish": []
+    },
+    {
+      "tag": "E_slot6_yes",
+      "slot": 6,
+      "confirmed": null,
+      "progressish": []
+    }
+  ],
+  "emuhawk_exit": 1
+}

@@ -71,6 +71,8 @@ SURVIVAL_BUDGET_SCALED = 1.0 * CHECKPOINT_REWARD
 NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.6667
 DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.3333
 DEATH_PENALTY = -DEATH_PENALTY_SCALED
+# Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
+MAIN_HALL_BEFORE_KENNETH_PENALTY = -3.0
 # Doing-nothing contempt must not exceed death (else suicide beats softlock).
 CONTEMPT_BUDGET_SCALED = DEATH_PENALTY_SCALED
 SOFTLOCK_TIMEOUT_PENALTY = -CONTEMPT_BUDGET_SCALED
@@ -188,12 +190,14 @@ def compute_reward(
         "item": 0.0,
         "key_item": 0.0,
         "story_use": 0.0,
+        "gallery": 0.0,
         "gold_emblem_return": 0.0,
         "shotgun_return": 0.0,
         "new_weapon": 0.0,
         "success_room": 0.0,
         "hp": 0.0,
         "death": 0.0,
+        "main_hall_before_kenneth": 0.0,
         "softlock": 0.0,
         "enemy_damage": 0.0,
         "enemy_kill": 0.0,
@@ -245,18 +249,21 @@ def compute_reward(
                     if claimed:
                         bd["wrong_room"] = WRONG_ROOM_PENALTY
 
-    if room_changed and is_new_room:
-        gated = False
-        if progress is not None:
-            from re1_rl.cutscene_reward import main_hall_new_room_gated
+    illegal_main_hall = False
+    if progress is not None:
+        from re1_rl.cutscene_reward import (
+            illegal_main_hall_before_kenneth_transition,
+        )
 
-            gated = main_hall_new_room_gated(
-                room,
-                rewarded_cutscenes=progress.rewarded_cutscenes,
-                visited_rooms=progress.visited_rooms,
-            )
-        if not gated:
-            bd["new_room"] = NEW_ROOM_BONUS
+        illegal_main_hall = illegal_main_hall_before_kenneth_transition(
+            prev_room,
+            room,
+            rewarded_cutscenes=progress.rewarded_cutscenes,
+            visited_rooms=progress.visited_rooms,
+        )
+
+    if room_changed and is_new_room and not illegal_main_hall:
+        bd["new_room"] = NEW_ROOM_BONUS
 
     cutscene_key = state.get("cutscene_key")
     if cutscene_key and progress is not None:
@@ -282,6 +289,16 @@ def compute_reward(
     inventory = {
         canonical_item(str(name)) for name in state.get("inventory", [])
     }
+    if progress is not None:
+        bd["gallery"] = progress.gallery_step_reward(
+            prev_room=prev_room,
+            room=room,
+            prev_raw=int(prev_state.get("gallery_progress", 0) or 0),
+            raw=int(state.get("gallery_progress", 0) or 0),
+            prev_confirm=int(prev_state.get("gallery_confirm", 0) or 0),
+            confirm=int(state.get("gallery_confirm", 0) or 0),
+            star_crest_held="star_crest" in inventory,
+        )
     room = str(state.get("room_id", "") or "")
     shotgun_removed_at_rack = (
         room in SHOTGUN_RACK_ROOMS
@@ -320,8 +337,12 @@ def compute_reward(
         # Ignore bogus HP jumps from menu/cutscene init (prev_hp==0).
         bd["hp"] = hp_heal_reward(hp_delta)
 
+    # Actual death owns the ordinary death channel. Otherwise the sole Kenneth
+    # gate contributes exactly -3.0 once under its explicit telemetry key.
     if state.get("dead"):
         bd["death"] = DEATH_PENALTY
+    elif illegal_main_hall:
+        bd["main_hall_before_kenneth"] = MAIN_HALL_BEFORE_KENNETH_PENALTY
 
     enemy_damage = int(state.get("enemy_damage", 0) or 0)
     if enemy_damage > 0:
@@ -330,12 +351,13 @@ def compute_reward(
     if enemy_kills > 0:
         bd["enemy_kill"] = ENEMY_KILL_REWARD * enemy_kills
 
-    if progress is not None and not state.get("dead"):
+    if progress is not None and not state.get("dead") and not illegal_main_hall:
         made_progress = (
             bd["new_room"] != 0.0
             or bd["new_cutscene"] != 0.0
             or bd["key_item"] != 0.0
             or bd["story_use"] != 0.0
+            or bd["gallery"] > 0.0
             or bd["new_weapon"] != 0.0
         )
         # Pause idle clock during cutscenes / doors (not in_control).

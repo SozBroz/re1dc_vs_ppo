@@ -130,6 +130,38 @@ def test_env_action_masks_uses_ram_hooks() -> None:
 
     env.bridge = None
 
+    env._async_cutscene_skip = False
+
+    env._skipping_flag = False
+
+    # Near enemy so combat mask does not zero knife (default MASK_ATTACK_WITHOUT_ENEMIES).
+
+    env._prev_state = {
+
+        "in_control": True,
+
+        "enemies": [
+
+            {
+
+                "slot": 0,
+
+                "hp": 80,
+
+                "in_room": 1,
+
+                "combat_near": 1,
+
+                "knife_near": 1,
+
+                "dist": 800,
+
+            }
+
+        ],
+
+    }
+
     assert env.action_masks()[KNIFE_SWING_ACTION]
 
 
@@ -143,4 +175,44 @@ def test_action_mask_shape() -> None:
     assert m.shape == (11,)
 
     assert m.dtype == np.bool_
+
+
+def test_knife_vs_gun_near_bands_mask() -> None:
+    """Knife masked out beyond knife band; gun still legal in gun band."""
+    from re1_rl.action_mask import ATTACK_ACTION
+
+    idle = dict(player_anim=0x0D, player_aux=0x01, player_recovery=0)
+    # Mid-range: knife band empty, gun band armed.
+    m_knife = action_mask(
+        11,
+        None,
+        **idle,
+        equipped_weapon_id=0x01,
+        knife_enemies_near=0,
+        gun_enemies_near=1,
+        mask_combat_without_enemies=True,
+    )
+    assert not m_knife[KNIFE_SWING_ACTION]
+    m_gun = action_mask(
+        11,
+        None,
+        **idle,
+        equipped_weapon_id=0x02,  # beretta
+        inventory=[(0x02, 15)],
+        knife_enemies_near=0,
+        gun_enemies_near=1,
+        mask_combat_without_enemies=True,
+    )
+    assert m_gun[ATTACK_ACTION]
+    # Close range: both armed.
+    m_close = action_mask(
+        11,
+        None,
+        **idle,
+        equipped_weapon_id=0x01,
+        knife_enemies_near=1,
+        gun_enemies_near=1,
+        mask_combat_without_enemies=True,
+    )
+    assert m_close[KNIFE_SWING_ACTION]
 

@@ -50,6 +50,10 @@ EQUIP_SUBMENU_CROSS_FRAMES = 15
 EQUIP_SUBMENU_SETTLE_FRAMES = 15
 CLOSE_START_FRAMES = 12
 CLOSE_ITEM_SETTLE_FRAMES = 30
+# Story key-item USE: poll slowly after submenu USE; do not close ITEM immediately.
+STORY_USE_POLL_FRAMES = 4
+STORY_USE_MENU_STALL_FRAMES = 120
+STORY_USE_MAX_WAIT_FRAMES = 900
 # Failsafe if RAM cursor never reaches last entry.
 COMBINE_CURSOR_MAX_DOWNS = 8
 
@@ -237,6 +241,80 @@ def close_item_screen(
             if died:
                 return True, frames
     return False, frames
+
+
+def _wait_for_story_use_after_pick(
+    client: Any,
+    *,
+    slot: int,
+    story_site: dict[str, Any],
+    inv_before: list[tuple[int, int]],
+    probe_before: dict[str, Any],
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int, bool]:
+    """Poll RAM after ITEM->USE; let cutscene start before closing menu."""
+    from re1_rl.item_box import read_inventory
+    from re1_rl.ram_skip import item_inventory_screen_from_ram
+    from re1_rl.story_item_use import read_story_use_probe, story_use_macro_resolved
+
+    frames = 0
+    menu_stall = 0
+    resolved = False
+
+    while frames < STORY_USE_MAX_WAIT_FRAMES:
+        probe_now = read_story_use_probe(client)
+        inv_now = read_inventory(client)
+        if story_use_macro_resolved(
+            before=probe_before,
+            after=probe_now,
+            site=story_site,
+            slot=int(slot),
+            inventory_before=inv_before,
+            inventory_after=inv_now,
+        ):
+            resolved = True
+            break
+
+        ram = {
+            "game_mode": probe_now.get("game_mode", 0),
+            "game_state": probe_now.get("game_state", 0),
+            "scene_flag": probe_now.get("scene_flag", 0),
+            "msg_flag": probe_now.get("msg_flag", 0),
+        }
+        if item_inventory_screen_from_ram(ram):
+            menu_stall += STORY_USE_POLL_FRAMES
+            if menu_stall >= STORY_USE_MENU_STALL_FRAMES:
+                break
+        else:
+            menu_stall = 0
+
+        died, f = _wait(
+            client,
+            frames=STORY_USE_POLL_FRAMES,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += f
+        if died:
+            return True, frames, False
+
+    probe_tail = read_story_use_probe(client)
+    ram_tail = {
+        "game_state": probe_tail.get("game_state", 0),
+        "game_mode": probe_tail.get("game_mode", 0),
+        "scene_flag": probe_tail.get("scene_flag", 0),
+        "msg_flag": probe_tail.get("msg_flag", 0),
+    }
+    if item_inventory_screen_from_ram(ram_tail):
+        died, f = close_item_screen(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames += f
+        if died:
+            return True, frames, resolved
+
+    return False, frames, resolved
 
 
 def _navigate_slot(
@@ -532,30 +610,50 @@ def execute_use_macro(
     *,
     prev_hp: int,
     episode_start_hp: int,
+    story_site: dict[str, Any] | None = None,
 ) -> tuple[bool, int, dict[str, Any]]:
-    """USE the item in ``slot`` (herbs / sprays)."""
+    """USE the item in ``slot`` (herbs / sprays, or story key at a use site)."""
+    from re1_rl.item_box import read_inventory
+    from re1_rl.story_item_use import read_story_use_probe, story_use_macro_resolved
+
     item_before, qty_before = _read_slot_qty(client, int(slot))
     hp_before = _read_hp(client)
     poison_raw = client.read_ram([("player_poison", PLAYER_POISON, "u8")])
     poisoned = bool(int(poison_raw.get("player_poison", 0)))
-    if not use_would_help(
-        int(item_before),
-        current_hp=hp_before,
-        poisoned=poisoned,
-        episode_start_hp=episode_start_hp,
-    ):
+    story = story_site is not None
+    if not story:
+        if not use_would_help(
+            int(item_before),
+            current_hp=hp_before,
+            poisoned=poisoned,
+            episode_start_hp=episode_start_hp,
+        ):
+            return (
+                False,
+                0,
+                {
+                    "ok": False,
+                    "reason": "use_would_not_help",
+                    "slot": int(slot),
+                    "item_id": int(item_before),
+                    "hp_before": hp_before,
+                    "frames": 0,
+                },
+            )
+    elif int(item_before) == 0 or (not story and int(qty_before) <= 0):
         return (
             False,
             0,
             {
                 "ok": False,
-                "reason": "use_would_not_help",
+                "reason": "story_slot_empty" if story else "use_would_not_help",
                 "slot": int(slot),
                 "item_id": int(item_before),
-                "hp_before": hp_before,
                 "frames": 0,
             },
         )
+    inv_before = read_inventory(client)
+    probe_before = read_story_use_probe(client)
     frames = 0
     died, f, cursor = open_item_screen(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
@@ -578,16 +676,59 @@ def execute_use_macro(
     if died:
         return True, frames, {"ok": False, "reason": "died", "slot": slot}
 
-    died, f = close_item_screen(
-        client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
-    )
-    frames += f
+    if story and story_site is not None:
+        died, f, resolved = _wait_for_story_use_after_pick(
+            client,
+            slot=int(slot),
+            story_site=story_site,
+            inv_before=inv_before,
+            probe_before=probe_before,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += f
+        if died:
+            return True, frames, {"ok": False, "reason": "died", "slot": slot}
+    else:
+        died, f = close_item_screen(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames += f
+        if died:
+            return True, frames, {"ok": False, "reason": "died", "slot": slot}
+        resolved = False
+
     item_after, qty_after = _read_slot_qty(client, int(slot))
     hp_after = _read_hp(client)
     ram = client.read_ram([("game_mode", GAME_MODE, "u8")])
     in_control = bool(int(ram.get("game_mode", 0)) & IN_CONTROL_MASK)
     consumed = qty_after < qty_before or item_after == 0
     healed = hp_after > hp_before
+    if story and story_site is not None:
+        inv_after = read_inventory(client)
+        probe_after = read_story_use_probe(client)
+        ok = not died and resolved and story_use_macro_resolved(
+            before=probe_before,
+            after=probe_after,
+            site=story_site,
+            slot=int(slot),
+            inventory_before=inv_before,
+            inventory_after=inv_after,
+        )
+        return (
+            died,
+            frames,
+            {
+                "ok": ok,
+                "reason": "story_use_ok" if ok else "story_use_failed",
+                "slot": int(slot),
+                "item_id": item_before,
+                "story_use_site": str(story_site.get("id", "")),
+                "story_use_item": str(story_site.get("item", "")),
+                "in_control_after": in_control,
+                "frames": frames,
+            },
+        )
     ok = not died and in_control and (consumed or healed)
     return (
         died,

@@ -26,8 +26,8 @@ Sources:
 
 | Machine | Role |
 |---------|------|
-| **workhorse2** (`192.168.0.111`) | Learner **+** local BizHawk fleet |
-| **workhorse1** (`192.168.0.160`) | Remote worker |
+| **workhorse2** (`192.168.0.116`) | Learner **+** local BizHawk fleet |
+| **workhorse1** (`192.168.0.203`) | Remote worker |
 | **pking** | Remote worker |
 
 Rules:

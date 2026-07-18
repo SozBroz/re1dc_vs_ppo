@@ -86,6 +86,8 @@ def test_new_room_bonus_once_per_episode():
     in_105 = make_state(room="105", step=1)
     in_106 = make_state(room="106", step=2)
     progress.first_visit("105")
+    # Legal 106 entry requires Kenneth ledger mark under the sole Kenneth gate.
+    progress.rewarded_cutscenes.add("104:0:s0")
 
     _, bd0 = compute_reward(
         in_105, in_106, planner, progress=progress, graph=g, return_breakdown=True,
@@ -269,6 +271,14 @@ def test_damage_and_death_calibrated_to_waypoint():
     assert bd_heal["hp"] * REWARD_SCALE == pytest.approx(
         0.8 * NEAR_DEATH_DAMAGE_SCALED
     )
+
+    from re1_rl.reward import hp_heal_reward
+
+    small = hp_heal_reward(10) * REWARD_SCALE
+    large = hp_heal_reward(80) * REWARD_SCALE
+    linear_small = HP_GAIN_SCALE * 10 * REWARD_SCALE
+    assert small < linear_small * 0.25
+    assert large > small * 30.0
 
 
 if __name__ == "__main__":

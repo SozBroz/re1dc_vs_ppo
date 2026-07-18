@@ -17,7 +17,7 @@ from re1_rl.herb_combine import GREEN, MIXED_GR, RED
 from re1_rl.item_use import apply_use, is_usable_item, plan_use
 from re1_rl.memory_map import INVENTORY_BASE, PLAYER_HP, PLAYER_HP_MAX
 
-N_ACTIONS = 45
+N_ACTIONS = 46
 
 
 def _inv(*slots: tuple[int, int]) -> list[tuple[int, int]]:

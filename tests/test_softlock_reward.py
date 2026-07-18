@@ -156,6 +156,8 @@ def test_room_loop_without_new_visits_accumulates_stagnation():
     progress = ProgressTracker()
     for r in ("105", "106", "104"):
         progress.first_visit(r)
+    # Legal 106 re-entry under the sole Kenneth gate (illegal entry ends episode).
+    progress.rewarded_cutscenes.add("104:0:s0")
     path = ["105", "106", "104", "106", "105"]
     step_frames = 4
     threshold = (len(path) - 1) * step_frames
@@ -166,6 +168,7 @@ def test_room_loop_without_new_visits_accumulates_stagnation():
             progress, prev, cur, step_frames=step_frames, softlock_threshold=10_000
         )
         assert bd["new_room"] == 0.0
+        assert bd["death"] == 0.0
         assert bd["softlock"] == 0.0
         prev = cur
     assert stagnation_episode_timeout(progress, threshold=threshold)
@@ -279,15 +282,15 @@ def test_key_item_pickup_resets_idle_timer():
 def test_first_visits_reset_idle_timer():
     progress = ProgressTracker()
     progress.first_visit("105")
+    # Kenneth paid so 106 entry is legal under the sole Kenneth gate.
+    progress.rewarded_cutscenes.add("104:0:s0")
     path = ["105", "106", "104", "203"]
     prev = make_state(room="105", step=0)
     for i, room in enumerate(path[1:], start=1):
         cur = make_state(room=room, step=i)
         _, bd = _step(progress, prev, cur, step_frames=4)
-        if room == "106":
-            assert bd["new_room"] == 0.0
-        else:
-            assert bd["new_room"] == NEW_ROOM_BONUS
+        assert bd["new_room"] == NEW_ROOM_BONUS
+        assert bd["death"] == 0.0
         prev = cur
     assert progress.stagnation_frames == 0
 

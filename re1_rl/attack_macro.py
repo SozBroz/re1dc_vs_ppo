@@ -38,6 +38,7 @@ from re1_rl.memory_map import (
 from re1_rl.sticky_input import STICKY_KEYS
 
 KNIFE_WEAPON_ID = 0x01
+SHOTGUN_WEAPON_ID = 0x03
 
 AIM_ANIM_RAISING = 0x12
 AIM_ANIM_STABLE = 0x13
@@ -70,8 +71,17 @@ def cleared_movement_sticky(sticky: dict[str, bool] | None = None) -> dict[str, 
 MAX_SETTLE_FRAMES = 20
 MAX_AIM_FRAMES = 120
 MIN_FIRE_HOLD_FRAMES = 6
+SHOTGUN_RECOVERY_PAD_FRAMES = MIN_BUTTON_PHASE_FRAMES
 MAX_FIRE_RECOVERY_FRAMES = 240
 MAX_TAIL_FRAMES = 60
+UP_AIM_MAX_FRAMES = 80
+UP_FIRE_MAX_FRAMES = 12
+UP_RECOVERY_MAX_FRAMES = 120
+UP_LOWER_MAX_FRAMES = 60
+UP_HOLSTER_MAX_FRAMES = 60
+KNIFE_UP_CROSS_FRAMES = 5
+KNIFE_UP_RELEASE_STAGE_FRAMES = 4
+KNIFE_UP_AIM_FRAMES = 24
 
 _FRAME_DATA_PATH = Path(__file__).resolve().parents[1] / "data" / "weapon_frame_data.json"
 _frame_data_cache: dict[str, Any] | None = None
@@ -268,6 +278,8 @@ def _execute_ranged_attack_macro(
     episode_start_hp: int,
     weapon_id: int,
     weapon: str | None,
+    recovery_padding_frames: int = 0,
+    macro_path: str | None = None,
 ) -> tuple[bool, int, dict[str, Any]]:
     """Standing R1 aim + fire for beretta, shotgun, magnum, etc.
 
@@ -275,7 +287,7 @@ def _execute_ranged_attack_macro(
     pad frame and movement sticky is force-cleared so R1+Down cannot floor-aim.
     """
     report = _empty_report(weapon_id, weapon)
-    report["macro_path"] = f"ranged:{weapon or weapon_id}"
+    report["macro_path"] = macro_path or f"ranged:{weapon or weapon_id}"
 
     # Never inherit walk / aim-down latch from the prior env step.
     empty_sticky = cleared_movement_sticky(empty_sticky)
@@ -283,6 +295,7 @@ def _execute_ranged_attack_macro(
     fire_pad = standing_gun_buttons(FIRE_BUTTONS)
 
     max_aim, max_recovery = frame_budget(weapon or "")
+    max_recovery += max(int(recovery_padding_frames), 0)
     ammo_before = _ammo_count(bridge, weapon_id)
     neutral: dict[str, bool] = {}
     total = 0
@@ -407,13 +420,223 @@ def _execute_ranged_attack_macro(
     return _finish("ok", False)
 
 
+def _execute_shotgun_attack_macro(
+    bridge: Any,
+    *,
+    empty_sticky: dict[str, bool],
+    prev_hp: int,
+    episode_start_hp: int,
+    weapon_id: int,
+    weapon: str | None,
+) -> tuple[bool, int, dict[str, Any]]:
+    """Shotgun recovery reaches stable aim at the generic 2x budget boundary."""
+    return _execute_ranged_attack_macro(
+        bridge,
+        empty_sticky=empty_sticky,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+        weapon_id=weapon_id,
+        weapon=weapon,
+        recovery_padding_frames=SHOTGUN_RECOVERY_PAD_FRAMES,
+        macro_path="shotgun_ranged",
+    )
+
+
+def _execute_ranged_attack_up_macro(
+    bridge: Any,
+    *,
+    empty_sticky: dict[str, bool],
+    prev_hp: int,
+    episode_start_hp: int,
+    weapon_id: int,
+    weapon: str | None,
+) -> tuple[bool, int, dict[str, Any]]:
+    """R1+Up shot with staged Cross, Up, then R1 release."""
+    report = _empty_report(weapon_id, weapon)
+    report["macro_path"] = f"ranged_up:{weapon or weapon_id}"
+    report["aim_mode"] = "up"
+    ammo_before = _ammo_count(bridge, weapon_id)
+    total = 0
+    trail: list[str] = []
+    up_aim = {"r1": True, "up": True}
+    up_fire = {"r1": True, "up": True, "cross": True}
+
+    def _observe() -> tuple[int, int, int]:
+        anim, aux, rec = read_knife_hooks(bridge)
+        trail.append(f"f{total}:anim=0x{anim:02X} aux=0x{aux:02X} rec={rec}")
+        if len(trail) > 16:
+            trail.pop(0)
+        return anim, aux, rec
+
+    def _step(buttons: dict[str, bool]) -> bool:
+        nonlocal total
+        died = _step_one_frame(
+            bridge,
+            buttons,
+            empty_sticky=empty_sticky,
+            echo_joypad=False,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        total += 1
+        return died
+
+    def _finish(outcome: str, died: bool) -> tuple[bool, int, dict[str, Any]]:
+        spent = max(0, ammo_before - _ammo_count(bridge, weapon_id))
+        report["frames"] = total
+        report["trail"] = list(trail)
+        report["ammo_spent"] = spent
+        report["outcome"] = "dry_fire" if outcome == "ok" and spent <= 0 else outcome
+        return died, total, report
+
+    stable = 0
+    for _ in range(UP_AIM_MAX_FRAMES):
+        if _step(up_aim):
+            return _finish("death", True)
+        anim, aux, rec = _observe()
+        stable = stable + 1 if is_gun_aim_stable(anim, aux, rec) else 0
+        if stable >= MIN_BUTTON_PHASE_FRAMES:
+            break
+    else:
+        return _finish("aim_timeout", False)
+
+    for _ in range(UP_FIRE_MAX_FRAMES):
+        if _step(up_fire):
+            return _finish("death", True)
+        anim, aux, _rec = _observe()
+        if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
+            report["saw_fire_anim"] = True
+        if _ammo_count(bridge, weapon_id) < ammo_before:
+            break
+    else:
+        return _finish("ammo_timeout", False)
+
+    stable = 0
+    for _ in range(UP_RECOVERY_MAX_FRAMES):
+        if _step(up_aim):
+            return _finish("death", True)
+        anim, aux, rec = _observe()
+        if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
+            report["saw_fire_anim"] = True
+        stable = stable + 1 if is_gun_aim_stable(anim, aux, rec) else 0
+        if report["saw_fire_anim"] and stable >= MIN_BUTTON_PHASE_FRAMES:
+            break
+    else:
+        return _finish("recovery_timeout", False)
+
+    stable = 0
+    for _ in range(UP_LOWER_MAX_FRAMES):
+        if _step({"r1": True}):
+            return _finish("death", True)
+        anim, aux, rec = _observe()
+        stable = stable + 1 if is_gun_aim_stable(anim, aux, rec) else 0
+        if stable >= MIN_BUTTON_PHASE_FRAMES:
+            break
+    else:
+        return _finish("lower_timeout", False)
+
+    stable = 0
+    for _ in range(UP_HOLSTER_MAX_FRAMES):
+        if _step({}):
+            return _finish("death", True)
+        anim, aux, rec = _observe()
+        stable = stable + 1 if (anim == 0 and aux == 0 and rec == 0) else 0
+        if stable >= MIN_BUTTON_PHASE_FRAMES:
+            break
+    else:
+        return _finish("holster_timeout", False)
+
+    return _finish("ok", False)
+
+
+def _execute_knife_attack_up_macro(
+    bridge: Any,
+    *,
+    empty_sticky: dict[str, bool],
+    prev_hp: int,
+    episode_start_hp: int,
+    weapon_id: int,
+    weapon: str | None,
+) -> tuple[bool, int, dict[str, Any]]:
+    """Empirically validated R1+Up high knife slash."""
+    report = _empty_report(weapon_id, weapon)
+    report["macro_path"] = "knife_up"
+    report["aim_mode"] = "up"
+    total = 0
+    trail: list[str] = []
+
+    def _observe() -> tuple[int, int, int]:
+        anim, aux, rec = read_knife_hooks(bridge)
+        trail.append(f"f{total}:anim=0x{anim:02X} aux=0x{aux:02X} rec={rec}")
+        if len(trail) > 16:
+            trail.pop(0)
+        return anim, aux, rec
+
+    def _step(buttons: dict[str, bool]) -> bool:
+        nonlocal total
+        died = _step_one_frame(
+            bridge,
+            buttons,
+            empty_sticky=empty_sticky,
+            echo_joypad=False,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        total += 1
+        return died
+
+    def _finish(outcome: str, died: bool) -> tuple[bool, int, dict[str, Any]]:
+        report["frames"] = total
+        report["trail"] = list(trail)
+        report["outcome"] = outcome
+        return died, total, report
+
+    for _ in range(KNIFE_UP_AIM_FRAMES):
+        if _step({"r1": True, "up": True}):
+            return _finish("death", True)
+        _observe()
+
+    for _ in range(KNIFE_UP_CROSS_FRAMES):
+        if _step({"r1": True, "up": True, "cross": True}):
+            return _finish("death", True)
+        anim, aux, _rec = _observe()
+        if anim == FIRE_ANIM and aux == 0x04:
+            report["saw_fire_anim"] = True
+    if not report["saw_fire_anim"]:
+        return _finish("slash_timeout", False)
+
+    for _ in range(KNIFE_UP_RELEASE_STAGE_FRAMES):
+        if _step({"r1": True, "up": True}):
+            return _finish("death", True)
+        _observe()
+
+    for _ in range(KNIFE_UP_RELEASE_STAGE_FRAMES):
+        if _step({"r1": True}):
+            return _finish("death", True)
+        _observe()
+
+    stable = 0
+    for _ in range(UP_RECOVERY_MAX_FRAMES):
+        if _step({}):
+            return _finish("death", True)
+        anim, aux, rec = _observe()
+        stable = stable + 1 if (anim == 0 and aux == 0 and rec == 0) else 0
+        if stable >= MIN_BUTTON_PHASE_FRAMES:
+            break
+    else:
+        return _finish("recovery_timeout", False)
+
+    return _finish("ok", False)
+
+
 # Per-weapon dispatch for the ``attack`` action. Knife is crouch; all PS1
 # ranged weapons share standing gun logic with per-name frame budgets.
 _WEAPON_ATTACK_HANDLERS: dict[int, Callable[..., tuple[bool, int, dict[str, Any]]]] = {
     KNIFE_WEAPON_ID: _execute_knife_attack_macro,
+    SHOTGUN_WEAPON_ID: _execute_shotgun_attack_macro,
 }
 for _wid in WEAPON_ITEM_IDS:
-    if _wid != KNIFE_WEAPON_ID:
+    if _wid not in (KNIFE_WEAPON_ID, SHOTGUN_WEAPON_ID):
         _WEAPON_ATTACK_HANDLERS[_wid] = _execute_ranged_attack_macro
 
 
@@ -437,6 +660,44 @@ def execute_attack_macro(
             return False, 0, report
 
         handler = _WEAPON_ATTACK_HANDLERS.get(weapon_id, _execute_ranged_attack_macro)
+        return handler(
+            bridge,
+            empty_sticky=empty_sticky,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            weapon_id=weapon_id,
+            weapon=weapon,
+        )
+    finally:
+        if pins is not None and pins.active:
+            pins.finish(bridge)
+
+
+def execute_attack_up_macro(
+    bridge: Any,
+    *,
+    empty_sticky: dict[str, bool],
+    prev_hp: int = 0,
+    episode_start_hp: int = 0,
+) -> tuple[bool, int, dict[str, Any]]:
+    """Dispatch the directional high attack for the equipped weapon."""
+    empty_sticky = cleared_movement_sticky(empty_sticky)
+    pins = getattr(bridge, "attack_pins", None)
+    if pins is not None and _bridge_uses_frame_ring(bridge):
+        pins.begin(bridge)
+    try:
+        weapon_id = read_equipped_weapon(bridge)
+        weapon = equipped_weapon_name(weapon_id)
+        if weapon is None or weapon_id not in WEAPON_ITEM_IDS:
+            report = _empty_report(weapon_id, weapon)
+            report["outcome"] = "no_weapon"
+            report["aim_mode"] = "up"
+            return False, 0, report
+        handler = (
+            _execute_knife_attack_up_macro
+            if weapon_id == KNIFE_WEAPON_ID
+            else _execute_ranged_attack_up_macro
+        )
         return handler(
             bridge,
             empty_sticky=empty_sticky,

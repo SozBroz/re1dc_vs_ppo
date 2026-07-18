@@ -97,10 +97,10 @@ GOAL_FIELDS: list[tuple[str, str]] = [
     ("wrong_room_flag", "1 = current room not on known route subgraph"),
     ("doors_available", "1 = door table knows the exit toward goal"),
     ("gated_items_here", "pickups here locked behind progression / 4 (ignore for now, come back)"),
-    ("reserved_1", "future boss phase"),
-    ("missing_prereq_count", "required items for current waypoint not yet held / 4"),
-    ("use_item_hint", "item id to use for a use_item step / 0x46 (else 0)"),
-    ("puzzle_macro_available", "1 = current route step has a scripted macro"),
+    ("gallery_bearing_sin", "sin(angle to next Gallery portrait - facing)"),
+    ("gallery_bearing_cos", "cos(angle to next Gallery portrait - facing)"),
+    ("gallery_distance", "distance to next Gallery portrait / 4096"),
+    ("gallery_progress", "correct Gallery switches / 6"),
 ]
 
 PROPRIO_DIM = len(PROPRIO_FIELDS)  # 28
@@ -206,8 +206,12 @@ class ObsEncoder:
         read the scripted route. Rewards use per-episode new-room/cutscene
         bonuses instead of checkpoint-path shaping.
         """
-        del state, planner, item_tracker, room_items
-        return np.zeros(GOAL_DIM, dtype=np.float32)
+        from re1_rl.gallery_puzzle import encode_gallery_hint
+
+        del planner, item_tracker, room_items
+        v = np.zeros(GOAL_DIM, dtype=np.float32)
+        v[-4:] = encode_gallery_hint(state)
+        return v
 
 
 def encode_inventory_slots(

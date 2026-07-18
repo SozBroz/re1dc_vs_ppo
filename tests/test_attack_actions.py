@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.action_mask import (
     ATTACK_ACTION,
+    ATTACK_UP_ACTION,
     COMBINE_ACTION,
     DEPOSIT_ACTION_BASE,
     EQUIP_ACTION,
@@ -35,7 +36,7 @@ from re1_rl.weapon_equip import (
     magic_equip_slot,
 )
 
-N_ACTIONS = WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS + 1 + N_SELECT_SLOT  # 45
+N_ACTIONS = ATTACK_UP_ACTION + 1  # 46
 
 
 def test_action_layout_matches_env_names() -> None:
@@ -44,6 +45,7 @@ def test_action_layout_matches_env_names() -> None:
     assert len(ACTION_NAMES) == N_ACTIONS
     assert ACTION_NAMES[KNIFE_SWING_ACTION] == "knife_swing"
     assert ACTION_NAMES[ATTACK_ACTION] == "attack"
+    assert ACTION_NAMES[ATTACK_UP_ACTION] == "attack_up"
     assert ACTION_NAMES[USE_ACTION] == "use"
     assert ACTION_NAMES[EQUIP_ACTION] == "equip"
     assert ACTION_NAMES[DEPOSIT_ACTION_BASE] == "deposit_slot_0"
@@ -69,6 +71,48 @@ def test_attack_legal_with_beretta_ammo() -> None:
         player_anim=0, player_aux=0, player_recovery=0,
     )
     assert m[ATTACK_ACTION]
+    assert m[ATTACK_UP_ACTION]
+
+
+def test_attack_up_mask_always_matches_attack_mask() -> None:
+    cases = [
+        {},
+        {"equipped_weapon_id": 0},
+        {
+            "equipped_weapon_id": 0x02,
+            "inventory": [(0x02, 5)] + [(0, 0)] * 7,
+            "gun_enemies_near": 1,
+        },
+        {
+            "equipped_weapon_id": 0x02,
+            "inventory": [(0x02, 0)] + [(0, 0)] * 7,
+            "gun_enemies_near": 1,
+        },
+        {
+            "equipped_weapon_id": 0x01,
+            "knife_enemies_near": 0,
+        },
+        {
+            "equipped_weapon_id": 0x01,
+            "knife_enemies_near": 1,
+        },
+        {
+            "equipped_weapon_id": 0x03,
+            "player_recovery": 5,
+            "gun_enemies_near": 1,
+        },
+        {"equipped_weapon_id": 0x03, "in_control": False},
+        {"equipped_weapon_id": 0x03, "use_phase": 1},
+    ]
+    for overrides in cases:
+        kwargs = {
+            "player_anim": 0,
+            "player_aux": 0,
+            "player_recovery": 0,
+            **overrides,
+        }
+        mask = action_mask(N_ACTIONS, None, **kwargs)
+        assert mask[ATTACK_UP_ACTION] == mask[ATTACK_ACTION], overrides
 
 
 def test_knife_attack_legal_without_ammo_items() -> None:
@@ -342,6 +386,17 @@ def test_aim_stable_signature() -> None:
 def test_frame_budget_defaults() -> None:
     max_aim, max_rec = frame_budget("nonexistent_weapon")
     assert max_aim >= 40 and max_rec >= 60
+
+
+def test_shotgun_handler_is_isolated_from_beretta() -> None:
+    from re1_rl.attack_macro import (
+        _WEAPON_ATTACK_HANDLERS,
+        _execute_ranged_attack_macro,
+        _execute_shotgun_attack_macro,
+    )
+
+    assert _WEAPON_ATTACK_HANDLERS[0x03] is _execute_shotgun_attack_macro
+    assert _WEAPON_ATTACK_HANDLERS[0x02] is _execute_ranged_attack_macro
 
 
 def test_equippable_ids_are_ten_ps1_weapons() -> None:

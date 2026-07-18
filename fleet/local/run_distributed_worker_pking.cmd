@@ -2,8 +2,9 @@
 REM pking → WH2 learner — visible grid for savestate/screenshot/debug
 setlocal
 cd /d D:\re1_rl
+call "%~dp0..\fleet_hosts.cmd"
 set MACHINE_NAME=pking
-set LEARNER_HOST=192.168.0.116
+set LEARNER_HOST=%FLEET_LEARNER_HOST%
 set BASE_PORT=5755
 set N_ENVS=20
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=180
@@ -12,7 +13,7 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role worker ^
   --machine-name %MACHINE_NAME% ^
   --learner-host %LEARNER_HOST% ^
-  --learner-port 8765 ^
+  --learner-port %FLEET_LEARNER_PORT% ^
   --n-envs %N_ENVS% ^
   --base-port %BASE_PORT% ^
   --total-steps 0 ^

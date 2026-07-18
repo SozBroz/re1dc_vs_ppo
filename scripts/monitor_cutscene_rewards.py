@@ -111,7 +111,7 @@ def _hits(breakdown: dict[str, Any] | None) -> dict[str, float]:
 # Exploration reward schema (skill re-exploration-rewards). Flag payouts that
 # defy the published buckets / hard exceptions — for operator triage only.
 _LARGE_OK = frozenset(
-    {"new_room", "new_cutscene", "key_item", "story_use", "new_weapon"}
+    {"new_room", "new_cutscene", "key_item", "story_use", "gallery", "new_weapon"}
 )
 _MODEST_OK = frozenset(
     {
@@ -125,6 +125,7 @@ _IGNORE = frozenset(
         "step",
         "hp",
         "death",
+        "main_hall_before_kenneth",
         "softlock",
         "gold_emblem_return",
         "shotgun_return",
@@ -168,7 +169,10 @@ def _schema_alerts(
             alerts.append(f"unlisted term {k}={_fmt5(v)}")
 
     if breakdown.get("new_room", 0.0) > 0.0 and room == "106" and not kenneth_seen:
-        alerts.append("new_room paid for main hall (106) before Kenneth — skill #1a")
+        alerts.append(
+            "new_room paid for main hall (106) before Kenneth — "
+            "illegal entry should terminate, not pay room"
+        )
 
     if paid_cutscene and skip_kind == "door_room_change":
         alerts.append("new_cutscene paid on door room-change — skill #2d")

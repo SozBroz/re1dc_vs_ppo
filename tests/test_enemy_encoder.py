@@ -108,10 +108,32 @@ def test_enemy_table_fields_mapped() -> None:
     by_slot = {int(e["slot"]): e for e in decoded}
     assert by_slot[0]["in_room"] == 1
     assert by_slot[0]["combat_near"] == 1
+    assert by_slot[0]["knife_near"] == 1
     assert by_slot[0]["alive"] == 1
     assert by_slot[1]["in_room"] == 0
     assert by_slot[1]["combat_near"] == 0
+    assert by_slot[1]["knife_near"] == 0
     assert by_slot[1]["alive"] == 0
+
+
+def test_knife_near_tighter_than_gun_band() -> None:
+    """Enemy at ~6500 units: gun combat_near yes, knife_near no."""
+    ram = {
+        "player_x": 0,
+        "player_z": 0,
+        "enemy0_hp": 80,
+        "enemy0_x": 6500,
+        "enemy0_z": 0,
+        "enemy0_active_byte": 0,
+    }
+    for i in range(1, 6):
+        ram[f"enemy{i}_hp"] = 0
+    decoded = decode_enemy_table(ram)
+    assert len(decoded) == 1
+    assert decoded[0]["combat_near"] == 1
+    assert decoded[0]["knife_near"] == 0
+    assert combat_enemy_count(decoded) == 1
+    assert combat_enemy_count(decoded, knife=True) == 0
 
 
 def test_origin_hp_ghost_not_combat_near() -> None:

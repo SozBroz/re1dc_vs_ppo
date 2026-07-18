@@ -1,31 +1,15 @@
 {
-  "opening": "opening_fmv_cinematic",
-  "label": "Helicopter / STARS intro FMV (fresh ROM boot)",
-  "captured_at": "2026-07-07T06:19:28 local",
-  "source": "play_human RAM log terminal 460675",
-  "screen_id": {
-    "game_state": "0x80040000",
-    "game_mode": "0x80",
-    "scene_flag": "0x04",
-    "msg_flag": "0x00"
-  },
-  "ram": {
-    "player_hp": 0,
-    "room_id": 0,
-    "stage_id": 0,
-    "character_id": 0,
-    "game_state": 2155872256,
-    "game_mode": 128,
-    "scene_flag": 4,
-    "msg_flag": 0
-  },
+  "opening": "mansion_intro_dialogue",
   "outside": null,
-  "notes": "Pre-mansion FMV; room byte still 0. Transitions to gs=0x80000000 scene=0x00 when clip ends.",
-  "boot_sequence": [
-    {"phase": "power_on", "game_state": "0x00000000", "game_mode": "0x00"},
-    {"phase": "playstation_logo", "game_state": "0x40000000", "game_mode": "0x40"},
-    {"phase": "opening_fmv_cinematic", "game_state": "0x80040000", "game_mode": "0x80", "scene_flag": "0x04"},
-    {"phase": "press_any_button", "game_state": "0x80000000", "game_mode": "0x80", "scene_flag": "0x00"},
-    {"phase": "post_button_logo", "game_state": "0x40000000", "game_mode": "0x40", "scene_flag": "0x00"},
-  ]
+  "ram": {
+    "stage_id": 0,
+    "player_hp": 96,
+    "character_id": 1,
+    "room_id": 5,
+    "game_state": 2157117440,
+    "game_mode": 128,
+    "msg_flag": 128,
+    "scene_flag": 147
+  },
+  "screenshot": "opening_capture_003_mansion_intro_dialogue.png"
 }

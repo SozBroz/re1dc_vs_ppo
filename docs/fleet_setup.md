@@ -4,8 +4,8 @@
 
 | Machine | Host | Role | Script |
 |---------|------|------|--------|
-| **workhorse2** | `192.168.0.111` | **Learner** — PPO train, checkpoints, HTTP weights | `C:\Users\sshuser\re1_rl` (no D: drive) |
-| **workhorse1** | `192.168.0.160` | Remote **worker** — BizHawk rollouts only | `D:\re1_rl` |
+| **workhorse2** | `192.168.0.116` | **Learner** — PPO train, checkpoints, HTTP weights | `C:\Users\sshuser\re1_rl` |
+| **workhorse1** | `192.168.0.203` | Remote **worker** — BizHawk rollouts only | `D:\re1_rl` |
 | **pking** (dev) | local | Remote **worker** | `D:\re1_rl` |
 
 Workers **never** load policy from disk; they pull weights from the learner at warmup and hot-sync after each train step.
@@ -69,15 +69,36 @@ python scripts/prune_checkpoints.py --keep 5
 
 | Machine | `--base-port` | `--n-envs` | Bottleneck |
 |---------|---------------|------------|------------|
-| workhorse2 (learner + local worker) | 5555 | **8** | ~32 GB RAM — keep headroom for 5–8 GB epoch ingest spike |
+| workhorse2 (learner + local worker) | 5555 | **27** | ~32 GB RAM — keep headroom for epoch ingest spike |
 | workhorse1 | 5655 | **8** | **8 CPU threads** — launch from **RDP/console only** |
-| pking | 5755 | 12 | **~48 GB RAM** (~900 MB/EmuHawk) |
+| pking | 5755 | **20** | **~48 GB RAM** (~900 MB/EmuHawk) |
 
 **BizHawk visibility (fleet default):** only **pking** runs `--no-headless` with `--tile-windows` (4×3 grid) for savestate/screenshot/debug. WH2 learner + WH1 worker use `--headless`.
 
 Weight sync / experience: **6-minute epochs**. Remotes buffer rollouts, then once per `--sync-interval-s` (default **360**) upload a burst and pull weights. Learner **waits for all live workers** (heartbeat registry) to contribute that epoch, with `--epoch-grace-s` (default 120) so a dead box cannot stall forever. Remotes heartbeat every ~30s; no heartbeat for `--worker-liveness-s` (default 90) drops them from the expected set (pking can leave/rejoin freely). Gentler large-batch hyperparams (`DISTRIBUTED_EPOCH_HYPERPARAMS`). `max_staleness` default **1**.
 
-**WH2 RAM budget (~32 GB):** 8 local EmuHawks (~7 GB) + learner/Python + **5–8 GB epoch ingest spike** must stay off the pagefile. Do not raise WH2 `--n-envs` without measuring free RAM at flush.
+**WH2 RAM budget (~32 GB):** 27 local EmuHawks + learner/Python + **epoch ingest spike** must stay off the pagefile. Do not raise WH2 `--n-envs` without measuring free RAM at flush.
+
+---
+
+## Static LAN addresses
+
+DHCP drift broke fleet wiring when workhorse1 moved `.160` → `.203` and workhorse2 `.111` → `.116`. Canonical addresses live in `fleet/fleet_hosts.cmd` and `fleet/fleet_hosts.json`.
+
+| Machine | Static IP |
+|---------|-----------|
+| workhorse1 | `192.168.0.203` |
+| workhorse2 | `192.168.0.116` |
+
+**Pin once per box** (elevated PowerShell on that machine):
+
+```powershell
+cd D:\re1_rl   # or C:\Users\sshuser\re1_rl on WH2
+powershell -ExecutionPolicy Bypass -File tools\set_fleet_static_ip.ps1 -Role workhorse1
+powershell -ExecutionPolicy Bypass -File tools\set_fleet_static_ip.ps1 -Role workhorse2
+```
+
+Idempotent — skips if already static. Also set **DHCP reservations** on the router (`192.168.0.1`) for the machines' MAC addresses as a belt-and-suspenders backup.
 
 Adjust if a box runs monolithic `train_parallel` instead of distributed worker.
 
@@ -96,7 +117,7 @@ cd D:\re1_rl
 
 ```powershell
 cd D:\re1_rl
-set LEARNER_HOST=192.168.0.111
+set LEARNER_HOST=%FLEET_LEARNER_HOST%
 .\fleet\local\run_distributed_worker.cmd          # WH1 headless
 .\fleet\local\run_distributed_worker_pking.cmd    # pking visible 4x3 grid
 ```
@@ -123,7 +144,7 @@ D:\re1_rl\fleet\local\start_worker_detached_workhorse1.cmd
 
 ## Health checks
 
-Learner status: `http://192.168.0.111:8765/status`  
+Learner status: `http://192.168.0.116:8765/status`  
 Worker warmup: blocks until `GET /weights` succeeds (no disk fallback).
 
 TensorBoard: `logs/tb/<run-name>/` on learner host only.

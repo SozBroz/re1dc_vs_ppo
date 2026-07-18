@@ -8,12 +8,19 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
+import torch
+from torch import nn
 from gymnasium import spaces
 from stable_baselines3 import PPO
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from re1_rl.async_fleet import PPO_HYPERPARAMS, load_async_learner
+from re1_rl.async_fleet import (
+    PPO_HYPERPARAMS,
+    _copy_compatible_policy_weights,
+    load_async_learner,
+)
 from re1_rl.checkpoint_io import resolve_resume_path, write_latest_pointer
 from re1_rl.distributed.spaces import make_re1_policy_spaces, make_re1_spaces
 from re1_rl.distributed.weights import _SpaceHolderEnv
@@ -107,6 +114,29 @@ def test_distributed_ppo_hyperparams_match_async_fleet() -> None:
 def test_make_re1_policy_spaces_frame_is_chw() -> None:
     obs_space, _ = make_re1_policy_spaces()
     assert obs_space["frame"].shape == FRAME_SHAPE_CHW
+
+
+def test_legacy_action_head_transplant_clones_attack_with_low_prior() -> None:
+    class Policy(nn.Module):
+        def __init__(self, actions: int) -> None:
+            super().__init__()
+            self.action_net = nn.Linear(3, actions)
+
+    old = Policy(45)
+    new = Policy(46)
+    with torch.no_grad():
+        old.action_net.weight.copy_(torch.arange(135).reshape(45, 3))
+        old.action_net.bias.copy_(torch.arange(45))
+
+    _copy_compatible_policy_weights(old, new)
+
+    assert torch.equal(new.action_net.weight[:45], old.action_net.weight)
+    assert torch.equal(new.action_net.bias[:45], old.action_net.bias)
+    assert torch.equal(new.action_net.weight[45], old.action_net.weight[9])
+    assert np.isclose(
+        float(new.action_net.bias[45].detach()),
+        float(old.action_net.bias[9].detach()) - np.log(100.0),
+    )
 
 
 def test_load_async_learner_fresh_uses_policy_chw_spaces() -> None:

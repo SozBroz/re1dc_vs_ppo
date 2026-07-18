@@ -1,0 +1,75 @@
+{
+  "port": 7799,
+  "state": "D:\\re1_rl\\tools\\BizHawk-2.11.1\\PSX\\State\\Resident Evil - Director's Cut (USA).Nymashock.QuickSave3.State",
+  "state_mtime": "2026-07-17 21:11:41",
+  "save_intact_after_trials": true,
+  "room": {
+    "debug_id": "117",
+    "name": "LARGE GALLERY",
+    "stage_id": 0,
+    "room_id_raw": 23,
+    "rdt": "ROOM1170.RDT"
+  },
+  "baseline_pose": {
+    "x": 2900,
+    "y": 0,
+    "z": 10000,
+    "facing": 0,
+    "cam_id": 0,
+    "hp": 16,
+    "in_control": true,
+    "game_mode": "0x80",
+    "game_state": "0x80800000",
+    "scene_flag": "0x80",
+    "msg_open": false,
+    "inventory": ["knife", "berettax9", "shotgunx3", "green_herb", "handgun_bulletsx15", "handgun_bulletsx15"]
+  },
+  "canonical_order": {
+    "names": [
+      "newborn baby",
+      "infant",
+      "lively boy",
+      "young man",
+      "tired middle-aged man",
+      "bold-looking old man",
+      "The end of life"
+    ],
+    "rdt_slots": [3, 5, 6, 4, 2, 7, 8],
+    "sources": [
+      {
+        "title": "Solving the gallery picture switch puzzle (Resident Evil) | Evil Resource",
+        "url": "https://www.evilresource.com/resident-evil/guides/puzzles/solving-gallery-picture-switch-puzzle"
+      },
+      {
+        "title": "Resident Evil: Director's Cut – Guide and Walkthrough (GameFAQs FAQ/32075)",
+        "url": "https://gamefaqs.gamespot.com/ps/198462-resident-evil-directors-cut/faqs/32075"
+      }
+    ]
+  },
+  "reliable_detection": {
+    "primary_ram": "0x800C3008",
+    "behavior": "one-hot last-accepted correct step; wrong Yes clears to 0; examine/YesNo without Yes leaves 0",
+    "slot_to_value_after_correct_yes": {
+      "3": 32,
+      "5": 8,
+      "6": 4,
+      "4": 16,
+      "2": 64,
+      "7": 2
+    },
+    "noise_do_not_use": {
+      "0x800C3009": "bit1 sets on ANY Yes including wrong/out-of-order"
+    },
+    "identity_of_painting": "nearest RDT message AOT by player (x,z); dual-write pose mirrors 0x800C5190/5194 for teleports",
+    "yes_confirm_ux": "open Cross → advance to 'Will you push it? Yes/No' → Cross confirms default Yes; MESSAGE closes",
+    "completion": "slot8 End of Life object AOT + star_crest inventory (#3 already pays); not pressed live to avoid crest/crow irreversibility on this pass",
+    "evidence_logs": [
+      "gallery_7799_diagnostic.json",
+      "gallery_7799_yes_hunt.json",
+      "gallery_7799_flagmap.json",
+      "gallery_7799_verify3008.json",
+      "data/gallery_7799/*.png"
+    ]
+  },
+  "emuhawk_cleanup": "port 7799 free; no lingering EmuHawk from this probe"
+}

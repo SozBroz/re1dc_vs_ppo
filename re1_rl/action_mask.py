@@ -10,6 +10,7 @@ Action layout (env.ACTION_NAMES):
   20-35 withdraw_box_N
   36    combine            — open COMBINE menu; select_slot x2 (3-step)
   37-44 select_slot_N      — shared slot pick (use / equip / combine)
+  45    attack_up          — R1+Up directional attack macro
 """
 
 from __future__ import annotations
@@ -41,6 +42,7 @@ N_WITHDRAW_ACTIONS = 16
 COMBINE_ACTION = WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS  # 36
 SELECT_SLOT_BASE = COMBINE_ACTION + 1  # 37
 N_SELECT_SLOT = 8
+ATTACK_UP_ACTION = SELECT_SLOT_BASE + N_SELECT_SLOT  # 45
 
 KNIFE_ID = 0x01
 
@@ -85,6 +87,8 @@ def action_mask(
     episode_start_hp: int | None = None,
     in_control: bool = True,
     alive_enemies_in_room: int | None = None,
+    knife_enemies_near: int | None = None,
+    gun_enemies_near: int | None = None,
     mask_combat_without_enemies: bool = True,
     room_id: str | None = None,
     player_x: float | int | None = None,
@@ -123,21 +127,46 @@ def action_mask(
     enemies_present = True
     if mask_combat_without_enemies and alive_enemies_in_room is not None:
         enemies_present = int(alive_enemies_in_room) > 0
+    # Prefer weapon-specific near counts when provided (generous knife band < gun).
+    knife_enemies = (
+        int(knife_enemies_near)
+        if knife_enemies_near is not None
+        else (int(alive_enemies_in_room) if alive_enemies_in_room is not None else None)
+    )
+    gun_enemies = (
+        int(gun_enemies_near)
+        if gun_enemies_near is not None
+        else (int(alive_enemies_in_room) if alive_enemies_in_room is not None else None)
+    )
 
     if not in_submenu and KNIFE_SWING_ACTION < n_actions:
-        legal = anim_ready and enemies_present
+        legal = anim_ready
+        if mask_combat_without_enemies and knife_enemies is not None:
+            legal = legal and knife_enemies > 0
         if equipped_weapon_id is not None:
             legal = legal and int(equipped_weapon_id) == KNIFE_ID
         mask[KNIFE_SWING_ACTION] = legal
 
     if not in_submenu and ATTACK_ACTION < n_actions:
-        legal = anim_ready and enemies_present
+        legal = anim_ready
         if equipped_weapon_id is not None:
             wid = int(equipped_weapon_id)
             legal = legal and wid in EQUIPPABLE_WEAPON_IDS
             if legal and wid != KNIFE_ID and inventory is not None:
                 legal = can_fire_weapon(inventory, wid)
+        else:
+            wid = None
+        if legal and mask_combat_without_enemies:
+            if wid == KNIFE_ID:
+                if knife_enemies is not None:
+                    legal = knife_enemies > 0
+            elif gun_enemies is not None:
+                legal = gun_enemies > 0
+            elif alive_enemies_in_room is not None:
+                legal = int(alive_enemies_in_room) > 0
         mask[ATTACK_ACTION] = legal
+        if ATTACK_UP_ACTION < n_actions:
+            mask[ATTACK_UP_ACTION] = legal
 
     if not in_submenu:
         if inventory is not None and box is not None:

@@ -259,10 +259,12 @@ def _build_model(
 
     base = BasePPO.load(str(resume_path), device=device)
     model = policy_cls("MultiInputPolicy", env, **hp)
-    model.policy.load_state_dict(base.policy.state_dict())
+    from re1_rl.async_fleet import _copy_compatible_policy_weights
+
+    copied = _copy_compatible_policy_weights(base.policy, model.policy)
     model.num_timesteps = int(base.num_timesteps)
     print(
-        f"[train] resumed PPO weights into MaskablePPO from {resume_path}",
+        f"[train] resumed {copied} PPO tensors into MaskablePPO from {resume_path}",
         flush=True,
     )
     return model
