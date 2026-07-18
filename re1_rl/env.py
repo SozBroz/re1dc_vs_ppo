@@ -1261,6 +1261,50 @@ class RE1Env(gym.Env):
             )
         return (not still), report
 
+    def _inventory_macro_owns_item_menu(self, action: int) -> bool:
+        """True while equip/use/combine (or any bridge macro) owns the ITEM screen."""
+        if bool(getattr(self, "_macro_active", False)):
+            return True
+        if int(getattr(self, "_use_phase", 0)) > 0:
+            return True
+        if int(getattr(self, "_equip_phase", 0)) > 0:
+            return True
+        if int(getattr(self, "_combine_phase", 0)) > 0:
+            return True
+        a = int(action)
+        return a in (USE_ACTION, EQUIP_ACTION, COMBINE_ACTION)
+
+    def _probe_item_inventory_menu(self) -> bool:
+        from re1_rl.ram_skip import item_inventory_screen_from_ram
+
+        try:
+            return item_inventory_screen_from_ram(self._skip_poll_ram())
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            return False
+
+    def _try_dismiss_orphan_item_menu(self) -> tuple[bool, dict[str, Any]]:
+        """Close orphan START/ITEM pause. Returns (recovered, report)."""
+        from re1_rl.inventory_menu_macro import dismiss_orphan_item_menu
+
+        self._sticky_input.reset()
+        self._macro_active = True
+        try:
+            still, _frames, report = dismiss_orphan_item_menu(
+                self.bridge,
+                prev_hp=self._prev_hp,
+                episode_start_hp=getattr(self, "_episode_start_hp", 0),
+            )
+        finally:
+            self._macro_active = False
+            self._sticky_input.reset()
+        if still:
+            port = getattr(self.bridge, "port", "?")
+            print(
+                f"[item_menu_dismiss_fail] port={port} report={report}",
+                flush=True,
+            )
+        return (not still), report
+
     def _skip_uncontrolled(self, max_frames: int | None = None) -> tuple[int, bool]:
         """Wait at turbo speed until player control returns (doors, cutscenes)."""
         kwargs: dict[str, Any] = {
@@ -1383,17 +1427,21 @@ class RE1Env(gym.Env):
                 **story_kwargs,
             )
         self._inventory_before_use = list(inventory) if inventory is not None else None
+        self._macro_active = True
         try:
-            died, frames, magic_report = execute_use_macro(
-                self.bridge,
-                int(slot),
-                prev_hp=self._prev_hp,
-                episode_start_hp=getattr(self, "_episode_start_hp", 0),
-                story_site=story_site,
-            )
-        except (OSError, RuntimeError, ValueError) as exc:
-            died, frames = False, self.frame_skip
-            magic_report = {"ok": False, "reason": f"error:{exc}"}
+            try:
+                died, frames, magic_report = execute_use_macro(
+                    self.bridge,
+                    int(slot),
+                    prev_hp=self._prev_hp,
+                    episode_start_hp=getattr(self, "_episode_start_hp", 0),
+                    story_site=story_site,
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                died, frames = False, self.frame_skip
+                magic_report = {"ok": False, "reason": f"error:{exc}"}
+        finally:
+            self._macro_active = False
         return self._submenu_step(
             action,
             step_emulated_frames=frames,
@@ -1470,16 +1518,20 @@ class RE1Env(gym.Env):
                 step_emulated_frames=self.frame_skip,
                 magic_report={"ok": False, "reason": "equip_slot_not_legal"},
             )
+        self._macro_active = True
         try:
-            died, frames, magic_report = execute_equip_macro(
-                self.bridge,
-                int(slot),
-                prev_hp=self._prev_hp,
-                episode_start_hp=getattr(self, "_episode_start_hp", 0),
-            )
-        except (OSError, RuntimeError, ValueError) as exc:
-            died, frames = False, self.frame_skip
-            magic_report = {"ok": False, "reason": f"error:{exc}"}
+            try:
+                died, frames, magic_report = execute_equip_macro(
+                    self.bridge,
+                    int(slot),
+                    prev_hp=self._prev_hp,
+                    episode_start_hp=getattr(self, "_episode_start_hp", 0),
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                died, frames = False, self.frame_skip
+                magic_report = {"ok": False, "reason": f"error:{exc}"}
+        finally:
+            self._macro_active = False
         return self._submenu_step(
             action,
             step_emulated_frames=frames,
@@ -1576,17 +1628,21 @@ class RE1Env(gym.Env):
                 step_emulated_frames=self.frame_skip,
                 magic_report={"ok": False, "reason": "combine_pair_not_legal"},
             )
+        self._macro_active = True
         try:
-            died, frames, magic_report = execute_combine_macro(
-                self.bridge,
-                int(slot_a),
-                int(slot),
-                prev_hp=self._prev_hp,
-                episode_start_hp=getattr(self, "_episode_start_hp", 0),
-            )
-        except (OSError, RuntimeError, ValueError) as exc:
-            died, frames = False, self.frame_skip
-            magic_report = {"ok": False, "reason": f"error:{exc}", "product": None}
+            try:
+                died, frames, magic_report = execute_combine_macro(
+                    self.bridge,
+                    int(slot_a),
+                    int(slot),
+                    prev_hp=self._prev_hp,
+                    episode_start_hp=getattr(self, "_episode_start_hp", 0),
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                died, frames = False, self.frame_skip
+                magic_report = {"ok": False, "reason": f"error:{exc}", "product": None}
+        finally:
+            self._macro_active = False
         return self._submenu_step(
             action,
             step_emulated_frames=frames,
@@ -1891,6 +1947,14 @@ class RE1Env(gym.Env):
             if recovered:
                 menu_reason = self._probe_outside_gameplay()
             # If still trapped (or another failure), fall through to terminate.
+        # Orphan START/ITEM pause (policy has no Start): close on a fresh step
+        # only — never while equip/use/combine or another bridge macro owns it.
+        if not self._inventory_macro_owns_item_menu(int(action)):
+            if self._probe_item_inventory_menu():
+                recovered, _item_report = self._try_dismiss_orphan_item_menu()
+                if recovered:
+                    self._skipping_flag = False
+                    menu_reason = self._probe_outside_gameplay()
         if menu_reason in _DEATH_FAILURE_REASONS:
             death = self._death_step(
                 action, died_during_skip=False, died_during_step=True

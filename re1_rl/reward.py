@@ -57,9 +57,13 @@ NEW_WEAPON_PICKUP_BONUS = CHECKPOINT_REWARD
 SHOTGUN_RETURN_PENALTY = -NEW_WEAPON_PICKUP_BONUS
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # Idle contempt: no new room / cutscene / key item / weapon / story-use / gallery.
-# Grace then linear-rate ramp; episode truncates at SOFTLOCK_FRAME_THRESHOLD.
-# 43200 = 12 min wall-clock @ 60 emulated fps (PS1 NTSC / BizHawk).
-SOFTLOCK_FRAME_THRESHOLD = 12 * 60 * 60
+# Grace then linear-rate ramp; episode truncates at the active softlock cap.
+# Pre-Kenneth: 3 min cap (== grace → bulk at timeout). After Kenneth pays: 6 min
+# cap with 3→6 min ramp. Frames @ 60 emulated fps (PS1 NTSC / BizHawk).
+SOFTLOCK_PRE_KENNETH_FRAMES = 3 * 60 * 60
+SOFTLOCK_POST_KENNETH_FRAMES = 6 * 60 * 60
+# Alias: post-Kenneth / max episode idle cap (tests of the full ramp).
+SOFTLOCK_FRAME_THRESHOLD = SOFTLOCK_POST_KENNETH_FRAMES
 # First 3 min of no-progress: no extra idle tax (living step cost only).
 CONTEMPT_GRACE_FRAMES = 3 * 60 * 60
 
@@ -71,10 +75,10 @@ NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.6667
 DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.3333
 DEATH_PENALTY = -DEATH_PENALTY_SCALED
 # Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
-MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.3
+MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.1
 # Doing-nothing contempt must not exceed death (else suicide beats softlock).
-# Ramp 3→12 min spends exactly this budget (no extra terminal lump).
-CONTEMPT_BUDGET_SCALED = DEATH_PENALTY_SCALED
+# Stepwise / ramp potency is 1/5 of the death budget.
+CONTEMPT_BUDGET_SCALED = DEATH_PENALTY_SCALED / 5.0
 SOFTLOCK_TIMEOUT_PENALTY = -CONTEMPT_BUDGET_SCALED
 
 ENEMY_DAMAGE_REWARD = CHECKPOINT_REWARD / 200
@@ -87,7 +91,7 @@ AMMO_WASTE_PENALTY = 0.0
 REWARD_SCALE = 1.0
 
 # Dense softlock ramp is already in the scalar reward (bd["softlock"]); one γ.
-RL_GAMMA = 0.99
+RL_GAMMA = 0.9925
 
 HP_LOSS_SCALE = NEAR_DEATH_DAMAGE_SCALED / (JILL_FINE_HP - 1)
 # Heal recovers ~80% of the damage channel so chip-then-herb is not free.
@@ -119,15 +123,27 @@ DIST_NORM = 4096.0
 ENABLE_CHECKPOINT_PATH = False
 
 
+def softlock_frame_threshold(progress: ProgressTracker | None) -> int:
+    """Idle truncate cap: 3 min before Kenneth pays, 6 min after."""
+    if progress is None:
+        return SOFTLOCK_PRE_KENNETH_FRAMES
+    from re1_rl.cutscene_reward import kenneth_cutscene_seen
+
+    if kenneth_cutscene_seen(progress.rewarded_cutscenes):
+        return SOFTLOCK_POST_KENNETH_FRAMES
+    return SOFTLOCK_PRE_KENNETH_FRAMES
+
+
 def stagnation_episode_timeout(
     progress: ProgressTracker | None,
     *,
-    threshold: int = SOFTLOCK_FRAME_THRESHOLD,
+    threshold: int | None = None,
 ) -> bool:
     """True when idle frames hit the stagnation episode cap (caller sets truncated)."""
     if progress is None:
         return False
-    return progress.stagnation_timed_out(threshold=threshold)
+    thr = softlock_frame_threshold(progress) if threshold is None else int(threshold)
+    return progress.stagnation_timed_out(threshold=thr)
 
 
 def contempt_spent_at(
@@ -217,12 +233,14 @@ def compute_reward(
     *,
     progress: ProgressTracker | None = None,
     graph: RoomGraph | None = None,
-    softlock_threshold: int = SOFTLOCK_FRAME_THRESHOLD,
+    softlock_threshold: int | None = None,
     success_room: str | None = None,
     return_breakdown: bool = False,
 ) -> float | tuple[float, dict[str, float]]:
     """Compute scalar reward from symbolic state dicts."""
     del success_room  # checkpoint success_room bonus disabled
+    if softlock_threshold is None:
+        softlock_threshold = softlock_frame_threshold(progress)
 
     step_frames = int(state.get("step_emulated_frames", REFERENCE_STEP_FRAMES))
     ref_frames = int(state.get("reference_step_frames", REFERENCE_STEP_FRAMES))
@@ -398,7 +416,7 @@ def compute_reward(
         bd["hp"] = hp_heal_reward(hp_delta)
 
     # Actual death owns the ordinary death channel. Otherwise the sole Kenneth
-    # gate contributes exactly -0.3 once under its explicit telemetry key.
+    # gate contributes exactly -0.1 once under its explicit telemetry key.
     if state.get("dead"):
         bd["death"] = DEATH_PENALTY
     elif illegal_main_hall:

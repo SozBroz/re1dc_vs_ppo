@@ -19,10 +19,13 @@ from re1_rl.reward import (
     NEW_ROOM_BONUS,
     REFERENCE_STEP_FRAMES,
     SOFTLOCK_FRAME_THRESHOLD,
+    SOFTLOCK_POST_KENNETH_FRAMES,
+    SOFTLOCK_PRE_KENNETH_FRAMES,
     SOFTLOCK_TIMEOUT_PENALTY,
     SURVIVAL_BUDGET_SCALED,
     contempt_penalty_delta,
     contempt_spent_at,
+    softlock_frame_threshold,
     stagnation_episode_timeout,
     compute_reward,
 )
@@ -35,7 +38,7 @@ def _step(
     cur,
     *,
     step_frames=REFERENCE_STEP_FRAMES,
-    softlock_threshold=SOFTLOCK_FRAME_THRESHOLD,
+    softlock_threshold=None,
 ):
     cur = dict(cur)
     cur.setdefault("step_emulated_frames", step_frames)
@@ -50,15 +53,27 @@ def _step(
     )
 
 
-def test_softlock_matches_death_budget():
-    assert CONTEMPT_BUDGET_SCALED == pytest.approx(DEATH_PENALTY_SCALED)
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-DEATH_PENALTY_SCALED)
+def test_softlock_budget_is_one_fifth_death():
+    assert CONTEMPT_BUDGET_SCALED == pytest.approx(DEATH_PENALTY_SCALED / 5.0)
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-DEATH_PENALTY_SCALED / 5.0)
     assert CONTEMPT_BUDGET_SCALED < SURVIVAL_BUDGET_SCALED
 
 
+def test_softlock_threshold_doubles_after_kenneth():
+    assert SOFTLOCK_PRE_KENNETH_FRAMES == 3 * 60 * 60
+    assert SOFTLOCK_POST_KENNETH_FRAMES == 6 * 60 * 60
+    assert SOFTLOCK_FRAME_THRESHOLD == SOFTLOCK_POST_KENNETH_FRAMES
+    progress = ProgressTracker()
+    assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES
+    progress.rewarded_cutscenes.add("104:0:s0")
+    assert softlock_frame_threshold(progress) == SOFTLOCK_POST_KENNETH_FRAMES
+
+
 def test_grace_has_no_softlock_tax():
+    """Under grace on the post-Kenneth 6m cap: no softlock tax."""
     progress = ProgressTracker()
     progress.first_visit("105")
+    progress.rewarded_cutscenes.add("104:0:s0")
     prev = make_state(room="105", step=0)
     step_frames = REFERENCE_STEP_FRAMES
     steps = CONTEMPT_GRACE_FRAMES // step_frames
@@ -73,12 +88,32 @@ def test_grace_has_no_softlock_tax():
     assert softlock_sum == pytest.approx(0.0)
 
 
-def test_ramp_integral_equals_death_budget_not_survival():
+def test_pre_kenneth_truncates_at_three_minutes():
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", step=0)
+    step_frames = REFERENCE_STEP_FRAMES
+    threshold = SOFTLOCK_PRE_KENNETH_FRAMES
+    steps = threshold // step_frames
     softlock_sum = 0.0
-    threshold = SOFTLOCK_FRAME_THRESHOLD
+    for i in range(1, steps + 1):
+        cur = make_state(room="105", step=i)
+        _, bd = _step(progress, prev, cur, step_frames=step_frames)
+        softlock_sum += bd["softlock"]
+        prev = cur
+    assert softlock_frame_threshold(progress) == threshold
+    assert stagnation_episode_timeout(progress)
+    # Pre-K: threshold == grace → bulk contempt on the timeout step only.
+    assert softlock_sum == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY)
+
+
+def test_ramp_integral_equals_contempt_budget_post_kenneth():
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    progress.rewarded_cutscenes.add("104:0:s0")
+    prev = make_state(room="105", step=0)
+    softlock_sum = 0.0
+    threshold = SOFTLOCK_POST_KENNETH_FRAMES
     step_frames = REFERENCE_STEP_FRAMES
     steps = threshold // step_frames
     for i in range(1, steps + 1):
@@ -95,13 +130,17 @@ def test_ramp_integral_equals_death_budget_not_survival():
 
 def test_contempt_spent_quadratic_mid_ramp():
     grace = CONTEMPT_GRACE_FRAMES
-    threshold = SOFTLOCK_FRAME_THRESHOLD
+    threshold = SOFTLOCK_POST_KENNETH_FRAMES
     ramp = threshold - grace
     mid = grace + ramp // 2
-    spent = contempt_spent_at(mid)
+    spent = contempt_spent_at(mid, grace=grace, threshold=threshold)
     assert spent == pytest.approx(CONTEMPT_BUDGET_SCALED * 0.25, rel=1e-6)
-    assert contempt_spent_at(grace) == pytest.approx(0.0)
-    assert contempt_spent_at(threshold) == pytest.approx(CONTEMPT_BUDGET_SCALED)
+    assert contempt_spent_at(grace, grace=grace, threshold=threshold) == pytest.approx(
+        0.0
+    )
+    assert contempt_spent_at(
+        threshold, grace=grace, threshold=threshold
+    ) == pytest.approx(CONTEMPT_BUDGET_SCALED)
 
 
 def test_short_threshold_falls_back_to_bulk_at_timeout():
@@ -126,8 +165,9 @@ def test_short_threshold_falls_back_to_bulk_at_timeout():
     assert bd["softlock"] == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY)
 
 
-def test_death_penalty_not_weaker_than_softlock_contempt():
-    assert abs(DEATH_PENALTY) == pytest.approx(CONTEMPT_BUDGET_SCALED)
+def test_softlock_contempt_weaker_than_death():
+    assert abs(DEATH_PENALTY) > CONTEMPT_BUDGET_SCALED
+    assert abs(DEATH_PENALTY) == pytest.approx(5.0 * CONTEMPT_BUDGET_SCALED)
 
 
 def test_progress_resets_ramp():
@@ -137,7 +177,13 @@ def test_progress_resets_ramp():
     prev = make_state(room="105", step=0)
     # Sit past grace into the ramp.
     progress._stagnation_frames = CONTEMPT_GRACE_FRAMES + 600
-    assert contempt_spent_at(progress.stagnation_frames) > 0.0
+    assert (
+        contempt_spent_at(
+            progress.stagnation_frames,
+            threshold=SOFTLOCK_POST_KENNETH_FRAMES,
+        )
+        > 0.0
+    )
     cur = make_state(room="106", step=1)
     _, bd = _step(progress, prev, cur, step_frames=REFERENCE_STEP_FRAMES)
     assert bd["new_room"] == NEW_ROOM_BONUS
@@ -312,8 +358,8 @@ def test_contempt_penalty_delta_monotonic():
     g = CONTEMPT_GRACE_FRAMES
     a = g + 1000
     b = g + 2000
-    d1 = contempt_penalty_delta(g, a)
-    d2 = contempt_penalty_delta(a, b)
+    d1 = contempt_penalty_delta(g, a, threshold=SOFTLOCK_POST_KENNETH_FRAMES)
+    d2 = contempt_penalty_delta(a, b, threshold=SOFTLOCK_POST_KENNETH_FRAMES)
     assert d1 < 0.0
     assert d2 < 0.0
     # Later slices of the linear-rate ramp are steeper.

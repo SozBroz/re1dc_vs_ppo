@@ -16,9 +16,11 @@ from re1_rl.inventory_menu_macro import (
     EQUIP_SUBMENU_SETTLE_FRAMES,
     OPEN_SETTLE_FRAMES,
     OPEN_START_FRAMES,
+    dismiss_orphan_item_menu,
     execute_equip_macro,
     slot_nav_moves,
 )
+from re1_rl.action_mask import COMBINE_ACTION, EQUIP_ACTION, USE_ACTION
 from re1_rl.obs_encoder import PROPRIO_DIM, ObsEncoder
 from re1_rl.room_graph import RoomGraph
 from re1_rl.weapon_equip import weapon_already_equipped
@@ -126,6 +128,58 @@ def test_execute_equip_macro_closes_item_screen_with_start() -> None:
         + CLOSE_ITEM_SETTLE_FRAMES
     )
     assert frames >= expected_min
+
+
+def test_dismiss_orphan_item_menu_closes_with_start() -> None:
+    client = _RecordingClient()
+    client.in_item_menu = True
+    still, frames, report = dismiss_orphan_item_menu(
+        client, prev_hp=96, episode_start_hp=96
+    )
+    assert not still
+    assert report["cleared"] is True
+    assert report.get("skipped") is not True
+    assert frames >= CLOSE_START_FRAMES + CLOSE_ITEM_SETTLE_FRAMES
+    assert client.steps[0] == ({"start": True}, CLOSE_START_FRAMES)
+    assert not client.in_item_menu
+
+
+def test_dismiss_orphan_item_menu_skips_when_already_clear() -> None:
+    client = _RecordingClient()
+    client.in_item_menu = False
+    still, frames, report = dismiss_orphan_item_menu(
+        client, prev_hp=96, episode_start_hp=96
+    )
+    assert not still
+    assert frames == 0
+    assert report.get("skipped") is True
+    assert client.steps == []
+
+
+def test_inventory_macro_owns_item_menu_gating() -> None:
+    """Orphan dismiss must not run while equip/use/combine owns the screen."""
+
+    class _Probe:
+        _macro_active = False
+        _use_phase = 0
+        _equip_phase = 0
+        _combine_phase = 0
+
+        def _inventory_macro_owns_item_menu(self, action: int) -> bool:
+            from re1_rl.env import RE1Env
+
+            return RE1Env._inventory_macro_owns_item_menu(self, int(action))  # type: ignore[arg-type]
+
+    p = _Probe()
+    assert not p._inventory_macro_owns_item_menu(0)
+    assert p._inventory_macro_owns_item_menu(USE_ACTION)
+    assert p._inventory_macro_owns_item_menu(EQUIP_ACTION)
+    assert p._inventory_macro_owns_item_menu(COMBINE_ACTION)
+    p._equip_phase = 1
+    assert p._inventory_macro_owns_item_menu(0)
+    p._equip_phase = 0
+    p._macro_active = True
+    assert p._inventory_macro_owns_item_menu(0)
 
 
 def test_execute_equip_releases_if_start_does_not_open_menu() -> None:

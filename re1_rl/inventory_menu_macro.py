@@ -264,6 +264,34 @@ def close_item_screen(
     return False, frames
 
 
+def dismiss_orphan_item_menu(
+    client: Any,
+    *,
+    prev_hp: int = 0,
+    episode_start_hp: int = 0,
+) -> tuple[bool, int, dict[str, Any]]:
+    """Close an orphan START/ITEM pause screen left open outside inventory macros.
+
+    Returns ``(still_open, frames_used, report)``. ``still_open=False`` means
+    Jill is back in mansion control (or was never on the pause tree).
+    """
+    report: dict[str, Any] = {"cleared": False, "path": "close_item_screen"}
+    if not _item_menu_confirmed(client):
+        report["cleared"] = True
+        report["skipped"] = True
+        return False, 0, report
+    died, frames = close_item_screen(
+        client,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+    )
+    still = _item_menu_confirmed(client)
+    report["cleared"] = not still
+    report["died"] = bool(died)
+    report["frames"] = int(frames)
+    return still, frames, report
+
+
 def _wait_for_story_use_after_pick(
     client: Any,
     *,
