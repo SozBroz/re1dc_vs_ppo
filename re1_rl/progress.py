@@ -19,6 +19,9 @@ class ProgressTracker:
     penalized_offroute_rooms: set[str] = field(default_factory=set)
     rewarded_cutscenes: set[str] = field(default_factory=set)
     rewarded_story_uses: set[str] = field(default_factory=set)
+    # After key/weapon pickup: suppress same-room cutscene fragments until leave.
+    # Implements skill (a) for multi-settle pickup cinema (emblem grab → +1s).
+    cutscene_blocked_after_pickup_room: str | None = None
     _success_room_rewarded: bool = False
     _in_control_steps: dict[str, int] = field(default_factory=dict)
 
@@ -112,6 +115,19 @@ class ProgressTracker:
             return False
         self.rewarded_cutscenes.add(key)
         return True
+
+    def note_pickup_cutscene_block(self, room_id: str) -> None:
+        """Arm same-room cutscene suppress after a key/weapon pickup."""
+        room = str(room_id or "")
+        self.cutscene_blocked_after_pickup_room = room or None
+
+    def clear_pickup_cutscene_block_if_left(self, room_id: str) -> None:
+        """Drop suppress once Jill leaves the pickup room."""
+        blocked = self.cutscene_blocked_after_pickup_room
+        if not blocked:
+            return
+        if str(room_id or "") != str(blocked):
+            self.cutscene_blocked_after_pickup_room = None
 
     def claim_story_use_bonus(self, site_id: str) -> bool:
         """True once per story USE site id per episode."""

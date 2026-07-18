@@ -78,7 +78,7 @@ Anything that **stops Jill from moving** can look like a “cutscene” to the d
 
 | ID | Non-paying “cutscene-like” event |
 |----|----------------------------------|
-| a | Picking up an item (item pickup has its own channel: #3 / #5 / #6) |
+| a | Picking up an item (item pickup has its own channel: #3 / #5 / #6). Same-skip inventory growth never pays cutscene; after a key/weapon pickup, further same-room cutscene settles stay suppressed until Jill leaves that room (covers fragmented pickup cinema). |
 | b | Opening a menu (e.g. HP text while menu open) |
 | c | Interact that only puts text on screen |
 | d | Door / stairs transitions that load a new room (room pay is #1, not #2) |

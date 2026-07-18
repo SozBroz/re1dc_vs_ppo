@@ -784,6 +784,9 @@ class RE1Env(gym.Env):
             episode_start_hp=int(getattr(self, "_episode_start_hp", 0)),
             rewarded_cutscenes=self._progress.rewarded_cutscenes,
             visited_rooms=self._progress.visited_rooms,
+            cutscene_blocked_after_pickup_room=(
+                self._progress.cutscene_blocked_after_pickup_room
+            ),
         )
 
     def _merge_post_skip_breakdown(
@@ -950,6 +953,12 @@ class RE1Env(gym.Env):
             rewarded_site_ids=self._progress.rewarded_story_uses,
         )
         self._inventory_before_skip = None
+        # Authoritative policy inventory for pickup→cutscene disqualify.
+        if inv_before is not None:
+            entry_prev = dict(entry_prev or {})
+            entry_prev["inventory"] = list(inv_before)
+        if inv_after is not None:
+            state["inventory"] = list(inv_after)
         fail = self._illegal_main_hall_failure_reason(entry_prev, state)
         if fail:
             self._progress.first_visit(

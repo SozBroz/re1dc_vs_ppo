@@ -715,6 +715,80 @@ def test_kenneth_idle_endpoints_pay_with_mid_skip_peak():
     )
 
 
+def test_emblem_pickup_skip_does_not_pay_cutscene():
+    """Skill (a): fireplace emblem grab must not mint new_cutscene."""
+    from re1_rl.cutscene_reward import apply_skip_script_evidence
+    from re1_rl.reward import KEY_ITEM_PICKUP_BONUS
+
+    prev = make_state(
+        room="105",
+        cam_id=2,
+        hp=96,
+        scene_flag=0x80,
+        inventory=["knife", "beretta"],
+    )
+    cur = make_state(
+        room="105",
+        cam_id=2,
+        hp=96,
+        scene_flag=0x80,
+        inventory=["knife", "beretta", "emblem"],
+    )
+    latched = apply_skip_script_evidence(prev, peak_scene_flag=0x93)
+    assert (
+        _qualify(latched, cur, skip_frames=400, visited_rooms={"105"}) is None
+    )
+    # Item channel still pays; cutscene claim stripped even if key sneaks in.
+    cur["cutscene_key"] = "105:2:s0"
+    progress = ProgressTracker()
+    _, bd = compute_reward(
+        prev, cur, make_planner(), progress=progress, return_breakdown=True
+    )
+    assert bd["key_item"] == KEY_ITEM_PICKUP_BONUS
+    assert bd["new_cutscene"] == 0.0
+    assert progress.cutscene_blocked_after_pickup_room == "105"
+
+
+def test_post_pickup_same_room_cutscene_fragments_suppressed():
+    """Live memlog: emblem +0.5 then two +1.0 cutscenes in dining — block extras."""
+    from re1_rl.cutscene_reward import apply_skip_script_evidence
+
+    prev = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80)
+    cur = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80)
+    latched = apply_skip_script_evidence(prev, peak_scene_flag=0x93)
+    assert (
+        qualify_cutscene_reward(
+            skip_frames=200,
+            prev_state=latched,
+            new_state=cur,
+            visited_rooms={"105"},
+            cutscene_blocked_after_pickup_room="105",
+        )
+        is None
+    )
+    # Leaving the pickup room clears suppress (tea Kenneth may pay).
+    progress = ProgressTracker()
+    progress.note_pickup_cutscene_block("105")
+    progress.clear_pickup_cutscene_block_if_left("104")
+    assert progress.cutscene_blocked_after_pickup_room is None
+    prev_k = apply_skip_script_evidence(
+        make_state(room="104", cam_id=4, hp=96, scene_flag=0x80),
+        peak_scene_flag=0x84,
+    )
+    cur_k = make_state(room="104", cam_id=4, hp=96, scene_flag=0x80)
+    assert (
+        qualify_cutscene_reward(
+            skip_frames=158,
+            prev_state=prev_k,
+            new_state=cur_k,
+            visited_rooms={"105", "104"},
+            rewarded_cutscenes={"105:2:s0"},
+            cutscene_blocked_after_pickup_room=None,
+        )
+        == "104:4:s0"
+    )
+
+
 def test_kenneth_msg_dialogue_short_skip_still_pays():
     """Msg-only dialogue needs SCRIPT_DIALOGUE_MIN frames; scene beats stay short-ok."""
     prev = make_state(room="104", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0x00)

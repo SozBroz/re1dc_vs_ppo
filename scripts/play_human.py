@@ -2043,7 +2043,13 @@ def cutscene_skip_chunk(
         peak_scene_flag=getattr(env._ram_skip, "last_skip_peak_scene_flag", None),
         peak_msg_flag=getattr(env._ram_skip, "last_skip_peak_msg_flag", None),
     ) or entry_prev
+    if inv_before is not None:
+        entry_prev = dict(entry_prev or {})
+        entry_prev["inventory"] = list(inv_before)
+    if inv_after is not None:
+        state["inventory"] = list(inv_after)
     env._cutscene_skip_entry_prev = dict(entry_prev)
+    blocked_room = env._progress.cutscene_blocked_after_pickup_room
     state["cutscene_key"] = qualify_cutscene_reward(
         skip_frames=skip_frames,
         prev_state=entry_prev,
@@ -2051,6 +2057,7 @@ def cutscene_skip_chunk(
         episode_start_hp=int(getattr(env, "_episode_start_hp", 0)),
         rewarded_cutscenes=env._progress.rewarded_cutscenes,
         visited_rooms=env._progress.visited_rooms,
+        cutscene_blocked_after_pickup_room=blocked_room,
     )
     env._progress.record_in_control_step(
         state.get("room_id", ""),
@@ -2074,6 +2081,9 @@ def cutscene_skip_chunk(
                 episode_start_hp=int(getattr(env, "_episode_start_hp", 0)),
                 rewarded_cutscenes=env._progress.rewarded_cutscenes,
                 visited_rooms=env._progress.visited_rooms,
+                cutscene_blocked_after_pickup_room=(
+                    env._progress.cutscene_blocked_after_pickup_room
+                ),
                 qualified_key=state.get("cutscene_key"),
                 breakdown=breakdown,
             ),
@@ -2087,6 +2097,9 @@ def cutscene_skip_chunk(
             episode_start_hp=int(getattr(env, "_episode_start_hp", 0)),
             rewarded_cutscenes=env._progress.rewarded_cutscenes,
             visited_rooms=env._progress.visited_rooms,
+            cutscene_blocked_after_pickup_room=(
+                env._progress.cutscene_blocked_after_pickup_room
+            ),
         )
         if why:
             print(

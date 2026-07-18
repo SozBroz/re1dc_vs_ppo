@@ -384,6 +384,46 @@ def apply_skip_script_evidence(
     return out
 
 
+def _inventory_name_set(state: dict[str, Any] | None) -> set[str]:
+    from re1_rl.item_todo import canonical_item
+
+    names: set[str] = set()
+    for raw in (state or {}).get("inventory") or ():
+        name = canonical_item(str(raw))
+        if name:
+            names.add(name)
+    return names
+
+
+def inventory_acquired(
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None,
+) -> set[str]:
+    """Item names gained between skip entry and settle (canonical)."""
+    return _inventory_name_set(new_state) - _inventory_name_set(prev_state)
+
+
+def pickup_cutscene_disqualified(
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None,
+    *,
+    cutscene_blocked_after_pickup_room: str | None = None,
+) -> bool:
+    """True when cutscene must yield to the item/weapon pickup channel.
+
+    Skill (a): pickup has its own pay (#3/#5/#6) — never also ``new_cutscene``.
+    Covers (1) inventory growth on this skip settle and (2) same-room fragment
+    skips after a key/weapon pickup until Jill leaves that room.
+    """
+    if inventory_acquired(prev_state, new_state):
+        return True
+    blocked = str(cutscene_blocked_after_pickup_room or "")
+    if not blocked:
+        return False
+    room = str((new_state or {}).get("room_id", "") or "")
+    return bool(room) and room == blocked
+
+
 def examine_text_skip_disqualified(
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any] | None,
@@ -430,6 +470,7 @@ def qualify_cutscene_reward(
     episode_start_hp: int = 0,
     rewarded_cutscenes: Collection[str] | None = None,
     visited_rooms: Collection[str] | None = None,
+    cutscene_blocked_after_pickup_room: str | None = None,
 ) -> str | None:
     """Return cutscene key if this skip earns ``new_cutscene`` bonus, else None."""
     # Room A→B is door discovery (``new_room``), never a script beat — check
@@ -473,6 +514,13 @@ def qualify_cutscene_reward(
         if not story_use_menu_cutscene_exempt(new_state):
             return None
 
+    if pickup_cutscene_disqualified(
+        prev_state,
+        new_state,
+        cutscene_blocked_after_pickup_room=cutscene_blocked_after_pickup_room,
+    ):
+        return None
+
     if (
         examine_text_skip_disqualified(
             prev_state, new_state, skip_frames=int(skip_frames)
@@ -504,6 +552,7 @@ def cutscene_disqualify_reason(
     episode_start_hp: int = 0,
     rewarded_cutscenes: Collection[str] | None = None,
     visited_rooms: Collection[str] | None = None,
+    cutscene_blocked_after_pickup_room: str | None = None,
 ) -> str | None:
     """Human-readable reason when ``qualify_cutscene_reward`` returns None."""
     # Structural door vs script before the length gate (patched doors are short).
@@ -553,6 +602,17 @@ def cutscene_disqualify_reason(
     if in_game_menu_from_ram(_ram_view_from_state(new_state or {})):
         if not story_use_menu_cutscene_exempt(new_state):
             return "pause menu at skip exit"
+    if pickup_cutscene_disqualified(
+        prev_state,
+        new_state,
+        cutscene_blocked_after_pickup_room=cutscene_blocked_after_pickup_room,
+    ):
+        if inventory_acquired(prev_state, new_state):
+            return "item pickup (own channel; not cutscene)"
+        return (
+            "post-pickup same-room suppress "
+            f"(blocked_room={cutscene_blocked_after_pickup_room!r})"
+        )
     if examine_text_skip_disqualified(
         prev_state, new_state, skip_frames=int(skip_frames)
     ):
@@ -590,6 +650,7 @@ def format_cutscene_gate_panel(
     episode_start_hp: int = 0,
     rewarded_cutscenes: Collection[str] | None = None,
     visited_rooms: Collection[str] | None = None,
+    cutscene_blocked_after_pickup_room: str | None = None,
     qualified_key: str | None = None,
     breakdown: dict[str, float] | None = None,
 ) -> str:
@@ -606,6 +667,7 @@ def format_cutscene_gate_panel(
             episode_start_hp=episode_start_hp,
             rewarded_cutscenes=rewarded_cutscenes,
             visited_rooms=visited_rooms,
+            cutscene_blocked_after_pickup_room=cutscene_blocked_after_pickup_room,
         )
     kenneth = kenneth_cutscene_seen(
         rewarded_cutscenes, visited_rooms=visited_rooms

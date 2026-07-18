@@ -315,23 +315,33 @@ def compute_reward(
     if room_changed and is_new_room and not illegal_main_hall:
         bd["new_room"] = NEW_ROOM_BONUS
 
-    cutscene_key = state.get("cutscene_key")
-    if cutscene_key and progress is not None:
-        if progress.claim_cutscene_bonus(str(cutscene_key)):
-            bd["new_cutscene"] = NEW_CUTSCENE_BONUS
-
     if "new_items" in state:
         new_items = set(state["new_items"])
     else:
         new_items = set(state.get("inventory", [])) - set(prev_state.get("inventory", []))
+    acquired_key_or_weapon = False
     for raw in new_items:
         name = canonical_item(str(raw))
         if name in _KEY_ITEM_NAME_SET:
             bd["key_item"] += KEY_ITEM_PICKUP_BONUS
+            acquired_key_or_weapon = True
         elif name in _WEAPON_NAME_SET:
             bd["new_weapon"] += NEW_WEAPON_PICKUP_BONUS
+            acquired_key_or_weapon = True
         else:
             bd["item"] += ITEM_PICKUP_BONUS
+
+    # Pickup owns its channel (skill a): never also claim new_cutscene this step.
+    cutscene_key = state.get("cutscene_key") if not new_items else None
+    if cutscene_key and progress is not None:
+        if progress.claim_cutscene_bonus(str(cutscene_key)):
+            bd["new_cutscene"] = NEW_CUTSCENE_BONUS
+
+    if progress is not None:
+        room_now = str(state.get("room_id", "") or "")
+        progress.clear_pickup_cutscene_block_if_left(room_now)
+        if acquired_key_or_weapon:
+            progress.note_pickup_cutscene_block(room_now)
 
     prev_inventory = {
         canonical_item(str(name)) for name in prev_state.get("inventory", [])
