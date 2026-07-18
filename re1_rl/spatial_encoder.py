@@ -14,15 +14,20 @@ from __future__ import annotations
 
 import json
 import math
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
+from re1_rl.item_affordances import door_requires_key_index
 from re1_rl.item_todo import ItemTracker, RoomItems, canonical_item
 from re1_rl.memory_map import ITEM_IDS
 from re1_rl.rdt_interactables import kind_id, load_rdt_interactables
 from re1_rl.room_graph import RoomGraph
+
+_ROOT = Path(__file__).resolve().parents[1]
+_DEFAULT_ROOMS = _ROOT / "data" / "rooms.json"
 
 FACING_FULL_CIRCLE = 4096.0
 DIST_NORM = 4096.0
@@ -58,7 +63,11 @@ _EXIT_SLOT_FIELDS = [
     ("bearing_sin", "sin(angle to exit door - facing)"),
     ("bearing_cos", "cos(angle to exit door - facing)"),
     ("dist", "euclidean distance / 4096, clip [0,2]"),
+    ("to_room", "destination room_index / 128"),
+    ("known", "1 = harvested door edge in graph"),
+    ("requires_key", "KEY_ITEM_NAMES index / 128, or 127/128 if none"),
 ]
+EXIT_SLOT_DIM = len(_EXIT_SLOT_FIELDS)
 _INTERACTABLE_SLOT_FIELDS = [
     ("bearing_sin", "sin(angle to interactable - facing)"),
     ("bearing_cos", "cos(angle to interactable - facing)"),
@@ -86,9 +95,24 @@ def _build_fields() -> list[tuple[str, str]]:
 
 
 SPATIAL_FIELDS: list[tuple[str, str]] = _build_fields()
-SPATIAL_DIM = len(SPATIAL_FIELDS)  # 119 + 1 + 2*4 = 128
+SPATIAL_DIM = len(SPATIAL_FIELDS)  # 128 + 4 exits * 3 new fields = 140
 
 _NAME_TO_ITEM_ID = {name: iid for iid, name in ITEM_IDS.items()}
+
+
+@lru_cache(maxsize=1)
+def load_room_index(rooms_path: str = str(_DEFAULT_ROOMS)) -> dict[str, int]:
+    """Stable alphanumeric room code -> index (matches obs_encoder / rooms.json)."""
+    p = Path(rooms_path)
+    if not p.is_file():
+        return {}
+    with p.open(encoding="utf-8") as f:
+        rooms = json.load(f)
+    return {rid: i for i, rid in enumerate(sorted(rooms.keys()))}
+
+
+def _room_norm(room_id: str, room_index: dict[str, int]) -> float:
+    return room_index.get(str(room_id), 127) / 128.0
 
 # Visited mask: per-room 16x16 allocentric grid anchored on the first pose
 # seen in the room this episode (PokeRL-style; progress_scaffolding sec. 1.6).
@@ -222,11 +246,21 @@ class SpatialEncoder:
         graph: RoomGraph | None = None,
         static_enemies: StaticEnemySpawns | None = None,
         interactables: dict[str, list[dict[str, Any]]] | None = None,
+        *,
+        room_index: dict[str, int] | None = None,
+        rooms_path: str | Path | None = None,
     ) -> None:
         self.item_positions = item_positions
         self.graph = graph
         self.static_enemies = static_enemies
         self.interactables = interactables if interactables is not None else load_rdt_interactables()
+        if room_index is not None:
+            self.room_index = room_index
+        elif rooms_path is not None:
+            self.room_index = load_room_index(str(rooms_path))
+        else:
+            self.room_index = load_room_index()
+        self._door_requires_key = door_requires_key_index()
 
     def encode(
         self,
@@ -353,7 +387,7 @@ class SpatialEncoder:
         theta: float,
     ) -> int:
         if self.graph is None:
-            return i + 1 + EXIT_SLOTS * 3
+            return i + 1 + EXIT_SLOTS * EXIT_SLOT_DIM
         doors = [d for (frm, _), d in self.graph.doors.items() if frm == room]
         v[i] = min(len(doors), 8) / 8.0
         i += 1
@@ -363,7 +397,11 @@ class SpatialEncoder:
             v[i] = bsin
             v[i + 1] = bcos
             v[i + 2] = dist
-            i += 3
+            v[i + 3] = _room_norm(d.to_room, self.room_index)
+            v[i + 4] = 1.0  # edge present in harvested graph
+            key_idx = self._door_requires_key.get((d.from_room, d.to_room))
+            v[i + 5] = (key_idx if key_idx is not None else 127) / 128.0
+            i += EXIT_SLOT_DIM
         return i
 
     def _encode_interactables(

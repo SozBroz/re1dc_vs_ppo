@@ -3,6 +3,8 @@
 **Status:** implemented and live-verified 2026-07-02 (`env_smoke.py` against EmuHawk).
 **Code of record:** `re1_rl/obs_encoder.py` (field specs), `re1_rl/env.py` (assembly), `re1_rl/reward.py` (shaping). If this doc and the code disagree, the code wins — the field lists below are transcribed from `PROPRIO_FIELDS` / `GOAL_FIELDS`, which drive both encoding and the human-readable tools.
 
+**World-aware architecture (2026-07-17):** The agreed next step is flat MaskablePPO with `RE1WorldAwareExtractor` — frozen Evil Resource almanac in policy `register_buffer`s, small dynamic `world_state` / `key_hints` on rollouts, no learned room-order head. See **[world_aware_nn_architecture.md](world_aware_nn_architecture.md)** for the full diagram, buffer inventory, obs-key table, and transplant notes.
+
 ---
 
 ## 1. Full stack

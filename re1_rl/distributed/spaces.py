@@ -10,6 +10,7 @@ from re1_rl.episode_history import ACQUISITION_LOG_DIM, ROOM_HISTORY_DIM
 from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, INVENTORY_OBS_DIM, PROPRIO_DIM, ROOM_VISITED_DIM
 from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM
 from re1_rl.item_affordances import AFFORDANCES_DIM
+from re1_rl.world_state_encoder import WORLD_STATE_DIM
 from re1_rl.key_items import KEYS_HELD_DIM
 from re1_rl.maps_files import MAPS_FILES_DIM
 from re1_rl.milestone_features import MILESTONE_DIM
@@ -33,6 +34,7 @@ def make_re1_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
             "room_enemies": spaces.Box(0.0, 1.0, shape=(ENEMY_ROSTER_DIM,), dtype="float32"),
             "keys_held": spaces.Box(0.0, 1.0, shape=(KEYS_HELD_DIM,), dtype="float32"),
             "affordances": spaces.Box(0.0, 1.0, shape=(AFFORDANCES_DIM,), dtype="float32"),
+            "world_state": spaces.Box(0.0, 8.0, shape=(WORLD_STATE_DIM,), dtype="float32"),
             "cutscene_ledger": spaces.Box(
                 0.0, 1.0, shape=(CUTSCENE_LEDGER_DIM,), dtype="float32"
             ),

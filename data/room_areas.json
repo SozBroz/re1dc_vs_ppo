@@ -1,0 +1,466 @@
+{
+  "100": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "101": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "102": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "103": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "104": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "105": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "106": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "107": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "108": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "109": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "10A": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "10B": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "10C": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "10D": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "10E": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "10F": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "110": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "111": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "112": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "113": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "114": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "115": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "116": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "117": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "118": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "119": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "11A": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "11B": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "11C": {
+    "area_id": 0,
+    "area_name": "mansion_1f"
+  },
+  "200": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "201": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "202": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "203": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "204": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "205": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "206": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "207": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "208": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "209": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "20A": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "20B": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "20C": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "20D": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "20E": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "20F": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "210": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "211": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "212": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "213": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "214": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "215": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "216": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "217": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "218": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "219": {
+    "area_id": 1,
+    "area_name": "mansion_2f"
+  },
+  "21A": {
+    "area_id": 2,
+    "area_name": "mansion_b1"
+  },
+  "21B": {
+    "area_id": 2,
+    "area_name": "mansion_b1"
+  },
+  "21C": {
+    "area_id": 2,
+    "area_name": "mansion_b1"
+  },
+  "300": {
+    "area_id": 3,
+    "area_name": "courtyard"
+  },
+  "301": {
+    "area_id": 3,
+    "area_name": "courtyard"
+  },
+  "302": {
+    "area_id": 3,
+    "area_name": "courtyard"
+  },
+  "303": {
+    "area_id": 3,
+    "area_name": "courtyard"
+  },
+  "304": {
+    "area_id": 3,
+    "area_name": "courtyard"
+  },
+  "305": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "306": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "307": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "308": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "309": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "30A": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "30B": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "30C": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "30D": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "30E": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "30F": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "310": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "311": {
+    "area_id": 4,
+    "area_name": "underground"
+  },
+  "400": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "401": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "402": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "403": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "404": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "405": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "406": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "407": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "408": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "409": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "40A": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "40B": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "40C": {
+    "area_id": 5,
+    "area_name": "guardhouse_1f"
+  },
+  "40D": {
+    "area_id": 6,
+    "area_name": "guardhouse_b1"
+  },
+  "40E": {
+    "area_id": 6,
+    "area_name": "guardhouse_b1"
+  },
+  "40F": {
+    "area_id": 6,
+    "area_name": "guardhouse_b1"
+  },
+  "410": {
+    "area_id": 6,
+    "area_name": "guardhouse_b1"
+  },
+  "411": {
+    "area_id": 6,
+    "area_name": "guardhouse_b1"
+  },
+  "500": {
+    "area_id": 7,
+    "area_name": "lab_b1"
+  },
+  "501": {
+    "area_id": 7,
+    "area_name": "lab_b1"
+  },
+  "502": {
+    "area_id": 7,
+    "area_name": "lab_b1"
+  },
+  "503": {
+    "area_id": 7,
+    "area_name": "lab_b1"
+  },
+  "504": {
+    "area_id": 8,
+    "area_name": "lab_b2"
+  },
+  "505": {
+    "area_id": 8,
+    "area_name": "lab_b2"
+  },
+  "506": {
+    "area_id": 8,
+    "area_name": "lab_b2"
+  },
+  "507": {
+    "area_id": 8,
+    "area_name": "lab_b2"
+  },
+  "508": {
+    "area_id": 8,
+    "area_name": "lab_b2"
+  },
+  "509": {
+    "area_id": 8,
+    "area_name": "lab_b2"
+  },
+  "50A": {
+    "area_id": 8,
+    "area_name": "lab_b2"
+  },
+  "50B": {
+    "area_id": 9,
+    "area_name": "lab_b3"
+  },
+  "50C": {
+    "area_id": 9,
+    "area_name": "lab_b3"
+  },
+  "50D": {
+    "area_id": 9,
+    "area_name": "lab_b3"
+  },
+  "50E": {
+    "area_id": 9,
+    "area_name": "lab_b3"
+  },
+  "50F": {
+    "area_id": 9,
+    "area_name": "lab_b3"
+  },
+  "510": {
+    "area_id": 10,
+    "area_name": "lab_b4"
+  },
+  "511": {
+    "area_id": 10,
+    "area_name": "lab_b4"
+  },
+  "512": {
+    "area_id": 10,
+    "area_name": "lab_b4"
+  },
+  "513": {
+    "area_id": 10,
+    "area_name": "lab_b4"
+  },
+  "514": {
+    "area_id": 10,
+    "area_name": "lab_b4"
+  },
+  "515": {
+    "area_id": 10,
+    "area_name": "lab_b4"
+  }
+}

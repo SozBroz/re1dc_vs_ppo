@@ -9,6 +9,9 @@ Per-slot floats (see `.cursor/plans/evilresource_key_affordances.plan.md`):
   2  affordant-here (standing at a use site)
   3  unlock target / path hint (to_room if affordant on a door; else next hop)
   4  currently in inventory
+
+``encode_key_hints`` (35×3) is the planned replacement; ``encode_affordances`` remains
+for backward-compatible checkpoints until obs transplant.
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from typing import Any
 import numpy as np
 
 from re1_rl.item_todo import canonical_item
+from re1_rl.key_items import KEY_ITEM_NAMES, KEYS_HELD_DIM
 from re1_rl.room_graph import RoomGraph
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +35,9 @@ _DOORS_RDT = _ROOT / "data" / "doors_rdt.json"
 AFFORDANCE_SLOTS = 8
 AFFORDANCE_SLOT_DIM = 5
 AFFORDANCES_DIM = AFFORDANCE_SLOTS * AFFORDANCE_SLOT_DIM
+
+KEY_HINTS_PER_KEY = 3
+KEY_HINTS_DIM = KEYS_HELD_DIM * KEY_HINTS_PER_KEY
 
 
 @lru_cache(maxsize=1)
@@ -81,6 +88,52 @@ def _normalize_entry(entry: dict[str, Any]) -> dict[str, Any]:
         "rooms": rooms,
         "notes": str(entry.get("notes") or ""),
     }
+
+
+def _resolve_affordance_data(
+    catalog_or_affordances: Any | None,
+    *,
+    affordances_path: str | None = None,
+) -> dict[str, dict[str, Any]]:
+    if catalog_or_affordances is not None:
+        if hasattr(catalog_or_affordances, "item_affordances"):
+            raw = catalog_or_affordances.item_affordances
+            if isinstance(raw, dict):
+                return {
+                    k: _normalize_entry(v) if isinstance(v, dict) else v
+                    for k, v in raw.items()
+                    if isinstance(v, dict)
+                }
+        if isinstance(catalog_or_affordances, dict):
+            return {
+                k: _normalize_entry(v) if isinstance(v, dict) else v
+                for k, v in catalog_or_affordances.items()
+                if isinstance(v, dict)
+            }
+    return (
+        load_affordances(affordances_path)
+        if affordances_path is not None
+        else load_affordances()
+    )
+
+
+@lru_cache(maxsize=1)
+def door_requires_key_index(
+    affordances_path: str = str(_DEFAULT_PATH),
+) -> dict[tuple[str, str], int]:
+    """Inverted door_edges: (from_room, to_room) -> KEY_ITEM_NAMES index."""
+    lookup: dict[tuple[str, str], int] = {}
+    name_to_idx = {name: i for i, name in enumerate(KEY_ITEM_NAMES)}
+    for key_name, entry in load_affordances(affordances_path).items():
+        idx = name_to_idx.get(key_name)
+        if idx is None:
+            continue
+        for edge in entry.get("door_edges") or []:
+            fr = str(edge.get("from_room") or "").strip()
+            to = str(edge.get("to_room") or "").strip()
+            if fr and to:
+                lookup[(fr, to)] = idx
+    return lookup
 
 
 def _item_sort_key(name: str) -> str:
@@ -149,6 +202,48 @@ def _path_hint_room(
     return hop or best_site
 
 
+def encode_key_hints(
+    ever_held: set[str] | frozenset[str] | None,
+    inventory_names: set[str] | frozenset[str] | list[str] | None,
+    current_room: str | None,
+    catalog_or_affordances: Any | None = None,
+    *,
+    affordances_path: str | None = None,
+) -> np.ndarray:
+    """Per KEY_ITEM_NAMES row: pickup_pending, use_pending, affordant_here."""
+    v = np.zeros(KEY_HINTS_DIM, dtype=np.float32)
+    data = _resolve_affordance_data(
+        catalog_or_affordances,
+        affordances_path=affordances_path,
+    )
+    if not data:
+        return v
+
+    held = {canonical_item(x) for x in (ever_held or ())}
+    inv: set[str] = set()
+    for name in inventory_names or ():
+        inv.add(canonical_item(str(name)))
+    inv.discard("")
+
+    room = str(current_room or "")
+    for i, name in enumerate(KEY_ITEM_NAMES):
+        entry = data.get(name)
+        if not entry:
+            continue
+        base = i * KEY_HINTS_PER_KEY
+        pickup_rooms = entry.get("pickup_rooms") or []
+        use_sites = _use_sites(entry)
+
+        if name not in held and pickup_rooms:
+            v[base] = 1.0
+        if name in inv and use_sites:
+            v[base + 1] = 1.0
+        if room and room in use_sites:
+            v[base + 2] = 1.0
+
+    return v
+
+
 def encode_affordances(
     *,
     ever_held: set[str] | frozenset[str] | None,
@@ -158,7 +253,11 @@ def encode_affordances(
     affordances_path: str | None = None,
     graph: RoomGraph | None = None,
 ) -> np.ndarray:
-    """Top-K held key items: id, primary USE, affordant-here, unlock/hint, in-inv."""
+    """Top-K held key items: id, primary USE, affordant-here, unlock/hint, in-inv.
+
+    .. deprecated::
+        Prefer :func:`encode_key_hints` plus static WorldCatalog buffers.
+    """
     v = np.zeros(AFFORDANCES_DIM, dtype=np.float32)
     data = (
         load_affordances(affordances_path)

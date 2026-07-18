@@ -1,0 +1,66 @@
+[
+  {
+    "name": "pass_number",
+    "room": "404",
+    "codes": [
+      3.0,
+      4.0,
+      5.0
+    ],
+    "notes": "Jill rec-room pool table (Chris gets this from Barry)"
+  },
+  {
+    "name": "pass_number",
+    "room": "304",
+    "codes": [
+      3.0,
+      4.0,
+      5.0
+    ],
+    "notes": "Guardhouse gate keypad uses same pool pass number"
+  },
+  {
+    "name": "researchers_will",
+    "room": "20A",
+    "codes": [
+      74.0,
+      79.0,
+      72.0,
+      78.0
+    ],
+    "notes": "ASCII ordinals for login JOHN (lab computer username)"
+  },
+  {
+    "name": "researchers_will",
+    "room": "20A",
+    "codes": [
+      65.0,
+      68.0,
+      65.0
+    ],
+    "notes": "ASCII ordinals for password ADA (visual data room)"
+  },
+  {
+    "name": "slides",
+    "room": "510",
+    "codes": [
+      77.0,
+      79.0,
+      76.0,
+      69.0
+    ],
+    "notes": "ASCII ordinals for MOLE (B3 electronic lock password)"
+  },
+  {
+    "name": "passcode_a",
+    "room": "508",
+    "codes": [],
+    "notes": "MO disc reader output — three digits vary by disc slot; not a fixed pickup code"
+  },
+  {
+    "name": "passcode_b",
+    "room": "508",
+    "codes": [],
+    "notes": "Second MO disc reader output — dynamic three-digit code"
+  }
+]

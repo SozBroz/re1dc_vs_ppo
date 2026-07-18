@@ -12,34 +12,31 @@ bars included), then bar columns are pruned (4+3 px). SB3 VecTransposeImage
 feeds NatureCNN (4, 84, 77); flatten after convs is 2688 (was 3136 at 84x84).
 Resume auto-transplants compatible tensors via async_fleet.
 
-Obs keys and their extractor paths (SB3 CombinedExtractor):
+Obs keys (RE1WorldAwareExtractor — see docs/world_aware_nn_architecture.md):
   frame   84x77x4 uint8   -> NatureCNN -> 512
-  proprio (28,) float32   -> flatten
-  goal    (27,) float32   -> flatten
-  spatial (128,) float32  -> flatten (egocentric items/enemies/exits/interactables)
-  visited (16,16,1) f32   -> flatten 256 (kept float32 0..1 ON PURPOSE:
-                             uint8 would trip is_image_space and NatureCNN
-                             cannot take 16x16 input)
-  rooms_visited (128,) f32 -> flatten (episode one-hot over room table)
-  box     (34,) float32   -> flatten (item-box slots + free_slots + in_box_room)
-  inventory (16,) f32     -> flatten (on-person 8 slots)
-  history (65,) f32       -> flatten (room deque K=32)
-  acquisitions (121,) f32 -> flatten (last 60 pickups)
-  room_enemies (12,) f32  -> flatten (static roster counts)
-  keys_held (37,) f32     -> flatten (ever-held key-item bitmask)
-  affordances (40,) f32   -> flatten (top-8 held key item affordances)
-  cutscene_ledger (16,) f32 -> flatten (milestone cutscene bits)
-  milestones (12,) f32   -> flatten (derived episode milestones)
-  maps_files (16,) f32   -> flatten (map/file pickup u16 bitfield)
-Fusion input = 512 + 28 + 27 + 128 + 256 + 128 + 34 + 16 + 65 + 121 + 12 + 37 + 40 + 16 + 12 + 16 = 1448 -> 2x256 pi/vf trunks.
+  proprio..maps_files     -> flatten (legacy privileged; world_state excluded)
+  world_state (475,) f32  -> world MLP join with frozen WorldCatalog buffers -> 64
+  affordances (40,) f32   -> still flattened (deprecated; key hints live in world_state)
 
-NOTE: PPO.load() restores the architecture stored in the checkpoint zip, so
-resuming an old 84x84 / 2x64 checkpoint keeps the old sizing. Frame-shape
-or widen changes require a weight transplant (see scripts/transplant_*.py).
+features_dim = 1523 = 512 CNN + ~947 flatten + 64 world_context.
+
+Static almanac (map_neighbors, pickup catalog, key_*, files, combine) is
+register_buffer only — rebuilt from JSON on learner load; NOT in rollouts.
+
+NOTE: PPO.load() restores checkpoint architecture. Use
+scripts/transplant_world_almanac.py for pre-almanac zips; async_fleet
+calls reload_world_catalog_buffers after resume.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
+from re1_rl.features_extractor import RE1WorldAwareExtractor
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
 POLICY_KWARGS: dict = dict(
     net_arch=dict(pi=[256, 256], vf=[256, 256]),
-    features_extractor_kwargs=dict(cnn_output_dim=512),
+    features_extractor_class=RE1WorldAwareExtractor,
+    features_extractor_kwargs=dict(cnn_output_dim=512, project_root=_PROJECT_ROOT),
 )

@@ -29,6 +29,7 @@ from re1_rl.spatial_encoder import (
 )
 
 DOORS = PROJECT_ROOT / "data" / "doors_empirical.json"
+DOORS_RDT = PROJECT_ROOT / "data" / "doors_rdt.json"
 IDX = {name: i for i, (name, _) in enumerate(SPATIAL_FIELDS)}
 
 EMBLEM_X, EMBLEM_Z = 30700, 7200  # dining room 105 table anchor
@@ -68,7 +69,7 @@ def make_room_items(tmp_path: Path) -> RoomItems:
 
 
 def test_spatial_dims_consistent():
-    assert len(SPATIAL_FIELDS) == SPATIAL_DIM == 128
+    assert len(SPATIAL_FIELDS) == SPATIAL_DIM == 140
     assert len({n for n, _ in SPATIAL_FIELDS}) == SPATIAL_DIM  # unique names
 
 
@@ -148,6 +149,16 @@ def test_exits_from_door_graph():
     assert abs(v[IDX["exit0_bearing_sin"]]) < 1e-6
     assert v[IDX["exit0_bearing_cos"]] > 0.99
     assert math.isclose(v[IDX["exit0_dist"]], 1500 / 4096, rel_tol=1e-5)
+    assert v[IDX["exit0_known"]] == 1.0
+    assert v[IDX["exit0_to_room"]] > 0.0
+
+
+def test_exit_requires_key_shield_attic():
+    g = RoomGraph(DOORS, DOORS_RDT)
+    enc = SpatialEncoder(None, g)
+    s = make_state(room="20E", x=28000, z=7200, facing=0)
+    v = enc.encode(s)
+    assert v[IDX["exit0_requires_key"]] == 25 / 128.0  # shield_key door -> attic
 
 
 def test_visited_mask_marks_and_resets():

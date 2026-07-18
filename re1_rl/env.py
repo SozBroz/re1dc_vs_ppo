@@ -67,6 +67,8 @@ from re1_rl.episode_history import (
 )
 from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM, encode_cutscene_ledger
 from re1_rl.item_affordances import AFFORDANCES_DIM, encode_affordances
+from re1_rl.world_catalog import WorldCatalog
+from re1_rl.world_state_encoder import WORLD_STATE_DIM, encode_world_state
 from re1_rl.key_items import KEY_ITEM_NAMES, KEYS_HELD_DIM, encode_keys_held
 from re1_rl.maps_files import MAPS_FILES_DIM, encode_maps_files_flags
 from re1_rl.milestone_features import MILESTONE_DIM, encode_milestones
@@ -209,6 +211,21 @@ def _resize_frame(
     return pruned[..., None]
 
 
+def _inventory_names_from_slots(
+    inventory_slots: list[dict[str, Any]] | None,
+) -> set[str]:
+    names: set[str] = set()
+    for slot in inventory_slots or []:
+        if isinstance(slot, (list, tuple)) and slot:
+            names.add(canonical_item(str(slot[0])))
+        elif isinstance(slot, dict):
+            names.add(
+                canonical_item(str(slot.get("item_id_name") or slot.get("name") or ""))
+            )
+    names.discard("")
+    return names
+
+
 class RE1Env(gym.Env):
     """Resident Evil 1 env wired to BizHawk (primary track).
 
@@ -261,7 +278,9 @@ class RE1Env(gym.Env):
                 # static Evil Resource enemy roster for current room
                 "room_enemies": spaces.Box(0.0, 1.0, shape=(ENEMY_ROSTER_DIM,), dtype=np.float32),
                 "keys_held": spaces.Box(0.0, 1.0, shape=(KEYS_HELD_DIM,), dtype=np.float32),
+                # Deprecated: superseded by world_state key-hint slices; kept for checkpoints.
                 "affordances": spaces.Box(0.0, 1.0, shape=(AFFORDANCES_DIM,), dtype=np.float32),
+                "world_state": spaces.Box(0.0, 8.0, shape=(WORLD_STATE_DIM,), dtype=np.float32),
                 "cutscene_ledger": spaces.Box(
                     0.0, 1.0, shape=(CUTSCENE_LEDGER_DIM,), dtype=np.float32
                 ),
@@ -276,6 +295,7 @@ class RE1Env(gym.Env):
             self.project_root / "data" / "doors_rdt.json",
         )
         self.room_items = RoomItems(self.project_root / "data" / "room_items.json")
+        self._world_catalog = WorldCatalog.from_files(self.project_root)
         self.item_positions = ItemPositions(
             self.project_root / "data" / "item_positions.json"
         )
@@ -522,6 +542,13 @@ class RE1Env(gym.Env):
                 inventory_slots=state.get("inventory_slots"),
                 current_room=str(state.get("room_id", "")),
                 room_index=self._encoder.room_index,
+            ),
+            "world_state": encode_world_state(
+                catalog=self._world_catalog,
+                room_items=self.room_items,
+                ever_held=self._items.ever_held,
+                inventory_names=_inventory_names_from_slots(state.get("inventory_slots")),
+                current_room=str(state.get("room_id", "")),
             ),
             "cutscene_ledger": cutscene_ledger,
             "milestones": encode_milestones(

@@ -219,6 +219,15 @@ def _transplant_into_current_spaces(model, *, tb_log: str | None, hp: dict):
     return fresh
 
 
+def _reload_world_catalog_buffers_if_needed(model) -> None:
+    from re1_rl.features_extractor import RE1WorldAwareExtractor, reload_world_catalog_buffers
+
+    extractor = model.policy.features_extractor
+    if isinstance(extractor, RE1WorldAwareExtractor):
+        reload_world_catalog_buffers(model.policy)
+        print("[train:async] reloaded world catalog buffers from data files", flush=True)
+
+
 def load_async_learner(*, device: str, resume: Path | None, tb_log: str | None):
     """MaskablePPO learner shell; accepts PPO or MaskablePPO checkpoint zips."""
     from sb3_contrib import MaskablePPO
@@ -269,6 +278,7 @@ def load_async_learner(*, device: str, resume: Path | None, tb_log: str | None):
             loaded = _transplant_into_current_spaces(
                 loaded, tb_log=tb_log, hp=hp,
             )
+        _reload_world_catalog_buffers_if_needed(loaded)
         return loaded
 
     return _fresh_maskable()

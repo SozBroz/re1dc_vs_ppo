@@ -28,6 +28,7 @@ from re1_rl.env import ACTION_NAMES, FRAME_SHAPE_CHW
 from re1_rl.episode_history import ACQUISITION_LOG_DIM, ROOM_HISTORY_DIM
 from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM
 from re1_rl.item_affordances import AFFORDANCES_DIM
+from re1_rl.world_state_encoder import WORLD_STATE_DIM
 from re1_rl.key_items import KEYS_HELD_DIM
 from re1_rl.maps_files import MAPS_FILES_DIM
 from re1_rl.milestone_features import MILESTONE_DIM
@@ -52,6 +53,7 @@ GUIDEBOOK_OBS_KEYS = frozenset(
         "room_enemies",
         "keys_held",
         "affordances",
+        "world_state",
         "cutscene_ledger",
         "milestones",
         "maps_files",
@@ -82,6 +84,7 @@ def test_make_re1_spaces_guidebook_keys_match_env() -> None:
     assert obs_space["room_enemies"].shape == (ENEMY_ROSTER_DIM,)
     assert obs_space["keys_held"].shape == (KEYS_HELD_DIM,)
     assert obs_space["affordances"].shape == (AFFORDANCES_DIM,)
+    assert obs_space["world_state"].shape == (WORLD_STATE_DIM,)
     assert obs_space["cutscene_ledger"].shape == (CUTSCENE_LEDGER_DIM,)
     assert obs_space["milestones"].shape == (MILESTONE_DIM,)
     assert obs_space["maps_files"].shape == (MAPS_FILES_DIM,)
