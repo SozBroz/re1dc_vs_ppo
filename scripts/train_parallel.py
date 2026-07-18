@@ -267,7 +267,7 @@ def _build_model(
         n_epochs=4,
         learning_rate=3e-4,
         gamma=0.995,
-        ent_coef=0.05,
+        ent_coef=0.015,
         verbose=1,
         device=device,
         tensorboard_log=tb_log,

@@ -439,7 +439,7 @@ def test_env_illegal_main_hall_failure_reason_exposed():
         == ILLEGAL_MAIN_HALL_FAILURE_REASON
     )
     reward, bd = env._episode_failure_penalty(ILLEGAL_MAIN_HALL_FAILURE_REASON)
-    assert reward == MAIN_HALL_BEFORE_KENNETH_PENALTY == -0.1
+    assert reward == MAIN_HALL_BEFORE_KENNETH_PENALTY == -0.3
     assert bd == {ILLEGAL_MAIN_HALL_FAILURE_REASON: MAIN_HALL_BEFORE_KENNETH_PENALTY}
     assert (
         env._illegal_main_hall_failure_reason(prev, {"room_id": "106", "dead": True})
@@ -907,7 +907,7 @@ def test_dining_scene_change_pays_after_door_split():
 
 
 def test_illegal_main_hall_transition_exact_penalty_no_new_room():
-    """105→106 before Kenneth: exactly -0.1 once, no new_room bonus."""
+    """105→106 before Kenneth: exactly -0.3 once, no new_room bonus."""
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", cam_id=0, hp=96)
@@ -920,7 +920,7 @@ def test_illegal_main_hall_transition_exact_penalty_no_new_room():
     assert (
         bd[ILLEGAL_MAIN_HALL_FAILURE_REASON]
         == MAIN_HALL_BEFORE_KENNETH_PENALTY
-        == -0.1
+        == -0.3
     )
     assert "106" in progress.visited_rooms
 
