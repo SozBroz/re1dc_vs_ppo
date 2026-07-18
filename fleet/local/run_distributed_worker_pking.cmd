@@ -9,6 +9,13 @@ set BASE_PORT=5755
 set N_ENVS=20
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=180
 
+REM Top-right grid seat (5 cols x 4 rows, row-major, spawn/HWND order ≈ rank):
+REM   rank 4 → port 5759 → slot (col=4,row=0). Only that env writes memlog.
+REM Disable: unset RE1_STEP_DIAG_PORT (or set empty) before launch.
+set RE1_STEP_DIAG_PORT=5759
+set RE1_MACHINE_NAME=%MACHINE_NAME%
+set RE1_STEP_DIAG_LOG=D:\re1_rl\data\logs\pking_top_right_memlog.jsonl
+
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role worker ^
   --machine-name %MACHINE_NAME% ^

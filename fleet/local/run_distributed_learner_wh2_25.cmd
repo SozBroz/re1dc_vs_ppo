@@ -1,10 +1,12 @@
 @echo off
-REM workhorse2 learner — 27 local envs (MMF screenshots); sync 180
+REM workhorse2 learner — 32 local envs (MMF screenshots); sync 180
+REM Headroom: soak @27 peaked ~32GB used / 33GB free. Live @32: ~45GB used / ~19GB free,
+REM pages_input=0, pagefile~100MB. Train spikes historically +3-6GB python — still >12GB free.
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE=workhorse2
 set RUN=reward_tune_1040k
-set N_ENVS=27
+set N_ENVS=32
 set BASE_PORT=5555
 set LEARNER_PORT=8765
 set SYNC_INTERVAL_S=180

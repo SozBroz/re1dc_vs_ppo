@@ -187,6 +187,17 @@ def make_env(
             emuhawk_cmd,
             cwd=str(EMUHAWK.parent),
         )
+        # Port→PID claim so the grid tiler can place this window by rank/port
+        # (not HWND discovery order). Title stamp marks the memlog env ★ MEMLOG.
+        # PID→port claim only (file). Do NOT SetWindowText here — touching the
+        # BizHawk UI thread during Lua connect/set_speed wedges the bridge.
+        try:
+            from re1_rl.window_grid import claim_emu_port
+
+            claim_emu_port(int(proc.pid), int(port), project_root=PROJECT_ROOT)
+        except (OSError, ValueError, TypeError) as exc:
+            _phase(f"port claim skipped: {exc!r}")
+
         _phase("waiting for Lua client")
         bridge.wait_for_client()
         _phase("connected; set_speed")
@@ -203,14 +214,24 @@ def make_env(
         env._ram_skip.skip_chunk = skip_chunk
         env._ram_skip.invisible_during_skip = headless
         env.knife_echo_joypad = False
+        # Attach rank on the optional step memlogger (pking top-right diag).
+        if getattr(env, "_step_diag", None) is not None:
+            env._step_diag.rank = int(rank)
 
         # ensure the owned EmuHawk dies with the env (instance-level hook)
         orig_close = env.close
+        emu_pid = int(proc.pid)
 
         def close_with_emu():
             try:
                 orig_close()
             finally:
+                try:
+                    from re1_rl.window_grid import release_emu_port
+
+                    release_emu_port(emu_pid, project_root=PROJECT_ROOT)
+                except (OSError, ValueError, TypeError):
+                    pass
                 try:
                     proc.terminate()
                 except OSError:

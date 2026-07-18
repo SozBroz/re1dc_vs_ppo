@@ -254,6 +254,18 @@ class RE1Env(gym.Env):
         self.frame_skip = frame_skip
         self._sticky_input = StickyInputState()
         self._prev_action: int | None = None
+        # Optional single-env step memlog (RE1_STEP_DIAG_PORT); None for all others.
+        self._step_diag = None
+        try:
+            from re1_rl.step_diag import try_make_logger
+
+            self._step_diag = try_make_logger(
+                getattr(self.bridge, "port", None),
+                project_root=self.project_root,
+                machine_name=os.environ.get("RE1_MACHINE_NAME") or None,
+            )
+        except (OSError, ValueError, TypeError):
+            self._step_diag = None
 
         self.observation_space = spaces.Dict(
             {
@@ -630,6 +642,8 @@ class RE1Env(gym.Env):
         self._box_cache = None
         if getattr(self, "_attack_telemetry", None) is not None:
             self._attack_telemetry.reset_episode()
+        if getattr(self, "_step_diag", None) is not None:
+            self._step_diag.reset_episode()
         rgb = self.bridge.screenshot()
         if self.bridge.emulated_frame >= 0:
             self.bridge.frame_ring.store_rgb(self.bridge.emulated_frame, rgb)
@@ -1781,8 +1795,42 @@ class RE1Env(gym.Env):
 
     def step(self, action: int):
         action = int(action)
+        # Capture the same mask the agent sees for this decision (pre-step state).
+        pre_masks = None
+        diag = getattr(self, "_step_diag", None)
+        if diag is not None:
+            try:
+                pre_masks = self.action_masks()
+            except (OSError, RuntimeError, AttributeError, TypeError, ValueError):
+                pre_masks = None
         try:
-            return self._step_once(action)
+            result = self._step_once(action)
+            if diag is not None:
+                _obs, reward, terminated, truncated, info = result
+                inv = None
+                if isinstance(info, dict):
+                    inv = info.get("inventory")
+                    state = info.get("state")
+                    if inv is None and isinstance(state, dict):
+                        inv = state.get("inventory_slots")
+                aname = None
+                try:
+                    aname = ACTION_NAMES[action]
+                except (IndexError, TypeError):
+                    if isinstance(info, dict):
+                        aname = info.get("action_name")
+                diag.log_step(
+                    reward=float(reward),
+                    terminated=bool(terminated),
+                    truncated=bool(truncated),
+                    action_masks=pre_masks,
+                    inventory_slots=inv,
+                    hooks=None,
+                    info=info if isinstance(info, dict) else None,
+                    action=action,
+                    action_name=aname,
+                )
+            return result
         finally:
             self._prev_action = action
 

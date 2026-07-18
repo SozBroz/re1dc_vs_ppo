@@ -34,7 +34,6 @@ from re1_rl.async_fleet import (  # noqa: E402
     PPO_HYPERPARAMS,
     load_async_learner,
 )
-from re1_rl.reward import SOFTLOCK_GAMMA  # noqa: E402
 from re1_rl.distributed.learner_server import (  # noqa: E402
     LearnerRolloutSink,
     LearnerState,
@@ -265,8 +264,7 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         f"epoch hyperparams lr={DISTRIBUTED_EPOCH_HYPERPARAMS['learning_rate']} "
         f"batch_size={DISTRIBUTED_EPOCH_HYPERPARAMS['batch_size']} "
         f"n_epochs={DISTRIBUTED_EPOCH_HYPERPARAMS['n_epochs']} "
-        f"gamma={DISTRIBUTED_EPOCH_HYPERPARAMS['gamma']} "
-        f"gamma_softlock={SOFTLOCK_GAMMA}",
+        f"gamma={DISTRIBUTED_EPOCH_HYPERPARAMS['gamma']}",
     )
     return model, ckpt_dir
 
@@ -283,11 +281,14 @@ def _maybe_start_grid_tiler(args: argparse.Namespace) -> threading.Event | None:
         gap=int(args.grid_gap),
         monitor=str(args.grid_monitor),
         log_fn=lambda msg: log(args.machine_name, msg),
+        base_port=int(args.base_port),
+        project_root=PROJECT_ROOT,
     )
     log(
         args.machine_name,
         f"window grid tiler started ({args.grid_cols}x{args.grid_rows}, "
-        f"monitor={args.grid_monitor})",
+        f"monitor={args.grid_monitor}, base_port={args.base_port}, "
+        f"place-by-port)",
     )
     return stop
 

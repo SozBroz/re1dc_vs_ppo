@@ -1,11 +1,19 @@
-"""Tile BizHawk/EmuHawk windows across monitors (Windows only)."""
+"""Tile BizHawk/EmuHawk windows across monitors (Windows only).
+
+Placement is by **TCP port** (``port = base_port + rank``), not HWND discovery
+order. Actors claim ``data/emu_port_by_pid/<pid>`` and stamp titles ``[p5759]``.
+The memlog/diag env also gets ``★ MEMLOG`` in the title so it is findable.
+"""
 
 from __future__ import annotations
 
 import ctypes
+import os
+import re
 import threading
 import time
 from ctypes import wintypes
+from pathlib import Path
 from typing import Callable
 
 import mss
@@ -14,7 +22,9 @@ user32 = ctypes.windll.user32
 SWP_NOZORDER = 0x0004
 SWP_SHOWWINDOW = 0x0040
 
-TITLE_NEEDLES = ("bizhawk", "emuhawk", "resident evil")
+TITLE_NEEDLES = ("bizhawk", "emuhawk", "resident evil", "[p")
+_PORT_TITLE_RE = re.compile(r"\[p(\d+)\]")
+_DEFAULT_PORT_MAP = Path("data") / "emu_port_by_pid"
 
 
 class _RECT(ctypes.Structure):
@@ -24,6 +34,64 @@ class _RECT(ctypes.Structure):
         ("right", ctypes.c_long),
         ("bottom", ctypes.c_long),
     ]
+
+
+def port_map_dir(project_root: Path | None = None) -> Path:
+    raw = os.environ.get("RE1_EMU_PORT_MAP", "").strip()
+    if raw:
+        return Path(raw)
+    if project_root is not None:
+        return Path(project_root) / _DEFAULT_PORT_MAP
+    return Path(_DEFAULT_PORT_MAP)
+
+
+def claim_emu_port(pid: int, port: int, *, project_root: Path | None = None) -> Path:
+    """Record which TCP port an EmuHawk process owns (tiler reads this)."""
+    d = port_map_dir(project_root)
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / str(int(pid))
+    path.write_text(str(int(port)), encoding="ascii")
+    return path
+
+
+def release_emu_port(pid: int, *, project_root: Path | None = None) -> None:
+    path = port_map_dir(project_root) / str(int(pid))
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def lookup_port_for_pid(pid: int, *, project_root: Path | None = None) -> int | None:
+    path = port_map_dir(project_root) / str(int(pid))
+    try:
+        return int(path.read_text(encoding="ascii").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def parse_port_from_title(title: str) -> int | None:
+    m = _PORT_TITLE_RE.search(title or "")
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except ValueError:
+        return None
+
+
+def format_emu_title(port: int, *, diag: bool = False) -> str:
+    """Stable title tag so humans and the tiler can find the window."""
+    if diag:
+        return f"[p{int(port)}] ★ MEMLOG"
+    return f"[p{int(port)}]"
+
+
+def slot_index_for_port(port: int, *, base_port: int, expected: int) -> int | None:
+    slot = int(port) - int(base_port)
+    if 0 <= slot < int(expected):
+        return slot
+    return None
 
 
 def list_monitors() -> list[dict[str, int]]:
@@ -93,6 +161,16 @@ def _window_title(hwnd: int) -> str:
     return buf.value
 
 
+def _set_window_title(hwnd: int, title: str) -> None:
+    user32.SetWindowTextW(hwnd, str(title))
+
+
+def _pid_for_hwnd(hwnd: int) -> int:
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    return int(pid.value)
+
+
 def _enum_bizhawk_windows() -> list[tuple[int, str]]:
     out: list[tuple[int, str]] = []
 
@@ -104,13 +182,55 @@ def _enum_bizhawk_windows() -> list[tuple[int, str]]:
         if not title:
             return True
         low = title.casefold()
-        if any(n in low for n in TITLE_NEEDLES):
+        if any(n in low for n in TITLE_NEEDLES) or title.startswith("[p"):
             out.append((hwnd, title))
         return True
 
     user32.EnumWindows(cb, 0)
     out.sort(key=lambda x: x[0])
     return out
+
+
+def find_hwnds_for_pid(pid: int) -> list[int]:
+    want = int(pid)
+    found: list[int] = []
+    for hwnd, _title in _enum_bizhawk_windows():
+        if _pid_for_hwnd(hwnd) == want:
+            found.append(hwnd)
+    return found
+
+
+def stamp_emu_window(
+    pid: int,
+    port: int,
+    *,
+    diag: bool = False,
+    retries: int = 20,
+    delay_s: float = 0.25,
+) -> int | None:
+    """Stamp EmuHawk title with ``[pPORT]`` (and ★ MEMLOG when diag). Return hwnd."""
+    title = format_emu_title(port, diag=diag)
+    hwnd: int | None = None
+    for _ in range(max(1, retries)):
+        hwnds = find_hwnds_for_pid(pid)
+        if hwnds:
+            hwnd = hwnds[0]
+            _set_window_title(hwnd, title)
+            return hwnd
+        time.sleep(delay_s)
+    return None
+
+
+def _resolve_port(
+    hwnd: int,
+    title: str,
+    *,
+    project_root: Path | None,
+) -> int | None:
+    port = parse_port_from_title(title)
+    if port is not None:
+        return port
+    return lookup_port_for_pid(_pid_for_hwnd(hwnd), project_root=project_root)
 
 
 def _window_outer_rect(hwnd: int) -> tuple[int, int, int, int]:
@@ -160,6 +280,9 @@ def tile_loop(
     interval: float = 1.5,
     lock_windows: bool = True,
     log_fn: Callable[[str], None] | None = None,
+    base_port: int = 5755,
+    project_root: Path | None = None,
+    diag_port: int | None = None,
 ) -> None:
     def _log(msg: str) -> None:
         if log_fn is not None:
@@ -168,40 +291,66 @@ def tile_loop(
             print(msg, flush=True)
 
     slots = build_slots(expected, monitors, cols=cols, rows=rows, gap=gap)
-    placed: dict[int, int] = {}
+    # hwnd -> (slot_idx, port)
+    placed: dict[int, tuple[int, int]] = {}
     per_monitor = cols * rows
     lock_note = ", lock=on" if lock_windows else ""
     _log(
-        f"[fleet-grid] tiling up to {expected} windows — "
-        f"{len(monitors)} target monitor(s), {cols}x{rows} grid, gap={gap}px{lock_note}"
+        f"[fleet-grid] tiling up to {expected} windows by port "
+        f"(base_port={base_port}) - {len(monitors)} monitor(s), "
+        f"{cols}x{rows} grid, gap={gap}px{lock_note}"
     )
+    if diag_port is not None:
+        # ASCII-only log text: Windows console often uses cp1252 and will kill
+        # the tiler thread on UnicodeEncodeError for arrows/stars.
+        _log(
+            f"[fleet-grid] memlog/diag port {diag_port} -> slot "
+            f"{diag_port - base_port} title tag '* MEMLOG'"
+        )
     initial_done = False
     while not stop.is_set():
         windows = _enum_bizhawk_windows()
         for hwnd, title in windows:
-            if hwnd in placed:
+            port = _resolve_port(hwnd, title, project_root=project_root)
+            if port is None:
                 continue
-            slot_idx = len(placed)
-            if slot_idx >= expected:
-                break
-            x, y, w, h = slots[slot_idx]
-            _place_window(hwnd, x, y, w, h)
-            placed[hwnd] = slot_idx
-            mon_idx = (slot_idx // per_monitor) % len(monitors)
-            local = slot_idx % per_monitor
-            _log(
-                f"[fleet-grid] window {slot_idx + 1}/{expected} "
-                f"monitor {mon_idx + 1} slot ({local % cols},{local // cols}) — {title!r}"
+            slot_idx = slot_index_for_port(
+                port, base_port=base_port, expected=expected
             )
+            if slot_idx is None:
+                continue
+            want_title = format_emu_title(
+                port, diag=(diag_port is not None and port == diag_port)
+            )
+            x, y, w, h = slots[slot_idx]
+            prev = placed.get(hwnd)
+            if prev is None or prev[0] != slot_idx:
+                _place_window(hwnd, x, y, w, h)
+                # Stamp title only after move, from the tiler (not the actor).
+                if title != want_title:
+                    _set_window_title(hwnd, want_title)
+                placed[hwnd] = (slot_idx, port)
+                mon_idx = (slot_idx // per_monitor) % len(monitors)
+                local = slot_idx % per_monitor
+                # Keep log ASCII (cp1252 consoles); window titles may still use ★.
+                safe_title = want_title.replace("★", "*")
+                _log(
+                    f"[fleet-grid] port {port} -> slot {slot_idx} "
+                    f"monitor {mon_idx + 1} ({local % cols},{local // cols}) "
+                    f"- {safe_title!r}"
+                )
+            else:
+                placed[hwnd] = (slot_idx, port)
+
         if len(placed) >= expected and not initial_done:
-            _log("[fleet-grid] all windows placed")
+            _log("[fleet-grid] all port-mapped windows placed")
             initial_done = True
             if not lock_windows:
                 break
 
         if lock_windows and placed:
             dead: list[int] = []
-            for hwnd, slot_idx in placed.items():
+            for hwnd, (slot_idx, port) in list(placed.items()):
                 if not user32.IsWindow(hwnd):
                     dead.append(hwnd)
                     continue
@@ -210,6 +359,17 @@ def tile_loop(
                 target = (x, y, w, h)
                 if cur != target:
                     _place_window(hwnd, x, y, w, h)
+                # Re-stamp occasionally so BizHawk ROM title churn does not erase MEMLOG.
+                want_title = format_emu_title(
+                    port, diag=(diag_port is not None and port == diag_port)
+                )
+                cur_title = _window_title(hwnd)
+                if cur_title != want_title and "[p" not in (cur_title or ""):
+                    _set_window_title(hwnd, want_title)
+                elif diag_port is not None and port == diag_port and "MEMLOG" not in (
+                    cur_title or ""
+                ):
+                    _set_window_title(hwnd, want_title)
             for hwnd in dead:
                 del placed[hwnd]
 
@@ -228,10 +388,18 @@ def start_grid_tiler(
     lock_windows: bool = True,
     interval: float = 1.5,
     log_fn: Callable[[str], None] | None = None,
+    base_port: int = 5755,
+    project_root: Path | str | None = None,
+    diag_port: int | None = None,
 ) -> tuple[threading.Event, threading.Thread]:
     """Start a daemon thread that tiles BizHawk windows. Returns (stop, thread)."""
     all_monitors = list_monitors()
     target_monitors = pick_monitors(all_monitors, monitor)
+    root = Path(project_root) if project_root is not None else None
+    if diag_port is None:
+        raw = os.environ.get("RE1_STEP_DIAG_PORT", "").strip()
+        if raw.isdigit():
+            diag_port = int(raw)
     stop = threading.Event()
     thread = threading.Thread(
         target=tile_loop,
@@ -245,6 +413,9 @@ def start_grid_tiler(
             "interval": interval,
             "lock_windows": lock_windows,
             "log_fn": log_fn,
+            "base_port": int(base_port),
+            "project_root": root,
+            "diag_port": diag_port,
         },
         name="bizhawk-grid-tiler",
         daemon=True,

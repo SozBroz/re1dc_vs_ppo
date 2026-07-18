@@ -10,6 +10,11 @@ set BASE_PORT=5755
 set N_ENVS=20
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=180
 
+REM Top-right grid seat: rank 4 / port 5759 (see run_distributed_worker_pking.cmd).
+set RE1_STEP_DIAG_PORT=5759
+set RE1_MACHINE_NAME=%MACHINE_NAME%
+set RE1_STEP_DIAG_LOG=D:\re1_rl\data\logs\pking_top_right_memlog.jsonl
+
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role worker ^
   --machine-name %MACHINE_NAME% ^

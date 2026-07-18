@@ -1,5 +1,5 @@
 @echo off
-REM Kill stale learner/local worker, restart WH2 distributed learner (28 local envs).
+REM Kill stale learner/local worker, restart WH2 distributed learner (32 local envs).
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 taskkill /F /IM EmuHawk.exe >nul 2>&1

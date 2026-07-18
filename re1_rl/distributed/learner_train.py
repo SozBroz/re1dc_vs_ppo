@@ -38,8 +38,6 @@ from re1_rl.distributed.weight_store import WeightStore
 
 from re1_rl.distributed.weights import export_policy_state_dict
 
-from re1_rl.reward import SOFTLOCK_GAMMA, spread_softlock_contempt_over_horizon
-
 from re1_rl.training_metrics_log import ensure_training_logger
 
 
@@ -111,8 +109,6 @@ def _release_rollout_arrays(rollouts: list[WorkerRollout]) -> None:
         r.last_values = np.empty(0)
 
         r.action_masks = np.empty(0)
-
-        r.rewards_softlock = None
 
 
 
@@ -188,41 +184,6 @@ def compute_episode_mc_returns(
                 returns[k, env] = g
     advantages = returns - values
     return returns, advantages
-
-
-def compute_dual_gamma_mc_returns(
-    rewards: np.ndarray,
-    rewards_softlock: np.ndarray,
-    dones: np.ndarray,
-    values: np.ndarray,
-    last_values: np.ndarray,
-    *,
-    gamma_main: float,
-    gamma_softlock: float,
-) -> tuple[np.ndarray, np.ndarray]:
-    """MC returns: main channel @ gamma_main + softlock @ gamma_softlock.
-
-    Softlock channel bootstraps to 0 (terminal lump only; V predicts main stream).
-    """
-    main = np.asarray(rewards, dtype=np.float32) - np.asarray(
-        rewards_softlock, dtype=np.float32
-    )
-    ret_main, _ = compute_episode_mc_returns(
-        main, dones, values, last_values, gamma=gamma_main
-    )
-    zeros_boot = np.zeros_like(last_values, dtype=np.float32)
-    ret_soft, _ = compute_episode_mc_returns(
-        np.asarray(rewards_softlock, dtype=np.float32),
-        dones,
-        values,
-        zeros_boot,
-        gamma=gamma_softlock,
-    )
-    returns = ret_main + ret_soft
-    advantages = returns - values
-    return returns.astype(np.float32, copy=False), advantages.astype(
-        np.float32, copy=False
-    )
 
 
 def _normalize_advantages_safe(advantages: np.ndarray) -> np.ndarray:
@@ -314,10 +275,6 @@ def merge_rollouts(rollouts: list[WorkerRollout]) -> dict[str, Any]:
 
     rewards = np.concatenate([r.rewards for r in rollouts], axis=1)
 
-    rewards_softlock = np.concatenate(
-        [r.softlock_rewards() for r in rollouts], axis=1
-    )
-
     dones = np.concatenate([r.dones for r in rollouts], axis=1)
 
     values = np.concatenate([r.values for r in rollouts], axis=1)
@@ -327,13 +284,6 @@ def merge_rollouts(rollouts: list[WorkerRollout]) -> dict[str, Any]:
     last_values = np.concatenate([r.last_values for r in rollouts], axis=0)
 
     action_masks = np.concatenate([r.action_masks for r in rollouts], axis=1)
-
-    spread_softlock_contempt_over_horizon(
-        rewards,
-        rewards_softlock,
-        dones,
-        horizon=n_steps,
-    )
 
     episode_starts = _episode_starts_from_dones(dones)
 
@@ -352,8 +302,6 @@ def merge_rollouts(rollouts: list[WorkerRollout]) -> dict[str, Any]:
         "actions": actions,
 
         "rewards": rewards,
-
-        "rewards_softlock": rewards_softlock,
 
         "dones": dones,
 
@@ -441,17 +389,12 @@ def fill_rollout_buffer(model: MaskablePPO, merged: dict[str, Any]) -> MaskableD
 
     last_values = torch.as_tensor(merged["last_values"], device=model.device)
 
-    softlock = merged.get("rewards_softlock")
-    if softlock is None:
-        softlock = np.zeros_like(merged["rewards"], dtype=np.float32)
-    returns_np, advantages_np = compute_dual_gamma_mc_returns(
+    returns_np, advantages_np = compute_episode_mc_returns(
         merged["rewards"],
-        softlock,
         merged["dones"],
         merged["values"],
         merged["last_values"],
-        gamma_main=float(model.gamma),
-        gamma_softlock=float(SOFTLOCK_GAMMA),
+        gamma=float(model.gamma),
     )
     if not np.isfinite(returns_np).all() or not np.isfinite(advantages_np).all():
         raise ValueError("non-finite MC returns or advantages")

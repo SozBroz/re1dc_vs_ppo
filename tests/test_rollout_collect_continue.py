@@ -68,8 +68,7 @@ def test_collect_rollout_continue_does_not_reset_between_horizons() -> None:
     )
     assert r1.n_steps == 3
     assert r1.n_envs == 2
-    assert r1.rewards_softlock is not None
-    assert r1.rewards_softlock.shape == (3, 2)
+    assert r1.rewards_softlock is None
     # After 3 steps, each env counter is 3 (stored in next obs).
     assert float(obs1["x"][0, 0]) == 3.0
     assert float(obs1["x"][1, 0]) == 3.0

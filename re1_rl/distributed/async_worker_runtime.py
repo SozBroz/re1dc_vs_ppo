@@ -66,15 +66,6 @@ def worker_rollout_from_actor_msg(
         last_values=last_values,
         action_masks=np.expand_dims(masks_arr, 1),
         episode_infos=list(msg.get("episode_infos") or []),
-        rewards_softlock=np.expand_dims(
-            np.asarray(
-                msg["rewards_softlock"][:actual_steps]
-                if msg.get("rewards_softlock") is not None
-                else np.zeros(actual_steps, dtype=np.float32),
-                dtype=np.float32,
-            ),
-            1,
-        ),
     )
 
 
@@ -108,9 +99,6 @@ def pack_rollouts(rollouts: list[WorkerRollout], *, worker_id: str) -> WorkerRol
         last_values=np.concatenate([r.last_values for r in rollouts], axis=0),
         action_masks=np.concatenate([r.action_masks for r in rollouts], axis=1),
         episode_infos=[info for r in rollouts for info in r.episode_infos],
-        rewards_softlock=np.concatenate(
-            [r.softlock_rewards() for r in rollouts], axis=1
-        ),
     )
 
 

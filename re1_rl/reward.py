@@ -13,8 +13,6 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any
 
-import numpy as np
-
 from re1_rl.item_todo import canonical_item
 from re1_rl.key_items import KEY_ITEM_NAMES
 from re1_rl.memory_map import ITEM_IDS, WEAPON_ITEM_IDS
@@ -58,11 +56,12 @@ NEW_WEAPON_PICKUP_BONUS = CHECKPOINT_REWARD
 # removes exactly that reward. Repeating the loop is net zero before step cost.
 SHOTGUN_RETURN_PENALTY = -NEW_WEAPON_PICKUP_BONUS
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
-# Idle contempt: no new room / cutscene / key item / weapon for SOFTLOCK_FRAME_THRESHOLD
-# emulated frames → episode truncation (env). Bulk softlock at timeout only
-# (spread across n_steps on the learner; no per-step stagnant tax).
+# Idle contempt: no new room / cutscene / key item / weapon / story-use / gallery.
+# Grace then linear-rate ramp; episode truncates at SOFTLOCK_FRAME_THRESHOLD.
 # 43200 = 12 min wall-clock @ 60 emulated fps (PS1 NTSC / BizHawk).
 SOFTLOCK_FRAME_THRESHOLD = 12 * 60 * 60
+# First 3 min of no-progress: no extra idle tax (living step cost only).
+CONTEMPT_GRACE_FRAMES = 3 * 60 * 60
 
 JILL_FINE_HP = 96
 # Survival budget: full Fine→1 chip + death terminal = −1× checkpoint.
@@ -74,6 +73,7 @@ DEATH_PENALTY = -DEATH_PENALTY_SCALED
 # Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
 MAIN_HALL_BEFORE_KENNETH_PENALTY = -3.0
 # Doing-nothing contempt must not exceed death (else suicide beats softlock).
+# Ramp 3→12 min spends exactly this budget (no extra terminal lump).
 CONTEMPT_BUDGET_SCALED = DEATH_PENALTY_SCALED
 SOFTLOCK_TIMEOUT_PENALTY = -CONTEMPT_BUDGET_SCALED
 
@@ -86,10 +86,8 @@ AMMO_WASTE_PENALTY = 0.0
 
 REWARD_SCALE = 1.0
 
-# Dual discount: dense/main rewards at RL_GAMMA; softlock spread per env-step @ γ=1
-# so MC sums to the full contempt lump over the digest horizon (n_steps).
+# Dense softlock ramp is already in the scalar reward (bd["softlock"]); one γ.
 RL_GAMMA = 0.99
-SOFTLOCK_GAMMA = 1.0
 
 HP_LOSS_SCALE = NEAR_DEATH_DAMAGE_SCALED / (JILL_FINE_HP - 1)
 # Heal recovers ~80% of the damage channel so chip-then-herb is not free.
@@ -130,6 +128,58 @@ def stagnation_episode_timeout(
     if progress is None:
         return False
     return progress.stagnation_timed_out(threshold=threshold)
+
+
+def contempt_spent_at(
+    frames: int,
+    *,
+    grace: int = CONTEMPT_GRACE_FRAMES,
+    threshold: int = SOFTLOCK_FRAME_THRESHOLD,
+    budget: float = CONTEMPT_BUDGET_SCALED,
+) -> float:
+    """Cumulative idle contempt spent after ``frames`` of no progress.
+
+    Grace is free. From grace→threshold a linear per-frame rate integrates to
+    ``budget`` (quadratic spent curve). If threshold≤grace (short test caps),
+    the full budget applies as a single step when frames reach threshold.
+    """
+    frames = max(0, int(frames))
+    threshold = max(0, int(threshold))
+    grace = min(max(0, int(grace)), threshold)
+    budget = float(budget)
+    if budget <= 0.0:
+        return 0.0
+    ramp = threshold - grace
+    # No ramp room (short test caps): full budget on the timeout step.
+    if ramp <= 0:
+        return budget if frames >= threshold else 0.0
+    if frames <= grace:
+        return 0.0
+    if frames >= threshold:
+        return budget
+    x = float(frames - grace)
+    return budget * (x / float(ramp)) ** 2
+
+
+def contempt_penalty_delta(
+    frames_before: int,
+    frames_after: int,
+    *,
+    grace: int = CONTEMPT_GRACE_FRAMES,
+    threshold: int = SOFTLOCK_FRAME_THRESHOLD,
+    budget: float = CONTEMPT_BUDGET_SCALED,
+) -> float:
+    """Negative reward for idle-frame advance; 0 if the clock did not increase."""
+    before = max(0, int(frames_before))
+    after = max(0, int(frames_after))
+    if after <= before:
+        return 0.0
+    spent = contempt_spent_at(
+        after, grace=grace, threshold=threshold, budget=budget
+    ) - contempt_spent_at(
+        before, grace=grace, threshold=threshold, budget=budget
+    )
+    return -float(spent)
 
 
 def potential(
@@ -361,60 +411,20 @@ def compute_reward(
             or bd["new_weapon"] != 0.0
         )
         # Pause idle clock during cutscenes / doors (not in_control).
+        frames_before = progress.stagnation_frames
         if made_progress or bool(state.get("in_control", True)):
             progress.note_stagnation_step(
                 made_progress=made_progress,
                 step_frames=step_frames,
             )
-        if progress.stagnation_timed_out(threshold=softlock_threshold):
-            bd["softlock"] = SOFTLOCK_TIMEOUT_PENALTY
+            if not made_progress:
+                bd["softlock"] = contempt_penalty_delta(
+                    frames_before,
+                    progress.stagnation_frames,
+                    threshold=softlock_threshold,
+                )
 
     reward = float(sum(bd.values())) * REWARD_SCALE
     if return_breakdown:
         return reward, bd
     return reward
-
-
-def softlock_reward_from_breakdown(breakdown: dict[str, float] | None) -> float:
-    """Scaled softlock channel contribution (0 when absent)."""
-    if not breakdown:
-        return 0.0
-    return float(breakdown.get("softlock", 0.0)) * REWARD_SCALE
-
-
-def spread_softlock_contempt_over_horizon(
-    rewards: np.ndarray,
-    rewards_softlock: np.ndarray,
-    dones: np.ndarray,
-    *,
-    horizon: int,
-) -> None:
-    """Spread terminal softlock lumps uniformly over the last ``horizon`` env-steps.
-
-    Mutates arrays in place. Keeps ``rewards - rewards_softlock`` (main channel)
-    unchanged while the softlock channel sums to the original lump per segment.
-    """
-    if horizon <= 0:
-        return
-    rewards = np.asarray(rewards, dtype=np.float32)
-    rewards_softlock = np.asarray(rewards_softlock, dtype=np.float32)
-    dones = np.asarray(dones, dtype=np.bool_)
-    n_steps, n_envs = rewards.shape
-    for env in range(n_envs):
-        for t in range(n_steps):
-            lump = float(rewards_softlock[t, env])
-            if lump >= 0.0:
-                continue
-            seg_start = 0
-            for k in range(t - 1, -1, -1):
-                if dones[k, env]:
-                    seg_start = k + 1
-                    break
-            win_start = max(seg_start, t - horizon + 1)
-            span = t - win_start + 1
-            per = lump / span
-            for k in range(win_start, t):
-                rewards_softlock[k, env] += per
-                rewards[k, env] += per
-            rewards_softlock[t, env] = per
-            rewards[t, env] += per - lump

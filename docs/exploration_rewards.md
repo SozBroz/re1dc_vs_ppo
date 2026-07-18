@@ -113,9 +113,12 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
   she replaces it on the rack. A repeated take/replace loop is therefore net
   zero before step cost; leaving with the shotgun preserves the pickup reward.
 - Weapon ammunition increases caused by reloading are not weapon pickups.
-- New rooms, cutscenes, key items, story uses, and weapon pickups reset the
-  stagnation clock. This restores up to the full **43,200 emulated frames
-  (12 minutes at 60 fps)** rather than adding a fixed number of frames.
+- New rooms, cutscenes, key items, story uses, gallery pays, and weapon pickups
+  reset the stagnation clock (junk/ammo loops do not). Idle contempt: **3 min
+  grace**, then a linear-rate ramp **3→12 min** integrating to the **death
+  penalty (~0.333)** (not the full −1 survival budget); progress resets the
+  clock. Truncate at 12 min of no progress. Dense in scalar reward under main
+  γ (**0.99**) — no separate softlock MC channel / no terminal bulk lump.
 
 ## Agent rules
 

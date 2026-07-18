@@ -9,22 +9,12 @@ from stable_baselines3.common.vec_env import VecEnv
 
 from re1_rl.distributed.inference_policy import InferencePolicy
 from re1_rl.distributed.rollout_types import WorkerRollout
-from re1_rl.reward import softlock_reward_from_breakdown
 
 
 def _stack_action_masks(vec_env: VecEnv) -> np.ndarray:
     """Fetch per-env bool masks via ActionMasker / env.action_masks()."""
     masks = vec_env.env_method("action_masks")
     return np.stack([np.asarray(m, dtype=bool) for m in masks], axis=0)
-
-
-def _softlock_from_infos(infos: list[dict[str, Any]], n_envs: int) -> np.ndarray:
-    out = np.zeros(n_envs, dtype=np.float32)
-    for i, info in enumerate(infos):
-        if not info:
-            continue
-        out[i] = softlock_reward_from_breakdown(info.get("reward_breakdown"))
-    return out
 
 
 def collect_rollout(
@@ -52,7 +42,6 @@ def collect_rollout(
 
     actions = np.zeros((n_steps, n_envs), dtype=np.int64)
     rewards = np.zeros((n_steps, n_envs), dtype=np.float32)
-    rewards_softlock = np.zeros((n_steps, n_envs), dtype=np.float32)
     dones = np.zeros((n_steps, n_envs), dtype=np.bool_)
     values = np.zeros((n_steps, n_envs), dtype=np.float32)
     log_probs = np.zeros((n_steps, n_envs), dtype=np.float32)
@@ -74,7 +63,6 @@ def collect_rollout(
 
         obs, rew, done, infos = vec_env.step(act)
         rewards[step] = rew
-        rewards_softlock[step] = _softlock_from_infos(list(infos), n_envs)
         dones[step] = done
         for info in infos:
             if info:
@@ -96,6 +84,5 @@ def collect_rollout(
         last_values=last_values,
         action_masks=action_masks,
         episode_infos=episode_infos,
-        rewards_softlock=rewards_softlock,
     )
     return rollout, obs

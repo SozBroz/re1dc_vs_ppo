@@ -299,7 +299,6 @@ def _actor_process(
     screenshot_mmf: bool | None = None,
 ) -> None:
     from scripts.train_parallel import make_env
-    from re1_rl.reward import softlock_reward_from_breakdown
     from re1_rl.training_progress import slim_progress_info
 
     try:
@@ -336,7 +335,6 @@ def _actor_process(
     mask_bufs: np.ndarray | None = None
     actions = np.zeros(n_steps, dtype=np.int64)
     rewards = np.zeros(n_steps, dtype=np.float32)
-    rewards_softlock = np.zeros(n_steps, dtype=np.float32)
     dones = np.zeros(n_steps, dtype=np.bool_)
     values = np.zeros(n_steps, dtype=np.float32)
     log_probs = np.zeros(n_steps, dtype=np.float32)
@@ -366,7 +364,6 @@ def _actor_process(
                 "obs": {k: v[:n].copy() for k, v in obs_bufs.items()},
                 "actions": actions[:n].copy(),
                 "rewards": rewards[:n].copy(),
-                "rewards_softlock": rewards_softlock[:n].copy(),
                 "dones": dones[:n].copy(),
                 "values": values[:n].copy(),
                 "log_probs": log_probs[:n].copy(),
@@ -401,6 +398,13 @@ def _actor_process(
 
             obs_before = obs
             masks_before = masks_now
+            # Top-right memlog (RE1_STEP_DIAG_PORT): stash critic V for this step.
+            try:
+                _diag = getattr(getattr(env, "unwrapped", env), "_step_diag", None)
+                if _diag is not None:
+                    _diag.note_value(value)
+            except (AttributeError, TypeError, ValueError):
+                pass
             obs, rew, done, trunc, info = env.step(action)
             if info:
                 episode_infos.append(slim_progress_info(info))
@@ -420,9 +424,6 @@ def _actor_process(
             values[step_i] = value
             log_probs[step_i] = logprob
             rewards[step_i] = float(rew)
-            rewards_softlock[step_i] = softlock_reward_from_breakdown(
-                (info or {}).get("reward_breakdown")
-            )
             dones[step_i] = bool(done or trunc)
             step_i += 1
 
@@ -638,15 +639,6 @@ def run_async_fleet_training(
                             np.asarray(msg["action_masks"], dtype=np.bool_), 1
                         ),
                         episode_infos=list(msg.get("episode_infos") or []),
-                        rewards_softlock=np.expand_dims(
-                            np.asarray(
-                                msg.get("rewards_softlock")
-                                if msg.get("rewards_softlock") is not None
-                                else np.zeros_like(msg["rewards"]),
-                                dtype=np.float32,
-                            ),
-                            1,
-                        ),
                     )
                 )
                 pending_steps += n_steps

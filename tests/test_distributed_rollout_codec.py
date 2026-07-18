@@ -43,8 +43,6 @@ def _sample_rollout() -> WorkerRollout:
 
 def test_rollout_codec_roundtrip() -> None:
     original = _sample_rollout()
-    original.rewards_softlock = np.zeros_like(original.rewards, dtype=np.float32)
-    original.rewards_softlock[-1, 0] = -0.8
     blob = encode_rollout(original)
     restored = decode_rollout(blob)
     assert restored.worker_id == original.worker_id
@@ -56,7 +54,11 @@ def test_rollout_codec_roundtrip() -> None:
     assert np.array_equal(restored.actions, original.actions)
     assert np.array_equal(restored.last_values, original.last_values)
     assert np.array_equal(restored.action_masks, original.action_masks)
-    assert np.array_equal(restored.softlock_rewards(), original.rewards_softlock)
+    # Legacy softlock channel optional; absent → zeros via softlock_rewards().
+    assert np.array_equal(
+        restored.softlock_rewards(),
+        np.zeros_like(original.rewards, dtype=np.float32),
+    )
 
 
 def test_rollout_codec_rejects_missing_masks() -> None:

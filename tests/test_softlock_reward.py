@@ -1,32 +1,30 @@
-"""Stagnation: bulk softlock at timeout; spread over n_steps on learner."""
+"""Stagnation: grace then ramping softlock in scalar reward."""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from re1_rl.distributed.learner_train import compute_dual_gamma_mc_returns
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
     CONTEMPT_BUDGET_SCALED,
+    CONTEMPT_GRACE_FRAMES,
     DEATH_PENALTY,
     DEATH_PENALTY_SCALED,
     ITEM_PICKUP_BONUS,
     NEW_ROOM_BONUS,
     REFERENCE_STEP_FRAMES,
-    REWARD_SCALE,
     SOFTLOCK_FRAME_THRESHOLD,
-    SOFTLOCK_GAMMA,
     SOFTLOCK_TIMEOUT_PENALTY,
+    SURVIVAL_BUDGET_SCALED,
+    contempt_penalty_delta,
+    contempt_spent_at,
     stagnation_episode_timeout,
     compute_reward,
-    softlock_reward_from_breakdown,
-    spread_softlock_contempt_over_horizon,
 )
 from tests.test_scaffolding import make_planner, make_state
 
@@ -55,41 +53,27 @@ def _step(
 def test_softlock_matches_death_budget():
     assert CONTEMPT_BUDGET_SCALED == pytest.approx(DEATH_PENALTY_SCALED)
     assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-DEATH_PENALTY_SCALED)
-    assert softlock_reward_from_breakdown(
-        {"softlock": SOFTLOCK_TIMEOUT_PENALTY}
-    ) == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY * REWARD_SCALE)
+    assert CONTEMPT_BUDGET_SCALED < SURVIVAL_BUDGET_SCALED
 
 
-def test_no_per_step_stagnant_tax():
+def test_grace_has_no_softlock_tax():
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", step=0)
-    for i in range(1, 200):
+    step_frames = REFERENCE_STEP_FRAMES
+    steps = CONTEMPT_GRACE_FRAMES // step_frames
+    softlock_sum = 0.0
+    for i in range(1, steps + 1):
         cur = make_state(room="105", step=i)
-        _, bd = _step(progress, prev, cur)
-        assert bd["softlock"] == 0.0
+        _, bd = _step(progress, prev, cur, step_frames=step_frames)
+        softlock_sum += bd["softlock"]
         prev = cur
+    assert progress.stagnation_frames == steps * step_frames
+    assert progress.stagnation_frames <= CONTEMPT_GRACE_FRAMES
+    assert softlock_sum == pytest.approx(0.0)
 
 
-def test_stagnation_timeout_applies_bulk_softlock():
-    progress = ProgressTracker()
-    progress.first_visit("105")
-    threshold = 40
-    step_frames = 4
-    prev = make_state(room="105", step=0)
-    bd = None
-    for i in range(1, 11):
-        cur = make_state(room="105", step=i)
-        _, bd = _step(
-            progress, prev, cur, step_frames=step_frames, softlock_threshold=threshold
-        )
-        prev = cur
-    assert stagnation_episode_timeout(progress, threshold=threshold)
-    assert bd is not None
-    assert bd["softlock"] == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY)
-
-
-def test_contempt_equals_death_budget_not_greater():
+def test_ramp_integral_equals_death_budget_not_survival():
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", step=0)
@@ -104,52 +88,67 @@ def test_contempt_equals_death_budget_not_greater():
         prev = cur
     assert stagnation_episode_timeout(progress, threshold=threshold)
     contempt = -softlock_sum
-    assert contempt == pytest.approx(CONTEMPT_BUDGET_SCALED)
+    assert contempt == pytest.approx(CONTEMPT_BUDGET_SCALED, rel=1e-5)
     assert contempt <= DEATH_PENALTY_SCALED + 1e-9
+    assert contempt < SURVIVAL_BUDGET_SCALED
+
+
+def test_contempt_spent_quadratic_mid_ramp():
+    grace = CONTEMPT_GRACE_FRAMES
+    threshold = SOFTLOCK_FRAME_THRESHOLD
+    ramp = threshold - grace
+    mid = grace + ramp // 2
+    spent = contempt_spent_at(mid)
+    assert spent == pytest.approx(CONTEMPT_BUDGET_SCALED * 0.25, rel=1e-6)
+    assert contempt_spent_at(grace) == pytest.approx(0.0)
+    assert contempt_spent_at(threshold) == pytest.approx(CONTEMPT_BUDGET_SCALED)
+
+
+def test_short_threshold_falls_back_to_bulk_at_timeout():
+    """When threshold ≤ grace, full budget hits on the timeout step."""
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    threshold = 40
+    step_frames = 4
+    prev = make_state(room="105", step=0)
+    bd = None
+    softlock_sum = 0.0
+    for i in range(1, 11):
+        cur = make_state(room="105", step=i)
+        _, bd = _step(
+            progress, prev, cur, step_frames=step_frames, softlock_threshold=threshold
+        )
+        softlock_sum += bd["softlock"]
+        prev = cur
+    assert stagnation_episode_timeout(progress, threshold=threshold)
+    assert bd is not None
+    assert softlock_sum == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY)
+    assert bd["softlock"] == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY)
 
 
 def test_death_penalty_not_weaker_than_softlock_contempt():
     assert abs(DEATH_PENALTY) == pytest.approx(CONTEMPT_BUDGET_SCALED)
 
 
-def test_spread_softlock_uniform_over_horizon():
-    rewards = np.zeros((4, 1), dtype=np.float32)
-    rewards[3, 0] = -1.0
-    softlock = np.zeros((4, 1), dtype=np.float32)
-    softlock[3, 0] = -1.0
-    dones = np.zeros((4, 1), dtype=np.bool_)
-    dones[3, 0] = True
-    spread_softlock_contempt_over_horizon(
-        rewards, softlock, dones, horizon=4
-    )
-    assert softlock[:, 0] == pytest.approx(-0.25)
-    assert rewards[:, 0] == pytest.approx(-0.25)
-    # main channel unchanged
-    assert (rewards - softlock)[:, 0] == pytest.approx(0.0)
-
-
-def test_spread_softlock_mc_sums_to_lump():
-    n = 4
-    lump = -CONTEMPT_BUDGET_SCALED
-    rewards = np.zeros((n, 1), dtype=np.float32)
-    rewards[-1, 0] = lump
-    softlock = np.zeros((n, 1), dtype=np.float32)
-    softlock[-1, 0] = lump
-    dones = np.zeros((n, 1), dtype=np.bool_)
-    dones[-1, 0] = True
-    spread_softlock_contempt_over_horizon(rewards, softlock, dones, horizon=n)
-    values = np.zeros_like(rewards)
-    last_values = np.array([0.0], dtype=np.float32)
-    returns, _ = compute_dual_gamma_mc_returns(
-        rewards,
-        softlock,
-        dones,
-        values,
-        last_values,
-        gamma_main=0.99,
-        gamma_softlock=SOFTLOCK_GAMMA,
-    )
-    assert returns[0, 0] == pytest.approx(lump, rel=1e-5)
+def test_progress_resets_ramp():
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    progress.rewarded_cutscenes.add("104:0:s0")
+    prev = make_state(room="105", step=0)
+    # Sit past grace into the ramp.
+    progress._stagnation_frames = CONTEMPT_GRACE_FRAMES + 600
+    assert contempt_spent_at(progress.stagnation_frames) > 0.0
+    cur = make_state(room="106", step=1)
+    _, bd = _step(progress, prev, cur, step_frames=REFERENCE_STEP_FRAMES)
+    assert bd["new_room"] == NEW_ROOM_BONUS
+    assert bd["softlock"] == 0.0
+    assert progress.stagnation_frames == 0
+    # Fresh grace after reset.
+    prev = cur
+    cur = make_state(room="106", step=2)
+    _, bd = _step(progress, prev, cur, step_frames=REFERENCE_STEP_FRAMES)
+    assert bd["softlock"] == 0.0
+    assert progress.stagnation_frames == REFERENCE_STEP_FRAMES
 
 
 def test_room_loop_without_new_visits_accumulates_stagnation():
@@ -307,3 +306,15 @@ def test_long_step_advances_stagnation_proportionally():
     long_step = make_state(room="105", step=2)
     _step(progress, short, long_step, step_frames=120)
     assert progress.stagnation_frames == 120
+
+
+def test_contempt_penalty_delta_monotonic():
+    g = CONTEMPT_GRACE_FRAMES
+    a = g + 1000
+    b = g + 2000
+    d1 = contempt_penalty_delta(g, a)
+    d2 = contempt_penalty_delta(a, b)
+    assert d1 < 0.0
+    assert d2 < 0.0
+    # Later slices of the linear-rate ramp are steeper.
+    assert abs(d2) > abs(d1)
