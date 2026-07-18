@@ -365,15 +365,15 @@
     "door_edges": [],
     "notes": "Decoded at MO terminal, not a floor pickup",
     "pickup_rooms": [
-      "213",
       "217",
+      "213",
       "306",
       "30B"
     ],
     "rooms": [
       "508",
-      "213",
       "217",
+      "213",
       "306",
       "30B"
     ],
@@ -453,13 +453,11 @@
     "door_edges": [],
     "notes": "Search Richard's body twice after giving him serum (pillar passage)",
     "pickup_rooms": [
-      "100",
-      "102"
+      "100"
     ],
     "rooms": [
       "20D",
-      "100",
-      "102"
+      "100"
     ],
     "use_rooms": [
       "20D"
@@ -536,43 +534,6 @@
     ],
     "use_rooms": [
       "205"
-    ]
-  },
-  "sword_key": {
-    "door_edges": [
-      {
-        "door_id": "107->108",
-        "from_room": "107",
-        "to_room": "108"
-      },
-      {
-        "door_id": "104->10F",
-        "from_room": "104",
-        "to_room": "10F"
-      },
-      {
-        "door_id": "103->10E",
-        "from_room": "103",
-        "to_room": "10E"
-      }
-    ],
-    "notes": "Chris-only. Same three doors Jill opens with lockpick. Pickup: Mansion Save Room bed.",
-    "pickup_rooms": [
-      "100"
-    ],
-    "rooms": [
-      "107",
-      "104",
-      "103",
-      "108",
-      "10F",
-      "10E",
-      "100"
-    ],
-    "use_rooms": [
-      "107",
-      "104",
-      "103"
     ]
   },
   "umb_no2": {

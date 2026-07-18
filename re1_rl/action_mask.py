@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from re1_rl.ammo_accounting import can_fire_weapon
+from re1_rl.ammo_accounting import can_fire_from_equipped_slot
 from re1_rl.item_use import any_legal_use_slot, slot_legal_for_use
 from re1_rl.story_item_use import (
     any_legal_story_use_slot,
@@ -153,7 +153,9 @@ def action_mask(
             wid = int(equipped_weapon_id)
             legal = legal and wid in EQUIPPABLE_WEAPON_IDS
             if legal and wid != KNIFE_ID and inventory is not None:
-                legal = can_fire_weapon(inventory, wid)
+                legal = can_fire_from_equipped_slot(
+                    inventory, wid, equipped_slot_0based
+                )
         else:
             wid = None
         if legal and mask_combat_without_enemies:

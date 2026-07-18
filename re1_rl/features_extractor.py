@@ -12,7 +12,7 @@ from stable_baselines3.common.type_aliases import TensorDict
 from torch import nn
 
 from re1_rl.item_affordances import KEY_HINTS_DIM
-from re1_rl.obs_encoder import PROPRIO_FIELDS
+from re1_rl.obs_encoder import MAX_ITEM_ID, PROPRIO_FIELDS
 from re1_rl.world_catalog import MAX_NEIGHBORS, NUM_ROOMS, WorldCatalog
 
 _DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -20,15 +20,15 @@ _DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # ``proprio`` field index for normalized room table index (/ 128).
 PROPRIO_ROOM_INDEX = next(i for i, (name, _) in enumerate(PROPRIO_FIELDS) if name == "room_index")
 
-# Dynamic mansion memory layout (~475); see docs/world_aware_nn_architecture.md.
-NUM_PICKUP_ROWS = 121
+# Dynamic mansion memory layout (~471); see docs/world_aware_nn_architecture.md.
+NUM_PICKUP_ROWS = 119
 PICKUP_ACTIVE_OFF = 0
 PICKUP_GATED_OFF = NUM_PICKUP_ROWS
 ROOM_REMAINING_OFF = PICKUP_GATED_OFF + NUM_PICKUP_ROWS
 KEY_PENDING_OFF = ROOM_REMAINING_OFF + NUM_ROOMS
 WORLD_STATE_DIM = KEY_PENDING_OFF + KEY_HINTS_DIM
 
-WORLD_CONTEXT_DIM = 64
+WORLD_CONTEXT_DIM = 128
 WORLD_MLP_HIDDEN = 256
 
 # Processed by WorldMLP — not flattened into the legacy concat path.
@@ -39,13 +39,22 @@ def _flatten_dim(space: spaces.Space) -> int:
     return int(get_flattened_obs_dim(space))
 
 
-def _world_mlp_input_dim(num_keys: int) -> int:
+def _world_mlp_input_dim(
+    num_keys: int,
+    *,
+    num_files: int,
+    num_combine: int,
+    file_code_width: int,
+) -> int:
     """Static size of the world-context MLP input vector."""
     room_topo = MAX_NEIGHBORS + 1 + 1 + 1 + MAX_NEIGHBORS  # neighbors, degree, area, stage, link
     pickup_join_scalars = 4
     gated_join_scalars = 2
     room_rem_scalars = 2
     key_join = num_keys * 4  # pickup / use / unlock / door_from
+    file_join_scalars = 4
+    file_codes = file_code_width * 2  # held + in-room weighted sums
+    combine_join_scalars = 4
     return (
         room_topo
         + NUM_PICKUP_ROWS
@@ -56,6 +65,11 @@ def _world_mlp_input_dim(num_keys: int) -> int:
         + gated_join_scalars
         + room_rem_scalars
         + key_join
+        + file_join_scalars
+        + file_codes
+        + num_files
+        + combine_join_scalars
+        + num_combine
     )
 
 
@@ -89,7 +103,12 @@ class RE1WorldAwareExtractor(BaseFeaturesExtractor):
         if frame_space is None:
             raise ValueError("observation_space must include 'frame'")
 
-        world_mlp_in = _world_mlp_input_dim(catalog.num_keys)
+        world_mlp_in = _world_mlp_input_dim(
+            catalog.num_keys,
+            num_files=catalog.num_files,
+            num_combine=catalog.num_combine,
+            file_code_width=catalog.file_code_width,
+        )
         features_dim = cnn_output_dim + flat_dim + WORLD_CONTEXT_DIM
         super().__init__(observation_space, features_dim=features_dim)
 
@@ -112,10 +131,13 @@ class RE1WorldAwareExtractor(BaseFeaturesExtractor):
         )
 
         for name, tensor in catalog.as_torch_buffers().items():
-            self.register_buffer(name, tensor, persistent=True)
+            self.register_buffer(name, tensor, persistent=False)
 
         self._num_pickups = catalog.num_pickups
         self._num_keys = catalog.num_keys
+        self._num_files = catalog.num_files
+        self._num_combine = catalog.num_combine
+        self._file_code_width = catalog.file_code_width
 
     def _room_index(self, proprio: th.Tensor) -> th.Tensor:
         raw = proprio[:, PROPRIO_ROOM_INDEX] * 128.0
@@ -133,6 +155,14 @@ class RE1WorldAwareExtractor(BaseFeaturesExtractor):
         if self._has_key_hints:
             return observations["key_hints"]
         return ws[:, KEY_PENDING_OFF : KEY_PENDING_OFF + KEY_HINTS_DIM]
+
+    def _inventory_item_ids(self, observations: TensorDict) -> th.Tensor:
+        inv = observations.get("inventory")
+        if inv is None:
+            batch = observations["proprio"].shape[0]
+            device = observations["proprio"].device
+            return th.zeros(batch, 8, device=device, dtype=th.float32)
+        return inv[:, 0::2] * float(MAX_ITEM_ID)
 
     def _build_world_features(self, observations: TensorDict) -> th.Tensor:
         proprio = observations["proprio"]
@@ -182,6 +212,34 @@ class RE1WorldAwareExtractor(BaseFeaturesExtractor):
         unlock_join = ku * self.key_unlock_room.unsqueeze(0)
         door_join = ka * self.key_door_from.unsqueeze(0)
 
+        inv_ids = self._inventory_item_ids(observations)
+        file_in_room = (self.file_room_idx.unsqueeze(0) == room.unsqueeze(-1)).float()
+        file_held = (inv_ids.unsqueeze(-1) == self.file_id.unsqueeze(0).unsqueeze(0)).any(dim=1).float()
+        file_join = th.stack(
+            [
+                (file_in_room * self.file_id.unsqueeze(0)).sum(dim=1),
+                file_in_room.sum(dim=1),
+                (file_held * self.file_id.unsqueeze(0)).sum(dim=1),
+                file_held.sum(dim=1),
+            ],
+            dim=-1,
+        )
+        held_codes = file_held @ self.file_code_const
+        in_room_codes = file_in_room @ self.file_code_const
+
+        has_a = (inv_ids.unsqueeze(-1) == self.combine_src_a.unsqueeze(0).unsqueeze(0)).any(dim=1)
+        has_b = (inv_ids.unsqueeze(-1) == self.combine_src_b.unsqueeze(0).unsqueeze(0)).any(dim=1)
+        recipe_avail = (has_a & has_b).float()
+        combine_join = th.stack(
+            [
+                (recipe_avail * self.combine_dst.unsqueeze(0)).sum(dim=1),
+                recipe_avail.sum(dim=1),
+                (recipe_avail * self.combine_src_a.unsqueeze(0)).sum(dim=1),
+                (recipe_avail * self.combine_src_b.unsqueeze(0)).sum(dim=1),
+            ],
+            dim=-1,
+        )
+
         return th.cat(
             [
                 room_topo,
@@ -197,6 +255,12 @@ class RE1WorldAwareExtractor(BaseFeaturesExtractor):
                 ku_join,
                 unlock_join,
                 door_join,
+                file_join,
+                held_codes,
+                in_room_codes,
+                file_in_room,
+                combine_join,
+                recipe_avail,
             ],
             dim=-1,
         )

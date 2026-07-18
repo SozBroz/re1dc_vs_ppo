@@ -2,10 +2,15 @@
 
 These buffers are **not** shipped in worker rollouts. The learner/policy rebuilds
 them via ``register_buffer`` using ``WorldCatalog.as_torch_buffers()``.
+
+Room topology is restricted to the 116 IDs in ``data/rooms.json``. ``RoomGraph``
+and ``map_neighbors`` drop RDT-only phantom endpoints (6xx debug codes, stray
+``51D``, etc.) so neighbor indices never point outside the padded 128-slot table.
 """
 
 from __future__ import annotations
 
+import functools
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,7 +21,7 @@ import numpy as np
 from re1_rl.item_todo import RoomItems, canonical_item
 from re1_rl.key_items import KEY_ITEM_NAMES
 from re1_rl.memory_map import ITEM_IDS
-from re1_rl.room_graph import RoomGraph
+from re1_rl.room_graph import RoomGraph, load_valid_rooms
 
 NUM_ROOMS = 128
 PAD_ROOM = 127
@@ -74,6 +79,31 @@ def _item_id_for_name(name: str) -> int:
     return int(_NAME_TO_ITEM_ID.get(canonical_item(name), 0))
 
 
+def _pickup_sites_by_key(room_items: RoomItems) -> dict[str, set[str]]:
+    sites: dict[str, set[str]] = {}
+    for room_id in room_items.rooms:
+        for item in room_items.items_in_room(room_id):
+            cname = canonical_item(str(item.get("name", "")))
+            sites.setdefault(cname, set()).add(str(room_id))
+    return sites
+
+
+def _best_pickup_room(
+    pickup_rooms: list[str],
+    key_name: str,
+    room_index: dict[str, int],
+    pickup_sites: dict[str, set[str]],
+) -> str | None:
+    """First listed room in ``room_index`` with a catalog pickup row; mo_disc prefers 217."""
+    cname = canonical_item(key_name)
+    candidates = [r for r in pickup_rooms if r in room_index and r in pickup_sites.get(cname, ())]
+    if not candidates:
+        return None
+    if cname == "mo_disc" and "217" in candidates:
+        return "217"
+    return candidates[0]
+
+
 @dataclass
 class WorldCatalog:
     """Frozen Evil Resource almanac for the 116-room mansion table (+ pad)."""
@@ -120,13 +150,20 @@ class WorldCatalog:
 
     @classmethod
     def from_files(cls, project_root: str | Path) -> WorldCatalog:
-        root = Path(project_root)
+        return _cached_world_catalog(str(Path(project_root).resolve()))
+
+    @classmethod
+    def _from_files_uncached(cls, root: Path) -> WorldCatalog:
         data = root / "data"
         rooms_path = data / "rooms.json"
         room_index = _room_table(rooms_path)
         rooms_meta = _load_json(rooms_path)
 
-        graph = RoomGraph(data / "doors_empirical.json", data / "doors_rdt.json")
+        graph = RoomGraph(
+            data / "doors_empirical.json",
+            data / "doors_rdt.json",
+            valid_rooms=load_valid_rooms(rooms_path),
+        )
         room_areas = _load_json(data / "room_areas.json")
         item_categories = _load_json(data / "item_categories.json")
         affordances = _load_json(data / "item_affordances.json")
@@ -139,7 +176,7 @@ class WorldCatalog:
         cat._build_topology(graph, room_index)
         cat._build_room_tags(rooms_meta, room_areas, room_index)
         cat._build_pickups(room_items, item_categories, room_index)
-        cat._build_key_buffers(affordances, room_index)
+        cat._build_key_buffers(affordances, room_index, room_items)
         cat._build_link_requires_key(affordances, room_index)
         cat._build_files(er_files, room_index)
         cat._build_combine(combine_recipes)
@@ -207,7 +244,13 @@ class WorldCatalog:
                 if cname in _KEY_NAME_TO_INDEX:
                     self.pickup_requires_mask[i, _KEY_NAME_TO_INDEX[cname]] = 1.0
 
-    def _build_key_buffers(self, affordances: dict[str, Any], room_index: dict[str, int]) -> None:
+    def _build_key_buffers(
+        self,
+        affordances: dict[str, Any],
+        room_index: dict[str, int],
+        room_items: RoomItems,
+    ) -> None:
+        pickup_sites = _pickup_sites_by_key(room_items)
         k = len(KEY_ITEM_NAMES)
         self.key_pickup_room = np.full(k, PAD_ROOM, dtype=np.float32)
         self.key_use_room = np.full(k, PAD_ROOM, dtype=np.float32)
@@ -219,8 +262,9 @@ class WorldCatalog:
             self.key_item_id[i] = float(_item_id_for_name(name))
             entry = affordances.get(name, {})
             pickups = entry.get("pickup_rooms") or []
-            if pickups:
-                self.key_pickup_room[i] = float(_room_idx(room_index, pickups[0]))
+            best = _best_pickup_room(pickups, name, room_index, pickup_sites)
+            if best is not None:
+                self.key_pickup_room[i] = float(_room_idx(room_index, best))
             use_rooms = entry.get("use_rooms") or []
             if use_rooms:
                 self.key_use_room[i] = float(_room_idx(room_index, use_rooms[0]))
@@ -349,3 +393,8 @@ class WorldCatalog:
         ):
             out[name] = torch.from_numpy(getattr(self, name))
         return out
+
+
+@functools.lru_cache(maxsize=4)
+def _cached_world_catalog(project_root: str) -> WorldCatalog:
+    return WorldCatalog._from_files_uncached(Path(project_root))

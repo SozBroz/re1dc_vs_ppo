@@ -1,7 +1,7 @@
 # World-Aware NN Architecture — RE1 Jill PPO
 
 **Date:** 2026-07-17  
-**Status:** implemented on `feature/world-almanac-extractor` — `features_dim=1523`; graft zip `data/ppo_re1_world_almanac_graft.zip`  
+**Status:** implemented on `feature/world-almanac-extractor` — `features_dim=1587`; graft zip `data/ppo_re1_world_almanac_graft.zip`  
 **Plan:** [static_world_map_obs_57f02d1c.plan.md](file:///c:/Users/phili/.cursor/plans/static_world_map_obs_57f02d1c.plan.md)  
 **Purity doctrine:** [north_star.md](north_star.md)
 
@@ -26,7 +26,7 @@ flowchart TB
   end
 
   subgraph dynamic_obs [Per-step obs — worker rollouts]
-  WS["world_state 475 incl key hints"]
+  WS["world_state 471 incl key hints"]
   Proprio["proprio 28"]
   Spatial["spatial 140"]
   Hist["history 65"]
@@ -47,7 +47,7 @@ flowchart TB
 
   subgraph extractor [RE1WorldAwareExtractor]
     Flat["flatten existing slices"]
-    WorldMLP["world_context MLP → 64-d"]
+    WorldMLP["world_context MLP → 128-d"]
     Fusion["concat → 2×256 trunk"]
   end
 
@@ -67,7 +67,7 @@ flowchart TB
   Fusion -.-> Aux["optional AUX heads (later)"]
 ```
 
-**Forward path (summary):** pixels → CNN 512-d; legacy flattened obs slices unchanged in role; static `WorldCatalog` buffers gathered at `current_room` and masked by dynamic `world_state` / `key_hints`; 1–2 layer MLP → 64-d `world_context`; concat → shared 2×256 MLP → policy and value heads.
+**Forward path (summary):** pixels → CNN 512-d; legacy flattened obs slices unchanged in role; static `WorldCatalog` buffers gathered at `current_room` and masked by dynamic `world_state` / `key_hints`; inventory joins `file_*` / `combine_*` recipe availability; 1–2 layer MLP → 128-d `world_context`; concat → shared 2×256 MLP → policy and value heads.
 
 ---
 
@@ -75,7 +75,7 @@ flowchart TB
 
 | Layer | Where it lives | Rollout / replay |
 |-------|----------------|------------------|
-| **Static almanac** | `register_buffer` on policy (`RE1WorldAwareExtractor`), built deterministically from JSON at init | **Not** serialized per step. Rebuilt when the learner loads a policy checkpoint from the same data files. |
+| **Static almanac** | `register_buffer(..., persistent=False)` on policy (`RE1WorldAwareExtractor`), built deterministically from JSON at init | **Not** serialized per step or in checkpoints. Rebuilt via `reload_world_catalog_buffers()` when the learner loads a policy checkpoint from the same data files. |
 | **Dynamic masks** | Env encoders (`world_state_encoder`, `encode_key_hints`) | **Yes** — small tensors only (`world_state`, `key_hints`). Workers ship these keys in the obs dict; distributed codec unchanged. |
 | **Learner replay** | PPO rollout buffer | Stores dynamic obs keys only. Learner does **not** need static catalog floats in the replay blob — the policy already holds them. |
 
@@ -87,7 +87,7 @@ flowchart TB
 
 ## Observation keys
 
-Shared vocabulary: **`room_index`** = sorted keys from `data/rooms.json`, padded to 128. **`item_id`** = `memory_map.ITEM_IDS` ordinals (`/ 0x4B`). Pickup catalog rows are **(room, item) instances** (121 rows), not unique item names.
+Shared vocabulary: **`room_index`** = sorted keys from `data/rooms.json`, padded to 128. **`item_id`** = `memory_map.ITEM_IDS` ordinals (`/ 0x4B`). Pickup catalog rows are **(room, item) instances** (119 rows after dedup), not unique item names.
 
 ### Existing keys (unchanged role)
 
@@ -104,7 +104,7 @@ Shared vocabulary: **`room_index`** = sorted keys from `data/rooms.json`, padded
 | `history` | (65,) | room deque K=32 |
 | `acquisitions` | **(121,)** | last **K=60** pickups: pairs `(item_id, room_idx)` → 121-d (**shipped**) |
 | `room_enemies` | (12,) | static roster counts for current room |
-| `keys_held` | (37,) | ever-held key-item bitmask |
+| `keys_held` | (35,) | ever-held key-item bitmask |
 | `cutscene_ledger` | (16,) | milestone cutscene bits |
 | `milestones` | (12,) | derived episode milestones |
 | `maps_files` | (16,) | map/file pickup RAM bitfield |
@@ -115,7 +115,7 @@ Current fusion baseline (pre–world-state): **1448-d** into 2×256 trunks (`pol
 
 | Key | Shape | Role |
 |-----|-------|------|
-| `world_state` | ~(475,) | dynamic mansion memory: `pickup_active[121]`, `pickup_gated`, `room_remaining[128]`, `room_key_remaining`, `key_pickup_pending[35]`, `key_use_pending`, `key_affordant_here`, optional scalars |
+| `world_state` | **(471,)** | dynamic mansion memory: `pickup_active[119]`, `pickup_gated`, `room_remaining[128]`, `room_key_remaining`, `key_pickup_pending[35]`, `key_use_pending`, `key_affordant_here`, optional scalars |
 | `key_hints` | (105,) = 35×3 | dynamic key relevance only: `key_pickup_pending`, `key_use_pending`, `key_affordant_here` per `KEY_ITEM_NAMES` index (location data lives in static buffers) |
 
 ### Deprecated
@@ -138,19 +138,19 @@ Per exit slot (+3 fields): `exitN_to_room`, `exitN_known`, `exitN_requires_key` 
 
 ## Static buffer inventory (`WorldCatalog`)
 
-Built once via `WorldCatalog.from_files(...)`; registered as **non-trainable** `register_buffer` tensors on `RE1WorldAwareExtractor`.
+Built once via `WorldCatalog.from_files(...)`; registered as **non-trainable** `register_buffer(..., persistent=False)` tensors on `RE1WorldAwareExtractor` (reloaded from JSON on checkpoint load).
 
 | Buffer group | Shape (representative) | Content |
 |--------------|------------------------|---------|
 | **Topology** | `map_neighbors (128, 6)`, `map_degree (128,)` | outbound neighbor `room_index` per room; pad 127; degree / 6 |
 | **Room tags** | `room_area (128,)`, `room_stage (128,)` | ER map section enum; normalized `rooms.json` stage |
-| **Pickup catalog** | `pickup_room_idx`, `pickup_item_id`, `pickup_category`, `pickup_key_flag`, `pickup_gate_type`, `pickup_requires_mask (121, 35)` | 121 ER rows; category: key / recovery / ammo / weapon / file / misc |
+| **Pickup catalog** | `pickup_room_idx`, `pickup_item_id`, `pickup_category`, `pickup_key_flag`, `pickup_gate_type`, `pickup_requires_mask (119, 35)` | 119 ER rows; category: key / recovery / ammo / weapon / file / misc |
 | **Key hints (static)** | `key_pickup_room`, `key_use_room`, `key_unlock_room`, `key_door_from`, `key_item_id` — each `(35,)` | all `KEY_ITEM_NAMES` rows; indexes align with `keys_held[i]` |
 | **Door links** | `link_requires_key (128, 6)` | same slot order as `map_neighbors`; key index or 127 = free |
 | **Files** | `file_room_idx (F,)`, `file_id (F,)`, `file_code_const (F, C)` | ER file locations + numeric constants (Pass Number, door codes) — facts, not auto-entry |
 | **Combine graph** | `combine_src_a`, `combine_src_b`, `combine_dst (R,)` | herb mixes + chem / V-JOLT chain; policy still learns COMBINE menu |
 
-Extractor gathers neighbor row for `proprio.room_index`, dots `pickup_active` against static catalog rows, and joins `keys_held` with `pickup_requires_mask` for newly reachable pickups.
+Extractor gathers neighbor row for `proprio.room_index`, dots `pickup_active` against static catalog rows, joins `keys_held` with `pickup_requires_mask` for newly reachable pickups, exposes held-file passcode constants via `file_code_const`, and marks combine recipes whose `src_a`/`src_b` are both in inventory.
 
 ---
 

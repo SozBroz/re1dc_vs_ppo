@@ -25,7 +25,7 @@ def _room_items() -> RoomItems:
     return RoomItems(_ROOT / "data" / "room_items.json")
 
 
-def test_encode_world_state_shape_475() -> None:
+def test_encode_world_state_shape_471() -> None:
     cat = _catalog()
     ri = _room_items()
     v = encode_world_state(
@@ -36,7 +36,7 @@ def test_encode_world_state_shape_475() -> None:
         current_room="105",
     )
     assert v.shape == (WORLD_STATE_DIM,)
-    assert WORLD_STATE_DIM == 475
+    assert WORLD_STATE_DIM == 471
     assert v.dtype == np.float32
 
 

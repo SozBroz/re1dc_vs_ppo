@@ -79,6 +79,8 @@ Humans use community references like [Evil Resource — Resident Evil](https://w
 
 **Like:** opening a map section and seeing what can appear in *this* room before you commit.
 
+[^world-aware-split]: **World-aware encoding note:** Per-step spatial / room-signature channels expose **current-room** content only (guidebook page, not GPS). The `RE1WorldAwareExtractor` also holds **full-mansion** static almanac tables as policy `register_buffer`s (neighbor rows gathered at `current_room`); **dynamic** masks (`world_state`, `key_hints`) are episode memory only. See [world_aware_nn_architecture.md](world_aware_nn_architecture.md).
+
 **Expose for the room the agent is in:**
 
 | Signal | Source (today / target) | Notes |
@@ -89,25 +91,26 @@ Humans use community references like [Evil Resource — Resident Evil](https://w
 | Door exits (bearing, distance) | `doors_empirical.json` / `doors_rdt.json` | Add **open/locked** when `DOOR_FLAGS` + bit map land |
 | Gated-but-hidden pickups | `docs/item_gates.md` + SCD flags | Show when requirements are trackable |
 
-**Do not** dump the entire mansion item/enemy table every step — only **current-room signature**, analogous to reading one Evil Resource room page.
+**Do not** dump the entire mansion item/enemy table every step into egocentric spatial channels — only **current-room signature**, analogous to reading one Evil Resource room page.[^world-aware-split]
 
 ### 2. Key-item affordances (what items are *for*)
 
-**Like:** clicking [Shield Key](https://www.evilresource.com/resident-evil) on Evil Resource and seeing which doors it opens.
+**Like:** clicking [Helmet Key](https://www.evilresource.com/resident-evil) on Evil Resource and seeing which doors it opens.
 
 **Expose associations between inventory key items and where they apply:**
 
 | Granularity | Example | Prefer when |
 |-------------|---------|-------------|
-| **Item → rooms** | `shield_key` → helmet-door rooms (`10D`, `117`, …) | Item-centric obs channel; “what can I do with what I hold?” |
-| **Item → door edges** | `shield_key` → `105→10C` edge | Best if `DOOR_FLAGS` bit map exists per edge |
+| **Item → rooms** | `helmet_key` → helmet-door rooms (`10A`, `119`, `201`, `215`, `20B`, `20C`, …) | Item-centric obs channel; “what can I do with what I hold?” |
+| **Item → door edges** | `helmet_key` → `10A→119`, `201→215`, `20B→20C` edges | Best if `DOOR_FLAGS` bit map exists per edge |
 | **Room → required items** | `10F` secret passage → needs `emblem` + `music_notes` | Room-centric; complements spatial `gated` bit |
 
 **Canonical examples to encode in data (Jill Standard):**
 
 - `emblem` (wooden) → bar piano chain → `10F` secret alcove (`gold_emblem` swap)
 - `gold_emblem` → dining fireplace `105` → reveals `shield_key`
-- `shield_key` → helmet-key doors across mansion
+- `shield_key` → attic entry door `20E` → `210` (Attic)
+- `helmet_key` → helmet doors across mansion (`10A`, `201`, `20B`, …)
 - `lockpick` → locked desks (`102`, `111`, `401`, …)
 - Crest / jewel / crank items → puzzle rooms listed in `docs/item_gates.md`
 

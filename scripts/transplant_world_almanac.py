@@ -1,7 +1,7 @@
 """Transplant a pre–world-aware MaskablePPO checkpoint into RE1WorldAwareExtractor.
 
 Old CombinedExtractor fusion (1335-d): frame CNN 512 + flattened privileged obs.
-New fusion (1523-d): CNN 512 + flattened obs + world_context 64 from world_mlp.
+New fusion (1587-d): CNN 512 + flattened obs + world_context 128 from world_mlp.
 
 Copies matching CNN / MLP / head weights; remaps MLP layer-1 input columns per
 obs-key slice (spatial 128→140, acquisitions 9→121, etc.); zero-inits world_mlp

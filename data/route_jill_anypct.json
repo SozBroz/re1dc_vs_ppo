@@ -294,8 +294,7 @@
     "action_type": "pickup",
     "required_items": [],
     "items_gained": [
-      "serum",
-      "sword_key"
+      "serum"
     ],
     "success_condition": "",
     "notes": "Jill uses lockpick on doors; still loots serum room",

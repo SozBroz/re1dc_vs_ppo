@@ -90,7 +90,7 @@ from re1_rl.reward import (
     REWARD_SCALE,
     stagnation_episode_timeout,
 )
-from re1_rl.room_graph import RoomGraph
+from re1_rl.room_graph import RoomGraph, load_valid_rooms
 from re1_rl.knife_macro import execute_knife_macro, read_knife_hooks
 from re1_rl.sticky_input import StickyInputState
 from re1_rl.action_mask import (
@@ -293,6 +293,7 @@ class RE1Env(gym.Env):
         self.graph = RoomGraph(
             self.project_root / "data" / "doors_empirical.json",
             self.project_root / "data" / "doors_rdt.json",
+            valid_rooms=load_valid_rooms(self.project_root / "data" / "rooms.json"),
         )
         self.room_items = RoomItems(self.project_root / "data" / "room_items.json")
         self._world_catalog = WorldCatalog.from_files(self.project_root)

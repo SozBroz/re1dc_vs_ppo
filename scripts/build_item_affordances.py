@@ -36,7 +36,7 @@ _MANUAL: dict[str, dict] = {
         "door_edges": [
             {"from_room": "20E", "to_room": "210", "door_id": "20E->210"},
         ],
-        "notes": "Helmet-key doors across mansion",
+        "notes": "ER: opens Attic Entry→Attic only. Pickup behind dining clock after gold_emblem.",
     },
     "lockpick": {
         "pickup_rooms": ["106"],
@@ -59,12 +59,6 @@ _MANUAL: dict[str, dict] = {
             {"from_room": "106", "to_room": "111", "door_id": "106->111"},
         ],
         "notes": "Armor room",
-    },
-    "sword_key": {
-        "pickup_rooms": [],
-        "use_rooms": ["20D"],
-        "door_edges": [],
-        "notes": "Chris-only in standard; kept for data completeness",
     },
 }
 

@@ -81,15 +81,16 @@ def test_attack_masked_without_ammo() -> None:
     assert not m[ATTACK_ACTION]
 
 
-def test_attack_legal_with_reserve_ammo() -> None:
+def test_attack_masked_with_reserve_ammo_requires_combine() -> None:
     inv = _inv((0x02, 0), (0x0B, 5))
     assert can_fire_weapon(inv, 0x02)
     assert total_fireable_ammo(inv, 0x02) == 5
     m = action_mask(
-        N_ACTIONS, None, equipped_weapon_id=0x02, inventory=inv,
+        N_ACTIONS, None, equipped_weapon_id=0x02, equipped_slot_0based=0,
+        inventory=inv,
         player_anim=0, player_aux=0, player_recovery=0,
     )
-    assert m[ATTACK_ACTION]
+    assert not m[ATTACK_ACTION]
 
 
 def test_knife_attack_legal_without_ammo() -> None:

@@ -15,17 +15,17 @@ from re1_rl.item_todo import RoomItems, canonical_item
 from re1_rl.key_items import KEY_ITEM_NAMES
 from re1_rl.world_catalog import NUM_ROOMS, WorldCatalog
 
-NUM_PICKUPS = 121
+NUM_PICKUPS = 119
 KEY_HINTS_PER_KEY = 3
 
 PICKUP_ACTIVE_SLICE = slice(0, NUM_PICKUPS)
 PICKUP_GATED_SLICE = slice(NUM_PICKUPS, 2 * NUM_PICKUPS)
 ROOM_REMAINING_SLICE = slice(2 * NUM_PICKUPS, 2 * NUM_PICKUPS + NUM_ROOMS)
-KEY_PICKUP_PENDING_SLICE = slice(370, 405)
-KEY_USE_PENDING_SLICE = slice(405, 440)
-KEY_AFFORDANT_HERE_SLICE = slice(440, 475)
+KEY_PICKUP_PENDING_SLICE = slice(366, 401)
+KEY_USE_PENDING_SLICE = slice(401, 436)
+KEY_AFFORDANT_HERE_SLICE = slice(436, 471)
 
-WORLD_STATE_DIM = 475
+WORLD_STATE_DIM = 471
 
 
 def _pickup_gated_mask(

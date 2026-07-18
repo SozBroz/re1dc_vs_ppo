@@ -1,5 +1,7 @@
 # Progress Scaffolding Design — RE1 Jill Any% RL
 
+> **SUPERSEDED (2026-07-17):** Checkpoint-path scaffolding (goal compass, PBRS, waypoint bonuses) is **not** the active training doctrine. Authoritative docs: [north_star.md](north_star.md) (purity + guidebook), [exploration_rewards.md](exploration_rewards.md) (what pays), [world_aware_nn_architecture.md](world_aware_nn_architecture.md) (obs / extractor). Kept for historical reference only.
+
 **Project:** `D:\re1_rl` — PPO agent for Resident Evil 1 Director's Cut (PS1, BizHawk)  
 **Audience:** Solo dev, YouTube deadline, pragmatic shortcuts encouraged  
 **Status:** Design doc only — no code changes in this pass  

@@ -6,7 +6,9 @@ from pathlib import Path
 
 import numpy as np
 
+from re1_rl.item_affordances import load_affordances
 from re1_rl.key_items import KEY_ITEM_NAMES
+from re1_rl.room_graph import RoomGraph, load_valid_rooms
 from re1_rl.world_catalog import MAX_NEIGHBORS, NUM_ROOMS, PAD_ROOM, WorldCatalog
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -24,13 +26,13 @@ def test_buffer_shapes_and_dtypes() -> None:
     assert cat.room_stage.shape == (NUM_ROOMS,)
     assert cat.link_requires_key.shape == (NUM_ROOMS, MAX_NEIGHBORS)
 
-    assert cat.num_pickups == 121
-    assert cat.pickup_room_idx.shape == (121,)
-    assert cat.pickup_item_id.shape == (121,)
-    assert cat.pickup_category.shape == (121,)
-    assert cat.pickup_key_flag.shape == (121,)
-    assert cat.pickup_gate_type.shape == (121,)
-    assert cat.pickup_requires_mask.shape == (121, len(KEY_ITEM_NAMES))
+    assert cat.num_pickups == 119
+    assert cat.pickup_room_idx.shape == (119,)
+    assert cat.pickup_item_id.shape == (119,)
+    assert cat.pickup_category.shape == (119,)
+    assert cat.pickup_key_flag.shape == (119,)
+    assert cat.pickup_gate_type.shape == (119,)
+    assert cat.pickup_requires_mask.shape == (119, len(KEY_ITEM_NAMES))
 
     k = len(KEY_ITEM_NAMES)
     assert cat.key_pickup_room.shape == (k,)
@@ -74,7 +76,7 @@ def test_room_105_neighbors_include_tea_or_main_hall() -> None:
 def test_pickup_active_mask_prunes_held_and_gated() -> None:
     cat = _catalog()
     all_active = cat.pickup_active_mask(set())
-    assert all_active.shape == (121,)
+    assert all_active.shape == (119,)
     assert all_active.sum() > 0
 
     held = {"emblem"}
@@ -104,3 +106,48 @@ def test_torch_buffers_roundtrip() -> None:
     assert set(buffers) >= {"map_neighbors", "pickup_requires_mask", "combine_dst"}
     assert buffers["map_neighbors"].dtype == torch.float32
     assert buffers["map_neighbors"].shape == (NUM_ROOMS, MAX_NEIGHBORS)
+
+
+def test_from_files_cached_per_process() -> None:
+    a = WorldCatalog.from_files(_ROOT)
+    b = WorldCatalog.from_files(_ROOT)
+    assert a is b
+
+
+def test_map_neighbors_only_valid_room_indices() -> None:
+    cat = _catalog()
+    valid = set(cat.room_index.values())
+    for idx in range(NUM_ROOMS):
+        for slot in range(MAX_NEIGHBORS):
+            n = int(cat.map_neighbors[idx, slot])
+            assert 0 <= n < NUM_ROOMS
+            if n != PAD_ROOM:
+                assert n in valid
+
+
+def test_room_graph_no_phantom_neighbors_from_valid_rooms() -> None:
+    valid = load_valid_rooms(_ROOT / "data" / "rooms.json")
+    graph = RoomGraph(
+        _ROOT / "data" / "doors_empirical.json",
+        _ROOT / "data" / "doors_rdt.json",
+        valid_rooms=valid,
+    )
+    for room, nbrs in graph.adj.items():
+        assert room in valid
+        for nbr in nbrs:
+            assert nbr in valid
+
+
+def test_sword_key_not_in_jill_key_buffers() -> None:
+    assert "sword_key" not in KEY_ITEM_NAMES
+    load_affordances.cache_clear()
+    assert "sword_key" not in load_affordances()
+    cat = _catalog()
+    sword_iid = float(0x33)
+    assert sword_iid not in set(cat.key_item_id.tolist())
+
+
+def test_mo_disc_pickup_room_prefers_217() -> None:
+    cat = _catalog()
+    mo_i = KEY_ITEM_NAMES.index("mo_disc")
+    assert cat.key_pickup_room[mo_i] == float(cat.room_index["217"])

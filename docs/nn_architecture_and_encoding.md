@@ -1,5 +1,7 @@
 # NN Architecture & Observation Encoding — RE1 Jill Any% PPO
 
+> **SUPERSEDED (2026-07-17):** For the current flat MaskablePPO stack, obs keys, and `RE1WorldAwareExtractor`, see [world_aware_nn_architecture.md](world_aware_nn_architecture.md). Training policy: [exploration_rewards.md](exploration_rewards.md). Purity doctrine: [north_star.md](north_star.md). This file remains a field-level archive of the pre–world-catalog encoder.
+
 **Status:** implemented and live-verified 2026-07-02 (`env_smoke.py` against EmuHawk).
 **Code of record:** `re1_rl/obs_encoder.py` (field specs), `re1_rl/env.py` (assembly), `re1_rl/reward.py` (shaping). If this doc and the code disagree, the code wins — the field lists below are transcribed from `PROPRIO_FIELDS` / `GOAL_FIELDS`, which drive both encoding and the human-readable tools.
 

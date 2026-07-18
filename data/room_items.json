@@ -5,7 +5,8 @@
     "game": "RE1 Director's Cut PS1 standard Jill",
     "date": "2026-07-02",
     "fetch_errors": [],
-    "scrape_count": 125
+    "scrape_count": 125,
+    "dedup_notes": "2026-07-17: removed serum@102 and map_1f@106 duplicates per docs/item_gates.md (canonical serum@100, map_1f@107 only)."
   },
   "_unmatched": [
     {
@@ -128,14 +129,6 @@
         "key_item": false,
         "in_inventory_table": true,
         "notes": "on wall"
-      },
-      {
-        "name": "serum",
-        "item_id": 66,
-        "count": 1,
-        "key_item": true,
-        "in_inventory_table": true,
-        "notes": "save room shelf route uses serum from 100; also 102"
       }
     ]
   },
@@ -221,14 +214,6 @@
         "key_item": false,
         "in_inventory_table": true,
         "notes": "on typewriter"
-      },
-      {
-        "name": "map_1f",
-        "item_id": null,
-        "count": 1,
-        "key_item": false,
-        "in_inventory_table": false,
-        "notes": "SE stairs alcove / art room map"
       },
       {
         "name": "acid_rounds",

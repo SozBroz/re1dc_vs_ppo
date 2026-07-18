@@ -32,6 +32,30 @@ WEAPON_CLIP_CAPACITY: dict[int, int] = {
 }
 
 
+def loaded_weapon_ammo(
+    inventory: list[tuple[int, int]],
+    weapon_id: int,
+    equipped_slot_0based: int | None = None,
+) -> int:
+    """Rounds in the equipped weapon slot only (not reserve ammo piles)."""
+    wid = int(weapon_id) & 0xFF
+    if wid == 0x01:
+        return 1
+    if wid not in WEAPON_ITEM_IDS:
+        return 0
+    if equipped_slot_0based is not None:
+        slot = int(equipped_slot_0based)
+        if 0 <= slot < len(inventory):
+            iid, qty = inventory[slot]
+            if int(iid) & 0xFF == wid:
+                return int(qty)
+        return 0
+    for iid, qty in inventory:
+        if int(iid) & 0xFF == wid:
+            return int(qty)
+    return 0
+
+
 def total_fireable_ammo(
     inventory: list[tuple[int, int]],
     weapon_id: int,
@@ -58,4 +82,14 @@ def can_fire_weapon(
     inventory: list[tuple[int, int]],
     weapon_id: int,
 ) -> bool:
+    """True when weapon + reserve piles can supply at least one round (COMBINE gating)."""
     return total_fireable_ammo(inventory, weapon_id) > 0
+
+
+def can_fire_from_equipped_slot(
+    inventory: list[tuple[int, int]],
+    weapon_id: int,
+    equipped_slot_0based: int | None = None,
+) -> bool:
+    """True when the equipped weapon slot has loaded ammo (attack gating)."""
+    return loaded_weapon_ammo(inventory, weapon_id, equipped_slot_0based) > 0

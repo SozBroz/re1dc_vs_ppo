@@ -129,12 +129,15 @@ def attack_possible(weapon_id: int) -> bool:
 def can_attack_with_ammo(
     inventory: list[tuple[int, int]],
     weapon_id: int,
+    equipped_slot_0based: int | None = None,
 ) -> bool:
-    from re1_rl.ammo_accounting import can_fire_weapon
+    from re1_rl.ammo_accounting import can_fire_from_equipped_slot
 
     if int(weapon_id) == KNIFE_WEAPON_ID:
         return True
-    return can_fire_weapon(inventory, weapon_id)
+    return can_fire_from_equipped_slot(
+        inventory, weapon_id, equipped_slot_0based
+    )
 
 
 def _ammo_count(bridge: Any, weapon_id: int) -> int:

@@ -1,5 +1,5 @@
 {
-  "_notes": "Inventory USE sites (START -> slot -> Cross -> USE). Position-gated; one reward per site id per episode.",
+  "_notes": "Inventory USE sites (START -> slot -> Cross -> USE). Position-gated; one reward per site id per episode. Entries with _draft:true lack verified stand coords and are ignored by the mask until reviewed.",
   "sites": [
     {
       "id": "music_notes@10F_piano",
@@ -30,6 +30,86 @@
       "radius": 1500,
       "consumes": false,
       "notes": "Dining fireplace — clock reveals shield key (empirical latest QuickSave4 2026-07-17 22:03:09.497 stand 3746/8186; RDT trigger 2900/8100, r=1500)"
+    },
+    {
+      "id": "blue_jewel@10D_tiger_eye",
+      "item": "blue_jewel",
+      "room": "10D",
+      "_draft": true,
+      "consumes": true,
+      "notes": "BEST-EFFORT: Tiger statue eye — insert blue jewel; statue slides to reveal wind crest (item_affordances use_rooms 10D; room_items gate on wind_crest)"
+    },
+    {
+      "id": "chemical@10C_greenhouse_pump",
+      "item": "chemical",
+      "room": "10C",
+      "_draft": true,
+      "consumes": true,
+      "notes": "BEST-EFFORT: Greenhouse pump — pour chemical to kill vines on armor-key crest plaque (room_items 10C gate requires chemical; pickup in 11B)"
+    },
+    {
+      "id": "sun_crest@11A_crest_slot",
+      "item": "sun_crest",
+      "room": "11A",
+      "_draft": true,
+      "consumes": true,
+      "notes": "BEST-EFFORT: Roofed passage — place sun crest on courtyard door puzzle (route_jill_anypct seq 20; item_affordances pickup 205)"
+    },
+    {
+      "id": "moon_crest@11A_crest_slot",
+      "item": "moon_crest",
+      "room": "11A",
+      "_draft": true,
+      "consumes": true,
+      "notes": "BEST-EFFORT: Roofed passage — place moon crest on courtyard door puzzle (route_jill_anypct seq 20; item_affordances pickup 210)"
+    },
+    {
+      "id": "star_crest@11A_crest_slot",
+      "item": "star_crest",
+      "room": "11A",
+      "_draft": true,
+      "consumes": true,
+      "notes": "BEST-EFFORT: Roofed passage — place star crest on courtyard door puzzle (route_jill_anypct seq 20; item_affordances pickup 117)"
+    },
+    {
+      "id": "wind_crest@11A_crest_slot",
+      "item": "wind_crest",
+      "room": "11A",
+      "_draft": true,
+      "consumes": true,
+      "notes": "BEST-EFFORT: Roofed passage — place wind crest on courtyard door puzzle (route_jill_anypct seq 20; pickup 10D after blue_jewel)"
+    },
+    {
+      "id": "v_jolt@40E_water_tank",
+      "item": "v_jolt",
+      "room": "40E",
+      "_draft": true,
+      "consumes": true,
+      "notes": "BEST-EFFORT: Water tank / plant roots — apply V-Jolt (route_jill_anypct seq 28 room 40E; prep in 409)"
+    },
+    {
+      "id": "hex_crank@305_statue_puzzle",
+      "item": "hex_crank",
+      "room": "305",
+      "_draft": true,
+      "consumes": false,
+      "notes": "BEST-EFFORT: Item chamber statue puzzle — hex crank use site (item_affordances use_rooms 305; room_items doom_book_2 gate)"
+    },
+    {
+      "id": "hex_crank@306_item_passage",
+      "item": "hex_crank",
+      "room": "306",
+      "_draft": true,
+      "consumes": false,
+      "notes": "BEST-EFFORT: Item passage — push statue / align on tile with hex crank (item_affordances use_rooms 306; room_items mo_disc gate)"
+    },
+    {
+      "id": "hex_crank@30B_boulder_alcove",
+      "item": "hex_crank",
+      "room": "30B",
+      "_draft": true,
+      "consumes": false,
+      "notes": "BEST-EFFORT: Boulder alcove wall crank (item_affordances use_rooms 30B; pickup 30A)"
     }
   ]
 }

@@ -15,10 +15,10 @@ Resume auto-transplants compatible tensors via async_fleet.
 Obs keys (RE1WorldAwareExtractor — see docs/world_aware_nn_architecture.md):
   frame   84x77x4 uint8   -> NatureCNN -> 512
   proprio..maps_files     -> flatten (legacy privileged; world_state excluded)
-  world_state (475,) f32  -> world MLP join with frozen WorldCatalog buffers -> 64
+  world_state (471,) f32  -> world MLP join with frozen WorldCatalog buffers -> 128
   affordances (40,) f32   -> still flattened (deprecated; key hints live in world_state)
 
-features_dim = 1523 = 512 CNN + ~947 flatten + 64 world_context.
+features_dim = 1587 = 512 CNN + ~947 flatten + 128 world_context.
 
 Static almanac (map_neighbors, pickup catalog, key_*, files, combine) is
 register_buffer only — rebuilt from JSON on learner load; NOT in rollouts.

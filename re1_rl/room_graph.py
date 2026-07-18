@@ -2,6 +2,10 @@
 
 Built from data/doors_empirical.json (grows as the route is logged). BFS hop
 distance feeds the goal obs vector and the graph PBRS potential.
+
+When ``valid_rooms`` is set (typically ``rooms.json`` keys), door edges whose
+``from_room`` or ``to_room`` is outside that set are dropped so RDT-only phantom
+nodes (e.g. 6xx debug codes) never appear in adjacency.
 """
 
 from __future__ import annotations
@@ -10,6 +14,7 @@ import json
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
+from typing import AbstractSet
 
 
 @dataclass(frozen=True)
@@ -23,14 +28,24 @@ class Door:
     entry_facing: int | None = None
 
 
+def load_valid_rooms(rooms_path: str | Path) -> frozenset[str]:
+    """Room IDs from ``rooms.json`` (the 116-room mansion table)."""
+    with Path(rooms_path).open(encoding="utf-8") as f:
+        raw = json.load(f)
+    return frozenset(str(k) for k in raw if not str(k).startswith("_"))
+
+
 class RoomGraph:
     def __init__(
         self,
         doors_path: str | Path,
         doors_rdt_path: str | Path | None = None,
+        *,
+        valid_rooms: AbstractSet[str] | None = None,
     ) -> None:
         self.doors: dict[tuple[str, str], Door] = {}
         self.adj: dict[str, set[str]] = {}
+        self._valid_rooms = frozenset(valid_rooms) if valid_rooms is not None else None
         self._diameter: int | None = None
         self._load_doors_file(Path(doors_path))
         if doors_rdt_path is not None:
@@ -44,9 +59,15 @@ class RoomGraph:
         for key, d in raw.items():
             if key.startswith("_"):
                 continue
+            from_room = str(d["from_room"])
+            to_room = str(d["to_room"])
+            if self._valid_rooms is not None and (
+                from_room not in self._valid_rooms or to_room not in self._valid_rooms
+            ):
+                continue
             door = Door(
-                from_room=str(d["from_room"]),
-                to_room=str(d["to_room"]),
+                from_room=from_room,
+                to_room=to_room,
                 x=int(d["door_x"]),
                 z=int(d["door_z"]),
                 entry_x=int(d["entry_x"]) if "entry_x" in d else None,

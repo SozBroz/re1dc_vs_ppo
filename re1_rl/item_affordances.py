@@ -25,7 +25,7 @@ import numpy as np
 
 from re1_rl.item_todo import canonical_item
 from re1_rl.key_items import KEY_ITEM_NAMES, KEYS_HELD_DIM
-from re1_rl.room_graph import RoomGraph
+from re1_rl.room_graph import RoomGraph, load_valid_rooms
 
 _ROOT = Path(__file__).resolve().parents[1]
 _DEFAULT_PATH = _ROOT / "data" / "item_affordances.json"
@@ -54,7 +54,11 @@ def load_affordances(path: str = str(_DEFAULT_PATH)) -> dict[str, dict[str, Any]
 
 @lru_cache(maxsize=1)
 def _door_graph() -> RoomGraph:
-    return RoomGraph(_DOORS_EMPIRICAL, _DOORS_RDT)
+    return RoomGraph(
+        _DOORS_EMPIRICAL,
+        _DOORS_RDT,
+        valid_rooms=load_valid_rooms(_ROOT / "data" / "rooms.json"),
+    )
 
 
 def _normalize_entry(entry: dict[str, Any]) -> dict[str, Any]:

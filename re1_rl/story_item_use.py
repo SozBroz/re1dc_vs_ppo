@@ -55,6 +55,7 @@ def load_story_use_sites(path: str = str(_DEFAULT_SITES_PATH)) -> tuple[dict[str
                 "radius": float(row.get("radius", 1500)),
                 "consumes": bool(row.get("consumes", False)),
                 "notes": str(row.get("notes", "")),
+                "_draft": bool(row.get("_draft", False)),
             }
         )
     return tuple(out)
@@ -171,6 +172,8 @@ def matching_story_sites(
     )
     hits: list[dict[str, Any]] = []
     for site in sites:
+        if site.get("_draft"):
+            continue
         if str(site["id"]) in rewarded:
             continue
         if str(site["room"]) != str(room):
