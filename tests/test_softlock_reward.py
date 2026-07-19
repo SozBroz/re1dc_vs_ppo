@@ -69,6 +69,21 @@ def test_softlock_threshold_doubles_after_kenneth():
     assert softlock_frame_threshold(progress) == SOFTLOCK_POST_KENNETH_FRAMES
 
 
+def test_new_room_raises_softlock_cap_to_six_minutes():
+    """Pre-Kenneth new_room still floors idle truncate at 6 min."""
+    from re1_rl.reward import SOFTLOCK_EXTENSION_FRAMES
+
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES
+    prev = make_state(room="105", step=0)
+    cur = make_state(room="104", step=1)
+    _, bd = _step(progress, prev, cur)
+    assert bd["new_room"] == NEW_ROOM_BONUS
+    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
+    assert softlock_frame_threshold(progress) == SOFTLOCK_EXTENSION_FRAMES
+
+
 def test_grace_has_no_softlock_tax():
     """Under grace on the post-Kenneth 6m cap: no softlock tax."""
     progress = ProgressTracker()
@@ -231,7 +246,9 @@ def test_junk_item_pickup_does_not_reset_idle_timer():
     assert progress.stagnation_frames == 4
 
 
-def test_weapon_pickup_resets_idle_timer():
+def test_weapon_pickup_resets_idle_timer_and_raises_six_minute_cap():
+    from re1_rl.reward import NEW_WEAPON_PICKUP_BONUS, SOFTLOCK_EXTENSION_FRAMES
+
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", step=0)
@@ -240,20 +257,23 @@ def test_weapon_pickup_resets_idle_timer():
         _step(progress, prev, cur, step_frames=4)
         prev = cur
     assert progress.stagnation_frames == 12
+    assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES
     cur = make_state(room="115", step=4, new_items=["colt_python"])
     _, bd = _step(progress, prev, cur, step_frames=4)
-    from re1_rl.reward import NEW_WEAPON_PICKUP_BONUS
 
-    assert bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS
+    assert bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 3.0
     assert bd["item"] == 0.0
     assert bd["key_item"] == 0.0
     assert progress.stagnation_frames == 0
+    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
+    assert softlock_frame_threshold(progress) == SOFTLOCK_EXTENSION_FRAMES
 
 
-def test_shotgun_wall_loop_is_zero_sum_and_pickup_extends_episode():
+def test_shotgun_wall_loop_is_zero_sum_and_retake_does_not_refarm_idle():
     from re1_rl.reward import (
         NEW_WEAPON_PICKUP_BONUS,
         SHOTGUN_RETURN_PENALTY,
+        SOFTLOCK_EXTENSION_FRAMES,
     )
 
     progress = ProgressTracker()
@@ -270,9 +290,11 @@ def test_shotgun_wall_loop_is_zero_sum_and_pickup_extends_episode():
     pickup_reward, pickup_bd = _step(
         progress, empty, held, step_frames=0
     )
-    assert pickup_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS
+    assert pickup_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 3.0
     assert pickup_bd["shotgun_return"] == 0.0
     assert progress.stagnation_frames == 0
+    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
+    assert SHOTGUN_RETURN_PENALTY == -NEW_WEAPON_PICKUP_BONUS == -3.0
 
     returned = make_state(room="115", step=2, inventory=[], new_items=[])
     return_reward, return_bd = _step(
@@ -288,16 +310,21 @@ def test_shotgun_wall_loop_is_zero_sum_and_pickup_extends_episode():
     assert duplicate_bd["shotgun_return"] == 0.0
     assert duplicate_return == 0.0
 
-    # A second take/replace cycle has the same exact zero-sum behavior.
+    # Idle a bit, then re-take: still ±3 net zero, but no second idle extend/reset.
+    progress._stagnation_frames = 400
     pickup2, pickup2_bd = _step(
         progress, returned, held, step_frames=0
     )
+    assert pickup2_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS
+    assert progress.stagnation_frames == 400  # re-take is not made_progress
     return2, return2_bd = _step(
         progress, held, returned, step_frames=0
     )
-    assert pickup2_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS
     assert return2_bd["shotgun_return"] == SHOTGUN_RETURN_PENALTY
     assert pickup2 + return2 == 0.0
+    # A live step after the loop still advances the idle clock (no free reset).
+    _, _ = _step(progress, returned, returned, step_frames=8)
+    assert progress.stagnation_frames == 408
 
 
 def test_shotgun_removal_outside_rack_rooms_is_not_penalized():

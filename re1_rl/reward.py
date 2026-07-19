@@ -34,26 +34,27 @@ STEPS_PER_CHECKPOINT = 5000
 STEP_PENALTY = -CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT  # -0.0002
 REFERENCE_STEP_FRAMES = 8
 
-# Exploration bonuses (same scale as the old per-waypoint checkpoint payout).
-NEW_ROOM_BONUS = CHECKPOINT_REWARD
-NEW_CUTSCENE_BONUS = CHECKPOINT_REWARD
+# Exploration bonuses (imperator 2026-07-18 retune).
+NEW_ROOM_BONUS = 3.0 * CHECKPOINT_REWARD
+NEW_CUTSCENE_BONUS = 1.0 * CHECKPOINT_REWARD
 
 # Legacy aliases kept for tests / telemetry that import old names.
 WAYPOINT_ROOM_BONUS = NEW_ROOM_BONUS
 
-# Junk / ammo / herbs: meaningful but well below a new room/cutscene.
+# Junk / ammo / herbs: meaningful but well below a new room.
 ITEM_PICKUP_BONUS = 0.15 * CHECKPOINT_REWARD
 # Keys / emblems / crests (room_items.json key_item=true).
-KEY_ITEM_PICKUP_BONUS = 0.5 * CHECKPOINT_REWARD
+KEY_ITEM_PICKUP_BONUS = 3.0 * CHECKPOINT_REWARD
 # Story inventory USE at a curated site (piano, fireplace, …).
-STORY_ITEM_USE_BONUS = CHECKPOINT_REWARD
+STORY_ITEM_USE_BONUS = 3.0 * CHECKPOINT_REWARD
 # 10F alcove: put gold_emblem back without leaving the wooden emblem (anti-hack).
-# Intended path is USE emblem (wooden) at the same stand → STORY_ITEM_USE_BONUS.
-GOLD_EMBLEM_RETURN_PENALTY = -2.0 * CHECKPOINT_REWARD
-# Every physical pickup of a gun/knife-class weapon (not ammo).
-NEW_WEAPON_PICKUP_BONUS = CHECKPOINT_REWARD
+# Exact inverse of key-item pickup (+3); intended path is USE wooden emblem → +3.
+GOLD_EMBLEM_RETURN_PENALTY = -KEY_ITEM_PICKUP_BONUS
+# Every physical pickup of a gun/knife-class weapon (not ammo). Same scale as keys.
+NEW_WEAPON_PICKUP_BONUS = 3.0 * CHECKPOINT_REWARD
 # The wall rack can toggle forever: taking the shotgun pays; replacing it
 # removes exactly that reward. Repeating the loop is net zero before step cost.
+# Re-takes after a return still claw ±NEW_WEAPON but do not re-extend idle.
 SHOTGUN_RETURN_PENALTY = -NEW_WEAPON_PICKUP_BONUS
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # Idle contempt: no new room / cutscene / key item / weapon / story-use / gallery.
@@ -62,6 +63,8 @@ SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # cap with 3→6 min ramp. Frames @ 60 emulated fps (PS1 NTSC / BizHawk).
 SOFTLOCK_PRE_KENNETH_FRAMES = 3 * 60 * 60
 SOFTLOCK_POST_KENNETH_FRAMES = 6 * 60 * 60
+# New room / key pickup / key use / first weapon acquire: at least this idle cap.
+SOFTLOCK_EXTENSION_FRAMES = 6 * 60 * 60
 # Alias: post-Kenneth / max episode idle cap (tests of the full ramp).
 SOFTLOCK_FRAME_THRESHOLD = SOFTLOCK_POST_KENNETH_FRAMES
 # First 3 min of no-progress: no extra idle tax (living step cost only).
@@ -94,20 +97,17 @@ REWARD_SCALE = 1.0
 RL_GAMMA = 0.9925
 
 HP_LOSS_SCALE = NEAR_DEATH_DAMAGE_SCALED / (JILL_FINE_HP - 1)
-# Heal recovers ~80% of the damage channel so chip-then-herb is not free.
-HP_GAIN_SCALE = 0.8 * HP_LOSS_SCALE
-# Log-shaped heal: small chips earn far less than linear; full Fine heal unchanged.
-HEAL_LOG_CURVE_EXPONENT = 6.0
+# Heal is the exact inverse of damage (same scale, opposite sign).
+HP_GAIN_SCALE = HP_LOSS_SCALE
+# Legacy export; heal is linear now (kept so old imports do not break).
+HEAL_LOG_CURVE_EXPONENT = 1.0
 
 
 def hp_heal_reward(hp_delta: int) -> float:
-    """Heal reward with log compression on small amounts; caps at linear full heal."""
+    """Heal reward: inverse of the per-HP damage penalty (linear)."""
     if hp_delta <= 0:
         return 0.0
-    cap_delta = float(JILL_FINE_HP - 1)
-    d = min(float(hp_delta), cap_delta)
-    log_ratio = math.log1p(d) / math.log1p(cap_delta)
-    return HP_GAIN_SCALE * cap_delta * (log_ratio ** HEAL_LOG_CURVE_EXPONENT)
+    return HP_GAIN_SCALE * float(hp_delta)
 
 # Disabled checkpoint-path terms (exported for tests that assert they stay off).
 WRONG_ROOM_PENALTY = -0.5 * CHECKPOINT_REWARD
@@ -124,14 +124,19 @@ ENABLE_CHECKPOINT_PATH = False
 
 
 def softlock_frame_threshold(progress: ProgressTracker | None) -> int:
-    """Idle truncate cap: 3 min before Kenneth pays, 6 min after."""
+    """Idle truncate cap: 3 min before Kenneth, 6 min after; ≥6 min after room/key/weapon/use."""
     if progress is None:
         return SOFTLOCK_PRE_KENNETH_FRAMES
     from re1_rl.cutscene_reward import kenneth_cutscene_seen
 
     if kenneth_cutscene_seen(progress.rewarded_cutscenes):
-        return SOFTLOCK_POST_KENNETH_FRAMES
-    return SOFTLOCK_PRE_KENNETH_FRAMES
+        base = SOFTLOCK_POST_KENNETH_FRAMES
+    else:
+        base = SOFTLOCK_PRE_KENNETH_FRAMES
+    extended = int(getattr(progress, "softlock_cap_frames", 0) or 0)
+    if extended > 0:
+        return max(base, extended)
+    return base
 
 
 def stagnation_episode_timeout(
@@ -279,7 +284,7 @@ def compute_reward(
 
     # Soft Kenneth gate: illegal pre-Kenneth entry into 106 pays -0.1, does not
     # end the episode, and must not mark 106 visited (so a later legal entry
-    # after Kenneth can still earn new_room +1).
+    # after Kenneth can still earn new_room).
     illegal_main_hall = False
     if progress is not None:
         from re1_rl.cutscene_reward import (
@@ -341,6 +346,10 @@ def compute_reward(
     else:
         new_items = set(state.get("inventory", [])) - set(prev_state.get("inventory", []))
     acquired_key_or_weapon = False
+    # First acquire of a weapon type this episode: 6m idle floor + stagnation reset.
+    # Shotgun rack re-takes still pay NEW_WEAPON (clawed back on return) but do not
+    # count as exploration progress — blocks idle-clock / extension farms.
+    weapon_progress = False
     for raw in new_items:
         name = canonical_item(str(raw))
         if name in _KEY_ITEM_NAME_SET:
@@ -349,6 +358,8 @@ def compute_reward(
         elif name in _WEAPON_NAME_SET:
             bd["new_weapon"] += NEW_WEAPON_PICKUP_BONUS
             acquired_key_or_weapon = True
+            if progress is not None and progress.claim_weapon_progress(name):
+                weapon_progress = True
         else:
             bd["item"] += ITEM_PICKUP_BONUS
 
@@ -434,13 +445,22 @@ def compute_reward(
         bd["enemy_kill"] = ENEMY_KILL_REWARD * enemy_kills
 
     if progress is not None and not state.get("dead"):
+        # Room / key get / key use / first weapon acquire → 6 min idle floor.
+        if (
+            bd["new_room"] != 0.0
+            or bd["key_item"] != 0.0
+            or bd["story_use"] != 0.0
+            or weapon_progress
+        ):
+            progress.note_softlock_extension(SOFTLOCK_EXTENSION_FRAMES)
+            softlock_threshold = softlock_frame_threshold(progress)
         made_progress = (
             bd["new_room"] != 0.0
             or bd["new_cutscene"] != 0.0
             or bd["key_item"] != 0.0
             or bd["story_use"] != 0.0
             or bd["gallery"] > 0.0
-            or bd["new_weapon"] != 0.0
+            or weapon_progress
         )
         # Pause idle clock during cutscenes / doors (not in_control).
         frames_before = progress.stagnation_frames

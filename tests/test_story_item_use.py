@@ -29,7 +29,7 @@ from re1_rl.story_item_use import (
     annotate_story_use_success,
 )
 
-N_ACTIONS = 46
+N_ACTIONS = 46  # attack_up@6, attack_down@45; no quickturn
 MUSIC_NOTES_ID = 0x23
 EMBLEM_ID = 0x1F
 GOLD_EMBLEM_ID = 0x20
@@ -460,13 +460,13 @@ def test_gold_only_put_back_pays_penalty() -> None:
         progress=progress,
         return_breakdown=True,
     )
-    assert bd["gold_emblem_return"] == GOLD_EMBLEM_RETURN_PENALTY
+    assert bd["gold_emblem_return"] == GOLD_EMBLEM_RETURN_PENALTY == -3.0
     assert bd["story_use"] == 0.0
-    assert rew < -1.9
+    assert rew < -2.9
 
 
 def test_swap_path_no_gold_return_penalty() -> None:
-    """Having both + wooden USE (gold stays) must not pay −2."""
+    """Having both + wooden USE (gold stays) must not pay gold put-back penalty."""
     prev = {
         "room_id": "10F",
         "x": ALCOVE_X,
@@ -497,7 +497,7 @@ def test_swap_path_no_gold_return_penalty() -> None:
 
 
 def test_putting_gold_back_while_holding_emblem_is_return_not_story_use() -> None:
-    """Wrong item USE: gold leaves at alcove → −2, not emblem story_use."""
+    """Wrong item USE: gold leaves at alcove → −3, not emblem story_use."""
     prev = {
         "room_id": "10F",
         "x": ALCOVE_X,

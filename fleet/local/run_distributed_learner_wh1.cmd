@@ -7,7 +7,7 @@ set RUN=reward_tune_1040k
 set N_ENVS=7
 set BASE_PORT=5555
 set LEARNER_PORT=8765
-set SYNC_INTERVAL_S=180
+set SYNC_INTERVAL_S=360
 
 if not exist data\logs mkdir data\logs
 

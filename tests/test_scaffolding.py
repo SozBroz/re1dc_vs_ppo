@@ -133,8 +133,23 @@ def test_new_cutscene_bonus_once_per_episode():
     )
     assert bd1["new_cutscene"] == 0.0
 
-    prev3 = make_state(room="106", cam_id=0, step=3, hp=96, scene_flag=0x93)
-    cur3 = make_state(room="106", cam_id=0, step=4, hp=96, scene_flag=0x91)
+    # Pre-Kenneth Main Hall cinema is suppressed (soft Kenneth gate).
+    prev_hall = make_state(room="106", cam_id=0, step=3, hp=96, scene_flag=0x93)
+    cur_hall = make_state(room="106", cam_id=0, step=4, hp=96, scene_flag=0x91)
+    assert (
+        qualify_cutscene_reward(
+            skip_frames=MIN_CUTSCENE_SKIP_FRAMES,
+            prev_state=prev_hall,
+            new_state=cur_hall,
+            episode_start_hp=96,
+            rewarded_cutscenes=progress.rewarded_cutscenes,
+        )
+        is None
+    )
+
+    # A distinct story beat in another room still pays once.
+    prev3 = make_state(room="104", cam_id=0, step=5, hp=96, scene_flag=0x93)
+    cur3 = make_state(room="104", cam_id=0, step=6, hp=96, scene_flag=0x91)
     key3 = qualify_cutscene_reward(
         skip_frames=MIN_CUTSCENE_SKIP_FRAMES,
         prev_state=prev3,
@@ -142,7 +157,7 @@ def test_new_cutscene_bonus_once_per_episode():
         episode_start_hp=96,
         rewarded_cutscenes=progress.rewarded_cutscenes,
     )
-    assert key3 == "106:0:s0"
+    assert key3 == "104:0:s0"
     cur3["cutscene_key"] = key3
     _, bd2 = compute_reward(
         cur2, cur3, planner, progress=progress, return_breakdown=True,
@@ -236,13 +251,16 @@ def test_damage_and_death_calibrated_to_waypoint():
 
     planner = make_planner()
     progress = ProgressTracker()
-    assert WAYPOINT_ROOM_BONUS * REWARD_SCALE == NEW_ROOM_BONUS == CHECKPOINT_REWARD == 1.0
+    assert CHECKPOINT_REWARD == 1.0
+    assert NEW_ROOM_BONUS == pytest.approx(3.0 * CHECKPOINT_REWARD)
+    assert NEW_CUTSCENE_BONUS == pytest.approx(1.0 * CHECKPOINT_REWARD)
+    assert WAYPOINT_ROOM_BONUS == NEW_ROOM_BONUS
     assert STEP_PENALTY * REWARD_SCALE == pytest.approx(-CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT)
     assert SURVIVAL_BUDGET_SCALED == pytest.approx(1.0 * CHECKPOINT_REWARD)
     assert NEAR_DEATH_DAMAGE_SCALED == pytest.approx((2.0 / 3.0) * CHECKPOINT_REWARD)
     assert DEATH_PENALTY_SCALED == pytest.approx((1.0 / 3.0) * CHECKPOINT_REWARD)
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-DEATH_PENALTY_SCALED)
-    assert HP_GAIN_SCALE == pytest.approx(0.8 * HP_LOSS_SCALE)
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-DEATH_PENALTY_SCALED / 5.0)
+    assert HP_GAIN_SCALE == pytest.approx(HP_LOSS_SCALE)
 
     full = make_state(hp=JILL_FINE_HP, step=1)
     near_death = make_state(hp=1, step=2)
@@ -262,23 +280,19 @@ def test_damage_and_death_calibrated_to_waypoint():
         -NEAR_DEATH_DAMAGE_SCALED * JILL_FINE_HP / (JILL_FINE_HP - 1)
     )
 
-    # Full Fine→1 chip then full heal back: heal recovers 80% of chip magnitude.
+    # Full Fine→1 chip then full heal: exact inverse of the chip magnitude.
     hurt = make_state(hp=1, step=20)
     healed = make_state(hp=JILL_FINE_HP, step=21)
     _, bd_heal = compute_reward(
         hurt, healed, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd_heal["hp"] * REWARD_SCALE == pytest.approx(
-        0.8 * NEAR_DEATH_DAMAGE_SCALED
-    )
+    assert bd_heal["hp"] * REWARD_SCALE == pytest.approx(NEAR_DEATH_DAMAGE_SCALED)
 
     from re1_rl.reward import hp_heal_reward
 
-    small = hp_heal_reward(10) * REWARD_SCALE
-    large = hp_heal_reward(80) * REWARD_SCALE
-    linear_small = HP_GAIN_SCALE * 10 * REWARD_SCALE
-    assert small < linear_small * 0.25
-    assert large > small * 30.0
+    assert hp_heal_reward(10) == pytest.approx(HP_GAIN_SCALE * 10.0)
+    assert hp_heal_reward(80) == pytest.approx(HP_GAIN_SCALE * 80.0)
+    assert hp_heal_reward(10) == pytest.approx(-HP_LOSS_SCALE * (-10.0))
 
 
 if __name__ == "__main__":

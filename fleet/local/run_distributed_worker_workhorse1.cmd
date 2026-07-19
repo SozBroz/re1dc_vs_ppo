@@ -7,7 +7,7 @@ set MACHINE_NAME=workhorse1
 set LEARNER_HOST=%FLEET_LEARNER_HOST%
 set BASE_PORT=5655
 set N_ENVS=8
-set SYNC_INTERVAL_S=180
+set SYNC_INTERVAL_S=360
 
 if not exist data\logs mkdir data\logs
 

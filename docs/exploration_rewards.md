@@ -1,6 +1,6 @@
 # RE exploration rewards
 
-> **Canonical policy source:** adapted from `D:\awbw\.cursor\skills\re-exploration-rewards\SKILL.md` (2026-07-17). Rewrite for clarity only. Any change to *what* pays, magnitudes, exceptions, or status (implemented / not) requires **explicit imperator validation** before it goes into code or this doc.
+> **Canonical policy source:** adapted from `D:\awbw\.cursor\skills\re-exploration-rewards\SKILL.md` (2026-07-18). Rewrite for clarity only. Any change to *what* pays, magnitudes, exceptions, or status (implemented / not) requires **explicit imperator validation** before it goes into code or this doc.
 
 Policy source: imperator.
 
@@ -14,20 +14,21 @@ Policy source: imperator.
 
 | # | Event | Magnitude | Episode | Status |
 |---|--------|-----------|---------|--------|
-| 1 | New room entered | Large: **≥ +0.5** | Extends | In force |
-| 2 | New **story-driven** cutscene | Large: **≥ +0.5** | Extends | In force |
-| 3 | New key item | Large: **≥ +0.5** | Extends | In force |
-| 4 | Using key item | Large: **≥ +0.5** | Extends | In force |
-| 5 | Weapon pickup (including wall shotgun) | Large: **+1.0** | Extends | In force |
-| 6 | Every non-key-item pickup | Modest: **typically below 0.5** | (no special rule stated) | In force |
+| 1 | New room entered | **+3.0** | Extends **+6 min** idle cap | In force |
+| 2 | New **story-driven** cutscene | **+1.0** | Resets stagnation clock | In force |
+| 3 | New key item | **+3.0** | Extends **+6 min** idle cap | In force |
+| 4 | Using key item | **+3.0** | Extends **+6 min** idle cap | In force |
+| 5 | Weapon pickup (including wall shotgun) | **+3.0** | Extends **+6 min** idle cap (first acquire of that weapon this episode) | In force |
+| 6 | Every non-key-item pickup | Modest: **0.15** | (no special rule stated) | In force |
 | 7 | Hitting an enemy | Modest: **typically below 0.5** | (no special rule stated) | In force |
 | 8 | Killing an enemy | Modest: **typically below 0.5** | (no special rule stated) | In force |
 | 9 | Story-driven interaction (Gallery portrait sequence) | Large: **+0.5 per correct switch** | Extends | In force |
 
 Buckets:
 
-- **1–5**: large (≥ +0.5), **extends the episode**
-- **6–8**: modest (typically below 0.5)
+- **1, 3, 4, 5**: **+3.0** and raise softlock idle truncate floor to **6 min** (weapons: first acquire of that name this episode)
+- **2**: **+1.0**; resets stagnation but does **not** by itself raise the 6 min floor
+- **6–8**: modest
 - **9**: large; each correct Gallery portrait switch pays +0.5 and extends
 
 Gallery room 117 policy:
@@ -57,7 +58,7 @@ dense penalty, not an episode reset:
   tea-room cutscene (`104:*:sN`) has occurred/paid this episode → apply exactly
   **−0.1 once** under `main_hall_before_kenneth`, **do not end the episode**,
   and **do not** mark 106 as visited (so a later legal entry after Kenneth can
-  still earn `new_room` +1).
+  still earn `new_room` +3.0).
 - Pre-Kenneth cutscenes in 106 (Wesker talk, etc.) **do not pay** `new_cutscene`.
 - Do **not** trigger the soft gate when an episode starts in 106, while remaining
   in 106, or when entering 106 after Kenneth has paid.
@@ -103,22 +104,35 @@ Illegal pre-Kenneth transition into 106 withholds visit credit and `new_room`
 
 Hit / kill pay only when the step is an actual **knife** or **attack** action. Enemy HP flicker on interact / door / cutscene without a combat action must **not** pay.
 
+## HP damage / heal
+
+- Taking damage: linear per-HP penalty (`HP_LOSS_SCALE`).
+- Healing: **exact inverse** of that punishment (same scale, opposite sign). No
+  0.8× haircut and no log compression.
+
 ## Item pickup pay (#5 / #6)
 
 - Every physical non-key-item pickup pays, including repeated pickups of the
   same type (another herb, ammunition box, etc.).
 - Key items remain once-per-episode.
-- The wall shotgun pays **+1.0** whenever Jill takes it and **−1.0** whenever
+- **Gold emblem put-back (10F alcove):** putting `gold_emblem` back on the stand
+  pays **−3.0** (`gold_emblem_return`) — exact inverse of key-item pickup.
+  Intended path is USE wooden `emblem` at the stand (+3.0 story use); that keeps
+  gold and does not trip the put-back penalty.
+- The wall shotgun pays **+3.0** whenever Jill takes it and **−3.0** whenever
   she replaces it on the rack. A repeated take/replace loop is therefore net
   zero before step cost; leaving with the shotgun preserves the pickup reward.
+  Re-takes after a return do **not** re-raise the 6 min idle floor or reset
+  stagnation (blocks rack idle-clock farms).
 - Weapon ammunition increases caused by reloading are not weapon pickups.
-- New rooms, cutscenes, key items, story uses, gallery pays, and weapon pickups
-  reset the stagnation clock (junk/ammo loops do not). Idle contempt: **3 min
-  grace**; pre-Kenneth truncate at **3 min** (bulk −1/5 death budget on the
-  timeout step); after Kenneth (`104:*:sN`) pays, truncate doubles to **6 min**
-  with a **3→6 min** ramp integrating to **1/5** of the death penalty (~0.0667).
-  Dense in scalar reward under main γ (**0.9925**) — no separate softlock MC
-  channel.
+- New rooms, cutscenes, key items, story uses, gallery pays, and **first**
+  weapon acquires reset the stagnation clock (junk/ammo/shotgun re-takes do not).
+- Idle contempt: **3 min grace**. Pre-Kenneth truncate at **3 min**; after
+  Kenneth (`104:*:sN`) pays, truncate doubles to **6 min** with a **3→6 min**
+  ramp. **New room / key pickup / key use / first weapon acquire floor the idle
+  cap at 6 min** (even pre-Kenneth). Contempt budget is **1/5** of death
+  (~0.0667). Dense in scalar reward under main γ (**0.9925**) — no separate
+  softlock MC channel.
 
 ## Agent rules
 
@@ -132,14 +146,14 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 
 ```
 Event fired?
-├─ Transition into 106 before Kenneth paid? → −0.1 once; continue episode; no visit/new_room (legal +1 later)
-├─ New room (legal)? → pay #1
+├─ Transition into 106 before Kenneth paid? → −0.1 once; continue episode; no visit/new_room (legal +3.0 later)
+├─ New room (legal)? → pay #1 (+3.0, 6m idle floor)
 ├─ Freeze / text / “cutscene”?
-│  ├─ Story-driven new beat under normal qual (incl. Kenneth 104:*:sN)? → pay #2
+│  ├─ Story-driven new beat under normal qual (incl. Kenneth 104:*:sN)? → pay #2 (+1.0)
 │  ├─ Pickup / menu / text-only interact / door-stairs load? → do NOT pay #2
 │  └─ Unclear? → ask; do not invent
-├─ Key item get / use? → #3 / #4
-├─ Weapon get? → #5 (+1.0 and extend); wall shotgun return → −1.0
+├─ Key item get / use? → #3 / #4 (+3.0, 6m idle floor)
+├─ Weapon get? → #5 (+3.0; first acquire → 6m idle floor); wall shotgun return → −3.0
 ├─ Other non-key item get? → #6 every pickup
 ├─ Hit / kill on knife|attack step? → #7 / #8
 └─ Gallery portrait sequence? → +0.5 per correct ordered switch; claw back partial attempt on wrong input/exit

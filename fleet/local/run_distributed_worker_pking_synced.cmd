@@ -8,7 +8,7 @@ set MACHINE_NAME=pking
 set LEARNER_HOST=%FLEET_LEARNER_HOST%
 set BASE_PORT=5755
 set N_ENVS=20
-if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=180
+if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
 
 REM Top-right grid seat: rank 4 / port 5759 (see run_distributed_worker_pking.cmd).
 set RE1_STEP_DIAG_PORT=5759

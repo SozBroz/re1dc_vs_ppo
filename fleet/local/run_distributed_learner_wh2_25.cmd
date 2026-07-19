@@ -1,7 +1,7 @@
 @echo off
-REM workhorse2 learner — 32 local envs (MMF screenshots); sync 180
+REM workhorse2 learner — 32 local envs (MMF screenshots); sync 360
 REM Headroom: @32 envs 10m soak peak ~41GB used / ~24GB free (pages_input~0).
-REM n_steps=1024 + batch_size=4096 staged for next restart (longer GAE, larger minibatches).
+REM Package: sync 360 + batch_size=8192 + n_epochs=4 (LR held at 1e-4).
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE=workhorse2
@@ -9,7 +9,7 @@ set RUN=reward_tune_1040k
 set N_ENVS=32
 set BASE_PORT=5555
 set LEARNER_PORT=8765
-set SYNC_INTERVAL_S=180
+set SYNC_INTERVAL_S=360
 
 if not exist data\logs mkdir data\logs
 REM Fresh heuristics log for this batch (truncate; do not delete).

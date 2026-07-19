@@ -27,6 +27,11 @@ class ProgressTracker:
 
     # Idle contempt: emulated frames since last exploration progress (reward.compute_reward).
     _stagnation_frames: int = 0
+    # Floor on softlock truncate after new_room / key / first weapon / key use.
+    softlock_cap_frames: int = 0
+    # Weapon names that already granted idle-extend / stagnation reset this ep.
+    # Shotgun rack re-takes still pay ±NEW_WEAPON but cannot re-farm the clock.
+    weapons_progressed: set[str] = field(default_factory=set)
     # Async skip may present one inventory transition twice. A wall return pays
     # once, then cannot pay again until shotgun possession is observed.
     _shotgun_return_armed: bool | None = None
@@ -67,6 +72,14 @@ class ProgressTracker:
     def stagnation_frames(self) -> int:
         return int(self._stagnation_frames)
 
+    def note_softlock_extension(self, frames: int) -> None:
+        """Raise idle truncate floor (and clear the idle clock) for 6m extensions."""
+        frames = max(0, int(frames))
+        if frames <= 0:
+            return
+        self.softlock_cap_frames = max(int(self.softlock_cap_frames), frames)
+        self._stagnation_frames = 0
+
     def note_stagnation_step(
         self,
         *,
@@ -76,8 +89,8 @@ class ProgressTracker:
         """Advance idle clock when no exploration progress this step.
 
         Progress is defined in ``compute_reward``: new room, new cutscene,
-        new key item, or new weapon this step. Revisiting rooms or junk
-        pickups do not reset.
+        new key item, first weapon acquire this episode, story use, or gallery.
+        Revisiting rooms, junk pickups, and shotgun rack re-takes do not reset.
         Each env step advances stagnation by ``step_frames`` (macro steps count more).
         """
         if made_progress:
@@ -90,6 +103,14 @@ class ProgressTracker:
         if threshold <= 0:
             return False
         return self._stagnation_frames >= int(threshold)
+
+    def claim_weapon_progress(self, weapon_name: str) -> bool:
+        """True once per weapon name per episode (idle extend / stagnation)."""
+        name = str(weapon_name or "")
+        if not name or name in self.weapons_progressed:
+            return False
+        self.weapons_progressed.add(name)
+        return True
 
     def claim_waypoint_bonus(self, waypoint_index: int) -> bool:
         """True exactly once per waypoint index per episode."""

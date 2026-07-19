@@ -7,7 +7,7 @@ if "%MACHINE_NAME%"=="" set MACHINE_NAME=workhorse1
 if "%LEARNER_HOST%"=="" set LEARNER_HOST=%FLEET_LEARNER_HOST%
 if "%N_ENVS%"=="" set N_ENVS=12
 if "%BASE_PORT%"=="" set BASE_PORT=5655
-if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=180
+if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role worker ^
