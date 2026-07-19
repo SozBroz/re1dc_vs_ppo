@@ -149,6 +149,8 @@ def _schema_alerts(
     paid_cutscene: bool,
 ) -> list[str]:
     """Return human-readable schema defiance lines (empty if clean)."""
+    from re1_rl.cutscene_reward import MIN_CUTSCENE_SKIP_FRAMES
+
     alerts: list[str] = []
     for k, v in sorted(breakdown.items()):
         if k in _IGNORE or abs(v) < 1e-9:
@@ -174,22 +176,10 @@ def _schema_alerts(
             "illegal entry should terminate, not pay room"
         )
 
-    if paid_cutscene and skip_kind == "door_room_change":
-        alerts.append("new_cutscene paid on door room-change — skill #2d")
-
-    if paid_cutscene and int(skip_frames) < 20:
-        alerts.append(f"new_cutscene paid with skip_frames={skip_frames} < 20")
-
-    # Interact-farm signature: short same-room cutscene pay.
-    if (
-        paid_cutscene
-        and skip_kind == "same_room_script"
-        and 0 < int(skip_frames) < 60
-        and room == "105"
-    ):
+    if paid_cutscene and int(skip_frames) < MIN_CUTSCENE_SKIP_FRAMES:
         alerts.append(
-            f"short dining cutscene pay skip_frames={skip_frames} "
-            "(interact-farm band; watch closely)"
+            f"new_cutscene paid with skip_frames={skip_frames} "
+            f"< {MIN_CUTSCENE_SKIP_FRAMES}"
         )
 
     if unpaid_reason and paid_cutscene:
@@ -262,6 +252,7 @@ def _print_gate(
             episode_start_hp=int(getattr(env.unwrapped, "_episode_start_hp", 0) or 0),
             rewarded_cutscenes=progress.rewarded_cutscenes,
             visited_rooms=progress.visited_rooms,
+            positive_rewards_disabled=progress.kenneth_gate_breached,
             qualified_key=qualified_key,
             breakdown=breakdown,
         ),

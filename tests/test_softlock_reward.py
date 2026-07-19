@@ -84,6 +84,31 @@ def test_new_room_raises_softlock_cap_to_six_minutes():
     assert softlock_frame_threshold(progress) == SOFTLOCK_EXTENSION_FRAMES
 
 
+def test_kenneth_gate_breach_revokes_and_blocks_softlock_extensions():
+    from re1_rl.reward import SOFTLOCK_EXTENSION_FRAMES
+
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    progress.note_softlock_extension(SOFTLOCK_EXTENSION_FRAMES)
+    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
+
+    prev = make_state(room="105", step=0)
+    hall = make_state(room="106", step=1)
+    _, breach = _step(progress, prev, hall)
+    assert breach["main_hall_before_kenneth"] == -1.6
+    assert progress.kenneth_gate_breached
+    assert progress.softlock_cap_frames == 0
+    assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES
+
+    progress.note_softlock_extension(SOFTLOCK_EXTENSION_FRAMES)
+    assert progress.softlock_cap_frames == 0
+    tea = make_state(room="104", step=2)
+    _, poisoned = _step(progress, hall, tea)
+    assert poisoned["new_room"] == 0.0
+    assert progress.softlock_cap_frames == 0
+    assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES
+
+
 def test_grace_has_no_softlock_tax():
     """Under grace on the post-Kenneth 6m cap: no softlock tax."""
     progress = ProgressTracker()

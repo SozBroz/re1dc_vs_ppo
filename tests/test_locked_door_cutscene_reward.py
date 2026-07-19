@@ -13,7 +13,7 @@ from re1_rl.reward import NEW_CUTSCENE_BONUS, compute_reward
 from tests.test_scaffolding import make_planner, make_state
 
 
-def test_locked_door_spam_no_cutscene_reward():
+def test_short_locked_door_spam_no_cutscene_reward():
     planner = make_planner()
     progress = ProgressTracker()
     progress.first_visit("107")
@@ -22,7 +22,7 @@ def test_locked_door_spam_no_cutscene_reward():
     for i in range(1, 6):
         cur = make_state(room="107", cam_id=2, hp=96, scene_flag=0x80, step=i)
         cur["cutscene_key"] = qualify_cutscene_reward(
-            skip_frames=MIN_CUTSCENE_SKIP_FRAMES + 40,
+            skip_frames=MIN_CUTSCENE_SKIP_FRAMES - 1,
             prev_state=prev,
             new_state=cur,
             episode_start_hp=96,

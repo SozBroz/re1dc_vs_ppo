@@ -1931,12 +1931,13 @@ def _credit_skip_room_crossing(
         )
     env._prev_state = dict(crossing)
     env._cutscene_skip_entry_prev = dict(crossing)
-    env._cutscene_skip_frames = 0
     try:
         env._ram_skip.clear_skip_script_peaks()
     except AttributeError:
         pass
-    return env._cutscene_skip_entry_prev, 0
+    return env._cutscene_skip_entry_prev, int(
+        getattr(env, "_cutscene_skip_frames", 0)
+    )
 
 
 def cutscene_skip_chunk(
@@ -2036,13 +2037,6 @@ def cutscene_skip_chunk(
     state = _annotate_story_use(
         env, entry_prev, state, inv_before, inv_after
     )
-    from re1_rl.cutscene_reward import apply_skip_script_evidence
-
-    entry_prev = apply_skip_script_evidence(
-        entry_prev,
-        peak_scene_flag=getattr(env._ram_skip, "last_skip_peak_scene_flag", None),
-        peak_msg_flag=getattr(env._ram_skip, "last_skip_peak_msg_flag", None),
-    ) or entry_prev
     if inv_before is not None:
         entry_prev = dict(entry_prev or {})
         entry_prev["inventory"] = list(inv_before)
@@ -2084,6 +2078,7 @@ def cutscene_skip_chunk(
                 cutscene_blocked_after_pickup_room=(
                     env._progress.cutscene_blocked_after_pickup_room
                 ),
+                positive_rewards_disabled=env._progress.kenneth_gate_breached,
                 qualified_key=state.get("cutscene_key"),
                 breakdown=breakdown,
             ),

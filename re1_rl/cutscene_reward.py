@@ -1,10 +1,7 @@
-"""Cutscene exploration reward gating (per-episode unique keys).
+"""Four-second cutscene duration gate with per-episode unique keys.
 
-Door / room-change skips use ``room:cam`` (blocks re-crossing the same door).
-
-Same-room scripted beats (Barry talk, then Barry zombie kill on return) share a
-camera — those use ``room:cam:sN`` so a later beat still pays once
-(``MAX_SAME_ROOM_CUTSCENE_INDEX`` caps N; default allows s0 and s1 only).
+Room-changing sessions use ``room:cam`` at entry. Same-room sessions use
+``room:cam:sN``; ``MAX_SAME_ROOM_CUTSCENE_INDEX`` caps repeats per camera.
 """
 
 from __future__ import annotations
@@ -17,25 +14,20 @@ from re1_rl.game_session import death_ui_from_ram, opening_phase_from_ram
 from re1_rl.memory_map import PLAYER_HP_MAX, SCENE_FLAG_MASK
 from re1_rl.ram_skip import in_game_menu_from_ram
 
-# Emulated frames burned in skip_uncontrolled before a cutscene counts.
-MIN_CUTSCENE_SKIP_FRAMES = 20
+# Emulated frames burned in one uninterrupted skip session before a cutscene
+# counts. 450 frames is 7.5 seconds at PS1 NTSC 60fps: above the observed
+# 384–424 frame stair transitions while preserving 508-frame Kenneth.
+MIN_CUTSCENE_SKIP_FRAMES = 450
 
-# Same-room scripted beats use ``room:cam:sN``. Cap N so scene_flag flicker /
-# dialogue loops cannot mint unbounded +NEW_CUTSCENE_BONUS in 104/105.
-# s0+s1 covers Barry talk then Barry-zombie return (see tests).
+# Same-room freezes use ``room:cam:sN``. Cap N so repeated long freezes at one
+# camera cannot mint unbounded +NEW_CUTSCENE_BONUS.
 MAX_SAME_ROOM_CUTSCENE_INDEX = 1
 
 # Boot / attract spans — never pay exploration cutscene bonus.
-# In-mansion Barry/Wesker scenes (``mansion_intro_*``) are real gameplay cutscenes
-# and pay once per room:cam like doors/Kenneth.
-# Kenneth tea-room zombie script (``104:*:sN``). Sole hard gate: transitioning
-# into Main Hall (106) before this beat has paid ends the episode (env).
+# Kenneth tea-room freeze (``104:*:sN``) unlocks legal Main Hall entry.
 KENNETH_CUTSCENE_MILESTONE = "104:0"
 MAIN_HALL_ROOM = "106"
-DINING_ROOM = "105"
 TEA_ROOM = "104"
-BARRY_DINING_CAM = 0
-BARRY_DINING_CLUSTER_PREFIX = f"{DINING_ROOM}:{BARRY_DINING_CAM}:s"
 # Telemetry key for soft pre-Kenneth Main Hall entry penalty (no episode end).
 ILLEGAL_MAIN_HALL_FAILURE_REASON = "main_hall_before_kenneth"
 
@@ -191,138 +183,11 @@ def illegal_main_hall_before_kenneth_transition(
     return not kenneth_cutscene_seen(rewarded_cutscenes)
 
 
-def dining_tea_corridor_repeat_disqualified(
-    *,
-    key: str,
-    prev_state: dict[str, Any] | None,
-    new_state: dict[str, Any] | None,
-    rewarded_cutscenes: Collection[str] | None,
-    visited_rooms: Collection[str] | None,
-) -> bool:
-    """Block dining↔tea-room cutscene farm (multi-cam doors + Kenneth sN replay).
-
-    Door re-crosses are also split by harness/training mid-skip room-crossing
-    credit (``new_room`` only, script segment reset) so settle frames do not
-    inherit the door span as a same-room ``room:cam:sN`` cutscene.
-    """
-    visited = {str(r) for r in (visited_rooms or ())}
-    if DINING_ROOM not in visited or TEA_ROOM not in visited:
-        return False
-
-    prev_r = str((prev_state or {}).get("room_id", "") or "")
-    new_r = str((new_state or {}).get("room_id", "") or "")
-    rewarded = {str(k) for k in (rewarded_cutscenes or ())}
-
-    if prev_r == DINING_ROOM and new_r == TEA_ROOM:
-        if any(k.startswith(f"{DINING_ROOM}:") for k in rewarded):
-            return True
-    if prev_r == TEA_ROOM and new_r == DINING_ROOM:
-        if any(
-            k.startswith(f"{TEA_ROOM}:") and ":s" not in k for k in rewarded
-        ):
-            return True
-
-    if str(key).startswith(f"{TEA_ROOM}:") and ":s" in str(key):
-        if any(k.startswith(f"{TEA_ROOM}:") and ":s" in k for k in rewarded):
-            return True
-
-    # After the corridor is known, block unbounded same-cam dining sN farm
-    # (door settle re-triggers). First beat per cam (``:s0``) and Barry cluster
-    # still pay; ``:s1+`` at non-Barry cams does not.
-    if (
-        prev_r == DINING_ROOM
-        and new_r == DINING_ROOM
-        and str(key).startswith(f"{DINING_ROOM}:")
-        and ":s" in str(key)
-        and not barry_dining_cluster_key(key)
-        and not str(key).endswith(":s0")
-    ):
-        return True
-
-    return False
-
-
-def kenneth_tea_script_key(key: str) -> bool:
-    """Tea-room Kenneth zombie script (``104:*:sN``)."""
-    return str(key).startswith(f"{TEA_ROOM}:") and ":s" in str(key)
-
-
-def same_room_script_key(key: str) -> bool:
-    """Sequenced same-camera beat (``room:cam:sN``) — not a door ``room:cam`` key."""
-    return ":s" in str(key)
-
-
-def same_camera_sequel_script_key(
-    key: str,
-    rewarded_cutscenes: Collection[str] | None,
-) -> bool:
-    """Second beat at a camera (``:s1``) after ``:s0`` already paid — examine-safe."""
-    k = str(key)
-    if not k.endswith(":s1"):
-        return False
-    base = k[: -len(":s1")]
-    prefix = base + ":s"
-    return any(str(x).startswith(prefix) for x in (rewarded_cutscenes or ()))
-
-
-def opening_corridor_dialogue_script_key(
-    key: str,
-    prev_state: dict[str, Any] | None,
-    new_state: dict[str, Any] | None,
-) -> bool:
-    """Dining/tea same-room ``:sN`` with real dialogue/script evidence.
-
-    Barry's walk-up talk often starts on cam 1/2 (not only cam 0) as msg-only
-    idle scene — must be examine-exempt. Idle examine spam (no msg/scene
-    movement) must stay blocked.
-    """
-    k = str(key)
-    if ":s" not in k:
-        return False
-    if not (k.startswith(f"{DINING_ROOM}:") or k.startswith(f"{TEA_ROOM}:")):
-        return False
-    prev_sf = int((prev_state or {}).get("scene_flag", 0) or 0)
-    new_sf = int((new_state or {}).get("scene_flag", 0) or 0)
-    if (prev_sf & SCENE_FLAG_MASK) or (new_sf & SCENE_FLAG_MASK):
-        return True
-    if prev_sf != new_sf:
-        return True
-    prev_msg = int((prev_state or {}).get("msg_flag", 0) or 0)
-    new_msg = int((new_state or {}).get("msg_flag", 0) or 0)
-    return prev_msg != new_msg
-
-
-def canonical_story_script_key(
-    key: str,
-    rewarded_cutscenes: Collection[str] | None = None,
-    *,
-    prev_state: dict[str, Any] | None = None,
-    new_state: dict[str, Any] | None = None,
-) -> bool:
-    """Barry / Kenneth / dining-tea dialogue / same-camera sequel markers.
-
-    Used for diagnostics / story classification. Examine-text skips are blocked
-    outright in ``qualify_cutscene_reward`` (no cam-0 exemption) so interact
-    spam cannot mint ``new_cutscene``.
-    """
-    return (
-        barry_dining_cluster_key(key)
-        or kenneth_tea_script_key(key)
-        or opening_corridor_dialogue_script_key(key, prev_state, new_state)
-        or same_camera_sequel_script_key(key, rewarded_cutscenes)
-    )
-
-
-def barry_dining_cluster_key(key: str) -> bool:
-    """Barry talk + Barry zombie at dining cam 0 (``105:0:sN``)."""
-    return str(key).startswith(BARRY_DINING_CLUSTER_PREFIX)
-
-
 def room_change_cutscene_disqualified(
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any] | None,
 ) -> bool:
-    """Room A -> door skip -> room B is discovery (``new_room``), not a script beat."""
+    """Classify a room-changing skip for diagnostics; it is not a pay denial."""
     if not prev_state or not new_state:
         return False
     prev_r = str(prev_state.get("room_id", "") or "")
@@ -331,21 +196,12 @@ def room_change_cutscene_disqualified(
 
 
 def story_use_menu_cutscene_exempt(new_state: dict[str, Any] | None) -> bool:
-    """Successful story USE: exempt pause-menu and examine-text cutscene gates.
+    """Successful story USE: exempt the pause-menu cutscene gate.
 
     Only when ``story_use_success`` is set — failed USE macros must not earn
     ``new_cutscene`` via this path.
     """
     return bool((new_state or {}).get("story_use_success"))
-
-
-# Same-room dialogue with message-flag movement (Barry, …) — not examine spam.
-SCRIPT_DIALOGUE_MIN_SKIP_FRAMES = 60
-# Story scripts often settle with idle scene/msg at BOTH skip endpoints (live
-# Barry walk-up: 1223 frames @ 105 cam2, both ends 0x80). Interact/examine
-# farm is short (~34 frames). Existing examine unit cases use ~120 frames —
-# keep the idle-settle floor above that band.
-STORY_IDLE_SETTLE_MIN_SKIP_FRAMES = 300
 
 
 def scene_flag_shows_script(scene_flag: int) -> bool:
@@ -362,11 +218,9 @@ def apply_skip_script_evidence(
     peak_scene_flag: int | None = None,
     peak_msg_flag: int | None = None,
 ) -> dict[str, Any] | None:
-    """Fold mid-skip scene/msg peaks into skip-entry for cutscene qualify.
+    """Fold mid-skip scene/msg peaks into an entry state for telemetry.
 
-    Turbo Kenneth often returns to idle 0x80 at both Python endpoints while
-    ``0x84`` only exists inside Lua ``fast_forward``. Without this latch, tea
-    room stays examine-blocked (idle-settle exemption is dining-only).
+    Reward qualification no longer depends on these peaks; duration owns pay.
     """
     if not entry:
         return entry
@@ -424,44 +278,6 @@ def pickup_cutscene_disqualified(
     return bool(room) and room == blocked
 
 
-def examine_text_skip_disqualified(
-    prev_state: dict[str, Any] | None,
-    new_state: dict[str, Any] | None,
-    *,
-    skip_frames: int = 0,
-) -> bool:
-    """Locked-door / examine message: same room, idle scene — not exploration."""
-    if not prev_state or not new_state:
-        return False
-    room = str(prev_state.get("room_id", "") or "")
-    if not room or room != str(new_state.get("room_id", "") or ""):
-        return False
-    prev_sf = int(prev_state.get("scene_flag", 0))
-    new_sf = int(new_state.get("scene_flag", 0))
-    # Scripted scenes (Barry, Kenneth, …) may move scene_flag mid-skip.
-    if (prev_sf & SCENE_FLAG_MASK) or (new_sf & SCENE_FLAG_MASK):
-        return False
-    if prev_sf != new_sf:
-        return False
-    msg_before = int(prev_state.get("msg_flag", 0))
-    msg_after = int(new_state.get("msg_flag", 0))
-    if (
-        msg_before != msg_after
-        and int(skip_frames) >= SCRIPT_DIALOGUE_MIN_SKIP_FRAMES
-    ):
-        return False
-    # Idle endpoints with no msg delta: short = examine/interact farm; long =
-    # story beat that returned to mansion idle (do not require endpoint evidence).
-    # Includes first Barry near dining spawn (idle settle both ends ~0x80).
-    if int(skip_frames) >= STORY_IDLE_SETTLE_MIN_SKIP_FRAMES:
-        if room == TEA_ROOM:
-            pass  # keep tea idle-settle blocked; Kenneth moves scene_flag
-        else:
-            return False
-    # Typical in-room idle while walking / at a door.
-    return (prev_sf & 0x7F) in (0, 0x80)
-
-
 def qualify_cutscene_reward(
     *,
     skip_frames: int,
@@ -472,11 +288,8 @@ def qualify_cutscene_reward(
     visited_rooms: Collection[str] | None = None,
     cutscene_blocked_after_pickup_room: str | None = None,
 ) -> str | None:
-    """Return cutscene key if this skip earns ``new_cutscene`` bonus, else None."""
-    # Room A→B is door discovery (``new_room``), never a script beat — check
-    # before the length gate so short patched doors are not mislabeled.
-    if room_change_cutscene_disqualified(prev_state, new_state):
-        return None
+    """Return a key when a non-exempt freeze lasts at least 450 frames."""
+    del visited_rooms
     if int(skip_frames) < MIN_CUTSCENE_SKIP_FRAMES:
         return None
     key = cutscene_key_from_state(
@@ -487,10 +300,6 @@ def qualify_cutscene_reward(
     if key is None:
         return None
 
-    hp_before = int((prev_state or {}).get("hp", 0))
-    hp_after = int((new_state or {}).get("hp", 0))
-    if hp_before > 0 and hp_after < hp_before:
-        return None
     if cutscene_death_disqualified_from_state(
         prev_state, episode_start_hp=episode_start_hp
     ):
@@ -521,28 +330,8 @@ def qualify_cutscene_reward(
     ):
         return None
 
-    if (
-        examine_text_skip_disqualified(
-            prev_state, new_state, skip_frames=int(skip_frames)
-        )
-        and not story_use_menu_cutscene_exempt(new_state)
-    ):
-        # Idle same-room examine / short msg: never pay. Cam-0 key exemptions
-        # farmed interact→cutscene (live: +1.0 for 105:0:s0 at skip_frames=34).
-        # Long idle-settle skips still clear via STORY_IDLE_SETTLE_MIN (Barry).
-        return None
-
-    if dining_tea_corridor_repeat_disqualified(
-        key=key,
-        prev_state=prev_state,
-        new_state=new_state,
-        rewarded_cutscenes=rewarded_cutscenes,
-        visited_rooms=visited_rooms,
-    ):
-        return None
-
     # Pre-Kenneth Main Hall scripts (Wesker talk, etc.): never pay cutscene.
-    # Illegal hall entry already applies the soft -0.1 gate in compute_reward.
+    # Illegal hall entry already applies the soft -1.6 gate in compute_reward.
     hall_room = str((new_state or {}).get("room_id", "") or "") or str(
         (prev_state or {}).get("room_id", "") or ""
     )
@@ -563,9 +352,7 @@ def cutscene_disqualify_reason(
     cutscene_blocked_after_pickup_room: str | None = None,
 ) -> str | None:
     """Human-readable reason when ``qualify_cutscene_reward`` returns None."""
-    # Structural door vs script before the length gate (patched doors are short).
-    if room_change_cutscene_disqualified(prev_state, new_state):
-        return "room-change door skip (same-room scripts only)"
+    del visited_rooms
     if int(skip_frames) < MIN_CUTSCENE_SKIP_FRAMES:
         return (
             f"skip_frames={int(skip_frames)} < {MIN_CUTSCENE_SKIP_FRAMES}"
@@ -586,10 +373,6 @@ def cutscene_disqualify_reason(
                         f"{MAX_SAME_ROOM_CUTSCENE_INDEX}"
                     )
         return "no room:cam key at skip entry"
-    hp_before = int((prev_state or {}).get("hp", 0))
-    hp_after = int((new_state or {}).get("hp", 0))
-    if hp_before > 0 and hp_after < hp_before:
-        return "hp loss during skip"
     if cutscene_death_disqualified_from_state(
         prev_state, episode_start_hp=episode_start_hp
     ):
@@ -621,27 +404,11 @@ def cutscene_disqualify_reason(
             "post-pickup same-room suppress "
             f"(blocked_room={cutscene_blocked_after_pickup_room!r})"
         )
-    if examine_text_skip_disqualified(
-        prev_state, new_state, skip_frames=int(skip_frames)
-    ):
-        if not story_use_menu_cutscene_exempt(new_state):
-            return "examine / locked text (same room, idle scene)"
-    key = cutscene_key_from_state(
-        prev_state, new_state, rewarded_cutscenes=rewarded_cutscenes
-    )
-    if key is not None and dining_tea_corridor_repeat_disqualified(
-        key=key,
-        prev_state=prev_state,
-        new_state=new_state,
-        rewarded_cutscenes=rewarded_cutscenes,
-        visited_rooms=visited_rooms,
-    ):
-        return "dining<->tea room repeat (Kenneth / multi-cam door farm)"
     hall_room = str((new_state or {}).get("room_id", "") or "") or str(
         (prev_state or {}).get("room_id", "") or ""
     )
     if hall_room == MAIN_HALL_ROOM and not kenneth_cutscene_seen(rewarded_cutscenes):
-        return "pre-Kenneth Main Hall cutscene (Wesker/hall; soft gate, no pay)"
+        return "pre-Kenneth Main Hall cutscene (Wesker/hall; poisoned gate, no pay)"
     return None
 
 
@@ -664,6 +431,7 @@ def format_cutscene_gate_panel(
     rewarded_cutscenes: Collection[str] | None = None,
     visited_rooms: Collection[str] | None = None,
     cutscene_blocked_after_pickup_room: str | None = None,
+    positive_rewards_disabled: bool = False,
     qualified_key: str | None = None,
     breakdown: dict[str, float] | None = None,
 ) -> str:
@@ -724,7 +492,11 @@ def format_cutscene_gate_panel(
         f"  rewarded_cutscenes={rewarded}",
     ]
     if paid <= 0.0:
-        if why:
+        if positive_rewards_disabled:
+            lines.append(
+                "  unpaid_reason: positive rewards disabled after Kenneth gate breach"
+            )
+        elif why:
             lines.append(f"  unpaid_reason: {why}")
         elif proposed and str(proposed) in rewarded:
             lines.append(f"  unpaid_reason: duplicate key {proposed!r} this episode")

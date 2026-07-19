@@ -50,6 +50,7 @@ def _stub_env(async_cutscene_skip: bool) -> RE1Env:
     env._post_skip_reward = 0.0
     env._post_skip_bd = {}
     env._last_skip_frames = 0
+    env._skip_session_frames = 0
     env._enemy_fields = []
     env.bridge = MagicMock()
     env.frame_skip = 8
@@ -141,6 +142,7 @@ def test_post_skip_sync_pays_cutscene_bonus_when_frames_recorded() -> None:
 
     env = _stub_env(async_cutscene_skip=True)
     env._last_skip_frames = 60
+    env._skip_session_frames = 450
     env._progress = ProgressTracker()
     env._cutscene_skip_entry_prev = None
     env._pending_skip_room_crossings = []
@@ -191,6 +193,7 @@ def test_post_skip_door_crossing_pays_new_room_not_cutscene() -> None:
 
     env = _stub_env(async_cutscene_skip=True)
     env._last_skip_frames = 80
+    env._skip_session_frames = 80
     env._progress = ProgressTracker()
     env._progress.first_visit("105")
     env._pending_skip_room_crossings = []
@@ -235,6 +238,78 @@ def test_post_skip_door_crossing_pays_new_room_not_cutscene() -> None:
     assert env._post_skip_bd.get("new_room") == NEW_ROOM_BONUS
     assert env._post_skip_bd.get("new_cutscene", 0.0) == 0.0
     assert env._post_skip_bd.get("new_cutscene", 0.0) != NEW_CUTSCENE_BONUS
+
+
+def test_room_cross_preserves_full_skip_session_duration() -> None:
+    env = _stub_env(async_cutscene_skip=True)
+    env._last_skip_frames = 120
+    env._skip_session_frames = 220
+    env._cutscene_skip_entry_prev = {
+        "room_id": "105",
+        "cam_id": 2,
+        "hp": 96,
+    }
+    env._pending_skip_room_crossings = []
+    env._read_state = MagicMock(
+        return_value={
+            "room_id": "104",
+            "cam_id": 0,
+            "hp": 96,
+        }
+    )
+
+    env._note_async_skip_room_crossing()
+
+    assert env._last_skip_frames == 0
+    assert env._skip_session_frames == 220
+    assert len(env._pending_skip_room_crossings) == 1
+
+
+def test_post_cross_settle_qualifies_with_full_session_not_last_segment() -> None:
+    from re1_rl.progress import ProgressTracker
+    from re1_rl.reward import NEW_CUTSCENE_BONUS
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._last_skip_frames = 20
+    env._skip_session_frames = 450
+    env._progress = ProgressTracker()
+    env._progress.first_visit("105")
+    env._progress.first_visit("104")
+    env._pending_skip_room_crossings = []
+    # A room crossing already restarted the segment entry at the destination.
+    env._cutscene_skip_entry_prev = {
+        "room_id": "104",
+        "cam_id": 0,
+        "hp": 96,
+        "inventory": [],
+        "stage_id": 0,
+        "character_id": 1,
+        "game_mode": 0x80,
+        "game_state": 0x80800004,
+        "scene_flag": 0x80,
+        "msg_flag": 0,
+    }
+    env._prev_state = dict(env._cutscene_skip_entry_prev)
+    env._read_state = MagicMock(
+        return_value={
+            **env._cutscene_skip_entry_prev,
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "facing": 0,
+            "in_control": True,
+            "dead": False,
+            "inventory_slots": [],
+            "new_items": [],
+            "enemies": [],
+            "interaction_prompt": False,
+        }
+    )
+
+    env._apply_post_skip_sync()
+
+    assert env._post_skip_bd.get("new_cutscene") == NEW_CUTSCENE_BONUS
+    assert env._last_settled_skip_frames == 450
 
 
 def test_sync_mode_still_calls_skip_uncontrolled(monkeypatch) -> None:

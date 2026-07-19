@@ -67,10 +67,9 @@ def test_skip_session_follows_needs_skip_not_in_control() -> None:
     assert play.skip_session_active(False) is False
 
 
-def test_barry_idle_settle_gate_matches_agent_floor() -> None:
-    """Human unpaid Barry was skip_frames<<300 from session fragmentation."""
+def test_human_cutscene_gate_matches_four_second_agent_floor() -> None:
     from re1_rl.cutscene_reward import (
-        STORY_IDLE_SETTLE_MIN_SKIP_FRAMES,
+        MIN_CUTSCENE_SKIP_FRAMES,
         qualify_cutscene_reward,
     )
 
@@ -97,7 +96,7 @@ def test_barry_idle_settle_gate_matches_agent_floor() -> None:
     )
     assert (
         qualify_cutscene_reward(
-            skip_frames=STORY_IDLE_SETTLE_MIN_SKIP_FRAMES,
+            skip_frames=MIN_CUTSCENE_SKIP_FRAMES,
             prev_state=prev,
             new_state=cur,
             visited_rooms={"105"},

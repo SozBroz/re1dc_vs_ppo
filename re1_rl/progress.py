@@ -29,6 +29,9 @@ class ProgressTracker:
     _stagnation_frames: int = 0
     # Floor on softlock truncate after new_room / key / first weapon / key use.
     softlock_cap_frames: int = 0
+    # Irreversible episode poison: entering Main Hall before Kenneth disables
+    # every later positive reward and all reward-driven idle extensions.
+    kenneth_gate_breached: bool = False
     # Spawn room (usually dining 105): visited at reset; +new_room paid once on
     # the first compute_reward of the episode so discovery is not attributed to
     # a later transition (e.g. Wesker / door settle).
@@ -94,11 +97,21 @@ class ProgressTracker:
 
     def note_softlock_extension(self, frames: int) -> None:
         """Raise idle truncate floor (and clear the idle clock) for 6m extensions."""
+        if self.kenneth_gate_breached:
+            return
         frames = max(0, int(frames))
         if frames <= 0:
             return
         self.softlock_cap_frames = max(int(self.softlock_cap_frames), frames)
         self._stagnation_frames = 0
+
+    def breach_kenneth_gate(self) -> bool:
+        """Poison positive reward/extension channels; true only on first breach."""
+        if self.kenneth_gate_breached:
+            return False
+        self.kenneth_gate_breached = True
+        self.softlock_cap_frames = 0
+        return True
 
     def note_stagnation_step(
         self,

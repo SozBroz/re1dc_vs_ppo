@@ -128,6 +128,8 @@ def softlock_frame_threshold(progress: ProgressTracker | None) -> int:
     """Idle truncate cap: 3 min before Kenneth, 6 min after; ≥6 min after room/key/weapon/use."""
     if progress is None:
         return SOFTLOCK_PRE_KENNETH_FRAMES
+    if progress.kenneth_gate_breached:
+        return SOFTLOCK_PRE_KENNETH_FRAMES
     from re1_rl.cutscene_reward import kenneth_cutscene_seen
 
     if kenneth_cutscene_seen(progress.rewarded_cutscenes):
@@ -283,10 +285,11 @@ def compute_reward(
     room = str(state.get("room_id", ""))
     room_changed = room != prev_room
 
-    # Soft Kenneth gate: illegal pre-Kenneth entry into 106 pays -1.6, does not
-    # end the episode, and must not mark 106 visited (so a later legal entry
-    # after Kenneth can still earn new_room).
+    # Kenneth gate: the first illegal pre-Kenneth entry into 106 pays -1.6 and
+    # irreversibly disables positive rewards/extensions for this episode.
+    # Never mark 106 visited on an illegal transition.
     illegal_main_hall = False
+    new_kenneth_gate_breach = False
     if progress is not None:
         from re1_rl.cutscene_reward import (
             illegal_main_hall_before_kenneth_transition,
@@ -298,6 +301,9 @@ def compute_reward(
             rewarded_cutscenes=progress.rewarded_cutscenes,
             visited_rooms=progress.visited_rooms,
         )
+        if illegal_main_hall and not state.get("dead"):
+            new_kenneth_gate_breach = progress.breach_kenneth_gate()
+            softlock_threshold = softlock_frame_threshold(progress)
 
     is_new_room = False
     if progress is not None and not illegal_main_hall:
@@ -371,7 +377,11 @@ def compute_reward(
 
     # Pickup owns its channel (skill a): never also claim new_cutscene this step.
     cutscene_key = state.get("cutscene_key") if not new_items else None
-    if cutscene_key and progress is not None:
+    if (
+        cutscene_key
+        and progress is not None
+        and not progress.kenneth_gate_breached
+    ):
         if progress.claim_cutscene_bonus(str(cutscene_key)):
             bd["new_cutscene"] = NEW_CUTSCENE_BONUS
 
@@ -435,12 +445,11 @@ def compute_reward(
         # Ignore bogus HP jumps from menu/cutscene init (prev_hp==0).
         bd["hp"] = hp_heal_reward(hp_delta)
 
-    # Actual death owns the ordinary death channel. Otherwise the soft Kenneth
-    # gate contributes once under its explicit telemetry key (no
-    # episode termination — caller must not treat this as episode failure).
+    # Actual death owns the ordinary death channel. Otherwise the first Kenneth
+    # gate breach contributes once under its explicit telemetry key.
     if state.get("dead"):
         bd["death"] = DEATH_PENALTY
-    elif illegal_main_hall:
+    elif new_kenneth_gate_breach:
         bd["main_hall_before_kenneth"] = MAIN_HALL_BEFORE_KENNETH_PENALTY
 
     enemy_damage = int(state.get("enemy_damage", 0) or 0)
@@ -449,6 +458,11 @@ def compute_reward(
     enemy_kills = int(state.get("enemy_kills", 0) or 0)
     if enemy_kills > 0:
         bd["enemy_kill"] = ENEMY_KILL_REWARD * enemy_kills
+
+    if progress is not None and progress.kenneth_gate_breached:
+        for term, value in bd.items():
+            if value > 0.0:
+                bd[term] = 0.0
 
     if progress is not None and not state.get("dead"):
         # Room / key get / key use / first weapon acquire → 6 min idle floor.

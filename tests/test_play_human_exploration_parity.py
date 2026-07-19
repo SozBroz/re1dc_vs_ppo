@@ -73,7 +73,7 @@ def test_spawn_dining_new_room_pays_on_first_reward_step():
 
 
 def test_cutscene_reward_needs_accumulated_skip_frames():
-    """Per-chunk 20f burns must not pay; 30f+ session total must."""
+    """Sub-threshold chunks must not pay; a 450f session total must."""
     planner = make_planner()
     progress = ProgressTracker()
     prev = make_state(room="105", cam_id=0, hp=96, scene_flag=0x80)
@@ -84,24 +84,28 @@ def test_cutscene_reward_needs_accumulated_skip_frames():
     _, bd_short = compute_reward(prev, cur20, planner, progress=progress, return_breakdown=True)
     assert bd_short["new_cutscene"] == 0.0
 
-    assert MIN_CUTSCENE_SKIP_FRAMES == 20
-    cur30 = dict(cur)
+    assert MIN_CUTSCENE_SKIP_FRAMES == 450
+    cur450 = dict(cur)
     from re1_rl.cutscene_reward import qualify_cutscene_reward
 
-    cur30["cutscene_key"] = qualify_cutscene_reward(
-        skip_frames=30,
+    cur450["cutscene_key"] = qualify_cutscene_reward(
+        skip_frames=450,
         prev_state=prev,
-        new_state=cur30,
+        new_state=cur450,
         episode_start_hp=96,
         rewarded_cutscenes=progress.rewarded_cutscenes,
     )
-    assert cur30["cutscene_key"] == "105:0:s0"
-    _, bd_ok = compute_reward(prev, cur30, planner, progress=progress, return_breakdown=True)
+    assert cur450["cutscene_key"] == "105:0:s0"
+    _, bd_ok = compute_reward(
+        prev, cur450, planner, progress=progress, return_breakdown=True
+    )
     assert bd_ok["new_cutscene"] == NEW_CUTSCENE_BONUS
 
-    cur30b = dict(cur)
-    cur30b["cutscene_key"] = "105:0:s0"
-    _, bd_dup = compute_reward(cur30, cur30b, planner, progress=progress, return_breakdown=True)
+    cur450b = dict(cur)
+    cur450b["cutscene_key"] = "105:0:s0"
+    _, bd_dup = compute_reward(
+        cur450, cur450b, planner, progress=progress, return_breakdown=True
+    )
     assert bd_dup["new_cutscene"] == 0.0
 
 

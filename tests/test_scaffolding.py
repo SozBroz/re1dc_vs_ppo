@@ -133,7 +133,7 @@ def test_new_cutscene_bonus_once_per_episode():
     )
     assert bd1["new_cutscene"] == 0.0
 
-    # Pre-Kenneth Main Hall cinema is suppressed (soft Kenneth gate).
+    # Pre-Kenneth Main Hall cinema is suppressed (poisoned Kenneth gate).
     prev_hall = make_state(room="106", cam_id=0, step=3, hp=96, scene_flag=0x93)
     cur_hall = make_state(room="106", cam_id=0, step=4, hp=96, scene_flag=0x91)
     assert (

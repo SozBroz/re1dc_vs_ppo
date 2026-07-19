@@ -13,8 +13,8 @@ from re1_rl.reward import compute_reward
 from tests.test_scaffolding import make_planner, make_state
 
 
-def test_dining_message_spam_no_cutscene_reward():
-  """Room 105 idle scene: repeated examine skips do not pay."""
+def test_short_dining_message_spam_no_cutscene_reward():
+  """Room 105 idle scene: repeated sub-threshold freezes do not pay."""
   planner = make_planner()
   progress = ProgressTracker()
   progress.first_visit("105")
@@ -23,7 +23,7 @@ def test_dining_message_spam_no_cutscene_reward():
   for i in range(1, 8):
     cur = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80, step=i)
     cur["cutscene_key"] = qualify_cutscene_reward(
-      skip_frames=MIN_CUTSCENE_SKIP_FRAMES + 40,
+      skip_frames=MIN_CUTSCENE_SKIP_FRAMES - 1,
       prev_state=prev,
       new_state=cur,
       episode_start_hp=96,

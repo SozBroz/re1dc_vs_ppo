@@ -373,6 +373,10 @@ class RE1Env(gym.Env):
         self._post_skip_reward = 0.0
         self._post_skip_bd: dict[str, float] = {}
         self._cutscene_skip_entry_prev: dict[str, Any] | None = None
+        # Total uncontrolled frames for the current skip, including every
+        # room-crossing segment. Unlike _last_skip_frames, this never resets at
+        # a door and is the sole duration used for cutscene reward qualification.
+        self._skip_session_frames = 0
         # (entry_prev, crossing_state) queued by bg skip; credited on main thread.
         self._pending_skip_room_crossings: list[
             tuple[dict[str, Any], dict[str, Any]]
@@ -604,6 +608,7 @@ class RE1Env(gym.Env):
         self._post_skip_reward = 0.0
         self._post_skip_bd = {}
         self._cutscene_skip_entry_prev = None
+        self._skip_session_frames = 0
         self._pending_skip_room_crossings = []
         self._pending_episode_failure = None
         self._load_stage()
@@ -711,6 +716,7 @@ class RE1Env(gym.Env):
                 continue
             if not self._skipping_flag:
                 self._last_skip_frames = 0
+                self._skip_session_frames = 0
                 # Live skip-entry pose (harness parity). Stale _prev_state can be
                 # idle while Kenneth scene_flag is already 0x84.
                 try:
@@ -747,6 +753,9 @@ class RE1Env(gym.Env):
             self._last_skip_frames = int(getattr(self, "_last_skip_frames", 0)) + int(
                 burned
             )
+            self._skip_session_frames = int(
+                getattr(self, "_skip_session_frames", 0)
+            ) + int(burned)
             if not died:
                 died = self._poll_death_during_skip()
             if died:
@@ -827,10 +836,10 @@ class RE1Env(gym.Env):
         prev_state: dict[str, Any] | None,
         state: dict[str, Any] | None,
     ) -> bool:
-        """True on soft Kenneth-gate transition (enter 106 before Kenneth paid).
+        """True on Kenneth-gate transition (enter 106 before Kenneth paid).
 
-        Soft gate: dense -0.1 in compute_reward, no episode end, no visit credit.
-        Returns False when Jill is already dead (real death path owns the step).
+        The first breach poisons positive rewards/extensions in compute_reward;
+        the episode continues. Returns False when Jill is already dead.
         """
         from re1_rl.cutscene_reward import (
             illegal_main_hall_before_kenneth_transition,
@@ -852,7 +861,7 @@ class RE1Env(gym.Env):
         prev_state: dict[str, Any] | None,
         state: dict[str, Any] | None,
     ) -> str | None:
-        """Legacy name: soft gate no longer ends the episode.
+        """Legacy name: the poisoned gate does not end the episode.
 
         Returns the telemetry reason string when the soft transition fires,
         else None. Callers must not treat this as episode failure.
@@ -901,8 +910,8 @@ class RE1Env(gym.Env):
                 str(crossing.get("room_id", "")),
                 bool(crossing.get("in_control", True)),
             )
-            # Soft Kenneth gate: compute_reward applies -0.1, skips visit/new_room;
-            # episode continues (no _pending_episode_failure).
+            # Kenneth gate: compute_reward applies -1.6, poisons all positive
+            # rewards/extensions, and continues the episode.
             reward, bd = compute_reward(
                 entry,
                 crossing,
@@ -917,7 +926,6 @@ class RE1Env(gym.Env):
 
     def _apply_post_skip_sync(self) -> None:
         """Credit pickups / cutscenes that finished while async skip was running."""
-        from re1_rl.cutscene_reward import room_change_cutscene_disqualified
         from re1_rl.story_item_use import annotate_story_use_success
 
         # Flush any door crossing (harness _credit_skip_room_crossing).
@@ -931,15 +939,6 @@ class RE1Env(gym.Env):
         inv_after = None
         inv_before = getattr(self, "_inventory_before_skip", None)
         entry_prev = getattr(self, "_cutscene_skip_entry_prev", None) or self._prev_state
-        from re1_rl.cutscene_reward import apply_skip_script_evidence
-
-        entry_prev = apply_skip_script_evidence(
-            entry_prev,
-            peak_scene_flag=getattr(
-                self._ram_skip, "last_skip_peak_scene_flag", None
-            ),
-            peak_msg_flag=getattr(self._ram_skip, "last_skip_peak_msg_flag", None),
-        ) or entry_prev
         try:
             from re1_rl.item_box import read_inventory
             from re1_rl.weapon_equip import policy_inventory
@@ -962,17 +961,14 @@ class RE1Env(gym.Env):
             entry_prev["inventory"] = list(inv_before)
         if inv_after is not None:
             state["inventory"] = list(inv_after)
-        # Soft Kenneth gate: do not end the episode; compute_reward below applies
-        # -0.1 and withholds 106 visit credit. Still null cutscene on door change.
-        # Room-change door skips: discovery is new_room only (never new_cutscene).
-        if room_change_cutscene_disqualified(entry_prev, state):
-            state["cutscene_key"] = None
-        else:
-            state["cutscene_key"] = self._qualify_cutscene_reward(
-                int(getattr(self, "_last_skip_frames", 0)),
-                entry_prev,
-                state,
-            )
+        # Reward qualification is duration-only apart from explicit menu,
+        # pickup, death, opening, and pre-Kenneth hall exclusions. Door crossings
+        # keep their new_room credit and contribute to this full-session duration.
+        state["cutscene_key"] = self._qualify_cutscene_reward(
+            int(getattr(self, "_skip_session_frames", 0)),
+            entry_prev,
+            state,
+        )
         reward, bd = compute_reward(
             entry_prev,
             state,
@@ -990,12 +986,15 @@ class RE1Env(gym.Env):
         # gate panels fall back to step_emulated_frames (lies as "4 < 20").
         from re1_rl.cutscene_reward import skip_session_kind
 
-        self._last_settled_skip_frames = int(getattr(self, "_last_skip_frames", 0) or 0)
+        self._last_settled_skip_frames = int(
+            getattr(self, "_skip_session_frames", 0) or 0
+        )
         self._last_settled_cutscene_key = state.get("cutscene_key")
         self._last_settled_skip_prev = dict(entry_prev) if entry_prev else None
         self._last_settled_skip_new = dict(state)
         self._last_settled_skip_kind = skip_session_kind(entry_prev, state)
         self._last_skip_frames = 0
+        self._skip_session_frames = 0
         if state["hp"] > 0:
             self._prev_hp = state["hp"]
         hp_now = int(state["hp"])
