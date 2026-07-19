@@ -29,6 +29,11 @@ class ProgressTracker:
     _stagnation_frames: int = 0
     # Floor on softlock truncate after new_room / key / first weapon / key use.
     softlock_cap_frames: int = 0
+    # Spawn room (usually dining 105): visited at reset; +new_room paid once on
+    # the first compute_reward of the episode so discovery is not attributed to
+    # a later transition (e.g. Wesker / door settle).
+    spawn_room_id: str | None = None
+    _spawn_room_bonus_paid: bool = False
     # Weapon names that already granted idle-extend / stagnation reset this ep.
     # Shotgun rack re-takes still pay ±NEW_WEAPON but cannot re-farm the clock.
     weapons_progressed: set[str] = field(default_factory=set)
@@ -39,6 +44,21 @@ class ProgressTracker:
     gallery_pending_reward: float = 0.0
     gallery_completed: bool = False
     gallery_needs_reentry: bool = False
+
+    def seed_spawn_room(self, room_id: str) -> None:
+        """Mark spawn visited and arm one-shot spawn ``new_room`` credit."""
+        room = str(room_id or "")
+        self.spawn_room_id = room or None
+        self._spawn_room_bonus_paid = False
+        if room:
+            self.first_visit(room)
+
+    def claim_spawn_room_bonus(self) -> bool:
+        """True once: first ``compute_reward`` this episode credits spawn room."""
+        if self._spawn_room_bonus_paid or not self.spawn_room_id:
+            return False
+        self._spawn_room_bonus_paid = True
+        return True
 
     def first_visit(
         self,

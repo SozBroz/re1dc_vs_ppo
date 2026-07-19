@@ -253,7 +253,7 @@ def test_damage_and_death_calibrated_to_waypoint():
     progress = ProgressTracker()
     assert CHECKPOINT_REWARD == 1.0
     assert NEW_ROOM_BONUS == pytest.approx(3.0 * CHECKPOINT_REWARD)
-    assert NEW_CUTSCENE_BONUS == pytest.approx(1.0 * CHECKPOINT_REWARD)
+    assert NEW_CUTSCENE_BONUS == pytest.approx(1.5 * CHECKPOINT_REWARD)
     assert WAYPOINT_ROOM_BONUS == NEW_ROOM_BONUS
     assert STEP_PENALTY * REWARD_SCALE == pytest.approx(-CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT)
     assert SURVIVAL_BUDGET_SCALED == pytest.approx(1.0 * CHECKPOINT_REWARD)

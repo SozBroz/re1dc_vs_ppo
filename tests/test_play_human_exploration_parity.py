@@ -24,14 +24,52 @@ def test_seed_episode_progress_marks_spawn_room_visited():
     )
     assert env._episode_start_hp == 96
     assert "105" in env._progress.visited_rooms
-    _, bd = compute_reward(
+    assert env._progress.spawn_room_id == "105"
+
+
+def test_spawn_dining_new_room_pays_on_first_reward_step():
+    """Dining (spawn) +3 lands on first compute_reward, not a later transition."""
+    env = MagicMock(spec=RE1Env)
+    env._progress = ProgressTracker()
+    RE1Env._seed_episode_progress(env, make_state(room="105", hp=96))
+    assert "105" in env._progress.visited_rooms
+
+    _, bd0 = compute_reward(
         make_state(room="105", hp=96),
         make_state(room="105", hp=96),
         make_planner(),
         progress=env._progress,
         return_breakdown=True,
     )
-    assert bd["new_room"] == 0.0
+    assert bd0["new_room"] == NEW_ROOM_BONUS
+    assert env._progress.softlock_cap_frames > 0
+
+    _, bd1 = compute_reward(
+        make_state(room="105", hp=96),
+        make_state(room="105", hp=96),
+        make_planner(),
+        progress=env._progress,
+        return_breakdown=True,
+    )
+    assert bd1["new_room"] == 0.0
+
+    # Re-enter dining after leaving — no second dining discovery.
+    _, bd_leave = compute_reward(
+        make_state(room="105", hp=96),
+        make_state(room="104", hp=96),
+        make_planner(),
+        progress=env._progress,
+        return_breakdown=True,
+    )
+    assert bd_leave["new_room"] == NEW_ROOM_BONUS  # 104 first visit
+    _, bd_back = compute_reward(
+        make_state(room="104", hp=96),
+        make_state(room="105", hp=96),
+        make_planner(),
+        progress=env._progress,
+        return_breakdown=True,
+    )
+    assert bd_back["new_room"] == 0.0
 
 
 def test_cutscene_reward_needs_accumulated_skip_frames():

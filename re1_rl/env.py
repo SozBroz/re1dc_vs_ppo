@@ -671,11 +671,11 @@ class RE1Env(gym.Env):
         return obs, info
 
     def _seed_episode_progress(self, state: dict[str, Any]) -> None:
-        """Mark spawn room visited + episode HP baseline (matches fleet reset)."""
+        """Mark spawn room visited + arm spawn ``new_room`` on first reward step."""
         hp = int(state.get("hp", 0))
         self._episode_start_hp = hp if hp > 0 else 0
         self._episode_min_hp = self._episode_start_hp
-        self._progress.first_visit(str(state.get("room_id", "")))
+        self._progress.seed_spawn_room(str(state.get("room_id", "")))
 
     def _skip_poll_ram(self) -> dict[str, int | float]:
         return self.bridge.read_ram(SKIP_POLL_RAM_FIELDS)

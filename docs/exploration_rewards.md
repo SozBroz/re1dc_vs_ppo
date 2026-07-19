@@ -15,7 +15,7 @@ Policy source: imperator.
 | # | Event | Magnitude | Episode | Status |
 |---|--------|-----------|---------|--------|
 | 1 | New room entered | **+3.0** | Extends **+6 min** idle cap | In force |
-| 2 | New **story-driven** cutscene | **+1.0** | Resets stagnation clock | In force |
+| 2 | New **story-driven** cutscene | **+1.5** | Resets stagnation clock | In force |
 | 3 | New key item | **+3.0** | Extends **+6 min** idle cap | In force |
 | 4 | Using key item | **+3.0** | Extends **+6 min** idle cap | In force |
 | 5 | Weapon pickup (including wall shotgun) | **+3.0** | Extends **+6 min** idle cap (first acquire of that weapon this episode) | In force |
@@ -27,7 +27,7 @@ Policy source: imperator.
 Buckets:
 
 - **1, 3, 4, 5**: **+3.0** and raise softlock idle truncate floor to **6 min** (weapons: first acquire of that name this episode)
-- **2**: **+1.0**; resets stagnation but does **not** by itself raise the 6 min floor
+- **2**: **+1.5**; resets stagnation but does **not** by itself raise the 6 min floor
 - **6–8**: modest
 - **9**: large; each correct Gallery portrait switch pays +0.5 and extends
 
@@ -100,6 +100,11 @@ Do not treat (f) as a decided pay/deny rule until validated.
 Illegal pre-Kenneth transition into 106 withholds visit credit and `new_room`
 (soft −0.1 instead). After Kenneth pays, the first real 106 entry may pay #1.
 
+**Spawn room (dining 105 on m0):** marked visited at episode reset; the +3.0
+`new_room` (and 6 min idle floor) pays on the **first** `compute_reward` of the
+episode. That way dining discovery is not attributed to a later Wesker/door
+settle. Re-entering dining never pays again.
+
 ## Combat pay (#7 / #8)
 
 Hit / kill pay only when the step is an actual **knife** or **attack** action. Enemy HP flicker on interact / door / cutscene without a combat action must **not** pay.
@@ -149,7 +154,7 @@ Event fired?
 ├─ Transition into 106 before Kenneth paid? → −0.1 once; continue episode; no visit/new_room (legal +3.0 later)
 ├─ New room (legal)? → pay #1 (+3.0, 6m idle floor)
 ├─ Freeze / text / “cutscene”?
-│  ├─ Story-driven new beat under normal qual (incl. Kenneth 104:*:sN)? → pay #2 (+1.0)
+│  ├─ Story-driven new beat under normal qual (incl. Kenneth 104:*:sN)? → pay #2 (+1.5)
 │  ├─ Pickup / menu / text-only interact / door-stairs load? → do NOT pay #2
 │  └─ Unclear? → ask; do not invent
 ├─ Key item get / use? → #3 / #4 (+3.0, 6m idle floor)

@@ -5,5 +5,6 @@ cd /d C:\Users\sshuser\re1_rl
 taskkill /F /IM EmuHawk.exe >nul 2>&1
 powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { $_.CommandLine -match 'distributed_train' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
 powershell -NoProfile -Command "Start-Sleep -Seconds 3"
+REM Log flush happens inside run_distributed_learner_wh2_25.cmd.
 start "WH2-learner" /MIN cmd /c "cd /d C:\Users\sshuser\re1_rl && fleet\local\run_distributed_learner_wh2_25.cmd"
 echo WH2 learner restarted. Tail: type data\logs\learner_wh2_25.log

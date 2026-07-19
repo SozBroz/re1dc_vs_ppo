@@ -14,6 +14,7 @@ Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 2
 
+# Log flush happens inside run_distributed_learner_wh2_25.cmd.
 $cmd = Join-Path $RepoRoot 'fleet\local\run_distributed_learner_wh2_25.cmd'
 Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$cmd`"" -WorkingDirectory $RepoRoot

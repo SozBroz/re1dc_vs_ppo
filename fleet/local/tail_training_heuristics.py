@@ -35,6 +35,7 @@ import threading
 import time
 from pathlib import Path
 
+# Truncated (not deleted) on each machine's batch restart via fleet/local/flush_log.cmd.
 DEFAULT_SOURCES: tuple[tuple[str, str | None, Path], ...] = (
     ("pking", None, Path(r"D:\re1_rl\data\logs\worker_pking.log")),
     ("wh1", "workhorse1", Path(r"D:\re1_rl\data\logs\worker_workhorse1.log")),

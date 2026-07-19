@@ -15,10 +15,15 @@ Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
 Start-Sleep -Seconds 2
 
 $wrapper = Join-Path $RepoRoot 'fleet\local\run_distributed_worker_pking.cmd'
+$flush = Join-Path $RepoRoot 'fleet\local\flush_log.cmd'
+$log = Join-Path $RepoRoot 'data\logs\worker_pking.log'
 $launcher = Join-Path $RepoRoot 'fleet\local\_pking_worker_launcher.cmd'
+# Fresh heuristics log for this batch (truncate; do not delete).
+& $flush $log
 @"
 @echo off
 cd /d $RepoRoot
+call "$flush" "$log"
 call "$wrapper" >> data\logs\worker_pking.log 2>&1
 "@ | Set-Content -Path $launcher -Encoding ASCII
 

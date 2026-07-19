@@ -36,7 +36,7 @@ REFERENCE_STEP_FRAMES = 8
 
 # Exploration bonuses (imperator 2026-07-18 retune).
 NEW_ROOM_BONUS = 3.0 * CHECKPOINT_REWARD
-NEW_CUTSCENE_BONUS = 1.0 * CHECKPOINT_REWARD
+NEW_CUTSCENE_BONUS = 1.5 * CHECKPOINT_REWARD
 
 # Legacy aliases kept for tests / telemetry that import old names.
 WAYPOINT_ROOM_BONUS = NEW_ROOM_BONUS
@@ -339,7 +339,12 @@ def compute_reward(
                         bd["wrong_room"] = WRONG_ROOM_PENALTY
 
     if room_changed and is_new_room:
-        bd["new_room"] = NEW_ROOM_BONUS
+        bd["new_room"] += NEW_ROOM_BONUS
+    # Spawn room (dining 105 in m0): visited at reset; pay +new_room once on the
+    # first compute_reward of the episode so Wesker/door settles cannot steal
+    # credit for "first time in dining".
+    if progress is not None and progress.claim_spawn_room_bonus():
+        bd["new_room"] += NEW_ROOM_BONUS
 
     if "new_items" in state:
         new_items = set(state["new_items"])

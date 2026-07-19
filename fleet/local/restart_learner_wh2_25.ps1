@@ -10,9 +10,7 @@ Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
 
 Start-Sleep -Seconds 3
 
-$stamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-"[$stamp] restart_learner_wh2_25.ps1 launching learner" |
-    Out-File -FilePath 'data\logs\learner_wh2_25.log' -Append -Encoding utf8
+# Log flush + restart stamp happen inside run_distributed_learner_wh2_25.cmd.
 
 # Must run from an interactive desktop session (RDP/console) — not schtasks /Run over SSH.
 Start-Process -FilePath 'cmd.exe' `
