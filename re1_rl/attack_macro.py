@@ -21,15 +21,12 @@ from typing import Any, Callable
 from re1_rl.frame_ring import FrameRingBuffer
 from re1_rl.knife_macro import (
     CROUCH_KNIFE_ACTIVE_AUX,
-    KNIFE_AIM_GAME_FRAMES,
-    KNIFE_FRAME_SCALE,
-    KNIFE_RECOVERY_GAME_FRAMES,
-    KNIFE_SWING_GAME_FRAMES,
     MIN_BUTTON_PHASE_FRAMES,
     _step_one_frame,
-    execute_knife_macro,
     is_idle_recovery_latch,
     is_knife_animation_idle,
+    is_knife_slash_anim,
+    is_knife_swing_recovery_tail,
     is_standing_pre_knife_idle,
     is_standing_recovery_latch,
     read_knife_hooks,
@@ -79,12 +76,9 @@ MAX_AIM_FRAMES = 120
 MIN_FIRE_HOLD_FRAMES = 6
 SHOTGUN_RECOVERY_PAD_FRAMES = MIN_BUTTON_PHASE_FRAMES
 MAX_FIRE_RECOVERY_FRAMES = 240
-MAX_TAIL_FRAMES = 60
 UP_AIM_MAX_FRAMES = 80
 UP_FIRE_MAX_FRAMES = 12
 UP_RECOVERY_MAX_FRAMES = 120
-UP_LOWER_MAX_FRAMES = 60
-UP_HOLSTER_MAX_FRAMES = 60
 KNIFE_UP_CROSS_FRAMES = 5
 KNIFE_UP_RELEASE_STAGE_FRAMES = 4
 KNIFE_UP_AIM_FRAMES = 24
@@ -165,6 +159,15 @@ def is_gun_aim_stable(anim: int, aux: int, recovery: int) -> bool:
     return recovery == 0 and aux == GUN_AUX_TRACK and anim == AIM_ANIM_STABLE
 
 
+def is_gun_link_ready(anim: int, aux: int, recovery: int) -> bool:
+    """Post-shot recovery is over; a following macro may buffer its next input."""
+    return recovery == 0 and aux == GUN_AUX_TRACK and anim in (
+        AIM_ANIM_STABLE,
+        FIRE_ANIM,
+        0x16,
+    )
+
+
 def is_aim_stable(anim: int, aux: int, recovery: int) -> bool:
     """Public helper: gun stable aim OR knife crouch-aim ready (tests / masks)."""
     if is_gun_aim_stable(anim, aux, recovery):
@@ -175,7 +178,7 @@ def is_aim_stable(anim: int, aux: int, recovery: int) -> bool:
 def is_gun_attack_track(anim: int, aux: int) -> bool:
     if anim == 0 and aux == 0:
         return True
-    return anim in (AIM_ANIM_RAISING, AIM_ANIM_STABLE, FIRE_ANIM, 0x15, 0x17) and aux in (
+    return anim in (AIM_ANIM_RAISING, AIM_ANIM_STABLE, FIRE_ANIM, 0x15, 0x16, 0x17) and aux in (
         0,
         GUN_AUX_TRACK,
     )
@@ -225,6 +228,7 @@ def _empty_report(weapon_id: int, weapon: str | None) -> dict[str, Any]:
         "saw_fire_anim": False,
         "trail": [],
         "macro_path": None,
+        "link_aim_held": False,
     }
 
 
@@ -237,29 +241,19 @@ def _execute_knife_attack_crouch_macro(
     weapon_id: int,
     weapon: str | None,
 ) -> tuple[bool, int, dict[str, Any]]:
-    """Crouch knife (R1+Down) — shared by ``attack_down`` and legacy callers."""
-    died, frames = execute_knife_macro(
+    """Crouch knife (R1+Down) with buffered Cross pulses for linked attacks."""
+    return _execute_standing_knife_height_macro(
         bridge,
         empty_sticky=empty_sticky,
-        phases=(
-            KNIFE_AIM_GAME_FRAMES,
-            KNIFE_SWING_GAME_FRAMES,
-            KNIFE_RECOVERY_GAME_FRAMES,
-        ),
-        scale=KNIFE_FRAME_SCALE,
-        use_ram_gates=True,
         prev_hp=prev_hp,
         episode_start_hp=episode_start_hp,
+        weapon_id=weapon_id,
+        weapon=weapon,
+        aim_buttons={"r1": True, "down": True},
+        swing_buttons={"r1": True, "down": True, "cross": True},
+        macro_path="knife_crouch",
+        aim_mode="down",
     )
-    knife_report = getattr(bridge, "last_knife_anim_report", None) or {}
-    report = _empty_report(weapon_id, weapon)
-    report["macro_path"] = "knife_crouch"
-    report["aim_mode"] = "down"
-    report["outcome"] = str(knife_report.get("outcome", "ok"))
-    report["frames"] = int(frames)
-    report["saw_fire_anim"] = report["outcome"] == "ok"
-    report["knife_report"] = dict(knife_report)
-    return died, int(frames), report
 
 
 def _execute_standing_knife_height_macro(
@@ -282,7 +276,15 @@ def _execute_standing_knife_height_macro(
     total = 0
     trail: list[str] = []
     max_aim = max(KNIFE_UP_AIM_FRAMES, 32)
-    max_swing = max(KNIFE_UP_CROSS_FRAMES * 12, 48)
+    max_swing = max(KNIFE_UP_CROSS_FRAMES * 24, 96)
+    entry_hooks = read_knife_hooks(bridge)
+    entry_slash = is_knife_slash_anim(*entry_hooks)
+    linked_entry = entry_hooks[1] == CROUCH_KNIFE_ACTIVE_AUX and entry_hooks[0] in (
+        0x13,
+        FIRE_ANIM,
+        0x15,
+    )
+    old_slash_cleared = not entry_slash
 
     def _observe() -> tuple[int, int, int]:
         anim, aux, rec = read_knife_hooks(bridge)
@@ -310,44 +312,63 @@ def _execute_standing_knife_height_macro(
         report["outcome"] = outcome
         return died, total, report
 
-    for _ in range(max_aim):
+    aim_frames = MIN_BUTTON_PHASE_FRAMES if linked_entry and not entry_slash else max_aim
+    for _ in range(aim_frames):
         if _step(aim_buttons):
             return _finish("death", True)
-        _observe()
+        anim, aux, rec = _observe()
+        if not is_knife_slash_anim(anim, aux, rec):
+            old_slash_cleared = True
+            if linked_entry:
+                break
 
     saw_slash = False
-    for _ in range(max_swing):
-        if _step(swing_buttons):
+    saw_positive_recovery = False
+    cross_on_frames = MIN_FIRE_HOLD_FRAMES
+    cross_off_frames = MIN_BUTTON_PHASE_FRAMES * 2
+    pulse_period = cross_on_frames + cross_off_frames
+    for pulse_frame in range(max_swing):
+        buttons = (
+            swing_buttons
+            if pulse_frame % pulse_period < cross_on_frames
+            else aim_buttons
+        )
+        if _step(buttons):
             return _finish("death", True)
-        anim, aux, _rec = _observe()
-        if anim == FIRE_ANIM and aux in (0, CROUCH_KNIFE_ACTIVE_AUX):
+        anim, aux, rec = _observe()
+        slash = is_knife_slash_anim(anim, aux, rec)
+        if not slash:
+            old_slash_cleared = True
+        if old_slash_cleared and slash:
             report["saw_fire_anim"] = True
             saw_slash = True
+            saw_positive_recovery = rec > 0
             break
     if not saw_slash:
         return _finish("slash_timeout", False)
 
-    # Release Cross first while holding aim height, then R1, then neutral.
+    # Release Cross and height, but never drop R1 between linked knife attacks.
     for _ in range(KNIFE_UP_RELEASE_STAGE_FRAMES):
         if _step(aim_buttons):
-            return _finish("death", True)
-        _observe()
-    for _ in range(KNIFE_UP_RELEASE_STAGE_FRAMES):
-        if _step({"r1": True}):
             return _finish("death", True)
         _observe()
 
     stable = 0
     for _ in range(UP_RECOVERY_MAX_FRAMES):
-        if _step({}):
+        if _step({"r1": True}):
             return _finish("death", True)
         anim, aux, rec = _observe()
-        stable = stable + 1 if (anim == 0 and aux == 0 and rec == 0) else 0
+        saw_positive_recovery = saw_positive_recovery or rec > 0
+        if saw_positive_recovery and rec == 0:
+            break
+        ready_fallback = rec == 0 and not is_knife_slash_anim(anim, aux, rec)
+        stable = stable + 1 if ready_fallback else 0
         if stable >= MIN_BUTTON_PHASE_FRAMES:
             break
     else:
         return _finish("recovery_timeout", False)
 
+    report["link_aim_held"] = True
     return _finish("ok", False)
 
 
@@ -466,7 +487,7 @@ def _execute_ranged_attack_macro(
     settle_wait = 0
     aim_precooked = False
     entry_anim, entry_aux, entry_recovery = _observe()
-    if is_gun_aim_stable(entry_anim, entry_aux, entry_recovery):
+    if is_gun_link_ready(entry_anim, entry_aux, entry_recovery):
         aim_precooked = True
         settle_run = MIN_BUTTON_PHASE_FRAMES
     while settle_run < MIN_BUTTON_PHASE_FRAMES and early_aim_run < MIN_BUTTON_PHASE_FRAMES:
@@ -507,18 +528,31 @@ def _execute_ranged_attack_macro(
             return _finish("aim_interrupt", False)
         stable_run = stable_run + 1 if is_gun_aim_stable(anim, aux, rec) else 0
 
-    for _ in range(MIN_FIRE_HOLD_FRAMES):
+    for _ in range(MAX_AIM_FRAMES):
         if _step(fire_pad):
             return _finish("death", True)
         anim, aux, _rec = _observe()
         if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
             report["saw_fire_anim"] = True
+        if _ammo_count(bridge, weapon_id) < ammo_before:
+            report["saw_fire_anim"] = True
+            break
+    else:
+        return _finish("ok", False)
 
     rec_wait = 0
+    saw_positive_recovery = False
     while rec_wait < max_recovery:
         anim, aux, rec = _observe()
         if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
             report["saw_fire_anim"] = True
+        saw_positive_recovery = saw_positive_recovery or rec > 0
+        if (
+            report["saw_fire_anim"]
+            and saw_positive_recovery
+            and is_gun_link_ready(anim, aux, rec)
+        ):
+            break
         if is_gun_aim_stable(anim, aux, rec) and report["saw_fire_anim"]:
             break
         if anim == 0 and aux == 0 and rec == 0 and rec_wait > MIN_BUTTON_PHASE_FRAMES:
@@ -531,15 +565,7 @@ def _execute_ranged_attack_macro(
     else:
         return _finish("recovery_timeout", False)
 
-    tail = 0
-    while tail < MAX_TAIL_FRAMES:
-        anim, aux, rec = _observe()
-        if anim == 0 and aux == 0 and rec == 0:
-            break
-        if _step(neutral):
-            return _finish("death", True)
-        tail += 1
-
+    report["link_aim_held"] = True
     return _finish("ok", False)
 
 
@@ -635,40 +661,32 @@ def _execute_ranged_attack_up_macro(
         return _finish("ammo_timeout", False)
 
     stable = 0
+    saw_positive_recovery = False
     for _ in range(UP_RECOVERY_MAX_FRAMES):
         if _step(up_aim):
             return _finish("death", True)
         anim, aux, rec = _observe()
         if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
             report["saw_fire_anim"] = True
+        saw_positive_recovery = saw_positive_recovery or rec > 0
+        if (
+            report["saw_fire_anim"]
+            and saw_positive_recovery
+            and is_gun_link_ready(anim, aux, rec)
+        ):
+            break
         stable = stable + 1 if is_gun_aim_stable(anim, aux, rec) else 0
         if report["saw_fire_anim"] and stable >= MIN_BUTTON_PHASE_FRAMES:
             break
     else:
         return _finish("recovery_timeout", False)
 
-    stable = 0
-    for _ in range(UP_LOWER_MAX_FRAMES):
-        if _step({"r1": True}):
-            return _finish("death", True)
-        anim, aux, rec = _observe()
-        stable = stable + 1 if is_gun_aim_stable(anim, aux, rec) else 0
-        if stable >= MIN_BUTTON_PHASE_FRAMES:
-            break
-    else:
-        return _finish("lower_timeout", False)
+    # Release Up immediately at the recovery-zero boundary; keep aim for linking.
+    if _step({"r1": True}):
+        return _finish("death", True)
+    _observe()
 
-    stable = 0
-    for _ in range(UP_HOLSTER_MAX_FRAMES):
-        if _step({}):
-            return _finish("death", True)
-        anim, aux, rec = _observe()
-        stable = stable + 1 if (anim == 0 and aux == 0 and rec == 0) else 0
-        if stable >= MIN_BUTTON_PHASE_FRAMES:
-            break
-    else:
-        return _finish("holster_timeout", False)
-
+    report["link_aim_held"] = True
     return _finish("ok", False)
 
 
@@ -773,32 +791,30 @@ def _execute_ranged_attack_down_macro(
     else:
         return _finish("ammo_timeout", False)
 
+    saw_positive_recovery = False
     for _ in range(UP_RECOVERY_MAX_FRAMES):
         if _step(down_aim):
             return _finish("death", True)
         anim, aux, rec = _observe()
         if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
             report["saw_fire_anim"] = True
+        saw_positive_recovery = saw_positive_recovery or rec > 0
+        if (
+            report["saw_fire_anim"]
+            and saw_positive_recovery
+            and is_gun_link_ready(anim, aux, rec)
+        ):
+            break
         if is_gun_aim_stable(anim, aux, rec) or (anim == 0 and aux == 0 and rec == 0):
             if report["saw_fire_anim"]:
                 break
 
-    for _ in range(UP_LOWER_MAX_FRAMES):
-        if _step({"r1": True}):
-            return _finish("death", True)
-        _observe()
+    # Release Down immediately at the recovery-zero boundary; keep aim for linking.
+    if _step({"r1": True}):
+        return _finish("death", True)
+    _observe()
 
-    stable = 0
-    for _ in range(UP_HOLSTER_MAX_FRAMES):
-        if _step({}):
-            return _finish("death", True)
-        anim, aux, rec = _observe()
-        stable = stable + 1 if (anim == 0 and aux == 0 and rec == 0) else 0
-        if stable >= MIN_BUTTON_PHASE_FRAMES:
-            break
-    else:
-        return _finish("holster_timeout", False)
-
+    report["link_aim_held"] = True
     return _finish("ok", False)
 
 

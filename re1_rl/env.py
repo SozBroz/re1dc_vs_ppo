@@ -2014,6 +2014,7 @@ class RE1Env(gym.Env):
             self._sticky_input.apply(0, ACTION_BUTTON_MAP)
             self._macro_active = True
             try:
+                    link_aim=True,
                 from re1_rl.attack_macro import cleared_movement_sticky
 
                 if attack_up:

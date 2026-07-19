@@ -158,6 +158,35 @@ def test_attack_masked_during_recovery() -> None:
     assert not m[ATTACK_ACTION]
 
 
+def test_attack_link_boundaries_are_legal_next_frame() -> None:
+    cases = (
+        # Live link-matrix boundaries: aimed knife, knife recovery aim, gun aim.
+        (0x01, 0x12, 0x04),
+        (0x01, 0x13, 0x04),
+        (0x02, 0x13, 0x03),
+        (0x03, 0x13, 0x03),
+    )
+    for weapon_id, anim, aux in cases:
+        inventory = (
+            [(weapon_id, 5)] + [(0, 0)] * 7
+            if weapon_id != 0x01
+            else [(0x01, 0)] + [(0, 0)] * 7
+        )
+        mask = action_mask(
+            N_ACTIONS,
+            None,
+            equipped_weapon_id=weapon_id,
+            inventory=inventory,
+            player_anim=anim,
+            player_aux=aux,
+            player_recovery=0,
+            alive_enemies_in_room=1,
+        )
+        assert mask[ATTACK_ACTION], (weapon_id, anim, aux)
+        assert mask[ATTACK_UP_ACTION], (weapon_id, anim, aux)
+        assert mask[ATTACK_DOWN_ACTION], (weapon_id, anim, aux)
+
+
 def test_combat_masked_without_enemies_in_room() -> None:
     m = action_mask(
         N_ACTIONS,
@@ -473,6 +502,8 @@ def test_attack_macro_settles_after_locomotion() -> None:
     assert report["outcome"] == "ok"
     assert report["ammo_spent"] == 1
     assert report["macro_path"] == "ranged:beretta"
+    assert report["link_aim_held"] is True
+    assert bridge.step.call_args_list[-1].kwargs["frame_buttons"][-1] == {"r1": True}
     assert frames > 0
 
 
@@ -666,13 +697,31 @@ def test_attack_down_knife_uses_crouch_macro_path(monkeypatch) -> None:
     from unittest.mock import MagicMock
 
     bridge = MagicMock()
-    bridge.read_ram.return_value = {"equipped_weapon_id": 0x01}
-    bridge.last_knife_anim_report = {"outcome": "ok", "frames": 42}
+    def read_ram(fields):
+        values = {
+            "equipped_weapon_id": 0x01,
+            "player_hp": 96,
+            "player_anim": 0,
+            "player_action_aux": 0,
+            "player_recovery_timer": 0,
+        }
+        return {name: values[name] for name, _addr, _dtype in fields}
 
-    def fake_knife(*_a, **_k):
-        return False, 42
+    bridge.read_ram.side_effect = read_ram
+    bridge.step.return_value = (0, False)
 
-    monkeypatch.setattr("re1_rl.attack_macro.execute_knife_macro", fake_knife)
+    def fake_height(*_a, **kwargs):
+        return False, 42, {
+            "macro_path": kwargs["macro_path"],
+            "aim_mode": kwargs["aim_mode"],
+            "weapon": kwargs["weapon"],
+            "outcome": "ok",
+            "link_aim_held": True,
+        }
+
+    monkeypatch.setattr(
+        "re1_rl.attack_macro._execute_standing_knife_height_macro", fake_height
+    )
     empty = {k: False for k in ("up", "down", "left", "right", "square")}
     died, frames, report = execute_attack_down_macro(
         bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
@@ -683,6 +732,7 @@ def test_attack_down_knife_uses_crouch_macro_path(monkeypatch) -> None:
     assert report["aim_mode"] == "down"
     assert report["weapon"] == "knife"
     assert report["outcome"] == "ok"
+    assert report["link_aim_held"] is True
 
 
 def test_attack_down_beretta_holds_down_and_spends_ammo() -> None:
@@ -738,6 +788,8 @@ def test_attack_down_beretta_holds_down_and_spends_ammo() -> None:
     assert report["aim_mode"] == "down"
     assert report["outcome"] == "ok"
     assert report["ammo_spent"] == 1
+    assert report["link_aim_held"] is True
+    assert bridge.step.call_args_list[-1].kwargs["frame_buttons"][-1] == {"r1": True}
     saw_down_fire = False
     for call in bridge.step.call_args_list:
         for btn in call.kwargs.get("frame_buttons") or []:
