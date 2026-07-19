@@ -91,6 +91,7 @@ def action_mask(
     poisoned: bool = False,
     episode_start_hp: int | None = None,
     in_control: bool = True,
+    grab_escape_pending: bool = False,
     alive_enemies_in_room: int | None = None,
     knife_enemies_near: int | None = None,
     gun_enemies_near: int | None = None,
@@ -104,6 +105,11 @@ def action_mask(
     del prev_action
 
     mask = np.ones(n_actions, dtype=bool)
+    if grab_escape_pending:
+        mask[:] = False
+        if n_actions > 0:
+            mask[0] = True
+        return mask
     if not in_control:
         mask[:] = False
         if n_actions > 0:

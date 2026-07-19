@@ -349,6 +349,7 @@ class RE1Env(gym.Env):
         self._step_count = 0
         self._prev_state: dict[str, Any] = {}
         self._prev_hp = 0
+        self._grab_escape_pending = False
         self._forward_collision_stall = False
         self._async_cutscene_skip = bool(async_cutscene_skip)
         self._bg_skip_stop = threading.Event()
@@ -529,6 +530,16 @@ class RE1Env(gym.Env):
             return True
         return stagnation_episode_timeout(self._progress)
 
+    def _termination_flags(
+        self, state: dict[str, Any]
+    ) -> tuple[bool, bool, str | None]:
+        """Return Gym termination flags, preserving the Wesker terminal mark."""
+        kenneth_gate_failure = self._progress.kenneth_gate_breached
+        terminated = bool(state.get("dead")) or kenneth_gate_failure
+        truncated = False if kenneth_gate_failure else self._episode_truncated()
+        reason = "main_hall_before_kenneth" if kenneth_gate_failure else None
+        return terminated, truncated, reason
+
     def _build_obs(self, frame_obs: np.ndarray, state: dict[str, Any]) -> dict[str, np.ndarray]:
         assert self._encoder is not None and self._planner is not None
         self._sync_episode_history(state)
@@ -538,7 +549,10 @@ class RE1Env(gym.Env):
             room_index=self._encoder.room_index,
             max_episode_steps=max_ep,
         )
-        cutscene_ledger = encode_cutscene_ledger(self._progress.rewarded_cutscenes)
+        cutscene_ledger = encode_cutscene_ledger(
+            self._progress.rewarded_cutscenes,
+            wesker_pre_kenneth=self._progress.kenneth_gate_breached,
+        )
         goal_state = dict(state)
         goal_state["gallery_needs_reentry"] = self._progress.gallery_needs_reentry
         return {
@@ -629,6 +643,7 @@ class RE1Env(gym.Env):
                 pass
         self._sticky_input.reset()
         self._prev_action = None
+        self._grab_escape_pending = False
         self._forward_collision_stall = False
         self._use_phase = 0
         self._inventory_before_use = None
@@ -838,8 +853,8 @@ class RE1Env(gym.Env):
     ) -> bool:
         """True on Kenneth-gate transition (enter 106 before Kenneth paid).
 
-        The first breach poisons positive rewards/extensions in compute_reward;
-        the episode continues. Returns False when Jill is already dead.
+        The first breach marks the terminal observation ledger and ends the
+        episode after its -1.6 reward. Returns False when Jill is already dead.
         """
         from re1_rl.cutscene_reward import (
             illegal_main_hall_before_kenneth_transition,
@@ -861,11 +876,7 @@ class RE1Env(gym.Env):
         prev_state: dict[str, Any] | None,
         state: dict[str, Any] | None,
     ) -> str | None:
-        """Legacy name: the poisoned gate does not end the episode.
-
-        Returns the telemetry reason string when the soft transition fires,
-        else None. Callers must not treat this as episode failure.
-        """
+        """Return the terminal failure reason for illegal pre-Kenneth 106 entry."""
         from re1_rl.cutscene_reward import ILLEGAL_MAIN_HALL_FAILURE_REASON
 
         if self._illegal_main_hall_transition(prev_state, state):
@@ -910,8 +921,8 @@ class RE1Env(gym.Env):
                 str(crossing.get("room_id", "")),
                 bool(crossing.get("in_control", True)),
             )
-            # Kenneth gate: compute_reward applies -1.6, poisons all positive
-            # rewards/extensions, and continues the episode.
+            # Kenneth gate: compute_reward applies -1.6 and marks the terminal
+            # observation; the outer step terminates after the skip settles.
             reward, bd = compute_reward(
                 entry,
                 crossing,
@@ -1708,8 +1719,7 @@ class RE1Env(gym.Env):
             success_room=self._stage.get("success_room"),
             return_breakdown=True,
         )
-        terminated = bool(state.get("dead"))
-        truncated = self._episode_truncated()
+        terminated, truncated, episode_failure = self._termination_flags(state)
         obs = self._build_obs(frame_obs, state)
         info = {
             "room_id": state["room_id"],
@@ -1717,6 +1727,7 @@ class RE1Env(gym.Env):
             "bridge_port": getattr(self.bridge, "port", None),
             "action_name": ACTION_NAMES[int(action)],
             "reward_breakdown": breakdown,
+            "episode_failure": episode_failure,
             "magic_report": magic_report,
             "use_phase": int(self._use_phase),
             "equip_phase": int(self._equip_phase),
@@ -1868,6 +1879,9 @@ class RE1Env(gym.Env):
             poisoned=bool(pose.get("poisoned", False)),
             episode_start_hp=int(getattr(self, "_episode_start_hp", 0) or 0),
             in_control=bool(pose.get("in_control", True)),
+            grab_escape_pending=bool(
+                getattr(self, "_grab_escape_pending", False)
+            ),
             alive_enemies_in_room=combat_enemy_count(enemies),
             knife_enemies_near=combat_enemy_count(enemies, knife=True),
             gun_enemies_near=combat_enemy_count(enemies),
@@ -1990,11 +2004,24 @@ class RE1Env(gym.Env):
         attack_up = int(action) == ATTACK_UP_ACTION
         attack_down = int(action) == ATTACK_DOWN_ACTION
         combat_attack = attack or attack_up or attack_down
+        grab_escape = bool(getattr(self, "_grab_escape_pending", False))
         magic = self._is_magic_action(int(action))
         attack_report: dict[str, Any] | None = None
         magic_report: dict[str, Any] | None = None
         step_emulated_frames = self.frame_skip
-        if knife:
+        if grab_escape:
+            from re1_rl.grab_escape import execute_grab_escape_noop
+
+            self._grab_escape_pending = False
+            self._sticky_input.reset()
+            self._macro_active = True
+            try:
+                died_during_step, step_emulated_frames = (
+                    execute_grab_escape_noop(self.bridge)
+                )
+            finally:
+                self._macro_active = False
+        elif knife:
             self._sticky_input.apply(int(action), ACTION_BUTTON_MAP)
             self._macro_active = True
             try:
@@ -2005,6 +2032,7 @@ class RE1Env(gym.Env):
                     scale=self.knife_scale,
                     echo_joypad=self.knife_echo_joypad,
                     use_ram_gates=self.knife_use_ram_gates,
+                    link_aim=True,
                     prev_hp=self._prev_hp,
                     episode_start_hp=getattr(self, "_episode_start_hp", 0),
                 )
@@ -2014,7 +2042,6 @@ class RE1Env(gym.Env):
             self._sticky_input.apply(0, ACTION_BUTTON_MAP)
             self._macro_active = True
             try:
-                    link_aim=True,
                 from re1_rl.attack_macro import cleared_movement_sticky
 
                 if attack_up:
@@ -2118,6 +2145,11 @@ class RE1Env(gym.Env):
             knife=knife,
             attack=combat_attack,
         )
+        from re1_rl.grab_escape import grab_bite_transition
+
+        grab_detected = grab_bite_transition(self._prev_state, state)
+        if grab_detected:
+            self._grab_escape_pending = True
         enemy_damage = int(state.get("enemy_damage", 0))
         enemy_kills = int(state.get("enemy_kills", 0))
         state["step_emulated_frames"] = step_emulated_frames
@@ -2135,8 +2167,8 @@ class RE1Env(gym.Env):
                 menu_reason = self._probe_outside_gameplay()
         if menu_reason:
             return self._outside_gameplay_step(action, reason=menu_reason)
-        # Soft Kenneth gate handled inside compute_reward (-0.1, no terminate,
-        # no 106 visit). Continue the episode so the agent can leave and retry.
+        # The first illegal pre-Kenneth 106 entry marks the terminal observation
+        # ledger, applies -1.6 in compute_reward, then ends this episode.
         self._visited.update(state["room_id"], state["x"], state["z"])
         self._progress.record_in_control_step(
             state.get("room_id", ""),
@@ -2171,8 +2203,7 @@ class RE1Env(gym.Env):
                 prev_state=self._prev_state,
             )
 
-        terminated = bool(state.get("dead"))
-        truncated = self._episode_truncated()
+        terminated, truncated, episode_failure = self._termination_flags(state)
 
         hp_now = int(state["hp"])
         if hp_now > 0:
@@ -2197,10 +2228,13 @@ class RE1Env(gym.Env):
             "reached_success_room": self._progress.reached_success_room,
             "action_name": ACTION_NAMES[int(action)],
             "reward_breakdown": breakdown,
+            "episode_failure": episode_failure,
             "knife_anim_report": (
                 getattr(self.bridge, "last_knife_anim_report", None) if knife else None
             ),
             "attack_report": attack_report,
+            "grab_detected": grab_detected,
+            "grab_escape": grab_escape,
             "magic_report": magic_report,
             "frames_skipped": skipped,
             "died_during_skip": died_during_skip,

@@ -234,7 +234,7 @@ def test_illegal_main_hall_gate_irreversibly_disables_positive_rewards() -> None
     assert all(value <= 0.0 for value in poisoned.values())
 
 
-def test_cutscene_panel_explains_kenneth_gate_reward_poison() -> None:
+def test_cutscene_panel_explains_terminal_kenneth_gate() -> None:
     prev = make_state(room="105", cam_id=0, hp=96)
     cur = make_state(room="105", cam_id=0, hp=96)
     panel = format_cutscene_gate_panel(
@@ -245,10 +245,7 @@ def test_cutscene_panel_explains_kenneth_gate_reward_poison() -> None:
         qualified_key="105:0:s0",
         breakdown={"new_cutscene": 0.0},
     )
-    assert (
-        "unpaid_reason: positive rewards disabled after Kenneth gate breach"
-        in panel
-    )
+    assert "unpaid_reason: terminal Kenneth gate breach" in panel
 
 
 def test_real_death_owns_penalty_not_kenneth_gate() -> None:

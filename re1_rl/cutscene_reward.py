@@ -408,7 +408,7 @@ def cutscene_disqualify_reason(
         (prev_state or {}).get("room_id", "") or ""
     )
     if hall_room == MAIN_HALL_ROOM and not kenneth_cutscene_seen(rewarded_cutscenes):
-        return "pre-Kenneth Main Hall cutscene (Wesker/hall; poisoned gate, no pay)"
+        return "pre-Kenneth Main Hall cutscene (Wesker/hall; terminal gate, no pay)"
     return None
 
 
@@ -494,7 +494,7 @@ def format_cutscene_gate_panel(
     if paid <= 0.0:
         if positive_rewards_disabled:
             lines.append(
-                "  unpaid_reason: positive rewards disabled after Kenneth gate breach"
+                "  unpaid_reason: terminal Kenneth gate breach"
             )
         elif why:
             lines.append(f"  unpaid_reason: {why}")

@@ -49,19 +49,17 @@ Gallery room 117 policy:
   edge is used only to detect a wrong first portrait when progress remains 0.
 - Observation guidance is next-target bearing/distance plus sequence progress.
 
-## Poisoned Kenneth gate (episode continues)
+## Terminal Kenneth gate
 
-**Imperator-approved:** Pre-Kenneth Main Hall entry irreversibly poisons the
-rest of that episode:
+**Imperator-approved:** Pre-Kenneth Main Hall entry terminates the episode:
 
 - On a **transition into** Main Hall room **106** before the canonical Kenneth
   tea-room cutscene (`104:*:sN`) has occurred/paid this episode → apply exactly
-  **−1.6 once** under `main_hall_before_kenneth` and **do not end the episode**.
-- From that transition onward, **all positive reward terms are forced to zero**
-  for the rest of the episode. Negative rewards remain active.
-- Reward-driven stagnation resets and six-minute episode extensions are
-  disabled; any extension already earned is revoked and the idle cap remains
-  at the three-minute pre-Kenneth threshold.
+  **−1.6 once** under `main_hall_before_kenneth`, mark the terminal observation,
+  and **end the episode immediately**.
+- The 16-wide cutscene ledger's dormant opening slot becomes the persistent
+  `wesker_pre_kenneth` bit in that terminal observation. This is observation
+  only: it does not count as a rewarded cutscene or increase cutscene count.
 - Do **not** mark 106 as visited on an illegal transition. Pre-Kenneth cutscenes
   in 106 (Wesker talk, etc.) do not pay `new_cutscene`.
 - Do **not** trigger the gate when an episode starts in 106, while remaining
@@ -102,8 +100,8 @@ Do not treat (f) as a decided pay/deny rule until validated.
 
 ## Exceptions to room pay (#1)
 
-Illegal pre-Kenneth transition into 106 withholds visit credit and poisons all
-positive rewards/extensions for the episode (−1.6 once).
+Illegal pre-Kenneth transition into 106 withholds visit credit, applies −1.6,
+marks `wesker_pre_kenneth`, and terminates the episode.
 
 **Spawn room (dining 105 on m0):** marked visited at episode reset; the +3.0
 `new_room` (and 6 min idle floor) pays on the **first** `compute_reward` of the
@@ -148,7 +146,7 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 
 1. **No silent policy edits.** New paid events, new exceptions, magnitude changes, or changes to item-box rule (f) need imperator sign-off, then update this doc and `.cursor/skills/re-exploration-rewards/SKILL.md`.
 2. **Cutscene duration owns the channel.** Any uninterrupted uncontrolled session ≥450 frames may pay unless it is a menu, pickup/post-pickup fragment, death/opening span, or pre-Kenneth hall script. Long doors may pay both room and cutscene channels.
-3. **Kenneth gate poisons the episode.** Transition into 106 before `104:*:sN` paid → exactly −1.6 once; episode continues, but every later positive reward and reward-driven extension is disabled. Existing extensions are revoked, the idle cap stays at three minutes, and 106 is not marked visited. Negative rewards remain active.
+3. **Kenneth gate terminates the episode.** Transition into 106 before `104:*:sN` paid → set terminal-observation ledger bit `wesker_pre_kenneth`, apply exactly −1.6 once, and terminate immediately. Do not mark 106 visited.
 4. **Reward-hack hunts:** assume the agent will farm anything that pays. When spam appears (main-hall door, interacts), gate the **specific** signal; log unpaid reasons that match this table; total reward in diagnostics should come from **what enters the training data pool**, not a parallel counter.
 5. **When unsure** whether an event belongs to an explicit exclusion: **do not guess a new exception** — ask.
 
@@ -156,8 +154,7 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 
 ```
 Event fired?
-├─ Transition into 106 before Kenneth paid? → −1.6 once; continue episode poisoned
-│  └─ Thereafter: zero all positive rewards; no stagnation resets/extensions; 3m idle cap
+├─ Transition into 106 before Kenneth paid? → mark Wesker ledger bit; −1.6; terminate
 ├─ New room (legal)? → pay #1 (+3.0, 6m idle floor)
 ├─ Freeze / text / “cutscene”?
 │  ├─ Total uninterrupted freeze <450 frames? → do NOT pay #2

@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import numpy as np
 
-# Mansion milestones in ``room:cam`` form. Same-room sequenced keys
+# Mansion milestones are normally ``room:cam`` keys. Same-room sequenced keys
 # (``room:cam:sN`` from cutscene_reward) also light the matching milestone.
+# The Wesker bit is synthetic because the terminal gate intentionally prevents
+# that pre-Kenneth cutscene from entering the rewarded-cutscene set.
+CUTSCENE_WESKER_PRE_KENNETH_KEY = "wesker_pre_kenneth"
+
 CUTSCENE_MILESTONE_KEYS: tuple[str, ...] = (
     "105:0",
     "105:1",
@@ -21,7 +25,7 @@ CUTSCENE_MILESTONE_KEYS: tuple[str, ...] = (
     "117:0",
     "203:0",
     "203:1",
-    "100:0",
+    CUTSCENE_WESKER_PRE_KENNETH_KEY,
     "211:0",
 )
 
@@ -35,11 +39,17 @@ def _milestone_seen(milestone: str, seen: set[str] | frozenset[str]) -> bool:
     return any(str(k).startswith(prefix) for k in seen)
 
 
-def encode_cutscene_ledger(rewarded_cutscenes: set[str] | frozenset[str] | None) -> np.ndarray:
+def encode_cutscene_ledger(
+    rewarded_cutscenes: set[str] | frozenset[str] | None,
+    *,
+    wesker_pre_kenneth: bool = False,
+) -> np.ndarray:
     """One float per milestone: 1.0 if this episode already saw that cutscene."""
     v = np.zeros(CUTSCENE_LEDGER_DIM, dtype=np.float32)
     seen = rewarded_cutscenes or set()
     for i, key in enumerate(CUTSCENE_MILESTONE_KEYS):
         if _milestone_seen(key, seen):
             v[i] = 1.0
+    if wesker_pre_kenneth:
+        v[CUTSCENE_MILESTONE_KEYS.index(CUTSCENE_WESKER_PRE_KENNETH_KEY)] = 1.0
     return v

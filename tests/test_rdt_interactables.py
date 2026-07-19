@@ -5,7 +5,12 @@ from __future__ import annotations
 import numpy as np
 
 from re1_rl.rdt_interactables import dedupe_interactable_rows, load_rdt_interactables
-from re1_rl.spatial_encoder import INTERACTABLE_SLOTS, SPATIAL_DIM, SpatialEncoder
+from re1_rl.spatial_encoder import (
+    INTERACTABLE_SLOTS,
+    SPATIAL_DIM,
+    SPATIAL_FIELDS,
+    SpatialEncoder,
+)
 
 
 def test_dedupe_interactable_rows_collapses_clock_triggers() -> None:
@@ -48,11 +53,12 @@ def test_spatial_encodes_nearest_interactable() -> None:
     }
     v = enc.encode(state)
     assert v.shape == (SPATIAL_DIM,)
-    # interactables_here at index after items+enemies+exits
-    # 1 + 8*8 + 1 + 5*8 + 1 + 4*3 = 119
-    assert v[119] == min(2, 8) / 8.0
+    interactables_i = [name for name, _ in SPATIAL_FIELDS].index(
+        "interactables_here"
+    )
+    assert v[interactables_i] == min(2, 8) / 8.0
     # nearest slot is item_box at player position
-    assert v[119 + 1 + 3] > 0.0  # kind_id for item_box
+    assert v[interactables_i + 1 + 3] > 0.0  # kind_id for item_box
 
 
 def test_spatial_room_105_one_trigger_not_four() -> None:
@@ -65,4 +71,7 @@ def test_spatial_room_105_one_trigger_not_four() -> None:
         "enemies": [],
     }
     v = enc.encode(state)
-    assert v[119] == 1 / 8.0  # one deduped trigger, not 4/8
+    interactables_i = [name for name, _ in SPATIAL_FIELDS].index(
+        "interactables_here"
+    )
+    assert v[interactables_i] == 1 / 8.0  # one deduped trigger, not 4/8

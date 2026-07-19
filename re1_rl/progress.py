@@ -29,8 +29,8 @@ class ProgressTracker:
     _stagnation_frames: int = 0
     # Floor on softlock truncate after new_room / key / first weapon / key use.
     softlock_cap_frames: int = 0
-    # Irreversible episode poison: entering Main Hall before Kenneth disables
-    # every later positive reward and all reward-driven idle extensions.
+    # Terminal black mark: set before building the terminal observation.
+    # Positive reward/extension guards also prevent same-step leakage.
     kenneth_gate_breached: bool = False
     # Spawn room (usually dining 105): visited at reset; +new_room paid once on
     # the first compute_reward of the episode so discovery is not attributed to
@@ -106,7 +106,7 @@ class ProgressTracker:
         self._stagnation_frames = 0
 
     def breach_kenneth_gate(self) -> bool:
-        """Poison positive reward/extension channels; true only on first breach."""
+        """Set the terminal black mark; true only on the first breach."""
         if self.kenneth_gate_breached:
             return False
         self.kenneth_gate_breached = True
