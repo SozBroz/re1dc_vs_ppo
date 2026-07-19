@@ -48,25 +48,24 @@ Gallery room 117 policy:
   edge is used only to detect a wrong first portrait when progress remains 0.
 - Observation guidance is next-target bearing/distance plus sequence progress.
 
-## Sole Kenneth gate (episode failure)
+## Soft Kenneth gate (no episode failure)
 
-**Imperator-approved (Kenneth-gate revamp):** The only Kenneth-related hard gate is:
+**Imperator-approved (soft Kenneth gate):** Pre-Kenneth Main Hall entry is a
+dense penalty, not an episode reset:
 
 - On a **transition into** Main Hall room **106** before the canonical Kenneth
-  tea-room cutscene (`104:*:sN`) has occurred/paid this episode → **immediately
-  end the episode** and apply exactly **−0.1 once** under the dedicated
-  `main_hall_before_kenneth` reward term (also the failure reason).
-- Do **not** trigger when an episode starts in 106, while remaining in 106, or
-  when entering 106 after Kenneth has paid.
+  tea-room cutscene (`104:*:sN`) has occurred/paid this episode → apply exactly
+  **−0.1 once** under `main_hall_before_kenneth`, **do not end the episode**,
+  and **do not** mark 106 as visited (so a later legal entry after Kenneth can
+  still earn `new_room` +1).
+- Pre-Kenneth cutscenes in 106 (Wesker talk, etc.) **do not pay** `new_cutscene`.
+- Do **not** trigger the soft gate when an episode starts in 106, while remaining
+  in 106, or when entering 106 after Kenneth has paid.
 - If Jill is actually dead on the same step, the real death path owns the
-  ordinary global `death` penalty and the −0.1 Kenneth-gate term does not apply.
-- The illegal-transition termination itself must prevent `new_room` reward
-  (no separate pre-Kenneth Main Hall new-room gate).
+  ordinary global `death` penalty and the −0.1 term does not apply.
 
 Kenneth remains an **ordinary curated story cutscene** that rewards once under
-normal qualification. There is **no** blanket suppression of unrelated
-pre-Kenneth cutscene rewards, **no** special pre-Kenneth Wesker-talk cutscene
-suppression, and **no** separate pre-Kenneth Main Hall `new_room` gate.
+normal qualification. Other valid pre-Kenneth dining/Barry beats may still pay.
 
 ## Cutscene detector (heuristic, not a free paycheck)
 
@@ -97,8 +96,8 @@ Do not treat (f) as a decided pay/deny rule until validated.
 
 ## Exceptions to room pay (#1)
 
-No Kenneth-specific room-pay exception. Illegal pre-Kenneth transition into 106
-ends the episode before `new_room` can pay.
+Illegal pre-Kenneth transition into 106 withholds visit credit and `new_room`
+(soft −0.1 instead). After Kenneth pays, the first real 106 entry may pay #1.
 
 ## Combat pay (#7 / #8)
 
@@ -125,7 +124,7 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 
 1. **No silent policy edits.** New paid events, new exceptions, magnitude changes, or changes to item-box rule (f) need imperator sign-off, then update this doc and `.cursor/skills/re-exploration-rewards/SKILL.md`.
 2. **Prefer the right channel.** Item pickup → item/key/gun rewards, not cutscene. Door/stairs load → room reward (if allowed), not cutscene. Text-only interact → no cutscene pay (and #9 only when implemented for true story interacts).
-3. **Sole Kenneth gate is illegal 106 entry.** Transition into 106 before `104:*:sN` paid → episode failure + exactly −0.1 once. Other story cutscenes (including valid pre-Kenneth dining/Barry beats) may pay under normal qualification. Kenneth itself pays once as an ordinary curated story beat.
+3. **Soft Kenneth gate is illegal 106 entry.** Transition into 106 before `104:*:sN` paid → exactly −0.1 once, episode continues, 106 not marked visited; pre-Kenneth hall cutscenes (Wesker) do not pay. Other story cutscenes (including valid pre-Kenneth dining/Barry beats) may pay under normal qualification. Kenneth itself pays once as an ordinary curated story beat.
 4. **Reward-hack hunts:** assume the agent will farm anything that pays. When spam appears (main-hall door, interacts), gate the **specific** signal; log unpaid reasons that match this table; total reward in diagnostics should come from **what enters the training data pool**, not a parallel counter.
 5. **When unsure** whether an event is story-driven vs (a–d): **do not guess a new exception** — ask.
 
@@ -133,7 +132,7 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 
 ```
 Event fired?
-├─ Transition into 106 before Kenneth paid? → end episode; exactly −0.1 once; no new_room
+├─ Transition into 106 before Kenneth paid? → −0.1 once; continue episode; no visit/new_room (legal +1 later)
 ├─ New room (legal)? → pay #1
 ├─ Freeze / text / “cutscene”?
 │  ├─ Story-driven new beat under normal qual (incl. Kenneth 104:*:sN)? → pay #2

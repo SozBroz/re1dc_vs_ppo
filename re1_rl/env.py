@@ -822,31 +822,44 @@ class RE1Env(gym.Env):
         except AttributeError:
             pass
 
+    def _illegal_main_hall_transition(
+        self,
+        prev_state: dict[str, Any] | None,
+        state: dict[str, Any] | None,
+    ) -> bool:
+        """True on soft Kenneth-gate transition (enter 106 before Kenneth paid).
+
+        Soft gate: dense -0.1 in compute_reward, no episode end, no visit credit.
+        Returns False when Jill is already dead (real death path owns the step).
+        """
+        from re1_rl.cutscene_reward import (
+            illegal_main_hall_before_kenneth_transition,
+        )
+
+        if not prev_state or not state:
+            return False
+        if state.get("dead"):
+            return False
+        return illegal_main_hall_before_kenneth_transition(
+            str(prev_state.get("room_id", "") or ""),
+            str(state.get("room_id", "") or ""),
+            rewarded_cutscenes=self._progress.rewarded_cutscenes,
+            visited_rooms=self._progress.visited_rooms,
+        )
+
     def _illegal_main_hall_failure_reason(
         self,
         prev_state: dict[str, Any] | None,
         state: dict[str, Any] | None,
     ) -> str | None:
-        """Death-equivalent policy fail: enter 106 before Kenneth paid.
+        """Legacy name: soft gate no longer ends the episode.
 
-        Returns None when Jill is already dead on this step (real death path
-        owns the single death penalty).
+        Returns the telemetry reason string when the soft transition fires,
+        else None. Callers must not treat this as episode failure.
         """
-        from re1_rl.cutscene_reward import (
-            ILLEGAL_MAIN_HALL_FAILURE_REASON,
-            illegal_main_hall_before_kenneth_transition,
-        )
+        from re1_rl.cutscene_reward import ILLEGAL_MAIN_HALL_FAILURE_REASON
 
-        if not prev_state or not state:
-            return None
-        if state.get("dead"):
-            return None
-        if illegal_main_hall_before_kenneth_transition(
-            str(prev_state.get("room_id", "") or ""),
-            str(state.get("room_id", "") or ""),
-            rewarded_cutscenes=self._progress.rewarded_cutscenes,
-            visited_rooms=self._progress.visited_rooms,
-        ):
+        if self._illegal_main_hall_transition(prev_state, state):
             return ILLEGAL_MAIN_HALL_FAILURE_REASON
         return None
 
@@ -888,18 +901,8 @@ class RE1Env(gym.Env):
                 str(crossing.get("room_id", "")),
                 bool(crossing.get("in_control", True)),
             )
-            fail = self._illegal_main_hall_failure_reason(entry, crossing)
-            if fail:
-                # No new_room / step shaping — exact Kenneth-gate penalty on flush.
-                self._progress.first_visit(
-                    str(crossing.get("room_id", "")),
-                    at_waypoint=0,
-                    at_route_seq=None,
-                )
-                self._pending_episode_failure = fail
-                self._prev_state = dict(crossing)
-                self._pending_skip_room_crossings.clear()
-                return
+            # Soft Kenneth gate: compute_reward applies -0.1, skips visit/new_room;
+            # episode continues (no _pending_episode_failure).
             reward, bd = compute_reward(
                 entry,
                 crossing,
@@ -959,18 +962,8 @@ class RE1Env(gym.Env):
             entry_prev["inventory"] = list(inv_before)
         if inv_after is not None:
             state["inventory"] = list(inv_after)
-        fail = self._illegal_main_hall_failure_reason(entry_prev, state)
-        if fail:
-            self._progress.first_visit(
-                str(state.get("room_id", "")),
-                at_waypoint=0,
-                at_route_seq=None,
-            )
-            self._pending_episode_failure = fail
-            self._prev_state = state
-            self._cutscene_skip_entry_prev = None
-            self._pending_skip_room_crossings = []
-            return
+        # Soft Kenneth gate: do not end the episode; compute_reward below applies
+        # -0.1 and withholds 106 visit credit. Still null cutscene on door change.
         # Room-change door skips: discovery is new_room only (never new_cutscene).
         if room_change_cutscene_disqualified(entry_prev, state):
             state["cutscene_key"] = None
@@ -2142,14 +2135,8 @@ class RE1Env(gym.Env):
                 menu_reason = self._probe_outside_gameplay()
         if menu_reason:
             return self._outside_gameplay_step(action, reason=menu_reason)
-        fail = self._illegal_main_hall_failure_reason(self._prev_state, state)
-        if fail:
-            self._progress.first_visit(
-                str(state.get("room_id", "")),
-                at_waypoint=0,
-                at_route_seq=None,
-            )
-            return self._episode_failure_step(action, reason=fail)
+        # Soft Kenneth gate handled inside compute_reward (-0.1, no terminate,
+        # no 106 visit). Continue the episode so the agent can leave and retry.
         self._visited.update(state["room_id"], state["x"], state["z"])
         self._progress.record_in_control_step(
             state.get("room_id", ""),

@@ -277,8 +277,24 @@ def compute_reward(
     room = str(state.get("room_id", ""))
     room_changed = room != prev_room
 
-    is_new_room = False
+    # Soft Kenneth gate: illegal pre-Kenneth entry into 106 pays -0.1, does not
+    # end the episode, and must not mark 106 visited (so a later legal entry
+    # after Kenneth can still earn new_room +1).
+    illegal_main_hall = False
     if progress is not None:
+        from re1_rl.cutscene_reward import (
+            illegal_main_hall_before_kenneth_transition,
+        )
+
+        illegal_main_hall = illegal_main_hall_before_kenneth_transition(
+            prev_room,
+            room,
+            rewarded_cutscenes=progress.rewarded_cutscenes,
+            visited_rooms=progress.visited_rooms,
+        )
+
+    is_new_room = False
+    if progress is not None and not illegal_main_hall:
         is_new_room = progress.first_visit(
             room,
             at_waypoint=0,
@@ -317,20 +333,7 @@ def compute_reward(
                     if claimed:
                         bd["wrong_room"] = WRONG_ROOM_PENALTY
 
-    illegal_main_hall = False
-    if progress is not None:
-        from re1_rl.cutscene_reward import (
-            illegal_main_hall_before_kenneth_transition,
-        )
-
-        illegal_main_hall = illegal_main_hall_before_kenneth_transition(
-            prev_room,
-            room,
-            rewarded_cutscenes=progress.rewarded_cutscenes,
-            visited_rooms=progress.visited_rooms,
-        )
-
-    if room_changed and is_new_room and not illegal_main_hall:
+    if room_changed and is_new_room:
         bd["new_room"] = NEW_ROOM_BONUS
 
     if "new_items" in state:
@@ -415,8 +418,9 @@ def compute_reward(
         # Ignore bogus HP jumps from menu/cutscene init (prev_hp==0).
         bd["hp"] = hp_heal_reward(hp_delta)
 
-    # Actual death owns the ordinary death channel. Otherwise the sole Kenneth
-    # gate contributes exactly -0.1 once under its explicit telemetry key.
+    # Actual death owns the ordinary death channel. Otherwise the soft Kenneth
+    # gate contributes exactly -0.1 once under its explicit telemetry key (no
+    # episode termination — caller must not treat this as episode failure).
     if state.get("dead"):
         bd["death"] = DEATH_PENALTY
     elif illegal_main_hall:
@@ -429,7 +433,7 @@ def compute_reward(
     if enemy_kills > 0:
         bd["enemy_kill"] = ENEMY_KILL_REWARD * enemy_kills
 
-    if progress is not None and not state.get("dead") and not illegal_main_hall:
+    if progress is not None and not state.get("dead"):
         made_progress = (
             bd["new_room"] != 0.0
             or bd["new_cutscene"] != 0.0

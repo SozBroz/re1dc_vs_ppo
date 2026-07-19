@@ -36,7 +36,7 @@ DINING_ROOM = "105"
 TEA_ROOM = "104"
 BARRY_DINING_CAM = 0
 BARRY_DINING_CLUSTER_PREFIX = f"{DINING_ROOM}:{BARRY_DINING_CAM}:s"
-# Telemetry / info key when illegal pre-Kenneth Main Hall entry terminates.
+# Telemetry key for soft pre-Kenneth Main Hall entry penalty (no episode end).
 ILLEGAL_MAIN_HALL_FAILURE_REASON = "main_hall_before_kenneth"
 
 OPENING_PHASES_NO_REWARD: frozenset[str] = frozenset(
@@ -541,6 +541,14 @@ def qualify_cutscene_reward(
     ):
         return None
 
+    # Pre-Kenneth Main Hall scripts (Wesker talk, etc.): never pay cutscene.
+    # Illegal hall entry already applies the soft -0.1 gate in compute_reward.
+    hall_room = str((new_state or {}).get("room_id", "") or "") or str(
+        (prev_state or {}).get("room_id", "") or ""
+    )
+    if hall_room == MAIN_HALL_ROOM and not kenneth_cutscene_seen(rewarded_cutscenes):
+        return None
+
     return key
 
 
@@ -629,6 +637,11 @@ def cutscene_disqualify_reason(
         visited_rooms=visited_rooms,
     ):
         return "dining<->tea room repeat (Kenneth / multi-cam door farm)"
+    hall_room = str((new_state or {}).get("room_id", "") or "") or str(
+        (prev_state or {}).get("room_id", "") or ""
+    )
+    if hall_room == MAIN_HALL_ROOM and not kenneth_cutscene_seen(rewarded_cutscenes):
+        return "pre-Kenneth Main Hall cutscene (Wesker/hall; soft gate, no pay)"
     return None
 
 

@@ -907,7 +907,7 @@ def test_dining_scene_change_pays_after_door_split():
 
 
 def test_illegal_main_hall_transition_exact_penalty_no_new_room():
-    """105→106 before Kenneth: exactly -0.1 once, no new_room bonus."""
+    """105→106 before Kenneth: -0.1, no new_room, and 106 not marked visited."""
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", cam_id=0, hp=96)
@@ -922,6 +922,63 @@ def test_illegal_main_hall_transition_exact_penalty_no_new_room():
         == MAIN_HALL_BEFORE_KENNETH_PENALTY
         == -0.1
     )
+    assert "106" not in progress.visited_rooms
+
+
+def test_pre_kenneth_main_hall_cutscene_does_not_pay():
+    """Wesker/hall scripts before Kenneth must not earn new_cutscene."""
+    prev = make_state(room="106", cam_id=1, hp=96, scene_flag=0x84)
+    cur = make_state(room="106", cam_id=1, hp=96, scene_flag=0x80)
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=200,
+            rewarded_cutscenes=set(),
+            visited_rooms={"105"},
+        )
+        is None
+    )
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=200,
+            rewarded_cutscenes=AFTER_KENNETH,
+            visited_rooms={"105", "104", "106"},
+        )
+        is not None
+    )
+
+
+def test_illegal_main_hall_later_legal_entry_still_pays_new_room():
+    """Soft gate must leave 106 unpaid so post-Kenneth entry can earn +1."""
+    from re1_rl.reward import NEW_ROOM_BONUS
+
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    # Illegal peek into the hall.
+    _, bd = compute_reward(
+        make_state(room="105", cam_id=0, hp=96),
+        make_state(room="106", cam_id=1, hp=96),
+        make_planner(),
+        progress=progress,
+        return_breakdown=True,
+    )
+    assert bd[ILLEGAL_MAIN_HALL_FAILURE_REASON] == MAIN_HALL_BEFORE_KENNETH_PENALTY
+    assert "106" not in progress.visited_rooms
+    # Leave hall, clear Kenneth, re-enter legally.
+    progress.first_visit("104")
+    progress.rewarded_cutscenes.add("104:0:s0")
+    _, bd2 = compute_reward(
+        make_state(room="105", cam_id=0, hp=96),
+        make_state(room="106", cam_id=1, hp=96),
+        make_planner(),
+        progress=progress,
+        return_breakdown=True,
+    )
+    assert bd2["new_room"] == NEW_ROOM_BONUS
+    assert bd2[ILLEGAL_MAIN_HALL_FAILURE_REASON] == 0.0
     assert "106" in progress.visited_rooms
 
 
