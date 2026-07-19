@@ -78,7 +78,8 @@ NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.6667
 DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.3333
 DEATH_PENALTY = -DEATH_PENALTY_SCALED
 # Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
-MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.1
+# Sized to more than cancel a story cutscene (+1.5) on the same step.
+MAIN_HALL_BEFORE_KENNETH_PENALTY = -1.6
 # Doing-nothing contempt must not exceed death (else suicide beats softlock).
 # Stepwise / ramp potency is 1/5 of the death budget.
 CONTEMPT_BUDGET_SCALED = DEATH_PENALTY_SCALED / 5.0
@@ -282,7 +283,7 @@ def compute_reward(
     room = str(state.get("room_id", ""))
     room_changed = room != prev_room
 
-    # Soft Kenneth gate: illegal pre-Kenneth entry into 106 pays -0.1, does not
+    # Soft Kenneth gate: illegal pre-Kenneth entry into 106 pays -1.6, does not
     # end the episode, and must not mark 106 visited (so a later legal entry
     # after Kenneth can still earn new_room).
     illegal_main_hall = False
@@ -435,7 +436,7 @@ def compute_reward(
         bd["hp"] = hp_heal_reward(hp_delta)
 
     # Actual death owns the ordinary death channel. Otherwise the soft Kenneth
-    # gate contributes exactly -0.1 once under its explicit telemetry key (no
+    # gate contributes once under its explicit telemetry key (no
     # episode termination — caller must not treat this as episode failure).
     if state.get("dead"):
         bd["death"] = DEATH_PENALTY
