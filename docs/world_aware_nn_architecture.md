@@ -99,8 +99,10 @@ Shared vocabulary: **`room_index`** = sorted keys from `data/rooms.json`, padded
 | `spatial` | (128,) → grows with exit `to_room` / `requires_key` | egocentric items, enemies, exits, interactables |
 | `visited` | (16, 16, 1) | episode-local cell trace |
 | `rooms_visited` | (128,) | episode one-hot over room table |
-| `box` | (34,) | item-box slots + room flag |
-| `inventory` | (16,) | on-person 8 slots |
+| `box` | (34,) | item-box slots + room flag (qty `/ AMMO_QTY_NORM=255`) |
+| `inventory` | (16,) | on-person 8 slots (qty `/ AMMO_QTY_NORM=255`) |
+| `weapon_card` | (12,) | equipped clip, nominal dmg, round type, boss-room bonus flags |
+| `last_attack` | (16,) | one-step attack memory (hit, clip before/after, HP events, height one-hot neutral/up/down); cleared next step |
 | `history` | (65,) | room deque K=32 |
 | `acquisitions` | **(121,)** | last **K=60** pickups: pairs `(item_id, room_idx)` → 121-d (**shipped**) |
 | `room_enemies` | (12,) | static roster counts for current room |

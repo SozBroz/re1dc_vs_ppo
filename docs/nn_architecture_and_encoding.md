@@ -7,6 +7,8 @@
 
 **World-aware architecture (2026-07-17):** The agreed next step is flat MaskablePPO with `RE1WorldAwareExtractor` — frozen Evil Resource almanac in policy `register_buffer`s, small dynamic `world_state` / `key_hints` on rollouts, no learned room-order head. See **[world_aware_nn_architecture.md](world_aware_nn_architecture.md)** for the full diagram, buffer inventory, obs-key table, and transplant notes.
 
+**Ammo / weapon card (2026-07-20):** Inventory and box slot qty, `weapon_card.equipped_clip`, and `last_attack` clip/spent fields share `AMMO_QTY_NORM = 255` (`re1_rl/weapon_damage.py`). Do not reintroduce `/15`. New always-on `weapon_card` (nominal damage, round type, acid/flame boss-*room* bonus flags) and one-step `last_attack` memory (cleared at the start of the next env step; includes 3-d height one-hot: attack_neutral / attack_up / attack_down — weapon from equip, not duplicated). Old checkpoints see a qty distribution shift and new flatten slices — transplant or fresh run at restart.
+
 ---
 
 ## 1. Full stack

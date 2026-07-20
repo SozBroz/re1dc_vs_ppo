@@ -30,6 +30,8 @@ from re1_rl.memory_map import (
     IN_CONTROL_MASK,
     MESSAGE_FLAG,
     MESSAGE_FLAG_MASK,
+    DOCUMENT_EXAMINE_GAME_MODE,
+    DOCUMENT_EXAMINE_GAME_STATE,
     OPENING_GAMEPLAY_TEASER_GAME_STATE,
     OPENING_NARRATION_GAME_MODE,
     OPTIONS_MENU_GAME_MODE,
@@ -147,6 +149,22 @@ def scene_active_from_ram(ram: dict[str, int | float]) -> bool:
 def item_inventory_screen_from_ram(ram: dict[str, int | float]) -> bool:
     """START menu tree: ITEM grid, STATUS/ECG, MAP — not OPTIONS/CONFIG."""
     return pause_menu_tree_from_ram(ram)
+
+
+def document_examine_ui_from_ram(ram: dict[str, int | float]) -> bool:
+    """Document / file examine overlay (QuickSave1 botany book).
+
+    Exact ``(mode, gs)`` like OPTIONS: ``mode=0x40``, ``gs=0x40808100``.
+    ITEM grid is ``0x40808000``; STATUS mid-byte drift ``0x40808104`` is not
+    this overlay. Triangle dismisses; Start does not.
+
+    Reward path assumes all books share this ``gs`` until a per-document ID
+    is hunted; anti-farm is once per room per episode (see ``compute_reward``).
+    """
+    return (
+        int(ram.get("game_mode", 0)) == DOCUMENT_EXAMINE_GAME_MODE
+        and int(ram.get("game_state", 0)) == DOCUMENT_EXAMINE_GAME_STATE
+    )
 
 
 def needs_skip_from_ram(ram: dict[str, int | float]) -> bool:

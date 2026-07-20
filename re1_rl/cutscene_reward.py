@@ -19,9 +19,10 @@ from re1_rl.ram_skip import in_game_menu_from_ram
 # 384–424 frame stair transitions while preserving 508-frame Kenneth.
 MIN_CUTSCENE_SKIP_FRAMES = 450
 
-# Same-room freezes use ``room:cam:sN``. Cap N so repeated long freezes at one
-# camera cannot mint unbounded +NEW_CUTSCENE_BONUS.
-MAX_SAME_ROOM_CUTSCENE_INDEX = 1
+# Same-room freezes use ``room:cam:sN``. Cap is an exclusive upper bound on N
+# so repeated long freezes at one camera cannot mint unbounded +NEW_CUTSCENE_BONUS.
+# MAX=4 → paid keys s0..s3 (indices 0..3); index 4+ rejected.
+MAX_SAME_ROOM_CUTSCENE_INDEX = 4
 
 # Boot / attract spans — never pay exploration cutscene bonus.
 # Kenneth tea-room freeze (``104:*:sN``) unlocks legal Main Hall entry.
@@ -93,7 +94,7 @@ def cutscene_key_from_state(
     if new_room and new_room != room:
         return door_key
     n = same_room_cutscene_index(room, cam, rewarded_cutscenes)
-    if n > MAX_SAME_ROOM_CUTSCENE_INDEX:
+    if n >= MAX_SAME_ROOM_CUTSCENE_INDEX:
         return None
     return f"{room}:{cam}:s{n}"
 
@@ -366,9 +367,9 @@ def cutscene_disqualify_reason(
             new_room = str((new_state or {}).get("room_id", "") or "")
             if not new_room or new_room == room:
                 n = same_room_cutscene_index(room, cam, rewarded_cutscenes)
-                if n > MAX_SAME_ROOM_CUTSCENE_INDEX:
+                if n >= MAX_SAME_ROOM_CUTSCENE_INDEX:
                     return (
-                        f"same-room cutscene index {n} > "
+                        f"same-room cutscene index {n} >= "
                         f"MAX_SAME_ROOM_CUTSCENE_INDEX="
                         f"{MAX_SAME_ROOM_CUTSCENE_INDEX}"
                     )

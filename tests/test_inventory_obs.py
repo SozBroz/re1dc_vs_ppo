@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from re1_rl.obs_encoder import INVENTORY_OBS_DIM, INVENTORY_SLOTS, encode_inventory_slots
+from re1_rl.weapon_damage import AMMO_QTY_NORM
 
 
 def test_inventory_obs_dim() -> None:
@@ -20,11 +22,11 @@ def test_empty_inventory_is_zeros() -> None:
 def test_inventory_encodes_item_id_and_qty() -> None:
     v = encode_inventory_slots([("shield_key", 1), ("emblem", 1)])
     # slot 0: shield_key 0x35
-    assert v[0] == 0x35 / 0x4B
-    assert v[1] == 1 / 15.0
+    assert v[0] == pytest.approx(0x35 / 0x4B)
+    assert v[1] == pytest.approx(1 / AMMO_QTY_NORM)
     # slot 1: emblem 0x1F
-    assert v[2] == 0x1F / 0x4B
-    assert v[3] == 1 / 15.0
+    assert v[2] == pytest.approx(0x1F / 0x4B)
+    assert v[3] == pytest.approx(1 / AMMO_QTY_NORM)
     # remaining slots zero
     assert np.all(v[4:] == 0.0)
 
@@ -35,4 +37,4 @@ def test_inventory_caps_at_eight_slots() -> None:
     assert v.shape == (16,)
     assert v[0] > 0
     assert v[14] > 0  # slot 7 item_id
-    assert v[15] == 1 / 15.0  # slot 7 qty — 9th+ inputs dropped
+    assert v[15] == pytest.approx(1 / AMMO_QTY_NORM)  # slot 7 qty — 9th+ inputs dropped

@@ -111,7 +111,15 @@ def _hits(breakdown: dict[str, Any] | None) -> dict[str, float]:
 # Exploration reward schema (skill re-exploration-rewards). Flag payouts that
 # defy the published buckets / hard exceptions — for operator triage only.
 _LARGE_OK = frozenset(
-    {"new_room", "new_cutscene", "key_item", "story_use", "gallery", "new_weapon"}
+    {
+        "new_room",
+        "document_examine",
+        "new_cutscene",
+        "key_item",
+        "story_use",
+        "gallery",
+        "new_weapon",
+    }
 )
 _MODEST_OK = frozenset(
     {

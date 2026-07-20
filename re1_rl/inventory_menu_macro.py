@@ -50,6 +50,10 @@ EQUIP_SUBMENU_CROSS_FRAMES = 15
 EQUIP_SUBMENU_SETTLE_FRAMES = 15
 CLOSE_START_FRAMES = 12
 CLOSE_ITEM_SETTLE_FRAMES = 30
+# Document/file examine (QS1 botany book): Triangle hold matches knife_equip close.
+CLOSE_TRIANGLE_FRAMES = 15
+CLOSE_TRIANGLE_SETTLE_FRAMES = 20
+CLOSE_TRIANGLE_MAX_ATTEMPTS = 12
 # Story key-item USE: poll slowly after submenu USE; do not close ITEM immediately.
 STORY_USE_POLL_FRAMES = 4
 STORY_USE_MENU_STALL_FRAMES = 120
@@ -264,28 +268,102 @@ def close_item_screen(
     return False, frames
 
 
+def close_document_examine_ui(
+    client: Any,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int]:
+    """Triangle-dismiss document/file examine UI (QS1 botany book).
+
+    Exact pause sub-state ``mode=0x40``, ``gs=0x40808100`` (not ITEM
+    ``0x40808000``). Start does not exit this overlay — Triangle does.
+    Returns ``(died, frames_used)``.
+    """
+    frames = 0
+    for _ in range(CLOSE_TRIANGLE_MAX_ATTEMPTS):
+        if not _item_menu_confirmed(client):
+            return False, frames
+        died, f = _tap(
+            client,
+            {"triangle": True},
+            frames=CLOSE_TRIANGLE_FRAMES,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += f
+        if died:
+            return True, frames
+        died, f = _wait(
+            client,
+            frames=CLOSE_TRIANGLE_SETTLE_FRAMES,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += f
+        if died:
+            return True, frames
+    return False, frames
+
+
 def dismiss_orphan_item_menu(
     client: Any,
     *,
     prev_hp: int = 0,
     episode_start_hp: int = 0,
 ) -> tuple[bool, int, dict[str, Any]]:
-    """Close an orphan START/ITEM pause screen left open outside inventory macros.
+    """Close an orphan START/ITEM pause or document-examine overlay.
+
+    Document examine (``gs=0x40808100``) goes straight to Triangle. Normal
+    ITEM/STATUS/MAP tries Start first, then Triangle as a fallback.
 
     Returns ``(still_open, frames_used, report)``. ``still_open=False`` means
     Jill is back in mansion control (or was never on the pause tree).
     """
+    from re1_rl.ram_skip import document_examine_ui_from_ram
+
     report: dict[str, Any] = {"cleared": False, "path": "close_item_screen"}
     if not _item_menu_confirmed(client):
         report["cleared"] = True
         report["skipped"] = True
         return False, 0, report
+
+    ram = client.read_ram(
+        [
+            ("game_mode", GAME_MODE, "u8"),
+            ("game_state", GAME_STATE, "u32"),
+        ]
+    )
+    if document_examine_ui_from_ram(ram):
+        died, frames = close_document_examine_ui(
+            client,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        still = _item_menu_confirmed(client)
+        report["path"] = "triangle_document"
+        report["cleared"] = not still
+        report["died"] = bool(died)
+        report["frames"] = int(frames)
+        return still, frames, report
+
     died, frames = close_item_screen(
         client,
         prev_hp=prev_hp,
         episode_start_hp=episode_start_hp,
     )
     still = _item_menu_confirmed(client)
+    if still and not died:
+        died_tri, tri_frames = close_document_examine_ui(
+            client,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += tri_frames
+        died = bool(died or died_tri)
+        still = _item_menu_confirmed(client)
+        if not still:
+            report["path"] = "triangle_document"
     report["cleared"] = not still
     report["died"] = bool(died)
     report["frames"] = int(frames)

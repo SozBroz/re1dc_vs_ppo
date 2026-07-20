@@ -13,6 +13,7 @@ from re1_rl.obs_encoder import (
     explain_obs,
     format_obs_table,
 )
+from re1_rl.weapon_damage import AMMO_QTY_NORM
 
 
 def test_box_dim_matches_fields():
@@ -25,9 +26,9 @@ def test_encode_box_two_stacks():
     v = encode_box([(0x01, 3), (0x0A, 7)], in_box_room=False)
     assert v.shape == (BOX_DIM,)
     assert v[0] == pytest.approx(0x01 / float(MAX_ITEM_ID))
-    assert v[1] == pytest.approx(3 / 15.0)
+    assert v[1] == pytest.approx(3 / AMMO_QTY_NORM)
     assert v[2] == pytest.approx(0x0A / float(MAX_ITEM_ID))
-    assert v[3] == pytest.approx(7 / 15.0)
+    assert v[3] == pytest.approx(7 / AMMO_QTY_NORM)
     assert v[4:32] == pytest.approx(0.0)
     assert v[32] == pytest.approx(14 / 16.0)  # 14 empty slots
     assert v[33] == 0.0
@@ -41,9 +42,11 @@ def test_encode_box_empty_and_none():
         assert v[33] == 0.0
 
 
-def test_encode_box_qty_clips_above_15():
-    v = encode_box([(0x05, 99)], in_box_room=False)
+def test_encode_box_qty_clips_above_ammo_norm():
+    v = encode_box([(0x05, 400)], in_box_room=False)
     assert v[1] == pytest.approx(1.0)
+    v2 = encode_box([(0x05, 99)], in_box_room=False)
+    assert v2[1] == pytest.approx(99 / AMMO_QTY_NORM)
 
 
 def test_encode_box_free_slots_math():
@@ -62,7 +65,7 @@ def test_encode_box_in_box_room_flag():
 def test_encode_box_short_list_zero_pads():
     v = encode_box([(0x03, 5)], in_box_room=False)
     assert v[0] == pytest.approx(0x03 / float(MAX_ITEM_ID))
-    assert v[1] == pytest.approx(5 / 15.0)
+    assert v[1] == pytest.approx(5 / AMMO_QTY_NORM)
     assert v[2] == 0.0
     assert v[32] == pytest.approx(15 / 16.0)
 

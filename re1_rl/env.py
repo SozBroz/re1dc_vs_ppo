@@ -60,6 +60,14 @@ from re1_rl.obs_encoder import (
     encode_box,
     encode_inventory_slots,
 )
+from re1_rl.weapon_damage import (
+    LAST_ATTACK_DIM,
+    WEAPON_CARD_DIM,
+    empty_last_attack,
+    encode_weapon_card,
+    equipped_clip_from_inventory_slots,
+    pack_last_attack,
+)
 from re1_rl.episode_history import (
     ACQUISITION_LOG_DIM,
     ROOM_HISTORY_DIM,
@@ -288,6 +296,10 @@ class RE1Env(gym.Env):
                 "box": spaces.Box(0.0, 2.0, shape=(BOX_DIM,), dtype=np.float32),
                 # on-person inventory (8 slots)
                 "inventory": spaces.Box(0.0, 1.0, shape=(INVENTORY_OBS_DIM,), dtype=np.float32),
+                # equipped weapon card (clip, nominal dmg, round type, room bonuses)
+                "weapon_card": spaces.Box(0.0, 1.0, shape=(WEAPON_CARD_DIM,), dtype=np.float32),
+                # one-step last knife/attack memory (cleared next step)
+                "last_attack": spaces.Box(0.0, 1.0, shape=(LAST_ATTACK_DIM,), dtype=np.float32),
                 # episode room-entry deque (K=32)
                 "history": spaces.Box(0.0, 1.0, shape=(ROOM_HISTORY_DIM,), dtype=np.float32),
                 # last pickups (K=4)
@@ -345,6 +357,7 @@ class RE1Env(gym.Env):
         self._combine_phase = 0
         self._combine_slot_a: int | None = None
         self._attack_telemetry = None
+        self._last_attack_obs = empty_last_attack()
         self._stage: dict[str, Any] = {}
         self._step_count = 0
         self._prev_state: dict[str, Any] = {}
@@ -524,6 +537,64 @@ class RE1Env(gym.Env):
                 pass
         return encode_box(self._box_cache, in_box_room=in_box_room)
 
+    def _weapon_card_obs(self, state: dict[str, Any]) -> np.ndarray:
+        wid = int(state.get("equipped_weapon_id", 0) or 0)
+        clip = equipped_clip_from_inventory_slots(
+            state.get("inventory_slots"), wid
+        )
+        return encode_weapon_card(
+            weapon_id=wid,
+            equipped_clip=clip,
+            room_id=state.get("room_id"),
+        )
+
+    def _fill_last_attack_obs(
+        self,
+        prev_state: dict[str, Any],
+        state: dict[str, Any],
+        *,
+        knife: bool,
+        attack: bool,
+        attack_report: dict[str, Any] | None,
+        action_id: int,
+    ) -> None:
+        """One-step last_attack pack; same room/combat gates as apply_combat_step_fields."""
+        if not knife and not attack:
+            return
+        prev_room = str(prev_state.get("room_id", "") or "")
+        curr_room = str(state.get("room_id", "") or "")
+        if prev_room and curr_room and prev_room != curr_room:
+            return
+        wid = int(
+            (attack_report or {}).get("weapon_id")
+            or state.get("equipped_weapon_id")
+            or prev_state.get("equipped_weapon_id")
+            or 0
+        )
+        clip_before = equipped_clip_from_inventory_slots(
+            prev_state.get("inventory_slots"), wid
+        )
+        ammo_spent = int(state.get("ammo_spent", 0) or 0)
+        if attack_report is not None:
+            ammo_spent = int(attack_report.get("ammo_spent", ammo_spent) or 0)
+        clip_after = equipped_clip_from_inventory_slots(
+            state.get("inventory_slots"), wid
+        )
+        if not knife and clip_after == 0 and clip_before > 0 and ammo_spent > 0:
+            clip_after = max(0, clip_before - ammo_spent)
+        self._last_attack_obs = pack_last_attack(
+            knife=knife,
+            attack=attack,
+            combat_events=state.get("combat_events"),
+            enemy_damage=int(state.get("enemy_damage", 0) or 0),
+            enemy_kills=int(state.get("enemy_kills", 0) or 0),
+            clip_before=clip_before,
+            clip_after=clip_after,
+            ammo_spent=ammo_spent,
+            enemies_before=prev_state.get("enemies"),
+            action_id=int(action_id),
+        )
+
     def _episode_truncated(self) -> bool:
         max_ep = int(self._stage.get("max_steps", 3000))
         if max_ep > 0 and self._step_count >= max_ep:
@@ -569,6 +640,8 @@ class RE1Env(gym.Env):
             "rooms_visited": self._encoder.encode_rooms_visited(self._progress.visited_rooms),
             "box": self._box_obs(state),
             "inventory": encode_inventory_slots(state.get("inventory_slots")),
+            "weapon_card": self._weapon_card_obs(state),
+            "last_attack": np.asarray(self._last_attack_obs, dtype=np.float32),
             "history": hist["history"],
             "acquisitions": hist["acquisitions"],
             "room_enemies": self._room_roster.encode(str(state.get("room_id", ""))),
@@ -634,6 +707,11 @@ class RE1Env(gym.Env):
         if self._ram_skip.use_engine_patches:
             self._ram_skip.install_engine_patches()
         self._skip_uncontrolled()
+        # Orphan START/ITEM or document examine left open by savestate
+        # (e.g. QuickSave1 botany book: mode=0x40 / gs=0x40808100; Triangle).
+        if self._probe_item_inventory_menu():
+            self._try_dismiss_orphan_item_menu()
+            self._skip_uncontrolled()
 
         if self._stage.get("knife_equipped_start"):
             try:
@@ -650,6 +728,7 @@ class RE1Env(gym.Env):
         self._equip_phase = 0
         self._combine_phase = 0
         self._combine_slot_a = None
+        self._last_attack_obs = empty_last_attack()
         self._last_skip_frames = 0
         self._last_settled_skip_frames = 0
         self._last_settled_cutscene_key = None
@@ -1935,6 +2014,8 @@ class RE1Env(gym.Env):
 
     def _step_once(self, action: int):
         assert self._planner is not None
+        # One-step TTL: clear prior last_attack before this step's observation.
+        self._last_attack_obs = empty_last_attack()
         self._start_bg_skip()
         if self._bg_death:
             self._bg_death = False
@@ -2160,6 +2241,15 @@ class RE1Env(gym.Env):
         if attack_report is not None:
             state["ammo_spent"] = int(attack_report.get("ammo_spent", 0))
             state["attack_weapon"] = attack_report.get("weapon")
+        if knife or combat_attack:
+            self._fill_last_attack_obs(
+                self._prev_state,
+                state,
+                knife=knife,
+                attack=combat_attack,
+                attack_report=attack_report,
+                action_id=int(action),
+            )
         menu_reason = self._probe_outside_gameplay()
         if menu_reason in {"options_menu", "pause_or_options_menu"}:
             recovered, options_dismiss_report = self._try_dismiss_options_menu()

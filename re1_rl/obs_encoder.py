@@ -24,6 +24,7 @@ from re1_rl.item_todo import ItemTracker, RoomItems, canonical_item, canonicaliz
 from re1_rl.memory_map import ITEM_IDS
 from re1_rl.planner import OBJECTIVE_TYPES, WaypointPlanner
 from re1_rl.room_graph import RoomGraph
+from re1_rl.weapon_damage import AMMO_QTY_NORM, ammo_qty_norm
 
 INVENTORY_SLOTS = 8
 INVENTORY_OBS_DIM = INVENTORY_SLOTS * 2  # item_id + qty per slot
@@ -114,7 +115,7 @@ BOX_FIELDS: list[tuple[str, str]] = [
     for n in range(16)
     for field in (
         (f"box{n}_item_id", "item id / 0x46 (0 = empty)"),
-        (f"box{n}_qty", "quantity / 15, clip [0,1]"),
+        (f"box{n}_qty", f"quantity / {int(AMMO_QTY_NORM)}, clip [0,1]"),
     )
 ] + [
     ("box_free_slots", "empty box slots / 16"),
@@ -217,7 +218,7 @@ class ObsEncoder:
 def encode_inventory_slots(
     inventory_slots: list[tuple[str, int]] | None,
 ) -> np.ndarray:
-    """Encode on-person inventory (8 slots): item_id / MAX, qty / 15."""
+    """Encode on-person inventory (8 slots): item_id / MAX, qty / AMMO_QTY_NORM."""
     v = np.zeros(INVENTORY_OBS_DIM, dtype=np.float32)
     slots = list(inventory_slots or [])[:INVENTORY_SLOTS]
     while len(slots) < INVENTORY_SLOTS:
@@ -225,7 +226,7 @@ def encode_inventory_slots(
     for i, (name, qty) in enumerate(slots):
         item_id = _NAME_TO_ITEM_ID.get(canonical_item(str(name)), 0)
         v[2 * i] = float(item_id) / float(MAX_ITEM_ID)
-        v[2 * i + 1] = float(np.clip(int(qty) / 15.0, 0.0, 1.0))
+        v[2 * i + 1] = ammo_qty_norm(qty)
     return v
 
 
@@ -239,7 +240,7 @@ def encode_box(box: list[tuple[int, int]] | None, *, in_box_room: bool) -> np.nd
     free = 0
     for i, (item_id, qty) in enumerate(slots):
         v[2 * i] = item_id / float(MAX_ITEM_ID)
-        v[2 * i + 1] = float(np.clip(qty / 15.0, 0.0, 1.0))
+        v[2 * i + 1] = ammo_qty_norm(qty)
         if item_id == 0:
             free += 1
     v[32] = free / 16.0
@@ -269,6 +270,14 @@ def explain_obs(obs: dict[str, np.ndarray]) -> dict[str, Any]:
         out["spatial"] = explain_vector(obs["spatial"], SPATIAL_FIELDS)
     if "box" in obs:
         out["box"] = explain_vector(obs["box"], BOX_FIELDS)
+    if "weapon_card" in obs:
+        from re1_rl.weapon_damage import WEAPON_CARD_FIELDS
+
+        out["weapon_card"] = explain_vector(obs["weapon_card"], WEAPON_CARD_FIELDS)
+    if "last_attack" in obs:
+        from re1_rl.weapon_damage import LAST_ATTACK_FIELDS
+
+        out["last_attack"] = explain_vector(obs["last_attack"], LAST_ATTACK_FIELDS)
     if "visited" in obs:
         vm = obs["visited"]
         out["visited"] = {"shape": list(vm.shape),
@@ -292,7 +301,7 @@ def format_obs_table(obs: dict[str, np.ndarray], *, spatial_nonzero_only: bool =
     """
     lines: list[str] = []
     ex = explain_obs(obs)
-    for section in ("proprio", "goal", "spatial", "box"):
+    for section in ("proprio", "goal", "spatial", "box", "weapon_card", "last_attack"):
         if section not in ex:
             continue
         lines.append(f"--- {section} ---")

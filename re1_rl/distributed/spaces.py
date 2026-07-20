@@ -16,6 +16,7 @@ from re1_rl.maps_files import MAPS_FILES_DIM
 from re1_rl.milestone_features import MILESTONE_DIM
 from re1_rl.room_signature import ENEMY_ROSTER_DIM
 from re1_rl.spatial_encoder import SPATIAL_DIM, VISITED_SHAPE
+from re1_rl.weapon_damage import LAST_ATTACK_DIM, WEAPON_CARD_DIM
 
 
 def make_re1_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
@@ -29,6 +30,8 @@ def make_re1_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
             "rooms_visited": spaces.Box(0.0, 1.0, shape=(ROOM_VISITED_DIM,), dtype="float32"),
             "box": spaces.Box(0.0, 2.0, shape=(BOX_DIM,), dtype="float32"),
             "inventory": spaces.Box(0.0, 1.0, shape=(INVENTORY_OBS_DIM,), dtype="float32"),
+            "weapon_card": spaces.Box(0.0, 1.0, shape=(WEAPON_CARD_DIM,), dtype="float32"),
+            "last_attack": spaces.Box(0.0, 1.0, shape=(LAST_ATTACK_DIM,), dtype="float32"),
             "history": spaces.Box(0.0, 1.0, shape=(ROOM_HISTORY_DIM,), dtype="float32"),
             "acquisitions": spaces.Box(0.0, 1.0, shape=(ACQUISITION_LOG_DIM,), dtype="float32"),
             "room_enemies": spaces.Box(0.0, 1.0, shape=(ENEMY_ROSTER_DIM,), dtype="float32"),

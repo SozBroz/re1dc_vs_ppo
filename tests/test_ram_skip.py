@@ -25,6 +25,7 @@ from re1_rl.memory_map import (
 )
 from re1_rl.ram_skip import (
     RamSkipper,
+    document_examine_ui_from_ram,
     in_control_from_ram,
     in_game_menu_from_ram,
     item_inventory_screen_from_ram,
@@ -196,6 +197,38 @@ def test_item_inventory_screen_from_ram() -> None:
     )
     # Without game_state the poll is incomplete — do not guess pause menu.
     assert needs_skip_from_ram({"game_mode": PAUSE_MENU_GAME_MODE, "msg_flag": 0})
+
+
+def test_document_examine_ui_from_ram_qs1_botany_book() -> None:
+    """QS1 botany book: exact gs=0x40808100 (not ITEM 0x40808000)."""
+    from re1_rl.memory_map import DOCUMENT_EXAMINE_GAME_STATE
+
+    qs1 = {
+        "game_mode": PAUSE_MENU_GAME_MODE,
+        "game_state": DOCUMENT_EXAMINE_GAME_STATE,  # 0x40808100
+        "msg_flag": 0x00,
+    }
+    assert document_examine_ui_from_ram(qs1)
+    assert pause_menu_tree_from_ram(qs1)
+    # Normal ITEM grid shares mode 0x40 but not the document mid-byte.
+    assert not document_examine_ui_from_ram(
+        {
+            "game_mode": PAUSE_MENU_GAME_MODE,
+            "game_state": PAUSE_MENU_GAME_STATE,  # 0x40808000
+            "msg_flag": 0x00,
+        }
+    )
+    # STATUS mid-byte drift 0x40808104 is not the document overlay.
+    assert not document_examine_ui_from_ram(
+        {
+            "game_mode": PAUSE_MENU_GAME_MODE,
+            "game_state": 0x40808104,
+            "msg_flag": 0x00,
+        }
+    )
+    assert not document_examine_ui_from_ram(
+        {"game_mode": 0x80, "game_state": 0x80808000, "msg_flag": 0}
+    )
 
 
 class FakeBridge:

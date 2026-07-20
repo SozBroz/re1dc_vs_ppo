@@ -171,13 +171,18 @@ def test_pre_kenneth_hall_is_excluded_but_post_kenneth_hall_pays() -> None:
 
 
 def test_same_camera_key_cap_and_reward_deduplication() -> None:
+    from re1_rl.cutscene_reward import MAX_SAME_ROOM_CUTSCENE_INDEX
+
     prev = make_state(room="105", cam_id=0, hp=96)
     cur = make_state(room="105", cam_id=0, hp=96)
-    assert _qualify(prev, cur, rewarded_cutscenes=set()) == "105:0:s0"
-    assert _qualify(prev, cur, rewarded_cutscenes={"105:0:s0"}) == "105:0:s1"
-    assert _qualify(
-        prev, cur, rewarded_cutscenes={"105:0:s0", "105:0:s1"}
-    ) is None
+    assert MAX_SAME_ROOM_CUTSCENE_INDEX == 4
+    # Indices 0..3 paid (s0..s3); index 4+ rejected.
+    claimed: set[str] = set()
+    for i in range(4):
+        key = _qualify(prev, cur, rewarded_cutscenes=claimed)
+        assert key == f"105:0:s{i}"
+        claimed.add(key)
+    assert _qualify(prev, cur, rewarded_cutscenes=claimed) is None
 
     progress = ProgressTracker()
     cur["cutscene_key"] = "105:0:s0"

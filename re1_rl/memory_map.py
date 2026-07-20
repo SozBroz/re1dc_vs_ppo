@@ -45,6 +45,12 @@ IN_CONTROL_GAMESTATE_MASK = 0x90000000
 PAUSE_MENU_GAME_STATE = 0x40808000
 PAUSE_MENU_GAME_STATE_MASK = 0xFFFFFF00
 PAUSE_MENU_GAME_MODE = 0x40
+# Document / file examine overlay (QS1 botany book, hunt 2026-07-20):
+# same mode 0x40 as ITEM but mid-byte 0x81 → exact gs 0x40808100. Distinct from
+# ITEM grid 0x40808000 and from STATUS mid-byte drift 0x40808104. Triangle
+# dismisses; Start does not. Stable across page/cursor taps on QS1.
+DOCUMENT_EXAMINE_GAME_STATE = 0x40808100
+DOCUMENT_EXAMINE_GAME_MODE = PAUSE_MENU_GAME_MODE
 # STATUS / ECG health-bar sub-screen (live hunt 2026-07-08, play_human :7788).
 # Same 0x008080xx session tag as ITEM but high byte 0x60 and mode 0x60.
 STATUS_ECG_GAME_STATE = 0x60808000

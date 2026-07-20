@@ -19,6 +19,9 @@ class ProgressTracker:
     penalized_offroute_rooms: set[str] = field(default_factory=set)
     rewarded_cutscenes: set[str] = field(default_factory=set)
     rewarded_story_uses: set[str] = field(default_factory=set)
+    # First rising edge into document/file examine UI per room this episode.
+    # No stable document ID in RAM yet — room key matches new_room anti-farm.
+    rewarded_document_rooms: set[str] = field(default_factory=set)
     # After key/weapon pickup: suppress same-room cutscene fragments until leave.
     # Implements skill (a) for multi-settle pickup cinema (emblem grab → +1s).
     cutscene_blocked_after_pickup_room: str | None = None
@@ -121,9 +124,10 @@ class ProgressTracker:
     ) -> None:
         """Advance idle clock when no exploration progress this step.
 
-        Progress is defined in ``compute_reward``: new room, new cutscene,
-        new key item, first weapon acquire this episode, story use, or gallery.
-        Revisiting rooms, junk pickups, and shotgun rack re-takes do not reset.
+        Progress is defined in ``compute_reward``: new room, document examine,
+        new cutscene, new key item, first weapon acquire this episode, story
+        use, or gallery. Revisiting rooms, reopening a paid document room,
+        junk pickups, and shotgun rack re-takes do not reset.
         Each env step advances stagnation by ``step_frames`` (macro steps count more).
         """
         if made_progress:
@@ -168,6 +172,14 @@ class ProgressTracker:
         if not key or key in self.rewarded_cutscenes:
             return False
         self.rewarded_cutscenes.add(key)
+        return True
+
+    def claim_document_examine_bonus(self, room_id: str) -> bool:
+        """True once per room on first document-examine edge this episode."""
+        room = str(room_id or "")
+        if not room or room in self.rewarded_document_rooms:
+            return False
+        self.rewarded_document_rooms.add(room)
         return True
 
     def note_pickup_cutscene_block(self, room_id: str) -> None:

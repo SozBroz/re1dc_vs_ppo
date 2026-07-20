@@ -12,10 +12,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from re1_rl.inventory_menu_macro import (
     CLOSE_ITEM_SETTLE_FRAMES,
     CLOSE_START_FRAMES,
+    CLOSE_TRIANGLE_FRAMES,
+    CLOSE_TRIANGLE_SETTLE_FRAMES,
     EQUIP_SUBMENU_CROSS_FRAMES,
     EQUIP_SUBMENU_SETTLE_FRAMES,
     OPEN_SETTLE_FRAMES,
     OPEN_START_FRAMES,
+    close_document_examine_ui,
     dismiss_orphan_item_menu,
     execute_equip_macro,
     slot_nav_moves,
@@ -38,18 +41,27 @@ class _RecordingClient:
         equipped_slot_1b: int = 0,
         inv_ids: list[int] | None = None,
         equip_target_slot: int | None = None,
+        start_closes_menu: bool = True,
+        triangle_closes_menu: bool = False,
+        document_examine: bool = False,
     ) -> None:
         self.equipped_id = int(equipped_id)
         self.equipped_slot_1b = int(equipped_slot_1b)
         self.inv_ids = list(inv_ids or [0] * 8)
         self.equip_target_slot = equip_target_slot
         self.in_item_menu = False
+        self.start_closes_menu = bool(start_closes_menu)
+        self.triangle_closes_menu = bool(triangle_closes_menu)
+        self.document_examine = bool(document_examine)
         self.steps: list[tuple[dict[str, bool], int]] = []
 
     def step(self, buttons: dict[str, bool], n: int = 1):
         self.steps.append((dict(buttons), int(n)))
-        if buttons.get("start"):
+        if buttons.get("start") and self.start_closes_menu:
             self.in_item_menu = not self.in_item_menu
+        if buttons.get("triangle") and self.triangle_closes_menu:
+            self.in_item_menu = False
+            self.document_examine = False
         crosses = sum(1 for b, _ in self.steps if b.get("cross"))
         if (
             crosses >= 2
@@ -71,8 +83,13 @@ class _RecordingClient:
             elif name == "game_mode":
                 out[name] = 0x40 if self.in_item_menu else 0x80
             elif name == "game_state":
-                # ITEM pause tree (ram_skip.item_inventory_screen_from_ram).
-                out[name] = 0x40808000 if self.in_item_menu else 0x90808000
+                # Document examine: exact 0x40808100; ITEM grid: 0x40808000.
+                if self.in_item_menu and self.document_examine:
+                    out[name] = 0x40808100
+                elif self.in_item_menu:
+                    out[name] = 0x40808000
+                else:
+                    out[name] = 0x90808000
             elif name.startswith("inv_slot_"):
                 idx = int(name.split("_")[-1])
                 item_id = self.inv_ids[idx] if idx < len(self.inv_ids) else 0
@@ -154,6 +171,53 @@ def test_dismiss_orphan_item_menu_skips_when_already_clear() -> None:
     assert frames == 0
     assert report.get("skipped") is True
     assert client.steps == []
+
+
+def test_close_document_examine_ui_triangle() -> None:
+    client = _RecordingClient(start_closes_menu=False, triangle_closes_menu=True)
+    client.in_item_menu = True
+    died, frames = close_document_examine_ui(
+        client, prev_hp=96, episode_start_hp=96
+    )
+    assert not died
+    assert frames >= CLOSE_TRIANGLE_FRAMES + CLOSE_TRIANGLE_SETTLE_FRAMES
+    assert client.steps[0] == ({"triangle": True}, CLOSE_TRIANGLE_FRAMES)
+    assert not client.in_item_menu
+
+
+def test_dismiss_orphan_document_examine_triangle_direct() -> None:
+    """QS1 botany book gs=0x40808100: Triangle immediately (no Start waste)."""
+    client = _RecordingClient(
+        start_closes_menu=False,
+        triangle_closes_menu=True,
+        document_examine=True,
+    )
+    client.in_item_menu = True
+    still, frames, report = dismiss_orphan_item_menu(
+        client, prev_hp=96, episode_start_hp=96
+    )
+    assert not still
+    assert report["cleared"] is True
+    assert report["path"] == "triangle_document"
+    assert client.steps[0] == ({"triangle": True}, CLOSE_TRIANGLE_FRAMES)
+    assert not any(b.get("start") for b, _ in client.steps)
+    assert frames >= CLOSE_TRIANGLE_FRAMES + CLOSE_TRIANGLE_SETTLE_FRAMES
+    assert not client.in_item_menu
+
+
+def test_dismiss_orphan_falls_back_to_triangle_for_document() -> None:
+    """Unknown pause-tree leftover: Start fails, Triangle clears it."""
+    client = _RecordingClient(start_closes_menu=False, triangle_closes_menu=True)
+    client.in_item_menu = True
+    still, frames, report = dismiss_orphan_item_menu(
+        client, prev_hp=96, episode_start_hp=96
+    )
+    assert not still
+    assert report["cleared"] is True
+    assert report["path"] == "triangle_document"
+    assert any(b.get("triangle") for b, _ in client.steps)
+    assert frames > CLOSE_START_FRAMES + CLOSE_ITEM_SETTLE_FRAMES
+    assert not client.in_item_menu
 
 
 def test_inventory_macro_owns_item_menu_gating() -> None:

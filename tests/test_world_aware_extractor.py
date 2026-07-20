@@ -30,6 +30,10 @@ from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, INVENTORY_OBS_DIM, PROPRIO_DIM
 from re1_rl.policy_config import POLICY_KWARGS
 from re1_rl.room_signature import ENEMY_ROSTER_DIM
 from re1_rl.spatial_encoder import SPATIAL_DIM, VISITED_SHAPE
+from re1_rl.weapon_damage import LAST_ATTACK_DIM, WEAPON_CARD_DIM
+
+# Flattened privileged dims excluding frame/world_state (weapon_card + last_attack = +28).
+_FLAT_PRIVILEGED_DIM = 947 + WEAPON_CARD_DIM + LAST_ATTACK_DIM
 
 
 def _stub_obs_space(*, with_world_state: bool = True, with_key_hints: bool = False) -> spaces.Dict:
@@ -42,6 +46,8 @@ def _stub_obs_space(*, with_world_state: bool = True, with_key_hints: bool = Fal
         "rooms_visited": spaces.Box(0.0, 1.0, shape=(ROOM_VISITED_DIM,), dtype=np.float32),
         "box": spaces.Box(0.0, 2.0, shape=(BOX_DIM,), dtype=np.float32),
         "inventory": spaces.Box(0.0, 1.0, shape=(INVENTORY_OBS_DIM,), dtype=np.float32),
+        "weapon_card": spaces.Box(0.0, 1.0, shape=(WEAPON_CARD_DIM,), dtype=np.float32),
+        "last_attack": spaces.Box(0.0, 1.0, shape=(LAST_ATTACK_DIM,), dtype=np.float32),
         "history": spaces.Box(0.0, 1.0, shape=(ROOM_HISTORY_DIM,), dtype=np.float32),
         "acquisitions": spaces.Box(0.0, 1.0, shape=(ACQUISITION_LOG_DIM,), dtype=np.float32),
         "room_enemies": spaces.Box(0.0, 1.0, shape=(ENEMY_ROSTER_DIM,), dtype=np.float32),
@@ -79,7 +85,7 @@ def test_world_aware_extractor_forward_with_world_state() -> None:
     batch = _fake_batch(obs_space)
     out = extractor(batch)
     assert out.shape == (4, extractor.features_dim)
-    assert extractor.features_dim == 512 + 947 + WORLD_CONTEXT_DIM
+    assert extractor.features_dim == 512 + _FLAT_PRIVILEGED_DIM + WORLD_CONTEXT_DIM
 
 
 def test_world_aware_extractor_forward_without_world_state() -> None:
@@ -88,7 +94,7 @@ def test_world_aware_extractor_forward_without_world_state() -> None:
     batch = _fake_batch(obs_space)
     out = extractor(batch)
     assert out.shape == (4, extractor.features_dim)
-    assert extractor.features_dim == 512 + 947 + WORLD_CONTEXT_DIM
+    assert extractor.features_dim == 512 + _FLAT_PRIVILEGED_DIM + WORLD_CONTEXT_DIM
 
 
 def test_reload_world_catalog_buffers() -> None:
@@ -128,5 +134,5 @@ def test_ppo_accepts_world_aware_extractor() -> None:
         device="cpu",
         verbose=0,
     )
-    assert model.policy.features_dim == 512 + 947 + WORLD_CONTEXT_DIM
+    assert model.policy.features_dim == 512 + _FLAT_PRIVILEGED_DIM + WORLD_CONTEXT_DIM
     model.learn(total_timesteps=32)

@@ -23,13 +23,21 @@ Policy source: imperator.
 | 7 | Hitting an enemy | Modest: **typically below 0.5** | (no special rule stated) | In force |
 | 8 | Killing an enemy | Modest: **typically below 0.5** | (no special rule stated) | In force |
 | 9 | Story-driven interaction (Gallery portrait sequence) | Large: **+0.5 per correct switch** | Extends | In force |
+| 10 | Document / book examine UI entered | **+3.0** | Extends **+12 min** idle cap (same path as new room) | In force |
 
 Buckets:
 
-- **1, 3, 4, 5**: **+3.0** and raise softlock idle truncate floor to **12 min** (weapons: first acquire of that name this episode)
+- **1, 3, 4, 5, 10**: **+3.0** and raise softlock idle truncate floor to **12 min** (weapons: first acquire of that name this episode; documents: first rising edge into examine UI per room this episode)
 - **2**: **+1.5**; resets stagnation but does **not** by itself raise the 12 min floor
 - **6–8**: modest
 - **9**: large; each correct Gallery portrait switch pays +0.5 and extends
+
+Document examine (#10):
+
+- Detector: exact `mode=0x40` + `gs=0x40808100` (`document_examine_ui_from_ram`). Assumes all books share that signature until a per-document ID is hunted.
+- Pays on the **rising edge** into that UI (not every frame while reading).
+- Anti-farm: **once per room per episode**. Leaving and reopening the same book in the same room does not re-pay; a first open in a different room can.
+- Extends the idle truncate floor via the same `note_softlock_extension(SOFTLOCK_EXTENSION_FRAMES)` path as new room.
 
 Gallery room 117 policy:
 
@@ -75,6 +83,10 @@ duration gate. It does not require scene/message peak evidence.
 Runtime turbo skip and menu dismiss behavior are unchanged. Cutscene reward
 qualification uses the total uninterrupted uncontrolled session, including all
 segments before and after a room crossing.
+
+Same-room freezes mint keys `room:cam:sN` with
+`MAX_SAME_ROOM_CUTSCENE_INDEX = 4` (paid indices `s0`…`s3`; further same-camera
+settles stop paying `new_cutscene`).
 
 An uncontrolled freeze pays #2 when it lasts **at least 450 emulated frames**
 (7.5 seconds at 60fps), subject only to these exclusions:
@@ -133,14 +145,15 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
   Re-takes after a return do **not** re-raise the 12 min idle floor or reset
   stagnation (blocks rack idle-clock farms).
 - Weapon ammunition increases caused by reloading are not weapon pickups.
-- New rooms, cutscenes, key items, story uses, gallery pays, and **first**
-  weapon acquires reset the stagnation clock (junk/ammo/shotgun re-takes do not).
+- New rooms, document examine, cutscenes, key items, story uses, gallery pays,
+  and **first** weapon acquires reset the stagnation clock (junk/ammo/shotgun
+  re-takes and document reopen in an already-paid room do not).
 - Idle contempt: **3 min grace**. Pre-Kenneth truncate at **3 min**; after
   Kenneth (`104:*:sN`) pays, raises to **12 min** with a **3→12 min**
-  ramp. **New room / key pickup / key use / first weapon acquire floor the idle
-  cap at 12 min** (even pre-Kenneth). Contempt budget is **1/5** of death
-  (~0.0667). Dense in scalar reward under main γ (**0.9925**) — no separate
-  softlock MC channel.
+  ramp. **New room / document examine / key pickup / key use / first weapon
+  acquire floor the idle cap at 12 min** (even pre-Kenneth). Contempt budget is
+  **1/5** of death (~0.0667). Dense in scalar reward under main γ (**0.9925**) —
+  no separate softlock MC channel.
 
 ## Agent rules
 
@@ -156,6 +169,7 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 Event fired?
 ├─ Transition into 106 before Kenneth paid? → mark Wesker ledger bit; −0.05; terminate
 ├─ New room (legal)? → pay #1 (+3.0, 12m idle floor)
+├─ Rising edge into document examine UI (0x40808100), unpaid room? → pay #10 (+3.0, 12m idle floor)
 ├─ Freeze / text / “cutscene”?
 │  ├─ Total uninterrupted freeze <450 frames? → do NOT pay #2
 │  ├─ Menu / pickup / death / opening / pre-Kenneth hall? → do NOT pay #2

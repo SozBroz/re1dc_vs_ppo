@@ -2,6 +2,7 @@
 
 Exploration mode (checkpoint path disabled):
   - +CHECKPOINT_REWARD once per new room entered per episode
+  - +3.0 once per room on first document/file examine UI edge per episode
   - +CHECKPOINT_REWARD once per same-room scripted cutscene (room:cam:sN) per episode
   - Room-change door skips do not pay new_cutscene (discovery is new_room only)
   - Goal-vector checkpoint compass is zeroed in obs (see obs_encoder.encode_goal)
@@ -37,6 +38,8 @@ REFERENCE_STEP_FRAMES = 8
 # Exploration bonuses (imperator 2026-07-18 retune).
 NEW_ROOM_BONUS = 3.0 * CHECKPOINT_REWARD
 NEW_CUTSCENE_BONUS = 1.5 * CHECKPOINT_REWARD
+# Document/file examine UI (gs=0x40808100): same +3 / 12m floor as new room.
+NEW_DOCUMENT_EXAMINE_BONUS = 3.0 * CHECKPOINT_REWARD
 
 # Legacy aliases kept for tests / telemetry that import old names.
 WAYPOINT_ROOM_BONUS = NEW_ROOM_BONUS
@@ -57,13 +60,13 @@ NEW_WEAPON_PICKUP_BONUS = 3.0 * CHECKPOINT_REWARD
 # Re-takes after a return still claw ±NEW_WEAPON but do not re-extend idle.
 SHOTGUN_RETURN_PENALTY = -NEW_WEAPON_PICKUP_BONUS
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
-# Idle contempt: no new room / cutscene / key item / weapon / story-use / gallery.
+# Idle contempt: no new room / document / cutscene / key / weapon / story / gallery.
 # Grace then linear-rate ramp; episode truncates at the active softlock cap.
 # Pre-Kenneth: 3 min cap (== grace → bulk at timeout). After Kenneth pays: 12 min
 # cap with 3→12 min ramp. Frames @ 60 emulated fps (PS1 NTSC / BizHawk).
 SOFTLOCK_PRE_KENNETH_FRAMES = 3 * 60 * 60
 SOFTLOCK_POST_KENNETH_FRAMES = 12 * 60 * 60
-# New room / key pickup / key use / first weapon acquire: at least this idle cap.
+# New room / document / key pickup / key use / first weapon: at least this idle cap.
 SOFTLOCK_EXTENSION_FRAMES = 12 * 60 * 60
 # Alias: post-Kenneth / max episode idle cap (tests of the full ramp).
 SOFTLOCK_FRAME_THRESHOLD = SOFTLOCK_POST_KENNETH_FRAMES
@@ -260,6 +263,7 @@ def compute_reward(
         "pbrs_door": 0.0,
         "waypoint": 0.0,
         "new_room": 0.0,
+        "document_examine": 0.0,
         "new_cutscene": 0.0,
         "retreat": 0.0,
         "wrong_room": 0.0,
@@ -352,6 +356,20 @@ def compute_reward(
     # credit for "first time in dining".
     if progress is not None and progress.claim_spawn_room_bonus():
         bd["new_room"] += NEW_ROOM_BONUS
+
+    # Document/file examine overlay: rising edge into mode=0x40 / gs=0x40808100.
+    # Assumption: all books share that signature (no stable document ID hunted
+    # yet). Anti-farm: once per room per episode — reopen in the same room does
+    # not re-pay; a first open in a different room can.
+    if progress is not None and not progress.kenneth_gate_breached:
+        from re1_rl.ram_skip import document_examine_ui_from_ram
+
+        entered_document = (
+            document_examine_ui_from_ram(state)
+            and not document_examine_ui_from_ram(prev_state)
+        )
+        if entered_document and progress.claim_document_examine_bonus(room):
+            bd["document_examine"] = NEW_DOCUMENT_EXAMINE_BONUS
 
     if "new_items" in state:
         new_items = set(state["new_items"])
@@ -465,9 +483,10 @@ def compute_reward(
                 bd[term] = 0.0
 
     if progress is not None and not state.get("dead"):
-        # Room / key get / key use / first weapon acquire → 12 min idle floor.
+        # Room / document / key get / key use / first weapon → 12 min idle floor.
         if (
             bd["new_room"] != 0.0
+            or bd["document_examine"] != 0.0
             or bd["key_item"] != 0.0
             or bd["story_use"] != 0.0
             or weapon_progress
@@ -476,6 +495,7 @@ def compute_reward(
             softlock_threshold = softlock_frame_threshold(progress)
         made_progress = (
             bd["new_room"] != 0.0
+            or bd["document_examine"] != 0.0
             or bd["new_cutscene"] != 0.0
             or bd["key_item"] != 0.0
             or bd["story_use"] != 0.0
