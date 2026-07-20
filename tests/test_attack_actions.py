@@ -433,6 +433,22 @@ def test_shotgun_handler_is_isolated_from_beretta() -> None:
     assert _WEAPON_ATTACK_HANDLERS[0x02] is _execute_ranged_attack_macro
 
 
+def test_bazooka_handlers_are_isolated_from_beretta() -> None:
+    from re1_rl.attack_macro import (
+        BAZOOKA_WEAPON_IDS,
+        _WEAPON_ATTACK_HANDLERS,
+        _execute_bazooka_attack_macro,
+        _execute_ranged_attack_macro,
+        _execute_shotgun_attack_macro,
+    )
+
+    assert BAZOOKA_WEAPON_IDS == frozenset({0x07, 0x08, 0x09, 0x0A})
+    for wid in BAZOOKA_WEAPON_IDS:
+        assert _WEAPON_ATTACK_HANDLERS[wid] is _execute_bazooka_attack_macro
+    assert _WEAPON_ATTACK_HANDLERS[0x02] is _execute_ranged_attack_macro
+    assert _WEAPON_ATTACK_HANDLERS[0x03] is _execute_shotgun_attack_macro
+
+
 def test_equippable_ids_are_ten_ps1_weapons() -> None:
     assert len(EQUIPPABLE_WEAPON_IDS) == 10
     assert 0x6F not in EQUIPPABLE_WEAPON_IDS

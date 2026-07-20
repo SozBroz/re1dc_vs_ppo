@@ -42,6 +42,10 @@ from re1_rl.sticky_input import STICKY_KEYS
 
 KNIFE_WEAPON_ID = 0x01
 SHOTGUN_WEAPON_ID = 0x03
+# Grenade launchers / bazooka family — live cadence is flat ~54f between
+# ammo drops (unlike beretta 38/46 or shotgun 52/74). Own dispatch so
+# beretta/shotgun timing tweaks cannot regress these weapons.
+BAZOOKA_WEAPON_IDS: frozenset[int] = frozenset({0x07, 0x08, 0x09, 0x0A})
 
 AIM_ANIM_RAISING = 0x12
 AIM_ANIM_STABLE = 0x13
@@ -591,6 +595,71 @@ def _execute_shotgun_attack_macro(
     )
 
 
+def _execute_bazooka_attack_macro(
+    bridge: Any,
+    *,
+    empty_sticky: dict[str, bool],
+    prev_hp: int,
+    episode_start_hp: int,
+    weapon_id: int,
+    weapon: str | None,
+) -> tuple[bool, int, dict[str, Any]]:
+    """Neutral bazooka / launcher fire — isolated from beretta/shotgun paths."""
+    return _execute_ranged_attack_macro(
+        bridge,
+        empty_sticky=empty_sticky,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+        weapon_id=weapon_id,
+        weapon=weapon,
+        macro_path="bazooka_ranged",
+    )
+
+
+def _execute_bazooka_attack_up_macro(
+    bridge: Any,
+    *,
+    empty_sticky: dict[str, bool],
+    prev_hp: int,
+    episode_start_hp: int,
+    weapon_id: int,
+    weapon: str | None,
+) -> tuple[bool, int, dict[str, Any]]:
+    """High bazooka / launcher fire — own dispatch entry (shared body for now)."""
+    died, frames, report = _execute_ranged_attack_up_macro(
+        bridge,
+        empty_sticky=empty_sticky,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+        weapon_id=weapon_id,
+        weapon=weapon,
+    )
+    report["macro_path"] = f"bazooka_up:{weapon or weapon_id}"
+    return died, frames, report
+
+
+def _execute_bazooka_attack_down_macro(
+    bridge: Any,
+    *,
+    empty_sticky: dict[str, bool],
+    prev_hp: int,
+    episode_start_hp: int,
+    weapon_id: int,
+    weapon: str | None,
+) -> tuple[bool, int, dict[str, Any]]:
+    """Floor-aim bazooka / launcher fire — own dispatch entry."""
+    died, frames, report = _execute_ranged_attack_down_macro(
+        bridge,
+        empty_sticky=empty_sticky,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+        weapon_id=weapon_id,
+        weapon=weapon,
+    )
+    report["macro_path"] = f"bazooka_down:{weapon or weapon_id}"
+    return died, frames, report
+
+
 def _execute_ranged_attack_up_macro(
     bridge: Any,
     *,
@@ -823,8 +892,10 @@ _WEAPON_ATTACK_HANDLERS: dict[int, Callable[..., tuple[bool, int, dict[str, Any]
     KNIFE_WEAPON_ID: _execute_knife_attack_macro,
     SHOTGUN_WEAPON_ID: _execute_shotgun_attack_macro,
 }
+for _wid in BAZOOKA_WEAPON_IDS:
+    _WEAPON_ATTACK_HANDLERS[_wid] = _execute_bazooka_attack_macro
 for _wid in WEAPON_ITEM_IDS:
-    if _wid not in (KNIFE_WEAPON_ID, SHOTGUN_WEAPON_ID):
+    if _wid not in _WEAPON_ATTACK_HANDLERS:
         _WEAPON_ATTACK_HANDLERS[_wid] = _execute_ranged_attack_macro
 
 
@@ -885,11 +956,12 @@ def execute_attack_up_macro(
             report["outcome"] = "no_weapon"
             report["aim_mode"] = "up"
             return False, 0, report
-        handler = (
-            _execute_knife_attack_up_macro
-            if weapon_id == KNIFE_WEAPON_ID
-            else _execute_ranged_attack_up_macro
-        )
+        if weapon_id == KNIFE_WEAPON_ID:
+            handler = _execute_knife_attack_up_macro
+        elif weapon_id in BAZOOKA_WEAPON_IDS:
+            handler = _execute_bazooka_attack_up_macro
+        else:
+            handler = _execute_ranged_attack_up_macro
         return handler(
             bridge,
             empty_sticky=empty_sticky,
@@ -923,11 +995,12 @@ def execute_attack_down_macro(
             report["outcome"] = "no_weapon"
             report["aim_mode"] = "down"
             return False, 0, report
-        handler = (
-            _execute_knife_attack_crouch_macro
-            if weapon_id == KNIFE_WEAPON_ID
-            else _execute_ranged_attack_down_macro
-        )
+        if weapon_id == KNIFE_WEAPON_ID:
+            handler = _execute_knife_attack_crouch_macro
+        elif weapon_id in BAZOOKA_WEAPON_IDS:
+            handler = _execute_bazooka_attack_down_macro
+        else:
+            handler = _execute_ranged_attack_down_macro
         return handler(
             bridge,
             empty_sticky=empty_sticky,
