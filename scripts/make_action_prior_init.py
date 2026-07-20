@@ -26,7 +26,7 @@ PRIOR = {
     "turn_left": 0.12,
     "turn_right": 0.12,
     "run_forward": 0.33,
-    "quickturn": 0.04,
+    "attack_up": 0.02,
     "interact": 0.18,
     "knife_swing": 0.02,
 }

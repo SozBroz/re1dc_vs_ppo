@@ -37,8 +37,7 @@ ACTION_WEIGHTS = {
     1: 0.15,  # forward
     3: 0.13,  # turn_left
     4: 0.13,  # turn_right
-    5: 0.35,  # run_forward
-    6: 0.04,  # quickturn
+    5: 0.39,  # run_forward
     7: 0.20,  # interact
 }
 ACTIONS = list(ACTION_WEIGHTS)

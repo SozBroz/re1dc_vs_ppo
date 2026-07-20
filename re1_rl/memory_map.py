@@ -225,9 +225,10 @@ ENEMY_HP_MAX_PLAUSIBLE = 2000
 # Off-map pool slots park near ~(30000, 30000); in-room entities use map scale.
 ENEMY_POOL_COORD_ABS_MAX = 20000
 # Knife/gun mask: enemy within this world distance of the player.
-# Gun keeps the wide envelope; knife is tighter but still generous vs
-# typical hit distances (~700–1500) so mid-room melee stays legal.
-ENEMY_COMBAT_NEAR_DIST = 8000
+# Gun stays wide so multi-zombie rooms can engage at keep-your-distance
+# ranges; knife is tighter but still generous vs typical hit distances
+# (~700–1500) so mid-room melee stays legal.
+ENEMY_COMBAT_NEAR_DIST = 20000
 ENEMY_KNIFE_COMBAT_NEAR_DIST = 5000
 ENEMY_FIELD_OFFSETS: dict[str, tuple[int, str]] = {
     "hp": (0, "u16"),

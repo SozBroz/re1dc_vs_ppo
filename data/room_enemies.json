@@ -384,6 +384,12 @@
     "room_name": "TERRACE",
     "enemies": [
       {
+        "enemy_type": "crow",
+        "count": 3,
+        "spawn_trigger": "always",
+        "notes": "Live QS0: three crows; active_byte 0x04 idle / 0x1C flying"
+      },
+      {
         "enemy_type": "zombie",
         "count": 1,
         "spawn_trigger": "cutscene",
