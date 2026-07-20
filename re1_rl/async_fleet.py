@@ -27,7 +27,7 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
 # Used only by ``scripts/distributed_train_parallel.py`` (not monolithic async).
 DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     n_steps=1024,
-    batch_size=8192,  # burn VRAM on ~200k-step fleet epochs (keep LR 1e-4)
+    batch_size=4096,  # host-RAM safe after merge OOMs at 8192 on fat epochs
     n_epochs=4,
     learning_rate=1e-4,
     gamma=RL_GAMMA,

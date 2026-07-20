@@ -1,7 +1,7 @@
 @echo off
 REM workhorse2 learner — 32 local envs (MMF screenshots); sync 360
 REM Headroom: @32 envs 10m soak peak ~41GB used / ~24GB free (pages_input~0).
-REM Package: sync 360 + batch_size=8192 + n_epochs=4 (LR held at 1e-4).
+REM Package: sync 360 + batch_size=4096 + n_epochs=4 (LR held at 1e-4).
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE=workhorse2
