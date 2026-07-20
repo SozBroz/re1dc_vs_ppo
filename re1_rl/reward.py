@@ -79,7 +79,7 @@ DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.3333
 DEATH_PENALTY = -DEATH_PENALTY_SCALED
 # Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
 # Sized to more than cancel a story cutscene (+1.5) on the same step.
-MAIN_HALL_BEFORE_KENNETH_PENALTY = -1.6
+MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.05
 # Doing-nothing contempt must not exceed death (else suicide beats softlock).
 # Stepwise / ramp potency is 1/5 of the death budget.
 CONTEMPT_BUDGET_SCALED = DEATH_PENALTY_SCALED / 5.0
@@ -285,7 +285,7 @@ def compute_reward(
     room = str(state.get("room_id", ""))
     room_changed = room != prev_room
 
-    # Kenneth gate: the first illegal pre-Kenneth entry into 106 pays -1.6 and
+    # Kenneth gate: the first illegal pre-Kenneth entry into 106 pays -0.05 and
     # irreversibly disables positive rewards/extensions for this episode.
     # Never mark 106 visited on an illegal transition.
     illegal_main_hall = False

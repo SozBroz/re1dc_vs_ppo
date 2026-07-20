@@ -854,7 +854,7 @@ class RE1Env(gym.Env):
         """True on Kenneth-gate transition (enter 106 before Kenneth paid).
 
         The first breach marks the terminal observation ledger and ends the
-        episode after its -1.6 reward. Returns False when Jill is already dead.
+        episode after its -0.05 reward. Returns False when Jill is already dead.
         """
         from re1_rl.cutscene_reward import (
             illegal_main_hall_before_kenneth_transition,
@@ -921,7 +921,7 @@ class RE1Env(gym.Env):
                 str(crossing.get("room_id", "")),
                 bool(crossing.get("in_control", True)),
             )
-            # Kenneth gate: compute_reward applies -1.6 and marks the terminal
+            # Kenneth gate: compute_reward applies -0.05 and marks the terminal
             # observation; the outer step terminates after the skip settles.
             reward, bd = compute_reward(
                 entry,
@@ -2168,7 +2168,7 @@ class RE1Env(gym.Env):
         if menu_reason:
             return self._outside_gameplay_step(action, reason=menu_reason)
         # The first illegal pre-Kenneth 106 entry marks the terminal observation
-        # ledger, applies -1.6 in compute_reward, then ends this episode.
+        # ledger, applies -0.05 in compute_reward, then ends this episode.
         self._visited.update(state["room_id"], state["x"], state["z"])
         self._progress.record_in_control_step(
             state.get("room_id", ""),

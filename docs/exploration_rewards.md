@@ -55,7 +55,7 @@ Gallery room 117 policy:
 
 - On a **transition into** Main Hall room **106** before the canonical Kenneth
   tea-room cutscene (`104:*:sN`) has occurred/paid this episode → apply exactly
-  **−1.6 once** under `main_hall_before_kenneth`, mark the terminal observation,
+  **−0.05 once** under `main_hall_before_kenneth`, mark the terminal observation,
   and **end the episode immediately**.
 - The 16-wide cutscene ledger's dormant opening slot becomes the persistent
   `wesker_pre_kenneth` bit in that terminal observation. This is observation
@@ -84,7 +84,7 @@ An uncontrolled freeze pays #2 when it lasts **at least 450 emulated frames**
 | a | Picking up an item (item pickup has its own channel: #3 / #5 / #6). Same-skip inventory growth never pays cutscene; after a key/weapon pickup, further same-room cutscene settles stay suppressed until Jill leaves that room (covers fragmented pickup cinema). |
 | b | Opening a menu (e.g. HP text while menu open) |
 | c | Death or opening/title sequences |
-| d | Pre-Kenneth Main Hall (106) scripts; the −1.6 hall gate owns that beat |
+| d | Pre-Kenneth Main Hall (106) scripts; the −0.05 hall gate owns that beat |
 
 There are no examine, idle-settle, dining↔tea, or room-change special cases in
 the pay path. A short door/examine freeze is unpaid; a door load lasting at
@@ -100,7 +100,7 @@ Do not treat (f) as a decided pay/deny rule until validated.
 
 ## Exceptions to room pay (#1)
 
-Illegal pre-Kenneth transition into 106 withholds visit credit, applies −1.6,
+Illegal pre-Kenneth transition into 106 withholds visit credit, applies −0.05,
 marks `wesker_pre_kenneth`, and terminates the episode.
 
 **Spawn room (dining 105 on m0):** marked visited at episode reset; the +3.0
@@ -146,7 +146,7 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 
 1. **No silent policy edits.** New paid events, new exceptions, magnitude changes, or changes to item-box rule (f) need imperator sign-off, then update this doc and `.cursor/skills/re-exploration-rewards/SKILL.md`.
 2. **Cutscene duration owns the channel.** Any uninterrupted uncontrolled session ≥450 frames may pay unless it is a menu, pickup/post-pickup fragment, death/opening span, or pre-Kenneth hall script. Long doors may pay both room and cutscene channels.
-3. **Kenneth gate terminates the episode.** Transition into 106 before `104:*:sN` paid → set terminal-observation ledger bit `wesker_pre_kenneth`, apply exactly −1.6 once, and terminate immediately. Do not mark 106 visited.
+3. **Kenneth gate terminates the episode.** Transition into 106 before `104:*:sN` paid → set terminal-observation ledger bit `wesker_pre_kenneth`, apply exactly −0.05 once, and terminate immediately. Do not mark 106 visited.
 4. **Reward-hack hunts:** assume the agent will farm anything that pays. When spam appears (main-hall door, interacts), gate the **specific** signal; log unpaid reasons that match this table; total reward in diagnostics should come from **what enters the training data pool**, not a parallel counter.
 5. **When unsure** whether an event belongs to an explicit exclusion: **do not guess a new exception** — ask.
 
@@ -154,7 +154,7 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 
 ```
 Event fired?
-├─ Transition into 106 before Kenneth paid? → mark Wesker ledger bit; −1.6; terminate
+├─ Transition into 106 before Kenneth paid? → mark Wesker ledger bit; −0.05; terminate
 ├─ New room (legal)? → pay #1 (+3.0, 6m idle floor)
 ├─ Freeze / text / “cutscene”?
 │  ├─ Total uninterrupted freeze <450 frames? → do NOT pay #2

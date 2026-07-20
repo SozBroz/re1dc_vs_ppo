@@ -331,7 +331,7 @@ def qualify_cutscene_reward(
         return None
 
     # Pre-Kenneth Main Hall scripts (Wesker talk, etc.): never pay cutscene.
-    # Illegal hall entry already applies the soft -1.6 gate in compute_reward.
+    # Illegal hall entry already applies the soft -0.05 gate in compute_reward.
     hall_room = str((new_state or {}).get("room_id", "") or "") or str(
         (prev_state or {}).get("room_id", "") or ""
     )

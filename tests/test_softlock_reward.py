@@ -95,7 +95,7 @@ def test_kenneth_gate_breach_revokes_and_blocks_softlock_extensions():
     prev = make_state(room="105", step=0)
     hall = make_state(room="106", step=1)
     _, breach = _step(progress, prev, hall)
-    assert breach["main_hall_before_kenneth"] == -1.6
+    assert breach["main_hall_before_kenneth"] == -0.05
     assert progress.kenneth_gate_breached
     assert progress.softlock_cap_frames == 0
     assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES
