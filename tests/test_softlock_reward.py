@@ -61,7 +61,7 @@ def test_softlock_budget_is_one_fifth_death():
 
 def test_softlock_threshold_doubles_after_kenneth():
     assert SOFTLOCK_PRE_KENNETH_FRAMES == 3 * 60 * 60
-    assert SOFTLOCK_POST_KENNETH_FRAMES == 6 * 60 * 60
+    assert SOFTLOCK_POST_KENNETH_FRAMES == 12 * 60 * 60
     assert SOFTLOCK_FRAME_THRESHOLD == SOFTLOCK_POST_KENNETH_FRAMES
     progress = ProgressTracker()
     assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES
@@ -70,7 +70,7 @@ def test_softlock_threshold_doubles_after_kenneth():
 
 
 def test_new_room_raises_softlock_cap_to_six_minutes():
-    """Pre-Kenneth new_room still floors idle truncate at 6 min."""
+    """Pre-Kenneth new_room still floors idle truncate at 12 min."""
     from re1_rl.reward import SOFTLOCK_EXTENSION_FRAMES
 
     progress = ProgressTracker()
@@ -110,7 +110,7 @@ def test_kenneth_gate_breach_revokes_and_blocks_softlock_extensions():
 
 
 def test_grace_has_no_softlock_tax():
-    """Under grace on the post-Kenneth 6m cap: no softlock tax."""
+    """Under grace on the post-Kenneth 12m cap: no softlock tax."""
     progress = ProgressTracker()
     progress.first_visit("105")
     progress.rewarded_cutscenes.add("104:0:s0")

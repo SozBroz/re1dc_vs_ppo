@@ -14,11 +14,11 @@ Policy source: imperator.
 
 | # | Event | Magnitude | Episode | Status |
 |---|--------|-----------|---------|--------|
-| 1 | New room entered | **+3.0** | Extends **+6 min** idle cap | In force |
+| 1 | New room entered | **+3.0** | Extends **+12 min** idle cap | In force |
 | 2 | Uncontrolled freeze lasting **≥7.5s** (450 emulated frames), unless excluded below | **+1.5** | Resets stagnation clock | In force |
-| 3 | New key item | **+3.0** | Extends **+6 min** idle cap | In force |
-| 4 | Using key item | **+3.0** | Extends **+6 min** idle cap | In force |
-| 5 | Weapon pickup (including wall shotgun) | **+3.0** | Extends **+6 min** idle cap (first acquire of that weapon this episode) | In force |
+| 3 | New key item | **+3.0** | Extends **+12 min** idle cap | In force |
+| 4 | Using key item | **+3.0** | Extends **+12 min** idle cap | In force |
+| 5 | Weapon pickup (including wall shotgun) | **+3.0** | Extends **+12 min** idle cap (first acquire of that weapon this episode) | In force |
 | 6 | Every non-key-item pickup | Modest: **0.15** | (no special rule stated) | In force |
 | 7 | Hitting an enemy | Modest: **typically below 0.5** | (no special rule stated) | In force |
 | 8 | Killing an enemy | Modest: **typically below 0.5** | (no special rule stated) | In force |
@@ -26,8 +26,8 @@ Policy source: imperator.
 
 Buckets:
 
-- **1, 3, 4, 5**: **+3.0** and raise softlock idle truncate floor to **6 min** (weapons: first acquire of that name this episode)
-- **2**: **+1.5**; resets stagnation but does **not** by itself raise the 6 min floor
+- **1, 3, 4, 5**: **+3.0** and raise softlock idle truncate floor to **12 min** (weapons: first acquire of that name this episode)
+- **2**: **+1.5**; resets stagnation but does **not** by itself raise the 12 min floor
 - **6–8**: modest
 - **9**: large; each correct Gallery portrait switch pays +0.5 and extends
 
@@ -104,7 +104,7 @@ Illegal pre-Kenneth transition into 106 withholds visit credit, applies −0.05,
 marks `wesker_pre_kenneth`, and terminates the episode.
 
 **Spawn room (dining 105 on m0):** marked visited at episode reset; the +3.0
-`new_room` (and 6 min idle floor) pays on the **first** `compute_reward` of the
+`new_room` (and 12 min idle floor) pays on the **first** `compute_reward` of the
 episode. That way dining discovery is not attributed to a later Wesker/door
 settle. Re-entering dining never pays again.
 
@@ -130,15 +130,15 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 - The wall shotgun pays **+3.0** whenever Jill takes it and **−3.0** whenever
   she replaces it on the rack. A repeated take/replace loop is therefore net
   zero before step cost; leaving with the shotgun preserves the pickup reward.
-  Re-takes after a return do **not** re-raise the 6 min idle floor or reset
+  Re-takes after a return do **not** re-raise the 12 min idle floor or reset
   stagnation (blocks rack idle-clock farms).
 - Weapon ammunition increases caused by reloading are not weapon pickups.
 - New rooms, cutscenes, key items, story uses, gallery pays, and **first**
   weapon acquires reset the stagnation clock (junk/ammo/shotgun re-takes do not).
 - Idle contempt: **3 min grace**. Pre-Kenneth truncate at **3 min**; after
-  Kenneth (`104:*:sN`) pays, truncate doubles to **6 min** with a **3→6 min**
+  Kenneth (`104:*:sN`) pays, raises to **12 min** with a **3→12 min**
   ramp. **New room / key pickup / key use / first weapon acquire floor the idle
-  cap at 6 min** (even pre-Kenneth). Contempt budget is **1/5** of death
+  cap at 12 min** (even pre-Kenneth). Contempt budget is **1/5** of death
   (~0.0667). Dense in scalar reward under main γ (**0.9925**) — no separate
   softlock MC channel.
 
@@ -155,13 +155,13 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 ```
 Event fired?
 ├─ Transition into 106 before Kenneth paid? → mark Wesker ledger bit; −0.05; terminate
-├─ New room (legal)? → pay #1 (+3.0, 6m idle floor)
+├─ New room (legal)? → pay #1 (+3.0, 12m idle floor)
 ├─ Freeze / text / “cutscene”?
 │  ├─ Total uninterrupted freeze <450 frames? → do NOT pay #2
 │  ├─ Menu / pickup / death / opening / pre-Kenneth hall? → do NOT pay #2
 │  └─ Otherwise → pay #2 (+1.5) once per key (long doors included)
-├─ Key item get / use? → #3 / #4 (+3.0, 6m idle floor)
-├─ Weapon get? → #5 (+3.0; first acquire → 6m idle floor); wall shotgun return → −3.0
+├─ Key item get / use? → #3 / #4 (+3.0, 12m idle floor)
+├─ Weapon get? → #5 (+3.0; first acquire → 12m idle floor); wall shotgun return → −3.0
 ├─ Other non-key item get? → #6 every pickup
 ├─ Hit / kill on knife|attack step? → #7 / #8
 └─ Gallery portrait sequence? → +0.5 per correct ordered switch; claw back partial attempt on wrong input/exit

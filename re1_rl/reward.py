@@ -59,12 +59,12 @@ SHOTGUN_RETURN_PENALTY = -NEW_WEAPON_PICKUP_BONUS
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # Idle contempt: no new room / cutscene / key item / weapon / story-use / gallery.
 # Grace then linear-rate ramp; episode truncates at the active softlock cap.
-# Pre-Kenneth: 3 min cap (== grace → bulk at timeout). After Kenneth pays: 6 min
-# cap with 3→6 min ramp. Frames @ 60 emulated fps (PS1 NTSC / BizHawk).
+# Pre-Kenneth: 3 min cap (== grace → bulk at timeout). After Kenneth pays: 12 min
+# cap with 3→12 min ramp. Frames @ 60 emulated fps (PS1 NTSC / BizHawk).
 SOFTLOCK_PRE_KENNETH_FRAMES = 3 * 60 * 60
-SOFTLOCK_POST_KENNETH_FRAMES = 6 * 60 * 60
+SOFTLOCK_POST_KENNETH_FRAMES = 12 * 60 * 60
 # New room / key pickup / key use / first weapon acquire: at least this idle cap.
-SOFTLOCK_EXTENSION_FRAMES = 6 * 60 * 60
+SOFTLOCK_EXTENSION_FRAMES = 12 * 60 * 60
 # Alias: post-Kenneth / max episode idle cap (tests of the full ramp).
 SOFTLOCK_FRAME_THRESHOLD = SOFTLOCK_POST_KENNETH_FRAMES
 # First 3 min of no-progress: no extra idle tax (living step cost only).
@@ -125,7 +125,7 @@ ENABLE_CHECKPOINT_PATH = False
 
 
 def softlock_frame_threshold(progress: ProgressTracker | None) -> int:
-    """Idle truncate cap: 3 min before Kenneth, 6 min after; ≥6 min after room/key/weapon/use."""
+    """Idle truncate cap: 3 min before Kenneth, 12 min after; ≥12 min after room/key/weapon/use."""
     if progress is None:
         return SOFTLOCK_PRE_KENNETH_FRAMES
     if progress.kenneth_gate_breached:
@@ -358,7 +358,7 @@ def compute_reward(
     else:
         new_items = set(state.get("inventory", [])) - set(prev_state.get("inventory", []))
     acquired_key_or_weapon = False
-    # First acquire of a weapon type this episode: 6m idle floor + stagnation reset.
+    # First acquire of a weapon type this episode: 12m idle floor + stagnation reset.
     # Shotgun rack re-takes still pay NEW_WEAPON (clawed back on return) but do not
     # count as exploration progress — blocks idle-clock / extension farms.
     weapon_progress = False
@@ -465,7 +465,7 @@ def compute_reward(
                 bd[term] = 0.0
 
     if progress is not None and not state.get("dead"):
-        # Room / key get / key use / first weapon acquire → 6 min idle floor.
+        # Room / key get / key use / first weapon acquire → 12 min idle floor.
         if (
             bd["new_room"] != 0.0
             or bd["key_item"] != 0.0
