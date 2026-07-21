@@ -124,6 +124,26 @@ settle. Re-entering dining never pays again.
 
 Hit / kill pay only when the step is an actual **knife** or **attack** action. Enemy HP flicker on interact / door / cutscene without a combat action must **not** pay. Magnitudes are independent statics: **+0.007** per enemy HP damaged, **+0.24** per kill (not × `CHECKPOINT_REWARD`).
 
+## Miss / ammo waste
+
+On `attack_missed` with `ammo_spent > 0` only (hits pay nothing; knife has no
+clip tax):
+
+`per_missed_round = −ITEM_PICKUP_BONUS / clip_size`
+
+Full inverse of one junk/ammo pickup, split across the magazine / pack. No 0.5×
+halve (clip amortization is the adjustment).
+
+| Weapon | clip_size | per missed round |
+|--------|-----------|------------------|
+| Beretta / handgun | 15 | −0.01 |
+| Shotgun | 7 | ≈ −0.021429 |
+| Magnum / dumdum | 6 | −0.025 |
+| Grenade launcher / bazooka / rocket (acid/flame/explosive) | 6 (pack size; chamber holds 1) | −0.025 |
+
+`ATTACK_MISS_PENALTY` / `KNIFE_MISS_PENALTY` / `AMMO_WASTE_PENALTY` remain 0.0
+stubs; live tax writes `bd["ammo_waste"]` via the clip helpers.
+
 ## HP damage / heal
 
 All live reward/punishment magnitudes in `reward.py` are **independent static

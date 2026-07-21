@@ -90,10 +90,28 @@ SOFTLOCK_TIMEOUT_PENALTY = -0.06666666666666667
 
 ENEMY_DAMAGE_REWARD = 0.007
 ENEMY_KILL_REWARD = 0.24
-# Legacy names kept for imports/tests; miss penalties disabled (step scale only).
+# Flat legacy miss flags (unused); live tax is ammo_waste via clip table below.
 ATTACK_MISS_PENALTY = 0.0
 KNIFE_MISS_PENALTY = 0.0
-AMMO_WASTE_PENALTY = 0.0
+AMMO_WASTE_PENALTY = 0.0  # legacy stub; not read by compute_reward
+
+# Miss / ammo-waste tax: per missed round =
+#   −ITEM_PICKUP_BONUS / clip_size
+# Full inverse of one junk/ammo pickup, amortized over the magazine / pack.
+# (Prior half-pickup factor removed 2026-07-20 — imperator: clip-adjusted inverse, not 0.5×.)
+# Knife and flamethrower omitted (no discrete clip pack for this tax).
+# Bazooka chamber capacity is 1 (WEAPON_CLIP_CAPACITY); miss tax uses pack size 6
+# (room_items acid_rounds count=6; DC / Evil Resource).
+MISS_TAX_CLIP_SIZE: dict[int, int] = {
+    0x02: 15,  # beretta / handgun
+    0x03: 7,   # shotgun
+    0x04: 6,   # colt python dumdum
+    0x05: 6,   # colt python magnum
+    0x07: 6,   # grenade launcher / bazooka acid
+    0x08: 6,   # bazooka explosive
+    0x09: 6,   # bazooka flame
+    0x0A: 6,   # rocket launcher
+}
 
 REWARD_SCALE = 1.0
 
@@ -115,6 +133,23 @@ def hp_heal_reward(hp_delta: int) -> float:
     if hp_delta <= 0:
         return 0.0
     return HP_GAIN_SCALE * float(hp_delta)
+
+
+def ammo_waste_per_missed_round(weapon_id: int) -> float:
+    """Per-round miss tax for ``weapon_id`` (0 if knife / unknown / no clip)."""
+    clip = MISS_TAX_CLIP_SIZE.get(int(weapon_id) & 0xFF)
+    if clip is None or clip <= 0:
+        return 0.0
+    return -ITEM_PICKUP_BONUS / float(clip)
+
+
+def ammo_waste_penalty(weapon_id: int, rounds_spent: int) -> float:
+    """Total ammo-waste penalty for a missed attack that spent ``rounds_spent``."""
+    rounds = int(rounds_spent)
+    if rounds <= 0:
+        return 0.0
+    return ammo_waste_per_missed_round(weapon_id) * float(rounds)
+
 
 # Disabled checkpoint-path terms (exported for tests that assert they stay off).
 # Staticized; ENABLE_CHECKPOINT_PATH=False so these never enter the live path.
@@ -480,6 +515,14 @@ def compute_reward(
     enemy_kills = int(state.get("enemy_kills", 0) or 0)
     if enemy_kills > 0:
         bd["enemy_kill"] = ENEMY_KILL_REWARD * enemy_kills
+
+    # Miss / ammo waste: only on attack_missed with ammo spent. Hits pay no tax.
+    # Knife uses knife_swing_missed (no clip) — never taxed here.
+    if state.get("attack_missed"):
+        rounds = int(state.get("ammo_spent", 0) or 0)
+        if rounds > 0:
+            wid = int(state.get("equipped_weapon_id", 0) or 0)
+            bd["ammo_waste"] = ammo_waste_penalty(wid, rounds)
 
     if progress is not None and progress.kenneth_gate_breached:
         for term, value in bd.items():
