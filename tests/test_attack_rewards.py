@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.progress import ProgressTracker
@@ -84,8 +86,8 @@ def test_hit_rewards_unchanged() -> None:
     assert reward == sum(bd.values())
 
 
-def test_enemy_kill_reward_is_point_two() -> None:
-    assert ENEMY_KILL_REWARD == 0.2
+def test_enemy_kill_reward_is_point_two_checkpoint() -> None:
+    assert ENEMY_KILL_REWARD == pytest.approx(0.2 * 1.2)
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -93,7 +95,7 @@ def test_enemy_kill_reward_is_point_two() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["enemy_kill"] == 0.2
+    assert bd["enemy_kill"] == pytest.approx(ENEMY_KILL_REWARD)
 
 
 def test_breakdown_keys_present() -> None:
