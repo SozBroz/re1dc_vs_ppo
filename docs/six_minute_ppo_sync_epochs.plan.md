@@ -23,13 +23,13 @@ sequenceDiagram
 
 | Knob | Value | Role |
 |------|-------|------|
-| `sync_interval_s` | **360** | Worker buffer + flush + weight pull |
+| `sync_interval_s` | **360** | Worker buffer + flush + weight pull (**wall** clock) |
 | `train_interval_s` | **360** | Learner trains on pending, then publishes |
 | `max_staleness` | **1** | Only current/prev version (epoch-aligned) |
 | `learning_rate` | **1e-4** | Down from 3e-4 for ~5–10× larger batches |
-| `n_epochs` | **2** | Less overfit on huge buffers |
-| `batch_size` | **2048** | Larger minibatches |
-| `n_steps` | **256** | Unchanged per-actor horizon |
+| `n_epochs` | **4** | Epoch package (was 2 in first draft) |
+| `batch_size` | **4096** | Host-RAM safe after 8192 merge OOMs |
+| `n_steps` | **1536** | MC horizon ≈4.5× γ half-life (~205s emulated); not wall-matched |
 
 Monolithic `train_parallel.py` / `PPO_HYPERPARAMS` unchanged.
 

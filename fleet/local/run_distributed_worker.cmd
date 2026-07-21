@@ -21,5 +21,5 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --skip-chunk 600 ^
   --sync-interval-s %SYNC_INTERVAL_S% ^
   --capture-checkpoints ^
-  --n-steps 1024 ^
+  --n-steps 1536 ^
   --headless

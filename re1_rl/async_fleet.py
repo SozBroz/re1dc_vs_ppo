@@ -25,8 +25,21 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
 
 # Distributed 6-minute sync epochs: larger on-policy batches, gentler updates.
 # Used only by ``scripts/distributed_train_parallel.py`` (not monolithic async).
+#
+# n_steps vs sync_interval_s (wall) vs emulated time:
+#   - sync_interval_s=360 is WALL clock (upload burst + weight pull cadence).
+#   - Actors cut MC/bootstrap rollouts at n_steps, then buffer until the wall flush.
+#   - Env step ≈ 8 frames @ 60fps ⇒ 8/60 s emulated; γ=0.998188 half-life ≈ 45s
+#     emulated (≈337.5 steps). Credit assignment is per n_steps segment, not the
+#     whole sync window.
+#   - 1536 steps ≈ 204.8s emulated ≈ 4.5 half-lives (good MC horizon for +12
+#     progress). Stays under typical wall collect (~6 env-steps/s ⇒ ~2160
+#     steps/env in 360s) so each env still finishes ≥1 rollout per epoch.
+#   - Do NOT set n_steps≈2700 (6 min emulated): at observed SPS that exceeds
+#     steps gathered in one sync window → empty/partial epoch flushes + fat
+#     rollout tensors on WH2 (32 local envs).
 DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
-    n_steps=1024,
+    n_steps=1536,
     batch_size=4096,  # host-RAM safe after merge OOMs at 8192 on fat epochs
     n_epochs=4,
     learning_rate=1e-4,

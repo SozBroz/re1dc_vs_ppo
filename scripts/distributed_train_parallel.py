@@ -158,8 +158,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--n-steps",
         type=int,
-        default=int(PPO_HYPERPARAMS["n_steps"]),
-        help="per-env rollout horizon (default: async_fleet.PPO_HYPERPARAMS)",
+        default=int(DISTRIBUTED_EPOCH_HYPERPARAMS["n_steps"]),
+        help=(
+            "per-env MC rollout horizon before buffer (default: "
+            f"{int(DISTRIBUTED_EPOCH_HYPERPARAMS['n_steps'])} ≈ 4.5× γ half-life "
+            "emulated; sync_interval_s is wall clock, not emulated time)"
+        ),
     )
 
     ap.add_argument("--n-envs", type=int, default=12)

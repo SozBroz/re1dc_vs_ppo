@@ -330,3 +330,6 @@ def test_distributed_epoch_hyperparams_gentler_than_monolithic() -> None:
     assert DISTRIBUTED_EPOCH_HYPERPARAMS["learning_rate"] < PPO_HYPERPARAMS["learning_rate"]
     assert DISTRIBUTED_EPOCH_HYPERPARAMS["n_epochs"] <= PPO_HYPERPARAMS["n_epochs"]
     assert DISTRIBUTED_EPOCH_HYPERPARAMS["batch_size"] >= PPO_HYPERPARAMS["batch_size"]
+    # MC horizon ≈4.5× γ half-life; must stay below typical wall collect in one sync.
+    assert DISTRIBUTED_EPOCH_HYPERPARAMS["n_steps"] == 1536
+    assert DISTRIBUTED_EPOCH_HYPERPARAMS["n_steps"] > PPO_HYPERPARAMS["n_steps"]
