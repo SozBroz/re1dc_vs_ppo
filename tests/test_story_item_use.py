@@ -460,7 +460,7 @@ def test_gold_only_put_back_pays_penalty() -> None:
         progress=progress,
         return_breakdown=True,
     )
-    assert bd["gold_emblem_return"] == GOLD_EMBLEM_RETURN_PENALTY == -3.0
+    assert bd["gold_emblem_return"] == GOLD_EMBLEM_RETURN_PENALTY == -12.0
     assert bd["story_use"] == 0.0
     assert rew < -2.9
 

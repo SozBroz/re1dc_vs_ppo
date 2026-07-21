@@ -59,8 +59,8 @@ def test_softlock_budget_is_one_fifth_death():
     assert CONTEMPT_BUDGET_SCALED < SURVIVAL_BUDGET_SCALED
 
 
-def test_softlock_threshold_doubles_after_kenneth():
-    assert SOFTLOCK_PRE_KENNETH_FRAMES == 3 * 60 * 60
+def test_softlock_start_and_post_kenneth_are_twelve_minutes():
+    assert SOFTLOCK_PRE_KENNETH_FRAMES == 12 * 60 * 60
     assert SOFTLOCK_POST_KENNETH_FRAMES == 12 * 60 * 60
     assert SOFTLOCK_FRAME_THRESHOLD == SOFTLOCK_POST_KENNETH_FRAMES
     progress = ProgressTracker()
@@ -69,8 +69,8 @@ def test_softlock_threshold_doubles_after_kenneth():
     assert softlock_frame_threshold(progress) == SOFTLOCK_POST_KENNETH_FRAMES
 
 
-def test_new_room_raises_softlock_cap_to_six_minutes():
-    """Pre-Kenneth new_room still floors idle truncate at 12 min."""
+def test_new_room_floors_softlock_cap_at_twelve_minutes():
+    """Progress extension floors idle truncate at 12 min (same as start budget)."""
     from re1_rl.reward import SOFTLOCK_EXTENSION_FRAMES
 
     progress = ProgressTracker()
@@ -128,7 +128,8 @@ def test_grace_has_no_softlock_tax():
     assert softlock_sum == pytest.approx(0.0)
 
 
-def test_pre_kenneth_truncates_at_three_minutes():
+def test_start_budget_truncates_at_twelve_minutes_with_grace_ramp():
+    """Episode starts at 12 min idle cap; 3 min grace then ramp to full contempt."""
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", step=0)
@@ -143,8 +144,8 @@ def test_pre_kenneth_truncates_at_three_minutes():
         prev = cur
     assert softlock_frame_threshold(progress) == threshold
     assert stagnation_episode_timeout(progress)
-    # Pre-K: threshold == grace → bulk contempt on the timeout step only.
-    assert softlock_sum == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY)
+    assert softlock_sum == pytest.approx(SOFTLOCK_TIMEOUT_PENALTY, rel=1e-5)
+    assert -softlock_sum == pytest.approx(CONTEMPT_BUDGET_SCALED, rel=1e-5)
 
 
 def test_ramp_integral_equals_contempt_budget_post_kenneth():
@@ -286,7 +287,7 @@ def test_weapon_pickup_resets_idle_timer_and_raises_six_minute_cap():
     cur = make_state(room="115", step=4, new_items=["colt_python"])
     _, bd = _step(progress, prev, cur, step_frames=4)
 
-    assert bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 3.0
+    assert bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 12.0
     assert bd["item"] == 0.0
     assert bd["key_item"] == 0.0
     assert progress.stagnation_frames == 0
@@ -315,11 +316,11 @@ def test_shotgun_wall_loop_is_zero_sum_and_retake_does_not_refarm_idle():
     pickup_reward, pickup_bd = _step(
         progress, empty, held, step_frames=0
     )
-    assert pickup_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 3.0
+    assert pickup_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 12.0
     assert pickup_bd["shotgun_return"] == 0.0
     assert progress.stagnation_frames == 0
     assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
-    assert SHOTGUN_RETURN_PENALTY == -NEW_WEAPON_PICKUP_BONUS == -3.0
+    assert SHOTGUN_RETURN_PENALTY == -NEW_WEAPON_PICKUP_BONUS == -12.0
 
     returned = make_state(room="115", step=2, inventory=[], new_items=[])
     return_reward, return_bd = _step(

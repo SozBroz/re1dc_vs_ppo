@@ -1,9 +1,9 @@
 """Shaped reward for hierarchical RE1 control.
 
 Exploration mode (checkpoint path disabled):
-  - +CHECKPOINT_REWARD once per new room entered per episode
-  - +3.0 once per room on first document/file examine UI edge per episode
-  - +CHECKPOINT_REWARD once per same-room scripted cutscene (room:cam:sN) per episode
+  - +NEW_ROOM_BONUS once per new room entered per episode
+  - +NEW_DOCUMENT_EXAMINE_BONUS once per room on first document/file examine UI edge
+  - +NEW_CUTSCENE_BONUS once per same-room scripted cutscene (room:cam:sN) per episode
   - Room-change door skips do not pay new_cutscene (discovery is new_room only)
   - Goal-vector checkpoint compass is zeroed in obs (see obs_encoder.encode_goal)
   - No waypoint / PBRS / wrong-room / retreat / success_room shaping
@@ -28,47 +28,47 @@ _WEAPON_NAME_SET: frozenset[str] = frozenset(
     ITEM_IDS[i] for i in WEAPON_ITEM_IDS if i in ITEM_IDS
 )
 
-# Human-scale reward units: one route checkpoint = +1.0; step = 1/4000 of that.
-CHECKPOINT_REWARD = 1.0
+# Human-scale reward units: one route checkpoint = +1.2; step = 1/5000 of that.
+CHECKPOINT_REWARD = 1.2
 STEPS_PER_CHECKPOINT = 5000
 
-STEP_PENALTY = -CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT  # -0.0002
+STEP_PENALTY = -CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT  # -0.00024
 REFERENCE_STEP_FRAMES = 8
 
-# Exploration bonuses (imperator 2026-07-18 retune).
-NEW_ROOM_BONUS = 3.0 * CHECKPOINT_REWARD
-NEW_CUTSCENE_BONUS = 1.5 * CHECKPOINT_REWARD
-# Document/file examine UI (gs=0x40808100): same +3 / 12m floor as new room.
-NEW_DOCUMENT_EXAMINE_BONUS = 3.0 * CHECKPOINT_REWARD
+# Large progress payouts (imperator 2026-07-20: ×4 vs prior 3.0 / 1.5 scale).
+# Absolute human-scale (not × CHECKPOINT); living cost / γ use CHECKPOINT_REWARD.
+NEW_ROOM_BONUS = 12.0
+NEW_CUTSCENE_BONUS = 6.0
+# Document/file examine UI (gs=0x40808100): same +12 / 12m floor as new room.
+NEW_DOCUMENT_EXAMINE_BONUS = 12.0
 
 # Legacy aliases kept for tests / telemetry that import old names.
 WAYPOINT_ROOM_BONUS = NEW_ROOM_BONUS
 
-# Junk / ammo / herbs: meaningful but well below a new room.
-ITEM_PICKUP_BONUS = 0.15 * CHECKPOINT_REWARD
+# Junk / ammo / herbs: modest crumb (not ×4 with large progress).
+ITEM_PICKUP_BONUS = 0.15
 # Keys / emblems / crests (room_items.json key_item=true).
-KEY_ITEM_PICKUP_BONUS = 3.0 * CHECKPOINT_REWARD
+KEY_ITEM_PICKUP_BONUS = 12.0
 # Story inventory USE at a curated site (piano, fireplace, …).
-STORY_ITEM_USE_BONUS = 3.0 * CHECKPOINT_REWARD
+STORY_ITEM_USE_BONUS = 12.0
 # 10F alcove: put gold_emblem back without leaving the wooden emblem (anti-hack).
-# Exact inverse of key-item pickup (+3); intended path is USE wooden emblem → +3.
+# Exact inverse of key-item pickup (+12); intended path is USE wooden emblem → +12.
 GOLD_EMBLEM_RETURN_PENALTY = -KEY_ITEM_PICKUP_BONUS
 # Every physical pickup of a gun/knife-class weapon (not ammo). Same scale as keys.
-NEW_WEAPON_PICKUP_BONUS = 3.0 * CHECKPOINT_REWARD
+NEW_WEAPON_PICKUP_BONUS = 12.0
 # The wall rack can toggle forever: taking the shotgun pays; replacing it
 # removes exactly that reward. Repeating the loop is net zero before step cost.
 # Re-takes after a return still claw ±NEW_WEAPON but do not re-extend idle.
 SHOTGUN_RETURN_PENALTY = -NEW_WEAPON_PICKUP_BONUS
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # Idle contempt: no new room / document / cutscene / key / weapon / story / gallery.
-# Grace then linear-rate ramp; episode truncates at the active softlock cap.
-# Pre-Kenneth: 3 min cap (== grace → bulk at timeout). After Kenneth pays: 12 min
-# cap with 3→12 min ramp. Frames @ 60 emulated fps (PS1 NTSC / BizHawk).
-SOFTLOCK_PRE_KENNETH_FRAMES = 3 * 60 * 60
+# Start budget and all progress extensions: 12 min. Grace 3 min then 3→12 ramp.
+# Frames @ 60 emulated fps (PS1 NTSC / BizHawk).
+SOFTLOCK_PRE_KENNETH_FRAMES = 12 * 60 * 60
 SOFTLOCK_POST_KENNETH_FRAMES = 12 * 60 * 60
 # New room / document / key pickup / key use / first weapon: at least this idle cap.
 SOFTLOCK_EXTENSION_FRAMES = 12 * 60 * 60
-# Alias: post-Kenneth / max episode idle cap (tests of the full ramp).
+# Alias: max episode idle cap (tests of the full ramp).
 SOFTLOCK_FRAME_THRESHOLD = SOFTLOCK_POST_KENNETH_FRAMES
 # First 3 min of no-progress: no extra idle tax (living step cost only).
 CONTEMPT_GRACE_FRAMES = 3 * 60 * 60
@@ -77,11 +77,11 @@ JILL_FINE_HP = 96
 # Survival budget: full Fine→1 chip + death terminal = −1× checkpoint.
 # 2/3 on dense HP loss, 1/3 on episode-end death.
 SURVIVAL_BUDGET_SCALED = 1.0 * CHECKPOINT_REWARD
-NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.6667
-DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.3333
+NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.8
+DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.4
 DEATH_PENALTY = -DEATH_PENALTY_SCALED
 # Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
-# Sized to more than cancel a story cutscene (+1.5) on the same step.
+# Fixed −0.05 (not scaled with large-progress ×4); terminates the episode.
 MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.05
 # Doing-nothing contempt must not exceed death (else suicide beats softlock).
 # Stepwise / ramp potency is 1/5 of the death budget.
@@ -98,7 +98,10 @@ AMMO_WASTE_PENALTY = 0.0
 REWARD_SCALE = 1.0
 
 # Dense softlock ramp is already in the scalar reward (bd["softlock"]); one γ.
-RL_GAMMA = 0.9925
+# Half-life ≈ 45s emulated time incl. living cost: γ_eff := γ + c with
+# c = STEP_PENALTY (−0.00024), n = 45 / (8/60) = 337.5 ref steps →
+# γ = 0.5^(1/n) − c ≈ 0.998188. (Delayed-+1 PV solve differs slightly; ship γ_eff.)
+RL_GAMMA = 0.998188
 
 HP_LOSS_SCALE = NEAR_DEATH_DAMAGE_SCALED / (JILL_FINE_HP - 1)
 # Heal is the exact inverse of damage (same scale, opposite sign).
@@ -128,7 +131,7 @@ ENABLE_CHECKPOINT_PATH = False
 
 
 def softlock_frame_threshold(progress: ProgressTracker | None) -> int:
-    """Idle truncate cap: 3 min before Kenneth, 12 min after; ≥12 min after room/key/weapon/use."""
+    """Idle truncate cap: 12 min from start; ≥12 min after room/key/weapon/use."""
     if progress is None:
         return SOFTLOCK_PRE_KENNETH_FRAMES
     if progress.kenneth_gate_breached:

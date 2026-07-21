@@ -260,13 +260,14 @@ def _build_model(
     tb_log: str,
 ):
     from re1_rl.policy_config import POLICY_KWARGS
+    from re1_rl.reward import RL_GAMMA
 
     hp = dict(
         n_steps=256,
         batch_size=512,
         n_epochs=4,
         learning_rate=3e-4,
-        gamma=0.9925,
+        gamma=RL_GAMMA,
         ent_coef=0.02,
         verbose=1,
         device=device,

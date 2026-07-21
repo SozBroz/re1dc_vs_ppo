@@ -262,7 +262,7 @@ n_steps=256          # per-env horizon in each worker rollout
 batch_size=512
 n_epochs=4
 learning_rate=3e-4
-gamma=0.9925
+gamma=0.998188  # RL_GAMMA; ~45s half-life with step contempt (c=-0.00024)
 ent_coef=0.02
 ```
 

@@ -251,9 +251,9 @@ def test_damage_and_death_calibrated_to_waypoint():
 
     planner = make_planner()
     progress = ProgressTracker()
-    assert CHECKPOINT_REWARD == 1.0
-    assert NEW_ROOM_BONUS == pytest.approx(3.0 * CHECKPOINT_REWARD)
-    assert NEW_CUTSCENE_BONUS == pytest.approx(1.5 * CHECKPOINT_REWARD)
+    assert CHECKPOINT_REWARD == 1.2
+    assert NEW_ROOM_BONUS == pytest.approx(12.0)
+    assert NEW_CUTSCENE_BONUS == pytest.approx(6.0)
     assert WAYPOINT_ROOM_BONUS == NEW_ROOM_BONUS
     assert STEP_PENALTY * REWARD_SCALE == pytest.approx(-CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT)
     assert SURVIVAL_BUDGET_SCALED == pytest.approx(1.0 * CHECKPOINT_REWARD)
@@ -293,6 +293,22 @@ def test_damage_and_death_calibrated_to_waypoint():
     assert hp_heal_reward(10) == pytest.approx(HP_GAIN_SCALE * 10.0)
     assert hp_heal_reward(80) == pytest.approx(HP_GAIN_SCALE * 80.0)
     assert hp_heal_reward(10) == pytest.approx(-HP_LOSS_SCALE * (-10.0))
+
+
+def test_rl_gamma_half_life_includes_step_contempt():
+    """γ_eff := γ + STEP_PENALTY; half-life ≈ 45s at 8-frame @ 60fps steps."""
+    from re1_rl.reward import REFERENCE_STEP_FRAMES, RL_GAMMA, STEP_PENALTY
+
+    dt_s = REFERENCE_STEP_FRAMES / 60.0
+    n_steps_45s = 45.0 / dt_s  # 337.5
+    assert n_steps_45s == pytest.approx(337.5)
+    assert STEP_PENALTY == pytest.approx(-0.00024)
+    assert RL_GAMMA == 0.998188
+
+    gamma_eff = RL_GAMMA + STEP_PENALTY
+    half_life_steps = math.log(0.5) / math.log(gamma_eff)
+    half_life_s = half_life_steps * dt_s
+    assert half_life_s == pytest.approx(45.0, abs=0.02)
 
 
 if __name__ == "__main__":

@@ -109,14 +109,17 @@ def test_resolve_resume_path_uses_latest_json(tmp_path: Path) -> None:
 
 
 def test_distributed_ppo_hyperparams_match_async_fleet() -> None:
+    from re1_rl.reward import RL_GAMMA
+
     assert PPO_HYPERPARAMS == dict(
         n_steps=1024,
         batch_size=512,
         n_epochs=4,
         learning_rate=3e-4,
-        gamma=0.9925,
+        gamma=RL_GAMMA,
         ent_coef=0.02,
     )
+    assert PPO_HYPERPARAMS["gamma"] == 0.998188
 
 
 def test_make_re1_policy_spaces_frame_is_chw() -> None:
