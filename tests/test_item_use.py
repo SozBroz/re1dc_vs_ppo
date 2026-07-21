@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.action_mask import (
@@ -50,10 +52,11 @@ def test_mixed_gr_heals_seventy() -> None:
 
 
 def test_spray_full_heal_capped() -> None:
+    # Must be ≤70% Fine to be legal; spray still caps at PLAYER_HP_MAX.
     inv = _inv((0x41, 1))
-    planned = plan_use(inv, 0, current_hp=PLAYER_HP_MAX - 10)
+    planned = plan_use(inv, 0, current_hp=50)
     assert planned is not None
-    assert planned[1] == 10
+    assert planned[1] == PLAYER_HP_MAX - 50
 
 
 def test_mask_only_noop_when_not_in_control() -> None:
@@ -63,19 +66,44 @@ def test_mask_only_noop_when_not_in_control() -> None:
 
 
 def test_use_mask_two_step() -> None:
+    # 50 HP is ≤ 70% of JILL_FINE_HP (96) → heal USE legal.
     inv = _inv((0x01, 0), (0x44, 1), (RED, 1))
     m0 = action_mask(
         N_ACTIONS, None, inventory=inv,
         player_anim=0, player_aux=0, player_recovery=0,
-        current_hp=100,
+        current_hp=50,
     )
     assert m0[USE_ACTION]
     assert not m0[SELECT_SLOT_BASE + 1]  # phase 0
     m1 = action_mask(
-        N_ACTIONS, None, inventory=inv, use_phase=1, current_hp=100,
+        N_ACTIONS, None, inventory=inv, use_phase=1, current_hp=50,
     )
     assert m1[SELECT_SLOT_BASE + 1]
     assert not m1[SELECT_SLOT_BASE + 2]  # red not usable
+
+
+def test_use_legal_at_or_below_seventy_percent_fine() -> None:
+    from re1_rl.item_use import heal_use_hp_threshold, use_would_help
+    from re1_rl.reward import JILL_FINE_HP
+
+    threshold = heal_use_hp_threshold(JILL_FINE_HP)
+    assert threshold == pytest.approx(0.70 * JILL_FINE_HP)
+    # Inclusive: hp == floor(threshold) still legal; one above illegal.
+    assert use_would_help(0x44, current_hp=67)  # 67 <= 67.2
+    assert not use_would_help(0x44, current_hp=68)
+
+
+def test_use_masked_above_seventy_percent_fine() -> None:
+    inv = _inv((0x41, 1), (0x44, 1))
+    m = action_mask(
+        N_ACTIONS,
+        None,
+        inventory=inv,
+        current_hp=68,
+        episode_start_hp=96,
+        poisoned=False,
+    )
+    assert not m[USE_ACTION]
 
 
 def test_use_masked_at_fine_episode_hp() -> None:

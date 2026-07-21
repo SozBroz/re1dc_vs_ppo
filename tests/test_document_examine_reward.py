@@ -62,7 +62,7 @@ def test_first_edge_into_document_pays_plus_three_and_extends():
     cur = _document(room="105", step=1)
     _, bd = _step(progress, prev, cur)
     assert bd["document_examine"] == NEW_DOCUMENT_EXAMINE_BONUS
-    assert bd["document_examine"] == pytest.approx(12.0)
+    assert bd["document_examine"] == pytest.approx(4.0)
     assert bd["new_room"] == 0.0
     assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
     assert progress.stagnation_frames == 0

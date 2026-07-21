@@ -37,31 +37,31 @@ STEPS_PER_CHECKPOINT = 5000  # legacy label; STEP_PENALTY is an independent stat
 STEP_PENALTY = -0.00024
 REFERENCE_STEP_FRAMES = 8
 
-# Large progress payouts (imperator 2026-07-20: ×4 vs prior 3.0 / 1.5 scale).
+# Progress payouts (imperator 2026-07-20 delinked table).
 # Each signal owns its float; not scaled from CHECKPOINT_REWARD.
-NEW_ROOM_BONUS = 12.0
-NEW_CUTSCENE_BONUS = 6.0
-# Document/file examine UI (gs=0x40808100): same +12 / 12m floor as new room.
-NEW_DOCUMENT_EXAMINE_BONUS = 12.0
+NEW_ROOM_BONUS = 4.0
+NEW_CUTSCENE_BONUS = 1.2
+# Document/file examine UI (gs=0x40808100): same +4 / 12m floor as new room.
+NEW_DOCUMENT_EXAMINE_BONUS = 4.0
 
 # Legacy aliases kept for tests / telemetry that import old names.
-WAYPOINT_ROOM_BONUS = 12.0
+WAYPOINT_ROOM_BONUS = 4.0
 
-# Junk / ammo / herbs: modest crumb (not ×4 with large progress).
+# Junk / ammo / herbs: modest crumb.
 ITEM_PICKUP_BONUS = 0.15
 # Keys / emblems / crests (room_items.json key_item=true).
-KEY_ITEM_PICKUP_BONUS = 12.0
+KEY_ITEM_PICKUP_BONUS = 4.0
 # Story inventory USE at a curated site (piano, fireplace, …).
-STORY_ITEM_USE_BONUS = 12.0
+STORY_ITEM_USE_BONUS = 4.0
 # 10F alcove: put gold_emblem back without leaving the wooden emblem (anti-hack).
-# Intended path is USE wooden emblem → +12.
-GOLD_EMBLEM_RETURN_PENALTY = -12.0
+# Intended path is USE wooden emblem → +4 story use.
+GOLD_EMBLEM_RETURN_PENALTY = -4.0
 # Every physical pickup of a gun/knife-class weapon (not ammo).
-NEW_WEAPON_PICKUP_BONUS = 12.0
+NEW_WEAPON_PICKUP_BONUS = 4.0
 # The wall rack can toggle forever: taking the shotgun pays; replacing it
 # removes exactly that reward. Repeating the loop is net zero before step cost.
 # Re-takes after a return still claw ±NEW_WEAPON but do not re-extend idle.
-SHOTGUN_RETURN_PENALTY = -12.0
+SHOTGUN_RETURN_PENALTY = -4.0
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # Idle contempt: no new room / document / cutscene / key / weapon / story / gallery.
 # Start budget and all progress extensions: 12 min. Grace 3 min then 3→12 ramp.
@@ -75,20 +75,20 @@ SOFTLOCK_FRAME_THRESHOLD = SOFTLOCK_POST_KENNETH_FRAMES
 # First 3 min of no-progress: no extra idle tax (living step cost only).
 CONTEMPT_GRACE_FRAMES = 3 * 60 * 60
 
-JILL_FINE_HP = 96
-# Survival / HP / death: independent statics (historically tied to 1.2 numerically).
-# Dense Fine→1 chip ≈ −0.80; terminal death −0.40; sum −1.20.
-SURVIVAL_BUDGET_SCALED = 1.2
-NEAR_DEATH_DAMAGE_SCALED = 0.8
-DEATH_PENALTY_SCALED = 0.4
-DEATH_PENALTY = -0.4
+JILL_FINE_HP = 96  # Jill Fine / practical max (RAM ceiling PLAYER_HP_MAX=140)
+# Survival budget 1.0; same chip/death ratio as before (2/3 dense Fine→1, 1/3 death).
+# Literals below are precomputed; not derived from CHECKPOINT_REWARD.
+SURVIVAL_BUDGET_SCALED = 1.0
+NEAR_DEATH_DAMAGE_SCALED = 0.6666666666666666  # 2/3
+DEATH_PENALTY_SCALED = 0.3333333333333333  # 1/3
+DEATH_PENALTY = -0.3333333333333333
 # Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
 MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.05
-# Idle contempt budget (independent static; historically death/5).
-CONTEMPT_BUDGET_SCALED = 0.08
-SOFTLOCK_TIMEOUT_PENALTY = -0.08
+# Idle contempt budget: death/5 → static literal under new death.
+CONTEMPT_BUDGET_SCALED = 0.06666666666666667  # |DEATH|/5
+SOFTLOCK_TIMEOUT_PENALTY = -0.06666666666666667
 
-ENEMY_DAMAGE_REWARD = 0.006
+ENEMY_DAMAGE_REWARD = 0.007
 ENEMY_KILL_REWARD = 0.24
 # Legacy names kept for imports/tests; miss penalties disabled (step scale only).
 ATTACK_MISS_PENALTY = 0.0
@@ -103,9 +103,9 @@ REWARD_SCALE = 1.0
 # γ = 0.5^(1/n) − c ≈ 0.998188. (Delayed-+1 PV solve differs slightly; ship γ_eff.)
 RL_GAMMA = 0.998188
 
-# Per-HP damage / heal (independent static; historically 0.8/95).
-HP_LOSS_SCALE = 0.008421052631578947
-HP_GAIN_SCALE = 0.008421052631578947
+# Per-HP damage / heal: (2/3) / (JILL_FINE_HP - 1) = (2/3)/95. Exact inverse heal.
+HP_LOSS_SCALE = 0.007017543859649122
+HP_GAIN_SCALE = 0.007017543859649122
 # Legacy export; heal is linear now (kept so old imports do not break).
 HEAL_LOG_CURVE_EXPONENT = 1.0
 

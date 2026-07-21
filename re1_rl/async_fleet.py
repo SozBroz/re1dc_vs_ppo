@@ -32,7 +32,7 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
 #   - Env step ≈ 8 frames @ 60fps ⇒ 8/60 s emulated; γ=0.998188 half-life ≈ 45s
 #     emulated (≈337.5 steps). Credit assignment is per n_steps segment, not the
 #     whole sync window.
-#   - 1536 steps ≈ 204.8s emulated ≈ 4.5 half-lives (good MC horizon for +12
+#   - 1536 steps ≈ 204.8s emulated ≈ 4.5 half-lives (good MC horizon for +4
 #     progress). Stays under typical wall collect (~6 env-steps/s ⇒ ~2160
 #     steps/env in 360s) so each env still finishes ≥1 rollout per epoch.
 #   - Do NOT set n_steps≈2700 (6 min emulated): at observed SPS that exceeds

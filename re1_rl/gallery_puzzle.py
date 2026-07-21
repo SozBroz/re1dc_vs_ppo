@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 
 GALLERY_ROOM_ID = "117"
-GALLERY_STEP_REWARD = 2.0  # large progress ×4 (was 0.5)
+GALLERY_STEP_REWARD = 0.5
 
 # RDT slots: newborn, infant, boy, young man, middle-aged man, old man.
 GALLERY_STEP_SLOTS = (3, 5, 6, 4, 2, 7)

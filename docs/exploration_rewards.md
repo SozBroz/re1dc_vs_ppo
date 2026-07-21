@@ -1,6 +1,6 @@
 # RE exploration rewards
 
-> **Canonical policy source:** adapted from `D:\awbw\.cursor\skills\re-exploration-rewards\SKILL.md` (2026-07-18). Rewrite for clarity only. Any change to *what* pays, magnitudes, exceptions, or status (implemented / not) requires **explicit imperator validation** before it goes into code or this doc.
+> **Canonical policy source:** adapted from `D:\awbw\.cursor\skills\re-exploration-rewards\SKILL.md` (2026-07-20). Rewrite for clarity only. Any change to *what* pays, magnitudes, exceptions, or status (implemented / not) requires **explicit imperator validation** before it goes into code or this doc.
 
 Policy source: imperator.
 
@@ -14,23 +14,23 @@ Policy source: imperator.
 
 | # | Event | Magnitude | Episode | Status |
 |---|--------|-----------|---------|--------|
-| 1 | New room entered | **+12.0** | Extends **+12 min** idle cap | In force |
-| 2 | Uncontrolled freeze lasting **≥7.5s** (450 emulated frames), unless excluded below | **+6.0** | Resets stagnation clock | In force |
-| 3 | New key item | **+12.0** | Extends **+12 min** idle cap | In force |
-| 4 | Using key item | **+12.0** | Extends **+12 min** idle cap | In force |
-| 5 | Weapon pickup (including wall shotgun) | **+12.0** | Extends **+12 min** idle cap (first acquire of that weapon this episode) | In force |
+| 1 | New room entered | **+4.0** | Extends **+12 min** idle cap | In force |
+| 2 | Uncontrolled freeze lasting **≥7.5s** (450 emulated frames), unless excluded below | **+1.2** | Resets stagnation clock | In force |
+| 3 | New key item | **+4.0** | Extends **+12 min** idle cap | In force |
+| 4 | Using key item | **+4.0** | Extends **+12 min** idle cap | In force |
+| 5 | Weapon pickup (including wall shotgun) | **+4.0** | Extends **+12 min** idle cap (first acquire of that weapon this episode) | In force |
 | 6 | Every non-key-item pickup | Modest: **0.15** | (no special rule stated) | In force |
-| 7 | Hitting an enemy | Modest: **typically below 0.5** | (no special rule stated) | In force |
-| 8 | Killing an enemy | Modest: **typically below 0.5** | (no special rule stated) | In force |
-| 9 | Story-driven interaction (Gallery portrait sequence) | Large: **+2.0 per correct switch** | Extends | In force |
-| 10 | Document / book examine UI entered | **+12.0** | Extends **+12 min** idle cap (same path as new room) | In force |
+| 7 | Hitting an enemy | Modest: **+0.007 per HP** | (no special rule stated) | In force |
+| 8 | Killing an enemy | Modest: **+0.24** | (no special rule stated) | In force |
+| 9 | Story-driven interaction (Gallery portrait sequence) | Modest: **+0.5 per correct switch** | Extends | In force |
+| 10 | Document / book examine UI entered | **+4.0** | Extends **+12 min** idle cap (same path as new room) | In force |
 
 Buckets:
 
-- **1, 3, 4, 5, 10**: **+12.0** and raise softlock idle truncate floor to **12 min** (weapons: first acquire of that name this episode; documents: first rising edge into examine UI per room this episode)
-- **2**: **+6.0**; resets stagnation but does **not** by itself raise the 12 min floor
-- **6–8**: modest (not ×4 with large progress)
-- **9**: large; each correct Gallery portrait switch pays +2.0 and extends
+- **1, 3, 4, 5, 10**: **+4.0** and raise softlock idle truncate floor to **12 min** (weapons: first acquire of that name this episode; documents: first rising edge into examine UI per room this episode)
+- **2**: **+1.2**; resets stagnation but does **not** by itself raise the 12 min floor
+- **6–8**: modest crumbs / combat
+- **9**: **+0.5** per correct Gallery portrait switch; extends
 
 Document examine (#10):
 
@@ -43,7 +43,7 @@ Gallery room 117 policy:
 
 - Correct order is RDT slots `3 → 5 → 6 → 4 → 2 → 7`, detected from the
   confirmed `0x800C3008` one-hot progression.
-- Each of those six switches pays +2.0 and resets the stagnation clock.
+- Each of those six switches pays +0.5 and resets the stagnation clock.
 - A wrong confirmed switch or leaving room 117 claws back the full sum of
   Gallery-step rewards still pending in that attempt.
 - After a wrong switch, Gallery rewards remain locked and the observation hint
@@ -115,26 +115,27 @@ Do not treat (f) as a decided pay/deny rule until validated.
 Illegal pre-Kenneth transition into 106 withholds visit credit, applies −0.05,
 marks `wesker_pre_kenneth`, and terminates the episode.
 
-**Spawn room (dining 105 on m0):** marked visited at episode reset; the +12.0
+**Spawn room (dining 105 on m0):** marked visited at episode reset; the +4.0
 `new_room` (and 12 min idle floor) pays on the **first** `compute_reward` of the
 episode. That way dining discovery is not attributed to a later Wesker/door
 settle. Re-entering dining never pays again.
 
 ## Combat pay (#7 / #8)
 
-Hit / kill pay only when the step is an actual **knife** or **attack** action. Enemy HP flicker on interact / door / cutscene without a combat action must **not** pay. Magnitudes are independent statics: **+0.006** per enemy HP damaged, **+0.24** per kill (not × `CHECKPOINT_REWARD`).
+Hit / kill pay only when the step is an actual **knife** or **attack** action. Enemy HP flicker on interact / door / cutscene without a combat action must **not** pay. Magnitudes are independent statics: **+0.007** per enemy HP damaged, **+0.24** per kill (not × `CHECKPOINT_REWARD`).
 
 ## HP damage / heal
 
 All live reward/punishment magnitudes in `reward.py` are **independent static
 floats** — not derived from `CHECKPOINT_REWARD` (legacy label only). Survival
-numbers (same magnitude as the old 1.2-unit era): Fine→1 chip **−0.80**,
-death **−0.40**, survival budget label **1.2**. Per-HP scale
-`HP_LOSS_SCALE` = **0.008421052631578947**. Living step cost **−0.00024**.
+budget **1.0**: Fine→1 chip **−2/3**, death **−1/3**. Per-HP scale
+`HP_LOSS_SCALE` = **(2/3)/95** ≈ **0.007017543859649122** (Jill Fine
+`JILL_FINE_HP=96`, not RAM ceiling 140). Living step cost **−0.00024**.
 
 - Taking damage: linear per-HP penalty (`HP_LOSS_SCALE`).
-- Healing: **exact inverse** of that punishment (same scale, opposite sign). No
-  0.8× haircut and no log compression.
+- Healing: **exact inverse** of that punishment (same scale, opposite sign).
+- Heal **USE** mask: legal when `hp <= 0.70 * JILL_FINE_HP` (integer HP ≤ 67);
+  illegal above 70%. Poison-cure USE legal at any HP.
 
 ## Item pickup pay (#5 / #6)
 
@@ -142,10 +143,10 @@ death **−0.40**, survival budget label **1.2**. Per-HP scale
   same type (another herb, ammunition box, etc.).
 - Key items remain once-per-episode.
 - **Gold emblem put-back (10F alcove):** putting `gold_emblem` back on the stand
-  pays **−12.0** (`gold_emblem_return`) — exact inverse of key-item pickup.
-  Intended path is USE wooden `emblem` at the stand (+12.0 story use); that keeps
+  pays **−4.0** (`gold_emblem_return`) — exact inverse of key-item pickup.
+  Intended path is USE wooden `emblem` at the stand (+4.0 story use); that keeps
   gold and does not trip the put-back penalty.
-- The wall shotgun pays **+12.0** whenever Jill takes it and **−12.0** whenever
+- The wall shotgun pays **+4.0** whenever Jill takes it and **−4.0** whenever
   she replaces it on the rack. A repeated take/replace loop is therefore net
   zero before step cost; leaving with the shotgun preserves the pickup reward.
   Re-takes after a return do **not** re-raise the 12 min idle floor or reset
@@ -158,7 +159,7 @@ death **−0.40**, survival budget label **1.2**. Per-HP scale
   budget and every progress extension** (new room / document examine / key
   pickup / key use / first weapon / gallery, via `SOFTLOCK_EXTENSION_FRAMES`)
   are **12 min** emulated — one clock. Contempt budget is the independent
-  static **0.08** (`CONTEMPT_BUDGET_SCALED`; not death/5 or × CHECKPOINT).
+  static **|death|/5 ≈ 0.06666666666666667** (`CONTEMPT_BUDGET_SCALED`).
   Dense in scalar reward under main γ (**0.998188**, ~45s half-life with step
   contempt) — no separate softlock MC channel.
 
@@ -175,15 +176,15 @@ death **−0.40**, survival budget label **1.2**. Per-HP scale
 ```
 Event fired?
 ├─ Transition into 106 before Kenneth paid? → mark Wesker ledger bit; −0.05; terminate
-├─ New room (legal)? → pay #1 (+12.0, 12m idle floor)
-├─ Rising edge into document examine UI (0x40808100), unpaid room? → pay #10 (+12.0, 12m idle floor)
+├─ New room (legal)? → pay #1 (+4.0, 12m idle floor)
+├─ Rising edge into document examine UI (0x40808100), unpaid room? → pay #10 (+4.0, 12m idle floor)
 ├─ Freeze / text / “cutscene”?
 │  ├─ Total uninterrupted freeze <450 frames? → do NOT pay #2
 │  ├─ Menu / pickup / death / opening / pre-Kenneth hall? → do NOT pay #2
-│  └─ Otherwise → pay #2 (+6.0) once per key (long doors included)
-├─ Key item get / use? → #3 / #4 (+12.0, 12m idle floor)
-├─ Weapon get? → #5 (+12.0; first acquire → 12m idle floor); wall shotgun return → −12.0
+│  └─ Otherwise → pay #2 (+1.2) once per key (long doors included)
+├─ Key item get / use? → #3 / #4 (+4.0, 12m idle floor)
+├─ Weapon get? → #5 (+4.0; first acquire → 12m idle floor); wall shotgun return → −4.0
 ├─ Other non-key item get? → #6 every pickup
 ├─ Hit / kill on knife|attack step? → #7 / #8
-└─ Gallery portrait sequence? → +2.0 per correct ordered switch; claw back partial attempt on wrong input/exit
+└─ Gallery portrait sequence? → +0.5 per correct ordered switch; claw back partial attempt on wrong input/exit
 ```

@@ -1,7 +1,8 @@
 """RE1 DC inventory USE (consumable heal / cure poison).
 
 PS1 manual: highlight item -> USE (weapons show EQUIP instead).
-Effects from SparkyCoulter RE1 DC item guide + Jacko herb chart; max HP 140.
+Effects from SparkyCoulter RE1 DC item guide + Jacko herb chart.
+Heal USE mask uses Jill Fine HP (JILL_FINE_HP=96), not RAM ceiling 140.
 """
 
 from __future__ import annotations
@@ -15,6 +16,10 @@ from re1_rl.memory_map import (
     PLAYER_HP,
     PLAYER_HP_MAX,
 )
+from re1_rl.reward import JILL_FINE_HP
+
+# Heal USE legal at or below this fraction of Jill Fine/max HP.
+HEAL_USE_HP_FRACTION = 0.70
 
 # item_id -> (heal_hp, cures_poison). None = cannot USE (e.g. red herb alone).
 _USE_EFFECTS: dict[int, tuple[int, bool] | None] = {
@@ -44,6 +49,11 @@ def is_usable_item(item_id: int) -> bool:
     return use_effect(item_id) is not None
 
 
+def heal_use_hp_threshold(max_hp: int = JILL_FINE_HP) -> float:
+    """Inclusive ceiling: heal USE legal when ``hp <=`` this value."""
+    return HEAL_USE_HP_FRACTION * float(max_hp)
+
+
 def use_would_help(
     item_id: int,
     *,
@@ -51,17 +61,21 @@ def use_would_help(
     poisoned: bool = False,
     episode_start_hp: int | None = None,
 ) -> bool:
-    """True when USE would heal HP or cure poison (not wasted at fine HP)."""
+    """True when USE would heal (HP ≤ 70% Fine) or cure poison (any HP).
+
+    ``episode_start_hp`` is accepted for call-site compatibility; heal gating
+    uses ``JILL_FINE_HP`` (96), not the RAM ceiling 140.
+    """
+    del episode_start_hp  # mask uses JILL_FINE_HP; kept for API parity
     effect = use_effect(item_id)
     if effect is None:
         return False
     heal_amt, cures_poison = effect
     if cures_poison and poisoned:
         return True
-    fine_hp = int(episode_start_hp) if episode_start_hp and episode_start_hp > 0 else PLAYER_HP_MAX
-    if int(current_hp) >= fine_hp:
+    if int(heal_amt) <= 0:
         return False
-    return int(heal_amt) > 0 and int(current_hp) < PLAYER_HP_MAX
+    return int(current_hp) <= heal_use_hp_threshold(JILL_FINE_HP)
 
 
 def slot_legal_for_use(

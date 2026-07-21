@@ -54,9 +54,9 @@ def _step(
 
 
 def test_softlock_budget_is_independent_static():
-    assert CONTEMPT_BUDGET_SCALED == pytest.approx(0.08)
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-0.08)
-    assert DEATH_PENALTY_SCALED == pytest.approx(0.4)
+    assert CONTEMPT_BUDGET_SCALED == pytest.approx(1.0 / 15.0)  # |death|/5
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-(1.0 / 15.0))
+    assert DEATH_PENALTY_SCALED == pytest.approx(1.0 / 3.0)
     assert CONTEMPT_BUDGET_SCALED < SURVIVAL_BUDGET_SCALED
 
 
@@ -288,7 +288,7 @@ def test_weapon_pickup_resets_idle_timer_and_raises_six_minute_cap():
     cur = make_state(room="115", step=4, new_items=["colt_python"])
     _, bd = _step(progress, prev, cur, step_frames=4)
 
-    assert bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 12.0
+    assert bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 4.0
     assert bd["item"] == 0.0
     assert bd["key_item"] == 0.0
     assert progress.stagnation_frames == 0
@@ -317,11 +317,11 @@ def test_shotgun_wall_loop_is_zero_sum_and_retake_does_not_refarm_idle():
     pickup_reward, pickup_bd = _step(
         progress, empty, held, step_frames=0
     )
-    assert pickup_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 12.0
+    assert pickup_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 4.0
     assert pickup_bd["shotgun_return"] == 0.0
     assert progress.stagnation_frames == 0
     assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
-    assert SHOTGUN_RETURN_PENALTY == -NEW_WEAPON_PICKUP_BONUS == -12.0
+    assert SHOTGUN_RETURN_PENALTY == -NEW_WEAPON_PICKUP_BONUS == -4.0
 
     returned = make_state(room="115", step=2, inventory=[], new_items=[])
     return_reward, return_bd = _step(

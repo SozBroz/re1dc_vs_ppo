@@ -22,7 +22,7 @@ from tests.test_scaffolding import make_planner, make_state
 
 def test_step_penalty_constant() -> None:
     assert STEP_PENALTY == pytest.approx(-0.00024)
-    assert ENEMY_DAMAGE_REWARD == pytest.approx(0.006)
+    assert ENEMY_DAMAGE_REWARD == pytest.approx(0.007)
     assert ENEMY_KILL_REWARD == pytest.approx(0.24)
 
 
