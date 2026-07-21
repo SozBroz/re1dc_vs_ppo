@@ -73,15 +73,12 @@ SOFTLOCK_FRAME_THRESHOLD = SOFTLOCK_POST_KENNETH_FRAMES
 # First 3 min of no-progress: no extra idle tax (living step cost only).
 CONTEMPT_GRACE_FRAMES = 3 * 60 * 60
 
-# Fine condition HP for Jill (real max band; not PLAYER_HP_MAX=140 RAM ceiling).
 JILL_FINE_HP = 96
-# Health punishment bucket: independent of CHECKPOINT_REWARD (progress stays 1.2).
-# Full Fine→1 chip + death terminal = −1.0 total. Same chip/death ratio as before:
-# 2/3 dense HP loss, 1/3 episode-end death.
-HEALTH_PUNISHMENT_BUDGET = 1.0
-SURVIVAL_BUDGET_SCALED = HEALTH_PUNISHMENT_BUDGET
-NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.6667
-DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.3333
+# Survival budget: full Fine→1 chip + death terminal = −1× checkpoint.
+# 2/3 on dense HP loss, 1/3 on episode-end death.
+SURVIVAL_BUDGET_SCALED = 1.0 * CHECKPOINT_REWARD
+NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.8
+DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.4
 DEATH_PENALTY = -DEATH_PENALTY_SCALED
 # Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
 # Fixed −0.05 (not scaled with large-progress ×4); terminates the episode.
@@ -93,27 +90,10 @@ SOFTLOCK_TIMEOUT_PENALTY = -CONTEMPT_BUDGET_SCALED
 
 ENEMY_DAMAGE_REWARD = CHECKPOINT_REWARD / 200
 ENEMY_KILL_REWARD = 0.2 * CHECKPOINT_REWARD
-# Flat legacy miss flags (unused); ammo waste uses per-weapon clip table below.
+# Legacy names kept for imports/tests; miss penalties disabled (step scale only).
 ATTACK_MISS_PENALTY = 0.0
 KNIFE_MISS_PENALTY = 0.0
 AMMO_WASTE_PENALTY = 0.0
-
-# Miss / ammo-waste tax: per missed round =
-#   -0.5 * ITEM_PICKUP_BONUS / clip_size
-# clip_size = magazine / typical ammo pack amortized against one junk pickup.
-# Knife and flamethrower omitted (no discrete clip pack for this tax).
-# Bazooka chamber capacity is 1 (WEAPON_CLIP_CAPACITY); miss tax uses pack size 6
-# (room_items acid_rounds count=6; DC / Evil Resource).
-MISS_TAX_CLIP_SIZE: dict[int, int] = {
-    0x02: 15,  # beretta / handgun
-    0x03: 7,   # shotgun
-    0x04: 6,   # colt python dumdum
-    0x05: 6,   # colt python magnum
-    0x07: 6,   # bazooka acid
-    0x08: 6,   # bazooka explosive
-    0x09: 6,   # bazooka flame
-    0x0A: 6,   # rocket launcher
-}
 
 REWARD_SCALE = 1.0
 
@@ -123,7 +103,6 @@ REWARD_SCALE = 1.0
 # γ = 0.5^(1/n) − c ≈ 0.998188. (Delayed-+1 PV solve differs slightly; ship γ_eff.)
 RL_GAMMA = 0.998188
 
-# Per-HP chip from health bucket / (Fine→1 span). Independent of CHECKPOINT_REWARD.
 HP_LOSS_SCALE = NEAR_DEATH_DAMAGE_SCALED / (JILL_FINE_HP - 1)
 # Heal is the exact inverse of damage (same scale, opposite sign).
 HP_GAIN_SCALE = HP_LOSS_SCALE
@@ -136,22 +115,6 @@ def hp_heal_reward(hp_delta: int) -> float:
     if hp_delta <= 0:
         return 0.0
     return HP_GAIN_SCALE * float(hp_delta)
-
-
-def ammo_waste_per_missed_round(weapon_id: int) -> float:
-    """Per-round miss tax for ``weapon_id`` (0 if knife / unknown / no clip)."""
-    clip = MISS_TAX_CLIP_SIZE.get(int(weapon_id) & 0xFF)
-    if clip is None or clip <= 0:
-        return 0.0
-    return -0.5 * ITEM_PICKUP_BONUS / float(clip)
-
-
-def ammo_waste_penalty(weapon_id: int, rounds_spent: int) -> float:
-    """Total ammo-waste penalty for a missed attack that spent ``rounds_spent``."""
-    rounds = int(rounds_spent)
-    if rounds <= 0:
-        return 0.0
-    return ammo_waste_per_missed_round(weapon_id) * float(rounds)
 
 # Disabled checkpoint-path terms (exported for tests that assert they stay off).
 WRONG_ROOM_PENALTY = -0.5 * CHECKPOINT_REWARD
@@ -516,14 +479,6 @@ def compute_reward(
     enemy_kills = int(state.get("enemy_kills", 0) or 0)
     if enemy_kills > 0:
         bd["enemy_kill"] = ENEMY_KILL_REWARD * enemy_kills
-
-    # Miss / ammo waste: only on attack_missed with ammo spent. Hits pay no tax.
-    # Knife uses knife_swing_missed (no clip) — never taxed here.
-    if state.get("attack_missed"):
-        rounds = int(state.get("ammo_spent", 0) or 0)
-        if rounds > 0:
-            wid = int(state.get("equipped_weapon_id", 0) or 0)
-            bd["ammo_waste"] = ammo_waste_penalty(wid, rounds)
 
     if progress is not None and progress.kenneth_gate_breached:
         for term, value in bd.items():

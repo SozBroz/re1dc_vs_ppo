@@ -50,11 +50,10 @@ def test_mixed_gr_heals_seventy() -> None:
 
 
 def test_spray_full_heal_capped() -> None:
-    # Below 70% of Fine (96): legal; spray heal still caps at PLAYER_HP_MAX.
     inv = _inv((0x41, 1))
-    planned = plan_use(inv, 0, current_hp=40, episode_start_hp=96)
+    planned = plan_use(inv, 0, current_hp=PLAYER_HP_MAX - 10)
     assert planned is not None
-    assert planned[1] == PLAYER_HP_MAX - 40
+    assert planned[1] == 10
 
 
 def test_mask_only_noop_when_not_in_control() -> None:
@@ -65,18 +64,15 @@ def test_mask_only_noop_when_not_in_control() -> None:
 
 def test_use_mask_two_step() -> None:
     inv = _inv((0x01, 0), (0x44, 1), (RED, 1))
-    # 50 < 0.70 * 96 (= 67.2) → heal USE legal
     m0 = action_mask(
         N_ACTIONS, None, inventory=inv,
         player_anim=0, player_aux=0, player_recovery=0,
-        current_hp=50,
-        episode_start_hp=96,
+        current_hp=100,
     )
     assert m0[USE_ACTION]
     assert not m0[SELECT_SLOT_BASE + 1]  # phase 0
     m1 = action_mask(
-        N_ACTIONS, None, inventory=inv, use_phase=1,
-        current_hp=50, episode_start_hp=96,
+        N_ACTIONS, None, inventory=inv, use_phase=1, current_hp=100,
     )
     assert m1[SELECT_SLOT_BASE + 1]
     assert not m1[SELECT_SLOT_BASE + 2]  # red not usable
@@ -93,40 +89,6 @@ def test_use_masked_at_fine_episode_hp() -> None:
         poisoned=False,
     )
     assert not m[USE_ACTION]
-
-
-def test_use_masked_at_or_above_70pct_max() -> None:
-    """Premature Caution heals: ≥70% of Fine (96) → USE illegal."""
-    from re1_rl.item_use import HEAL_USE_HP_FRAC
-    from re1_rl.reward import JILL_FINE_HP
-
-    inv = _inv((0x41, 1), (0x44, 1))
-    # Strict below: hp < 0.70 * 96 = 67.2 → 68 illegal, 67 legal
-    assert 68 >= HEAL_USE_HP_FRAC * JILL_FINE_HP
-    m_high = action_mask(
-        N_ACTIONS,
-        None,
-        inventory=inv,
-        current_hp=68,
-        episode_start_hp=JILL_FINE_HP,
-        poisoned=False,
-        player_anim=0,
-        player_aux=0,
-        player_recovery=0,
-    )
-    assert not m_high[USE_ACTION]
-    m_ok = action_mask(
-        N_ACTIONS,
-        None,
-        inventory=inv,
-        current_hp=67,
-        episode_start_hp=JILL_FINE_HP,
-        poisoned=False,
-        player_anim=0,
-        player_aux=0,
-        player_recovery=0,
-    )
-    assert m_ok[USE_ACTION]
 
 
 def test_use_masked_at_full_hp() -> None:

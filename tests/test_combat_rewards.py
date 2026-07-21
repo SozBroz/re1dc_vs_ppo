@@ -43,13 +43,11 @@ def test_knife_miss_only_scaled_step_contempt() -> None:
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
     cur["knife_swing_missed"] = True
-    cur["equipped_weapon_id"] = 0x01
     cur["step_emulated_frames"] = 42
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
     assert bd["attack_miss"] == 0.0
-    assert bd["ammo_waste"] == 0.0
     assert bd["step"] == STEP_PENALTY * (42 / REFERENCE_STEP_FRAMES)
 
 
@@ -90,5 +88,5 @@ def test_knife_hit_rewards_stack_on_scaled_step_contempt() -> None:
     assert bd["enemy_damage"] == ENEMY_DAMAGE_REWARD * 20
     assert bd["enemy_kill"] == ENEMY_KILL_REWARD
     assert bd["attack_miss"] == 0.0
-    assert bd["ammo_waste"] == 0.0  # hit path: no miss tax
+    assert bd["ammo_waste"] == 0.0
     assert reward == sum(bd.values())

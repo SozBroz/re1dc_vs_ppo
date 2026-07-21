@@ -126,31 +126,9 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 
 ## HP damage / heal
 
-Health punishment budget is **1.0 total** (`HEALTH_PUNISHMENT_BUDGET`),
-**independent of** `CHECKPOINT_REWARD` (progress stays 1.2). Ratio unchanged:
-**2/3** dense Fine→1 chip, **1/3** terminal death. Scale uses real Jill Fine HP
-(`JILL_FINE_HP=96`), not the RAM ceiling 140.
-
-- Taking damage: linear per-HP penalty (`HP_LOSS_SCALE` = chip_budget / 95).
-- Healing: **exact inverse** (`HP_GAIN_SCALE == HP_LOSS_SCALE`). No 0.8× haircut
-  and no log compression.
-
-## Miss / ammo waste
-
-On `attack_missed` with `ammo_spent > 0` only (hits pay nothing; knife has no
-clip tax):
-
-`per_missed_round = -0.5 * ITEM_PICKUP_BONUS / clip_size`
-
-| Weapon | clip_size |
-|--------|-----------|
-| Beretta | 15 |
-| Shotgun | 7 |
-| Magnum / dumdum | 6 |
-| Bazooka / rocket (acid/flame/explosive) | 6 (pack size; chamber holds 1) |
-- Heal **USE** mask: legal only when `hp < 0.70 * max_hp` (strict below 70%;
-  `max_hp` = `episode_start_hp` or `JILL_FINE_HP`=96 — not the 140 engine
-  ceiling). Poison-cure USE stays legal at any HP.
+- Taking damage: linear per-HP penalty (`HP_LOSS_SCALE`).
+- Healing: **exact inverse** of that punishment (same scale, opposite sign). No
+  0.8× haircut and no log compression.
 
 ## Item pickup pay (#5 / #6)
 
@@ -174,7 +152,7 @@ clip tax):
   budget and every progress extension** (new room / document examine / key
   pickup / key use / first weapon / gallery, via `SOFTLOCK_EXTENSION_FRAMES`)
   are **12 min** emulated — one clock. Contempt budget is **1/5** of death
-  (~0.0667 at `HEALTH_PUNISHMENT_BUDGET=1.0`). Dense in scalar reward under main γ
+  (~0.08 at `CHECKPOINT_REWARD=1.2`). Dense in scalar reward under main γ
   (**0.998188**, ~45s half-life with step contempt) — no separate softlock MC
   channel.
 
