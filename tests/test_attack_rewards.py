@@ -86,8 +86,8 @@ def test_hit_rewards_unchanged() -> None:
     assert reward == sum(bd.values())
 
 
-def test_enemy_kill_reward_is_point_two_checkpoint() -> None:
-    assert ENEMY_KILL_REWARD == pytest.approx(0.2 * 1.2)
+def test_enemy_kill_reward_is_static() -> None:
+    assert ENEMY_KILL_REWARD == pytest.approx(0.24)
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)

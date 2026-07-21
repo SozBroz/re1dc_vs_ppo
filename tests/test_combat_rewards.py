@@ -5,15 +5,15 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
-    CHECKPOINT_REWARD,
     ENEMY_DAMAGE_REWARD,
     ENEMY_KILL_REWARD,
     REFERENCE_STEP_FRAMES,
-    STEPS_PER_CHECKPOINT,
     STEP_PENALTY,
     compute_reward,
 )
@@ -21,8 +21,9 @@ from tests.test_scaffolding import make_planner, make_state
 
 
 def test_step_penalty_constant() -> None:
-    assert STEPS_PER_CHECKPOINT == 5000
-    assert STEP_PENALTY == -CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT
+    assert STEP_PENALTY == pytest.approx(-0.00024)
+    assert ENEMY_DAMAGE_REWARD == pytest.approx(0.006)
+    assert ENEMY_KILL_REWARD == pytest.approx(0.24)
 
 
 def test_enemy_damage_and_kill_rewards() -> None:

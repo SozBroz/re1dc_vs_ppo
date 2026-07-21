@@ -28,22 +28,24 @@ _WEAPON_NAME_SET: frozenset[str] = frozenset(
     ITEM_IDS[i] for i in WEAPON_ITEM_IDS if i in ITEM_IDS
 )
 
-# Human-scale reward units: one route checkpoint = +1.2; step = 1/5000 of that.
+# Legacy unit label only (docs / old telemetry). Live magnitudes below are
+# independent statics — do not derive progress / survival / step / combat from this.
 CHECKPOINT_REWARD = 1.2
-STEPS_PER_CHECKPOINT = 5000
+STEPS_PER_CHECKPOINT = 5000  # legacy label; STEP_PENALTY is an independent static
 
-STEP_PENALTY = -CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT  # -0.00024
+# Living cost: independent static (historically −1.2/5000).
+STEP_PENALTY = -0.00024
 REFERENCE_STEP_FRAMES = 8
 
 # Large progress payouts (imperator 2026-07-20: ×4 vs prior 3.0 / 1.5 scale).
-# Absolute human-scale (not × CHECKPOINT); living cost / γ use CHECKPOINT_REWARD.
+# Each signal owns its float; not scaled from CHECKPOINT_REWARD.
 NEW_ROOM_BONUS = 12.0
 NEW_CUTSCENE_BONUS = 6.0
 # Document/file examine UI (gs=0x40808100): same +12 / 12m floor as new room.
 NEW_DOCUMENT_EXAMINE_BONUS = 12.0
 
 # Legacy aliases kept for tests / telemetry that import old names.
-WAYPOINT_ROOM_BONUS = NEW_ROOM_BONUS
+WAYPOINT_ROOM_BONUS = 12.0
 
 # Junk / ammo / herbs: modest crumb (not ×4 with large progress).
 ITEM_PICKUP_BONUS = 0.15
@@ -52,14 +54,14 @@ KEY_ITEM_PICKUP_BONUS = 12.0
 # Story inventory USE at a curated site (piano, fireplace, …).
 STORY_ITEM_USE_BONUS = 12.0
 # 10F alcove: put gold_emblem back without leaving the wooden emblem (anti-hack).
-# Exact inverse of key-item pickup (+12); intended path is USE wooden emblem → +12.
-GOLD_EMBLEM_RETURN_PENALTY = -KEY_ITEM_PICKUP_BONUS
-# Every physical pickup of a gun/knife-class weapon (not ammo). Same scale as keys.
+# Intended path is USE wooden emblem → +12.
+GOLD_EMBLEM_RETURN_PENALTY = -12.0
+# Every physical pickup of a gun/knife-class weapon (not ammo).
 NEW_WEAPON_PICKUP_BONUS = 12.0
 # The wall rack can toggle forever: taking the shotgun pays; replacing it
 # removes exactly that reward. Repeating the loop is net zero before step cost.
 # Re-takes after a return still claw ±NEW_WEAPON but do not re-extend idle.
-SHOTGUN_RETURN_PENALTY = -NEW_WEAPON_PICKUP_BONUS
+SHOTGUN_RETURN_PENALTY = -12.0
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # Idle contempt: no new room / document / cutscene / key / weapon / story / gallery.
 # Start budget and all progress extensions: 12 min. Grace 3 min then 3→12 ramp.
@@ -74,22 +76,20 @@ SOFTLOCK_FRAME_THRESHOLD = SOFTLOCK_POST_KENNETH_FRAMES
 CONTEMPT_GRACE_FRAMES = 3 * 60 * 60
 
 JILL_FINE_HP = 96
-# Survival budget: full Fine→1 chip + death terminal = −1× checkpoint.
-# 2/3 on dense HP loss, 1/3 on episode-end death.
-SURVIVAL_BUDGET_SCALED = 1.0 * CHECKPOINT_REWARD
-NEAR_DEATH_DAMAGE_SCALED = (2.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.8
-DEATH_PENALTY_SCALED = (1.0 / 3.0) * SURVIVAL_BUDGET_SCALED  # ≈0.4
-DEATH_PENALTY = -DEATH_PENALTY_SCALED
+# Survival / HP / death: independent statics (historically tied to 1.2 numerically).
+# Dense Fine→1 chip ≈ −0.80; terminal death −0.40; sum −1.20.
+SURVIVAL_BUDGET_SCALED = 1.2
+NEAR_DEATH_DAMAGE_SCALED = 0.8
+DEATH_PENALTY_SCALED = 0.4
+DEATH_PENALTY = -0.4
 # Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
-# Fixed −0.05 (not scaled with large-progress ×4); terminates the episode.
 MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.05
-# Doing-nothing contempt must not exceed death (else suicide beats softlock).
-# Stepwise / ramp potency is 1/5 of the death budget.
-CONTEMPT_BUDGET_SCALED = DEATH_PENALTY_SCALED / 5.0
-SOFTLOCK_TIMEOUT_PENALTY = -CONTEMPT_BUDGET_SCALED
+# Idle contempt budget (independent static; historically death/5).
+CONTEMPT_BUDGET_SCALED = 0.08
+SOFTLOCK_TIMEOUT_PENALTY = -0.08
 
-ENEMY_DAMAGE_REWARD = CHECKPOINT_REWARD / 200
-ENEMY_KILL_REWARD = 0.2 * CHECKPOINT_REWARD
+ENEMY_DAMAGE_REWARD = 0.006
+ENEMY_KILL_REWARD = 0.24
 # Legacy names kept for imports/tests; miss penalties disabled (step scale only).
 ATTACK_MISS_PENALTY = 0.0
 KNIFE_MISS_PENALTY = 0.0
@@ -103,9 +103,9 @@ REWARD_SCALE = 1.0
 # γ = 0.5^(1/n) − c ≈ 0.998188. (Delayed-+1 PV solve differs slightly; ship γ_eff.)
 RL_GAMMA = 0.998188
 
-HP_LOSS_SCALE = NEAR_DEATH_DAMAGE_SCALED / (JILL_FINE_HP - 1)
-# Heal is the exact inverse of damage (same scale, opposite sign).
-HP_GAIN_SCALE = HP_LOSS_SCALE
+# Per-HP damage / heal (independent static; historically 0.8/95).
+HP_LOSS_SCALE = 0.008421052631578947
+HP_GAIN_SCALE = 0.008421052631578947
 # Legacy export; heal is linear now (kept so old imports do not break).
 HEAL_LOG_CURVE_EXPONENT = 1.0
 
@@ -117,11 +117,12 @@ def hp_heal_reward(hp_delta: int) -> float:
     return HP_GAIN_SCALE * float(hp_delta)
 
 # Disabled checkpoint-path terms (exported for tests that assert they stay off).
-WRONG_ROOM_PENALTY = -0.5 * CHECKPOINT_REWARD
-RETREAT_PENALTY = -0.5 * CHECKPOINT_REWARD
-SUCCESS_ROOM_BONUS = 100.0 * CHECKPOINT_REWARD
-PBRS_GRAPH_WEIGHT = CHECKPOINT_REWARD / 20
-PBRS_DOOR_WEIGHT = 0.5 * CHECKPOINT_REWARD
+# Staticized; ENABLE_CHECKPOINT_PATH=False so these never enter the live path.
+WRONG_ROOM_PENALTY = -0.6
+RETREAT_PENALTY = -0.6
+SUCCESS_ROOM_BONUS = 120.0
+PBRS_GRAPH_WEIGHT = 0.06
+PBRS_DOOR_WEIGHT = 0.6
 SHAPING_GAMMA = 1.0
 UNKNOWN_HOPS = 8.0
 DIST_NORM = 4096.0

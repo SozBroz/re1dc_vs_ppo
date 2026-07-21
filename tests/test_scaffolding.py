@@ -234,7 +234,7 @@ def test_explain_obs_names_every_slot():
 
 def test_damage_and_death_calibrated_to_waypoint():
     from re1_rl.reward import (
-        CHECKPOINT_REWARD,
+        CONTEMPT_BUDGET_SCALED,
         DEATH_PENALTY_SCALED,
         HP_GAIN_SCALE,
         HP_LOSS_SCALE,
@@ -242,7 +242,6 @@ def test_damage_and_death_calibrated_to_waypoint():
         NEAR_DEATH_DAMAGE_SCALED,
         REWARD_SCALE,
         SOFTLOCK_TIMEOUT_PENALTY,
-        STEPS_PER_CHECKPOINT,
         STEP_PENALTY,
         SURVIVAL_BUDGET_SCALED,
         WAYPOINT_ROOM_BONUS,
@@ -251,15 +250,17 @@ def test_damage_and_death_calibrated_to_waypoint():
 
     planner = make_planner()
     progress = ProgressTracker()
-    assert CHECKPOINT_REWARD == 1.2
+    # Independent statics (not derived from CHECKPOINT_REWARD).
     assert NEW_ROOM_BONUS == pytest.approx(12.0)
     assert NEW_CUTSCENE_BONUS == pytest.approx(6.0)
-    assert WAYPOINT_ROOM_BONUS == NEW_ROOM_BONUS
-    assert STEP_PENALTY * REWARD_SCALE == pytest.approx(-CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT)
-    assert SURVIVAL_BUDGET_SCALED == pytest.approx(1.0 * CHECKPOINT_REWARD)
-    assert NEAR_DEATH_DAMAGE_SCALED == pytest.approx((2.0 / 3.0) * CHECKPOINT_REWARD)
-    assert DEATH_PENALTY_SCALED == pytest.approx((1.0 / 3.0) * CHECKPOINT_REWARD)
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-DEATH_PENALTY_SCALED / 5.0)
+    assert WAYPOINT_ROOM_BONUS == pytest.approx(12.0)
+    assert STEP_PENALTY * REWARD_SCALE == pytest.approx(-0.00024)
+    assert SURVIVAL_BUDGET_SCALED == pytest.approx(1.2)
+    assert NEAR_DEATH_DAMAGE_SCALED == pytest.approx(0.8)
+    assert DEATH_PENALTY_SCALED == pytest.approx(0.4)
+    assert CONTEMPT_BUDGET_SCALED == pytest.approx(0.08)
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-0.08)
+    assert HP_LOSS_SCALE == pytest.approx(0.008421052631578947)
     assert HP_GAIN_SCALE == pytest.approx(HP_LOSS_SCALE)
 
     full = make_state(hp=JILL_FINE_HP, step=1)

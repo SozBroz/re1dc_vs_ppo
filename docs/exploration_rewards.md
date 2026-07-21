@@ -122,9 +122,15 @@ settle. Re-entering dining never pays again.
 
 ## Combat pay (#7 / #8)
 
-Hit / kill pay only when the step is an actual **knife** or **attack** action. Enemy HP flicker on interact / door / cutscene without a combat action must **not** pay.
+Hit / kill pay only when the step is an actual **knife** or **attack** action. Enemy HP flicker on interact / door / cutscene without a combat action must **not** pay. Magnitudes are independent statics: **+0.006** per enemy HP damaged, **+0.24** per kill (not × `CHECKPOINT_REWARD`).
 
 ## HP damage / heal
+
+All live reward/punishment magnitudes in `reward.py` are **independent static
+floats** — not derived from `CHECKPOINT_REWARD` (legacy label only). Survival
+numbers (same magnitude as the old 1.2-unit era): Fine→1 chip **−0.80**,
+death **−0.40**, survival budget label **1.2**. Per-HP scale
+`HP_LOSS_SCALE` = **0.008421052631578947**. Living step cost **−0.00024**.
 
 - Taking damage: linear per-HP penalty (`HP_LOSS_SCALE`).
 - Healing: **exact inverse** of that punishment (same scale, opposite sign). No
@@ -151,10 +157,10 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 - Idle contempt: **3 min grace**, then a **3→12 min** ramp. **Starting play
   budget and every progress extension** (new room / document examine / key
   pickup / key use / first weapon / gallery, via `SOFTLOCK_EXTENSION_FRAMES`)
-  are **12 min** emulated — one clock. Contempt budget is **1/5** of death
-  (~0.08 at `CHECKPOINT_REWARD=1.2`). Dense in scalar reward under main γ
-  (**0.998188**, ~45s half-life with step contempt) — no separate softlock MC
-  channel.
+  are **12 min** emulated — one clock. Contempt budget is the independent
+  static **0.08** (`CONTEMPT_BUDGET_SCALED`; not death/5 or × CHECKPOINT).
+  Dense in scalar reward under main γ (**0.998188**, ~45s half-life with step
+  contempt) — no separate softlock MC channel.
 
 ## Agent rules
 
