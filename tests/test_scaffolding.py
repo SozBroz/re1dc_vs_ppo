@@ -256,11 +256,14 @@ def test_damage_and_death_calibrated_to_waypoint():
     assert NEW_CUTSCENE_BONUS == pytest.approx(6.0)
     assert WAYPOINT_ROOM_BONUS == NEW_ROOM_BONUS
     assert STEP_PENALTY * REWARD_SCALE == pytest.approx(-CHECKPOINT_REWARD / STEPS_PER_CHECKPOINT)
-    assert SURVIVAL_BUDGET_SCALED == pytest.approx(1.0 * CHECKPOINT_REWARD)
-    assert NEAR_DEATH_DAMAGE_SCALED == pytest.approx((2.0 / 3.0) * CHECKPOINT_REWARD)
-    assert DEATH_PENALTY_SCALED == pytest.approx((1.0 / 3.0) * CHECKPOINT_REWARD)
+    # Health bucket is 1.0 total (chip+death), independent of CHECKPOINT_REWARD.
+    assert SURVIVAL_BUDGET_SCALED == pytest.approx(1.0)
+    assert NEAR_DEATH_DAMAGE_SCALED == pytest.approx((2.0 / 3.0) * 1.0)
+    assert DEATH_PENALTY_SCALED == pytest.approx((1.0 / 3.0) * 1.0)
     assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-DEATH_PENALTY_SCALED / 5.0)
     assert HP_GAIN_SCALE == pytest.approx(HP_LOSS_SCALE)
+    assert HP_LOSS_SCALE == pytest.approx(NEAR_DEATH_DAMAGE_SCALED / (JILL_FINE_HP - 1))
+    assert JILL_FINE_HP == 96
 
     full = make_state(hp=JILL_FINE_HP, step=1)
     near_death = make_state(hp=1, step=2)

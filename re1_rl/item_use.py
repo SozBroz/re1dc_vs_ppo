@@ -1,7 +1,8 @@
 """RE1 DC inventory USE (consumable heal / cure poison).
 
 PS1 manual: highlight item -> USE (weapons show EQUIP instead).
-Effects from SparkyCoulter RE1 DC item guide + Jacko herb chart; max HP 140.
+Effects from SparkyCoulter RE1 DC item guide + Jacko herb chart.
+Jill Fine / episode-start max is JILL_FINE_HP (96), not PLAYER_HP_MAX (140).
 """
 
 from __future__ import annotations
@@ -15,8 +16,14 @@ from re1_rl.memory_map import (
     PLAYER_HP,
     PLAYER_HP_MAX,
 )
+from re1_rl.reward import JILL_FINE_HP
+
+# Heal USE legal only while strictly below this fraction of max HP.
+# "Below 70%": current_hp < HEAL_USE_HP_FRAC * max_hp (at 96 → < 67.2 → HP ≤ 67).
+HEAL_USE_HP_FRAC = 0.70
 
 # item_id -> (heal_hp, cures_poison). None = cannot USE (e.g. red herb alone).
+# Heal amounts still use PLAYER_HP_MAX as the engine spray/full-heal ceiling.
 _USE_EFFECTS: dict[int, tuple[int, bool] | None] = {
     0x41: (PLAYER_HP_MAX, False),  # first_aid_spray (PS1 id; 0x0B is handgun_bullets)
     0x42: (PLAYER_HP_MAX, True),   # serum — full + poison (story / lab)
@@ -36,6 +43,13 @@ USABLE_ITEM_IDS = frozenset(
 )
 
 
+def _heal_max_hp(episode_start_hp: int | None) -> int:
+    """Jill Fine / episode max — never the 140 engine ceiling."""
+    if episode_start_hp is not None and int(episode_start_hp) > 0:
+        return int(episode_start_hp)
+    return int(JILL_FINE_HP)
+
+
 def use_effect(item_id: int) -> tuple[int, bool] | None:
     return _USE_EFFECTS.get(int(item_id) & 0xFF)
 
@@ -51,17 +65,22 @@ def use_would_help(
     poisoned: bool = False,
     episode_start_hp: int | None = None,
 ) -> bool:
-    """True when USE would heal HP or cure poison (not wasted at fine HP)."""
+    """True when USE would cure poison or heal below 70% of Jill max HP.
+
+    Poison cure stays legal at any HP. Pure heals require
+    ``current_hp < 0.70 * max_hp`` (strict below; max = episode_start_hp or
+    JILL_FINE_HP=96). Premature Caution heals at ≥70% are illegal.
+    """
     effect = use_effect(item_id)
     if effect is None:
         return False
     heal_amt, cures_poison = effect
     if cures_poison and poisoned:
         return True
-    fine_hp = int(episode_start_hp) if episode_start_hp and episode_start_hp > 0 else PLAYER_HP_MAX
-    if int(current_hp) >= fine_hp:
+    if int(heal_amt) <= 0:
         return False
-    return int(heal_amt) > 0 and int(current_hp) < PLAYER_HP_MAX
+    max_hp = _heal_max_hp(episode_start_hp)
+    return int(current_hp) < HEAL_USE_HP_FRAC * max_hp
 
 
 def slot_legal_for_use(
