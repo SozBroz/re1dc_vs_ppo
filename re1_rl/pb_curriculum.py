@@ -119,6 +119,17 @@ def _list_filled_champions_fallback(project_root: Path | str) -> list[dict[str, 
         state_file = d / "champion.State"
         if not rec_path.is_file() or not state_file.is_file():
             continue
+        side_file = d / "champion.sidecar.json"
+        if not side_file.is_file():
+            continue
+        try:
+            from re1_rl.pb_bundle_io import verify_champion_bundle
+
+            ok, _ = verify_champion_bundle(d, require_unlocked=True)
+            if not ok:
+                continue
+        except Exception:
+            continue
         try:
             rec = json.loads(rec_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):

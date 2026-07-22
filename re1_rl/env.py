@@ -754,10 +754,44 @@ class RE1Env(gym.Env):
         if getattr(self, "_typewriter_save_detector", None) is not None:
             self._typewriter_save_detector.reset()
 
+        from re1_rl.pb_bundle_io import (
+            bundle_room_matches_sidecar,
+            verify_champion_bundle,
+        )
         from re1_rl.pb_capture import load_sidecar_json, resolve_pb_bundle
         from re1_rl.pb_sidecar import apply_episode_sidecar
 
         pb_bundle = resolve_pb_bundle(options)
+        if pb_bundle is not None:
+            sp = Path(pb_bundle["state_path"])
+            state_path = sp if sp.is_absolute() else self.project_root / sp
+            scp = Path(pb_bundle["sidecar_path"])
+            sidecar_path = scp if scp.is_absolute() else self.project_root / scp
+            # Refuse half-bundles: State/sidecar must live together under one slot.
+            slot_dir = state_path.parent
+            if state_path.parent != sidecar_path.parent:
+                print(
+                    f"[pb] refusing split bundle paths state={state_path} "
+                    f"sidecar={sidecar_path}; falling back to fresh",
+                    flush=True,
+                )
+                pb_bundle = None
+            else:
+                ok, reason = verify_champion_bundle(slot_dir, require_unlocked=True)
+                if not ok:
+                    print(
+                        f"[pb] refusing incoherent/locked champion ({reason}) "
+                        f"dir={slot_dir}; falling back to fresh",
+                        flush=True,
+                    )
+                    pb_bundle = None
+                elif not sidecar_path.is_file() or not state_path.is_file():
+                    print(
+                        f"[pb] refusing incomplete bundle state={state_path} "
+                        f"sidecar={sidecar_path}; falling back to fresh",
+                        flush=True,
+                    )
+                    pb_bundle = None
         if pb_bundle is not None:
             sp = Path(pb_bundle["state_path"])
             state_path = sp if sp.is_absolute() else self.project_root / sp
@@ -822,17 +856,39 @@ class RE1Env(gym.Env):
                 raise FileNotFoundError(
                     f"PB sidecar missing (State alone is not enough): {sidecar_path}"
                 )
-            apply_episode_sidecar(
-                self, load_sidecar_json(sidecar_path), reset_softlock=True
-            )
-            state = self._read_state(track_items=True)
-            self._seed_episode_hp(state)
-            rooms = sorted(self._progress.visited_rooms)
-            print(
-                f"[pb] reset applied sidecar visited={rooms} "
-                f"state={pb_bundle.get('state_path')}",
-                flush=True,
-            )
+            sidecar = load_sidecar_json(sidecar_path)
+            if not bundle_room_matches_sidecar(state.get("room_id"), sidecar):
+                print(
+                    f"[pb] State/sidecar room mismatch "
+                    f"ram={state.get('room_id')!r} "
+                    f"captured={sidecar.get('captured_room_id')!r}; "
+                    f"reloading fresh init_savestate",
+                    flush=True,
+                )
+                state_path = self.project_root / self._stage["init_savestate"]
+                self.bridge.load_savestate(str(state_path))
+                self.bridge.frameadvance(1)
+                if self._ram_skip.use_engine_patches:
+                    self._ram_skip.install_engine_patches()
+                self._skip_uncontrolled()
+                self._progress = ProgressTracker()
+                self._visited.reset()
+                self._box_cache = None
+                state = self._read_state(track_items=True)
+                self._seed_episode_progress(state)
+                self._episode_history.reset(str(state.get("room_id", "")), step=0)
+                pb_bundle = None
+            else:
+                apply_episode_sidecar(self, sidecar, reset_softlock=True)
+                state = self._read_state(track_items=True)
+                self._seed_episode_hp(state)
+                rooms = sorted(self._progress.visited_rooms)
+                print(
+                    f"[pb] reset applied sidecar visited={rooms} "
+                    f"bundle_id={sidecar.get('bundle_id')} "
+                    f"state={pb_bundle.get('state_path')}",
+                    flush=True,
+                )
         else:
             self._seed_episode_progress(state)
             self._episode_history.reset(str(state.get("room_id", "")), step=0)

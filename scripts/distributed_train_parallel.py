@@ -781,6 +781,16 @@ def _run_learner(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
+    # Fleet restart / process start: never leave PB sync locks wedging resets.
+    try:
+        from re1_rl.pb_bundle_io import clear_all_champion_locks
+
+        n_locks = clear_all_champion_locks(PROJECT_ROOT)
+        if n_locks:
+            log("pb", f"cleared {n_locks} champion.sync.lock file(s) at startup")
+    except Exception:
+        pass
+
     args = build_parser().parse_args()
     role = args.role
     if role == "both":

@@ -296,10 +296,14 @@ def test_try_replace_champion_atomic_and_room_slot(tmp_path: Path) -> None:
     )
     cdir = tmp_path / "states" / "pb" / "champions" / "mainhall_typewriter"
     assert (cdir / "champion.State").is_file()
+    assert (cdir / "champion.sidecar.json").is_file()
     rec = json.loads((cdir / "champion.json").read_text(encoding="utf-8"))
+    side = json.loads((cdir / "champion.sidecar.json").read_text(encoding="utf-8"))
     assert rec["milestone_id"] == TYPEWRITER_SAVE_MILESTONE
     assert rec["score_version"] == 2
     assert len(rec["score"]) == 5
+    assert rec["bundle_id"] and rec["bundle_id"] == side["bundle_id"]
+    assert rec.get("state_sha256")
 
     worse = _slots_state(ribbons=4, bullets=5, hp=50)
     worse_state = tmp_path / "b.State"

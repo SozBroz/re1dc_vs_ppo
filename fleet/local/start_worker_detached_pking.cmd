@@ -14,6 +14,10 @@ powershell -NoProfile -Command ^
 
 timeout /t 2 /nobreak >nul
 
+REM Drop any wedged PB sync locks from a prior crash / mid-copy.
+powershell -NoProfile -Command ^
+  "$root='D:\re1_rl\states\pb\champions'; if (Test-Path $root) { Get-ChildItem $root -Directory -EA SilentlyContinue | ForEach-Object { Remove-Item -Force (Join-Path $_.FullName 'champion.sync.lock') -EA SilentlyContinue; Remove-Item -Recurse -Force (Join-Path $_.FullName '.incoming') -EA SilentlyContinue } }"
+
 REM Fresh heuristics log for this batch (truncate; do not delete).
 call "%~dp0flush_log.cmd" "D:\re1_rl\data\logs\worker_pking.log"
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import tempfile
 from pathlib import Path
 from typing import Any, Iterable
@@ -310,7 +309,12 @@ def champion_bundle_for_reset(
 
 
 def list_filled_champions(project_root: Path | str) -> list[dict[str, Any]]:
-    """Scan mainhall_typewriter + typewriter_* dirs with valid json + State."""
+    """Scan mainhall_typewriter + typewriter_* dirs with a coherent unlocked bundle.
+
+    Skips slots mid-sync (lockfile) or with State/sidecar/json split in half.
+    """
+    from re1_rl.pb_bundle_io import verify_champion_bundle
+
     champs_root = pb_root(project_root) / "champions"
     if not champs_root.is_dir():
         return []
@@ -321,10 +325,13 @@ def list_filled_champions(project_root: Path | str) -> list[dict[str, Any]]:
         name = child.name
         if name != "mainhall_typewriter" and not name.startswith("typewriter_"):
             continue
-        if not (child / "champion.State").is_file():
+        ok, _reason = verify_champion_bundle(child, require_unlocked=True)
+        if not ok:
             continue
         rec = _read_champion_json(child / CHAMPION_JSON)
         if rec is None:
+            continue
+        if not rec.get("state_path") or not rec.get("sidecar_path"):
             continue
         enriched = dict(rec)
         enriched.setdefault("champion_dir", child.as_posix())
@@ -411,9 +418,6 @@ def try_replace_champion(
 
     dest_state = cdir / "champion.State"
     dest_sidecar = cdir / "champion.sidecar.json"
-    shutil.copy2(state_path, dest_state)
-    shutil.copy2(sidecar_path, dest_sidecar)
-
     try:
         rel_state = dest_state.relative_to(project_root).as_posix()
         rel_sidecar = dest_sidecar.relative_to(project_root).as_posix()
@@ -430,5 +434,17 @@ def try_replace_champion(
         "room_id": room,
         "hp": int(state.get("hp", 0) or 0),
     }
-    _atomic_write_json(cdir / CHAMPION_JSON, record)
+    from re1_rl.pb_bundle_io import install_champion_bundle
+
+    try:
+        install_champion_bundle(
+            cdir,
+            state_src=state_path,
+            sidecar_src=sidecar_path,
+            record=record,
+            holder=f"capture:{os.environ.get('COMPUTERNAME', 'local')}",
+        )
+    except RuntimeError:
+        # Slot locked by fleet sync — skip this candidate; next save can retry.
+        return False
     return True

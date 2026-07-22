@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import threading
 import time
 from pathlib import Path
@@ -126,15 +125,16 @@ def _rel_paths_for_slot(slot_name: str) -> tuple[str, str]:
 
 
 def _copy_champion_tree(src_dir: Path, dst_dir: Path, *, slot_name: str) -> None:
-    """Copy champion.State / sidecar / json into *dst_dir* (atomic json last).
+    """Copy champion.State / sidecar / json into *dst_dir* as one locked bundle.
 
-    Never deletes unrelated files or other slot trees.
+    Never deletes unrelated files or other slot trees. Refuses to read a locked
+    or incoherent source; installs under ``champion.sync.lock`` on the destination.
     """
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    for name in ("champion.State", "champion.sidecar.json"):
-        src = src_dir / name
-        if src.is_file():
-            shutil.copy2(src, dst_dir / name)
+    from re1_rl.pb_bundle_io import install_champion_bundle, verify_champion_bundle
+
+    ok, reason = verify_champion_bundle(src_dir, require_unlocked=True)
+    if not ok:
+        raise OSError(f"source champion incoherent ({reason}): {src_dir}")
     src_json = src_dir / CHAMPION_JSON
     if not src_json.is_file():
         return
@@ -142,9 +142,14 @@ def _copy_champion_tree(src_dir: Path, dst_dir: Path, *, slot_name: str) -> None
     state_rel, sidecar_rel = _rel_paths_for_slot(slot_name)
     data["state_path"] = state_rel
     data["sidecar_path"] = sidecar_rel
-    tmp = dst_dir / f".{CHAMPION_JSON}.tmp"
-    tmp.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(tmp, dst_dir / CHAMPION_JSON)
+    install_champion_bundle(
+        dst_dir,
+        state_src=src_dir / "champion.State",
+        sidecar_src=src_dir / "champion.sidecar.json",
+        record=data,
+        holder=f"pb_sync:{os.environ.get('COMPUTERNAME', 'local')}",
+        bundle_id=str(data.get("bundle_id") or "") or None,
+    )
 
 
 def _sync_one_slot(
@@ -166,7 +171,15 @@ def _sync_one_slot(
     local_cand_ver = local_ver if local_ver is not None else 1
     shared_cand_ver = shared_ver if shared_ver is not None else 1
 
-    if local_rec and local_dir.joinpath("champion.State").is_file():
+    from re1_rl.pb_bundle_io import is_slot_locked, verify_champion_bundle
+
+    if is_slot_locked(local_dir) or is_slot_locked(shared_dir):
+        actions["push"] = "locked"
+        actions["pull"] = "locked"
+        return actions
+
+    local_ok, _ = verify_champion_bundle(local_dir, require_unlocked=True)
+    if local_ok and local_rec:
         if score_beats(
             local_score or (),
             shared_score,
@@ -176,7 +189,7 @@ def _sync_one_slot(
             try:
                 _copy_champion_tree(local_dir, shared_dir, slot_name=slot_name)
                 actions["push"] = "ok"
-            except OSError as exc:
+            except (OSError, RuntimeError, ValueError) as exc:
                 actions["push"] = f"error:{exc}"
 
     # Re-read shared after possible push.
@@ -185,7 +198,8 @@ def _sync_one_slot(
     shared_ver = _score_version(shared_rec)
     shared_cand_ver = shared_ver if shared_ver is not None else 1
 
-    if shared_rec and shared_dir.joinpath("champion.State").is_file():
+    shared_ok, _ = verify_champion_bundle(shared_dir, require_unlocked=True)
+    if shared_ok and shared_rec:
         if score_beats(
             shared_score or (),
             local_score,
@@ -194,16 +208,8 @@ def _sync_one_slot(
         ):
             try:
                 _copy_champion_tree(shared_dir, local_dir, slot_name=slot_name)
-                data = _read_json(local_dir / CHAMPION_JSON) or {}
-                state_rel, sidecar_rel = _rel_paths_for_slot(slot_name)
-                data["state_path"] = state_rel
-                data["sidecar_path"] = sidecar_rel
-                (local_dir / CHAMPION_JSON).write_text(
-                    json.dumps(data, indent=2, sort_keys=True) + "\n",
-                    encoding="utf-8",
-                )
                 actions["pull"] = "ok"
-            except OSError as exc:
+            except (OSError, RuntimeError, ValueError) as exc:
                 actions["pull"] = f"error:{exc}"
 
     return actions

@@ -21,6 +21,10 @@ taskkill /F /IM EmuHawk.exe >nul 2>&1
 taskkill /F /IM python.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 
+REM Drop wedged PB sync locks before worker comes up.
+powershell -NoProfile -Command ^
+  "$root='D:\re1_rl\states\pb\champions'; if (Test-Path $root) { Get-ChildItem $root -Directory -EA SilentlyContinue | ForEach-Object { Remove-Item -Force (Join-Path $_.FullName 'champion.sync.lock') -EA SilentlyContinue; Remove-Item -Recurse -Force (Join-Path $_.FullName '.incoming') -EA SilentlyContinue } }"
+
 REM Fresh heuristics log for this batch (truncate; do not delete).
 call "%~dp0flush_log.cmd" "D:\re1_rl\data\logs\worker_workhorse1.log"
 

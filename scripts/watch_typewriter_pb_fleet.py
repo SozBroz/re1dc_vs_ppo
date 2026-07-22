@@ -23,6 +23,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CHAMPS_REL = Path("states/pb/champions")
 CHAMP_FILES = ("champion.State", "champion.sidecar.json", "champion.json")
+LOCK_NAME = "champion.sync.lock"
 
 HOSTS = {
     "pking": {"kind": "local", "root": PROJECT_ROOT},
@@ -173,20 +174,57 @@ def fetch_record(host_id: str, slot_name: str) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def _remote_win_path(posix_root: str, rel: Path) -> str:
+    return f"{posix_root}/{rel.as_posix()}".replace("/", "\\")
+
+
+def _host_locked(host_id: str, slot_name: str) -> bool:
+    """True if destination holds a fresh champion.sync.lock."""
+    cfg = HOSTS[host_id]
+    rel = CHAMPS_REL / slot_name / LOCK_NAME
+    if cfg["kind"] == "local":
+        return (Path(cfg["root"]) / rel).is_file()
+    remote = f'{cfg["root"]}/{rel.as_posix()}'
+    proc = subprocess.run(
+        [
+            "ssh",
+            "-o",
+            "ConnectTimeout=12",
+            "-o",
+            "BatchMode=yes",
+            cfg["ssh"],
+            f'if exist "{_remote_win_path(cfg["root"], CHAMPS_REL / slot_name / LOCK_NAME)}" (exit 0) else (exit 1)',
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    return proc.returncode == 0
+
+
 def pull_champion_tree(host_id: str, slot_name: str, dest_dir: Path) -> bool:
     cfg = HOSTS[host_id]
     dest_dir.mkdir(parents=True, exist_ok=True)
     rel = CHAMPS_REL / slot_name
+    if _host_locked(host_id, slot_name):
+        print(f"[watch] skip pull slot={slot_name} from={host_id}: locked", flush=True)
+        return False
     if cfg["kind"] == "local":
         src = Path(cfg["root"]) / rel
-        ok = True
+        sys.path.insert(0, str(PROJECT_ROOT))
+        from re1_rl.pb_bundle_io import verify_champion_bundle
+
+        ok, reason = verify_champion_bundle(src, require_unlocked=True)
+        if not ok:
+            print(f"[watch] skip pull slot={slot_name} from={host_id}: {reason}", flush=True)
+            return False
         for name in CHAMP_FILES:
             s = src / name
             if not s.is_file():
-                ok = False
-                continue
+                return False
             shutil.copy2(s, dest_dir / name)
-        return ok and (dest_dir / "champion.State").is_file()
+        return True
 
     remote_dir = f'{cfg["root"]}/{rel.as_posix()}'
     for name in CHAMP_FILES:
@@ -204,23 +242,51 @@ def pull_champion_tree(host_id: str, slot_name: str, dest_dir: Path) -> bool:
             return False
         if proc.returncode != 0:
             return False
-    return (dest_dir / "champion.State").is_file()
+    sys.path.insert(0, str(PROJECT_ROOT))
+    from re1_rl.pb_bundle_io import verify_champion_bundle
+
+    ok, reason = verify_champion_bundle(dest_dir, require_unlocked=False)
+    if not ok:
+        print(f"[watch] pulled incoherent slot={slot_name} from={host_id}: {reason}", flush=True)
+        return False
+    return True
 
 
 def push_champion_tree(host_id: str, slot_name: str, src_dir: Path) -> bool:
-    """Push one slot tree. Never deletes or touches other slots."""
+    """Push one slot tree under lock. Never deletes or touches other slots."""
     cfg = HOSTS[host_id]
     rel = CHAMPS_REL / slot_name
+    sys.path.insert(0, str(PROJECT_ROOT))
+    from re1_rl.pb_bundle_io import install_champion_bundle, verify_champion_bundle
+
+    ok, reason = verify_champion_bundle(src_dir, require_unlocked=False)
+    if not ok:
+        print(f"[watch] refuse push incoherent src slot={slot_name}: {reason}", flush=True)
+        return False
+
     if cfg["kind"] == "local":
         dest = Path(cfg["root"]) / rel
-        dest.mkdir(parents=True, exist_ok=True)
-        for name in CHAMP_FILES:
-            s = src_dir / name
-            if s.is_file():
-                shutil.copy2(s, dest / name)
+        data = json.loads((src_dir / "champion.json").read_text(encoding="utf-8"))
+        try:
+            install_champion_bundle(
+                dest,
+                state_src=src_dir / "champion.State",
+                sidecar_src=src_dir / "champion.sidecar.json",
+                record=data,
+                holder="watch:pking",
+                bundle_id=str(data.get("bundle_id") or "") or None,
+            )
+        except RuntimeError as exc:
+            print(f"[watch] push locked/fail slot={slot_name} -> {host_id}: {exc}", flush=True)
+            return False
         return True
 
+    if _host_locked(host_id, slot_name):
+        print(f"[watch] skip push slot={slot_name} -> {host_id}: locked", flush=True)
+        return False
+
     remote_dir = f'{cfg["root"]}/{rel.as_posix()}'
+    win_dir = _remote_win_path(cfg["root"], rel)
     # Ensure remote slot dir exists (mkdir only — never wipe).
     subprocess.run(
         [
@@ -230,30 +296,75 @@ def push_champion_tree(host_id: str, slot_name: str, src_dir: Path) -> bool:
             "-o",
             "BatchMode=yes",
             cfg["ssh"],
-            f'mkdir "{remote_dir.replace("/", chr(92))}" 2>nul',
+            f'mkdir "{win_dir}" 2>nul',
         ],
         capture_output=True,
         text=True,
         timeout=30,
         check=False,
     )
-    for name in CHAMP_FILES:
-        local = src_dir / name
-        if not local.is_file():
-            continue
-        remote = f"{cfg['ssh']}:{remote_dir}/{name}"
-        try:
-            proc = subprocess.run(
-                ["scp", "-o", "ConnectTimeout=12", "-o", "BatchMode=yes", str(local), remote],
-                capture_output=True,
-                text=True,
-                timeout=120,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            return False
+    # Plant lock first so workers skip this slot until State+sidecar+json land.
+    lock_local = src_dir / LOCK_NAME
+    lock_local.write_text(
+        json.dumps({"holder": "watch:pking", "created_unix": time.time()}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    try:
+        proc = subprocess.run(
+            [
+                "scp",
+                "-o",
+                "ConnectTimeout=12",
+                "-o",
+                "BatchMode=yes",
+                str(lock_local),
+                f"{cfg['ssh']}:{remote_dir}/{LOCK_NAME}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
         if proc.returncode != 0:
             return False
+        for name in CHAMP_FILES:
+            local = src_dir / name
+            if not local.is_file():
+                continue
+            remote = f"{cfg['ssh']}:{remote_dir}/{name}"
+            try:
+                proc = subprocess.run(
+                    ["scp", "-o", "ConnectTimeout=12", "-o", "BatchMode=yes", str(local), remote],
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                    check=False,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                return False
+            if proc.returncode != 0:
+                return False
+    finally:
+        # Always drop remote + local lock so training is not wedged.
+        subprocess.run(
+            [
+                "ssh",
+                "-o",
+                "ConnectTimeout=12",
+                "-o",
+                "BatchMode=yes",
+                cfg["ssh"],
+                f'del /f /q "{win_dir}\\{LOCK_NAME}" 2>nul',
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        try:
+            lock_local.unlink()
+        except OSError:
+            pass
     return True
 
 

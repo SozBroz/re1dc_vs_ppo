@@ -18,6 +18,9 @@ set RE1_PB_FRESH_WEIGHT=0.5
 set RE1_PB_SHARED_ROOT=C:\Users\sshuser\re1_rl\states\pb
 
 if not exist data\logs mkdir data\logs
+REM Drop wedged PB sync locks before learner/workers come up.
+powershell -NoProfile -Command ^
+  "$root='C:\Users\sshuser\re1_rl\states\pb\champions'; if (Test-Path $root) { Get-ChildItem $root -Directory -EA SilentlyContinue | ForEach-Object { Remove-Item -Force (Join-Path $_.FullName 'champion.sync.lock') -EA SilentlyContinue; Remove-Item -Recurse -Force (Join-Path $_.FullName '.incoming') -EA SilentlyContinue } }"
 REM Fresh heuristics log for this batch (truncate; do not delete).
 call "%~dp0flush_log.cmd" "C:\Users\sshuser\re1_rl\data\logs\learner_wh2_25.log"
 echo [%DATE% %TIME%] run_distributed_learner_wh2_25.cmd launching learner>> data\logs\learner_wh2_25.log
