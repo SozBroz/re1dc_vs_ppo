@@ -231,6 +231,16 @@ def resolve_resume_path(
     if resume is not None and str(resume).lower() == "auto":
         resume = None
 
+    if resume is None:
+        ptr = read_latest_pointer(ckpt_dir)
+        if ptr and ptr.get("path"):
+            ptr_p = Path(str(ptr["path"]))
+            if not ptr_p.is_absolute():
+                ptr_p = root / ptr_p
+            ptr_zip = zip_path(ptr_p)
+            if is_valid_checkpoint(ptr_zip):
+                return ptr_zip
+
     if resume:
         p = Path(resume)
         if not p.is_absolute():
