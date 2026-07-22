@@ -1131,6 +1131,15 @@ class RE1Env(gym.Env):
         self._skipping_flag = False
         return self._episode_failure_step(action, reason=reason)
 
+    def _queue_kenneth_gate_failure_if_needed(self) -> None:
+        """Queue terminal step when async skip credits an illegal 106 crossing."""
+        if getattr(self, "_pending_episode_failure", None):
+            return
+        if self._progress.kenneth_gate_breached:
+            from re1_rl.cutscene_reward import ILLEGAL_MAIN_HALL_FAILURE_REASON
+
+            self._pending_episode_failure = ILLEGAL_MAIN_HALL_FAILURE_REASON
+
     def _credit_async_skip_room_crossing(self) -> None:
         """Harness parity: door mid-skip pays ``new_room`` only (main thread)."""
         # Also catch a crossing on the final chunk if bg note missed it.
@@ -1175,6 +1184,7 @@ class RE1Env(gym.Env):
             )
             self._merge_post_skip_breakdown(float(reward), dict(bd))
             self._prev_state = dict(crossing)
+            self._queue_kenneth_gate_failure_if_needed()
 
     def _apply_post_skip_sync(self) -> None:
         """Credit pickups / cutscenes that finished while async skip was running."""
@@ -1237,6 +1247,7 @@ class RE1Env(gym.Env):
         )
         self._merge_post_skip_breakdown(float(reward), dict(bd))
         self._prev_state = state
+        self._queue_kenneth_gate_failure_if_needed()
         self._cutscene_skip_entry_prev = None
         self._pending_skip_room_crossings = []
         # Stash for monitor/harness before session counters reset. Do not let

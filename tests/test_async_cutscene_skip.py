@@ -49,6 +49,9 @@ def _stub_env(async_cutscene_skip: bool) -> RE1Env:
     env._post_skip_sync = False
     env._post_skip_reward = 0.0
     env._post_skip_bd = {}
+    env._pending_episode_failure = None
+    env._pending_skip_room_crossings = []
+    env._cutscene_skip_entry_prev = None
     env._last_skip_frames = 0
     env._skip_session_frames = 0
     env._enemy_fields = []
@@ -114,6 +117,70 @@ def test_fast_cutscene_step_terminates_on_zero_hp() -> None:
     env._death_step.assert_called_once()
     assert terminated
     assert reward == 0.0
+    assert not env._skipping_flag
+
+
+def test_skip_crossing_queues_kenneth_failure_for_fast_step() -> None:
+    from re1_rl.cutscene_reward import ILLEGAL_MAIN_HALL_FAILURE_REASON
+    from re1_rl.progress import ProgressTracker
+    from tests.test_scaffolding import make_planner
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    env._progress = ProgressTracker()
+    env._progress.first_visit("105")
+    env._planner = make_planner()
+    env._stage = {"success_room": None}
+    env._poll_typewriter_save = lambda *_a, **_k: False
+    env._after_reward_step = lambda *_a, **_k: None
+    env._merge_post_skip_breakdown = RE1Env._merge_post_skip_breakdown.__get__(
+        env, RE1Env
+    )
+    env._credit_async_skip_room_crossing = RE1Env._credit_async_skip_room_crossing.__get__(
+        env, RE1Env
+    )
+    env._queue_kenneth_gate_failure_if_needed = (
+        RE1Env._queue_kenneth_gate_failure_if_needed.__get__(env, RE1Env)
+    )
+    env._pending_skip_room_crossings = [
+        (
+            {
+                "room_id": "105",
+                "hp": 96,
+                "in_control": True,
+                "inventory": [],
+                "inventory_slots": [],
+            },
+            {
+                "room_id": "106",
+                "hp": 96,
+                "in_control": True,
+                "inventory": [],
+                "inventory_slots": [],
+            },
+        )
+    ]
+    env._cutscene_skip_entry_prev = {"room_id": "105", "hp": 96}
+    env.bridge.read_ram.return_value = {"player_hp": 96}
+    env._episode_failure_step = MagicMock(
+        return_value=(
+            {"frame": np.zeros((84, 77, 4), dtype=np.uint8)},
+            -0.05,
+            True,
+            False,
+            {"episode_failure": ILLEGAL_MAIN_HALL_FAILURE_REASON},
+        )
+    )
+
+    env._credit_async_skip_room_crossing()
+    assert env._progress.kenneth_gate_breached
+    assert env._pending_episode_failure == ILLEGAL_MAIN_HALL_FAILURE_REASON
+    assert "106" not in env._progress.visited_rooms
+
+    _, _, terminated, _, info = env._fast_cutscene_step(0)
+    env._episode_failure_step.assert_called_once()
+    assert terminated
+    assert info["episode_failure"] == ILLEGAL_MAIN_HALL_FAILURE_REASON
     assert not env._skipping_flag
 
 
