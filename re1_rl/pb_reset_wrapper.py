@@ -9,7 +9,12 @@ import gymnasium as gym
 
 
 class PbChampionResetWrapper(gym.Wrapper):
-    """When ``reset`` has no ``options.pb_bundle``, sample champion vs fresh."""
+    """When ``reset`` has no ``options.pb_bundle``, sample champion vs fresh.
+
+    Must wrap the live env stack used by actors (outermost or above Monitor).
+    If no champion exists on disk, resets stay fresh — there is nothing to apply.
+    Never delete ``states/pb/champions/...`` on code deploys; that disables sidecars.
+    """
 
     def __init__(self, env: gym.Env, project_root: Path | str | None = None) -> None:
         super().__init__(env)
@@ -29,3 +34,10 @@ class PbChampionResetWrapper(gym.Wrapper):
             if bundle is not None:
                 opts["pb_bundle"] = bundle
         return self.env.reset(seed=seed, options=opts or None)
+
+    def action_masks(self):
+        # Forward through ActionMasker / env when this wrapper is outermost.
+        fn = getattr(self.env, "action_masks", None)
+        if callable(fn):
+            return fn()
+        return self.unwrapped.action_masks()

@@ -245,8 +245,10 @@ def make_env(
         from re1_rl.pb_reset_wrapper import PbChampionResetWrapper
         from sb3_contrib.common.wrappers import ActionMasker
 
-        env = PbChampionResetWrapper(env, project_root=PROJECT_ROOT)
+        # Outer wrapper so every env.reset() (async actors / VecEnv) can inject
+        # champion pb_bundle + sidecar — ActionMasker must not sit outside this.
         env = ActionMasker(env, lambda e: e.unwrapped.action_masks())
+        env = PbChampionResetWrapper(env, project_root=PROJECT_ROOT)
         _phase("env ready")
         return env
 

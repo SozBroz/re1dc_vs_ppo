@@ -812,11 +812,21 @@ class RE1Env(gym.Env):
         if pb_bundle is not None:
             scp = Path(pb_bundle["sidecar_path"])
             sidecar_path = scp if scp.is_absolute() else self.project_root / scp
+            if not sidecar_path.is_file():
+                raise FileNotFoundError(
+                    f"PB sidecar missing (State alone is not enough): {sidecar_path}"
+                )
             apply_episode_sidecar(
                 self, load_sidecar_json(sidecar_path), reset_softlock=True
             )
             state = self._read_state(track_items=True)
             self._seed_episode_hp(state)
+            rooms = sorted(self._progress.visited_rooms)
+            print(
+                f"[pb] reset applied sidecar visited={rooms} "
+                f"state={pb_bundle.get('state_path')}",
+                flush=True,
+            )
         else:
             self._seed_episode_progress(state)
             self._episode_history.reset(str(state.get("room_id", "")), step=0)
