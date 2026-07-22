@@ -1,12 +1,12 @@
 @echo off
-REM workhorse2 learner — 32 local envs (MMF screenshots); sync 360
+REM workhorse2 learner — 24 local envs (Doc04 medium RAM/VRAM budget); sync 360
 REM Headroom: @32 envs 10m soak peak ~41GB used / ~24GB free (pages_input~0).
 REM Package: sync 360 wall + n_steps=1536 (~205s emu / ~4.5 γ HL) + batch_size=4096 + n_epochs=4.
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE=workhorse2
 set RUN=reward_tune_1040k
-set N_ENVS=32
+set N_ENVS=24
 set BASE_PORT=5555
 set LEARNER_PORT=8765
 set SYNC_INTERVAL_S=360

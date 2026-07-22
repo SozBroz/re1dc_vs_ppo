@@ -1,0 +1,52 @@
+﻿{
+    "created_at":  "2026-07-22T02:36:43.7467764-04:00",
+    "campaign":  "pre_doc04_medium_2026-07-22",
+    "git":  {
+                "head":  "d77773a0946691fd522f85dca515b6795071f022",
+                "branch_at_backup":  "feature/world-almanac-extractor",
+                "backup_branch":  "backup/pre-doc04-medium-2026-07-22"
+            },
+    "latest_checkpoints":  {
+                               "pking":  null,
+                               "wh1":  {
+                                           "name":  "ppo_re1_28680354_steps.zip",
+                                           "steps":  28680354
+                                       },
+                               "wh2":  {
+                                           "name":  "ppo_re1_104126634_steps.zip",
+                                           "steps":  104126634
+                                       }
+                           },
+    "archived_files":  [
+                           {
+                               "path":  "pking/pb/manifest.jsonl",
+                               "bytes":  395,
+                               "source_host":  "pking (local)"
+                           },
+                           {
+                               "path":  "wh1_192.168.0.203/checkpoints/latest.json",
+                               "bytes":  171,
+                               "source_host":  "sshuser@192.168.0.203"
+                           },
+                           {
+                               "path":  "wh1_192.168.0.203/checkpoints/ppo_re1_28680354_steps.zip",
+                               "bytes":  27580755,
+                               "source_host":  "sshuser@192.168.0.203"
+                           },
+                           {
+                               "path":  "wh1_192.168.0.203/pb/manifest.jsonl",
+                               "bytes":  776,
+                               "source_host":  "sshuser@192.168.0.203"
+                           },
+                           {
+                               "path":  "wh2_192.168.0.116/checkpoints/latest.json",
+                               "bytes":  187,
+                               "source_host":  "sshuser@192.168.0.116"
+                           },
+                           {
+                               "path":  "wh2_192.168.0.116/checkpoints/ppo_re1_104126634_steps.zip",
+                               "bytes":  31549860,
+                               "source_host":  "sshuser@192.168.0.116"
+                           }
+                       ]
+}

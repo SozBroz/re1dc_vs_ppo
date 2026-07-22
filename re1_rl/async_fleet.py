@@ -40,7 +40,7 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
 #     rollout tensors on WH2 (32 local envs).
 DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     n_steps=1536,
-    batch_size=4096,  # host-RAM safe after merge OOMs at 8192 on fat epochs
+    batch_size=2048,  # Doc04 medium + WH2 8GB VRAM; was 4096 on ~2M policy
     n_epochs=4,
     learning_rate=1e-4,
     gamma=RL_GAMMA,
@@ -233,10 +233,17 @@ def _transplant_into_current_spaces(model, *, tb_log: str | None, hp: dict):
 
 
 def _reload_world_catalog_buffers_if_needed(model) -> None:
+    from re1_rl.doc04_medium_extractor import (
+        RE1Doc04MediumExtractor,
+        reload_doc04_world_catalog_buffers,
+    )
     from re1_rl.features_extractor import RE1WorldAwareExtractor, reload_world_catalog_buffers
 
     extractor = model.policy.features_extractor
-    if isinstance(extractor, RE1WorldAwareExtractor):
+    if isinstance(extractor, RE1Doc04MediumExtractor):
+        reload_doc04_world_catalog_buffers(model.policy)
+        print("[train:async] reloaded world catalog buffers from data files", flush=True)
+    elif isinstance(extractor, RE1WorldAwareExtractor):
         reload_world_catalog_buffers(model.policy)
         print("[train:async] reloaded world catalog buffers from data files", flush=True)
 

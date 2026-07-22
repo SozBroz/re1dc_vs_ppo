@@ -1,4 +1,4 @@
-"""RE1WorldAwareExtractor forward pass and features_dim."""
+"""RE1Doc04MediumExtractor forward pass and features_dim."""
 
 from __future__ import annotations
 
@@ -14,25 +14,24 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM
+from re1_rl.doc04_medium_extractor import (
+    FEATURES_DIM,
+    RE1Doc04MediumExtractor,
+    TOWER_OUT_DIM,
+    reload_doc04_world_catalog_buffers,
+)
 from re1_rl.env import ACTION_NAMES, FRAME_SHAPE_CHW
 from re1_rl.episode_history import ACQUISITION_LOG_DIM, ROOM_HISTORY_DIM
-from re1_rl.features_extractor import (
-    RE1WorldAwareExtractor,
-    WORLD_CONTEXT_DIM,
-    WORLD_STATE_DIM,
-    reload_world_catalog_buffers,
-)
+from re1_rl.features_extractor import WORLD_STATE_DIM
 from re1_rl.item_affordances import AFFORDANCES_DIM, KEY_HINTS_DIM
 from re1_rl.key_items import KEYS_HELD_DIM
 from re1_rl.maps_files import MAPS_FILES_DIM
 from re1_rl.milestone_features import MILESTONE_DIM
 from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, INVENTORY_OBS_DIM, PROPRIO_DIM, ROOM_VISITED_DIM
+from re1_rl.policy_config import POLICY_KWARGS
 from re1_rl.room_signature import ENEMY_ROSTER_DIM
 from re1_rl.spatial_encoder import SPATIAL_DIM, VISITED_SHAPE
 from re1_rl.weapon_damage import LAST_ATTACK_DIM, WEAPON_CARD_DIM
-
-# Flattened privileged dims excluding frame/world_state (weapon_card + last_attack = +28).
-_FLAT_PRIVILEGED_DIM = 947 + WEAPON_CARD_DIM + LAST_ATTACK_DIM
 
 
 def _stub_obs_space(*, with_world_state: bool = True, with_key_hints: bool = False) -> spaces.Dict:
@@ -78,42 +77,43 @@ def _fake_batch(obs_space: spaces.Dict, batch: int = 4) -> dict[str, torch.Tenso
     return batch_obs
 
 
-def test_world_aware_extractor_forward_with_world_state() -> None:
+def test_doc04_medium_extractor_forward_shape() -> None:
     obs_space = _stub_obs_space(with_world_state=True)
-    extractor = RE1WorldAwareExtractor(obs_space, cnn_output_dim=512, project_root=PROJECT_ROOT)
+    extractor = RE1Doc04MediumExtractor(obs_space, cnn_output_dim=512, project_root=PROJECT_ROOT)
     batch = _fake_batch(obs_space)
     out = extractor(batch)
-    assert out.shape == (4, extractor.features_dim)
-    assert extractor.features_dim == 512 + _FLAT_PRIVILEGED_DIM + WORLD_CONTEXT_DIM
+    assert out.shape == (4, FEATURES_DIM)
+    assert extractor.features_dim == FEATURES_DIM
 
 
-def test_world_aware_extractor_forward_without_world_state() -> None:
-    obs_space = _stub_obs_space(with_world_state=False)
-    extractor = RE1WorldAwareExtractor(obs_space, cnn_output_dim=512, project_root=PROJECT_ROOT)
-    batch = _fake_batch(obs_space)
-    out = extractor(batch)
-    assert out.shape == (4, extractor.features_dim)
-    assert extractor.features_dim == 512 + _FLAT_PRIVILEGED_DIM + WORLD_CONTEXT_DIM
+def test_doc04_medium_tower_concat_width() -> None:
+    assert TOWER_OUT_DIM == 1344
 
 
-def test_reload_world_catalog_buffers() -> None:
+def test_doc04_medium_ignores_goal_and_affordances() -> None:
     obs_space = _stub_obs_space(with_world_state=True)
-    extractor = RE1WorldAwareExtractor(obs_space, project_root=PROJECT_ROOT)
-    before = extractor.map_neighbors.clone()
-    reload_world_catalog_buffers(extractor, PROJECT_ROOT)
-    after = extractor.map_neighbors
+    extractor = RE1Doc04MediumExtractor(obs_space, project_root=PROJECT_ROOT)
+    batch_a = _fake_batch(obs_space)
+    batch_b = {k: v.clone() for k, v in batch_a.items()}
+    batch_b["goal"] = torch.zeros_like(batch_b["goal"])
+    batch_b["affordances"] = torch.zeros_like(batch_b["affordances"])
+    out_a = extractor(batch_a)
+    out_b = extractor(batch_b)
+    assert torch.allclose(out_a, out_b)
+
+
+def test_reload_doc04_world_catalog_buffers() -> None:
+    obs_space = _stub_obs_space(with_world_state=True)
+    extractor = RE1Doc04MediumExtractor(obs_space, project_root=PROJECT_ROOT)
+    before = extractor.world_context.map_neighbors.clone()
+    reload_doc04_world_catalog_buffers(extractor)
+    after = extractor.world_context.map_neighbors
     assert after.shape == before.shape
     assert torch.equal(after.cpu(), before.cpu())
 
 
-def test_ppo_accepts_world_aware_extractor() -> None:
+def test_ppo_accepts_doc04_medium_extractor() -> None:
     from stable_baselines3 import PPO
-
-    world_aware_kwargs = dict(
-        net_arch=dict(pi=[256, 256], vf=[256, 256]),
-        features_extractor_class=RE1WorldAwareExtractor,
-        features_extractor_kwargs=dict(cnn_output_dim=512),
-    )
 
     class StubEnv(gym.Env):
         def __init__(self) -> None:
@@ -132,12 +132,12 @@ def test_ppo_accepts_world_aware_extractor() -> None:
     model = PPO(
         "MultiInputPolicy",
         StubEnv(),
-        policy_kwargs=world_aware_kwargs,
+        policy_kwargs=POLICY_KWARGS,
         n_steps=32,
         batch_size=16,
         n_epochs=1,
         device="cpu",
         verbose=0,
     )
-    assert model.policy.features_dim == 512 + _FLAT_PRIVILEGED_DIM + WORLD_CONTEXT_DIM
+    assert model.policy.features_dim == FEATURES_DIM
     model.learn(total_timesteps=32)
