@@ -1,13 +1,14 @@
-"""Async delayed sync of the typewriter PB champion across fleet machines.
+"""Async delayed sync of typewriter PB champions across fleet machines.
 
 Local capture writes under ``RE1_PB_ROOT`` (default ``<project>/states/pb``).
 When ``RE1_PB_SHARED_ROOT`` is set (e.g. ``Z:/re1_rl/states/pb`` on Samba),
-a background thread periodically:
+a background thread periodically syncs **each champion slot independently**:
 
-- **push** local champion → shared if local score is better
-- **pull** shared champion → local if shared score is better
+- **push** local slot → shared if local score is better for that slot
+- **pull** shared slot → local if shared score is better for that slot
 
-Sync lag is acceptable; training never blocks on the shared FS.
+Never deletes champion trees. Sync lag is acceptable; training never blocks
+on the shared FS.
 """
 
 from __future__ import annotations
@@ -22,9 +23,10 @@ from typing import Any
 
 from re1_rl.pb_champion import (
     CHAMPION_JSON,
-    CHAMPION_SUBDIR,
+    list_filled_champions,
     pb_root,
     score_beats,
+    typewriter_champion_subdir,
 )
 
 _SHARED_ENV = "RE1_PB_SHARED_ROOT"
@@ -51,12 +53,83 @@ def _score_from_record(rec: dict[str, Any] | None) -> tuple[int, ...] | None:
         return None
 
 
-def _champion_payload_dir(root: Path) -> Path:
-    return Path(root) / CHAMPION_SUBDIR
+def _score_version(rec: dict[str, Any] | None) -> int | None:
+    if not rec or "score_version" not in rec:
+        return None
+    try:
+        return int(rec["score_version"])
+    except (TypeError, ValueError):
+        return None
 
 
-def _copy_champion_tree(src_dir: Path, dst_dir: Path) -> None:
-    """Copy champion.State / sidecar / json into *dst_dir* (atomic json last)."""
+def _slot_name_from_subdir(subdir: str) -> str:
+    """``champions/mainhall_typewriter`` → ``mainhall_typewriter``."""
+    s = subdir.replace("\\", "/").strip("/")
+    if s.startswith("champions/"):
+        return s.split("/", 1)[1]
+    return Path(s).name
+
+
+def _is_slot_dirname(name: str) -> bool:
+    return name == "mainhall_typewriter" or name.startswith("typewriter_")
+
+
+def _scan_slot_names(pb_root_path: Path) -> set[str]:
+    """Directory names under ``pb_root/champions/`` that look like typewriter slots."""
+    champs = Path(pb_root_path) / "champions"
+    if not champs.is_dir():
+        return set()
+    out: set[str] = set()
+    for child in champs.iterdir():
+        if child.is_dir() and _is_slot_dirname(child.name):
+            out.add(child.name)
+    return out
+
+
+def _slot_names_from_filled(project_root: Path | str) -> set[str]:
+    names: set[str] = set()
+    try:
+        for rec in list_filled_champions(project_root):
+            room = rec.get("room_id")
+            if room is not None:
+                names.add(_slot_name_from_subdir(typewriter_champion_subdir(room)))
+                continue
+            cdir = rec.get("champion_dir")
+            if cdir:
+                names.add(Path(str(cdir)).name)
+    except OSError:
+        pass
+    return names
+
+
+def list_sync_slot_names(local_pb: Path, shared_pb: Path) -> list[str]:
+    """Union of slot directory names present on local and/or shared trees."""
+    names = _scan_slot_names(local_pb) | _scan_slot_names(shared_pb)
+    return sorted(names)
+
+
+def _read_json(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _rel_paths_for_slot(slot_name: str) -> tuple[str, str]:
+    subdir = f"champions/{slot_name}".replace("\\", "/")
+    state = f"states/pb/{subdir}/champion.State"
+    sidecar = f"states/pb/{subdir}/champion.sidecar.json"
+    return state, sidecar
+
+
+def _copy_champion_tree(src_dir: Path, dst_dir: Path, *, slot_name: str) -> None:
+    """Copy champion.State / sidecar / json into *dst_dir* (atomic json last).
+
+    Never deletes unrelated files or other slot trees.
+    """
     dst_dir.mkdir(parents=True, exist_ok=True)
     for name in ("champion.State", "champion.sidecar.json"):
         src = src_dir / name
@@ -66,79 +139,65 @@ def _copy_champion_tree(src_dir: Path, dst_dir: Path) -> None:
     if not src_json.is_file():
         return
     data = json.loads(src_json.read_text(encoding="utf-8"))
-    # Project-relative paths (local and shared trees use the same layout).
-    data["state_path"] = f"states/pb/{CHAMPION_SUBDIR}/champion.State".replace(
-        "\\", "/"
-    )
-    data["sidecar_path"] = (
-        f"states/pb/{CHAMPION_SUBDIR}/champion.sidecar.json".replace("\\", "/")
-    )
+    state_rel, sidecar_rel = _rel_paths_for_slot(slot_name)
+    data["state_path"] = state_rel
+    data["sidecar_path"] = sidecar_rel
     tmp = dst_dir / f".{CHAMPION_JSON}.tmp"
     tmp.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.replace(tmp, dst_dir / CHAMPION_JSON)
 
 
-def sync_champion_once(project_root: Path | str) -> dict[str, str]:
-    """One push/pull cycle. Returns actions taken: push/pull/none keys."""
+def _sync_one_slot(
+    local_dir: Path,
+    shared_dir: Path,
+    *,
+    slot_name: str,
+) -> dict[str, str]:
+    """Push/pull a single slot. Never touches other slots."""
     actions: dict[str, str] = {"push": "skip", "pull": "skip"}
-    shared = shared_pb_root()
-    if shared is None:
-        return actions
 
-    local_root = pb_root(project_root)
-    local_dir = _champion_payload_dir(local_root)
-    shared_dir = _champion_payload_dir(shared)
-
-    local_rec = None
-    local_json = local_dir / CHAMPION_JSON
-    if local_json.is_file():
-        try:
-            local_rec = json.loads(local_json.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            local_rec = None
-    shared_rec = None
-    shared_json = shared_dir / CHAMPION_JSON
-    if shared_json.is_file():
-        try:
-            shared_rec = json.loads(shared_json.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            shared_rec = None
-
+    local_rec = _read_json(local_dir / CHAMPION_JSON)
+    shared_rec = _read_json(shared_dir / CHAMPION_JSON)
     local_score = _score_from_record(local_rec)
     shared_score = _score_from_record(shared_rec)
+    local_ver = _score_version(local_rec)
+    shared_ver = _score_version(shared_rec)
+    # Missing version ⇒ treat as v1 (legacy).
+    local_cand_ver = local_ver if local_ver is not None else 1
+    shared_cand_ver = shared_ver if shared_ver is not None else 1
 
-    # Push if local strictly better (or shared missing).
     if local_rec and local_dir.joinpath("champion.State").is_file():
-        if score_beats(local_score or (), shared_score):
+        if score_beats(
+            local_score or (),
+            shared_score,
+            candidate_version=local_cand_ver,
+            incumbent_version=shared_ver,
+        ):
             try:
-                _copy_champion_tree(local_dir, shared_dir)
+                _copy_champion_tree(local_dir, shared_dir, slot_name=slot_name)
                 actions["push"] = "ok"
             except OSError as exc:
                 actions["push"] = f"error:{exc}"
 
     # Re-read shared after possible push.
-    if shared_json.is_file():
-        try:
-            shared_rec = json.loads(shared_json.read_text(encoding="utf-8"))
-            shared_score = _score_from_record(shared_rec)
-        except (OSError, json.JSONDecodeError):
-            pass
+    shared_rec = _read_json(shared_dir / CHAMPION_JSON)
+    shared_score = _score_from_record(shared_rec)
+    shared_ver = _score_version(shared_rec)
+    shared_cand_ver = shared_ver if shared_ver is not None else 1
 
     if shared_rec and shared_dir.joinpath("champion.State").is_file():
-        if score_beats(shared_score or (), local_score):
+        if score_beats(
+            shared_score or (),
+            local_score,
+            candidate_version=shared_cand_ver,
+            incumbent_version=local_ver,
+        ):
             try:
-                _copy_champion_tree(shared_dir, local_dir)
-                data = json.loads(
-                    (local_dir / CHAMPION_JSON).read_text(encoding="utf-8")
-                )
-                data["state_path"] = (
-                    f"states/pb/{CHAMPION_SUBDIR}/champion.State".replace("\\", "/")
-                )
-                data["sidecar_path"] = (
-                    f"states/pb/{CHAMPION_SUBDIR}/champion.sidecar.json".replace(
-                        "\\", "/"
-                    )
-                )
+                _copy_champion_tree(shared_dir, local_dir, slot_name=slot_name)
+                data = _read_json(local_dir / CHAMPION_JSON) or {}
+                state_rel, sidecar_rel = _rel_paths_for_slot(slot_name)
+                data["state_path"] = state_rel
+                data["sidecar_path"] = sidecar_rel
                 (local_dir / CHAMPION_JSON).write_text(
                     json.dumps(data, indent=2, sort_keys=True) + "\n",
                     encoding="utf-8",
@@ -146,6 +205,59 @@ def sync_champion_once(project_root: Path | str) -> dict[str, str]:
                 actions["pull"] = "ok"
             except OSError as exc:
                 actions["pull"] = f"error:{exc}"
+
+    return actions
+
+
+def sync_champion_once(project_root: Path | str) -> dict[str, Any]:
+    """One push/pull cycle across **all** champion slots.
+
+    Returns aggregate ``push`` / ``pull`` plus per-slot ``slots`` detail.
+    Aggregate ``push``/``pull`` is ``ok`` if any slot succeeded, else ``skip``
+    (or an ``error:…`` string if every attempted action failed).
+    """
+    actions: dict[str, Any] = {"push": "skip", "pull": "skip", "slots": {}}
+    shared = shared_pb_root()
+    if shared is None:
+        return actions
+
+    local_root = pb_root(project_root)
+    # Prefer list_filled_champions for local, then union with directory scans.
+    slot_names = (
+        _slot_names_from_filled(project_root)
+        | _scan_slot_names(local_root)
+        | _scan_slot_names(shared)
+    )
+    if not slot_names:
+        return actions
+
+    any_push_ok = False
+    any_pull_ok = False
+    push_errors: list[str] = []
+    pull_errors: list[str] = []
+
+    for slot_name in sorted(slot_names):
+        local_dir = local_root / "champions" / slot_name
+        shared_dir = shared / "champions" / slot_name
+        slot_actions = _sync_one_slot(local_dir, shared_dir, slot_name=slot_name)
+        actions["slots"][slot_name] = slot_actions
+        if slot_actions["push"] == "ok":
+            any_push_ok = True
+        elif str(slot_actions["push"]).startswith("error:"):
+            push_errors.append(slot_actions["push"])
+        if slot_actions["pull"] == "ok":
+            any_pull_ok = True
+        elif str(slot_actions["pull"]).startswith("error:"):
+            pull_errors.append(slot_actions["pull"])
+
+    if any_push_ok:
+        actions["push"] = "ok"
+    elif push_errors:
+        actions["push"] = push_errors[0]
+    if any_pull_ok:
+        actions["pull"] = "ok"
+    elif pull_errors:
+        actions["pull"] = pull_errors[0]
 
     return actions
 
@@ -191,7 +303,7 @@ def ensure_pb_sync_daemon(project_root: Path | str) -> bool:
 
 
 def push_champion_async(project_root: Path | str) -> None:
-    """Fire-and-forget push/pull after a local champion replace."""
+    """Fire-and-forget push/pull of all slots after a local champion replace."""
     if shared_pb_root() is None:
         return
 

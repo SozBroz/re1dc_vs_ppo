@@ -1,9 +1,12 @@
-"""Watch fleet hosts for the single typewriter champion; sync best; launch harness.
+"""Watch fleet hosts for per-room typewriter champions; sync each slot; launch harness.
 
-Polls pking / WH1 / WH2 champion.json via local FS + SSH. Keeps only one logical
-champion (best score) and copies it onto every host. When a champion first
-appears (or improves), prints the validate command and optionally launches
-``scripts/validate_typewriter_champion.cmd`` on this machine (pking).
+Polls pking / WH1 / WH2 ``champions/*/champion.json`` via local FS + SSH.
+For **each slot independently**, keeps the best host's tree and copies that
+slot onto every other host — never overwrites other rooms with a global winner.
+
+When any champion first appears (or improves), prints the validate command and
+optionally launches ``scripts/validate_typewriter_champion.cmd`` on this machine
+(pking), preferring ``mainhall_typewriter`` if that slot improved.
 """
 
 from __future__ import annotations
@@ -18,7 +21,7 @@ import time
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CHAMP_REL = Path("states/pb/champions/mainhall_typewriter")
+CHAMPS_REL = Path("states/pb/champions")
 CHAMP_FILES = ("champion.State", "champion.sidecar.json", "champion.json")
 
 HOSTS = {
@@ -28,6 +31,10 @@ HOSTS = {
 }
 
 
+def _is_slot_dirname(name: str) -> bool:
+    return name == "mainhall_typewriter" or name.startswith("typewriter_")
+
+
 def _score(rec: dict | None) -> tuple[int, ...] | None:
     if not rec or "score" not in rec:
         return None
@@ -35,6 +42,31 @@ def _score(rec: dict | None) -> tuple[int, ...] | None:
         return tuple(int(x) for x in rec["score"])
     except (TypeError, ValueError):
         return None
+
+
+def _score_version(rec: dict | None) -> int | None:
+    if not rec or "score_version" not in rec:
+        return None
+    try:
+        return int(rec["score_version"])
+    except (TypeError, ValueError):
+        return None
+
+
+def _score_beats(candidate: tuple[int, ...], incumbent: tuple[int, ...] | None, *,
+                 candidate_version: int, incumbent_version: int | None) -> bool:
+    """Local copy of pb_champion.score_beats to keep the watch script standalone."""
+    if incumbent is None:
+        return True
+    if incumbent_version == candidate_version:
+        return tuple(candidate) > tuple(incumbent)
+    if incumbent_version is None:
+        if len(candidate) == len(incumbent):
+            return tuple(candidate) > tuple(incumbent)
+        return True
+    if incumbent_version < candidate_version:
+        return True
+    return False
 
 
 def _read_local_json(path: Path) -> dict | None:
@@ -71,11 +103,66 @@ def _ssh_cat(ssh: str, remote_path: str) -> str | None:
     return proc.stdout
 
 
-def fetch_record(host_id: str) -> dict | None:
+def _ssh_dir_listing(ssh: str, remote_dir: str) -> list[str]:
+    """``dir /b`` of a remote directory; empty on failure."""
+    win = remote_dir.replace("/", chr(92))
+    try:
+        proc = subprocess.run(
+            [
+                "ssh",
+                "-o",
+                "ConnectTimeout=12",
+                "-o",
+                "BatchMode=yes",
+                ssh,
+                f'dir /b "{win}"',
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    if proc.returncode != 0:
+        return []
+    return [ln.strip() for ln in proc.stdout.splitlines() if ln.strip()]
+
+
+def list_slot_names(host_id: str) -> set[str]:
     cfg = HOSTS[host_id]
     if cfg["kind"] == "local":
-        return _read_local_json(Path(cfg["root"]) / CHAMP_REL / "champion.json")
-    remote = f'{cfg["root"]}/{CHAMP_REL.as_posix()}/champion.json'
+        root = Path(cfg["root"]) / CHAMPS_REL
+        if not root.is_dir():
+            return set()
+        return {
+            p.name
+            for p in root.iterdir()
+            if p.is_dir() and _is_slot_dirname(p.name)
+        }
+    remote = f'{cfg["root"]}/{CHAMPS_REL.as_posix()}'
+    names = set()
+    for name in _ssh_dir_listing(cfg["ssh"], remote):
+        if _is_slot_dirname(name):
+            names.add(name)
+    return names
+
+
+def fetch_all_records(host_id: str) -> dict[str, dict | None]:
+    """Map slot_name → champion.json record (or None) for one host."""
+    slots = list_slot_names(host_id)
+    out: dict[str, dict | None] = {}
+    for slot in slots:
+        out[slot] = fetch_record(host_id, slot)
+    return out
+
+
+def fetch_record(host_id: str, slot_name: str) -> dict | None:
+    cfg = HOSTS[host_id]
+    rel = CHAMPS_REL / slot_name / "champion.json"
+    if cfg["kind"] == "local":
+        return _read_local_json(Path(cfg["root"]) / rel)
+    remote = f'{cfg["root"]}/{rel.as_posix()}'
     text = _ssh_cat(cfg["ssh"], remote)
     if not text:
         return None
@@ -86,11 +173,12 @@ def fetch_record(host_id: str) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def pull_champion_tree(host_id: str, dest_dir: Path) -> bool:
+def pull_champion_tree(host_id: str, slot_name: str, dest_dir: Path) -> bool:
     cfg = HOSTS[host_id]
     dest_dir.mkdir(parents=True, exist_ok=True)
+    rel = CHAMPS_REL / slot_name
     if cfg["kind"] == "local":
-        src = Path(cfg["root"]) / CHAMP_REL
+        src = Path(cfg["root"]) / rel
         ok = True
         for name in CHAMP_FILES:
             s = src / name
@@ -100,7 +188,7 @@ def pull_champion_tree(host_id: str, dest_dir: Path) -> bool:
             shutil.copy2(s, dest_dir / name)
         return ok and (dest_dir / "champion.State").is_file()
 
-    remote_dir = f'{cfg["root"]}/{CHAMP_REL.as_posix()}'
+    remote_dir = f'{cfg["root"]}/{rel.as_posix()}'
     for name in CHAMP_FILES:
         remote = f"{cfg['ssh']}:{remote_dir}/{name}"
         local = dest_dir / name
@@ -119,10 +207,12 @@ def pull_champion_tree(host_id: str, dest_dir: Path) -> bool:
     return (dest_dir / "champion.State").is_file()
 
 
-def push_champion_tree(host_id: str, src_dir: Path) -> bool:
+def push_champion_tree(host_id: str, slot_name: str, src_dir: Path) -> bool:
+    """Push one slot tree. Never deletes or touches other slots."""
     cfg = HOSTS[host_id]
+    rel = CHAMPS_REL / slot_name
     if cfg["kind"] == "local":
-        dest = Path(cfg["root"]) / CHAMP_REL
+        dest = Path(cfg["root"]) / rel
         dest.mkdir(parents=True, exist_ok=True)
         for name in CHAMP_FILES:
             s = src_dir / name
@@ -130,8 +220,8 @@ def push_champion_tree(host_id: str, src_dir: Path) -> bool:
                 shutil.copy2(s, dest / name)
         return True
 
-    remote_dir = f'{cfg["root"]}/{CHAMP_REL.as_posix()}'
-    # Ensure remote dir exists.
+    remote_dir = f'{cfg["root"]}/{rel.as_posix()}'
+    # Ensure remote slot dir exists (mkdir only — never wipe).
     subprocess.run(
         [
             "ssh",
@@ -167,14 +257,27 @@ def push_champion_tree(host_id: str, src_dir: Path) -> bool:
     return True
 
 
-def best_host(records: dict[str, dict | None]) -> tuple[str, dict] | None:
-    best: tuple[str, dict, tuple[int, ...]] | None = None
-    for host_id, rec in records.items():
+def best_host_for_slot(
+    records_by_host: dict[str, dict | None],
+) -> tuple[str, dict] | None:
+    """Pick the best host for a single slot from host→record map."""
+    best: tuple[str, dict, tuple[int, ...], int | None] | None = None
+    for host_id, rec in records_by_host.items():
         sc = _score(rec)
         if sc is None or rec is None:
             continue
-        if best is None or sc > best[2]:
-            best = (host_id, rec, sc)
+        ver = _score_version(rec)
+        cand_ver = ver if ver is not None else 1
+        if best is None:
+            best = (host_id, rec, sc, ver)
+            continue
+        if _score_beats(
+            sc,
+            best[2],
+            candidate_version=cand_ver,
+            incumbent_version=best[3],
+        ):
+            best = (host_id, rec, sc, ver)
     if best is None:
         return None
     return best[0], best[1]
@@ -195,6 +298,14 @@ def launch_harness(state_path: Path) -> None:
     )
 
 
+def _normalize_json_paths(data: dict, slot_name: str) -> dict:
+    sub = f"states/pb/champions/{slot_name}"
+    data = dict(data)
+    data["state_path"] = f"{sub}/champion.State"
+    data["sidecar_path"] = f"{sub}/champion.sidecar.json"
+    return data
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--interval-s", type=float, default=20.0)
@@ -203,60 +314,90 @@ def main() -> int:
         "--launch-harness",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="open play_human validate console when champion first appears (default on)",
+        help="open play_human validate console when a champion first appears (default on)",
     )
     args = ap.parse_args()
 
-    last_score: tuple[int, ...] | None = None
+    # Per-slot last known best score (after fleet sync).
+    last_scores: dict[str, tuple[int, ...]] = {}
     launched = False
 
     while True:
-        records = {hid: fetch_record(hid) for hid in HOSTS}
-        summary = {
-            hid: (_score(rec), (rec or {}).get("hp"), (rec or {}).get("room_id"))
-            for hid, rec in records.items()
+        # host → slot → record
+        all_recs: dict[str, dict[str, dict | None]] = {
+            hid: fetch_all_records(hid) for hid in HOSTS
         }
-        print(f"[watch] {time.strftime('%H:%M:%S')} scores={summary}", flush=True)
+        all_slots: set[str] = set()
+        for by_slot in all_recs.values():
+            all_slots.update(by_slot.keys())
 
-        winner = best_host(records)
-        if winner is not None:
+        summary: dict[str, dict[str, object]] = {}
+        for hid, by_slot in all_recs.items():
+            summary[hid] = {
+                slot: (_score(rec), (rec or {}).get("hp"), (rec or {}).get("room_id"))
+                for slot, rec in sorted(by_slot.items())
+            }
+        print(f"[watch] {time.strftime('%H:%M:%S')} slots={sorted(all_slots)} scores={summary}", flush=True)
+
+        improved_slots: list[tuple[str, str, tuple[int, ...]]] = []
+        # (slot, winner_host, score)
+
+        for slot in sorted(all_slots):
+            records = {hid: all_recs[hid].get(slot) for hid in HOSTS}
+            winner = best_host_for_slot(records)
+            if winner is None:
+                continue
             host_id, rec = winner
             sc = _score(rec)
             assert sc is not None
-            if last_score is None or sc > last_score:
-                with tempfile.TemporaryDirectory(prefix="re1_pb_champ_") as tmp:
-                    tmp_path = Path(tmp)
-                    if not pull_champion_tree(host_id, tmp_path):
-                        print(f"[watch] pull failed from {host_id}", flush=True)
-                    else:
-                        # Normalize paths in champion.json for local layout.
-                        data = json.loads(
-                            (tmp_path / "champion.json").read_text(encoding="utf-8")
-                        )
-                        data["state_path"] = (
-                            "states/pb/champions/mainhall_typewriter/champion.State"
-                        )
-                        data["sidecar_path"] = (
-                            "states/pb/champions/mainhall_typewriter/champion.sidecar.json"
-                        )
-                        (tmp_path / "champion.json").write_text(
-                            json.dumps(data, indent=2, sort_keys=True) + "\n",
-                            encoding="utf-8",
-                        )
-                        for hid in HOSTS:
-                            ok = push_champion_tree(hid, tmp_path)
-                            print(f"[watch] push -> {hid}: {'ok' if ok else 'FAIL'}", flush=True)
-                        local_state = PROJECT_ROOT / CHAMP_REL / "champion.State"
-                        print(
-                            f"[watch] CHAMPION score={list(sc)} from={host_id}\n"
-                            f"  validate: scripts\\validate_typewriter_champion.cmd\n"
-                            f"  state: {local_state}",
-                            flush=True,
-                        )
-                        if args.launch_harness and not launched and local_state.is_file():
-                            launch_harness(local_state)
-                            launched = True
-                        last_score = sc
+            prev = last_scores.get(slot)
+            cand_ver = _score_version(rec)
+            cand_ver_n = cand_ver if cand_ver is not None else 1
+            if not _score_beats(
+                sc, prev, candidate_version=cand_ver_n, incumbent_version=None
+            ):
+                continue
+
+            with tempfile.TemporaryDirectory(prefix=f"re1_pb_{slot}_") as tmp:
+                tmp_path = Path(tmp)
+                if not pull_champion_tree(host_id, slot, tmp_path):
+                    print(f"[watch] pull failed slot={slot} from={host_id}", flush=True)
+                    continue
+                data = json.loads((tmp_path / "champion.json").read_text(encoding="utf-8"))
+                data = _normalize_json_paths(data, slot)
+                (tmp_path / "champion.json").write_text(
+                    json.dumps(data, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+                for hid in HOSTS:
+                    ok = push_champion_tree(hid, slot, tmp_path)
+                    print(
+                        f"[watch] push slot={slot} -> {hid}: {'ok' if ok else 'FAIL'}",
+                        flush=True,
+                    )
+                local_state = PROJECT_ROOT / CHAMPS_REL / slot / "champion.State"
+                print(
+                    f"[watch] CHAMPION slot={slot} score={list(sc)} from={host_id}\n"
+                    f"  validate: scripts\\validate_typewriter_champion.cmd\n"
+                    f"  state: {local_state}",
+                    flush=True,
+                )
+                last_scores[slot] = sc
+                improved_slots.append((slot, host_id, sc))
+
+        if args.launch_harness and not launched and improved_slots:
+            # Prefer mainhall if present among improved, else first improved.
+            pick = None
+            for slot, _hid, _sc in improved_slots:
+                if slot == "mainhall_typewriter":
+                    pick = slot
+                    break
+            if pick is None:
+                pick = improved_slots[0][0]
+            local_state = PROJECT_ROOT / CHAMPS_REL / pick / "champion.State"
+            if local_state.is_file():
+                launch_harness(local_state)
+                launched = True
 
         if args.once:
             return 0

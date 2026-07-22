@@ -1,8 +1,8 @@
 """Hand-crafted PB milestone taxonomy.
 
-v1 (typewriter PB): only Main Hall ink-ribbon saves with prologue room allowlist.
-Key/room/story helpers remain for later ladder stages but are disabled in
-``detect_milestone_triggers`` until ``RE1_PB_V1_TYPEWRITER_ONLY=0``.
+Typewriter PB: any RDT typewriter room save (shared capture gates; prologue
+allowlist lifted). Key/room/story helpers remain for later ladder stages but
+are disabled in ``detect_milestone_triggers`` until ``RE1_PB_V1_TYPEWRITER_ONLY=0``.
 """
 
 from __future__ import annotations
@@ -10,13 +10,15 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from re1_rl.cutscene_reward import kenneth_cutscene_seen
 from re1_rl.item_todo import canonical_item
-from re1_rl.typewriter_save import (
-    PROLOGUE_ROOM_ALLOWLIST,
-    TYPEWRITER_SAVE_MILESTONE,
-    visited_rooms_allow_prologue_pb,
-)
+
+try:
+    from re1_rl.pb_champion import typewriter_milestone_id
+except ImportError:
+
+    def typewriter_milestone_id(room: str) -> str:
+        return f"typewriter_save:{room}"
+
 
 # Later ladder (disabled while v1 typewriter-only is on).
 KEY_ITEM_MILESTONES: frozenset[str] = frozenset(
@@ -46,7 +48,7 @@ STORY_USE_MILESTONES: frozenset[str] = frozenset(
 
 
 def typewriter_v1_only() -> bool:
-    """Default on: only typewriter_save:106 is active."""
+    """Default on: suppress KEY/ROOM/STORY milestones (typewriter still multi-room)."""
     raw = os.environ.get("RE1_PB_V1_TYPEWRITER_ONLY", "1").strip().lower()
     return raw not in {"0", "false", "no", "off"}
 
@@ -76,27 +78,18 @@ def is_key_item_milestone(name: str) -> bool:
     return canonical_item(str(name)) in KEY_ITEM_MILESTONES
 
 
-def typewriter_save_gates_ok(
+def typewriter_save_capture_ok(
     state: dict[str, Any],
     *,
-    visited_rooms: set[str] | frozenset[str] | None,
-    rewarded_cutscenes: set[str] | frozenset[str] | None,
+    room: str,
     kenneth_gate_breached: bool,
 ) -> bool:
-    """Kenneth + room allowlist gates for the first typewriter champion."""
+    """Shared capture gates: still in room ``r`` and Kenneth gate not breached."""
     if kenneth_gate_breached:
         return False
-    if str(state.get("room_id", "") or "") != "106":
+    if not room:
         return False
-    if not kenneth_cutscene_seen(rewarded_cutscenes):
-        return False
-    if not visited_rooms_allow_prologue_pb(visited_rooms):
-        return False
-    # Prefer having actually walked dining + tea + hall.
-    rooms = {str(r) for r in (visited_rooms or ())}
-    if not PROLOGUE_ROOM_ALLOWLIST.issubset(rooms):
-        return False
-    return True
+    return str(state.get("room_id", "") or "") == str(room)
 
 
 def detect_milestone_triggers(
@@ -106,23 +99,31 @@ def detect_milestone_triggers(
     *,
     already_captured: set[str] | frozenset[str] | None = None,
     typewriter_save_complete: bool = False,
+    typewriter_save_room: str | None = None,
     visited_rooms: set[str] | frozenset[str] | None = None,
     rewarded_cutscenes: set[str] | frozenset[str] | None = None,
     kenneth_gate_breached: bool = False,
 ) -> list[str]:
-    """Return trigger ids newly earned this step."""
+    """Return trigger ids newly earned this step.
+
+    ``visited_rooms`` / ``rewarded_cutscenes`` retained for call-site compat;
+    typewriter capture no longer gates on prologue allowlist or Kenneth cinema.
+    """
+    _ = visited_rooms, rewarded_cutscenes
     seen = set(already_captured or ())
     out: list[str] = []
 
-    if typewriter_save_complete and TYPEWRITER_SAVE_MILESTONE not in seen:
-        if typewriter_save_gates_ok(
-            state,
-            visited_rooms=visited_rooms,
-            rewarded_cutscenes=rewarded_cutscenes,
-            kenneth_gate_breached=kenneth_gate_breached,
-        ):
-            out.append(TYPEWRITER_SAVE_MILESTONE)
-            seen.add(TYPEWRITER_SAVE_MILESTONE)
+    if typewriter_save_complete:
+        room = str(typewriter_save_room or state.get("room_id", "") or "")
+        if room:
+            trigger = typewriter_milestone_id(room)
+            if trigger not in seen and typewriter_save_capture_ok(
+                state,
+                room=room,
+                kenneth_gate_breached=kenneth_gate_breached,
+            ):
+                out.append(trigger)
+                seen.add(trigger)
 
     if typewriter_v1_only():
         return out

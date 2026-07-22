@@ -88,7 +88,11 @@ def sample_reset_bundle(
 
 
 def fresh_weight_from_env(default: float = 0.5) -> float:
-    """``RE1_PB_FRESH_WEIGHT`` in ``[0, 1]``; default 0.5 when champion mix is on."""
+    """``RE1_PB_FRESH_WEIGHT`` in ``[0, 1]``; default 0.5 when champion mix is on.
+
+    Deprecated for the default typewriter sampler (``sample_typewriter_start``);
+    kept for legacy ``sample_reset_bundle`` callers.
+    """
     import os
 
     raw = os.environ.get("RE1_PB_FRESH_WEIGHT", "").strip()
@@ -97,36 +101,112 @@ def fresh_weight_from_env(default: float = 0.5) -> float:
     return max(0.0, min(1.0, float(raw)))
 
 
+def _list_filled_champions_fallback(project_root: Path | str) -> list[dict[str, Any]]:
+    """Scan ``champions/mainhall_typewriter`` + ``typewriter_*`` when API missing."""
+    from re1_rl.pb_champion import CHAMPION_JSON, pb_root
+
+    champs_root = pb_root(project_root) / "champions"
+    if not champs_root.is_dir():
+        return []
+    out: list[dict[str, Any]] = []
+    for d in sorted(champs_root.iterdir(), key=lambda p: p.name):
+        if not d.is_dir():
+            continue
+        name = d.name
+        if name != "mainhall_typewriter" and not name.startswith("typewriter_"):
+            continue
+        rec_path = d / CHAMPION_JSON
+        state_file = d / "champion.State"
+        if not rec_path.is_file() or not state_file.is_file():
+            continue
+        try:
+            rec = json.loads(rec_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(rec, dict):
+            continue
+        if not rec.get("state_path") or not rec.get("sidecar_path"):
+            continue
+        out.append(
+            {
+                "state_path": str(rec["state_path"]),
+                "sidecar_path": str(rec["sidecar_path"]),
+                "milestone_id": str(rec.get("milestone_id") or ""),
+                "room_id": str(rec.get("room_id") or ""),
+            }
+        )
+    return out
+
+
+def _list_filled_champions(project_root: Path | str) -> list[dict[str, Any]]:
+    from re1_rl import pb_champion as champ
+
+    fn = getattr(champ, "list_filled_champions", None)
+    if callable(fn):
+        return list(fn(project_root))
+    return _list_filled_champions_fallback(project_root)
+
+
+def _bundle_dict_from_record(rec: dict[str, Any]) -> dict[str, str]:
+    return {
+        "state_path": str(rec["state_path"]),
+        "sidecar_path": str(rec["sidecar_path"]),
+    }
+
+
+def typewriter_mix_weights(n_filled: int) -> tuple[float, float]:
+    """Return ``(p_fresh, p_each_sidecar)`` for ``N`` filled champion slots.
+
+    - N=0: fresh only (caller short-circuits)
+    - N=1: 1/2 fresh, 1/2 that sidecar
+    - N>=2: fresh pinned at 1/3; each sidecar gets (2/3)/N
+    """
+    n = int(n_filled)
+    if n <= 0:
+        return (1.0, 0.0)
+    if n == 1:
+        return (0.5, 0.5)
+    return (1.0 / 3.0, (2.0 / 3.0) / float(n))
+
+
+def sample_typewriter_start(
+    project_root: Path | str,
+    rng: random.Random | None = None,
+) -> dict[str, str] | None:
+    """Weighted mix of fresh vs filled typewriter champion sidecars.
+
+    ``None`` means a fresh episode start. Filled slots come from
+    ``list_filled_champions``. ``RE1_PB_FRESH_WEIGHT`` is ignored here.
+    """
+    from re1_rl.pb_sync import ensure_pb_sync_daemon
+
+    root = Path(project_root)
+    ensure_pb_sync_daemon(root)
+
+    filled = _list_filled_champions(root)
+    n = len(filled)
+    if n == 0:
+        return None
+
+    rng = rng or random.Random()
+    p_fresh, p_each = typewriter_mix_weights(n)
+    # Outcomes: index 0 = fresh; 1..N = filled[i-1]
+    weights = [p_fresh] + [p_each] * n
+    pick = int(rng.choices(range(n + 1), weights=weights, k=1)[0])
+    if pick == 0:
+        return None
+    return _bundle_dict_from_record(filled[pick - 1])
+
+
 def sample_champion_or_fresh(
     project_root: Path | str,
     *,
     fresh_weight: float | None = None,
     rng: random.Random | None = None,
 ) -> dict[str, str] | None:
-    """50/50 (configurable) mix: champion pb_bundle dict or ``None`` for fresh.
+    """Alias for ``sample_typewriter_start`` (multi-room mix).
 
-    Starts the delayed shared-root sync daemon when configured; does not block
-    on a sync round-trip (lag is acceptable).
+    ``fresh_weight`` / ``RE1_PB_FRESH_WEIGHT`` are deprecated and ignored.
     """
-    from re1_rl.pb_champion import champion_bundle_for_reset
-    from re1_rl.pb_sync import ensure_pb_sync_daemon
-
-    root = Path(project_root)
-    ensure_pb_sync_daemon(root)
-
-    bundle = champion_bundle_for_reset(root)
-    if bundle is None:
-        return None
-    weight = fresh_weight_from_env(0.5) if fresh_weight is None else float(fresh_weight)
-    pb = PbBundle(
-        state_path=bundle["state_path"],
-        sidecar_path=bundle["sidecar_path"],
-        milestone_id=str(bundle.get("milestone_id") or "typewriter_save:106"),
-    )
-    chosen = sample_reset_bundle([pb], fresh_weight=weight, rng=rng)
-    if chosen is None:
-        return None
-    return {
-        "state_path": chosen.state_path,
-        "sidecar_path": chosen.sidecar_path,
-    }
+    del fresh_weight  # deprecated; typewriter mix uses fixed N-dependent floors
+    return sample_typewriter_start(project_root, rng=rng)

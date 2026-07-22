@@ -135,4 +135,21 @@ Migration: existing v1 cells get `milestone_digest=""` (legacy bucket); new capt
 
 ---
 
-*Document version: 1.1 — typewriter champion + async `RE1_PB_SHARED_ROOT` sync.*
+## 8. Addendum — multi-room typewriter PB (2026-07-21)
+
+v1 typewriter champion is no longer Main-Hall-only. Any RDT typewriter room may capture a per-room slot; prologue allowlist is **not** a capture gate.
+
+| Piece | Policy |
+|-------|--------|
+| Detector | Ink-ribbon drop in any `TYPEWRITER_ROOMS` id (e.g. `106`, `118`) → save cinema → stable control |
+| Capture gate | `typewriter_save_capture_ok`: still in room `r` and Kenneth gate not breached (no `visited ⊆ {105,104,106}`) |
+| Milestone id | `typewriter_save:{room}` — 106 keeps slot dir `champions/mainhall_typewriter`; others `champions/typewriter_{room}` |
+| Score | `champion_score_v2`: herb unit table + physical loot + ever-held key credit (no double-count) → HP → handgun ammo → fewer ribbons → **visited count** tie-break |
+| Cutscene | Ribbon drop in any typewriter room disqualifies exploration cutscene pay (`typewriter_save_cutscene_disqualified`) |
+| Mix | `sample_typewriter_start` / `typewriter_mix_weights(N)`: **N=0** fresh only; **N=1** ½ fresh / ½ sidecar; **N≥2** fresh pinned **⅓**, sidecars share **⅔** equally. `RE1_PB_FRESH_WEIGHT` ignored for this sampler |
+| Capture flag | Still `RE1_PB_CAPTURE` default **off**; `RE1_PB_V1_TYPEWRITER_ONLY=1` suppresses non-typewriter milestones |
+
+---
+
+*Document version: 1.2 — multi-room typewriter PB + score v2 mix weights.*
+

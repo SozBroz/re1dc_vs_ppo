@@ -331,7 +331,7 @@ def qualify_cutscene_reward(
     ):
         return None
 
-    # Typewriter save cinema (ink ribbon spent in 106): not exploration cutscene.
+    # Typewriter save cinema (ink ribbon spent in any TW room): not exploration cutscene.
     from re1_rl.typewriter_save import typewriter_save_cutscene_disqualified
 
     if typewriter_save_cutscene_disqualified(prev_state, new_state):

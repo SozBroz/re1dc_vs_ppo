@@ -1,7 +1,7 @@
 """Detect in-game typewriter saves (ink ribbon consumption) for PB capture.
 
-v1 detector (no dedicated save-UI RAM yet): ink_ribbon qty drop in Main Hall
-``106``, optionally near the RDT typewriter, then control restored.
+Detector (no dedicated save-UI RAM yet): ink_ribbon qty drop in any RDT
+typewriter room, then control restored after the save cinema.
 """
 
 from __future__ import annotations
@@ -19,7 +19,37 @@ TYPEWRITER_106_XZ: tuple[float, float] = (14000.0, 17000.0)
 TYPEWRITER_PROXIMITY = 4000.0  # world units; generous for fixed-cam approach
 
 # First PB only: visited rooms must be a subset of prologue path.
+# Kept for helpers / legacy callers; capture gates no longer use this.
 PROLOGUE_ROOM_ALLOWLIST: frozenset[str] = frozenset({"105", "104", "106"})
+
+_FALLBACK_TYPEWRITER_ROOMS: frozenset[str] = frozenset(
+    {"100", "106", "118", "307", "30E", "403", "50E", "600", "606", "618"}
+)
+
+
+def _load_typewriter_rooms() -> frozenset[str]:
+    try:
+        from re1_rl.rdt_interactables import load_rdt_interactables
+
+        table = load_rdt_interactables()
+        rooms = {
+            str(room_id)
+            for room_id, rows in table.items()
+            if any(str(r.get("kind", "")) == "typewriter" for r in (rows or ()))
+        }
+        if rooms:
+            return frozenset(rooms)
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    return _FALLBACK_TYPEWRITER_ROOMS
+
+
+TYPEWRITER_ROOMS: frozenset[str] = _load_typewriter_rooms()
+
+
+def typewriter_rooms() -> frozenset[str]:
+    """Room ids that contain an RDT typewriter (fallback if table missing)."""
+    return TYPEWRITER_ROOMS
 
 
 def _slots(state: dict[str, Any] | None) -> list[tuple[str, int]]:
@@ -82,11 +112,11 @@ def typewriter_save_cutscene_disqualified(
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any] | None,
 ) -> bool:
-    """True when this settle looks like a Main Hall typewriter save (ribbon drop)."""
+    """True when this settle looks like a typewriter save (ribbon drop in any TW room)."""
     room = str((new_state or {}).get("room_id", "") or "") or str(
         (prev_state or {}).get("room_id", "") or ""
     )
-    if room != MAIN_HALL_ROOM:
+    if room not in TYPEWRITER_ROOMS:
         return False
     return ink_ribbon_consumed(prev_state, new_state)
 
@@ -100,16 +130,30 @@ class TypewriterSaveDetector:
 
     Must not fire on the ribbon-drop step itself (still mid save-UI / pre-cinema).
     Capture only after the engine seizes control for the save sequence and then
-    returns Jill to playable control in Main Hall.
+    returns Jill to playable control in the same typewriter room.
     """
 
     def __init__(self) -> None:
         self._pending = False
+        self._pending_room: str | None = None
         self._saw_uncontrolled = False
         self._control_streak = 0
+        self.armed_room: str | None = None
+        self.completed_room: str | None = None
+        self.last_room: str | None = None
 
     def reset(self) -> None:
         self._pending = False
+        self._pending_room = None
+        self._saw_uncontrolled = False
+        self._control_streak = 0
+        self.armed_room = None
+        self.completed_room = None
+        self.last_room = None
+
+    def _clear_pending(self) -> None:
+        self._pending = False
+        self._pending_room = None
         self._saw_uncontrolled = False
         self._control_streak = 0
 
@@ -124,9 +168,11 @@ class TypewriterSaveDetector:
         room = str(state.get("room_id", "") or "")
         in_control = bool(state.get("in_control", False))
 
-        if ink_ribbon_consumed(prev_state, state) and room == MAIN_HALL_ROOM:
+        if ink_ribbon_consumed(prev_state, state) and room in TYPEWRITER_ROOMS:
             # Ribbon drop arms the latch; never fire this same step.
             self._pending = True
+            self._pending_room = room
+            self.armed_room = room
             self._saw_uncontrolled = not in_control
             self._control_streak = 0
             return False
@@ -134,8 +180,9 @@ class TypewriterSaveDetector:
         if not self._pending:
             return False
 
-        if room != MAIN_HALL_ROOM:
-            self.reset()
+        if room != self._pending_room:
+            self._clear_pending()
+            self.armed_room = None
             return False
 
         if not in_control:
@@ -151,5 +198,9 @@ class TypewriterSaveDetector:
         if self._control_streak < _POST_SAVE_CONTROL_STREAK:
             return False
 
-        self.reset()
+        fired = self._pending_room or room
+        self._clear_pending()
+        self.armed_room = fired
+        self.completed_room = fired
+        self.last_room = fired
         return True

@@ -1,4 +1,4 @@
-"""Shared typewriter-save champion: score, atomic replace, load."""
+"""Shared typewriter-save champion: score v2, atomic replace, load."""
 
 from __future__ import annotations
 
@@ -7,16 +7,34 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from re1_rl.item_todo import canonical_item
+from re1_rl.key_items import KEY_ITEM_NAMES
+from re1_rl.memory_map import ITEM_IDS
 from re1_rl.typewriter_save import TYPEWRITER_SAVE_MILESTONE
 
 CHAMPION_MILESTONE = TYPEWRITER_SAVE_MILESTONE
 CHAMPION_SUBDIR = "champions/mainhall_typewriter"
 CHAMPION_JSON = "champion.json"
+SCORE_VERSION = 2
 
 _PB_ROOT_ENV = "RE1_PB_ROOT"
+_TYPEWRITER_MILESTONE_PREFIX = "typewriter_save:"
+_KEY_ITEM_NAME_SET: frozenset[str] = frozenset(KEY_ITEM_NAMES)
+
+# Herb atom values; mixes are always the sum of component atoms.
+_HERB_UNIT_V: dict[str, float] = {
+    "green_herb": 1.0 / 3.0,
+    "red_herb": 2.0 / 3.0,
+    "blue_herb": 1.0 / 6.0,
+    "mixed_herbs_gr": 1.0 / 3.0 + 2.0 / 3.0,
+    "mixed_herbs_gg": 1.0 / 3.0 + 1.0 / 3.0,
+    "mixed_herbs_gb": 1.0 / 3.0 + 1.0 / 6.0,
+    "mixed_herbs_ggg": 1.0 / 3.0 + 1.0 / 3.0 + 1.0 / 3.0,
+    "mixed_herbs_ggb": 1.0 / 3.0 + 1.0 / 3.0 + 1.0 / 6.0,
+    "mixed_herbs_grb": 1.0 / 3.0 + 2.0 / 3.0 + 1.0 / 6.0,
+}
 
 
 def pb_root(project_root: Path | str) -> Path:
@@ -26,8 +44,46 @@ def pb_root(project_root: Path | str) -> Path:
     return Path(project_root) / "states" / "pb"
 
 
+def _normalize_room_id(room_id: int | str) -> str:
+    s = str(room_id).strip()
+    if s.lower().startswith("0x"):
+        s = s[2:]
+    return s.upper()
+
+
+def typewriter_champion_subdir(room_id: int | str) -> str:
+    room = _normalize_room_id(room_id)
+    if room == "106":
+        return CHAMPION_SUBDIR
+    return f"champions/typewriter_{room}"
+
+
+def typewriter_champion_dir(project_root: Path | str, room_id: int | str) -> Path:
+    return pb_root(project_root) / typewriter_champion_subdir(room_id)
+
+
 def champion_dir(project_root: Path | str) -> Path:
-    return pb_root(project_root) / CHAMPION_SUBDIR
+    """Compat: Main Hall (106) champion slot."""
+    return typewriter_champion_dir(project_root, "106")
+
+
+def typewriter_milestone_id(room_id: int | str) -> str:
+    return f"{_TYPEWRITER_MILESTONE_PREFIX}{_normalize_room_id(room_id)}"
+
+
+def is_typewriter_milestone(trigger_id: str | None) -> bool:
+    if not trigger_id:
+        return False
+    return str(trigger_id).startswith(_TYPEWRITER_MILESTONE_PREFIX)
+
+
+def parse_typewriter_room(trigger_id: str | None) -> str | None:
+    if not is_typewriter_milestone(trigger_id):
+        return None
+    room = str(trigger_id)[len(_TYPEWRITER_MILESTONE_PREFIX) :].strip()
+    if not room:
+        return None
+    return _normalize_room_id(room)
 
 
 def _slots(state: dict[str, Any] | None) -> list[tuple[str, int]]:
@@ -50,8 +106,48 @@ def _slots(state: dict[str, Any] | None) -> list[tuple[str, int]]:
     return out
 
 
+def _normalize_inv_slots(
+    inventory_slots: Iterable[Any] | None,
+) -> list[tuple[str, int]]:
+    if not inventory_slots:
+        return []
+    out: list[tuple[str, int]] = []
+    for entry in inventory_slots:
+        if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+            name, qty = entry[0], entry[1]
+            if isinstance(name, int):
+                decoded = ITEM_IDS.get(int(name))
+                if not decoded:
+                    continue
+                name = decoded
+            out.append((canonical_item(str(name)), int(qty)))
+        elif isinstance(entry, dict):
+            raw_name = entry.get("name") or entry.get("item") or ""
+            out.append((canonical_item(str(raw_name)), int(entry.get("qty", 1) or 0)))
+    return out
+
+
+def _box_slots(box_cache: Iterable[Any] | None) -> list[tuple[str, int]]:
+    """Decode box_cache list of (item_id, qty) via ITEM_IDS."""
+    if not box_cache:
+        return []
+    out: list[tuple[str, int]] = []
+    for entry in box_cache:
+        if not isinstance(entry, (list, tuple)) or len(entry) < 2:
+            continue
+        item_id = int(entry[0])
+        qty = int(entry[1])
+        if item_id <= 0 or qty <= 0:
+            continue
+        name = ITEM_IDS.get(item_id)
+        if not name:
+            continue
+        out.append((canonical_item(name), qty))
+    return out
+
+
 def champion_score(state: dict[str, Any] | None) -> tuple[int, int, int, int]:
-    """Lexicographic score (higher better).
+    """Legacy v1 lexicographic score (higher better).
 
     (valuable_slots, hp, handgun_bullets, -ink_ribbons)
     """
@@ -73,14 +169,86 @@ def champion_score(state: dict[str, Any] | None) -> tuple[int, int, int, int]:
     return (valuable, hp, bullets, -ribbons)
 
 
-def score_beats(candidate: tuple[int, ...], incumbent: tuple[int, ...] | None) -> bool:
+def champion_score_v2(
+    *,
+    inventory_slots: Iterable[Any] | None,
+    box_cache: Iterable[Any] | None,
+    ever_held: Iterable[str] | None,
+    visited_rooms: Iterable[str] | None,
+    hp: int,
+) -> tuple[int, int, int, int, int]:
+    """Unified V score: (v_milli, hp, handgun_bullets, -ink_ribbons, n_visited)."""
+    inv = _normalize_inv_slots(inventory_slots)
+    box = _box_slots(box_cache)
+    physical = inv + box
+
+    v_physical = 0.0
+    ribbons = 0
+    bullets = 0
+    present_keys: set[str] = set()
+
+    for name, qty in physical:
+        q = max(0, int(qty))
+        if not name or q <= 0:
+            continue
+        if name == "ink_ribbon":
+            ribbons += q
+            continue
+        if name in ("beretta", "handgun_bullets"):
+            bullets += q
+        herb_u = _HERB_UNIT_V.get(name)
+        if herb_u is not None:
+            v_physical += herb_u * q
+        else:
+            v_physical += 1.0
+            if name in _KEY_ITEM_NAME_SET:
+                present_keys.add(name)
+
+    held = {canonical_item(str(n)) for n in (ever_held or ()) if n}
+    key_credit = held & _KEY_ITEM_NAME_SET
+    key_credit -= present_keys
+    v_keys = float(len(key_credit))
+
+    v = v_physical + v_keys
+    v_milli = int(round(1000.0 * v))
+    n_visited = len({_normalize_room_id(r) for r in (visited_rooms or ()) if r})
+    return (v_milli, int(hp), int(bullets), -int(ribbons), int(n_visited))
+
+
+def score_beats(
+    candidate: tuple[int, ...],
+    incumbent: tuple[int, ...] | None,
+    *,
+    candidate_version: int = 2,
+    incumbent_version: int | None = None,
+) -> bool:
+    """Return True if *candidate* should replace *incumbent*.
+
+    Prefer same-version lexicographic compare. If the incumbent has no version
+    (``None``) or an older ``score_version`` than the candidate, the candidate
+    wins without lex-comparing incompatible tuples — so the first v2 record
+    can replace a legacy v1 / unversioned incumbent. A newer incumbent schema
+    is never beaten by an older candidate schema.
+
+    When ``incumbent_version`` is omitted but both tuples share the same rank
+    length, fall back to lex compare (legacy bare callers / sync before
+    version wiring). Differing lengths with a missing incumbent version are
+    treated as a schema upgrade and the candidate wins.
+    """
     if incumbent is None:
         return True
-    return tuple(candidate) > tuple(incumbent)
+    if incumbent_version == candidate_version:
+        return tuple(candidate) > tuple(incumbent)
+    if incumbent_version is None:
+        if len(candidate) == len(incumbent):
+            return tuple(candidate) > tuple(incumbent)
+        return True
+    if incumbent_version < candidate_version:
+        return True
+    return False
 
 
-def load_champion_record(project_root: Path | str) -> dict[str, Any] | None:
-    path = champion_dir(project_root) / CHAMPION_JSON
+def _read_champion_json(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
         return None
     try:
@@ -94,16 +262,78 @@ def load_champion_record(project_root: Path | str) -> dict[str, Any] | None:
     return data
 
 
-def champion_bundle_for_reset(project_root: Path | str) -> dict[str, str] | None:
+def load_champion_record(
+    project_root_or_path: Path | str,
+    room_id: int | str | None = None,
+) -> dict[str, Any] | None:
+    """Load champion.json by project root (+ optional room) or by path.
+
+    *project_root_or_path* may be:
+    - a project root (uses ``room_id`` or defaults to ``106``)
+    - a champion directory containing ``champion.json``
+    - a path to ``champion.json`` itself
+    """
+    p = Path(project_root_or_path)
+    if p.is_file():
+        return _read_champion_json(p)
+    looks_like_slot = (
+        room_id is None
+        and (
+            p.name == "mainhall_typewriter"
+            or p.name.startswith("typewriter_")
+            or (p / CHAMPION_JSON).is_file()
+            or (p / "champion.State").is_file()
+        )
+    )
+    if looks_like_slot:
+        return _read_champion_json(p / CHAMPION_JSON)
+    room = room_id if room_id is not None else "106"
+    return _read_champion_json(typewriter_champion_dir(p, room) / CHAMPION_JSON)
+
+
+def champion_bundle_for_reset(
+    project_root: Path | str,
+    room_id: int | str | None = None,
+) -> dict[str, str] | None:
     """Paths relative to project_root for ``env.reset(options=pb_bundle=...)``."""
-    rec = load_champion_record(project_root)
+    room = room_id if room_id is not None else "106"
+    rec = load_champion_record(project_root, room)
     if not rec:
         return None
     return {
         "state_path": str(rec["state_path"]),
         "sidecar_path": str(rec["sidecar_path"]),
-        "milestone_id": str(rec.get("milestone_id") or CHAMPION_MILESTONE),
+        "milestone_id": str(
+            rec.get("milestone_id") or typewriter_milestone_id(room)
+        ),
     }
+
+
+def list_filled_champions(project_root: Path | str) -> list[dict[str, Any]]:
+    """Scan mainhall_typewriter + typewriter_* dirs with valid json + State."""
+    champs_root = pb_root(project_root) / "champions"
+    if not champs_root.is_dir():
+        return []
+    out: list[dict[str, Any]] = []
+    for child in sorted(champs_root.iterdir(), key=lambda p: p.name):
+        if not child.is_dir():
+            continue
+        name = child.name
+        if name != "mainhall_typewriter" and not name.startswith("typewriter_"):
+            continue
+        if not (child / "champion.State").is_file():
+            continue
+        rec = _read_champion_json(child / CHAMPION_JSON)
+        if rec is None:
+            continue
+        enriched = dict(rec)
+        enriched.setdefault("champion_dir", child.as_posix())
+        if name == "mainhall_typewriter":
+            enriched.setdefault("room_id", str(rec.get("room_id") or "106"))
+        elif name.startswith("typewriter_"):
+            enriched.setdefault("room_id", name[len("typewriter_") :])
+        out.append(enriched)
+    return out
 
 
 def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
@@ -129,24 +359,54 @@ def try_replace_champion(
     sidecar_path: Path,
     state: dict[str, Any],
     score: tuple[int, ...] | None = None,
+    room_id: int | str | None = None,
+    ever_held: Iterable[str] | None = None,
+    box_cache: Iterable[Any] | None = None,
+    visited_rooms: Iterable[str] | None = None,
 ) -> bool:
-    """Copy candidate into champion dir and replace if score wins.
+    """Copy candidate into the per-room champion dir and replace if score wins.
 
-    Returns True when champion was created or replaced.
+    Returns True when champion was created or replaced. Writes ``score_version`` 2.
     """
     project_root = Path(project_root)
-    score_t = tuple(score) if score is not None else champion_score(state)
-    cdir = champion_dir(project_root)
+    room = _normalize_room_id(
+        room_id if room_id is not None else (state.get("room_id") or "106")
+    )
+
+    if score is not None:
+        score_t = tuple(int(x) for x in score)
+    else:
+        score_t = champion_score_v2(
+            inventory_slots=_slots(state),
+            box_cache=box_cache,
+            ever_held=ever_held,
+            visited_rooms=visited_rooms,
+            hp=int(state.get("hp", 0) or 0),
+        )
+
+    cdir = typewriter_champion_dir(project_root, room)
     cdir.mkdir(parents=True, exist_ok=True)
 
-    incumbent = load_champion_record(project_root)
+    incumbent = load_champion_record(cdir)
     inc_score = None
-    if incumbent and "score" in incumbent:
-        try:
-            inc_score = tuple(int(x) for x in incumbent["score"])
-        except (TypeError, ValueError):
-            inc_score = None
-    if not score_beats(score_t, inc_score):
+    inc_version: int | None = None
+    if incumbent:
+        if "score_version" in incumbent:
+            try:
+                inc_version = int(incumbent["score_version"])
+            except (TypeError, ValueError):
+                inc_version = None
+        if "score" in incumbent:
+            try:
+                inc_score = tuple(int(x) for x in incumbent["score"])
+            except (TypeError, ValueError):
+                inc_score = None
+    if not score_beats(
+        score_t,
+        inc_score,
+        candidate_version=SCORE_VERSION,
+        incumbent_version=inc_version,
+    ):
         return False
 
     dest_state = cdir / "champion.State"
@@ -162,11 +422,12 @@ def try_replace_champion(
         rel_sidecar = dest_sidecar.as_posix()
 
     record = {
-        "milestone_id": CHAMPION_MILESTONE,
+        "milestone_id": typewriter_milestone_id(room),
         "state_path": rel_state,
         "sidecar_path": rel_sidecar,
         "score": list(score_t),
-        "room_id": str(state.get("room_id", "") or ""),
+        "score_version": SCORE_VERSION,
+        "room_id": room,
         "hp": int(state.get("hp", 0) or 0),
     }
     _atomic_write_json(cdir / CHAMPION_JSON, record)

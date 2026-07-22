@@ -698,8 +698,13 @@ class RE1Env(gym.Env):
             return
         detector = getattr(self, "_typewriter_save_detector", None)
         save_complete = False
+        save_room = None
         if detector is not None:
             save_complete = bool(detector.update(prev_state, state))
+            if save_complete:
+                save_room = getattr(detector, "last_room", None) or getattr(
+                    detector, "completed_room", None
+                )
         states_dir = pb_root_dir(self.project_root)
         for trigger_id in detect_milestone_triggers(
             prev_state,
@@ -707,6 +712,7 @@ class RE1Env(gym.Env):
             breakdown,
             already_captured=self._pb_captured_triggers,
             typewriter_save_complete=save_complete,
+            typewriter_save_room=save_room,
             visited_rooms=self._progress.visited_rooms,
             rewarded_cutscenes=self._progress.rewarded_cutscenes,
             kenneth_gate_breached=bool(self._progress.kenneth_gate_breached),
