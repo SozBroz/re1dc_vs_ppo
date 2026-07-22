@@ -95,7 +95,14 @@ local function mmf_capture(mmf_name)
     if not comm.mmfScreenshot then
         return nil, 0, "mmfScreenshot unavailable"
     end
-    local size = tonumber(comm.mmfScreenshot()) or 0
+    -- NLua/.NET can throw on transient MMF races; pcall so Python can retry.
+    local ok, size_or_err = pcall(function()
+        return tonumber(comm.mmfScreenshot()) or 0
+    end)
+    if not ok then
+        return nil, 0, tostring(size_or_err)
+    end
+    local size = tonumber(size_or_err) or 0
     if size <= 0 then
         return nil, 0, "mmfScreenshot returned size 0"
     end
@@ -815,12 +822,17 @@ local function handle_command(cmd)
 
     elseif op == "screenshot_mmf" then
         -- Benchmark: MMF capture; Python reads tag via mmap (no _frame_*.png).
+        -- Retry a couple times for transient NLua/MMF failures.
         local mmf_name = cmd.mmf_name or ("re1_screenshot_" .. tostring(cmd.port or 0))
-        local got, size, err = mmf_capture(mmf_name)
-        if err then
-            return { ok = false, error = err }
+        local last_err = "mmfScreenshot failed"
+        for attempt = 1, 3 do
+            local got, size, err = mmf_capture(mmf_name)
+            if not err and got and size and size > 0 then
+                return { ok = true, mmf_name = got, size = size }
+            end
+            last_err = err or "mmfScreenshot failed"
         end
-        return { ok = true, mmf_name = got, size = size }
+        return { ok = false, error = last_err }
 
     elseif op == "speed" then
         client.speedmode(cmd.percent or 100)

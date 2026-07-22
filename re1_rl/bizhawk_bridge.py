@@ -56,7 +56,9 @@ class BizHawkClient:
             screenshot_mmf = sys.platform == "win32"
         self.screenshot_mmf = bool(screenshot_mmf)
         self.mmf_name = f"re1_screenshot_{port}"
-        self._screenshot_mmf_disabled = False
+        # Transient BizHawk/NLua MMF blips are common; retry before failing the actor.
+        self._screenshot_mmf_retries = 3
+        self._screenshot_mmf_retry_sleep_s = 0.02
         self._server: socket.socket | None = None
         self._client: socket.socket | None = None
         self._lock = threading.Lock()
@@ -517,21 +519,23 @@ class BizHawkClient:
 
         Training default: BizHawk MMF only (no ``_frame_*.png`` disk I/O).
         File PNG is opt-in via ``allow_file_fallback=True`` for debug tools.
+        Transient MMF / NLua failures are retried a few times before raising.
         """
         if self.screenshot_mmf:
-            if self._screenshot_mmf_disabled:
-                raise RuntimeError(
-                    "screenshot_mmf disabled after prior failure; refusing disk PNG "
-                    f"(port={self.port}). Restart env or fix MMF."
-                )
-            try:
-                return self._screenshot_from_mmf()
-            except (OSError, RuntimeError, ValueError) as exc:
-                self._screenshot_mmf_disabled = True
-                if allow_file_fallback:
-                    return self._screenshot_from_file(path)
-                raise RuntimeError(
-                    f"screenshot_mmf failed on port={self.port}; disk PNG fallback "
-                    "disabled for training throughput"
-                ) from exc
+            attempts = max(1, int(self._screenshot_mmf_retries))
+            last_exc: BaseException | None = None
+            for attempt in range(1, attempts + 1):
+                try:
+                    return self._screenshot_from_mmf()
+                except (OSError, RuntimeError, ValueError) as exc:
+                    last_exc = exc
+                    if attempt < attempts:
+                        time.sleep(float(self._screenshot_mmf_retry_sleep_s))
+                        continue
+            if allow_file_fallback:
+                return self._screenshot_from_file(path)
+            raise RuntimeError(
+                f"screenshot_mmf failed on port={self.port} after {attempts} attempt(s); "
+                "disk PNG fallback disabled for training throughput"
+            ) from last_exc
         return self._screenshot_from_file(path)
