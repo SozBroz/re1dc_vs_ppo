@@ -791,6 +791,26 @@ def main() -> int:
     except Exception:
         pass
 
+    try:
+        from re1_rl.pb_sync import warm_pb_champions_for_training
+
+        mix = warm_pb_champions_for_training(PROJECT_ROOT)
+        if mix["n_filled"]:
+            log(
+                "pb",
+                f"reset mix ready: N={mix['n_filled']} "
+                f"p_fresh={mix['p_fresh']:.3f} p_each_sidecar={mix['p_each_sidecar']:.3f} "
+                f"rooms={mix['room_ids']}",
+            )
+        else:
+            log(
+                "pb",
+                "reset mix: no filled typewriter champions yet — fresh starts only "
+                "(PbChampionResetWrapper still active)",
+            )
+    except Exception as exc:
+        log("pb", f"warm_pb_champions_for_training skipped: {exc!r}")
+
     args = build_parser().parse_args()
     role = args.role
     if role == "both":

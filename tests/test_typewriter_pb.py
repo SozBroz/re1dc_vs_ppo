@@ -147,6 +147,15 @@ def test_detector_waits_for_save_cinema_then_stable_control() -> None:
     assert det.update(done, done) is False
 
 
+@pytest.mark.parametrize("save_slot", [1, 2, 3, 5, 8, 15])
+def test_detector_complete_independent_of_memory_card_slot(save_slot: int) -> None:
+    """TypewriterSaveDetector keys off ribbon drop + cinema, not save slot."""
+    del save_slot  # slot is not an input to the detector
+    det = TypewriterSaveDetector()
+    assert _run_save_complete(det) is True
+    assert det.completed_room == "106"
+
+
 def test_sidecar_holdoff_blocks_false_save_on_load_settle() -> None:
     """PB start: uncontrolled→control must not complete a save without ribbon drop."""
     det = TypewriterSaveDetector()

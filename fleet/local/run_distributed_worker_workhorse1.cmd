@@ -9,10 +9,10 @@ set BASE_PORT=5655
 set N_ENVS=8
 set SYNC_INTERVAL_S=360
 
-REM Typewriter PB champion — local capture; fleet watch syncs best via scp.
+REM Typewriter PB champion — local capture; mix via PbChampionResetWrapper.
+REM Reset mix: sample_typewriter_start (N=0 fresh only; N=1 50/50; N>=2 fresh 1/3).
 set RE1_PB_CAPTURE=1
 set RE1_PB_V1_TYPEWRITER_ONLY=1
-set RE1_PB_FRESH_WEIGHT=0.5
 
 if not exist data\logs mkdir data\logs
 

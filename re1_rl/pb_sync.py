@@ -333,17 +333,58 @@ class _PbSyncDaemon:
 
 
 def ensure_pb_sync_daemon(project_root: Path | str) -> bool:
-    """Start background sync if ``RE1_PB_SHARED_ROOT`` is set. Idempotent."""
+    """Start background sync if ``RE1_PB_SHARED_ROOT`` is set. Idempotent.
+
+    On first start, runs one synchronous ``sync_champion_once`` so a training
+    restart can sample pulled sidecars on the first ``env.reset()``.
+    """
     if shared_pb_root() is None:
         return False
     global _daemon
     with _daemon_lock:
         if _daemon is not None:
             return True
+        try:
+            sync_champion_once(project_root)
+        except Exception:
+            pass
         interval = float(os.environ.get(_SYNC_INTERVAL_ENV, _DEFAULT_INTERVAL_S) or 30)
         _daemon = _PbSyncDaemon(Path(project_root), interval)
         _daemon.start()
         return True
+
+
+def warm_pb_champions_for_training(project_root: Path | str) -> dict[str, Any]:
+    """Pull shared champions (when configured) and report reset-mix status.
+
+    Call once at training process start (before actors spawn). Safe when no
+    champions exist yet — mix is fresh-only until slots fill.
+    """
+    from re1_rl.pb_curriculum import typewriter_mix_weights
+
+    root = Path(project_root)
+    shared = shared_pb_root()
+    sync_ran = False
+    if shared is not None:
+        sync_ran = ensure_pb_sync_daemon(root)
+        if not sync_ran:
+            try:
+                sync_champion_once(root)
+                sync_ran = True
+            except Exception:
+                pass
+    filled = list_filled_champions(root)
+    n = len(filled)
+    p_fresh, p_each = typewriter_mix_weights(n)
+    return {
+        "n_filled": n,
+        "p_fresh": p_fresh,
+        "p_each_sidecar": p_each,
+        "milestone_ids": [str(r.get("milestone_id") or "") for r in filled],
+        "room_ids": [str(r.get("room_id") or "") for r in filled],
+        "shared_root": str(shared) if shared is not None else None,
+        "sync_ran": sync_ran,
+    }
 
 
 def push_champion_async(project_root: Path | str) -> None:
