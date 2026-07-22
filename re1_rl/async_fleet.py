@@ -342,6 +342,7 @@ def _actor_process(
         env.close()
         return
 
+    # PbChampionResetWrapper (make_env) mixes champion vs fresh on reset.
     obs, _ = env.reset()
 
     obs_bufs: dict[str, np.ndarray] | None = None

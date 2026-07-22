@@ -242,8 +242,10 @@ def make_env(
             env = CheckpointCaptureWrapper(
                 env, PROJECT_ROOT / curriculum, port)
         env = Monitor(env)
+        from re1_rl.pb_reset_wrapper import PbChampionResetWrapper
         from sb3_contrib.common.wrappers import ActionMasker
 
+        env = PbChampionResetWrapper(env, project_root=PROJECT_ROOT)
         env = ActionMasker(env, lambda e: e.unwrapped.action_masks())
         _phase("env ready")
         return env

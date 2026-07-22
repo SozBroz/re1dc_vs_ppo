@@ -331,6 +331,12 @@ def qualify_cutscene_reward(
     ):
         return None
 
+    # Typewriter save cinema (ink ribbon spent in 106): not exploration cutscene.
+    from re1_rl.typewriter_save import typewriter_save_cutscene_disqualified
+
+    if typewriter_save_cutscene_disqualified(prev_state, new_state):
+        return None
+
     # Pre-Kenneth Main Hall scripts (Wesker talk, etc.): never pay cutscene.
     # Illegal hall entry already applies the soft -0.05 gate in compute_reward.
     hall_room = str((new_state or {}).get("room_id", "") or "") or str(

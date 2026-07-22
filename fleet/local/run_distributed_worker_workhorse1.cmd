@@ -9,6 +9,11 @@ set BASE_PORT=5655
 set N_ENVS=8
 set SYNC_INTERVAL_S=360
 
+REM Typewriter PB champion — local capture; fleet watch syncs best via scp.
+set RE1_PB_CAPTURE=1
+set RE1_PB_V1_TYPEWRITER_ONLY=1
+set RE1_PB_FRESH_WEIGHT=0.5
+
 if not exist data\logs mkdir data\logs
 
 echo Killing leftover EmuHawk/python on WH1...

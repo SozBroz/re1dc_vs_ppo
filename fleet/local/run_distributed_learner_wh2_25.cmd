@@ -11,6 +11,12 @@ set BASE_PORT=5555
 set LEARNER_PORT=8765
 set SYNC_INTERVAL_S=360
 
+REM Typewriter PB champion (single shared slot; capture on legal Main Hall save).
+set RE1_PB_CAPTURE=1
+set RE1_PB_V1_TYPEWRITER_ONLY=1
+set RE1_PB_FRESH_WEIGHT=0.5
+set RE1_PB_SHARED_ROOT=C:\Users\sshuser\re1_rl\states\pb
+
 if not exist data\logs mkdir data\logs
 REM Fresh heuristics log for this batch (truncate; do not delete).
 call "%~dp0flush_log.cmd" "C:\Users\sshuser\re1_rl\data\logs\learner_wh2_25.log"

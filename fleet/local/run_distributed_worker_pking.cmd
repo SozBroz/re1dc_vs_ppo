@@ -9,6 +9,11 @@ set BASE_PORT=5755
 set N_ENVS=20
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
 
+REM Typewriter PB champion — local capture; fleet watch syncs best via scp.
+set RE1_PB_CAPTURE=1
+set RE1_PB_V1_TYPEWRITER_ONLY=1
+set RE1_PB_FRESH_WEIGHT=0.5
+
 REM Top-right grid seat (5 cols x 4 rows, row-major, spawn/HWND order ≈ rank):
 REM   rank 4 → port 5759 → slot (col=4,row=0). Only that env writes memlog.
 REM Disable: unset RE1_STEP_DIAG_PORT (or set empty) before launch.

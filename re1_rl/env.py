@@ -397,6 +397,11 @@ class RE1Env(gym.Env):
         ] = []
         # Illegal pre-Kenneth Main Hall entry — flushed as episode failure.
         self._pending_episode_failure: str | None = None
+        # PB capture: one archive per trigger_id per episode (RE1_PB_CAPTURE=1).
+        self._pb_captured_triggers: set[str] = set()
+        from re1_rl.typewriter_save import TypewriterSaveDetector
+
+        self._typewriter_save_detector = TypewriterSaveDetector()
 
     def _load_stage(self) -> None:
         with self.curriculum_path.open(encoding="utf-8") as f:
@@ -677,6 +682,45 @@ class RE1Env(gym.Env):
             new_items=state.get("new_items") or [],
         )
 
+    def _after_reward_step(
+        self,
+        prev_state: dict[str, Any],
+        state: dict[str, Any],
+        breakdown: dict[str, float],
+    ) -> None:
+        """Auto-capture PB milestones when RE1_PB_CAPTURE=1."""
+        from re1_rl.pb_capture import maybe_capture_pb, pb_capture_enabled, pb_root_dir
+        from re1_rl.pb_milestones import detect_milestone_triggers
+        from re1_rl.pb_sync import ensure_pb_sync_daemon
+
+        ensure_pb_sync_daemon(self.project_root)
+        if not pb_capture_enabled():
+            return
+        detector = getattr(self, "_typewriter_save_detector", None)
+        save_complete = False
+        if detector is not None:
+            save_complete = bool(detector.update(prev_state, state))
+        states_dir = pb_root_dir(self.project_root)
+        for trigger_id in detect_milestone_triggers(
+            prev_state,
+            state,
+            breakdown,
+            already_captured=self._pb_captured_triggers,
+            typewriter_save_complete=save_complete,
+            visited_rooms=self._progress.visited_rooms,
+            rewarded_cutscenes=self._progress.rewarded_cutscenes,
+            kenneth_gate_breached=bool(self._progress.kenneth_gate_breached),
+        ):
+            try:
+                maybe_capture_pb(
+                    self,
+                    trigger_id=trigger_id,
+                    states_dir=states_dir,
+                    captured=self._pb_captured_triggers,
+                )
+            except (OSError, RuntimeError, ValueError):
+                pass
+
     def _capture_step_obs(self) -> np.ndarray:
         """Store the live framebuffer at ``emulated_frame`` and build [t-12..t]."""
         if self.bridge.emulated_frame >= 0:
@@ -700,8 +744,19 @@ class RE1Env(gym.Env):
         self._pending_episode_failure = None
         self._load_stage()
         assert self._planner is not None
+        self._pb_captured_triggers = set()
+        if getattr(self, "_typewriter_save_detector", None) is not None:
+            self._typewriter_save_detector.reset()
 
-        state_path = self.project_root / self._stage["init_savestate"]
+        from re1_rl.pb_capture import load_sidecar_json, resolve_pb_bundle
+        from re1_rl.pb_sidecar import apply_episode_sidecar
+
+        pb_bundle = resolve_pb_bundle(options)
+        if pb_bundle is not None:
+            sp = Path(pb_bundle["state_path"])
+            state_path = sp if sp.is_absolute() else self.project_root / sp
+        else:
+            state_path = self.project_root / self._stage["init_savestate"]
         self.bridge.load_savestate(str(state_path))
         self.bridge.frameadvance(1)
         if self._ram_skip.use_engine_patches:
@@ -753,9 +808,18 @@ class RE1Env(gym.Env):
             self.bridge.frame_ring.store_rgb(self.bridge.emulated_frame, rgb)
         frame_obs = self.bridge.build_frame_stack()
         self._prev_hp = 0
-        state = self._read_state()
-        self._seed_episode_progress(state)
-        self._episode_history.reset(str(state.get("room_id", "")), step=0)
+        state = self._read_state(track_items=pb_bundle is None)
+        if pb_bundle is not None:
+            scp = Path(pb_bundle["sidecar_path"])
+            sidecar_path = scp if scp.is_absolute() else self.project_root / scp
+            apply_episode_sidecar(
+                self, load_sidecar_json(sidecar_path), reset_softlock=True
+            )
+            state = self._read_state(track_items=True)
+            self._seed_episode_hp(state)
+        else:
+            self._seed_episode_progress(state)
+            self._episode_history.reset(str(state.get("room_id", "")), step=0)
         self._visited.update(state["room_id"], state["x"], state["z"])
         self._prev_state = state
         self._prev_hp = state["hp"]
@@ -767,13 +831,19 @@ class RE1Env(gym.Env):
             "waypoint": self._planner.next_waypoint_room(),
             "state": state,
         }
+        if pb_bundle is not None:
+            info["pb_bundle"] = pb_bundle
         return obs, info
 
-    def _seed_episode_progress(self, state: dict[str, Any]) -> None:
-        """Mark spawn room visited + arm spawn ``new_room`` on first reward step."""
+    def _seed_episode_hp(self, state: dict[str, Any]) -> None:
+        """HP bookkeeping only (PB restore — sidecar owns progress trackers)."""
         hp = int(state.get("hp", 0))
         self._episode_start_hp = hp if hp > 0 else 0
         self._episode_min_hp = self._episode_start_hp
+
+    def _seed_episode_progress(self, state: dict[str, Any]) -> None:
+        """Mark spawn room visited + arm spawn ``new_room`` on first reward step."""
+        self._seed_episode_hp(state)
         self._progress.seed_spawn_room(str(state.get("room_id", "")))
 
     def _skip_poll_ram(self) -> dict[str, int | float]:
@@ -1011,6 +1081,7 @@ class RE1Env(gym.Env):
                 success_room=self._stage.get("success_room"),
                 return_breakdown=True,
             )
+            self._after_reward_step(entry, crossing, bd)
             self._merge_post_skip_breakdown(float(reward), dict(bd))
             self._prev_state = dict(crossing)
 
@@ -1068,6 +1139,7 @@ class RE1Env(gym.Env):
             success_room=self._stage.get("success_room"),
             return_breakdown=True,
         )
+        self._after_reward_step(entry_prev or {}, state, bd)
         self._merge_post_skip_breakdown(float(reward), dict(bd))
         self._prev_state = state
         self._cutscene_skip_entry_prev = None
@@ -1798,6 +1870,7 @@ class RE1Env(gym.Env):
             success_room=self._stage.get("success_room"),
             return_breakdown=True,
         )
+        self._after_reward_step(self._prev_state, state, breakdown)
         terminated, truncated, episode_failure = self._termination_flags(state)
         obs = self._build_obs(frame_obs, state)
         info = {
@@ -2274,6 +2347,7 @@ class RE1Env(gym.Env):
             success_room=self._stage.get("success_room"),
             return_breakdown=True,
         )
+        self._after_reward_step(self._prev_state, state, breakdown)
         if self._post_skip_reward or self._post_skip_bd:
             reward += self._post_skip_reward
             for k, v in self._post_skip_bd.items():
