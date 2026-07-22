@@ -1776,6 +1776,11 @@ class RE1Env(gym.Env):
                     prev_hp=self._prev_hp,
                     episode_start_hp=getattr(self, "_episode_start_hp", 0),
                 )
+                if not magic_report.get("ok"):
+                    recovered, dismiss_report = self._try_dismiss_orphan_item_menu()
+                    magic_report = dict(magic_report)
+                    magic_report["menu_dismiss"] = dismiss_report
+                    magic_report["menu_recovered"] = bool(recovered)
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, self.frame_skip
                 magic_report = {"ok": False, "reason": f"error:{exc}"}
