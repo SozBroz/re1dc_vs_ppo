@@ -394,6 +394,7 @@ def try_replace_champion(
     cdir = typewriter_champion_dir(project_root, room)
     cdir.mkdir(parents=True, exist_ok=True)
 
+    # Fast path: if a stronger incumbent is already visible, keep going.
     incumbent = load_champion_record(cdir)
     inc_score = None
     inc_version: int | None = None
@@ -434,17 +435,44 @@ def try_replace_champion(
         "room_id": room,
         "hp": int(state.get("hp", 0) or 0),
     }
-    from re1_rl.pb_bundle_io import install_champion_bundle
+    from re1_rl.pb_bundle_io import install_champion_bundle, wait_for_slot_unlock
+
+    # Lock held → wait, then re-check; install does a second CAS under the lock.
+    if not wait_for_slot_unlock(cdir, timeout_s=90.0):
+        return False
+    incumbent = load_champion_record(cdir)
+    inc_score = None
+    inc_version = None
+    if incumbent:
+        if "score_version" in incumbent:
+            try:
+                inc_version = int(incumbent["score_version"])
+            except (TypeError, ValueError):
+                inc_version = None
+        if "score" in incumbent:
+            try:
+                inc_score = tuple(int(x) for x in incumbent["score"])
+            except (TypeError, ValueError):
+                inc_score = None
+    if not score_beats(
+        score_t,
+        inc_score,
+        candidate_version=SCORE_VERSION,
+        incumbent_version=inc_version,
+    ):
+        return False
 
     try:
-        install_champion_bundle(
+        bid = install_champion_bundle(
             cdir,
             state_src=state_path,
             sidecar_src=sidecar_path,
             record=record,
             holder=f"capture:{os.environ.get('COMPUTERNAME', 'local')}",
+            candidate_score=score_t,
+            candidate_version=SCORE_VERSION,
+            wait_timeout_s=90.0,
         )
     except RuntimeError:
-        # Slot locked by fleet sync — skip this candidate; next save can retry.
         return False
-    return True
+    return bid is not None

@@ -26,13 +26,15 @@ from re1_rl.pb_milestones import detect_milestone_triggers, typewriter_save_capt
 from re1_rl.pb_sidecar import EpisodeSidecarParts, apply_episode_sidecar, dump_episode_sidecar
 from re1_rl.pb_sync import sync_champion_once
 from re1_rl.progress import ProgressTracker
-from re1_rl.reward import SOFTLOCK_EXTENSION_FRAMES
+from re1_rl.reward import SOFTLOCK_EXTENSION_FRAMES, TYPEWRITER_SAVE_BONUS, compute_reward
 from re1_rl.typewriter_save import (
     TYPEWRITER_SAVE_MILESTONE,
     TypewriterSaveDetector,
+    _SIDECAR_HOLDOFF_CONTROL_STREAK,
     ink_ribbon_consumed,
     typewriter_save_cutscene_disqualified,
 )
+from tests.test_scaffolding import make_planner
 
 
 def _slots_state(
@@ -121,10 +123,9 @@ def test_detect_typewriter_milestone_room_118(
     assert triggers == [typewriter_milestone_id("118")]
 
 
-def test_detector_waits_for_save_cinema_then_stable_control() -> None:
-    det = TypewriterSaveDetector()
-    prev = _slots_state(ribbons=2)
-    drop = _slots_state(ribbons=1)
+def _run_save_complete(det: TypewriterSaveDetector, *, room: str = "106") -> bool:
+    prev = _slots_state(ribbons=2, room=room)
+    drop = _slots_state(ribbons=1, room=room)
     drop["in_control"] = True
     assert det.update(prev, drop) is False
     cinema = dict(drop)
@@ -134,9 +135,68 @@ def test_detector_waits_for_save_cinema_then_stable_control() -> None:
     ctrl1["in_control"] = True
     assert det.update(cinema, ctrl1) is False
     ctrl2 = dict(ctrl1)
-    assert det.update(ctrl1, ctrl2) is True
+    return bool(det.update(ctrl1, ctrl2))
+
+
+def test_detector_waits_for_save_cinema_then_stable_control() -> None:
+    det = TypewriterSaveDetector()
+    assert _run_save_complete(det) is True
     assert det.completed_room == "106"
-    assert det.update(ctrl2, ctrl2) is False
+    done = _slots_state(ribbons=1)
+    done["in_control"] = True
+    assert det.update(done, done) is False
+
+
+def test_sidecar_holdoff_blocks_false_save_on_load_settle() -> None:
+    """PB start: uncontrolled→control must not complete a save without ribbon drop."""
+    det = TypewriterSaveDetector()
+    spawn = _slots_state(ribbons=1)
+    spawn["in_control"] = False
+    det.begin_episode(from_sidecar=True, state=spawn)
+    assert det.sidecar_holdoff
+    # Mimic load settle / ribbon flicker that would otherwise arm+complete.
+    flicker = _slots_state(ribbons=0)
+    flicker["in_control"] = False
+    assert det.update(spawn, flicker) is False
+    ctrl = _slots_state(ribbons=1)
+    ctrl["in_control"] = True
+    for _ in range(_SIDECAR_HOLDOFF_CONTROL_STREAK + 2):
+        assert det.update(ctrl, ctrl) is False
+    assert not det.sidecar_holdoff
+    # Real save after holdoff clears still pays/detects.
+    assert _run_save_complete(det) is True
+
+
+def test_typewriter_save_reward_pays_on_complete_flag() -> None:
+    progress = ProgressTracker()
+    progress.first_visit("106")
+    progress.claim_spawn_room_bonus()
+    prev = _slots_state(ribbons=1)
+    prev["in_control"] = True
+    cur = dict(prev)
+    cap_before = progress.softlock_cap_frames
+    _, bd = compute_reward(
+        prev,
+        cur,
+        make_planner(),
+        progress=progress,
+        typewriter_save_complete=True,
+        return_breakdown=True,
+    )
+    assert bd["typewriter_save"] == pytest.approx(TYPEWRITER_SAVE_BONUS)
+    assert bd["typewriter_save"] == pytest.approx(0.3)
+    # Modest crumb — does not raise the 12 min idle floor by itself.
+    assert progress.softlock_cap_frames == cap_before
+
+    _, bd2 = compute_reward(
+        prev,
+        cur,
+        make_planner(),
+        progress=progress,
+        typewriter_save_complete=False,
+        return_breakdown=True,
+    )
+    assert bd2["typewriter_save"] == 0.0
 
 
 def test_detector_works_in_non_106_room() -> None:

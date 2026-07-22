@@ -49,6 +49,8 @@ WAYPOINT_ROOM_BONUS = 4.0
 
 # Junk / ammo / herbs: modest crumb.
 ITEM_PICKUP_BONUS = 0.15
+# Completed typewriter save (ink-ribbon consume + save cinema + stable control).
+TYPEWRITER_SAVE_BONUS = 0.3
 # Keys / emblems / crests (room_items.json key_item=true).
 KEY_ITEM_PICKUP_BONUS = 4.0
 # Story inventory USE at a curated site (piano, fireplace, …).
@@ -285,6 +287,7 @@ def compute_reward(
     graph: RoomGraph | None = None,
     softlock_threshold: int | None = None,
     success_room: str | None = None,
+    typewriter_save_complete: bool = False,
     return_breakdown: bool = False,
 ) -> float | tuple[float, dict[str, float]]:
     """Compute scalar reward from symbolic state dicts."""
@@ -304,6 +307,7 @@ def compute_reward(
         "new_room": 0.0,
         "document_examine": 0.0,
         "new_cutscene": 0.0,
+        "typewriter_save": 0.0,
         "retreat": 0.0,
         "wrong_room": 0.0,
         "item": 0.0,
@@ -441,6 +445,14 @@ def compute_reward(
     ):
         if progress.claim_cutscene_bonus(str(cutscene_key)):
             bd["new_cutscene"] = NEW_CUTSCENE_BONUS
+
+    # Same edge as PB typewriter capture (detector complete). Modest crumb;
+    # does not extend the 12 min idle floor. Sidecar episode starts suppress
+    # the detector until control+ribbon count are stable (see TypewriterSaveDetector).
+    if typewriter_save_complete and not (
+        progress is not None and progress.kenneth_gate_breached
+    ):
+        bd["typewriter_save"] = TYPEWRITER_SAVE_BONUS
 
     if progress is not None:
         room_now = str(state.get("room_id", "") or "")

@@ -130,7 +130,11 @@ def _copy_champion_tree(src_dir: Path, dst_dir: Path, *, slot_name: str) -> None
     Never deletes unrelated files or other slot trees. Refuses to read a locked
     or incoherent source; installs under ``champion.sync.lock`` on the destination.
     """
-    from re1_rl.pb_bundle_io import install_champion_bundle, verify_champion_bundle
+    from re1_rl.pb_bundle_io import (
+        install_champion_bundle,
+        verify_champion_bundle,
+        wait_for_slot_unlock,
+    )
 
     ok, reason = verify_champion_bundle(src_dir, require_unlocked=True)
     if not ok:
@@ -142,14 +146,34 @@ def _copy_champion_tree(src_dir: Path, dst_dir: Path, *, slot_name: str) -> None
     state_rel, sidecar_rel = _rel_paths_for_slot(slot_name)
     data["state_path"] = state_rel
     data["sidecar_path"] = sidecar_rel
-    install_champion_bundle(
+    cand_score = None
+    try:
+        cand_score = tuple(int(x) for x in (data.get("score") or ()))
+    except (TypeError, ValueError):
+        cand_score = None
+    cand_ver = None
+    try:
+        if "score_version" in data:
+            cand_ver = int(data["score_version"])
+    except (TypeError, ValueError):
+        cand_ver = None
+    # Wait for dest lock, then CAS-install (None ⇒ dest already stronger — ok).
+    if not wait_for_slot_unlock(dst_dir, timeout_s=90.0):
+        raise OSError(f"destination champion locked: {dst_dir}")
+    installed = install_champion_bundle(
         dst_dir,
         state_src=src_dir / "champion.State",
         sidecar_src=src_dir / "champion.sidecar.json",
         record=data,
         holder=f"pb_sync:{os.environ.get('COMPUTERNAME', 'local')}",
         bundle_id=str(data.get("bundle_id") or "") or None,
+        candidate_score=cand_score if cand_score else None,
+        candidate_version=cand_ver,
+        wait_timeout_s=90.0,
     )
+    if installed is None and cand_score:
+        # Dest won the CAS — not an error; pull/push simply no-ops.
+        return
 
 
 def _sync_one_slot(
@@ -171,12 +195,26 @@ def _sync_one_slot(
     local_cand_ver = local_ver if local_ver is not None else 1
     shared_cand_ver = shared_ver if shared_ver is not None else 1
 
-    from re1_rl.pb_bundle_io import is_slot_locked, verify_champion_bundle
+    from re1_rl.pb_bundle_io import verify_champion_bundle, wait_for_slot_unlock
 
-    if is_slot_locked(local_dir) or is_slot_locked(shared_dir):
+    # Wait for locks rather than skipping the cycle — then re-read scores.
+    if not wait_for_slot_unlock(local_dir, timeout_s=90.0):
         actions["push"] = "locked"
         actions["pull"] = "locked"
         return actions
+    if not wait_for_slot_unlock(shared_dir, timeout_s=90.0):
+        actions["push"] = "locked"
+        actions["pull"] = "locked"
+        return actions
+
+    local_rec = _read_json(local_dir / CHAMPION_JSON)
+    shared_rec = _read_json(shared_dir / CHAMPION_JSON)
+    local_score = _score_from_record(local_rec)
+    shared_score = _score_from_record(shared_rec)
+    local_ver = _score_version(local_rec)
+    shared_ver = _score_version(shared_rec)
+    local_cand_ver = local_ver if local_ver is not None else 1
+    shared_cand_ver = shared_ver if shared_ver is not None else 1
 
     local_ok, _ = verify_champion_bundle(local_dir, require_unlocked=True)
     if local_ok and local_rec:

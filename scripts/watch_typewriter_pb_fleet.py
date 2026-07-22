@@ -264,26 +264,67 @@ def push_champion_tree(host_id: str, slot_name: str, src_dir: Path) -> bool:
         print(f"[watch] refuse push incoherent src slot={slot_name}: {reason}", flush=True)
         return False
 
+    data = json.loads((src_dir / "champion.json").read_text(encoding="utf-8"))
+    try:
+        cand_score = tuple(int(x) for x in (data.get("score") or ()))
+    except (TypeError, ValueError):
+        cand_score = None
+    try:
+        cand_ver = int(data["score_version"]) if "score_version" in data else None
+    except (TypeError, ValueError):
+        cand_ver = None
+
     if cfg["kind"] == "local":
         dest = Path(cfg["root"]) / rel
-        data = json.loads((src_dir / "champion.json").read_text(encoding="utf-8"))
+        from re1_rl.pb_bundle_io import wait_for_slot_unlock
+
+        if not wait_for_slot_unlock(dest, timeout_s=90.0):
+            print(f"[watch] push timeout waiting lock slot={slot_name} -> {host_id}", flush=True)
+            return False
         try:
-            install_champion_bundle(
+            installed = install_champion_bundle(
                 dest,
                 state_src=src_dir / "champion.State",
                 sidecar_src=src_dir / "champion.sidecar.json",
                 record=data,
                 holder="watch:pking",
                 bundle_id=str(data.get("bundle_id") or "") or None,
+                candidate_score=cand_score if cand_score else None,
+                candidate_version=cand_ver,
+                wait_timeout_s=90.0,
             )
         except RuntimeError as exc:
             print(f"[watch] push locked/fail slot={slot_name} -> {host_id}: {exc}", flush=True)
             return False
+        if installed is None:
+            print(
+                f"[watch] push CAS skip slot={slot_name} -> {host_id}: dest stronger",
+                flush=True,
+            )
         return True
 
-    if _host_locked(host_id, slot_name):
-        print(f"[watch] skip push slot={slot_name} -> {host_id}: locked", flush=True)
-        return False
+    # Remote: wait out lock, then re-check remote score before scp overwrite.
+    deadline = time.time() + 90.0
+    while _host_locked(host_id, slot_name):
+        if time.time() >= deadline:
+            print(f"[watch] push timeout waiting remote lock slot={slot_name} -> {host_id}", flush=True)
+            return False
+        time.sleep(0.5)
+    remote_rec = _fetch_record(host_id, slot_name)
+    remote_sc = _score(remote_rec)
+    if remote_sc is not None and cand_score is not None:
+        remote_ver = _score_version(remote_rec)
+        if not _score_beats(
+            cand_score,
+            remote_sc,
+            candidate_version=cand_ver if cand_ver is not None else 1,
+            incumbent_version=remote_ver,
+        ):
+            print(
+                f"[watch] push CAS skip slot={slot_name} -> {host_id}: remote stronger {list(remote_sc)}",
+                flush=True,
+            )
+            return True
 
     remote_dir = f'{cfg["root"]}/{rel.as_posix()}'
     win_dir = _remote_win_path(cfg["root"], rel)
@@ -327,6 +368,24 @@ def push_champion_tree(host_id: str, slot_name: str, src_dir: Path) -> bool:
         )
         if proc.returncode != 0:
             return False
+        # Under our remote lock: re-read score (another host may have landed
+        # a stronger bundle in the wait window). Abort push if we lost.
+        remote_rec = _fetch_record(host_id, slot_name)
+        remote_sc = _score(remote_rec)
+        if remote_sc is not None and cand_score is not None:
+            remote_ver = _score_version(remote_rec)
+            if not _score_beats(
+                cand_score,
+                remote_sc,
+                candidate_version=cand_ver if cand_ver is not None else 1,
+                incumbent_version=remote_ver,
+            ):
+                print(
+                    f"[watch] push CAS skip (under lock) slot={slot_name} -> {host_id}: "
+                    f"remote stronger {list(remote_sc)}",
+                    flush=True,
+                )
+                return True
         for name in CHAMP_FILES:
             local = src_dir / name
             if not local.is_file():

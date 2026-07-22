@@ -20,6 +20,7 @@ from re1_rl.pb_bundle_io import (
     is_slot_locked,
     release_slot_lock,
     verify_champion_bundle,
+    wait_for_slot_unlock,
 )
 from re1_rl.pb_champion import list_filled_champions, try_replace_champion
 
@@ -130,6 +131,105 @@ def test_bundle_room_match() -> None:
     assert bundle_room_matches_sidecar("106", {"captured_room_id": "0x106"}) is False
     assert bundle_room_matches_sidecar("106", {})  # unknown capture room → allow
     assert not bundle_room_matches_sidecar("105", {"captured_room_id": "106"})
+
+
+def test_wait_for_slot_unlock_and_cas_lose(tmp_path: Path) -> None:
+    slot = tmp_path / "slot"
+    state = tmp_path / "a.State"
+    side = tmp_path / "a.sidecar.json"
+    state.write_bytes(b"STRONG")
+    side.write_text(json.dumps({"captured_room_id": "106"}), encoding="utf-8")
+    install_champion_bundle(
+        slot,
+        state_src=state,
+        sidecar_src=side,
+        record={
+            "state_path": "s",
+            "sidecar_path": "c",
+            "score": [5, 0, 0, 0, 100],
+            "score_version": 2,
+            "room_id": "106",
+        },
+        holder="strong",
+    )
+    weak_state = tmp_path / "b.State"
+    weak_side = tmp_path / "b.sidecar.json"
+    weak_state.write_bytes(b"WEAK")
+    weak_side.write_text(json.dumps({"captured_room_id": "106"}), encoding="utf-8")
+    lost = install_champion_bundle(
+        slot,
+        state_src=weak_state,
+        sidecar_src=weak_side,
+        record={
+            "state_path": "s",
+            "sidecar_path": "c",
+            "score": [1, 0, 0, 0, 50],
+            "score_version": 2,
+            "room_id": "106",
+        },
+        holder="weak",
+        candidate_score=(1, 0, 0, 0, 50),
+        candidate_version=2,
+    )
+    assert lost is None
+    assert (slot / "champion.State").read_bytes() == b"STRONG"
+    assert not is_slot_locked(slot)
+
+    assert acquire_slot_lock(slot, holder="writer")
+    released = {"ok": False}
+
+    def _release_soon() -> None:
+        time.sleep(0.3)
+        release_slot_lock(slot)
+        released["ok"] = True
+
+    import threading
+
+    threading.Thread(target=_release_soon, daemon=True).start()
+    assert wait_for_slot_unlock(slot, timeout_s=5.0, poll_s=0.05)
+    assert released["ok"]
+    assert not is_slot_locked(slot)
+
+
+def test_try_replace_keeps_stronger_after_wait(tmp_path: Path) -> None:
+    strong = tmp_path / "strong.State"
+    strong_side = tmp_path / "strong.sidecar.json"
+    strong.write_bytes(b"S")
+    strong_side.write_text("{}", encoding="utf-8")
+    assert try_replace_champion(
+        tmp_path,
+        state_path=strong,
+        sidecar_path=strong_side,
+        state={
+            "room_id": "106",
+            "hp": 200,
+            "inventory_slots": [["beretta", 30], ["ink_ribbon", 3]],
+            "inventory": ["beretta", "ink_ribbon"],
+        },
+        score=(9, 0, 0, 0, 200),
+        room_id="106",
+        visited_rooms=("106",),
+    )
+    weak = tmp_path / "weak.State"
+    weak_side = tmp_path / "weak.sidecar.json"
+    weak.write_bytes(b"W")
+    weak_side.write_text("{}", encoding="utf-8")
+    assert not try_replace_champion(
+        tmp_path,
+        state_path=weak,
+        sidecar_path=weak_side,
+        state={
+            "room_id": "106",
+            "hp": 10,
+            "inventory_slots": [["knife", 0]],
+            "inventory": ["knife"],
+        },
+        score=(1, 0, 0, 0, 10),
+        room_id="106",
+        visited_rooms=("106",),
+    )
+    cdir = tmp_path / "states" / "pb" / "champions" / "mainhall_typewriter"
+    assert (cdir / "champion.State").read_bytes() == b"S"
 
 
 def test_split_state_hash_rejected(tmp_path: Path) -> None:

@@ -682,11 +682,24 @@ class RE1Env(gym.Env):
             new_items=state.get("new_items") or [],
         )
 
+    def _poll_typewriter_save(
+        self,
+        prev_state: dict[str, Any] | None,
+        state: dict[str, Any] | None,
+    ) -> bool:
+        """Advance save detector once per reward step. True on completed save."""
+        detector = getattr(self, "_typewriter_save_detector", None)
+        if detector is None:
+            return False
+        return bool(detector.update(prev_state, state))
+
     def _after_reward_step(
         self,
         prev_state: dict[str, Any],
         state: dict[str, Any],
         breakdown: dict[str, float],
+        *,
+        typewriter_save_complete: bool = False,
     ) -> None:
         """Auto-capture PB milestones when RE1_PB_CAPTURE=1."""
         from re1_rl.pb_capture import maybe_capture_pb, pb_capture_enabled, pb_root_dir
@@ -696,12 +709,10 @@ class RE1Env(gym.Env):
         ensure_pb_sync_daemon(self.project_root)
         if not pb_capture_enabled():
             return
-        detector = getattr(self, "_typewriter_save_detector", None)
-        save_complete = False
         save_room = None
-        if detector is not None:
-            save_complete = bool(detector.update(prev_state, state))
-            if save_complete:
+        if typewriter_save_complete:
+            detector = getattr(self, "_typewriter_save_detector", None)
+            if detector is not None:
                 save_room = getattr(detector, "last_room", None) or getattr(
                     detector, "completed_room", None
                 )
@@ -711,7 +722,7 @@ class RE1Env(gym.Env):
             state,
             breakdown,
             already_captured=self._pb_captured_triggers,
-            typewriter_save_complete=save_complete,
+            typewriter_save_complete=typewriter_save_complete,
             typewriter_save_room=save_room,
             visited_rooms=self._progress.visited_rooms,
             rewarded_cutscenes=self._progress.rewarded_cutscenes,
@@ -751,8 +762,6 @@ class RE1Env(gym.Env):
         self._load_stage()
         assert self._planner is not None
         self._pb_captured_triggers = set()
-        if getattr(self, "_typewriter_save_detector", None) is not None:
-            self._typewriter_save_detector.reset()
 
         from re1_rl.pb_bundle_io import (
             bundle_room_matches_sidecar,
@@ -895,6 +904,12 @@ class RE1Env(gym.Env):
         self._visited.update(state["room_id"], state["x"], state["z"])
         self._prev_state = state
         self._prev_hp = state["hp"]
+        if getattr(self, "_typewriter_save_detector", None) is not None:
+            # Sidecar/PB starts hold off save detect until control+ribbons stable.
+            self._typewriter_save_detector.begin_episode(
+                from_sidecar=pb_bundle is not None,
+                state=state,
+            )
         self._start_bg_skip()
 
         obs = self._build_obs(frame_obs, state)
@@ -1144,6 +1159,7 @@ class RE1Env(gym.Env):
             )
             # Kenneth gate: compute_reward applies -0.05 and marks the terminal
             # observation; the outer step terminates after the skip settles.
+            save_complete = self._poll_typewriter_save(entry, crossing)
             reward, bd = compute_reward(
                 entry,
                 crossing,
@@ -1151,9 +1167,12 @@ class RE1Env(gym.Env):
                 progress=self._progress,
                 graph=self.graph,
                 success_room=self._stage.get("success_room"),
+                typewriter_save_complete=save_complete,
                 return_breakdown=True,
             )
-            self._after_reward_step(entry, crossing, bd)
+            self._after_reward_step(
+                entry, crossing, bd, typewriter_save_complete=save_complete
+            )
             self._merge_post_skip_breakdown(float(reward), dict(bd))
             self._prev_state = dict(crossing)
 
@@ -1202,6 +1221,7 @@ class RE1Env(gym.Env):
             entry_prev,
             state,
         )
+        save_complete = self._poll_typewriter_save(entry_prev or {}, state)
         reward, bd = compute_reward(
             entry_prev,
             state,
@@ -1209,9 +1229,12 @@ class RE1Env(gym.Env):
             progress=self._progress,
             graph=self.graph,
             success_room=self._stage.get("success_room"),
+            typewriter_save_complete=save_complete,
             return_breakdown=True,
         )
-        self._after_reward_step(entry_prev or {}, state, bd)
+        self._after_reward_step(
+            entry_prev or {}, state, bd, typewriter_save_complete=save_complete
+        )
         self._merge_post_skip_breakdown(float(reward), dict(bd))
         self._prev_state = state
         self._cutscene_skip_entry_prev = None
@@ -1933,6 +1956,7 @@ class RE1Env(gym.Env):
             state.get("room_id", ""),
             bool(state.get("in_control", True)),
         )
+        save_complete = self._poll_typewriter_save(self._prev_state, state)
         reward, breakdown = compute_reward(
             self._prev_state,
             state,
@@ -1940,9 +1964,15 @@ class RE1Env(gym.Env):
             progress=self._progress,
             graph=self.graph,
             success_room=self._stage.get("success_room"),
+            typewriter_save_complete=save_complete,
             return_breakdown=True,
         )
-        self._after_reward_step(self._prev_state, state, breakdown)
+        self._after_reward_step(
+            self._prev_state,
+            state,
+            breakdown,
+            typewriter_save_complete=save_complete,
+        )
         terminated, truncated, episode_failure = self._termination_flags(state)
         obs = self._build_obs(frame_obs, state)
         info = {
@@ -2410,6 +2440,7 @@ class RE1Env(gym.Env):
             bool(state.get("in_control", True)),
         )
 
+        save_complete = self._poll_typewriter_save(self._prev_state, state)
         reward, breakdown = compute_reward(
             self._prev_state,
             state,
@@ -2417,9 +2448,15 @@ class RE1Env(gym.Env):
             progress=self._progress,
             graph=self.graph,
             success_room=self._stage.get("success_room"),
+            typewriter_save_complete=save_complete,
             return_breakdown=True,
         )
-        self._after_reward_step(self._prev_state, state, breakdown)
+        self._after_reward_step(
+            self._prev_state,
+            state,
+            breakdown,
+            typewriter_save_complete=save_complete,
+        )
         if self._post_skip_reward or self._post_skip_bd:
             reward += self._post_skip_reward
             for k, v in self._post_skip_bd.items():

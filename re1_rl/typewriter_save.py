@@ -124,6 +124,11 @@ def typewriter_save_cutscene_disqualified(
 # Env macro-steps of continuous in_control after the save cinema (frame_skip≈8).
 _POST_SAVE_CONTROL_STREAK = 2
 
+# After a PB/sidecar episode start, ignore ribbon/control edges until Jill has
+# been stably in control with an unchanged ink-ribbon count. Load settle can
+# look like save cinema (uncontrolled → control) and inventory can flicker.
+_SIDECAR_HOLDOFF_CONTROL_STREAK = 8
+
 
 class TypewriterSaveDetector:
     """Latch ribbon drop → require save cinema (uncontrolled) → stable control.
@@ -131,6 +136,9 @@ class TypewriterSaveDetector:
     Must not fire on the ribbon-drop step itself (still mid save-UI / pre-cinema).
     Capture only after the engine seizes control for the save sequence and then
     returns Jill to playable control in the same typewriter room.
+
+    Sidecar / PB episode starts begin in holdoff so a load settle cannot look
+    like a completed save (reward + capture stay silent until holdoff clears).
     """
 
     def __init__(self) -> None:
@@ -138,6 +146,9 @@ class TypewriterSaveDetector:
         self._pending_room: str | None = None
         self._saw_uncontrolled = False
         self._control_streak = 0
+        self._sidecar_holdoff = False
+        self._holdoff_ribbon_baseline: int | None = None
+        self._holdoff_stable_ctrl = 0
         self.armed_room: str | None = None
         self.completed_room: str | None = None
         self.last_room: str | None = None
@@ -147,15 +158,52 @@ class TypewriterSaveDetector:
         self._pending_room = None
         self._saw_uncontrolled = False
         self._control_streak = 0
+        self._sidecar_holdoff = False
+        self._holdoff_ribbon_baseline = None
+        self._holdoff_stable_ctrl = 0
         self.armed_room = None
         self.completed_room = None
         self.last_room = None
+
+    def begin_episode(
+        self,
+        *,
+        from_sidecar: bool,
+        state: dict[str, Any] | None = None,
+    ) -> None:
+        """Reset detector; arm sidecar holdoff when the episode loaded a PB."""
+        self.reset()
+        if not from_sidecar:
+            return
+        self._sidecar_holdoff = True
+        self._holdoff_ribbon_baseline = count_ink_ribbons(state)
+        self._holdoff_stable_ctrl = 0
+
+    @property
+    def sidecar_holdoff(self) -> bool:
+        return bool(self._sidecar_holdoff)
 
     def _clear_pending(self) -> None:
         self._pending = False
         self._pending_room = None
         self._saw_uncontrolled = False
         self._control_streak = 0
+
+    def _tick_sidecar_holdoff(self, state: dict[str, Any]) -> None:
+        ribbons = count_ink_ribbons(state)
+        if self._holdoff_ribbon_baseline is None:
+            self._holdoff_ribbon_baseline = ribbons
+        in_control = bool(state.get("in_control", False))
+        if in_control and ribbons == self._holdoff_ribbon_baseline:
+            self._holdoff_stable_ctrl += 1
+        else:
+            self._holdoff_stable_ctrl = 0
+            if in_control:
+                self._holdoff_ribbon_baseline = ribbons
+        self._clear_pending()
+        self.armed_room = None
+        if self._holdoff_stable_ctrl >= _SIDECAR_HOLDOFF_CONTROL_STREAK:
+            self._sidecar_holdoff = False
 
     def update(
         self,
@@ -164,6 +212,9 @@ class TypewriterSaveDetector:
     ) -> bool:
         """Return True on the step a completed typewriter save should capture."""
         if state is None:
+            return False
+        if self._sidecar_holdoff:
+            self._tick_sidecar_holdoff(state)
             return False
         room = str(state.get("room_id", "") or "")
         in_control = bool(state.get("in_control", False))

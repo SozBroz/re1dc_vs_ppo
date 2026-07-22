@@ -24,13 +24,22 @@ Policy source: imperator.
 | 8 | Killing an enemy | Modest: **+0.24** | (no special rule stated) | In force |
 | 9 | Story-driven interaction (Gallery portrait sequence) | Modest: **+0.5 per correct switch** | Extends | In force |
 | 10 | Document / book examine UI entered | **+4.0** | Extends **+12 min** idle cap (same path as new room) | In force |
+| 11 | Typewriter save completed | Modest: **+0.3** | (no 12 min floor raise; PB sidecar start holdoff) | In force |
 
 Buckets:
 
 - **1, 3, 4, 5, 10**: **+4.0** and raise softlock idle truncate floor to **12 min** (weapons: first acquire of that name this episode; documents: first rising edge into examine UI per room this episode)
 - **2**: **+1.2**; resets stagnation but does **not** by itself raise the 12 min floor
-- **6–8**: modest crumbs / combat
+- **6–8, 11**: modest crumbs / combat / save
 - **9**: **+0.5** per correct Gallery portrait switch; extends
+
+Typewriter save (#11):
+
+- Same detector as PB capture (`TypewriterSaveDetector`): ink_ribbon drop in a
+  typewriter room → save cinema → stable control. Pays **+0.3** on that complete
+  edge (`bd["typewriter_save"]`). Does not raise the 12 min idle floor.
+- **Sidecar / PB starts:** holdoff until stable in_control + unchanged ribbon
+  count so load settle cannot pay. Real saves after holdoff still pay.
 
 Document examine (#10):
 
@@ -206,5 +215,6 @@ Event fired?
 ├─ Weapon get? → #5 (+4.0; first acquire → 12m idle floor); wall shotgun return → −4.0
 ├─ Other non-key item get? → #6 every pickup
 ├─ Hit / kill on knife|attack step? → #7 / #8
-└─ Gallery portrait sequence? → +0.5 per correct ordered switch; claw back partial attempt on wrong input/exit
+├─ Gallery portrait sequence? → +0.5 per correct ordered switch; claw back partial attempt on wrong input/exit
+└─ Typewriter save complete (not during PB sidecar holdoff)? → #11 (+0.3)
 ```

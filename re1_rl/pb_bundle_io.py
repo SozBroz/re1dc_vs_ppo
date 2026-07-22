@@ -67,6 +67,23 @@ def is_slot_locked(slot_dir: Path | str, *, stale_s: float = STALE_LOCK_S) -> bo
     return lock_path(slot_dir).is_file()
 
 
+def wait_for_slot_unlock(
+    slot_dir: Path | str,
+    *,
+    timeout_s: float = 90.0,
+    poll_s: float = 0.25,
+    stale_s: float = STALE_LOCK_S,
+) -> bool:
+    """Block until ``champion.sync.lock`` is gone (or stale). False on timeout."""
+    deadline = time.monotonic() + max(0.0, float(timeout_s))
+    while True:
+        if not is_slot_locked(slot_dir, stale_s=stale_s):
+            return True
+        if time.monotonic() >= deadline:
+            return not is_slot_locked(slot_dir, stale_s=stale_s)
+        time.sleep(max(0.05, float(poll_s)))
+
+
 def acquire_slot_lock(
     slot_dir: Path | str,
     *,
@@ -209,12 +226,25 @@ def install_champion_bundle(
     record: dict[str, Any],
     holder: str = "local",
     bundle_id: str | None = None,
-) -> str:
-    """Install State + sidecar + json under a lock. Returns ``bundle_id``.
+    candidate_score: tuple[int, ...] | None = None,
+    candidate_version: int | None = None,
+    wait_timeout_s: float = 90.0,
+) -> str | None:
+    """Install State + sidecar + json under a lock.
 
-    Stages into ``.incoming/`` then promotes with ``os.replace``. Lock is always
-    released (best-effort) even on failure.
+    Protocol:
+      1. If lock held → wait for release (up to *wait_timeout_s*).
+      2. Acquire lock.
+      3. If *candidate_score* is set → re-read incumbent under the lock; if we no
+         longer beat it, release and return ``None`` (lost CAS — keep going).
+      4. Otherwise promote the full bundle atomically.
+
+    Returns ``bundle_id`` on success, ``None`` if a stronger incumbent appeared
+    while we waited / under the lock. Raises if the slot stays locked past timeout
+    or sources are missing.
     """
+    from re1_rl.pb_champion import SCORE_VERSION, score_beats
+
     slot = Path(slot_dir)
     slot.mkdir(parents=True, exist_ok=True)
     state_src = Path(state_src)
@@ -223,11 +253,47 @@ def install_champion_bundle(
         raise FileNotFoundError("install_champion_bundle requires State + sidecar sources")
 
     bid = bundle_id or new_bundle_id()
+    if is_slot_locked(slot):
+        if not wait_for_slot_unlock(slot, timeout_s=wait_timeout_s):
+            raise RuntimeError(f"champion slot locked (timeout): {slot}")
+
     if not acquire_slot_lock(slot, holder=holder, bundle_id=bid):
-        raise RuntimeError(f"champion slot locked: {slot}")
+        # Lost the race for the lock — wait once more then retry acquire.
+        if not wait_for_slot_unlock(slot, timeout_s=min(30.0, wait_timeout_s)):
+            raise RuntimeError(f"champion slot locked: {slot}")
+        if not acquire_slot_lock(slot, holder=holder, bundle_id=bid):
+            raise RuntimeError(f"champion slot locked: {slot}")
 
     incoming = slot / INCOMING_NAME
     try:
+        # Compare-and-swap: under the lock, bail if someone stronger already landed.
+        if candidate_score is not None:
+            inc = _read_json(slot / CHAMPION_JSON)
+            inc_score = None
+            inc_ver = None
+            if inc and "score" in inc:
+                try:
+                    inc_score = tuple(int(x) for x in inc["score"])
+                except (TypeError, ValueError):
+                    inc_score = None
+            if inc and "score_version" in inc:
+                try:
+                    inc_ver = int(inc["score_version"])
+                except (TypeError, ValueError):
+                    inc_ver = None
+            cand_ver = (
+                int(candidate_version)
+                if candidate_version is not None
+                else int(SCORE_VERSION)
+            )
+            if not score_beats(
+                tuple(int(x) for x in candidate_score),
+                inc_score,
+                candidate_version=cand_ver,
+                incumbent_version=inc_ver,
+            ):
+                return None
+
         if incoming.exists():
             shutil.rmtree(incoming, ignore_errors=True)
         incoming.mkdir(parents=True, exist_ok=True)
