@@ -1264,11 +1264,25 @@ def _apply_checkpoint_meta(env: RE1Env, meta: dict[str, Any]) -> None:
     env._progress.rewarded_waypoint_indices = set(range(idx))
 
 
-def _finalize_bootstrap_state(env: RE1Env) -> tuple[dict[str, Any], Any]:
+def _pb_sidecar_path_for(savestate: Path) -> Path | None:
+    """Sibling PB episode sidecar: ``foo.State`` → ``foo.sidecar.json``."""
+    cand = savestate.with_name(f"{savestate.stem}.sidecar.json")
+    return cand if cand.is_file() else None
+
+
+def _finalize_bootstrap_state(
+    env: RE1Env,
+    *,
+    from_pb_sidecar: bool = False,
+) -> tuple[dict[str, Any], Any]:
     """Read live RAM and seed per-episode exploration state like env.reset()."""
     env._prev_hp = 0
     state = env._read_state()
-    env._seed_episode_progress(state)
+    if from_pb_sidecar:
+        # Sidecar owns visited_rooms / cutscenes / ever_held — do not re-seed.
+        env._seed_episode_hp(state)
+    else:
+        env._seed_episode_progress(state)
     env._visited.update(state["room_id"], state["x"], state["z"])
     env._prev_state = dict(state)
     env._prev_hp = state["hp"] if state["hp"] > 0 else 0
@@ -1537,7 +1551,23 @@ def bootstrap_env(
     from re1_rl.progress import ProgressTracker
 
     env._progress = ProgressTracker()
-    if checkpoint_meta:
+    from_pb = False
+    pb_side = _pb_sidecar_path_for(resolved)
+    if pb_side is not None:
+        from re1_rl.pb_capture import load_sidecar_json
+        from re1_rl.pb_sidecar import apply_episode_sidecar
+
+        apply_episode_sidecar(
+            env, load_sidecar_json(pb_side), reset_softlock=True
+        )
+        from_pb = True
+        rooms = sorted(env._progress.visited_rooms)
+        print(
+            f"[play] applied PB sidecar {pb_side.name} "
+            f"visited={rooms} kenneth_breached={env._progress.kenneth_gate_breached}",
+            flush=True,
+        )
+    elif checkpoint_meta:
         _apply_checkpoint_meta(env, checkpoint_meta)
     else:
         synced = _catch_up_planner_index(env)
@@ -1545,7 +1575,7 @@ def bootstrap_env(
             print(f"[play] planner synced {synced} completed leg(s) from savestate", flush=True)
 
     env._prev_hp = 0
-    state, goal = _finalize_bootstrap_state(env)
+    state, goal = _finalize_bootstrap_state(env, from_pb_sidecar=from_pb)
     return state, goal
 
 

@@ -18,7 +18,12 @@ if not exist "%STATE%" (
 
 echo === Typewriter PB validate ===
 echo State:   %STATE%
-if exist "%SIDE%" (echo Sidecar: %SIDE%) else (echo Sidecar: ^(missing^) — load State only)
+if exist "%SIDE%" (
+  echo Sidecar: %SIDE%
+  echo play_human will apply sibling .sidecar.json ^(anti-repay visited/cutscenes^)
+) else (
+  echo Sidecar: ^(missing^) — State only; room rewards will re-pay like a fresh episode
+)
 echo Controls: play_human on port 7788, --no-training-parity
 echo.
 

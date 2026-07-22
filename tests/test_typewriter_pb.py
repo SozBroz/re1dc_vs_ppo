@@ -81,7 +81,27 @@ def test_typewriter_gates() -> None:
     )
 
 
-def test_detector_fires_on_ribbon_drop_then_control() -> None:
+def test_detector_waits_for_save_cinema_then_stable_control() -> None:
+    det = TypewriterSaveDetector()
+    # Ribbon drop while still in_control must NOT capture (pre-cinema).
+    prev = _slots_state(ribbons=2)
+    drop = _slots_state(ribbons=1)
+    drop["in_control"] = True
+    assert det.update(prev, drop) is False
+    # Save cinema / UI seizes control.
+    cinema = dict(drop)
+    cinema["in_control"] = False
+    assert det.update(drop, cinema) is False
+    # Back to control: need a short streak past settle.
+    ctrl1 = dict(cinema)
+    ctrl1["in_control"] = True
+    assert det.update(cinema, ctrl1) is False
+    ctrl2 = dict(ctrl1)
+    assert det.update(ctrl1, ctrl2) is True
+    assert det.update(ctrl2, ctrl2) is False
+
+
+def test_detector_ribbon_drop_already_uncontrolled() -> None:
     det = TypewriterSaveDetector()
     prev = _slots_state(ribbons=2)
     mid = _slots_state(ribbons=1)
@@ -89,8 +109,8 @@ def test_detector_fires_on_ribbon_drop_then_control() -> None:
     assert det.update(prev, mid) is False
     done = dict(mid)
     done["in_control"] = True
-    assert det.update(mid, done) is True
-    assert det.update(done, done) is False
+    assert det.update(mid, done) is False  # streak 1
+    assert det.update(done, done) is True  # streak 2
 
 
 def test_ink_ribbon_consumed() -> None:

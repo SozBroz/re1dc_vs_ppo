@@ -91,14 +91,27 @@ def typewriter_save_cutscene_disqualified(
     return ink_ribbon_consumed(prev_state, new_state)
 
 
+# Env macro-steps of continuous in_control after the save cinema (frame_skip≈8).
+_POST_SAVE_CONTROL_STREAK = 2
+
+
 class TypewriterSaveDetector:
-    """Latch ribbon drop → fire once when player returns to control in 106."""
+    """Latch ribbon drop → require save cinema (uncontrolled) → stable control.
+
+    Must not fire on the ribbon-drop step itself (still mid save-UI / pre-cinema).
+    Capture only after the engine seizes control for the save sequence and then
+    returns Jill to playable control in Main Hall.
+    """
 
     def __init__(self) -> None:
         self._pending = False
+        self._saw_uncontrolled = False
+        self._control_streak = 0
 
     def reset(self) -> None:
         self._pending = False
+        self._saw_uncontrolled = False
+        self._control_streak = 0
 
     def update(
         self,
@@ -112,16 +125,31 @@ class TypewriterSaveDetector:
         in_control = bool(state.get("in_control", False))
 
         if ink_ribbon_consumed(prev_state, state) and room == MAIN_HALL_ROOM:
-            # Prefer proximity when pose is available; still accept ribbon drop in 106.
-            if near_main_hall_typewriter(state) or near_main_hall_typewriter(prev_state):
-                self._pending = True
-            else:
-                self._pending = True  # ribbon drop in hall is strong enough for v1
+            # Ribbon drop arms the latch; never fire this same step.
+            self._pending = True
+            self._saw_uncontrolled = not in_control
+            self._control_streak = 0
+            return False
 
-        if self._pending and room == MAIN_HALL_ROOM and in_control:
-            self._pending = False
-            return True
+        if not self._pending:
+            return False
 
         if room != MAIN_HALL_ROOM:
-            self._pending = False
-        return False
+            self.reset()
+            return False
+
+        if not in_control:
+            self._saw_uncontrolled = True
+            self._control_streak = 0
+            return False
+
+        if not self._saw_uncontrolled:
+            # Still waiting for the save cinema / UI to take control.
+            return False
+
+        self._control_streak += 1
+        if self._control_streak < _POST_SAVE_CONTROL_STREAK:
+            return False
+
+        self.reset()
+        return True
