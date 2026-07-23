@@ -14,7 +14,7 @@
     "repo": "C:\\Users\\sshuser\\re1_rl",
     "learner_port": 8765,
     "learner_base_port": 5555,
-    "learner_n_envs": 24
+    "learner_n_envs": 28
   },
   "pking": {
     "role": "remote_worker",

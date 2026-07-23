@@ -71,7 +71,7 @@ PROPRIO_FIELDS: list[tuple[str, str]] = [
     ("anim_hist3_state", "player anim byte t / 255"),
     ("anim_hist3_aux", "player action aux t / 255"),
     ("anim_hist3_recovery", "recovery timer t / 32"),
-    ("poisoned", "1 = poisoned (RAM candidate 0x800C51A1)"),
+    ("poisoned", "1 = poisoned (u8@0x800C51A1; verify on live Yawn bite)"),
 ]
 
 GOAL_FIELDS: list[tuple[str, str]] = [

@@ -148,3 +148,80 @@ def test_interact_hp_flicker_does_not_pay_damage() -> None:
     out_hit = apply_combat_step_fields(prev, cur, attack=True)
     assert out_hit["enemy_damage"] == 12
     assert out_hit["enemy_kills"] == 0
+
+
+def test_wasp_room_408_denies_combat_pay() -> None:
+    """Honeycomb wasps respawn — no damage/kill reward in exclusive room 408."""
+    prev = {"room_id": "408", "enemies": [{"slot": 0, "hp": 20}]}
+    cur = {"room_id": "408", "enemies": [{"slot": 0, "hp": 0}]}
+    out = apply_combat_step_fields(prev, cur, attack=True)
+    assert out["enemy_damage"] == 0
+    assert out["enemy_kills"] == 0
+    assert out.get("combat_reward_denied") is True
+    assert out["combat_events"] and out["combat_events"][0]["reward_denied"] is True
+
+
+def test_adder_room_301_and_shark_room_40e_deny() -> None:
+    for room in ("301", "40E"):
+        prev = {"room_id": room, "enemies": [{"slot": 0, "hp": 30}]}
+        cur = {"room_id": room, "enemies": [{"slot": 0, "hp": 10}]}
+        out = apply_combat_step_fields(prev, cur, attack=True)
+        assert out["enemy_damage"] == 0, room
+        assert out.get("combat_reward_denied") is True, room
+
+
+def test_shark_type_name_denies_damage() -> None:
+    prev = {
+        "room_id": "40E",
+        "enemies": [{"slot": 0, "hp": 200, "enemy_type": "shark"}],
+    }
+    cur = {
+        "room_id": "40E",
+        "enemies": [{"slot": 0, "hp": 150, "enemy_type": "shark"}],
+    }
+    out = apply_combat_step_fields(prev, cur, attack=True)
+    assert out["enemy_damage"] == 0
+    assert out["enemy_kills"] == 0
+    assert out["combat_events"][0]["reward_denied"] is True
+
+
+def test_type_id_wasp_adder_shark_deny() -> None:
+    for tid in (0x0A, 0x0B, 0x0D):
+        prev = {
+            "room_id": "105",
+            "enemies": [{"slot": 0, "hp": 40, "type_id": tid}],
+        }
+        cur = {
+            "room_id": "105",
+            "enemies": [{"slot": 0, "hp": 10, "type_id": tid}],
+        }
+        out = apply_combat_step_fields(prev, cur, attack=True)
+        assert out["enemy_damage"] == 0, hex(tid)
+        assert out["combat_events"][0]["reward_denied"] is True
+
+
+def test_zombie_type_still_pays() -> None:
+    prev = {
+        "room_id": "104",
+        "enemies": [{"slot": 0, "hp": 40, "type_id": 1}],
+    }
+    cur = {
+        "room_id": "104",
+        "enemies": [{"slot": 0, "hp": 28, "type_id": 1}],
+    }
+    out = apply_combat_step_fields(prev, cur, attack=True)
+    assert out["enemy_damage"] == 12
+    assert out["combat_events"][0].get("reward_denied") is False
+
+
+def test_adder_type_name_denies_kill() -> None:
+    prev = {
+        "room_id": "405",
+        "enemies": [{"slot": 1, "hp": 5, "type_name": "adder"}],
+    }
+    cur = {"room_id": "405", "enemies": []}
+    out = apply_combat_step_fields(prev, cur, knife=True)
+    assert out["enemy_damage"] == 0
+    assert out["enemy_kills"] == 0
+    assert out["combat_events"][0]["reward_denied"] is True
+    assert out["combat_events"][0]["killed"] is True

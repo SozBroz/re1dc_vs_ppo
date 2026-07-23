@@ -65,6 +65,9 @@ class BizHawkClient:
         self.emulated_frame: int = -1
         self.frame_ring = FrameRingBuffer()
         self.attack_pins = AttackFramePins()
+        self.camera_whiten_bank: Any | None = None
+        self.whiten_context: Any | None = None
+        self._zombie_attack_latch: Any | None = None
 
     # ------------------------------------------------------------------
     # Connection lifecycle
@@ -507,6 +510,76 @@ class BizHawkClient:
             raise ValueError(f"Failed to read screenshot PNG from BizHawk at {written}")
         return cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
+    def set_whiten_context(self, ctx: Any | None) -> None:
+        """Set per-frame room/camera/control context for dynamic backdrop whitening."""
+        self.whiten_context = ctx
+
+    def refresh_whiten_context(self) -> Any | None:
+        """Read minimal RAM and update ``whiten_context`` (no-op if bank unset)."""
+        if self.camera_whiten_bank is None:
+            self.whiten_context = None
+            return None
+        from re1_rl.camera_whiten import WhitenContext, ZombieAttackLatch
+        from re1_rl.memory_map import (
+            CAM_ID,
+            GAME_MODE,
+            GAME_STATE,
+            MESSAGE_FLAG,
+            PLAYER_HP,
+            ROOM_ID,
+            SCENE_FLAG,
+            STAGE_ID,
+        )
+        from re1_rl.ram_skip import message_open_from_ram, scene_active_from_ram
+
+        ram = self.read_ram(
+            [
+                ("stage_id", STAGE_ID, "u8"),
+                ("room_id", ROOM_ID, "u8"),
+                ("cam_id", CAM_ID, "u8"),
+                ("game_mode", GAME_MODE, "u8"),
+                ("game_state", GAME_STATE, "u32"),
+                ("msg_flag", MESSAGE_FLAG, "u8"),
+                ("scene_flag", SCENE_FLAG, "u8"),
+                ("player_hp", PLAYER_HP, "u16"),
+            ]
+        )
+        room_code = f"{int(ram['stage_id']) + 1}{int(ram['room_id']):02X}"
+        in_control = bool(int(ram["game_mode"]) & 0x80)
+        scene_active = scene_active_from_ram(ram)
+        message_open = message_open_from_ram(ram)
+        if self._zombie_attack_latch is None:
+            self._zombie_attack_latch = ZombieAttackLatch()
+        zombie_attack = bool(
+            self._zombie_attack_latch.update(
+                hp=int(ram["player_hp"]),
+                in_control=in_control,
+                scene_active=scene_active,
+                message_open=message_open,
+            )
+        )
+        ctx = WhitenContext(
+            room_code=room_code,
+            cam_id=int(ram["cam_id"]),
+            in_control=in_control,
+            scene_active=scene_active,
+            message_open=message_open,
+            zombie_attack=zombie_attack,
+        )
+        self.whiten_context = ctx
+        return ctx
+
+    def _maybe_apply_camera_whiten(self, rgb: np.ndarray) -> np.ndarray:
+        bank = self.camera_whiten_bank
+        if bank is None:
+            return rgb
+        ctx = self.whiten_context
+        if ctx is None:
+            ctx = self.refresh_whiten_context()
+        if ctx is None:
+            return rgb
+        return bank.apply(rgb, ctx)
+
     def screenshot(
         self,
         path: str | None = None,
@@ -525,13 +598,13 @@ class BizHawkClient:
                     f"(port={self.port}). Restart env or fix MMF."
                 )
             try:
-                return self._screenshot_from_mmf()
+                return self._maybe_apply_camera_whiten(self._screenshot_from_mmf())
             except (OSError, RuntimeError, ValueError) as exc:
                 self._screenshot_mmf_disabled = True
                 if allow_file_fallback:
-                    return self._screenshot_from_file(path)
+                    return self._maybe_apply_camera_whiten(self._screenshot_from_file(path))
                 raise RuntimeError(
                     f"screenshot_mmf failed on port={self.port}; disk PNG fallback "
                     "disabled for training throughput"
                 ) from exc
-        return self._screenshot_from_file(path)
+        return self._maybe_apply_camera_whiten(self._screenshot_from_file(path))

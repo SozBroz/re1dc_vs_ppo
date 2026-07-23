@@ -4,6 +4,35 @@ from __future__ import annotations
 
 from typing import Any
 
+# Imperator-validated 2026-07-23: infinite-respawn pests and the aquarium
+# shark (Neptune) must never mint #7/#8 combat pay. Kind filter prefers
+# type_id once H1.4 lands; room deny is a bridge for exclusive pest rooms.
+# kind@0x05 from hub-door classify (wasp/adder/shark). Confirm before adding more.
+NO_COMBAT_REWARD_TYPE_IDS: frozenset[int] = frozenset({0x0A, 0x0B, 0x0D})
+NO_COMBAT_REWARD_TYPE_NAMES: frozenset[str] = frozenset(
+    {"wasp", "bee", "hornet", "adder", "snake_adder", "shark", "neptune"}
+)
+# Exclusive rooms confirmed by hub-door classify (2026-07-23) until type_id
+# is wired. Expand only when a room is pest/shark-only (no paid fauna).
+# 408 honeycomb wasps; 301 water-gate adder swarm; 40E water-tank Neptunes.
+NO_COMBAT_REWARD_ROOMS: frozenset[str] = frozenset({"408", "301", "40E"})
+
+
+def combat_reward_denied(
+    *,
+    room_id: str | None = None,
+    type_id: int | None = None,
+    type_name: str | None = None,
+) -> bool:
+    """True when damage/kill on this entity/room must not pay."""
+    if room_id is not None and str(room_id).upper() in NO_COMBAT_REWARD_ROOMS:
+        return True
+    if type_id is not None and int(type_id) in NO_COMBAT_REWARD_TYPE_IDS:
+        return True
+    if type_name is not None and str(type_name).lower() in NO_COMBAT_REWARD_TYPE_NAMES:
+        return True
+    return False
+
 
 def alive_enemy_count(enemies: list[dict[str, Any]] | None) -> int:
     """Enemies with in-room coordinates (excludes off-map pool ghosts)."""
@@ -75,19 +104,50 @@ def enemy_combat_delta(
     return damage, kills
 
 
+def _type_meta_by_slot(
+    enemies: list[dict[str, Any]] | None,
+) -> dict[int, dict[str, Any]]:
+    """slot -> {type_id?, type_name?/enemy_type?} from whichever side has it."""
+    out: dict[int, dict[str, Any]] = {}
+    for ent in enemies or []:
+        slot = int(ent.get("slot", -1))
+        if slot < 0:
+            continue
+        meta: dict[str, Any] = {}
+        if "type_id" in ent:
+            meta["type_id"] = int(ent["type_id"])
+        name = ent.get("type_name") or ent.get("enemy_type")
+        if name is not None:
+            meta["type_name"] = str(name)
+        if meta:
+            out[slot] = meta
+    return out
+
+
 def enemy_combat_events(
     prev_enemies: list[dict[str, Any]] | None,
     curr_enemies: list[dict[str, Any]] | None,
+    *,
+    room_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Per-slot HP changes: slot, hp_before, hp_after, damage, killed."""
     prev_hps = enemy_hp_by_slot(prev_enemies or [])
     curr_hps = enemy_hp_by_slot(curr_enemies or [])
+    types = _type_meta_by_slot(prev_enemies)
+    for slot, meta in _type_meta_by_slot(curr_enemies).items():
+        types.setdefault(slot, {}).update(meta)
     events: list[dict[str, Any]] = []
     for slot in sorted(set(prev_hps) | set(curr_hps)):
         before = int(prev_hps.get(slot, 0))
         after = int(curr_hps.get(slot, 0))
         if before <= 0:
             continue
+        meta = types.get(slot, {})
+        denied = combat_reward_denied(
+            room_id=room_id,
+            type_id=meta.get("type_id"),
+            type_name=meta.get("type_name"),
+        )
         if after <= 0:
             events.append({
                 "slot": slot,
@@ -95,6 +155,8 @@ def enemy_combat_events(
                 "hp_after": 0,
                 "damage": before,
                 "killed": True,
+                "reward_denied": denied,
+                **({"type_id": meta["type_id"]} if "type_id" in meta else {}),
             })
         elif after < before:
             events.append({
@@ -103,6 +165,8 @@ def enemy_combat_events(
                 "hp_after": after,
                 "damage": before - after,
                 "killed": False,
+                "reward_denied": denied,
+                **({"type_id": meta["type_id"]} if "type_id" in meta else {}),
             })
     return events
 
@@ -158,10 +222,32 @@ def apply_combat_step_fields(
 
     prev_enemies = list(prev_state.get("enemies", []) or [])
     curr_enemies = list(out.get("enemies", []) or [])
-    prev_enemy_hps = enemy_hp_by_slot(prev_enemies)
-    curr_enemy_hps = enemy_hp_by_slot(curr_enemies)
-    enemy_damage, enemy_kills = enemy_combat_delta(prev_enemy_hps, curr_enemy_hps)
-    combat_events = enemy_combat_events(prev_enemies, curr_enemies)
+    # Room-wide deny (exclusive wasp/adder/shark halls) zeroes combat pay even
+    # before type_id is mapped — still record events with reward_denied.
+    if combat_reward_denied(room_id=curr_room):
+        combat_events = enemy_combat_events(
+            prev_enemies, curr_enemies, room_id=curr_room
+        )
+        out["enemy_damage"] = 0
+        out["enemy_kills"] = 0
+        out["combat_events"] = combat_events
+        out["combat_reward_denied"] = True
+        if not combat_events:
+            out["knife_swing_missed"] = knife
+            out["attack_missed"] = attack
+        return out
+
+    combat_events = enemy_combat_events(
+        prev_enemies, curr_enemies, room_id=curr_room
+    )
+    enemy_damage = 0
+    enemy_kills = 0
+    for ev in combat_events:
+        if ev.get("reward_denied"):
+            continue
+        enemy_damage += int(ev.get("damage", 0))
+        if ev.get("killed"):
+            enemy_kills += 1
     out["enemy_damage"] = enemy_damage
     out["enemy_kills"] = enemy_kills
     out["combat_events"] = combat_events

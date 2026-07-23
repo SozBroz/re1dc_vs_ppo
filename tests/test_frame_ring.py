@@ -13,7 +13,7 @@ def test_stack_at_stride_offsets() -> None:
     stride = FrameRingBuffer.STRIDE
     frames = tuple(stride * i for i in range(1, 5))
     for fc in frames:
-        ring.store_plane(fc, np.full((84, 77, 1), fc, dtype=np.uint8))
+        ring.store_plane(fc, np.full((63, 84, 1), fc, dtype=np.uint8))
     stack = ring.stack_at(frames[-1])
     assert stack.shape == FRAME_SHAPE
     assert int(stack[0, 0, 0]) == frames[0]
@@ -25,10 +25,10 @@ def test_stack_at_stride_offsets() -> None:
 def test_attack_pins_stack_order() -> None:
     ring = FrameRingBuffer()
     pins = AttackFramePins()
-    pins.entry = np.full((84, 77, 1), 1, dtype=np.uint8)
-    pins.windup = np.full((84, 77, 1), 2, dtype=np.uint8)
-    pins.swing = np.full((84, 77, 1), 3, dtype=np.uint8)
-    pins.end = np.full((84, 77, 1), 4, dtype=np.uint8)
+    pins.entry = np.full((63, 84, 1), 1, dtype=np.uint8)
+    pins.windup = np.full((63, 84, 1), 2, dtype=np.uint8)
+    pins.swing = np.full((63, 84, 1), 3, dtype=np.uint8)
+    pins.end = np.full((63, 84, 1), 4, dtype=np.uint8)
     stack = pins.stack_hwc(ring, end_frame=40)
     assert int(stack[0, 0, 0]) == 1
     assert int(stack[0, 0, 1]) == 2
@@ -42,7 +42,7 @@ def test_attack_pins_macro_anim_history() -> None:
     pins.windup_hooks = (0x12, 0x04, 10)
     pins.swing_hooks = (0x13, 0x04, 5)
     pins.end_hooks = (0x00, 0x00, 0)
-    pins.end = np.zeros((84, 77, 1), dtype=np.uint8)
+    pins.end = np.zeros((63, 84, 1), dtype=np.uint8)
     pins.entry = pins.end
     hist = pins.macro_anim_history()
     assert hist == [

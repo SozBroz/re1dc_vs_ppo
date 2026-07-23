@@ -8,36 +8,55 @@ from typing import Any
 
 import numpy as np
 
-# Match RE1Env frame pipeline (84x84 square -> prune pillarbox -> 77 wide).
+# BizHawk RE1 screenshot: 240x350 RGB with near-black pillarbox.
+# Crop the authentic 320x240 game plane (4:3), then AREA-resize to 84x63
+# (OpenCV WxH) → numpy (FRAME_H, FRAME_W) = (63, 84).
 PILLARBOX_LEFT = 18
 PILLARBOX_RIGHT = 12
-FRAME_SQUARE = 84
-PILLARBOX_LEFT_SQ = round(PILLARBOX_LEFT * FRAME_SQUARE / 350)
-PILLARBOX_RIGHT_SQ = round(PILLARBOX_RIGHT * FRAME_SQUARE / 350)
-FRAME_H = FRAME_SQUARE
-FRAME_W = FRAME_SQUARE - PILLARBOX_LEFT_SQ - PILLARBOX_RIGHT_SQ
+GAME_W = 320
+GAME_H = 240
+FRAME_W = 84  # width (4:3 landscape with height 63)
+FRAME_H = 63  # height
 FRAME_STACK = 4
 FRAME_SHAPE = (FRAME_H, FRAME_W, FRAME_STACK)
+# Legacy aliases (old square+prune path removed).
+FRAME_SQUARE = FRAME_W
+PILLARBOX_LEFT_SQ = 0
+PILLARBOX_RIGHT_SQ = 0
 AnimHooks = tuple[int, int, int]
 ZERO_HOOKS: AnimHooks = (0, 0, 0)
 
 
+def crop_game_plane(frame: np.ndarray) -> np.ndarray:
+    """Crop BizHawk RGB/gray to the 320x240 game plane (drop pillarbox)."""
+    h, w = frame.shape[:2]
+    x0 = PILLARBOX_LEFT
+    x1 = x0 + GAME_W
+    if h < GAME_H or w < x1:
+        # Already a game plane, or unexpected size — best-effort.
+        if h == GAME_H and w == GAME_W:
+            return frame
+        return frame[:GAME_H, : min(w, GAME_W)]
+    return frame[:GAME_H, x0:x1]
+
+
 def prune_square_pillarbox(square: np.ndarray) -> np.ndarray:
-    w = int(square.shape[1])
-    if w != FRAME_SQUARE:
-        return square
-    return square[:, PILLARBOX_LEFT_SQ : FRAME_SQUARE - PILLARBOX_RIGHT_SQ]
+    """Deprecated no-op kept for import compatibility; prefer crop_game_plane."""
+    return square
 
 
 def resize_rgb_to_plane(
-    frame: np.ndarray, size: tuple[int, int] = (FRAME_SQUARE, FRAME_SQUARE)
+    frame: np.ndarray, size: tuple[int, int] | None = None
 ) -> np.ndarray:
+    """RGB → crop pillarbox → grayscale → INTER_AREA to (FRAME_W, FRAME_H)."""
     import cv2
 
-    gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-    square = cv2.resize(gray, size, interpolation=cv2.INTER_AREA)
-    pruned = prune_square_pillarbox(square)
-    return pruned[..., None]
+    if size is None:
+        size = (FRAME_W, FRAME_H)  # OpenCV (width, height)
+    game = crop_game_plane(frame)
+    gray = cv2.cvtColor(game, cv2.COLOR_RGB2GRAY)
+    plane = cv2.resize(gray, size, interpolation=cv2.INTER_AREA)
+    return plane[..., None]
 
 
 def decode_png_b64(png_b64: str) -> np.ndarray:

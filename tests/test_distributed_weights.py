@@ -97,7 +97,7 @@ def test_learner_http_weights_and_rollout() -> None:
             n_envs=1,
             n_steps=2,
             obs={
-                "frame": np.zeros((2, 1, 84, 77, 4), dtype=np.uint8),
+                "frame": np.zeros((2, 1, 63, 84, 4), dtype=np.uint8),
                 "proprio": np.zeros((2, 1, PROPRIO_DIM), dtype=np.float32),
                 "goal": np.zeros((2, 1, GOAL_DIM), dtype=np.float32),
                 "spatial": np.zeros((2, 1, 119), dtype=np.float32),

@@ -226,10 +226,12 @@ MESSAGE_FLAG_MASK = 0x80
 ENEMY_TABLE_BASE: int | None = 0x800C532C
 ENEMY_SLOT_STRIDE = 0x18C  # confirmed: GS first zombie + second slot
 ENEMY_TABLE_SLOTS = 6
-# Per-slot HP at struct base (ASL / GS). Cap rejects empty-slot garbage.
-ENEMY_HP_MAX_PLAUSIBLE = 2000
-# Off-map pool slots park near ~(30000, 30000); in-room entities use map scale.
-ENEMY_POOL_COORD_ABS_MAX = 20000
+# Per-slot HP at struct base (ASL / GS). Cap rejects empty-slot garbage
+# (0xFFFF) and keeps Yawn (~3050 on spawn cinema QS5 / 210) visible.
+ENEMY_HP_MAX_PLAUSIBLE = 4000
+# Off-map pool slots park near ~(30000, 30000); courtyard Cerberus live near
+# ~27000 (hub-door classify 300/304). Cap sits between those and the park.
+ENEMY_POOL_COORD_ABS_MAX = 29000
 # Knife/gun mask: enemy within this world distance of the player.
 # Gun stays wide so multi-zombie rooms can engage at keep-your-distance
 # ranges; knife is tighter but still generous vs typical hit distances
@@ -238,6 +240,10 @@ ENEMY_COMBAT_NEAR_DIST = 20000
 ENEMY_KNIFE_COMBAT_NEAR_DIST = 5000
 ENEMY_FIELD_OFFSETS: dict[str, tuple[int, str]] = {
     "hp": (0, "u16"),
+    # Runtime kind byte (hub-door classify 2026-07-23): wasp=0x0A, adder=0x0B,
+    # shark=0x0D, plant42=0x10, black_tiger=0x14. Not classic EMD model IDs;
+    # 0x0F appears on Tyrant and also Cerberus/stale pool — do not treat as unique.
+    "type_id": (0x05, "u8"),
     "x": (0xDE, "s16"),
     "z": (0xE0, "s16"),
     "active_byte": (0xEC, "u8"),
@@ -271,12 +277,19 @@ def enemy_table_fields() -> list[tuple[str, int, str]]:
 
 
 def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
-    """[{x, z, hp, alive, in_room, combat_near, ...}] from enemy table RAM."""
+    """[{x, z, hp, alive, in_room, combat_near, ...}] from enemy table RAM.
+
+    Room ``210`` Yawn: raw ``hp@0`` ~3050 is translated to wiki-scale logical
+    HP (attic 120) via :mod:`re1_rl.yawn_hp` so spatial ``hp/255`` stays sane.
+    """
+    from re1_rl.yawn_hp import apply_yawn_hp_translate
+
     out: list[dict[str, int]] = []
     if ENEMY_TABLE_BASE is None or not ENEMY_FIELD_OFFSETS:
         return out
     px = int(ram.get("player_x", 0))
     pz = int(ram.get("player_z", 0))
+    room_code = f"{int(ram.get('stage_id', 0)) + 1}{int(ram.get('room_id', 0)):02X}"
     for slot in range(ENEMY_TABLE_SLOTS):
         vals = {f: int(ram.get(f"enemy{slot}_{f}", 0)) for f in ENEMY_FIELD_OFFSETS}
         hp = vals.get("hp", 0)
@@ -295,7 +308,7 @@ def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
         vals["knife_near"] = 1 if knife_near else 0
         vals["dist"] = int(dist)
         out.append(vals)
-    return out
+    return apply_yawn_hp_translate(out, room_id=room_code)
 
 
 # Interaction prompt ("Press X" affordance) [HUNT PENDING — see

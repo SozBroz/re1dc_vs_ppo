@@ -170,19 +170,23 @@ for _idx in range(9, len(ACTION_NAMES)):
     ACTION_BUTTON_MAP[_idx] = {}
 
 # BizHawk RE1 screenshot is 240x350 RGB; left 18 + right 12 px are near-black
-# pillarbox. Pipeline: grayscale + resize FULL frame to 84x84 (bars included,
-# same as the original Atari-style square), THEN prune the bar columns so the
-# policy sees content only at 84x77. NatureCNN flatten drops 3136 -> 2688;
-# resume uses async_fleet compatible-weight transplant (conv reuse, linear reinit).
-PILLARBOX_LEFT = 18
-PILLARBOX_RIGHT = 12
-FRAME_SQUARE = 84
-# Bars on the 84-wide square (round of 18/350 and 12/350 of 84).
-PILLARBOX_LEFT_SQ = round(PILLARBOX_LEFT * FRAME_SQUARE / 350)  # 4
-PILLARBOX_RIGHT_SQ = round(PILLARBOX_RIGHT * FRAME_SQUARE / 350)  # 3
-FRAME_H = FRAME_SQUARE
-FRAME_W = FRAME_SQUARE - PILLARBOX_LEFT_SQ - PILLARBOX_RIGHT_SQ  # 77
-from re1_rl.frame_ring import FRAME_SHAPE, FRAME_STACK
+# pillarbox. Pipeline: crop 320x240 game plane → gray → INTER_AREA to 84x63
+# (landscape 4:3). Numpy shape (FRAME_H, FRAME_W) = (63, 84). NatureCNN flatten
+# ~1792; resume uses async_fleet compatible-weight transplant.
+from re1_rl.frame_ring import (
+    FRAME_H,
+    FRAME_SHAPE,
+    FRAME_SQUARE,
+    FRAME_STACK,
+    FRAME_W,
+    PILLARBOX_LEFT,
+    PILLARBOX_LEFT_SQ,
+    PILLARBOX_RIGHT,
+    PILLARBOX_RIGHT_SQ,
+    crop_game_plane,
+    prune_square_pillarbox,
+    resize_rgb_to_plane,
+)
 
 FRAME_SHAPE_CHW = (FRAME_STACK, FRAME_H, FRAME_W)  # SB3 / VecTransposeImage
 
@@ -199,29 +203,17 @@ _DEATH_FAILURE_REASONS = frozenset(
     }
 )
 
+
 def _prune_square_pillarbox(square: np.ndarray) -> np.ndarray:
-    """Drop fixed pillarbox columns from an 84-wide (HxW) gray/RGB frame."""
-    w = int(square.shape[1])
-    if w != FRAME_SQUARE:
-        return square
-    return square[:, PILLARBOX_LEFT_SQ : FRAME_SQUARE - PILLARBOX_RIGHT_SQ]
+    """Deprecated; pillarbox is cropped before resize now."""
+    return prune_square_pillarbox(square)
 
 
 def _resize_frame(
-    frame: np.ndarray, size: tuple[int, int] = (FRAME_SQUARE, FRAME_SQUARE)
+    frame: np.ndarray, size: tuple[int, int] | None = None
 ) -> np.ndarray:
-    """RGB -> grayscale -> 84x84 (bars in) -> prune bars -> HxW single channel.
-
-    ``size`` is OpenCV (width, height) for the intermediate square (default 84x84).
-    Output width is FRAME_W after prune. Pre-rendered RE1 backgrounds carry
-    almost no color signal; gray x4 stack matches the Atari recipe.
-    """
-    import cv2
-
-    gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-    square = cv2.resize(gray, size, interpolation=cv2.INTER_AREA)
-    pruned = _prune_square_pillarbox(square)
-    return pruned[..., None]
+    """RGB → crop pillarbox → grayscale → INTER_AREA to (FRAME_W, FRAME_H)."""
+    return resize_rgb_to_plane(frame, size=size)
 
 
 def _inventory_names_from_slots(
@@ -259,6 +251,7 @@ class RE1Env(gym.Env):
         project_root: str | Path | None = None,
         *,
         async_cutscene_skip: bool = False,
+        camera_whiten: bool | None = None,
     ) -> None:
         super().__init__()
         self.project_root = Path(project_root or Path(__file__).resolve().parents[1])
@@ -282,7 +275,7 @@ class RE1Env(gym.Env):
 
         self.observation_space = spaces.Dict(
             {
-                # 4 stacked grayscale frames, channels-last (84 high x 112 wide)
+                # 4 stacked grayscale frames, channels-last (63 high x 84 wide)
                 "frame": spaces.Box(0, 255, shape=FRAME_SHAPE, dtype=np.uint8),
                 "proprio": spaces.Box(-1.0, 1.0, shape=(PROPRIO_DIM,), dtype=np.float32),
                 "goal": spaces.Box(-2.0, 2.0, shape=(GOAL_DIM,), dtype=np.float32),
@@ -371,6 +364,14 @@ class RE1Env(gym.Env):
         # worker must not start a fast_forward (which mashes cross and stomps
         # joypad) while this is set.
         self._macro_active = False
+        if camera_whiten is None:
+            from re1_rl.camera_whiten import whitened_enabled_from_env
+
+            camera_whiten = whitened_enabled_from_env()
+        if camera_whiten:
+            from re1_rl.camera_whiten import load_mansion_camera_bank
+
+            self.bridge.camera_whiten_bank = load_mansion_camera_bank(self.project_root)
         # Optional (aim, swing, recovery) game-frame override for the knife
         # macro, emu-frames-per-game-frame scale override, and joypad.get()
         # readback toggle (QA harnesses set these).
@@ -705,10 +706,13 @@ class RE1Env(gym.Env):
         from re1_rl.pb_capture import maybe_capture_pb, pb_capture_enabled, pb_root_dir
         from re1_rl.pb_milestones import detect_milestone_triggers
         from re1_rl.pb_sync import ensure_pb_sync_daemon
+        from re1_rl.typewriter_save_log import (
+            log_ctx_from_env,
+            log_typewriter_save,
+            state_fields,
+        )
 
         ensure_pb_sync_daemon(self.project_root)
-        if not pb_capture_enabled():
-            return
         save_room = None
         if typewriter_save_complete:
             detector = getattr(self, "_typewriter_save_detector", None)
@@ -716,8 +720,25 @@ class RE1Env(gym.Env):
                 save_room = getattr(detector, "last_room", None) or getattr(
                     detector, "completed_room", None
                 )
+        tw_log_ctx = {
+            **log_ctx_from_env(self),
+            **state_fields(state),
+        }
+        if save_room is not None:
+            tw_log_ctx["save_room"] = save_room
+
+        if typewriter_save_complete and not pb_capture_enabled():
+            log_typewriter_save(
+                "capture_skipped",
+                reason="pb_capture_disabled",
+                **tw_log_ctx,
+            )
+
+        if not pb_capture_enabled():
+            return
+
         states_dir = pb_root_dir(self.project_root)
-        for trigger_id in detect_milestone_triggers(
+        triggers = detect_milestone_triggers(
             prev_state,
             state,
             breakdown,
@@ -727,7 +748,25 @@ class RE1Env(gym.Env):
             visited_rooms=self._progress.visited_rooms,
             rewarded_cutscenes=self._progress.rewarded_cutscenes,
             kenneth_gate_breached=bool(self._progress.kenneth_gate_breached),
-        ):
+        )
+        if typewriter_save_complete and not triggers:
+            if self._progress.kenneth_gate_breached:
+                reason = "kenneth_gate"
+            elif save_room and str(state.get("room_id", "") or "") != str(save_room):
+                reason = "room_mismatch"
+            elif any(
+                str(t).startswith("typewriter_save:")
+                for t in self._pb_captured_triggers
+            ):
+                reason = "already_captured_episode"
+            else:
+                reason = "milestone_gate"
+            log_typewriter_save(
+                "capture_skipped",
+                reason=reason,
+                **tw_log_ctx,
+            )
+        for trigger_id in triggers:
             try:
                 maybe_capture_pb(
                     self,
@@ -735,8 +774,14 @@ class RE1Env(gym.Env):
                     states_dir=states_dir,
                     captured=self._pb_captured_triggers,
                 )
-            except (OSError, RuntimeError, ValueError):
-                pass
+            except (OSError, RuntimeError, ValueError) as exc:
+                if str(trigger_id).startswith("typewriter_save:"):
+                    log_typewriter_save(
+                        "capture_error",
+                        trigger=trigger_id,
+                        error=str(exc),
+                        **tw_log_ctx,
+                    )
 
     def _capture_step_obs(self) -> np.ndarray:
         """Store the live framebuffer at ``emulated_frame`` and build [t-12..t]."""

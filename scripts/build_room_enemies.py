@@ -164,7 +164,7 @@ ER_TO_ROOM: dict[str, str] = {
 
 ENEMY_TYPES = frozenset({
   "zombie", "cerberus", "crow", "hunter", "spider", "snake_yawn",
-  "plant42", "wasp", "chimera", "tyrant", "shark", "black_tiger",
+  "plant42", "wasp", "adder", "chimera", "tyrant", "shark", "black_tiger",
 })
 
 SPAWN_TRIGGERS = frozenset({"always", "event", "cutscene", "return_visit"})
@@ -192,6 +192,10 @@ ENEMY_META: dict[str, str] = {
   "Wasps": "wasp",
   "Hornet": "wasp",
   "Hornets": "wasp",
+  "Adder": "adder",
+  "Adders": "adder",
+  "Snake": "adder",
+  "Snakes": "adder",
   "Chimera": "chimera",
   "Chimeras": "chimera",
   "Tyrant": "tyrant",

@@ -61,7 +61,7 @@ class _FakePolicy:
 
 def _fake_obs() -> dict[str, np.ndarray]:
     return {
-        "frame": np.zeros((84, 77, 4), dtype=np.uint8),
+        "frame": np.zeros((63, 84, 4), dtype=np.uint8),
         "proprio": np.zeros((8,), dtype=np.float32),
     }
 
@@ -148,7 +148,7 @@ def test_worker_rollout_from_actor_msg_shapes() -> None:
         "t": "rollout",
         "rank": 2,
         "obs": {
-            "frame": np.zeros((n_steps, 84, 77, 4), dtype=np.uint8),
+            "frame": np.zeros((n_steps, 63, 84, 4), dtype=np.uint8),
             "proprio": np.zeros((n_steps, 8), dtype=np.float32),
         },
         "actions": np.arange(n_steps, dtype=np.int64),
@@ -171,7 +171,7 @@ def test_worker_rollout_from_actor_msg_shapes() -> None:
     assert rollout.num_timesteps() == n_steps
     assert rollout.actions.shape == (n_steps, 1)
     assert rollout.rewards.shape == (n_steps, 1)
-    assert rollout.obs["frame"].shape == (n_steps, 1, 84, 77, 4)
+    assert rollout.obs["frame"].shape == (n_steps, 1, 63, 84, 4)
     assert rollout.action_masks.shape == (n_steps, 1, N_ACTIONS)
     assert rollout.last_values.shape == (1,)
     assert rollout.episode_infos == [{"room_id": "104"}]

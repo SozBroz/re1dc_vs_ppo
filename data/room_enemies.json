@@ -455,7 +455,16 @@
   },
   "301": {
     "room_name": "WATER GATE",
-    "enemies": []
+    "enemies": [
+      {
+        "enemy_type": "adder",
+        "count": 6,
+        "spawn_trigger": "always",
+        "notes": "Hub-door classify 2026-07-23: 6 low-HP slots, kind@0x05=0x0B; infinite respawn — no combat pay",
+        "unverified": false,
+        "type_id": 11
+      }
+    ]
   },
   "302": {
     "room_name": "FALLS",
@@ -582,10 +591,20 @@
     "room_name": "BAR",
     "enemies": [
       {
+        "enemy_type": "spider",
+        "count": 2,
+        "spawn_trigger": "always",
+        "notes": "Hub-door classify 2026-07-23: 2 Web Spinners @ (11600,12700), kind@0x05=0x14 (same byte as Black Tiger)",
+        "unverified": false,
+        "x": 11600,
+        "z": 12700,
+        "type_id": 20
+      },
+      {
         "enemy_type": "hunter",
         "count": 1,
         "spawn_trigger": "return_visit",
-        "notes": "hunter in recreation room | RDT @(14100,24900)",
+        "notes": "hunter in recreation room on return visit | RDT @(14100,24900)",
         "unverified": true,
         "x": 14100,
         "z": 24900,
@@ -626,10 +645,11 @@
     "enemies": [
       {
         "enemy_type": "wasp",
-        "count": 1,
+        "count": 6,
         "spawn_trigger": "always",
-        "notes": "wasp nest blocks passage to 002 key",
-        "unverified": true
+        "notes": "Hub-door classify 2026-07-23: 6 wasp slots HP~36-50, kind@0x05=0x0A; infinite respawn — no combat pay",
+        "unverified": false,
+        "type_id": 10
       }
     ]
   },
@@ -674,7 +694,16 @@
   },
   "40E": {
     "room_name": "WATER TANK",
-    "enemies": []
+    "enemies": [
+      {
+        "enemy_type": "shark",
+        "count": 3,
+        "spawn_trigger": "always",
+        "notes": "Hub-door classify 2026-07-23: 3 Neptune slots ~HP45-52, kind@0x05=0x0D; aim snap = instant death — no combat pay",
+        "unverified": false,
+        "type_id": 13
+      }
+    ]
   },
   "40F": {
     "room_name": "SECURITY ROOM",

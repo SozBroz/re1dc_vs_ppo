@@ -23,7 +23,7 @@ def _sample_rollout() -> WorkerRollout:
         n_envs=n_envs,
         n_steps=n_steps,
         obs={
-            "frame": np.random.randint(0, 255, (n_steps, n_envs, 84, 77, 4), dtype=np.uint8),
+            "frame": np.random.randint(0, 255, (n_steps, n_envs, 63, 84, 4), dtype=np.uint8),
             "proprio": np.random.randn(n_steps, n_envs, PROPRIO_DIM).astype(np.float32),
             "goal": np.random.randn(n_steps, n_envs, GOAL_DIM).astype(np.float32),
             "spatial": np.random.randn(n_steps, n_envs, 119).astype(np.float32),

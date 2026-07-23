@@ -87,17 +87,20 @@ def test_proprio_enemy_count_wired():
 def test_enemy_table_fields_mapped() -> None:
     """HP/x/z/active at slot offsets -> decode with in-room + combat flags."""
     fields = enemy_table_fields()
-    assert len(fields) == 6 * len({"hp", "x", "z", "active_byte"})
+    assert len(fields) == 6 * len({"hp", "type_id", "x", "z", "active_byte"})
     ram = {
         "player_x": 7000,
         "player_z": 15000,
         "enemy0_hp": 46,
+        "enemy0_type_id": 1,
         "enemy0_x": 3150,
         "enemy0_z": 13400,
         "enemy0_active_byte": 0,
         "enemy1_hp": 54,
-        "enemy1_x": 23809,
-        "enemy1_z": 25057,
+        "enemy1_type_id": 2,
+        # Pool park (~30000) stays outside ENEMY_POOL_COORD_ABS_MAX (29000).
+        "enemy1_x": 30000,
+        "enemy1_z": 30000,
         "enemy1_active_byte": 0,
     }
     for i in range(6):
@@ -107,10 +110,12 @@ def test_enemy_table_fields_mapped() -> None:
     assert len(decoded) == 2
     by_slot = {int(e["slot"]): e for e in decoded}
     assert by_slot[0]["in_room"] == 1
+    assert by_slot[0]["type_id"] == 1
     assert by_slot[0]["combat_near"] == 1
     assert by_slot[0]["knife_near"] == 1
     assert by_slot[0]["alive"] == 1
     assert by_slot[1]["in_room"] == 0
+    assert by_slot[1]["type_id"] == 2
     assert by_slot[1]["combat_near"] == 0
     assert by_slot[1]["knife_near"] == 0
     assert by_slot[1]["alive"] == 0
@@ -154,6 +159,29 @@ def test_origin_hp_ghost_not_combat_near() -> None:
     assert decoded[0]["alive"] == 0
     assert decoded[0]["combat_near"] == 0
     assert combat_enemy_count(decoded) == 0
+
+
+def test_yawn_hp_3050_decodes() -> None:
+    """Yawn spawn cinema QS5: hp@0=3050 must pass the plausible-HP gate."""
+    from re1_rl.memory_map import ENEMY_HP_MAX_PLAUSIBLE
+
+    assert ENEMY_HP_MAX_PLAUSIBLE >= 3050
+    ram = {
+        "player_x": 6100,
+        "player_z": 3600,
+        "enemy0_hp": 3050,
+        "enemy0_type_id": 0x0F,
+        "enemy0_x": 4500,
+        "enemy0_z": 12000,
+        "enemy0_active_byte": 2,
+    }
+    for i in range(1, 6):
+        ram[f"enemy{i}_hp"] = 0
+    decoded = decode_enemy_table(ram)
+    assert len(decoded) == 1
+    assert decoded[0]["hp"] == 3050
+    assert decoded[0]["in_room"] == 1
+    assert decoded[0]["combat_near"] == 1
 
 
 if __name__ == "__main__":
