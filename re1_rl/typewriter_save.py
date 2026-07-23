@@ -154,6 +154,15 @@ class TypewriterSaveDetector:
         self.last_room: str | None = None
 
     def reset(self) -> None:
+        if self._pending:
+            from re1_rl.typewriter_save_log import log_typewriter_save
+
+            log_typewriter_save(
+                "abort_reset",
+                pending_room=self._pending_room,
+                saw_uncontrolled=self._saw_uncontrolled,
+                control_streak=self._control_streak,
+            )
         self._pending = False
         self._pending_room = None
         self._saw_uncontrolled = False
@@ -178,6 +187,13 @@ class TypewriterSaveDetector:
         self._sidecar_holdoff = True
         self._holdoff_ribbon_baseline = count_ink_ribbons(state)
         self._holdoff_stable_ctrl = 0
+        from re1_rl.typewriter_save_log import log_typewriter_save, state_fields
+
+        log_typewriter_save(
+            "holdoff_begin",
+            baseline_ribbons=self._holdoff_ribbon_baseline,
+            **state_fields(state),
+        )
 
     @property
     def sidecar_holdoff(self) -> bool:
@@ -203,6 +219,12 @@ class TypewriterSaveDetector:
         self._clear_pending()
         self.armed_room = None
         if self._holdoff_stable_ctrl >= _SIDECAR_HOLDOFF_CONTROL_STREAK:
+            from re1_rl.typewriter_save_log import log_typewriter_save
+
+            log_typewriter_save(
+                "holdoff_clear",
+                baseline_ribbons=self._holdoff_ribbon_baseline,
+            )
             self._sidecar_holdoff = False
 
     def update(
@@ -221,22 +243,48 @@ class TypewriterSaveDetector:
 
         if ink_ribbon_consumed(prev_state, state) and room in TYPEWRITER_ROOMS:
             # Ribbon drop arms the latch; never fire this same step.
+            from re1_rl.typewriter_save_log import log_typewriter_save, state_fields
+
             self._pending = True
             self._pending_room = room
             self.armed_room = room
             self._saw_uncontrolled = not in_control
             self._control_streak = 0
+            log_typewriter_save(
+                "armed",
+                room=room,
+                ribbons_before=count_ink_ribbons(prev_state),
+                ribbons_after=count_ink_ribbons(state),
+                **state_fields(state),
+            )
             return False
 
         if not self._pending:
             return False
 
         if room != self._pending_room:
+            from re1_rl.typewriter_save_log import log_typewriter_save
+
+            log_typewriter_save(
+                "abort_room_change",
+                pending_room=self._pending_room,
+                room=room,
+                saw_uncontrolled=self._saw_uncontrolled,
+                control_streak=self._control_streak,
+            )
             self._clear_pending()
             self.armed_room = None
             return False
 
         if not in_control:
+            if not self._saw_uncontrolled:
+                from re1_rl.typewriter_save_log import log_typewriter_save, state_fields
+
+                log_typewriter_save(
+                    "cinema",
+                    pending_room=self._pending_room,
+                    **state_fields(state),
+                )
             self._saw_uncontrolled = True
             self._control_streak = 0
             return False
@@ -250,6 +298,14 @@ class TypewriterSaveDetector:
             return False
 
         fired = self._pending_room or room
+        from re1_rl.typewriter_save_log import log_typewriter_save, state_fields
+
+        log_typewriter_save(
+            "complete",
+            room=fired,
+            control_streak=self._control_streak,
+            **state_fields(state),
+        )
         self._clear_pending()
         self.armed_room = fired
         self.completed_room = fired

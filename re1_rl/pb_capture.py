@@ -237,10 +237,22 @@ def maybe_capture_pb(
 
     Returns the savestate path on success, else None (disabled, duplicate, or error).
     """
-    if not pb_capture_enabled():
-        return None
+    from re1_rl.typewriter_save_log import log_ctx_from_env, log_typewriter_save
 
     trigger_id = str(trigger_id)
+    is_typewriter = _is_typewriter_milestone_fallback(trigger_id)
+    log_ctx = log_ctx_from_env(env) if is_typewriter else {}
+
+    if not pb_capture_enabled():
+        if is_typewriter:
+            log_typewriter_save(
+                "capture_skipped",
+                reason="pb_capture_disabled",
+                trigger=trigger_id,
+                **log_ctx,
+            )
+        return None
+
     episode_captured = captured
     if episode_captured is None:
         episode_captured = getattr(env, "_pb_captured_triggers", None)
@@ -249,13 +261,30 @@ def maybe_capture_pb(
         env._pb_captured_triggers = episode_captured
 
     if trigger_id in episode_captured:
+        if is_typewriter:
+            log_typewriter_save(
+                "capture_skipped",
+                reason="duplicate_episode",
+                trigger=trigger_id,
+                **log_ctx,
+            )
         return None
+
+    if is_typewriter:
+        log_typewriter_save("capture_begin", trigger=trigger_id, **log_ctx)
 
     states_dir = Path(states_dir)
     states_dir.mkdir(parents=True, exist_ok=True)
 
     bridge = getattr(env, "bridge", None)
     if bridge is None or not hasattr(bridge, "save_savestate"):
+        if is_typewriter:
+            log_typewriter_save(
+                "capture_failed",
+                reason="no_savestate_bridge",
+                trigger=trigger_id,
+                **log_ctx,
+            )
         return None
 
     state: dict[str, Any] = {}
@@ -290,6 +319,12 @@ def maybe_capture_pb(
             or ""
         ).strip().upper()
         if not room_id:
+            log_typewriter_save(
+                "capture_failed",
+                reason="missing_room_id",
+                trigger=trigger_id,
+                **log_ctx,
+            )
             return None
         stage_dir = typewriter_champion_dir(project_root, room_id) / ".staging"
         stage_dir.mkdir(parents=True, exist_ok=True)
@@ -306,6 +341,15 @@ def maybe_capture_pb(
     except (OSError, RuntimeError, ValueError) as exc:
         if state_path.is_file():
             state_path.unlink(missing_ok=True)
+        if is_typewriter:
+            log_typewriter_save(
+                "capture_failed",
+                reason="save_savestate",
+                trigger=trigger_id,
+                error=str(exc),
+                state_path=str(state_path),
+                **log_ctx,
+            )
         raise RuntimeError(f"save_savestate failed for {trigger_id}: {exc}") from exc
 
     sidecar = dump_episode_sidecar(
@@ -336,6 +380,13 @@ def maybe_capture_pb(
         except OSError:
             pass
         if not replaced:
+            log_typewriter_save(
+                "capture_replace_rejected",
+                trigger=trigger_id,
+                room=room_id,
+                score=list(score),
+                **log_ctx,
+            )
             return None
         cdir = typewriter_champion_dir(project_root, room_id)
         champ_state = cdir / "champion.State"
@@ -368,6 +419,15 @@ def maybe_capture_pb(
         append_manifest_row(states_dir / MANIFEST_FILENAME, row)
         ensure_pb_sync_daemon(project_root)
         push_champion_async(project_root)
+        log_typewriter_save(
+            "capture_ok",
+            trigger=trigger_id,
+            room=room_id,
+            score=list(score),
+            champion_state=rel_state,
+            champion_sidecar=rel_sidecar,
+            **log_ctx,
+        )
         return champ_state
 
     try:

@@ -156,7 +156,16 @@ def test_detector_complete_independent_of_memory_card_slot(save_slot: int) -> No
     assert det.completed_room == "106"
 
 
-def test_sidecar_holdoff_blocks_false_save_on_load_settle() -> None:
+def test_detector_logs_armed_and_complete(capsys: pytest.CaptureFixture[str]) -> None:
+    det = TypewriterSaveDetector()
+    assert _run_save_complete(det) is True
+    out = capsys.readouterr().out
+    assert "[typewriter_save] event=armed" in out
+    assert "[typewriter_save] event=cinema" in out
+    assert "[typewriter_save] event=complete" in out
+
+
+def test_sidecar_holdoff_logs_begin_and_clear(capsys: pytest.CaptureFixture[str]) -> None:
     """PB start: uncontrolled→control must not complete a save without ribbon drop."""
     det = TypewriterSaveDetector()
     spawn = _slots_state(ribbons=1)
@@ -172,6 +181,9 @@ def test_sidecar_holdoff_blocks_false_save_on_load_settle() -> None:
     for _ in range(_SIDECAR_HOLDOFF_CONTROL_STREAK + 2):
         assert det.update(ctrl, ctrl) is False
     assert not det.sidecar_holdoff
+    out = capsys.readouterr().out
+    assert "[typewriter_save] event=holdoff_begin" in out
+    assert "[typewriter_save] event=holdoff_clear" in out
     # Real save after holdoff clears still pays/detects.
     assert _run_save_complete(det) is True
 
