@@ -330,6 +330,81 @@ def test_champion_score_v2_visited_tie_break() -> None:
     assert score_beats(many, few, candidate_version=2, incumbent_version=2)
 
 
+def test_champion_score_v2_ammo_overflow_quanta() -> None:
+    """Ammo V scales by quantum (20 HG / 7 SG); not flat +1 per stack."""
+    empty = champion_score_v2(
+        inventory_slots=[["knife", 1]],
+        box_cache=None,
+        ever_held=(),
+        visited_rooms=(),
+        hp=100,
+    )
+    twenty_hg = champion_score_v2(
+        inventory_slots=[["knife", 1], ["handgun_bullets", 20]],
+        box_cache=None,
+        ever_held=(),
+        visited_rooms=(),
+        hp=100,
+    )
+    forty_hg = champion_score_v2(
+        inventory_slots=[["knife", 1], ["handgun_bullets", 40]],
+        box_cache=None,
+        ever_held=(),
+        visited_rooms=(),
+        hp=100,
+    )
+    # +1.0 V per 20 handgun rounds
+    assert twenty_hg[0] == empty[0] + 1000
+    assert forty_hg[0] == empty[0] + 2000
+    assert forty_hg[2] == 40
+
+    seven_sg = champion_score_v2(
+        inventory_slots=[["knife", 1], ["shotgun_shells", 7]],
+        box_cache=None,
+        ever_held=(),
+        visited_rooms=(),
+        hp=100,
+    )
+    assert seven_sg[0] == empty[0] + 1000
+
+    # Loaded beretta qty pools into handgun bullets (weapon itself still +1).
+    gun_only = champion_score_v2(
+        inventory_slots=[["beretta", 15]],
+        box_cache=None,
+        ever_held=(),
+        visited_rooms=(),
+        hp=100,
+    )
+    gun_plus_box = champion_score_v2(
+        inventory_slots=[["beretta", 15]],
+        box_cache=[[0x0B, 5]],  # handgun_bullets x5 → total 20 with loaded
+        ever_held=(),
+        visited_rooms=(),
+        hp=100,
+    )
+    # 15/20 = 0.75 ammo V vs (15+5)/20 = 1.0 ammo V; both include +1 weapon
+    assert gun_plus_box[0] == gun_only[0] + 250
+    assert gun_plus_box[2] == 20
+
+    # 20 HG bullets (+1 V) beats one FAS (+1 V) on the bullets tie-break.
+    fas = champion_score_v2(
+        inventory_slots=[["first_aid_spray_alt", 1]],
+        box_cache=None,
+        ever_held=(),
+        visited_rooms=(),
+        hp=100,
+    )
+    ammo20 = champion_score_v2(
+        inventory_slots=[["handgun_bullets", 20]],
+        box_cache=None,
+        ever_held=(),
+        visited_rooms=(),
+        hp=100,
+    )
+    assert fas[0] == ammo20[0]
+    assert score_beats(ammo20, fas, candidate_version=2, incumbent_version=2)
+
+
 def test_champion_score_legacy_v1_still_orders() -> None:
     rich = _slots_state(ribbons=1, bullets=20, hp=100)
     rich["inventory_slots"] = [

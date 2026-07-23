@@ -22,4 +22,5 @@ set RE1_STEP_DIAG_PORT=5759
 set RE1_MACHINE_NAME=%MACHINE_NAME%
 set RE1_STEP_DIAG_LOG=D:\re1_rl\data\logs\pking_top_right_memlog.jsonl
 
-venv\Scripts\python.exe scripts\distributed_train_parallel.py --role worker --machine-name %MACHINE_NAME% --learner-host %LEARNER_HOST% --learner-port %FLEET_LEARNER_PORT% --n-envs %N_ENVS% --base-port %BASE_PORT% --total-steps 0 --training-speed 6400 --skip-chunk 600 --sync-interval-s %SYNC_INTERVAL_S% --capture-checkpoints --no-headless --screenshot-mmf --n-steps 1536 --inference-batch-max %N_ENVS% --tile-windows --grid-cols 5 --grid-rows 4
+REM Headless for throughput (flip to --no-headless --tile-windows --grid-cols 5 --grid-rows 4 for visible grid).
+venv\Scripts\python.exe scripts\distributed_train_parallel.py --role worker --machine-name %MACHINE_NAME% --learner-host %LEARNER_HOST% --learner-port %FLEET_LEARNER_PORT% --n-envs %N_ENVS% --base-port %BASE_PORT% --total-steps 0 --training-speed 6400 --skip-chunk 600 --sync-interval-s %SYNC_INTERVAL_S% --capture-checkpoints --headless --screenshot-mmf --n-steps 1536 --inference-batch-max %N_ENVS%

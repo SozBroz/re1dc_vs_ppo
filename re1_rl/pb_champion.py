@@ -35,6 +35,33 @@ _HERB_UNIT_V: dict[str, float] = {
     "mixed_herbs_grb": 1.0 / 3.0 + 2.0 / 3.0 + 1.0 / 6.0,
 }
 
+# Rounds per +1.0 V for ammo (overflow). Beretta baseline 20; others scaled
+# from the prior 30-HG table by 20/30 (keep rocket at 1).
+_AMMO_V_QUANTUM: dict[str, int] = {
+    "handgun_bullets": 20,  # was 30
+    "shotgun_shells": 7,  # was 10
+    "magnum_rounds": 2,  # was 3
+    "dumdum_rounds": 2,  # was 3
+    "flamethrower_fuel": 33,  # was 50
+    "explosive_rounds": 2,  # was 3
+    "acid_rounds": 2,  # was 3
+    "flame_rounds": 2,  # was 3
+    "rocket": 1,  # unchanged (floor)
+}
+
+# Loaded qty on the weapon card feeds the matching ammo pool (weapon still +1 V).
+_WEAPON_AMMO_POOL: dict[str, str] = {
+    "beretta": "handgun_bullets",
+    "shotgun": "shotgun_shells",
+    "colt_python": "magnum_rounds",
+    "colt_python_dumdum": "dumdum_rounds",
+    "flamethrower": "flamethrower_fuel",
+    "bazooka_acid": "acid_rounds",
+    "bazooka_explosive": "explosive_rounds",
+    "bazooka_flame": "flame_rounds",
+    "rocket_launcher": "rocket",
+}
+
 
 def pb_root(project_root: Path | str) -> Path:
     override = os.environ.get(_PB_ROOT_ENV, "").strip()
@@ -176,7 +203,14 @@ def champion_score_v2(
     visited_rooms: Iterable[str] | None,
     hp: int,
 ) -> tuple[int, int, int, int, int]:
-    """Unified V score: (v_milli, hp, handgun_bullets, -ink_ribbons, n_visited)."""
+    """Unified V score: (v_milli, hp, handgun_bullets, -ink_ribbons, n_visited).
+
+    Ammo does not get a flat +1 per stack. All rounds of each ammo type
+    (inventory + box + loaded weapon qty) are pooled, then
+    ``pool_qty / _AMMO_V_QUANTUM[type]`` is added to V (e.g. 20 handgun
+    bullets = +1.0, 7 shotgun shells = +1.0). The weapon item itself still
+    counts as +1.0 when present.
+    """
     inv = _normalize_inv_slots(inventory_slots)
     box = _box_slots(box_cache)
     physical = inv + box
@@ -185,6 +219,7 @@ def champion_score_v2(
     ribbons = 0
     bullets = 0
     present_keys: set[str] = set()
+    ammo_totals: dict[str, int] = {k: 0 for k in _AMMO_V_QUANTUM}
 
     for name, qty in physical:
         q = max(0, int(qty))
@@ -193,8 +228,23 @@ def champion_score_v2(
         if name == "ink_ribbon":
             ribbons += q
             continue
-        if name in ("beretta", "handgun_bullets"):
-            bullets += q
+
+        if name in _AMMO_V_QUANTUM:
+            ammo_totals[name] += q
+            if name == "handgun_bullets":
+                bullets += q
+            continue
+
+        pool = _WEAPON_AMMO_POOL.get(name)
+        if pool is not None:
+            ammo_totals[pool] = ammo_totals.get(pool, 0) + q
+            if pool == "handgun_bullets" or name == "beretta":
+                bullets += q
+            v_physical += 1.0
+            if name in _KEY_ITEM_NAME_SET:
+                present_keys.add(name)
+            continue
+
         herb_u = _HERB_UNIT_V.get(name)
         if herb_u is not None:
             v_physical += herb_u * q
@@ -202,6 +252,14 @@ def champion_score_v2(
             v_physical += 1.0
             if name in _KEY_ITEM_NAME_SET:
                 present_keys.add(name)
+
+    for ammo_name, total in ammo_totals.items():
+        if total <= 0:
+            continue
+        quantum = _AMMO_V_QUANTUM.get(ammo_name)
+        if not quantum:
+            continue
+        v_physical += float(total) / float(quantum)
 
     held = {canonical_item(str(n)) for n in (ever_held or ()) if n}
     key_credit = held & _KEY_ITEM_NAME_SET
