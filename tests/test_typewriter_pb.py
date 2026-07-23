@@ -127,18 +127,10 @@ def _run_save_complete(det: TypewriterSaveDetector, *, room: str = "106") -> boo
     prev = _slots_state(ribbons=2, room=room)
     drop = _slots_state(ribbons=1, room=room)
     drop["in_control"] = True
-    assert det.update(prev, drop) is False
-    cinema = dict(drop)
-    cinema["in_control"] = False
-    assert det.update(drop, cinema) is False
-    ctrl1 = dict(cinema)
-    ctrl1["in_control"] = True
-    assert det.update(cinema, ctrl1) is False
-    ctrl2 = dict(ctrl1)
-    return bool(det.update(ctrl1, ctrl2))
+    return bool(det.update(prev, drop))
 
 
-def test_detector_waits_for_save_cinema_then_stable_control() -> None:
+def test_detector_fires_on_ink_ribbon_drop() -> None:
     det = TypewriterSaveDetector()
     assert _run_save_complete(det) is True
     assert det.completed_room == "106"
@@ -149,7 +141,7 @@ def test_detector_waits_for_save_cinema_then_stable_control() -> None:
 
 @pytest.mark.parametrize("save_slot", [1, 2, 3, 5, 8, 15])
 def test_detector_complete_independent_of_memory_card_slot(save_slot: int) -> None:
-    """TypewriterSaveDetector keys off ribbon drop + cinema, not save slot."""
+    """TypewriterSaveDetector keys off ribbon drop, not save slot."""
     del save_slot  # slot is not an input to the detector
     det = TypewriterSaveDetector()
     assert _run_save_complete(det) is True
@@ -161,8 +153,8 @@ def test_detector_logs_armed_and_complete(capsys: pytest.CaptureFixture[str]) ->
     assert _run_save_complete(det) is True
     out = capsys.readouterr().out
     assert "[typewriter_save] event=armed" in out
-    assert "[typewriter_save] event=cinema" in out
     assert "[typewriter_save] event=complete" in out
+    assert "reason='ribbon_drop'" in out
 
 
 def test_sidecar_holdoff_logs_begin_and_clear(capsys: pytest.CaptureFixture[str]) -> None:
@@ -225,16 +217,8 @@ def test_detector_works_in_non_106_room() -> None:
     prev = _slots_state(ribbons=2, room="118")
     drop = _slots_state(ribbons=1, room="118")
     drop["in_control"] = True
-    assert det.update(prev, drop) is False
+    assert det.update(prev, drop) is True
     assert det.armed_room == "118"
-    cinema = dict(drop)
-    cinema["in_control"] = False
-    assert det.update(drop, cinema) is False
-    ctrl1 = dict(cinema)
-    ctrl1["in_control"] = True
-    assert det.update(cinema, ctrl1) is False
-    ctrl2 = dict(ctrl1)
-    assert det.update(ctrl1, ctrl2) is True
     assert det.completed_room == "118"
     assert det.last_room == "118"
 
@@ -244,11 +228,8 @@ def test_detector_ribbon_drop_already_uncontrolled() -> None:
     prev = _slots_state(ribbons=2)
     mid = _slots_state(ribbons=1)
     mid["in_control"] = False
-    assert det.update(prev, mid) is False
-    done = dict(mid)
-    done["in_control"] = True
-    assert det.update(mid, done) is False  # streak 1
-    assert det.update(done, done) is True  # streak 2
+    assert det.update(prev, mid) is True
+    assert det.completed_room == "106"
 
 
 def test_ink_ribbon_consumed() -> None:

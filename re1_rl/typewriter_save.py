@@ -1,7 +1,8 @@
 """Detect in-game typewriter saves (ink ribbon consumption) for PB capture.
 
 Detector (no dedicated save-UI RAM yet): ink_ribbon qty drop in any RDT
-typewriter room, then control restored after the save cinema.
+typewriter room fires capture on that step. Champion replace / score gates
+still decide whether the sidecar is kept.
 """
 
 from __future__ import annotations
@@ -121,31 +122,21 @@ def typewriter_save_cutscene_disqualified(
     return ink_ribbon_consumed(prev_state, new_state)
 
 
-# Env macro-steps of continuous in_control after the save cinema (frame_skip≈8).
-_POST_SAVE_CONTROL_STREAK = 2
-
-# After a PB/sidecar episode start, ignore ribbon/control edges until Jill has
-# been stably in control with an unchanged ink-ribbon count. Load settle can
-# look like save cinema (uncontrolled → control) and inventory can flicker.
+# After a PB/sidecar episode start, ignore ribbon edges until Jill has been
+# stably in control with an unchanged ink-ribbon count. Load settle can flicker
+# inventory and must not look like a fresh typewriter save.
 _SIDECAR_HOLDOFF_CONTROL_STREAK = 8
 
 
 class TypewriterSaveDetector:
-    """Latch ribbon drop → require save cinema (uncontrolled) → stable control.
+    """Fire on ink-ribbon drop in a typewriter room (same step).
 
-    Must not fire on the ribbon-drop step itself (still mid save-UI / pre-cinema).
-    Capture only after the engine seizes control for the save sequence and then
-    returns Jill to playable control in the same typewriter room.
-
-    Sidecar / PB episode starts begin in holdoff so a load settle cannot look
-    like a completed save (reward + capture stay silent until holdoff clears).
+    Champion score / ``try_replace_champion`` still decide whether the captured
+    sidecar replaces the machine-local slot. Sidecar episode starts begin in
+    holdoff so load settle cannot look like a completed save.
     """
 
     def __init__(self) -> None:
-        self._pending = False
-        self._pending_room: str | None = None
-        self._saw_uncontrolled = False
-        self._control_streak = 0
         self._sidecar_holdoff = False
         self._holdoff_ribbon_baseline: int | None = None
         self._holdoff_stable_ctrl = 0
@@ -154,19 +145,6 @@ class TypewriterSaveDetector:
         self.last_room: str | None = None
 
     def reset(self) -> None:
-        if self._pending:
-            from re1_rl.typewriter_save_log import log_typewriter_save
-
-            log_typewriter_save(
-                "abort_reset",
-                pending_room=self._pending_room,
-                saw_uncontrolled=self._saw_uncontrolled,
-                control_streak=self._control_streak,
-            )
-        self._pending = False
-        self._pending_room = None
-        self._saw_uncontrolled = False
-        self._control_streak = 0
         self._sidecar_holdoff = False
         self._holdoff_ribbon_baseline = None
         self._holdoff_stable_ctrl = 0
@@ -199,12 +177,6 @@ class TypewriterSaveDetector:
     def sidecar_holdoff(self) -> bool:
         return bool(self._sidecar_holdoff)
 
-    def _clear_pending(self) -> None:
-        self._pending = False
-        self._pending_room = None
-        self._saw_uncontrolled = False
-        self._control_streak = 0
-
     def _tick_sidecar_holdoff(self, state: dict[str, Any]) -> None:
         ribbons = count_ink_ribbons(state)
         if self._holdoff_ribbon_baseline is None:
@@ -216,7 +188,6 @@ class TypewriterSaveDetector:
             self._holdoff_stable_ctrl = 0
             if in_control:
                 self._holdoff_ribbon_baseline = ribbons
-        self._clear_pending()
         self.armed_room = None
         if self._holdoff_stable_ctrl >= _SIDECAR_HOLDOFF_CONTROL_STREAK:
             from re1_rl.typewriter_save_log import log_typewriter_save
@@ -232,82 +203,36 @@ class TypewriterSaveDetector:
         prev_state: dict[str, Any] | None,
         state: dict[str, Any] | None,
     ) -> bool:
-        """Return True on the step a completed typewriter save should capture."""
+        """Return True on the step that should trigger typewriter PB capture."""
         if state is None:
             return False
         if self._sidecar_holdoff:
             self._tick_sidecar_holdoff(state)
             return False
         room = str(state.get("room_id", "") or "")
-        in_control = bool(state.get("in_control", False))
-
-        if ink_ribbon_consumed(prev_state, state) and room in TYPEWRITER_ROOMS:
-            # Ribbon drop arms the latch; never fire this same step.
-            from re1_rl.typewriter_save_log import log_typewriter_save, state_fields
-
-            self._pending = True
-            self._pending_room = room
-            self.armed_room = room
-            self._saw_uncontrolled = not in_control
-            self._control_streak = 0
-            log_typewriter_save(
-                "armed",
-                room=room,
-                ribbons_before=count_ink_ribbons(prev_state),
-                ribbons_after=count_ink_ribbons(state),
-                **state_fields(state),
-            )
+        if not (ink_ribbon_consumed(prev_state, state) and room in TYPEWRITER_ROOMS):
             return False
 
-        if not self._pending:
-            return False
-
-        if room != self._pending_room:
-            from re1_rl.typewriter_save_log import log_typewriter_save
-
-            log_typewriter_save(
-                "abort_room_change",
-                pending_room=self._pending_room,
-                room=room,
-                saw_uncontrolled=self._saw_uncontrolled,
-                control_streak=self._control_streak,
-            )
-            self._clear_pending()
-            self.armed_room = None
-            return False
-
-        if not in_control:
-            if not self._saw_uncontrolled:
-                from re1_rl.typewriter_save_log import log_typewriter_save, state_fields
-
-                log_typewriter_save(
-                    "cinema",
-                    pending_room=self._pending_room,
-                    **state_fields(state),
-                )
-            self._saw_uncontrolled = True
-            self._control_streak = 0
-            return False
-
-        if not self._saw_uncontrolled:
-            # Still waiting for the save cinema / UI to take control.
-            return False
-
-        self._control_streak += 1
-        if self._control_streak < _POST_SAVE_CONTROL_STREAK:
-            return False
-
-        fired = self._pending_room or room
         from re1_rl.typewriter_save_log import log_typewriter_save, state_fields
 
+        ribbons_before = count_ink_ribbons(prev_state)
+        ribbons_after = count_ink_ribbons(state)
         log_typewriter_save(
-            "complete",
-            room=fired,
-            control_streak=self._control_streak,
+            "armed",
+            room=room,
+            ribbons_before=ribbons_before,
+            ribbons_after=ribbons_after,
             **state_fields(state),
         )
-        self._clear_pending()
-        self.armed_room = fired
-        self.completed_room = fired
-        self.last_room = fired
+        log_typewriter_save(
+            "complete",
+            room=room,
+            reason="ribbon_drop",
+            ribbons_before=ribbons_before,
+            ribbons_after=ribbons_after,
+            **state_fields(state),
+        )
+        self.armed_room = room
+        self.completed_room = room
+        self.last_room = room
         return True
