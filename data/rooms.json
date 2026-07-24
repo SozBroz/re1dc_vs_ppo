@@ -270,16 +270,14 @@
     "unverified": true
   },
   "218": {
-    "name": "HIDDEN LIBRARY",
+    "name": "SMALL LIBRARY",
     "stage": 2,
-    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
-    "unverified": true
+    "notes": "Evil Resource Small Library; links 201 and 204 (operator-confirmed 2026-07-24)"
   },
   "219": {
-    "name": "SHED",
+    "name": "CLOSET",
     "stage": 2,
-    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
-    "unverified": true
+    "notes": "Evil Resource Closet; battery + explosive rounds (operator-confirmed 2026-07-24)"
   },
   "21A": {
     "name": "UNDER PASSAGE 1",
@@ -387,8 +385,7 @@
   "311": {
     "name": "ROTATING HOLE",
     "stage": 3,
-    "notes": "hex ID inferred from TapTalk table order (IDs column missing in mirrors)",
-    "unverified": true
+    "notes": "Sub-room of boulder passage 30D; hex crank puzzle (operator-confirmed 2026-07-24)"
   },
   "400": {
     "name": "ENTER PASSAGE",

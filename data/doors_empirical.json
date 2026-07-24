@@ -237,5 +237,182 @@
     "entry_x": 12000,
     "entry_z": 4000,
     "notes": "reverse of 116->115; UNVERIFIED"
+  },
+  "119->10A": {
+    "from_room": "119",
+    "to_room": "10A",
+    "door_x": 6300,
+    "door_z": 2700,
+    "entry_x": 8550,
+    "entry_z": 6050,
+    "notes": "Courtyard Study return; mirrored from doors_rdt 10A->119 (operator 2026-07-24)"
+  },
+  "213->214": {
+    "from_room": "213",
+    "to_room": "214",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology 2026-07-24; coords TBD"
+  },
+  "214->213": {
+    "from_room": "214",
+    "to_room": "213",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology 2026-07-24; coords TBD"
+  },
+  "213->216": {
+    "from_room": "213",
+    "to_room": "216",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology 2026-07-24; coords TBD"
+  },
+  "216->213": {
+    "from_room": "216",
+    "to_room": "213",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology 2026-07-24; coords TBD"
+  },
+  "213->219": {
+    "from_room": "213",
+    "to_room": "219",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology 2026-07-24; coords TBD"
+  },
+  "219->213": {
+    "from_room": "219",
+    "to_room": "213",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology 2026-07-24; coords TBD"
+  },
+  "216->217": {
+    "from_room": "216",
+    "to_room": "217",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology 2026-07-24; coords TBD"
+  },
+  "217->216": {
+    "from_room": "217",
+    "to_room": "216",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology 2026-07-24; coords TBD"
+  },
+  "201->218": {
+    "from_room": "201",
+    "to_room": "218",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology Small Library 2026-07-24; coords TBD"
+  },
+  "218->201": {
+    "from_room": "218",
+    "to_room": "201",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology Small Library 2026-07-24; coords TBD"
+  },
+  "204->218": {
+    "from_room": "204",
+    "to_room": "218",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology Small Library 2026-07-24; coords TBD"
+  },
+  "218->204": {
+    "from_room": "218",
+    "to_room": "204",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology Small Library 2026-07-24; coords TBD"
+  },
+  "21C->213": {
+    "from_room": "21C",
+    "to_room": "213",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology B1 2026-07-24; coords TBD"
+  },
+  "213->21C": {
+    "from_room": "213",
+    "to_room": "21C",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology B1 2026-07-24; coords TBD"
+  },
+  "21C->21B": {
+    "from_room": "21C",
+    "to_room": "21B",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology B1 2026-07-24; coords TBD"
+  },
+  "21B->21C": {
+    "from_room": "21B",
+    "to_room": "21C",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology B1 2026-07-24; coords TBD"
+  },
+  "21C->118": {
+    "from_room": "21C",
+    "to_room": "118",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology B1 2026-07-24; coords TBD"
+  },
+  "118->21C": {
+    "from_room": "118",
+    "to_room": "21C",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology B1 2026-07-24; coords TBD"
+  },
+  "21B->21A": {
+    "from_room": "21B",
+    "to_room": "21A",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology B1 2026-07-24; coords TBD"
+  },
+  "21A->21B": {
+    "from_room": "21A",
+    "to_room": "21B",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology B1 2026-07-24; coords TBD"
+  },
+  "21A->118": {
+    "from_room": "21A",
+    "to_room": "118",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology B1 2026-07-24; coords TBD"
+  },
+  "118->21A": {
+    "from_room": "118",
+    "to_room": "21A",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "operator topology B1 2026-07-24; coords TBD"
+  },
+  "30D->311": {
+    "from_room": "30D",
+    "to_room": "311",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "rotating hole sub-room; hex crank from 30D (operator 2026-07-24); coords TBD"
+  },
+  "311->30D": {
+    "from_room": "311",
+    "to_room": "30D",
+    "door_x": 0,
+    "door_z": 0,
+    "notes": "rotating hole return; operator 2026-07-24; coords TBD"
   }
 }
