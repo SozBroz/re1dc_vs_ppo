@@ -26,6 +26,38 @@ CKPT_DIR = ROOT / "data" / "checkpoints" / RUN
 _STEPS_RE = re.compile(r"ppo_re1_(\d+)_steps\.zip$", re.I)
 
 
+def _wipe_other_ckpts(ckpt_dir: Path, out_zip: Path, root: Path) -> None:
+    kept = {out_zip.resolve(), (ckpt_dir / "latest.json").resolve()}
+    top_latest = (root / "data" / "checkpoints" / "latest.json").resolve()
+    kept.add(top_latest)
+    removed = 0
+    for p in ckpt_dir.iterdir():
+        if p.resolve() in kept:
+            continue
+        if p.is_file():
+            p.unlink()
+            removed += 1
+            print(f"[scalpel] removed {p.name}", flush=True)
+    parent = ckpt_dir.parent
+    for child in parent.iterdir():
+        if child.resolve() == ckpt_dir.resolve():
+            continue
+        if child.is_dir():
+            import shutil
+
+            shutil.rmtree(child)
+            removed += 1
+            print(f"[scalpel] removed dir {child.name}", flush=True)
+        elif child.is_file() and child.resolve() not in kept:
+            child.unlink()
+            removed += 1
+    for final in (root / "data").glob("ppo_re1_final*.zip"):
+        final.unlink()
+        removed += 1
+        print(f"[scalpel] removed {final.name}", flush=True)
+    print(f"[scalpel] wipe removed={removed}", flush=True)
+
+
 def _newest_zip(run_dir: Path) -> Path:
     zips = list(run_dir.glob("ppo_re1_*_steps.zip"))
     zips += list(run_dir.glob("ppo_re1_*_cnn_graft.zip"))
@@ -59,7 +91,49 @@ def main() -> int:
     print(f"[scalpel] frame target {FRAME_H}x{FRAME_W}", flush=True)
     print(f"[scalpel] src={src}", flush=True)
 
-    model = load_async_learner(device=str(args.device), resume=src, tb_log=None)
+    try:
+        model = load_async_learner(device=str(args.device), resume=src, tb_log=None)
+    except RuntimeError as exc:
+        print(f"[scalpel] load_async_learner failed ({exc}); doc04 catalog transplant", flush=True)
+        from re1_rl.doc04_catalog_transplant import transplant_doc04_checkpoint
+
+        out_base = out_zip.with_suffix("")
+        model, out_zip, report = transplant_doc04_checkpoint(
+            src, out_base, device=str(args.device)
+        )
+        for line in report.get("copied", [])[:8]:
+            print(f"[scalpel] copied {line}", flush=True)
+        for line in report.get("remapped", []):
+            print(f"[scalpel] remapped {line}", flush=True)
+        if report.get("skipped"):
+            print(f"[scalpel] skipped {len(report['skipped'])} tensors", flush=True)
+        steps = int(getattr(model, "num_timesteps", 0) or 0)
+        meta = {
+            "path": str(out_zip.relative_to(ROOT)).replace("\\", "/"),
+            "steps": steps,
+            "saved_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "bytes": out_zip.stat().st_size,
+            "scalpel": {
+                "src": str(src),
+                "frame": [FRAME_H, FRAME_W],
+                "reason": "doc04 catalog transplant",
+            },
+        }
+        for latest in (
+            CKPT_DIR / "latest.json",
+            ROOT / "data" / "checkpoints" / "latest.json",
+        ):
+            latest.parent.mkdir(parents=True, exist_ok=True)
+            latest.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+            print(f"[scalpel] wrote {latest}", flush=True)
+        print(
+            f"[scalpel] saved {out_zip} steps={steps} bytes={out_zip.stat().st_size}",
+            flush=True,
+        )
+        if args.wipe_others:
+            _wipe_other_ckpts(CKPT_DIR, out_zip, ROOT)
+        return 0
+
     # SB3 save without .zip suffix
     out_base = out_zip.with_suffix("")
     if out_zip.is_file() and out_zip.resolve() != src.resolve():
@@ -100,36 +174,7 @@ def main() -> int:
     )
 
     if args.wipe_others:
-        kept = {out_zip.resolve(), (CKPT_DIR / "latest.json").resolve()}
-        top_latest = (ROOT / "data" / "checkpoints" / "latest.json").resolve()
-        kept.add(top_latest)
-        removed = 0
-        for p in CKPT_DIR.iterdir():
-            if p.resolve() in kept:
-                continue
-            if p.is_file():
-                p.unlink()
-                removed += 1
-                print(f"[scalpel] removed {p.name}", flush=True)
-        # Also clear sibling run dirs under data/checkpoints except reward_tune_1040k
-        parent = CKPT_DIR.parent
-        for child in parent.iterdir():
-            if child.resolve() == CKPT_DIR.resolve():
-                continue
-            if child.is_dir():
-                import shutil
-
-                shutil.rmtree(child)
-                removed += 1
-                print(f"[scalpel] removed dir {child.name}", flush=True)
-            elif child.is_file() and child.resolve() not in kept:
-                child.unlink()
-                removed += 1
-        for final in (ROOT / "data").glob("ppo_re1_final*.zip"):
-            final.unlink()
-            removed += 1
-            print(f"[scalpel] removed {final.name}", flush=True)
-        print(f"[scalpel] wipe removed={removed}", flush=True)
+        _wipe_other_ckpts(CKPT_DIR, out_zip, ROOT)
 
     return 0
 
