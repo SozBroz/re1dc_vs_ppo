@@ -10,11 +10,6 @@ PATH = ROOT / "data" / "room_items.json"
 # (room_id, item_name) -> gate dict
 GATES: dict[tuple[str, str], dict] = {
     # --- Mansion 1F ---
-    ("103", "green_herb"): {
-        "type": "puzzle",
-        "requires": [],
-        "notes": "Behind floor grate; push both statues onto grates before red button",
-    },
     ("105", "shield_key"): {
         "type": "item",
         "requires": ["gold_emblem"],
@@ -50,6 +45,11 @@ GATES: dict[tuple[str, str], dict] = {
         "requires": ["blue_jewel"],
         "notes": "Insert blue jewel in tiger eye; statue slides to reveal crest",
     },
+    ("10D", "colt_python"): {
+        "type": "item",
+        "requires": ["red_jewel"],
+        "notes": "Insert red jewel in tiger eye; alcove reveals Colt Python",
+    },
     ("10F", "music_notes"): {
         "type": "puzzle",
         "requires": [],
@@ -70,11 +70,6 @@ GATES: dict[tuple[str, str], dict] = {
         "requires": ["lockpick"],
         "notes": "Locked desk in dressing room",
     },
-    ("115", "shotgun"): {
-        "type": "trap",
-        "requires": [],
-        "notes": "Ceiling trap; Jill saved by Barry once (Chris needs broken_shotgun swap)",
-    },
     ("116", "shotgun"): {
         "type": "trap",
         "requires": [],
@@ -85,10 +80,20 @@ GATES: dict[tuple[str, str], dict] = {
         "requires": [],
         "notes": "Crow painting buttons in life-cycle order (large gallery)",
     },
-    ("11B", "square_crank"): {
-        "type": "puzzle",
+    ("11B", "shotgun_shells"): {
+        "type": "event",
         "requires": [],
-        "notes": "Position stepladder at shelf and climb to top shelf",
+        "notes": "Barry drops after Plant 42 defeat (1x7 shells)",
+    },
+    ("11B", "first_aid_spray_alt"): {
+        "type": "event",
+        "requires": [],
+        "notes": "Barry drops after Plant 42 defeat",
+    },
+    ("11B", "acid_rounds"): {
+        "type": "event",
+        "requires": [],
+        "notes": "Barry drops after Plant 42 defeat (1x6)",
     },
     # --- Mansion 2F ---
     ("202", "blue_jewel"): {
@@ -152,15 +157,30 @@ GATES: dict[tuple[str, str], dict] = {
         "notes": "Library B: press wall button, push statue onto lit floor tile",
     },
     # --- Courtyard / Garden ---
-    ("305", "doom_book_2"): {
+    ("119", "doom_book_1"): {
         "type": "puzzle",
-        "requires": ["hex_crank"],
-        "notes": "Item chamber statue + hex crank puzzle (see room placement note in docs)",
+        "requires": [],
+        "notes": "Flip wall switch by door, then take Doom Book 1 from bookshelf",
     },
-    ("306", "mo_disc"): {
+    ("119", "eagle_medal"): {
+        "type": "item",
+        "requires": ["doom_book_1"],
+        "notes": "Examine Doom Book 1 pages (directions + Cross) until eagle medal",
+    },
+    ("303", "doom_book_2"): {
         "type": "puzzle",
-        "requires": ["hex_crank"],
-        "notes": "Push statue five times, hex crank twice, align statue on tile",
+        "requires": [],
+        "notes": "Take Doom Book 2 from helipad desk",
+    },
+    ("303", "wolf_medal"): {
+        "type": "item",
+        "requires": ["doom_book_2"],
+        "notes": "Examine Doom Book 2 pages (directions + Cross) until wolf medal",
+    },
+    ("303", "flare"): {
+        "type": "event",
+        "requires": [],
+        "notes": "Barry gives flare; use on helipad for good ending signal",
     },
     # --- Underground ---
     ("30A", "hex_crank"): {
@@ -194,6 +214,16 @@ GATES: dict[tuple[str, str], dict] = {
         "requires": ["lockpick"],
         "notes": "Locked desk in room 001",
     },
+    ("406", "shotgun_shells"): {
+        "type": "item",
+        "requires": ["lockpick"],
+        "notes": "Locked locker in room 002",
+    },
+    ("216", "scrapbook"): {
+        "type": "item",
+        "requires": ["lockpick"],
+        "notes": "Locked locker in large library",
+    },
     ("402", "control_room_key"): {
         "type": "puzzle",
         "requires": [],
@@ -215,15 +245,10 @@ GATES: dict[tuple[str, str], dict] = {
         "notes": "Fireplace after Plant 42 boss (Barry helps if no V-Jolt)",
     },
     # --- Laboratory ---
-    ("506", "wolf_medal"): {
-        "type": "item",
-        "requires": ["doom_book_2"],
-        "notes": "Standard: inside Doom Book 2; open book at fountain (desk placement disputed)",
-    },
-    ("507", "eagle_medal"): {
-        "type": "item",
-        "requires": ["doom_book_1"],
-        "notes": "Standard: inside Doom Book 1; open book at fountain (coffin note disputed)",
+    ("503", "mo_disc"): {
+        "type": "puzzle",
+        "requires": [],
+        "notes": "Second MO disc pickup on lab B2 stairs",
     },
     ("508", "passcode_a"): {
         "type": "item",
@@ -244,11 +269,6 @@ GATES: dict[tuple[str, str], dict] = {
         "type": "event",
         "requires": [],
         "notes": "Barry gives flare at falls for good ending path",
-    },
-    ("50B", "flare"): {
-        "type": "event",
-        "requires": [],
-        "notes": "Barry good-ending flare near lab escape elevator",
     },
     ("514", "rocket_launcher"): {
         "type": "event",

@@ -192,12 +192,41 @@ def _enum_bizhawk_windows() -> list[tuple[int, str]]:
 
 
 def find_hwnds_for_pid(pid: int) -> list[int]:
+    """Visible top-level windows owned by ``pid`` (no title filter)."""
     want = int(pid)
     found: list[int] = []
-    for hwnd, _title in _enum_bizhawk_windows():
-        if _pid_for_hwnd(hwnd) == want:
-            found.append(hwnd)
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def cb(hwnd: int, _: int) -> bool:
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        if _pid_for_hwnd(hwnd) != want:
+            return True
+        if not _window_title(hwnd):
+            return True
+        found.append(int(hwnd))
+        return True
+
+    user32.EnumWindows(cb, 0)
     return found
+
+
+def set_emu_window_title(
+    pid: int,
+    title: str,
+    *,
+    retries: int = 20,
+    delay_s: float = 0.25,
+) -> int | None:
+    """Set EmuHawk main window title for ``pid``. Return hwnd when found."""
+    for _ in range(max(1, retries)):
+        hwnds = find_hwnds_for_pid(pid)
+        if hwnds:
+            hwnd = hwnds[0]
+            _set_window_title(hwnd, title)
+            return hwnd
+        time.sleep(delay_s)
+    return None
 
 
 def stamp_emu_window(
@@ -209,16 +238,12 @@ def stamp_emu_window(
     delay_s: float = 0.25,
 ) -> int | None:
     """Stamp EmuHawk title with ``[pPORT]`` (and ★ MEMLOG when diag). Return hwnd."""
-    title = format_emu_title(port, diag=diag)
-    hwnd: int | None = None
-    for _ in range(max(1, retries)):
-        hwnds = find_hwnds_for_pid(pid)
-        if hwnds:
-            hwnd = hwnds[0]
-            _set_window_title(hwnd, title)
-            return hwnd
-        time.sleep(delay_s)
-    return None
+    return set_emu_window_title(
+        pid,
+        format_emu_title(port, diag=diag),
+        retries=retries,
+        delay_s=delay_s,
+    )
 
 
 def _resolve_port(

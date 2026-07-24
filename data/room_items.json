@@ -5,8 +5,7 @@
     "game": "RE1 Director's Cut PS1 standard Jill",
     "date": "2026-07-02",
     "fetch_errors": [],
-    "scrape_count": 125,
-    "dedup_notes": "2026-07-17: removed serum@102 and map_1f@106 duplicates per docs/item_gates.md (canonical serum@100, map_1f@107 only)."
+    "scrape_count": 128
   },
   "_unmatched": [
     {
@@ -56,18 +55,6 @@
       "item": "battery",
       "count": 1,
       "notes": "ROUTE CONFLICT wp35: route says 213 FRONT ELEVATOR; Evil Resource places battery in the Closet adjacent to Elevator 2F, best debug match 219 SHED (stage-2 = 2F). Kept in 219; needs in-game hex confirmation."
-    },
-    {
-      "er_room": "Courtyard Study",
-      "item": "doom_book_1",
-      "count": 1,
-      "notes": "bookshelf next to door; switch on lamp first (contains eagle_medal) | ROUTE CONFLICT wp36: route says 20B FRONT LESSON ROOM; Evil Resource places Doom Book 1 in Courtyard Study (1F, helmet key door off Back Passage). No confident debug code in rooms.json - left unmapped."
-    },
-    {
-      "er_room": "Store Room",
-      "item": "square_crank",
-      "count": 1,
-      "notes": "ROUTE CONFLICT wp37: route says 305 FOUNTAIN; Evil Resource places square_crank on the Store Room top shelf (shed to courtyard) = 11B. Kept in 11B."
     }
   ],
   "100": {
@@ -134,21 +121,7 @@
   },
   "103": {
     "room_name": "F PASSAGE",
-    "items": [
-      {
-        "name": "green_herb",
-        "item_id": 68,
-        "count": 3,
-        "key_item": false,
-        "in_inventory_table": true,
-        "notes": "behind pushed statue",
-        "gate": {
-          "type": "puzzle",
-          "requires": [],
-          "notes": "Behind floor grate; push both statues onto grates before red button"
-        }
-      }
-    ]
+    "items": []
   },
   "104": {
     "room_name": "TEA ROOM",
@@ -188,6 +161,19 @@
           ],
           "notes": "Grandfather clock slides after gold emblem placed on fireplace"
         }
+      },
+      {
+        "name": "blue_jewel",
+        "item_id": 33,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "statue landing after push from 202 dining balcony",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Push statue off 2F dining balcony; jewel lands in dining room 1F"
+        }
       }
     ]
   },
@@ -214,6 +200,14 @@
         "key_item": false,
         "in_inventory_table": true,
         "notes": "on typewriter"
+      },
+      {
+        "name": "map_1f",
+        "item_id": null,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": false,
+        "notes": "SE stairs alcove / art room map"
       },
       {
         "name": "acid_rounds",
@@ -319,7 +313,15 @@
         "count": 4,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "benches by fountain"
+        "notes": "benches next to fountain"
+      },
+      {
+        "name": "red_herb",
+        "item_id": 67,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "benches next to fountain"
       }
     ]
   },
@@ -339,6 +341,21 @@
             "blue_jewel"
           ],
           "notes": "Insert blue jewel in tiger eye; statue slides to reveal crest"
+        }
+      },
+      {
+        "name": "colt_python",
+        "item_id": 5,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "red jewel alcove behind tiger statue",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "red_jewel"
+          ],
+          "notes": "Insert red jewel in tiger eye; alcove reveals Colt Python"
         }
       }
     ]
@@ -448,6 +465,14 @@
         "key_item": false,
         "in_inventory_table": true,
         "notes": "SE corner"
+      },
+      {
+        "name": "ink_ribbon",
+        "item_id": 47,
+        "count": 2,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "changing area west side"
       }
     ]
   },
@@ -457,25 +482,20 @@
   },
   "114": {
     "room_name": "BOILER",
-    "items": []
+    "items": [
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 6,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "next to rusty boiler"
+      }
+    ]
   },
   "115": {
     "room_name": "TRAP ROOM",
-    "items": [
-      {
-        "name": "shotgun",
-        "item_id": 3,
-        "count": 1,
-        "key_item": false,
-        "in_inventory_table": true,
-        "notes": "living room rack; Jill Barry rescue",
-        "gate": {
-          "type": "trap",
-          "requires": [],
-          "notes": "Ceiling trap; Jill saved by Barry once (Chris needs broken_shotgun swap)"
-        }
-      }
-    ]
+    "items": []
   },
   "116": {
     "room_name": "LIVING ROOM",
@@ -518,8 +538,37 @@
     "items": []
   },
   "119": {
-    "room_name": "N/A",
-    "items": []
+    "room_name": "COURTYARD STUDY",
+    "items": [
+      {
+        "name": "doom_book_1",
+        "item_id": 64,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "bookshelf; switch lamp first (contains eagle_medal)",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Flip wall switch by door, then take Doom Book 1 from bookshelf"
+        }
+      },
+      {
+        "name": "eagle_medal",
+        "item_id": 37,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "inside Doom Book 1; examine pages in study",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "doom_book_1"
+          ],
+          "notes": "Examine Doom Book 1 pages (directions + Cross) until eagle medal"
+        }
+      }
+    ]
   },
   "11A": {
     "room_name": "ROOFED PASSAGE",
@@ -534,15 +583,7 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "herbicide chemicals"
-      },
-      {
-        "name": "green_herb",
-        "item_id": 68,
-        "count": 1,
-        "key_item": false,
-        "in_inventory_table": true,
-        "notes": "on shelf"
+        "notes": "herbicide (wiki name; RAM id chemical)"
       },
       {
         "name": "square_crank",
@@ -550,11 +591,45 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "top shelf via stepladder",
+        "notes": "top shelf in crest shed / store room"
+      },
+      {
+        "name": "shotgun_shells",
+        "item_id": 12,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "Barry after Plant 42 (1x7 rounds)",
         "gate": {
-          "type": "puzzle",
+          "type": "event",
           "requires": [],
-          "notes": "Position stepladder at shelf and climb to top shelf"
+          "notes": "Barry drops after Plant 42 defeat (1x7 shells)"
+        }
+      },
+      {
+        "name": "first_aid_spray_alt",
+        "item_id": 65,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "Barry after Plant 42",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry drops after Plant 42 defeat"
+        }
+      },
+      {
+        "name": "acid_rounds",
+        "item_id": 17,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "Barry after Plant 42 (1x6)",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry drops after Plant 42 defeat (1x6)"
         }
       }
     ]
@@ -875,14 +950,6 @@
         "key_item": false,
         "in_inventory_table": true,
         "notes": "alcove near elevator"
-      },
-      {
-        "name": "mo_disc",
-        "item_id": 40,
-        "count": 1,
-        "key_item": true,
-        "in_inventory_table": true,
-        "notes": "first MO disc; Any% may use 213 security room instead"
       }
     ]
   },
@@ -941,7 +1008,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": false,
-        "notes": "on desk"
+        "notes": "on desk",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked locker in large library"
+        }
       }
     ]
   },
@@ -1043,25 +1117,52 @@
   },
   "302": {
     "room_name": "FALLS",
+    "items": []
+  },
+  "303": {
+    "room_name": "HELIPORT",
     "items": [
+      {
+        "name": "doom_book_2",
+        "item_id": 63,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "on helipad desk",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Take Doom Book 2 from helipad desk"
+        }
+      },
+      {
+        "name": "wolf_medal",
+        "item_id": 36,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "inside Doom Book 2; examine pages on helipad",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "doom_book_2"
+          ],
+          "notes": "Examine Doom Book 2 pages (directions + Cross) until wolf medal"
+        }
+      },
       {
         "name": "flare",
         "item_id": 42,
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "Barry ending item",
+        "notes": "Barry ending item; use on helipad to signal Brad",
         "gate": {
           "type": "event",
           "requires": [],
-          "notes": "Barry gives flare at falls for good ending path"
+          "notes": "Barry gives flare; use on helipad for good ending signal"
         }
-      }
-    ]
-  },
-  "303": {
-    "room_name": "HELIPORT",
-    "items": [
+      },
       {
         "name": "rocket_launcher",
         "item_id": 10,
@@ -1108,42 +1209,12 @@
         "key_item": false,
         "in_inventory_table": true,
         "notes": "near welded doors"
-      },
-      {
-        "name": "doom_book_2",
-        "item_id": 63,
-        "count": 1,
-        "key_item": true,
-        "in_inventory_table": true,
-        "notes": "fountain puzzle reward",
-        "gate": {
-          "type": "puzzle",
-          "requires": [
-            "hex_crank"
-          ],
-          "notes": "Item chamber statue + hex crank puzzle (see room placement note in docs)"
-        }
       }
     ]
   },
   "306": {
     "room_name": "ITEM PASSAGE",
     "items": [
-      {
-        "name": "mo_disc",
-        "item_id": 40,
-        "count": 1,
-        "key_item": true,
-        "in_inventory_table": true,
-        "notes": "second MO disk",
-        "gate": {
-          "type": "puzzle",
-          "requires": [
-            "hex_crank"
-          ],
-          "notes": "Push statue five times, hex crank twice, align statue on tile"
-        }
-      },
       {
         "name": "explosive_rounds",
         "item_id": 16,
@@ -1153,8 +1224,8 @@
         "notes": "on shelf"
       },
       {
-        "name": "first_aid_spray",
-        "item_id": 11,
+        "name": "first_aid_spray_alt",
+        "item_id": 65,
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
@@ -1287,8 +1358,8 @@
     "room_name": "CRANK PASSAGE",
     "items": [
       {
-        "name": "first_aid_spray",
-        "item_id": 11,
+        "name": "first_aid_spray_alt",
+        "item_id": 65,
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
@@ -1375,8 +1446,8 @@
     "room_name": "SAVE ROOM",
     "items": [
       {
-        "name": "first_aid_spray",
-        "item_id": 11,
+        "name": "first_aid_spray_alt",
+        "item_id": 65,
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
@@ -1423,7 +1494,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "in desk"
+        "notes": "in desk",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked locker in room 002"
+        }
       },
       {
         "name": "map_dormitory",
@@ -1626,11 +1704,34 @@
   },
   "503": {
     "room_name": "STAIRS",
-    "items": []
+    "items": [
+      {
+        "name": "mo_disc",
+        "item_id": 40,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "MO disc on lab stair landing",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Second MO disc pickup on lab B2 stairs"
+        }
+      }
+    ]
   },
   "504": {
     "room_name": "CONFERENCE ROOM",
-    "items": []
+    "items": [
+      {
+        "name": "power_room_key",
+        "item_id": 55,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "on shelf; ITEM_IDS 0x37 names this lab_key_1"
+      }
+    ]
   },
   "505": {
     "room_name": "O PASSAGE",
@@ -1640,41 +1741,18 @@
     "room_name": "SMALL LABORATORY",
     "items": [
       {
-        "name": "wolf_medal",
-        "item_id": 36,
+        "name": "slides",
+        "item_id": 43,
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "on desk",
-        "gate": {
-          "type": "item",
-          "requires": [
-            "doom_book_2"
-          ],
-          "notes": "Standard: inside Doom Book 2; open book at fountain (desk placement disputed)"
-        }
+        "notes": "on desk in small lab"
       }
     ]
   },
   "507": {
     "room_name": "MORTUARY",
-    "items": [
-      {
-        "name": "eagle_medal",
-        "item_id": 37,
-        "count": 1,
-        "key_item": true,
-        "in_inventory_table": true,
-        "notes": "inside coffin",
-        "gate": {
-          "type": "item",
-          "requires": [
-            "doom_book_1"
-          ],
-          "notes": "Standard: inside Doom Book 1; open book at fountain (coffin note disputed)"
-        }
-      }
-    ]
+    "items": []
   },
   "508": {
     "room_name": "DOUBLE LOCK",
@@ -1737,21 +1815,7 @@
   },
   "50B": {
     "room_name": "FRONT OF CELL",
-    "items": [
-      {
-        "name": "flare",
-        "item_id": 42,
-        "count": 1,
-        "key_item": true,
-        "in_inventory_table": true,
-        "notes": "Barry good ending",
-        "gate": {
-          "type": "event",
-          "requires": [],
-          "notes": "Barry good-ending flare near lab escape elevator"
-        }
-      }
-    ]
+    "items": []
   },
   "50C": {
     "room_name": "FRONT OF ELEVATOR",
@@ -1764,14 +1828,6 @@
   "50E": {
     "room_name": "SAVE ROOM",
     "items": [
-      {
-        "name": "power_room_key",
-        "item_id": 55,
-        "count": 1,
-        "key_item": true,
-        "in_inventory_table": true,
-        "notes": "on shelf; ITEM_IDS 0x37 names this lab_key_1"
-      },
       {
         "name": "green_herb",
         "item_id": 68,
@@ -1788,16 +1844,7 @@
   },
   "510": {
     "room_name": "MAZE B",
-    "items": [
-      {
-        "name": "slides",
-        "item_id": 43,
-        "count": 1,
-        "key_item": true,
-        "in_inventory_table": true,
-        "notes": "projector room"
-      }
-    ]
+    "items": []
   },
   "511": {
     "room_name": "MOVIE ROOM",
@@ -1809,7 +1856,16 @@
   },
   "513": {
     "room_name": "TYRANT ROOM",
-    "items": []
+    "items": [
+      {
+        "name": "lab_key_2",
+        "item_id": 60,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "laboratory master key on desk"
+      }
+    ]
   },
   "514": {
     "room_name": "FRONT OF TYRANT",

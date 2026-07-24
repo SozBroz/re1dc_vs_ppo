@@ -32,55 +32,47 @@
         "to_room": "111"
       }
     ],
-    "notes": "ER: six armor-carving doors. Pickup on greenhouse plaque after chemical.",
+    "notes": "Unlocks: Winding Passage\u2192Outside Boiler (109\u2192114); East Stairway 1F\u2192Vacant Room (101\u2192102); 'C' Passage\u2192Armor Room (204\u2192205); 'C' Passage\u2192Pillar Passage (204\u219220D); West Stairway 2F\u2192Deer Room (207\u2192208); Main Hall 1F\u2192Dressing Room (106\u2192111)",
     "pickup_rooms": [
       "10C"
     ],
     "rooms": [
-      "109",
-      "101",
-      "204",
-      "207",
-      "106",
-      "114",
       "102",
-      "205",
-      "20D",
-      "208",
+      "10C",
       "111",
-      "10C"
+      "114",
+      "205",
+      "208",
+      "20D"
     ],
-    "use_rooms": [
-      "109",
-      "101",
-      "204",
-      "207",
-      "106"
-    ]
+    "use_rooms": []
   },
   "battery": {
     "door_edges": [],
-    "notes": "on chair",
+    "notes": "Closet 219 + lab entry 500. Use at Falls elevator (302) and lab entry socket (500)",
     "pickup_rooms": [
       "219",
       "500"
     ],
     "rooms": [
       "219",
+      "302",
       "500"
     ],
     "use_rooms": [
-      "219",
+      "302",
       "500"
     ]
   },
   "blue_jewel": {
     "door_edges": [],
-    "notes": "Insert blue jewel in tiger eye; statue slides to reveal crest",
+    "notes": "Pickup 202 (push statue) and 105 (landing). Insert in tiger eye at 10D",
     "pickup_rooms": [
+      "105",
       "202"
     ],
     "rooms": [
+      "105",
       "10D",
       "202"
     ],
@@ -90,105 +82,134 @@
   },
   "chemical": {
     "door_edges": [],
-    "notes": "herbicide chemicals",
+    "notes": "Herbicide (wiki name; RAM id chemical). Pour into greenhouse pump to kill vines on crest",
     "pickup_rooms": [
       "11B"
     ],
     "rooms": [
+      "10C",
       "11B"
     ],
     "use_rooms": [
-      "11B"
+      "10C"
     ]
   },
   "control_room_key": {
-    "door_edges": [],
-    "notes": "drain bathtub",
+    "door_edges": [
+      {
+        "door_id": "40E->411",
+        "from_room": "40E",
+        "to_room": "411"
+      }
+    ],
+    "notes": "Room 001 bathroom drain; opens Water Tank\u2192Control Room (40E\u2192411)",
     "pickup_rooms": [
       "402"
     ],
     "rooms": [
-      "402"
+      "402",
+      "40E",
+      "411"
     ],
     "use_rooms": [
-      "402"
+      "40E"
     ]
   },
   "doom_book_1": {
     "door_edges": [],
-    "notes": "Standard: inside Doom Book 1; open book at fountain (coffin note disputed)",
-    "pickup_rooms": [],
+    "notes": "Courtyard Study bookshelf. Examine pages (directions + Cross) for eagle medal",
+    "pickup_rooms": [
+      "119"
+    ],
     "rooms": [
-      "507"
+      "119"
     ],
     "use_rooms": [
-      "507"
+      "119"
     ]
   },
   "doom_book_2": {
     "door_edges": [],
-    "notes": "Standard: inside Doom Book 2; open book at fountain (desk placement disputed)",
+    "notes": "Heliport desk. Examine pages (directions + Cross) for wolf medal",
     "pickup_rooms": [
-      "305"
+      "303"
     ],
     "rooms": [
-      "506",
-      "305"
+      "303"
     ],
     "use_rooms": [
-      "506"
+      "303"
     ]
   },
   "dorm_key_002": {
-    "door_edges": [],
-    "notes": "on table near wasp nest",
+    "door_edges": [
+      {
+        "door_id": "406->407",
+        "from_room": "406",
+        "to_room": "407"
+      }
+    ],
+    "notes": "Beehive Passage table; opens Room 002\u2192002 Bathroom (406\u2192407)",
     "pickup_rooms": [
       "408"
     ],
     "rooms": [
+      "406",
+      "407",
       "408"
     ],
     "use_rooms": [
-      "408"
+      "406"
     ]
   },
   "dorm_key_003": {
-    "door_edges": [],
-    "notes": "sparkle on shelf",
+    "door_edges": [
+      {
+        "door_id": "408->40A",
+        "from_room": "408",
+        "to_room": "40A"
+      }
+    ],
+    "notes": "Arms storehouse shelf; opens Beehive Passage\u2192Room 003 (408\u219240A)",
     "pickup_rooms": [
       "410"
     ],
     "rooms": [
+      "408",
+      "40A",
       "410"
     ],
     "use_rooms": [
-      "410"
+      "408"
     ]
   },
   "eagle_medal": {
     "door_edges": [],
-    "notes": "inside coffin",
+    "notes": "Inside Doom Book 1 (119). Place both medals at Fountain (305) for lab entry",
     "pickup_rooms": [
-      "507"
+      "119"
     ],
     "rooms": [
-      "507"
+      "119",
+      "305"
     ],
     "use_rooms": [
-      "507"
+      "305"
     ]
   },
   "emblem": {
     "door_edges": [],
-    "notes": "ER wooden Emblem: place in Bar secret alcove to replace gold (not trapped). Pickup: dining fireplace.",
+    "notes": "Wooden emblem: bar piano chain; gold swap at 10F alcove",
     "pickup_rooms": [
-      "105"
+      "105",
+      "10F"
     ],
     "rooms": [
-      "10F",
-      "105"
+      "105",
+      "10F"
     ],
     "use_rooms": [
+      "105",
       "10F"
     ]
   },
@@ -201,29 +222,24 @@
     "rooms": [
       "409"
     ],
-    "use_rooms": [
-      "409"
-    ]
+    "use_rooms": []
   },
   "flare": {
     "door_edges": [],
-    "notes": "Barry ending item",
+    "notes": "Barry gives flare; pickup and use on Heliport (303) to signal Brad",
     "pickup_rooms": [
-      "302",
-      "50B"
+      "303"
     ],
     "rooms": [
-      "302",
-      "50B"
+      "303"
     ],
     "use_rooms": [
-      "302",
-      "50B"
+      "303"
     ]
   },
   "gold_emblem": {
     "door_edges": [],
-    "notes": "ER: use on dining fireplace slot \u2192 clock reveals shield_key. Pickup: Bar secret alcove after piano + wooden emblem.",
+    "notes": "Dining fireplace reveals shield_key",
     "pickup_rooms": [
       "10F"
     ],
@@ -253,54 +269,48 @@
         "to_room": "20C"
       }
     ],
-    "notes": "ER: Courtyard Study, Trophy Room, Lesson Room doors. Pickup: Plant 42 fireplace.",
+    "notes": "Unlocks: Back Passage\u2192Courtyard Study (10A\u2192119); East Stairway 2F\u2192Trophy Room (201\u2192215); Lesson Room Entry\u2192Lesson Room (20B\u219220C)",
     "pickup_rooms": [
       "40C"
     ],
     "rooms": [
-      "10A",
-      "201",
-      "20B",
       "119",
-      "215",
       "20C",
+      "215",
       "40C"
     ],
-    "use_rooms": [
-      "10A",
-      "201",
-      "20B"
-    ]
+    "use_rooms": []
   },
   "hex_crank": {
     "door_edges": [],
-    "notes": "On wall in boulder alcove (same gate as second MO disc)",
+    "notes": "Enrico room pickup. Use in Item Passage (306), Underground Entry (310), Boulder Passage (30B)",
     "pickup_rooms": [
       "30A"
     ],
     "rooms": [
-      "305",
+      "306",
+      "30A",
+      "30B",
+      "310"
+    ],
+    "use_rooms": [
       "306",
       "30B",
-      "30A"
-    ],
-    "use_rooms": [
-      "305",
-      "306",
-      "30B"
+      "310"
     ]
   },
-  "lab_key_1": {
+  "lab_key_2": {
     "door_edges": [],
-    "notes": "on shelf; ITEM_IDS 0x37 names this lab_key_1",
+    "notes": "Laboratory master key on Tyrant Room desk (513); use at Laboratory Entry (500)",
     "pickup_rooms": [
-      "50E"
+      "513"
     ],
     "rooms": [
-      "50E"
+      "500",
+      "513"
     ],
     "use_rooms": [
-      "50E"
+      "500"
     ]
   },
   "lighter": {
@@ -310,9 +320,9 @@
       "209"
     ],
     "rooms": [
+      "209",
       "20B",
-      "20F",
-      "209"
+      "20F"
     ],
     "use_rooms": [
       "20B",
@@ -322,9 +332,9 @@
   "lockpick": {
     "door_edges": [
       {
-        "door_id": "107->108",
-        "from_room": "107",
-        "to_room": "108"
+        "door_id": "103->10E",
+        "from_room": "103",
+        "to_room": "10E"
       },
       {
         "door_id": "104->10F",
@@ -332,71 +342,78 @@
         "to_room": "10F"
       },
       {
-        "door_id": "103->10E",
-        "from_room": "103",
-        "to_room": "10E"
+        "door_id": "107->108",
+        "from_room": "107",
+        "to_room": "108"
       }
     ],
-    "notes": "ER: three sword-carving doors + desk drawers (Vacant/Dressing/Room001/Room003). Barry gives in Main Hall after tea-room zombie.",
+    "notes": "Jill: Barry in tea room; locked desks/lockers; Keeper's Bedroom door off Central Corridor",
     "pickup_rooms": [
       "106"
     ],
     "rooms": [
       "102",
-      "111",
-      "401",
-      "40A",
-      "107",
-      "104",
-      "103",
+      "106",
       "108",
-      "10F",
       "10E",
-      "106"
+      "10F",
+      "111",
+      "216",
+      "401",
+      "406",
+      "40A"
     ],
     "use_rooms": [
       "102",
+      "10E",
       "111",
+      "216",
       "401",
+      "406",
       "40A"
     ]
   },
   "mo_disc": {
     "door_edges": [],
-    "notes": "Decoded at MO terminal, not a floor pickup",
+    "notes": "Pickups Library B (217), lab stairs (503), boulder passage (30B). Use MO readers 509/507/510",
     "pickup_rooms": [
       "217",
-      "213",
-      "306",
-      "30B"
+      "30B",
+      "503"
     ],
     "rooms": [
-      "508",
       "217",
-      "213",
-      "306",
-      "30B"
+      "30B",
+      "503",
+      "507",
+      "508",
+      "509",
+      "510"
     ],
     "use_rooms": [
-      "508"
+      "507",
+      "508",
+      "509",
+      "510"
     ]
   },
   "moon_crest": {
     "door_edges": [],
-    "notes": "after Yawn 1",
+    "notes": "Place on Roofed Passage courtyard door puzzle (11A)",
     "pickup_rooms": [
       "210"
     ],
     "rooms": [
+      "11A",
       "210"
     ],
     "use_rooms": [
-      "210"
+      "11A"
     ]
   },
   "music_notes": {
     "door_edges": [],
-    "notes": "behind movable bookcase",
+    "notes": "Play piano with music notes; swap wooden emblem for gold in secret alcove",
     "pickup_rooms": [
       "10F"
     ],
@@ -418,9 +435,20 @@
       "404",
       "508"
     ],
+    "use_rooms": []
+  },
+  "power_room_key": {
+    "door_edges": [],
+    "notes": "Conference Room shelf (504); unlocks power maze at Front of Elevator (50C)",
+    "pickup_rooms": [
+      "504"
+    ],
+    "rooms": [
+      "504",
+      "50C"
+    ],
     "use_rooms": [
-      "404",
-      "508"
+      "50C"
     ]
   },
   "red_book": {
@@ -432,21 +460,20 @@
     "rooms": [
       "401"
     ],
-    "use_rooms": [
-      "401"
-    ]
+    "use_rooms": []
   },
   "red_jewel": {
     "door_edges": [],
-    "notes": "deer head with lights off",
+    "notes": "Insert red jewel in tiger eye; alcove reveals Colt Python",
     "pickup_rooms": [
       "215"
     ],
     "rooms": [
+      "10D",
       "215"
     ],
     "use_rooms": [
-      "215"
+      "10D"
     ]
   },
   "serum": {
@@ -456,8 +483,8 @@
       "100"
     ],
     "rooms": [
-      "20D",
-      "100"
+      "100",
+      "20D"
     ],
     "use_rooms": [
       "20D"
@@ -476,9 +503,9 @@
       "105"
     ],
     "rooms": [
+      "105",
       "20E",
-      "210",
-      "105"
+      "210"
     ],
     "use_rooms": [
       "20E"
@@ -486,54 +513,58 @@
   },
   "slides": {
     "door_edges": [],
-    "notes": "projector room",
+    "notes": "Small Lab (506) pickup; Visual Data / Conference Room projector (504)",
     "pickup_rooms": [
-      "510"
+      "506"
     ],
     "rooms": [
-      "510"
+      "504",
+      "506"
     ],
     "use_rooms": [
-      "510"
+      "504"
     ]
   },
   "square_crank": {
     "door_edges": [],
-    "notes": "top shelf via stepladder",
+    "notes": "Crest shed / store room shelf; use at Water Gate (301)",
     "pickup_rooms": [
       "11B"
     ],
     "rooms": [
-      "11B"
+      "11B",
+      "301"
     ],
     "use_rooms": [
-      "11B"
+      "301"
     ]
   },
   "star_crest": {
     "door_edges": [],
-    "notes": "crow painting puzzle",
+    "notes": "Place on Roofed Passage courtyard door puzzle (11A)",
     "pickup_rooms": [
       "117"
     ],
     "rooms": [
-      "117"
+      "117",
+      "11A"
     ],
     "use_rooms": [
-      "117"
+      "11A"
     ]
   },
   "sun_crest": {
     "door_edges": [],
-    "notes": "statue puzzle cabinet",
+    "notes": "Place on Roofed Passage courtyard door puzzle (11A)",
     "pickup_rooms": [
       "205"
     ],
     "rooms": [
+      "11A",
       "205"
     ],
     "use_rooms": [
-      "205"
+      "11A"
     ]
   },
   "umb_no2": {
@@ -545,9 +576,7 @@
     "rooms": [
       "409"
     ],
-    "use_rooms": [
-      "409"
-    ]
+    "use_rooms": []
   },
   "umb_no4": {
     "door_edges": [],
@@ -558,9 +587,7 @@
     "rooms": [
       "409"
     ],
-    "use_rooms": [
-      "409"
-    ]
+    "use_rooms": []
   },
   "water": {
     "door_edges": [],
@@ -571,34 +598,34 @@
     "rooms": [
       "409"
     ],
-    "use_rooms": [
-      "409"
-    ]
+    "use_rooms": []
   },
   "wind_crest": {
     "door_edges": [],
-    "notes": "blue jewel on tiger eye",
+    "notes": "Place on Roofed Passage courtyard door puzzle (11A)",
     "pickup_rooms": [
       "10D"
     ],
     "rooms": [
-      "10D"
+      "10D",
+      "11A"
     ],
     "use_rooms": [
-      "10D"
+      "11A"
     ]
   },
   "wolf_medal": {
     "door_edges": [],
-    "notes": "on desk",
+    "notes": "Inside Doom Book 2 (303). Place both medals at Fountain (305) for lab entry",
     "pickup_rooms": [
-      "506"
+      "303"
     ],
     "rooms": [
-      "506"
+      "303",
+      "305"
     ],
     "use_rooms": [
-      "506"
+      "305"
     ]
   }
 }

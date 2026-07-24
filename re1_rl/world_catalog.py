@@ -148,6 +148,9 @@ class WorldCatalog:
     combine_src_b: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
     combine_dst: np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
 
+    # Frozen at catalog build; pickup_active_mask must not re-read room_items.json.
+    _pickup_rows: list[dict[str, Any]] = field(default_factory=list, repr=False)
+
     @classmethod
     def from_files(cls, project_root: str | Path) -> WorldCatalog:
         return _cached_world_catalog(str(Path(project_root).resolve()))
@@ -243,6 +246,7 @@ class WorldCatalog:
                 cname = canonical_item(str(req))
                 if cname in _KEY_NAME_TO_INDEX:
                     self.pickup_requires_mask[i, _KEY_NAME_TO_INDEX[cname]] = 1.0
+        self._pickup_rows = rows
 
     def _build_key_buffers(
         self,
@@ -331,14 +335,8 @@ class WorldCatalog:
             self.combine_dst[i] = float(min(dst, MAX_ITEM_ID))
 
     def _iter_pickup_rows(self) -> list[dict[str, Any]]:
-        if self.room_items_path is None:
-            return []
-        ri = RoomItems(self.room_items_path)
-        rows: list[dict[str, Any]] = []
-        for room_id in sorted(ri.rooms):
-            for item in ri.items_in_room(room_id):
-                rows.append(item)
-        return rows
+        """Pickup rows frozen when the catalog was built (no disk I/O)."""
+        return self._pickup_rows
 
     def pickup_active_mask(
         self,

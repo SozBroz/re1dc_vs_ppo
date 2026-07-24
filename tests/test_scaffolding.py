@@ -221,7 +221,7 @@ def test_explain_obs_names_every_slot():
     planner = make_planner()
     s = make_state()
     obs = {
-        "frame": np.zeros((84, 77, 4), dtype=np.uint8),
+        "frame": np.zeros((63, 84, 4), dtype=np.uint8),
         "proprio": enc.encode_proprio(s, prev_hp=96),
         "goal": enc.encode_goal(s, planner),
     }

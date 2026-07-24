@@ -9,7 +9,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from re1_rl.action_mask import SELECT_SLOT_BASE, USE_ACTION, action_mask
+from re1_rl.action_mask import ATTACK_ACTION, SELECT_SLOT_BASE, USE_ACTION, action_mask
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
     GOLD_EMBLEM_RETURN_PENALTY,
@@ -652,3 +652,31 @@ def test_music_notes_piano_unaffected_by_alcove_logic() -> None:
     )
     assert out.get("story_use_success") == "music_notes@10F_piano"
     assert not out.get("gold_emblem_return")
+
+
+def test_doom_book_room_wide_story_use_anywhere_in_room() -> None:
+    load_story_use_sites.cache_clear()
+    inv = _inv((0x40, 0), (0, 0))  # doom_book_1
+    assert any_legal_story_use_slot(
+        inv, room="119", x=0, z=0, rewarded_site_ids=set()
+    )
+    assert any_legal_story_use_slot(
+        inv, room="119", x=99999, z=99999, rewarded_site_ids=set()
+    )
+    assert not any_legal_story_use_slot(
+        inv, room="10F", x=0, z=0, rewarded_site_ids=set()
+    )
+
+
+def test_document_examine_mask_allows_mash_actions() -> None:
+    m = action_mask(
+        N_ACTIONS,
+        None,
+        inventory=_inv((0x40, 0)),
+        current_hp=96,
+        episode_start_hp=96,
+        document_examine_open=True,
+    )
+    assert m[0] and m[1] and m[2] and m[3] and m[7]
+    assert not m[USE_ACTION]
+    assert not m[ATTACK_ACTION]

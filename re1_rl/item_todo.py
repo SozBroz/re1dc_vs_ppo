@@ -35,8 +35,7 @@ ITEM_ALIASES: dict[str, str] = {
     "mo_disk_1": "mo_disc",
     "mo_disk_2": "mo_disc",
     "mo_disk_3": "mo_disc",
-    # power room key is the item ITEM_IDS calls lab_key_1
-    "power_room_key": "lab_key_1",
+    # power_room_key is catalog name; RAM ITEM_IDS calls the same slot lab_key_1
     # the two lab passcodes are both "pass_number" printouts from the MO
     # terminal; like the MO discs they collapse to one trackable name
     "passcode_a": "pass_number",

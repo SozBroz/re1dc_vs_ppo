@@ -26,13 +26,13 @@ def test_buffer_shapes_and_dtypes() -> None:
     assert cat.room_stage.shape == (NUM_ROOMS,)
     assert cat.link_requires_key.shape == (NUM_ROOMS, MAX_NEIGHBORS)
 
-    assert cat.num_pickups == 119
-    assert cat.pickup_room_idx.shape == (119,)
-    assert cat.pickup_item_id.shape == (119,)
-    assert cat.pickup_category.shape == (119,)
-    assert cat.pickup_key_flag.shape == (119,)
-    assert cat.pickup_gate_type.shape == (119,)
-    assert cat.pickup_requires_mask.shape == (119, len(KEY_ITEM_NAMES))
+    assert cat.num_pickups == 125
+    assert cat.pickup_room_idx.shape == (125,)
+    assert cat.pickup_item_id.shape == (125,)
+    assert cat.pickup_category.shape == (125,)
+    assert cat.pickup_key_flag.shape == (125,)
+    assert cat.pickup_gate_type.shape == (125,)
+    assert cat.pickup_requires_mask.shape == (125, len(KEY_ITEM_NAMES))
 
     k = len(KEY_ITEM_NAMES)
     assert cat.key_pickup_room.shape == (k,)
@@ -76,7 +76,7 @@ def test_room_105_neighbors_include_tea_or_main_hall() -> None:
 def test_pickup_active_mask_prunes_held_and_gated() -> None:
     cat = _catalog()
     all_active = cat.pickup_active_mask(set())
-    assert all_active.shape == (119,)
+    assert all_active.shape == (125,)
     assert all_active.sum() > 0
 
     held = {"emblem"}
@@ -90,6 +90,21 @@ def test_pickup_active_mask_prunes_held_and_gated() -> None:
 
     with_gold = cat.pickup_active_mask({"emblem", "gold_emblem", "music_notes"})
     assert with_gold[shield_gated] == 1.0
+
+
+def test_pickup_masks_use_frozen_rows_not_disk() -> None:
+    """pickup_active_mask must not re-open room_items.json each step."""
+    from unittest.mock import patch
+
+    cat = _catalog()
+    assert len(cat._pickup_rows) == cat.num_pickups
+    path = cat.room_items_path
+    assert path is not None
+    with patch("builtins.open", wraps=open) as mock_open:
+        cat.pickup_active_mask(set())
+        cat.pickup_active_mask({"emblem"})
+        opened = [str(c.args[0]) for c in mock_open.call_args_list if c.args]
+    assert not any("room_items.json" in p for p in opened), opened
 
 
 def test_emblem_key_pickup_room() -> None:

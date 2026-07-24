@@ -158,7 +158,7 @@ def test_exit_requires_key_shield_attic():
     enc = SpatialEncoder(None, g)
     s = make_state(room="20E", x=28000, z=7200, facing=0)
     v = enc.encode(s)
-    assert v[IDX["exit0_requires_key"]] == 25 / 128.0  # shield_key door -> attic
+    assert v[IDX["exit0_requires_key"]] == 27 / 128.0  # shield_key door -> attic
 
 
 def test_visited_mask_marks_and_resets():

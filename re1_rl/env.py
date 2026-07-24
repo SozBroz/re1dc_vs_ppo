@@ -2174,6 +2174,21 @@ class RE1Env(gym.Env):
         rewarded_story_uses = (
             progress.rewarded_story_uses if progress is not None else None
         )
+        document_examine_open = False
+        if bridge is not None:
+            try:
+                from re1_rl.memory_map import GAME_MODE, GAME_STATE
+                from re1_rl.ram_skip import document_examine_ui_from_ram
+
+                doc_ram = bridge.read_ram(
+                    [
+                        ("game_mode", GAME_MODE, "u8"),
+                        ("game_state", GAME_STATE, "u32"),
+                    ]
+                )
+                document_examine_open = document_examine_ui_from_ram(doc_ram)
+            except (OSError, RuntimeError, AttributeError, TypeError, ValueError):
+                document_examine_open = False
         enemies = pose.get("enemies")
         return build_action_mask(
             int(self.action_space.n),
@@ -2205,6 +2220,7 @@ class RE1Env(gym.Env):
             player_x=pose.get("x"),
             player_z=pose.get("z"),
             rewarded_story_uses=rewarded_story_uses,
+            document_examine_open=document_examine_open,
         )
 
     def step(self, action: int):

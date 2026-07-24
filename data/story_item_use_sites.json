@@ -45,7 +45,7 @@
       "room": "10C",
       "_draft": true,
       "consumes": true,
-      "notes": "BEST-EFFORT: Greenhouse pump — pour chemical to kill vines on armor-key crest plaque (room_items 10C gate requires chemical; pickup in 11B)"
+      "notes": "BEST-EFFORT: Greenhouse pump — pour herbicide/chemical to kill vines on armor-key crest plaque"
     },
     {
       "id": "sun_crest@11A_crest_slot",
@@ -88,20 +88,20 @@
       "notes": "BEST-EFFORT: Water tank / plant roots — apply V-Jolt (route_jill_anypct seq 28 room 40E; prep in 409)"
     },
     {
-      "id": "hex_crank@305_statue_puzzle",
-      "item": "hex_crank",
-      "room": "305",
-      "_draft": true,
-      "consumes": false,
-      "notes": "BEST-EFFORT: Item chamber statue puzzle — hex crank use site (item_affordances use_rooms 305; room_items doom_book_2 gate)"
-    },
-    {
       "id": "hex_crank@306_item_passage",
       "item": "hex_crank",
       "room": "306",
       "_draft": true,
       "consumes": false,
-      "notes": "BEST-EFFORT: Item passage — push statue / align on tile with hex crank (item_affordances use_rooms 306; room_items mo_disc gate)"
+      "notes": "BEST-EFFORT: Item passage — push statue / align on tile with hex crank"
+    },
+    {
+      "id": "hex_crank@310_underground_entry",
+      "item": "hex_crank",
+      "room": "310",
+      "_draft": true,
+      "consumes": false,
+      "notes": "BEST-EFFORT: Underground entry crank wall"
     },
     {
       "id": "hex_crank@30B_boulder_alcove",
@@ -109,7 +109,27 @@
       "room": "30B",
       "_draft": true,
       "consumes": false,
-      "notes": "BEST-EFFORT: Boulder alcove wall crank (item_affordances use_rooms 30B; pickup 30A)"
+      "notes": "BEST-EFFORT: Boulder alcove wall crank (pickup 30A)"
+    },
+    {
+      "id": "doom_book_1@119_examine",
+      "item": "doom_book_1",
+      "room": "119",
+      "room_wide": true,
+      "mash_pages": true,
+      "reward_items": ["eagle_medal"],
+      "consumes": false,
+      "notes": "Courtyard Study — USE book anywhere in room; mash directions + Cross on examine pages until eagle medal"
+    },
+    {
+      "id": "doom_book_2@303_examine",
+      "item": "doom_book_2",
+      "room": "303",
+      "room_wide": true,
+      "mash_pages": true,
+      "reward_items": ["wolf_medal"],
+      "consumes": false,
+      "notes": "Heliport — USE book anywhere in room; mash directions + Cross on examine pages until wolf medal"
     }
   ]
 }

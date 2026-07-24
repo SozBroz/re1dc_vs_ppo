@@ -140,8 +140,8 @@
   },
   {
     "seq": 8,
-    "room_id": "115",
-    "objective": "get shotgun before gallery (living room trap / Barry rescue)",
+    "room_id": "116",
+    "objective": "get shotgun before gallery (living room rack / trap room 115)",
     "action_type": "pickup",
     "required_items": [],
     "items_gained": [
@@ -151,7 +151,7 @@
       "type": "has_item",
       "item": "shotgun"
     },
-    "notes": "After Barry 2F return: living room rack -> trap room 115; Jill skips broken-shotgun swap",
+    "notes": "After Barry 2F return: living room 116 rack; taking triggers trap room 115; Jill skips broken-shotgun swap",
     "source": "alexfung|clix"
   },
   {
@@ -174,12 +174,11 @@
   {
     "seq": 10,
     "room_id": "11B",
-    "objective": "storeroom under east stairs: chemicals + green herb",
+    "objective": "mansion storeroom under east stairs: herbicide (+ Barry loot after Plant 42)",
     "action_type": "pickup",
     "required_items": [],
     "items_gained": [
-      "chemical",
-      "green_herb"
+      "chemical"
     ],
     "success_condition": "",
     "notes": "",

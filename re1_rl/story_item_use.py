@@ -56,6 +56,13 @@ def load_story_use_sites(path: str = str(_DEFAULT_SITES_PATH)) -> tuple[dict[str
                 "consumes": bool(row.get("consumes", False)),
                 "notes": str(row.get("notes", "")),
                 "_draft": bool(row.get("_draft", False)),
+                "room_wide": bool(row.get("room_wide", False)),
+                "mash_pages": bool(row.get("mash_pages", False)),
+                "reward_items": [
+                    canonical_item(str(r))
+                    for r in (row.get("reward_items") or [])
+                    if r
+                ],
             }
         )
     return tuple(out)
@@ -181,6 +188,9 @@ def matching_story_sites(
         item_id = _NAME_TO_ITEM_ID.get(str(site["item"]), 0)
         if item_id not in held_ids:
             continue
+        if site.get("room_wide"):
+            hits.append(site)
+            continue
         if _dist(px, pz, float(site["x"]), float(site["z"])) > float(site["radius"]):
             continue
         hits.append(site)
@@ -291,6 +301,15 @@ def story_use_macro_resolved(
     )
     if consumed:
         return True
+
+    if site.get("mash_pages"):
+        for reward_name in site.get("reward_items") or ():
+            if _inventory_holds_named_key(
+                inventory_after, str(reward_name)
+            ) and not _inventory_holds_named_key(
+                inventory_before, str(reward_name)
+            ):
+                return True
 
     in_menu = bool(after.get("in_item_menu", False))
     scene_before = int(before.get("scene_flag", 0))

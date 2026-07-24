@@ -61,6 +61,9 @@ _STORY_USE_RECOVERY_ACTIONS = frozenset(
     i for i in range(8) if i != ATTACK_UP_ACTION
 )
 
+# Document / file examine overlay (doom books, botany book): mash directions + Cross.
+_DOCUMENT_EXAMINE_ACTIONS = frozenset({0, 1, 2, 3, 7})
+
 
 def _submenu_active(
     *,
@@ -100,11 +103,18 @@ def action_mask(
     player_x: float | int | None = None,
     player_z: float | int | None = None,
     rewarded_story_uses: set[str] | frozenset[str] | None = None,
+    document_examine_open: bool = False,
 ) -> np.ndarray:
     """Return bool mask (True = legal) for MaskablePPO / ActionMasker."""
     del prev_action
 
     mask = np.ones(n_actions, dtype=bool)
+    if document_examine_open:
+        mask[:] = False
+        for idx in _DOCUMENT_EXAMINE_ACTIONS:
+            if idx < n_actions:
+                mask[idx] = True
+        return mask
     if grab_escape_pending:
         mask[:] = False
         if n_actions > 0:

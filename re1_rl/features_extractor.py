@@ -20,8 +20,8 @@ _DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # ``proprio`` field index for normalized room table index (/ 128).
 PROPRIO_ROOM_INDEX = next(i for i, (name, _) in enumerate(PROPRIO_FIELDS) if name == "room_index")
 
-# Dynamic mansion memory layout (~471); see docs/world_aware_nn_architecture.md.
-NUM_PICKUP_ROWS = 119
+# Dynamic mansion memory layout (~481); see docs/world_aware_nn_architecture.md.
+NUM_PICKUP_ROWS = 125
 PICKUP_ACTIVE_OFF = 0
 PICKUP_GATED_OFF = NUM_PICKUP_ROWS
 ROOM_REMAINING_OFF = PICKUP_GATED_OFF + NUM_PICKUP_ROWS
