@@ -11,7 +11,9 @@ Exploration mode (checkpoint path disabled):
 
 from __future__ import annotations
 
+import json
 import math
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from re1_rl.item_todo import canonical_item
@@ -47,8 +49,10 @@ NEW_DOCUMENT_EXAMINE_BONUS = 4.0
 # Legacy aliases kept for tests / telemetry that import old names.
 WAYPOINT_ROOM_BONUS = 4.0
 
-# Junk / ammo / herbs: modest crumb.
+# Junk / herbs: modest crumb.
 ITEM_PICKUP_BONUS = 0.15
+# Ammunition stacks (handgun bullets, shells, launcher packs, …).
+AMMO_PICKUP_BONUS = 2.0
 # Completed typewriter save (ink-ribbon consume + save cinema + stable control).
 TYPEWRITER_SAVE_BONUS = 0.3
 # Keys / emblems / crests (room_items.json key_item=true).
@@ -92,14 +96,14 @@ SOFTLOCK_TIMEOUT_PENALTY = -0.06666666666666667
 
 ENEMY_DAMAGE_REWARD = 0.007
 ENEMY_KILL_REWARD = 0.24
-# Flat legacy miss flags (unused); live tax is ammo_waste via clip table below.
+KNIFE_MISS_PENALTY = -0.01
+# Flat legacy miss flag (unused); live knife tax uses KNIFE_MISS_PENALTY above.
 ATTACK_MISS_PENALTY = 0.0
-KNIFE_MISS_PENALTY = 0.0
 AMMO_WASTE_PENALTY = 0.0  # legacy stub; not read by compute_reward
 
 # Miss / ammo-waste tax: per missed round =
-#   −ITEM_PICKUP_BONUS / clip_size
-# Full inverse of one junk/ammo pickup, amortized over the magazine / pack.
+#   −AMMO_PICKUP_BONUS / clip_size
+# Full inverse of one ammo pickup, amortized over the magazine / pack.
 # (Prior half-pickup factor removed 2026-07-20 — imperator: clip-adjusted inverse, not 0.5×.)
 # Knife and flamethrower omitted (no discrete clip pack for this tax).
 # Bazooka chamber capacity is 1 (WEAPON_CLIP_CAPACITY); miss tax uses pack size 6
@@ -116,6 +120,23 @@ MISS_TAX_CLIP_SIZE: dict[int, int] = {
 }
 
 REWARD_SCALE = 1.0
+
+
+def _load_ammo_item_names() -> frozenset[str]:
+    names: set[str] = set()
+    try:
+        cat_path = Path(__file__).resolve().parents[1] / "data" / "item_categories.json"
+        data = json.loads(cat_path.read_text(encoding="utf-8"))
+        names.update(str(k) for k, v in data.items() if v == "ammo")
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        pass
+    for item_id in range(0x0B, 0x13):
+        if item_id in ITEM_IDS:
+            names.add(ITEM_IDS[item_id])
+    return frozenset(names)
+
+
+AMMO_ITEM_NAMES: frozenset[str] = _load_ammo_item_names()
 
 # Dense softlock ramp is already in the scalar reward (bd["softlock"]); one γ.
 # Half-life ≈ 45s emulated time incl. living cost: γ_eff := γ + c with
@@ -142,7 +163,7 @@ def ammo_waste_per_missed_round(weapon_id: int) -> float:
     clip = MISS_TAX_CLIP_SIZE.get(int(weapon_id) & 0xFF)
     if clip is None or clip <= 0:
         return 0.0
-    return -ITEM_PICKUP_BONUS / float(clip)
+    return -AMMO_PICKUP_BONUS / float(clip)
 
 
 def ammo_waste_penalty(weapon_id: int, rounds_spent: int) -> float:
@@ -311,6 +332,7 @@ def compute_reward(
         "retreat": 0.0,
         "wrong_room": 0.0,
         "item": 0.0,
+        "ammo_pickup": 0.0,
         "key_item": 0.0,
         "story_use": 0.0,
         "gallery": 0.0,
@@ -423,6 +445,7 @@ def compute_reward(
     # Shotgun rack re-takes still pay NEW_WEAPON (clawed back on return) but do not
     # count as exploration progress — blocks idle-clock / extension farms.
     weapon_progress = False
+    ammo_progress = False
     for raw in new_items:
         name = canonical_item(str(raw))
         if name in _KEY_ITEM_NAME_SET:
@@ -433,6 +456,9 @@ def compute_reward(
             acquired_key_or_weapon = True
             if progress is not None and progress.claim_weapon_progress(name):
                 weapon_progress = True
+        elif name in AMMO_ITEM_NAMES:
+            bd["ammo_pickup"] += AMMO_PICKUP_BONUS
+            ammo_progress = True
         else:
             bd["item"] += ITEM_PICKUP_BONUS
 
@@ -528,9 +554,10 @@ def compute_reward(
     if enemy_kills > 0:
         bd["enemy_kill"] = ENEMY_KILL_REWARD * enemy_kills
 
-    # Miss / ammo waste: only on attack_missed with ammo spent. Hits pay no tax.
-    # Knife uses knife_swing_missed (no clip) — never taxed here.
-    if state.get("attack_missed"):
+    # Miss taxes: gun ammo waste on attack_missed; knife whiff on knife_swing_missed.
+    if state.get("knife_swing_missed"):
+        bd["attack_miss"] = KNIFE_MISS_PENALTY
+    elif state.get("attack_missed"):
         rounds = int(state.get("ammo_spent", 0) or 0)
         if rounds > 0:
             wid = int(state.get("equipped_weapon_id", 0) or 0)
@@ -549,6 +576,7 @@ def compute_reward(
             or bd["key_item"] != 0.0
             or bd["story_use"] != 0.0
             or weapon_progress
+            or ammo_progress
         ):
             progress.note_softlock_extension(SOFTLOCK_EXTENSION_FRAMES)
             softlock_threshold = softlock_frame_threshold(progress)

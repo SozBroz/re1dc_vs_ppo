@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
+    AMMO_PICKUP_BONUS,
     CONTEMPT_BUDGET_SCALED,
     CONTEMPT_GRACE_FRAMES,
     DEATH_PENALTY,
@@ -18,6 +19,7 @@ from re1_rl.reward import (
     ITEM_PICKUP_BONUS,
     NEW_ROOM_BONUS,
     REFERENCE_STEP_FRAMES,
+    SOFTLOCK_EXTENSION_FRAMES,
     SOFTLOCK_FRAME_THRESHOLD,
     SOFTLOCK_POST_KENNETH_FRAMES,
     SOFTLOCK_PRE_KENNETH_FRAMES,
@@ -271,6 +273,22 @@ def test_junk_item_pickup_does_not_reset_idle_timer():
     assert bd["key_item"] == 0.0
     assert bd["new_weapon"] == 0.0
     assert progress.stagnation_frames == 4
+
+
+def test_ammo_pickup_extends_idle_cap_and_clears_stagnation_clock():
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    progress.claim_spawn_room_bonus()
+    progress.note_stagnation_step(made_progress=False, step_frames=20)
+    prev = make_state(room="105", step=0)
+    cur = make_state(room="105", step=1, new_items=["handgun_bullets"])
+    _, bd = _step(progress, prev, cur, step_frames=4)
+    assert bd["ammo_pickup"] == AMMO_PICKUP_BONUS
+    assert bd["item"] == 0.0
+    # note_softlock_extension clears the idle clock, then this step ticks forward.
+    assert progress.stagnation_frames == 4
+    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
+    assert softlock_frame_threshold(progress) == SOFTLOCK_EXTENSION_FRAMES
 
 
 def test_weapon_pickup_resets_idle_timer_and_raises_six_minute_cap():

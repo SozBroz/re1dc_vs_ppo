@@ -13,6 +13,7 @@ from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
     ENEMY_DAMAGE_REWARD,
     ENEMY_KILL_REWARD,
+    KNIFE_MISS_PENALTY,
     REFERENCE_STEP_FRAMES,
     STEP_PENALTY,
     compute_reward,
@@ -39,7 +40,7 @@ def test_enemy_damage_and_kill_rewards() -> None:
     assert bd["enemy_kill"] == ENEMY_KILL_REWARD
 
 
-def test_knife_miss_only_scaled_step_contempt() -> None:
+def test_knife_miss_penalty_and_scaled_step_contempt() -> None:
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -48,7 +49,7 @@ def test_knife_miss_only_scaled_step_contempt() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["attack_miss"] == 0.0
+    assert bd["attack_miss"] == pytest.approx(KNIFE_MISS_PENALTY)
     assert bd["step"] == STEP_PENALTY * (42 / REFERENCE_STEP_FRAMES)
 
 
