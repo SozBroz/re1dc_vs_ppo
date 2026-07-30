@@ -17,6 +17,9 @@ set RE1_PB_CAPTURE=1
 set RE1_PB_V1_TYPEWRITER_ONLY=1
 set RE1_PB_DANGER_ROOMS=1
 
+call "%~dp0go_explore_phase_c.env.cmd"
+if not exist data\go_explore mkdir data\go_explore
+
 if not exist data\logs mkdir data\logs
 REM Drop wedged PB sync locks before learner/workers come up.
 powershell -NoProfile -Command ^

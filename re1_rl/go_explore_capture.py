@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from datetime import date
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -37,6 +38,17 @@ from re1_rl.progress import ProgressTracker
 
 _CAPTURE_ENV_VAR = "RE1_GO_EXPLORE_CAPTURE"
 _ARCHIVE_ENV_VAR = "RE1_GO_EXPLORE_ARCHIVE"
+_COOLDOWN_STEPS_ENV = "RE1_GO_CAPTURE_COOLDOWN_STEPS"
+_MIN_FREE_GB_ENV = "RE1_GO_MIN_FREE_GB"
+_REPLACE_BUDGET_DAY_ENV = "RE1_GO_REPLACE_BUDGET_DAY"
+_MIN_HP_DELTA_ENV = "RE1_GO_REPLACE_MIN_HP_DELTA"
+_MIN_AMMO_DELTA_ENV = "RE1_GO_REPLACE_MIN_AMMO_DELTA"
+_DEFAULT_COOLDOWN_STEPS = 60
+_DEFAULT_MIN_FREE_GB = 10.0
+_DEFAULT_REPLACE_BUDGET_DAY = 200
+_DEFAULT_MIN_HP_DELTA = 5
+_DEFAULT_MIN_AMMO_DELTA = 10
+_PURGE_DONE: set[str] = set()
 
 CELL_STATE_NAME = "cell.State"
 CELL_SIDECAR_NAME = "cell.sidecar.json"
@@ -98,19 +110,166 @@ def go_explore_capture_enabled() -> bool:
     }
 
 
-def go_explore_root(project_root: Path | str | None = None) -> Path:
-    """``data/go_explore`` under project root (or parent of archive path)."""
+def resolve_archive_path(project_root: Path | str | None = None) -> Path:
+    """Absolute path to ``archive.json`` (never relative to BizHawk cwd)."""
+    root = Path(project_root) if project_root is not None else Path.cwd()
     override = os.environ.get(_ARCHIVE_ENV_VAR, "").strip()
     if override:
-        return Path(override).resolve().parent
-    root = Path(project_root) if project_root is not None else Path.cwd()
-    return root / "data" / "go_explore"
+        p = Path(override)
+        if not p.is_absolute():
+            p = root / p
+        return p.resolve()
+    return (root / "data" / "go_explore" / "archive.json").resolve()
+
+
+def go_explore_root(project_root: Path | str | None = None) -> Path:
+    """``data/go_explore`` under project root (or parent of archive path)."""
+    return resolve_archive_path(project_root).parent
 
 
 def cells_root(project_root: Path | str | None = None, *, archive: GoExploreArchive | None = None) -> Path:
     if archive is not None:
-        return archive.path.parent / "cells"
+        return archive.path.resolve().parent / "cells"
     return go_explore_root(project_root) / "cells"
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return float(default)
+    try:
+        return float(raw)
+    except ValueError:
+        return float(default)
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return int(default)
+    try:
+        return int(raw)
+    except ValueError:
+        return int(default)
+
+
+def capture_cooldown_steps() -> int:
+    return max(1, _env_int(_COOLDOWN_STEPS_ENV, _DEFAULT_COOLDOWN_STEPS))
+
+
+def min_free_bytes() -> int:
+    gb = max(0.0, _env_float(_MIN_FREE_GB_ENV, _DEFAULT_MIN_FREE_GB))
+    return int(gb * 1024 * 1024 * 1024)
+
+
+def replace_budget_per_day() -> int:
+    return max(0, _env_int(_REPLACE_BUDGET_DAY_ENV, _DEFAULT_REPLACE_BUDGET_DAY))
+
+
+def _min_hp_delta() -> int:
+    return max(1, _env_int(_MIN_HP_DELTA_ENV, _DEFAULT_MIN_HP_DELTA))
+
+
+def _min_ammo_delta() -> int:
+    return max(1, _env_int(_MIN_AMMO_DELTA_ENV, _DEFAULT_MIN_AMMO_DELTA))
+
+
+def _disk_free_bytes(path: Path) -> int:
+    try:
+        usage = shutil.disk_usage(str(path))
+        return int(usage.free)
+    except OSError:
+        return 0
+
+
+def quality_replace_significant(
+    new_q: Quality,
+    old_q: Quality | list[int] | tuple[int, ...],
+) -> bool:
+    """Ignore HP/ammo noise; require meaningful survival-resource gains."""
+    o = tuple(int(x) for x in old_q)
+    n = tuple(int(x) for x in new_q)
+    while len(o) < 5:
+        o = o + (0,)
+    while len(n) < 5:
+        n = n + (0,)
+    if n[0] - o[0] >= _min_hp_delta():
+        return True
+    if n[1] - o[1] >= _min_ammo_delta():
+        return True
+    if n[2] > o[2]:
+        return True
+    if n[3] > o[3]:
+        return True
+    if n[4] > o[4]:
+        return True
+    return False
+
+
+def _touch_replace_budget(capture_state: dict[str, Any] | None) -> bool:
+    """Increment daily replace counter; return False when budget exhausted."""
+    budget = replace_budget_per_day()
+    if budget <= 0:
+        return False
+    if capture_state is None:
+        return True
+    today = date.today().isoformat()
+    if capture_state.get("replace_day") != today:
+        capture_state["replace_day"] = today
+        capture_state["replaces_today"] = 0
+    used = int(capture_state.get("replaces_today", 0) or 0)
+    if used >= budget:
+        return False
+    capture_state["replaces_today"] = used + 1
+    return True
+
+
+def purge_orphan_cell_dirs(
+    cells_root_path: Path | str,
+    *,
+    known_record_ids: set[str] | frozenset[str] | None = None,
+) -> int:
+    """Remove ``.staging`` debris and cell dirs without an installed bundle.
+
+    Returns count of removed top-level cell directories.
+    """
+    root = Path(cells_root_path)
+    if not root.is_dir():
+        return 0
+    removed = 0
+    known = {str(r) for r in (known_record_ids or ())}
+    for child in list(root.iterdir()):
+        if child.is_dir() and child.name.startswith(".staging"):
+            shutil.rmtree(child, ignore_errors=True)
+            continue
+        if not child.is_dir():
+            continue
+        staging = child / ".staging"
+        if staging.is_dir():
+            shutil.rmtree(staging, ignore_errors=True)
+        state_p = child / CELL_STATE_NAME
+        side_p = child / CELL_SIDECAR_NAME
+        installed = state_p.is_file() and side_p.is_file()
+        if installed:
+            continue
+        if known and child.name in known:
+            continue
+        shutil.rmtree(child, ignore_errors=True)
+        removed += 1
+    return removed
+
+
+def ensure_cells_root_purged(
+    cells_root_path: Path | str,
+    *,
+    known_record_ids: set[str] | frozenset[str] | None = None,
+) -> int:
+    """Run orphan purge once per process per cells root."""
+    key = str(Path(cells_root_path).resolve())
+    if key in _PURGE_DONE:
+        return 0
+    _PURGE_DONE.add(key)
+    return purge_orphan_cell_dirs(cells_root_path, known_record_ids=known_record_ids)
 
 
 def _inventory_slots(state: dict[str, Any]) -> list[tuple[str, int]]:
@@ -297,10 +456,13 @@ def maybe_capture_cell(
     project_root: Path | str | None = None,
     tile_span: int | None = None,
     path_rooms: frozenset[str] | set[str] | None = None,
+    env_step: int = 0,
+    capture_state: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Capture a Go-Explore cell when integrity + quality gates pass.
 
-    Returns an HTTP merge proposal dict, or ``None`` when skipped.
+    All admission checks run before ``save_state``. Returns an HTTP merge
+    proposal dict, or ``None`` when skipped.
     """
     if not go_explore_capture_enabled():
         return None
@@ -324,64 +486,92 @@ def maybe_capture_cell(
     quality = compute_quality(env_state)
 
     existing = archive.cells.get(key)
-    if existing is not None and not quality_beats(quality, existing.quality):
-        # Still bump visit count for frontier bookkeeping.
+    if existing is not None:
         existing.visit_count += 1
-        return None
-
-    # New cell rejected by per-room cap.
-    if existing is None and archive._room_cell_count(room) >= archive.max_cells_per_room:
-        return None
-
-    record_id = new_record_id()
-    root = cells_root(project_root, archive=archive)
-    cell_dir = root / record_id
-    cell_dir.mkdir(parents=True, exist_ok=True)
-
-    captured_at = utc_now_iso()
-    staging = cell_dir / ".staging"
-    staging.mkdir(parents=True, exist_ok=True)
-    state_tmp = staging / CELL_STATE_NAME
-    side_tmp = staging / CELL_SIDECAR_NAME
-
-    try:
-        save_state(state_tmp)
-        if not state_tmp.is_file():
+        if not quality_beats(quality, existing.quality):
             return None
-        sidecar = _dump_sidecar(
-            env=env, progress=progress, state=env_state, captured_at=captured_at
-        )
-        side_tmp.write_text(
-            json.dumps(sidecar, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        meta = {
-            "record_id": record_id,
-            "cell_key": key,
-            "room_id": room,
-            "quality": list(quality),
-            "milestone_digest": digest,
-            "captured_at_iso": captured_at,
-            "tile_span": span,
-            "x": x,
-            "z": z,
-        }
-        shas = install_cell_bundle(
-            cell_dir,
-            state_src=state_tmp,
-            sidecar_src=side_tmp,
-            meta=meta,
-        )
-    except (OSError, RuntimeError, ValueError):
-        shutil.rmtree(staging, ignore_errors=True)
+        if not quality_replace_significant(quality, existing.quality):
+            return None
+        if not _touch_replace_budget(capture_state):
+            return None
+    elif archive._room_cell_count(room) >= archive.max_cells_per_room:
         return None
-    finally:
-        shutil.rmtree(staging, ignore_errors=True)
 
+    last_step = int((capture_state or {}).get("last_capture_step", -10**9))
+    if int(env_step) - last_step < capture_cooldown_steps():
+        return None
+
+    root_cells = cells_root(project_root, archive=archive)
+    ensure_cells_root_purged(
+        root_cells,
+        known_record_ids={c.record_id for c in archive.cells.values() if c.record_id},
+    )
+    root_cells.mkdir(parents=True, exist_ok=True)
+
+    if not acquire_slot_lock(root_cells, holder=f"go_disk:{os.getpid()}"):
+        return None
     try:
-        rel_bundle = (cell_dir / CELL_STATE_NAME).relative_to(archive.path.parent).as_posix()
+        if _disk_free_bytes(root_cells) < min_free_bytes():
+            return None
+
+        record_id = str(existing.record_id) if existing is not None and existing.record_id else new_record_id()
+        cell_dir = root_cells / record_id
+        captured_at = utc_now_iso()
+
+        # Temp staging outside the cell slot until install succeeds.
+        staging = root_cells / f".staging_{record_id}_{os.getpid()}"
+        if staging.exists():
+            shutil.rmtree(staging, ignore_errors=True)
+        state_tmp = staging / CELL_STATE_NAME
+        side_tmp = staging / CELL_SIDECAR_NAME
+
+        try:
+            staging.mkdir(parents=True, exist_ok=True)
+            save_state(state_tmp)
+            if not state_tmp.is_file():
+                return None
+            sidecar = _dump_sidecar(
+                env=env, progress=progress, state=env_state, captured_at=captured_at
+            )
+            side_tmp.write_text(
+                json.dumps(sidecar, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            meta = {
+                "record_id": record_id,
+                "cell_key": key,
+                "room_id": room,
+                "quality": list(quality),
+                "milestone_digest": digest,
+                "captured_at_iso": captured_at,
+                "tile_span": span,
+                "x": x,
+                "z": z,
+            }
+            shas = install_cell_bundle(
+                cell_dir,
+                state_src=state_tmp,
+                sidecar_src=side_tmp,
+                meta=meta,
+            )
+        except (OSError, RuntimeError, ValueError):
+            if cell_dir.is_dir() and not (cell_dir / CELL_STATE_NAME).is_file():
+                shutil.rmtree(cell_dir, ignore_errors=True)
+            return None
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
+    finally:
+        release_slot_lock(root_cells)
+
+    if capture_state is not None:
+        capture_state["last_capture_step"] = int(env_step)
+
+    archive_root = archive.path.resolve().parent
+    try:
+        rel_bundle = (cell_dir / CELL_STATE_NAME).relative_to(archive_root).as_posix()
     except ValueError:
         rel_bundle = (cell_dir / CELL_STATE_NAME).as_posix()
 
+    old_record_id = existing.record_id if existing is not None else None
     cell = archive.upsert(
         room_id=room,
         x=x,
@@ -394,6 +584,11 @@ def maybe_capture_cell(
     )
     if cell is None:
         return None
+
+    if old_record_id and old_record_id != record_id:
+        old_dir = root_cells / old_record_id
+        if old_dir.is_dir():
+            shutil.rmtree(old_dir, ignore_errors=True)
 
     proposal = {
         "cell_key": key,

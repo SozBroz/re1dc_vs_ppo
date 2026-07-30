@@ -401,6 +401,7 @@ class RE1Env(gym.Env):
         self._pending_episode_failure: str | None = None
         # PB capture: one archive per trigger_id per episode (RE1_PB_CAPTURE=1).
         self._pb_captured_triggers: set[str] = set()
+        self._go_capture_budget = {"last_capture_step": -10**9, "replaces_today": 0, "replace_day": ""}
         from re1_rl.typewriter_save import TypewriterSaveDetector
 
         self._typewriter_save_detector = TypewriterSaveDetector()
@@ -810,10 +811,9 @@ class RE1Env(gym.Env):
         if arc is not None:
             return arc
         from re1_rl.go_explore_archive import GoExploreArchive
-        from re1_rl.go_explore_capture import go_explore_root
+        from re1_rl.go_explore_capture import resolve_archive_path
 
-        raw = os.environ.get("RE1_GO_EXPLORE_ARCHIVE", "").strip()
-        path = Path(raw) if raw else go_explore_root(self.project_root) / "archive.json"
+        path = resolve_archive_path(self.project_root)
         arc = GoExploreArchive(path)
         try:
             arc.load()
@@ -829,7 +829,7 @@ class RE1Env(gym.Env):
             return None
 
         def _save(dst: Path) -> None:
-            self.bridge.savestate(str(dst))
+            self.bridge.save_savestate(str(dst))
 
         return maybe_capture_cell(
             state,
@@ -839,6 +839,8 @@ class RE1Env(gym.Env):
             ever_held=self._items.ever_held,
             env=self,
             project_root=self.project_root,
+            env_step=self._step_count,
+            capture_state=self._go_capture_budget,
         )
 
     def _capture_step_obs(self) -> np.ndarray:
@@ -867,6 +869,7 @@ class RE1Env(gym.Env):
         self._pb_captured_triggers = set()
         self._go_explore_capture_pending = []
         self._go_explore_archive_cache = None
+        self._go_capture_budget = {"last_capture_step": -10**9, "replaces_today": 0, "replace_day": ""}
 
         from re1_rl.pb_bundle_io import (
             bundle_room_matches_sidecar,
