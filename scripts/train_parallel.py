@@ -242,13 +242,12 @@ def make_env(
             env = CheckpointCaptureWrapper(
                 env, PROJECT_ROOT / curriculum, port)
         env = Monitor(env)
-        from re1_rl.pb_reset_wrapper import PbChampionResetWrapper
+        from re1_rl.go_explore_reset_wrapper import GoExploreResetWrapper
         from sb3_contrib.common.wrappers import ActionMasker
 
-        # Outer wrapper so every env.reset() (async actors / VecEnv) can inject
-        # champion pb_bundle + sidecar — ActionMasker must not sit outside this.
+        # Outer wrapper: fresh / PB / archive mix (replaces PbChampionResetWrapper).
         env = ActionMasker(env, lambda e: e.unwrapped.action_masks())
-        env = PbChampionResetWrapper(env, project_root=PROJECT_ROOT)
+        env = GoExploreResetWrapper(env, project_root=PROJECT_ROOT)
         _phase("env ready")
         return env
 

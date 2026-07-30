@@ -68,6 +68,7 @@ from re1_rl.weapon_damage import (
     equipped_clip_from_inventory_slots,
     pack_last_attack,
 )
+from re1_rl.enemy_motion import EnemyMotionTracker, PlayerMotionTracker
 from re1_rl.episode_history import (
     ACQUISITION_LOG_DIM,
     ROOM_HISTORY_DIM,
@@ -403,6 +404,8 @@ class RE1Env(gym.Env):
         from re1_rl.typewriter_save import TypewriterSaveDetector
 
         self._typewriter_save_detector = TypewriterSaveDetector()
+        self._enemy_motion = EnemyMotionTracker()
+        self._player_motion = PlayerMotionTracker()
 
     def _load_stage(self) -> None:
         with self.curriculum_path.open(encoding="utf-8") as f:
@@ -458,23 +461,33 @@ class RE1Env(gym.Env):
         else:
             names = {canonical_item(name) for name, _ in inv_slots}
             new_items = names - self._items.ever_held
+        in_control = bool(int(ram.get("game_mode", 0)) & IN_CONTROL_MASK)
+        px = int(ram.get("player_x", 0))
+        pz = int(ram.get("player_z", 0))
+        enemies = decode_enemy_table(ram)
+        enemies = self._enemy_motion.update(
+            enemies, room_code, in_control,
+        )
+        p_vx, p_vz = self._player_motion.update(px, pz, room_code, in_control)
         return {
             "hp": hp,
             "room_id": room_code,
-            "x": int(ram.get("player_x", 0)),
+            "x": px,
             "y": int(ram.get("player_y", 0)),
-            "z": int(ram.get("player_z", 0)),
+            "z": pz,
             "facing": int(ram.get("player_facing", 0)),
             "cam_id": int(ram.get("cam_id", 0)),
             "character_id": int(ram.get("character_id", 1)),
-            "in_control": bool(int(ram.get("game_mode", 0)) & IN_CONTROL_MASK),
+            "in_control": in_control,
             "game_state": int(ram.get("game_state", 0)),
             "game_mode": int(ram.get("game_mode", 0)),
             "scene_flag": int(ram.get("scene_flag", 0)),
             "msg_flag": int(ram.get("msg_flag", 0)),
             "stage_id": int(ram.get("stage_id", 0)),
             "room_byte": int(ram.get("room_id", 0)),
-            "enemies": decode_enemy_table(ram),
+            "enemies": enemies,
+            "player_world_vx": p_vx,
+            "player_world_vz": p_vz,
             "interaction_prompt": bool(
                 int(ram.get("interaction_prompt_raw", 0)) & INTERACTION_PROMPT_MASK
             ),
@@ -783,6 +796,51 @@ class RE1Env(gym.Env):
                         **tw_log_ctx,
                     )
 
+        proposal = self._maybe_capture_go_explore(state)
+        if proposal is not None:
+            pending = getattr(self, "_go_explore_capture_pending", None)
+            if pending is None:
+                self._go_explore_capture_pending = []
+                pending = self._go_explore_capture_pending
+            pending.append(proposal)
+
+    def _go_explore_archive(self):
+        """Lazy-load canonical archive (monolithic / learner-local)."""
+        arc = getattr(self, "_go_explore_archive_cache", None)
+        if arc is not None:
+            return arc
+        from re1_rl.go_explore_archive import GoExploreArchive
+        from re1_rl.go_explore_capture import go_explore_root
+
+        raw = os.environ.get("RE1_GO_EXPLORE_ARCHIVE", "").strip()
+        path = Path(raw) if raw else go_explore_root(self.project_root) / "archive.json"
+        arc = GoExploreArchive(path)
+        try:
+            arc.load()
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+        self._go_explore_archive_cache = arc
+        return arc
+
+    def _maybe_capture_go_explore(self, state: dict[str, Any]) -> dict[str, Any] | None:
+        from re1_rl.go_explore_capture import go_explore_capture_enabled, maybe_capture_cell
+
+        if not go_explore_capture_enabled():
+            return None
+
+        def _save(dst: Path) -> None:
+            self.bridge.savestate(str(dst))
+
+        return maybe_capture_cell(
+            state,
+            self._progress,
+            self._go_explore_archive(),
+            save_state=_save,
+            ever_held=self._items.ever_held,
+            env=self,
+            project_root=self.project_root,
+        )
+
     def _capture_step_obs(self) -> np.ndarray:
         """Store the live framebuffer at ``emulated_frame`` and build [t-12..t]."""
         if self.bridge.emulated_frame >= 0:
@@ -807,6 +865,8 @@ class RE1Env(gym.Env):
         self._load_stage()
         assert self._planner is not None
         self._pb_captured_triggers = set()
+        self._go_explore_capture_pending = []
+        self._go_explore_archive_cache = None
 
         from re1_rl.pb_bundle_io import (
             bundle_room_matches_sidecar,
@@ -892,6 +952,8 @@ class RE1Env(gym.Env):
         self.bridge.attack_pins.clear()
         self._progress = ProgressTracker()
         self._visited.reset()
+        self._enemy_motion.reset()
+        self._player_motion.reset()
         self._box_cache = None
         if getattr(self, "_attack_telemetry", None) is not None:
             self._attack_telemetry.reset_episode()
@@ -2605,6 +2667,10 @@ class RE1Env(gym.Env):
             ),
             "state": state,
         }
+        pending_ge = getattr(self, "_go_explore_capture_pending", None) or []
+        if pending_ge:
+            info["go_explore_capture"] = list(pending_ge)
+            self._go_explore_capture_pending = []
         if breakdown.get("success_room", 0) > 0:
             info["gallery_flawless"] = not damage_taken
         self._forward_collision_stall = update_forward_collision_stall(

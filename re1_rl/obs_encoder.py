@@ -20,6 +20,7 @@ from typing import Any
 
 import numpy as np
 
+from re1_rl.enemy_motion import clip_vel
 from re1_rl.item_todo import ItemTracker, RoomItems, canonical_item, canonicalize
 from re1_rl.memory_map import ITEM_IDS
 from re1_rl.planner import OBJECTIVE_TYPES, WaypointPlanner
@@ -72,6 +73,8 @@ PROPRIO_FIELDS: list[tuple[str, str]] = [
     ("anim_hist3_aux", "player action aux t / 255"),
     ("anim_hist3_recovery", "recovery timer t / 32"),
     ("poisoned", "1 = poisoned (u8@0x800C51A1; verify on live Yawn bite)"),
+    ("player_world_vx", "Jill allocentric x delta / VEL_NORM, clip [-1,1]"),
+    ("player_world_vz", "Jill allocentric z delta / VEL_NORM, clip [-1,1]"),
 ]
 
 GOAL_FIELDS: list[tuple[str, str]] = [
@@ -183,6 +186,8 @@ class ObsEncoder:
                 v[base + 1] = float(aux) / 255.0
                 v[base + 2] = float(rec) / ANIM_RECOVERY_NORM
         v[27] = 1.0 if state.get("poisoned") else 0.0
+        v[28] = clip_vel(float(state.get("player_world_vx", 0)))
+        v[29] = clip_vel(float(state.get("player_world_vz", 0)))
         return v
 
     def encode_rooms_visited(self, visited_rooms: set[str]) -> np.ndarray:

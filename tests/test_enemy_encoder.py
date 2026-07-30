@@ -75,6 +75,13 @@ def test_no_enemies_all_zero():
     assert all(v[IDX[f"enemy{i}_alive"]] == 0.0 for i in range(ENEMY_SLOTS))
 
 
+def test_enemy_world_velocity_encoded():
+    enc = SpatialEncoder(None, None)
+    v = enc.encode(make_state([{**zombie(11000, 10000), "world_vx": 512, "world_vz": -256}]))
+    assert v[IDX["enemy0_world_vx"]] == pytest.approx(0.5)
+    assert v[IDX["enemy0_world_vz"]] == pytest.approx(-0.25)
+
+
 def test_proprio_enemy_count_wired():
     enc = ObsEncoder(ROOMS, RoomGraph(DOORS))
     s = make_state([zombie(11000, 10000), zombie(12000, 10000)])
@@ -82,6 +89,15 @@ def test_proprio_enemy_count_wired():
     v = enc.encode_proprio(s, prev_hp=96)
     assert v[P_IDX["enemy_count"]] == pytest.approx(2 / 10)
     assert v[P_IDX["interaction_prompt"]] == 0.0
+
+
+def test_proprio_player_world_velocity():
+    enc = ObsEncoder(ROOMS, RoomGraph(DOORS))
+    s = make_state([])
+    s.update({"character_id": 1, "inventory": [], "player_world_vx": 1024, "player_world_vz": 0})
+    v = enc.encode_proprio(s, prev_hp=96)
+    assert v[P_IDX["player_world_vx"]] == pytest.approx(1.0)
+    assert v[P_IDX["player_world_vz"]] == pytest.approx(0.0)
 
 
 def test_enemy_table_fields_mapped() -> None:

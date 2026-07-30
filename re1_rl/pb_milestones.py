@@ -36,6 +36,10 @@ KEY_ITEM_MILESTONES: frozenset[str] = frozenset(
     }
 )
 
+# West-wing combat rooms: first-entry capture → per-room champion (not 203 hub).
+DANGER_ROOM_MILESTONES: frozenset[str] = frozenset({"108", "202", "204"})
+
+# Later attic ladder (disabled while v1 typewriter-only is on).
 ROOM_MILESTONES: frozenset[str] = frozenset({"20E", "210"})
 
 STORY_USE_MILESTONES: frozenset[str] = frozenset(
@@ -53,6 +57,12 @@ def typewriter_v1_only() -> bool:
     return raw not in {"0", "false", "no", "off"}
 
 
+def danger_room_capture_enabled() -> bool:
+    """Default on: capture first-entry champions for ``DANGER_ROOM_MILESTONES``."""
+    raw = os.environ.get("RE1_PB_DANGER_ROOMS", "1").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
 def milestone_id_for_new_key(name: str) -> str | None:
     item = canonical_item(str(name))
     if item not in KEY_ITEM_MILESTONES:
@@ -65,6 +75,23 @@ def milestone_id_for_room(room_id: str) -> str | None:
     if room not in ROOM_MILESTONES:
         return None
     return f"room:{room}"
+
+
+def milestone_id_for_danger_room(room_id: str) -> str | None:
+    room = str(room_id or "").strip().upper()
+    if room not in DANGER_ROOM_MILESTONES:
+        return None
+    return f"room:{room}"
+
+
+def is_danger_room_milestone(trigger_id: str | None) -> bool:
+    if not trigger_id:
+        return False
+    s = str(trigger_id)
+    if not s.startswith("room:"):
+        return False
+    room = s[len("room:") :].strip().upper()
+    return room in DANGER_ROOM_MILESTONES
 
 
 def milestone_id_for_story_use(site_id: str) -> str | None:
@@ -122,6 +149,14 @@ def detect_milestone_triggers(
                 room=room,
                 kenneth_gate_breached=kenneth_gate_breached,
             ):
+                out.append(trigger)
+                seen.add(trigger)
+
+    if danger_room_capture_enabled() and float(breakdown.get("new_room", 0.0) or 0.0) > 0.0:
+        room = str(state.get("room_id", "") or "")
+        if room != str(prev_state.get("room_id", "") or ""):
+            trigger = milestone_id_for_danger_room(room)
+            if trigger and trigger not in seen:
                 out.append(trigger)
                 seen.add(trigger)
 

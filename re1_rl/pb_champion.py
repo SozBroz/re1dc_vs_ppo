@@ -17,9 +17,11 @@ CHAMPION_MILESTONE = TYPEWRITER_SAVE_MILESTONE
 CHAMPION_SUBDIR = "champions/mainhall_typewriter"
 CHAMPION_JSON = "champion.json"
 SCORE_VERSION = 2
+DANGER_ROOM_SCORE_VERSION = 3
 
 _PB_ROOT_ENV = "RE1_PB_ROOT"
 _TYPEWRITER_MILESTONE_PREFIX = "typewriter_save:"
+_ROOM_MILESTONE_PREFIX = "room:"
 _KEY_ITEM_NAME_SET: frozenset[str] = frozenset(KEY_ITEM_NAMES)
 
 # Herb atom values; mixes are always the sum of component atoms.
@@ -110,6 +112,62 @@ def parse_typewriter_room(trigger_id: str | None) -> str | None:
     if not room:
         return None
     return _normalize_room_id(room)
+
+
+def room_milestone_id(room_id: int | str) -> str:
+    return f"{_ROOM_MILESTONE_PREFIX}{_normalize_room_id(room_id)}"
+
+
+def is_room_milestone(trigger_id: str | None) -> bool:
+    if not trigger_id:
+        return False
+    return str(trigger_id).startswith(_ROOM_MILESTONE_PREFIX)
+
+
+def parse_room_milestone(trigger_id: str | None) -> str | None:
+    if not is_room_milestone(trigger_id):
+        return None
+    room = str(trigger_id)[len(_ROOM_MILESTONE_PREFIX) :].strip()
+    if not room:
+        return None
+    return _normalize_room_id(room)
+
+
+def is_danger_room_milestone(trigger_id: str | None) -> bool:
+    from re1_rl.pb_milestones import DANGER_ROOM_MILESTONES
+
+    room = parse_room_milestone(trigger_id)
+    return bool(room and room in DANGER_ROOM_MILESTONES)
+
+
+def is_champion_milestone(trigger_id: str | None) -> bool:
+    return is_typewriter_milestone(trigger_id) or is_danger_room_milestone(trigger_id)
+
+
+def room_champion_subdir(room_id: int | str) -> str:
+    return f"champions/room_{_normalize_room_id(room_id)}"
+
+
+def room_champion_dir(project_root: Path | str, room_id: int | str) -> Path:
+    return pb_root(project_root) / room_champion_subdir(room_id)
+
+
+def champion_dir_for_milestone(
+    project_root: Path | str,
+    *,
+    milestone_id: str,
+    room_id: int | str | None = None,
+) -> Path:
+    """Resolve champion slot directory for a typewriter or danger-room milestone."""
+    if is_typewriter_milestone(milestone_id):
+        rid = parse_typewriter_room(milestone_id) or room_id or "106"
+        return typewriter_champion_dir(project_root, rid)
+    if is_danger_room_milestone(milestone_id):
+        rid = parse_room_milestone(milestone_id) or room_id
+        if not rid:
+            raise ValueError(f"missing room for danger milestone {milestone_id!r}")
+        return room_champion_dir(project_root, rid)
+    raise ValueError(f"unsupported champion milestone {milestone_id!r}")
 
 
 def _slots(state: dict[str, Any] | None) -> list[tuple[str, int]]:
@@ -272,6 +330,59 @@ def champion_score_v2(
     return (v_milli, int(hp), int(bullets), -int(ribbons), int(n_visited))
 
 
+def danger_room_score_v2(
+    *,
+    inventory_slots: Iterable[Any] | None,
+    box_cache: Iterable[Any] | None,
+    ever_held: Iterable[str] | None,
+    hp: int,
+) -> tuple[int, int, int, int]:
+    """Combat-first score for west-wing room champions.
+
+    ``(hp, handgun_bullets, v_milli, -ink_ribbons)`` — no visited-room tiebreak.
+    """
+    v_milli, hp_s, bullets, ribbons, _ = champion_score_v2(
+        inventory_slots=inventory_slots,
+        box_cache=box_cache,
+        ever_held=ever_held,
+        visited_rooms=(),
+        hp=hp,
+    )
+    return (int(hp_s), int(bullets), int(v_milli), int(ribbons))
+
+
+def score_for_milestone(
+    milestone_id: str,
+    *,
+    inventory_slots: Iterable[Any] | None,
+    box_cache: Iterable[Any] | None,
+    ever_held: Iterable[str] | None,
+    visited_rooms: Iterable[str] | None,
+    hp: int,
+) -> tuple[tuple[int, ...], int]:
+    """Return ``(score_tuple, score_version)`` for champion replace."""
+    if is_danger_room_milestone(milestone_id):
+        return (
+            danger_room_score_v2(
+                inventory_slots=inventory_slots,
+                box_cache=box_cache,
+                ever_held=ever_held,
+                hp=hp,
+            ),
+            DANGER_ROOM_SCORE_VERSION,
+        )
+    return (
+        champion_score_v2(
+            inventory_slots=inventory_slots,
+            box_cache=box_cache,
+            ever_held=ever_held,
+            visited_rooms=visited_rooms,
+            hp=hp,
+        ),
+        SCORE_VERSION,
+    )
+
+
 def score_beats(
     candidate: tuple[int, ...],
     incumbent: tuple[int, ...] | None,
@@ -338,6 +449,7 @@ def load_champion_record(
         and (
             p.name == "mainhall_typewriter"
             or p.name.startswith("typewriter_")
+            or p.name.startswith("room_")
             or (p / CHAMPION_JSON).is_file()
             or (p / "champion.State").is_file()
         )
@@ -366,11 +478,8 @@ def champion_bundle_for_reset(
     }
 
 
-def list_filled_champions(project_root: Path | str) -> list[dict[str, Any]]:
-    """Scan mainhall_typewriter + typewriter_* dirs with a coherent unlocked bundle.
-
-    Skips slots mid-sync (lockfile) or with State/sidecar/json split in half.
-    """
+def list_filled_typewriter_champions(project_root: Path | str) -> list[dict[str, Any]]:
+    """Scan mainhall_typewriter + typewriter_* dirs with a coherent unlocked bundle."""
     from re1_rl.pb_bundle_io import verify_champion_bundle
 
     champs_root = pb_root(project_root) / "champions"
@@ -401,6 +510,44 @@ def list_filled_champions(project_root: Path | str) -> list[dict[str, Any]]:
     return out
 
 
+def list_filled_danger_room_champions(project_root: Path | str) -> list[dict[str, Any]]:
+    """Scan room_* champion slots for west-wing danger rooms."""
+    from re1_rl.pb_bundle_io import verify_champion_bundle
+    from re1_rl.pb_milestones import DANGER_ROOM_MILESTONES
+
+    champs_root = pb_root(project_root) / "champions"
+    if not champs_root.is_dir():
+        return []
+    out: list[dict[str, Any]] = []
+    for child in sorted(champs_root.iterdir(), key=lambda p: p.name):
+        if not child.is_dir() or not child.name.startswith("room_"):
+            continue
+        room = child.name[len("room_") :].upper()
+        if room not in DANGER_ROOM_MILESTONES:
+            continue
+        ok, _reason = verify_champion_bundle(child, require_unlocked=True)
+        if not ok:
+            continue
+        rec = _read_champion_json(child / CHAMPION_JSON)
+        if rec is None:
+            continue
+        if not rec.get("state_path") or not rec.get("sidecar_path"):
+            continue
+        enriched = dict(rec)
+        enriched.setdefault("champion_dir", child.as_posix())
+        enriched.setdefault("room_id", room)
+        enriched.setdefault("milestone_id", room_milestone_id(room))
+        out.append(enriched)
+    return out
+
+
+def list_filled_champions(project_root: Path | str) -> list[dict[str, Any]]:
+    """All filled champion slots (typewriter + danger-room)."""
+    return list_filled_typewriter_champions(project_root) + list_filled_danger_room_champions(
+        project_root
+    )
+
+
 def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix="champion_", suffix=".json", dir=str(path.parent))
@@ -428,20 +575,28 @@ def try_replace_champion(
     ever_held: Iterable[str] | None = None,
     box_cache: Iterable[Any] | None = None,
     visited_rooms: Iterable[str] | None = None,
+    milestone_id: str | None = None,
 ) -> bool:
-    """Copy candidate into the per-room champion dir and replace if score wins.
+    """Copy candidate into a champion dir and replace if score wins.
 
-    Returns True when champion was created or replaced. Writes ``score_version`` 2.
+    Returns True when champion was created or replaced. Writes score metadata.
     """
     project_root = Path(project_root)
     room = _normalize_room_id(
         room_id if room_id is not None else (state.get("room_id") or "106")
     )
+    mid = str(milestone_id or typewriter_milestone_id(room))
 
     if score is not None:
         score_t = tuple(int(x) for x in score)
+        score_version = (
+            DANGER_ROOM_SCORE_VERSION
+            if is_danger_room_milestone(mid)
+            else SCORE_VERSION
+        )
     else:
-        score_t = champion_score_v2(
+        score_t, score_version = score_for_milestone(
+            mid,
             inventory_slots=_slots(state),
             box_cache=box_cache,
             ever_held=ever_held,
@@ -449,7 +604,7 @@ def try_replace_champion(
             hp=int(state.get("hp", 0) or 0),
         )
 
-    cdir = typewriter_champion_dir(project_root, room)
+    cdir = champion_dir_for_milestone(project_root, milestone_id=mid, room_id=room)
     cdir.mkdir(parents=True, exist_ok=True)
 
     # Fast path: if a stronger incumbent is already visible, keep going.
@@ -470,7 +625,7 @@ def try_replace_champion(
     if not score_beats(
         score_t,
         inc_score,
-        candidate_version=SCORE_VERSION,
+        candidate_version=score_version,
         incumbent_version=inc_version,
     ):
         return False
@@ -484,12 +639,17 @@ def try_replace_champion(
         rel_state = dest_state.as_posix()
         rel_sidecar = dest_sidecar.as_posix()
 
+    record_milestone = (
+        typewriter_milestone_id(room)
+        if is_typewriter_milestone(mid)
+        else room_milestone_id(room)
+    )
     record = {
-        "milestone_id": typewriter_milestone_id(room),
+        "milestone_id": record_milestone,
         "state_path": rel_state,
         "sidecar_path": rel_sidecar,
         "score": list(score_t),
-        "score_version": SCORE_VERSION,
+        "score_version": score_version,
         "room_id": room,
         "hp": int(state.get("hp", 0) or 0),
     }
@@ -515,7 +675,7 @@ def try_replace_champion(
     if not score_beats(
         score_t,
         inc_score,
-        candidate_version=SCORE_VERSION,
+        candidate_version=score_version,
         incumbent_version=inc_version,
     ):
         return False
@@ -528,7 +688,7 @@ def try_replace_champion(
             record=record,
             holder=f"capture:{os.environ.get('COMPUTERNAME', 'local')}",
             candidate_score=score_t,
-            candidate_version=SCORE_VERSION,
+            candidate_version=score_version,
             wait_timeout_s=90.0,
         )
     except RuntimeError:

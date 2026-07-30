@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import queue
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -16,11 +18,20 @@ from re1_rl.distributed.relevance_gate import DEFAULT_RELEVANCE_MAX_AGE
 from re1_rl.distributed.rollout_codec import decode_rollout
 from re1_rl.distributed.rollout_types import WorkerRollout
 from re1_rl.distributed.weight_store import WeightStore
+from re1_rl.go_explore_merge import GoExploreMerge, extract_proposals_from_infos
 
 
 def base_worker_id(worker_id: str) -> str:
     """Strip ``:actor_N`` suffix so contribution is per machine."""
     return str(worker_id).split(":", 1)[0]
+
+
+def _go_explore_merge_from_env() -> GoExploreMerge | None:
+    """Attach merge when ``RE1_GO_EXPLORE_ARCHIVE`` is set (canonical learner path)."""
+    raw = os.environ.get("RE1_GO_EXPLORE_ARCHIVE", "").strip()
+    if not raw:
+        return None
+    return GoExploreMerge(Path(raw))
 
 
 class LearnerState:
@@ -34,6 +45,7 @@ class LearnerState:
         worker_liveness_s: float = 90.0,
         relevance_gate: bool = False,
         relevance_max_age: int | None = None,
+        go_explore_merge: GoExploreMerge | None = None,
     ) -> None:
         self.weight_store = weight_store
         self.rollout_queue = rollout_queue
@@ -67,6 +79,10 @@ class LearnerState:
         self.epoch_contributors: set[str] = set()
         self.epoch_expected: set[str] = set()
         self.rollouts_rejected_duplicate = 0
+        self.go_explore_merge = (
+            go_explore_merge if go_explore_merge is not None else _go_explore_merge_from_env()
+        )
+        self.go_explore_accepted = 0
 
     def set_current_version(self, version: int) -> None:
         with self.lock:
@@ -169,6 +185,28 @@ class LearnerState:
             self.epoch_expected = set(live.keys())
             return self.epoch_id, sorted(self.epoch_expected)
 
+    def ingest_go_explore_from_rollout(self, rollout: WorkerRollout) -> list[str]:
+        """Merge capture proposals from accepted rollout episode infos."""
+        merge = self.go_explore_merge
+        if merge is None:
+            return []
+        proposals = extract_proposals_from_infos(rollout.episode_infos)
+        if not proposals:
+            return []
+        try:
+            accepted = merge.ingest_proposals(proposals)
+        except Exception as exc:
+            log(self.machine_name, f"go_explore merge failed: {exc}")
+            return []
+        if accepted:
+            with self.lock:
+                self.go_explore_accepted += len(accepted)
+            log(
+                self.machine_name,
+                f"go_explore merged {len(accepted)} cell(s) from {rollout.worker_id}",
+            )
+        return accepted
+
     def accept_rollout(self, rollout: WorkerRollout) -> tuple[bool, str]:
         wid = base_worker_id(rollout.worker_id)
         steps = int(rollout.num_timesteps())
@@ -184,15 +222,24 @@ class LearnerState:
                         self.steps_stale_queued += steps
                         self.epoch_contributors.add(wid)
                         self.rollout_queue.put(rollout)
-                        return True, "stale_queued_for_relevance_gate"
-                self.rollouts_rejected += 1
-                self.steps_rejected_ingest += steps
-                return False, "stale_policy_version"
-            self.rollouts_accepted += 1
-            self.steps_accepted += steps
-            self.epoch_contributors.add(wid)
-        self.rollout_queue.put(rollout)
-        return True, "ok"
+                        reason = "stale_queued_for_relevance_gate"
+                    else:
+                        self.rollouts_rejected += 1
+                        self.steps_rejected_ingest += steps
+                        return False, "stale_policy_version"
+                else:
+                    self.rollouts_rejected += 1
+                    self.steps_rejected_ingest += steps
+                    return False, "stale_policy_version"
+            else:
+                self.rollouts_accepted += 1
+                self.steps_accepted += steps
+                self.epoch_contributors.add(wid)
+                reason = "ok"
+        if reason == "ok":
+            self.rollout_queue.put(rollout)
+        self.ingest_go_explore_from_rollout(rollout)
+        return True, reason
 
     def record_relevance_stats(
         self,
@@ -344,10 +391,40 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "relevance_max_age": self.state.relevance_max_age,
                     "relevance_kept": self.state.relevance_kept,
                     "relevance_dropped": self.state.relevance_dropped,
+                    "go_explore_accepted": self.state.go_explore_accepted,
                     "pitch": pitch,
                     "epoch": epoch,
                 }
             self._send_json(200, payload)
+            return
+
+        if path == "/go_explore/manifest":
+            merge = self.state.go_explore_merge
+            if merge is None:
+                self._send_json(503, {"error": "go_explore merge not configured"})
+                return
+            since = int(qs.get("since_version", ["0"])[0])
+            self._send_json(200, merge.build_manifest(since_version=since))
+            return
+
+        if path.startswith("/go_explore/bundle/"):
+            merge = self.state.go_explore_merge
+            if merge is None:
+                self._send_json(503, {"error": "go_explore merge not configured"})
+                return
+            record_id = path[len("/go_explore/bundle/") :].strip("/")
+            if not record_id or "/" in record_id or "\\" in record_id or ".." in record_id:
+                self._send_json(400, {"error": "invalid record_id"})
+                return
+            blob = merge.pack_bundle_zip(record_id)
+            if blob is None:
+                self._send_json(404, {"error": "bundle not found"})
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Length", str(len(blob)))
+            self.end_headers()
+            self.wfile.write(blob)
             return
 
         self._send_json(404, {"error": "not found"})

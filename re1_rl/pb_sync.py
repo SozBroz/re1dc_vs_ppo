@@ -24,6 +24,7 @@ from re1_rl.pb_champion import (
     CHAMPION_JSON,
     list_filled_champions,
     pb_root,
+    room_champion_subdir,
     score_beats,
     typewriter_champion_subdir,
 )
@@ -70,7 +71,11 @@ def _slot_name_from_subdir(subdir: str) -> str:
 
 
 def _is_slot_dirname(name: str) -> bool:
-    return name == "mainhall_typewriter" or name.startswith("typewriter_")
+    return (
+        name == "mainhall_typewriter"
+        or name.startswith("typewriter_")
+        or name.startswith("room_")
+    )
 
 
 def _scan_slot_names(pb_root_path: Path) -> set[str]:
@@ -90,6 +95,11 @@ def _slot_names_from_filled(project_root: Path | str) -> set[str]:
     try:
         for rec in list_filled_champions(project_root):
             room = rec.get("room_id")
+            milestone = str(rec.get("milestone_id") or "")
+            if milestone.startswith("room:"):
+                rid = milestone.split(":", 1)[1]
+                names.add(_slot_name_from_subdir(room_champion_subdir(rid)))
+                continue
             if room is not None:
                 names.add(_slot_name_from_subdir(typewriter_champion_subdir(room)))
                 continue

@@ -95,6 +95,38 @@ def _is_typewriter_milestone_fallback(trigger_id: str) -> bool:
     return str(trigger_id).startswith("typewriter_save:")
 
 
+def _is_champion_milestone_fallback(trigger_id: str) -> bool:
+    from re1_rl.pb_milestones import is_danger_room_milestone
+
+    return _is_typewriter_milestone_fallback(trigger_id) or is_danger_room_milestone(
+        trigger_id
+    )
+
+
+def _parse_champion_room_fallback(trigger_id: str, state: dict[str, Any]) -> str:
+    from re1_rl.pb_milestones import is_danger_room_milestone
+
+    if _is_typewriter_milestone_fallback(trigger_id):
+        room = _parse_typewriter_room_fallback(trigger_id)
+        if room:
+            return room
+    if is_danger_room_milestone(trigger_id):
+        s = str(trigger_id)
+        if s.startswith("room:"):
+            return s[len("room:") :].strip().upper()
+    return str(state.get("room_id", "") or "").strip().upper()
+
+
+def _champion_dir_for_trigger_fallback(
+    project_root: Path | str, trigger_id: str, room_id: str
+) -> Path:
+    from re1_rl.pb_milestones import is_danger_room_milestone
+
+    if is_danger_room_milestone(trigger_id):
+        return pb_root_dir(project_root) / f"champions/room_{room_id}"
+    return _typewriter_champion_dir_fallback(project_root, room_id)
+
+
 def _parse_typewriter_room_fallback(trigger_id: str) -> str | None:
     s = str(trigger_id)
     prefix = "typewriter_save:"
@@ -177,6 +209,7 @@ def _try_replace_champion_call(
     state: dict[str, Any],
     score: tuple[int, ...],
     room_id: str,
+    milestone_id: str | None = None,
 ) -> bool:
     import inspect
 
@@ -194,14 +227,18 @@ def _try_replace_champion_call(
         kwargs["room_id"] = room_id
     elif "room" in params:
         kwargs["room"] = room_id
+    if milestone_id is not None and "milestone_id" in params:
+        kwargs["milestone_id"] = milestone_id
     return bool(try_replace_champion(project_root, **kwargs))
 
 
-def _score_for_typewriter_capture(
+def _score_for_champion_capture(
     env: Any,
     state: dict[str, Any],
     box_cache: list[tuple[int, int]] | None,
-) -> tuple[int, ...]:
+    *,
+    milestone_id: str,
+) -> tuple[tuple[int, ...], int]:
     from re1_rl import pb_champion as champ
 
     slots = _inventory_slots_from_state(state)
@@ -211,19 +248,28 @@ def _score_for_typewriter_capture(
     visited = set(getattr(progress, "visited_rooms", None) or ())
     hp = int(state.get("hp", 0) or 0)
 
-    score_v2 = getattr(champ, "champion_score_v2", None)
-    if callable(score_v2):
-        return tuple(
-            score_v2(
-                inventory_slots=slots,
-                box_cache=box_cache,
-                ever_held=ever_held,
-                visited_rooms=visited,
-                hp=hp,
-            )
+    score_for = getattr(champ, "score_for_milestone", None)
+    if callable(score_for):
+        return score_for(
+            milestone_id,
+            inventory_slots=slots,
+            box_cache=box_cache,
+            ever_held=ever_held,
+            visited_rooms=visited,
+            hp=hp,
         )
-    # Pre-v2 champion module: fall back to inventory-only score.
-    return tuple(champ.champion_score(state))
+    return tuple(champ.champion_score(state)), int(getattr(champ, "SCORE_VERSION", 2))
+
+
+def _score_for_typewriter_capture(
+    env: Any,
+    state: dict[str, Any],
+    box_cache: list[tuple[int, int]] | None,
+) -> tuple[int, ...]:
+    score, _ver = _score_for_champion_capture(
+        env, state, box_cache, milestone_id="typewriter_save:106"
+    )
+    return score
 
 
 def maybe_capture_pb(
@@ -300,38 +346,55 @@ def maybe_capture_pb(
     is_typewriter_milestone = _champ_fn(
         "is_typewriter_milestone", _is_typewriter_milestone_fallback
     )
+    is_champion_milestone = _champ_fn(
+        "is_champion_milestone",
+        lambda tid: _is_champion_milestone_fallback(tid),
+    )
+    if not callable(is_champion_milestone):
+        is_champion_milestone = lambda tid: bool(is_typewriter_milestone(tid))  # noqa: E731
+
     parse_typewriter_room = _champ_fn(
         "parse_typewriter_room", _parse_typewriter_room_fallback
     )
     typewriter_champion_dir = _champ_fn(
         "typewriter_champion_dir", _typewriter_champion_dir_fallback
     )
+    champion_dir_for_milestone = getattr(
+        __import__("re1_rl.pb_champion", fromlist=["champion_dir_for_milestone"]),
+        "champion_dir_for_milestone",
+        None,
+    )
 
     project_root = Path(getattr(env, "project_root", states_dir.parent.parent))
     captured_at = utc_now_iso()
     slug = _timestamp_slug(captured_at)
-    typewriter = bool(is_typewriter_milestone(trigger_id))
+    champion = bool(_is_champion_milestone_fallback(trigger_id))
     room_id = ""
-    if typewriter:
-        room_id = str(
-            parse_typewriter_room(trigger_id)
-            or state.get("room_id", "")
-            or ""
-        ).strip().upper()
+    if champion:
+        room_id = _parse_champion_room_fallback(trigger_id, state)
         if not room_id:
-            log_typewriter_save(
-                "capture_failed",
-                reason="missing_room_id",
-                trigger=trigger_id,
-                **log_ctx,
-            )
+            if is_typewriter:
+                log_typewriter_save(
+                    "capture_failed",
+                    reason="missing_room_id",
+                    trigger=trigger_id,
+                    **log_ctx,
+                )
             return None
-        stage_dir = typewriter_champion_dir(project_root, room_id) / ".staging"
+        if callable(champion_dir_for_milestone):
+            stage_parent = champion_dir_for_milestone(
+                project_root, milestone_id=trigger_id, room_id=room_id
+            )
+        else:
+            stage_parent = _champion_dir_for_trigger_fallback(
+                project_root, trigger_id, room_id
+            )
+        stage_dir = stage_parent / ".staging"
         stage_dir.mkdir(parents=True, exist_ok=True)
         state_path = stage_dir / f"candidate_{slug}.State"
         sidecar_path = stage_dir / f"candidate_{slug}.sidecar.json"
     else:
-        # Non-typewriter milestones: timestamped sidecars (when v1-only flag is off).
+        # Non-champion milestones: timestamped sidecars (when v1-only flag is off).
         base = f"{_safe_trigger_slug(trigger_id)}_{slug}"
         state_path = states_dir / f"{base}.State"
         sidecar_path = states_dir / f"{base}.sidecar.json"
@@ -361,9 +424,11 @@ def maybe_capture_pb(
 
     episode_captured.add(trigger_id)
 
-    if typewriter:
+    if champion:
         box_cache = _box_cache_for_capture(env)
-        score = _score_for_typewriter_capture(env, state, box_cache)
+        score, score_version = _score_for_champion_capture(
+            env, state, box_cache, milestone_id=trigger_id
+        )
         replaced = _try_replace_champion_call(
             project_root,
             state_path=state_path,
@@ -371,6 +436,7 @@ def maybe_capture_pb(
             state=state,
             score=score,
             room_id=room_id,
+            milestone_id=trigger_id,
         )
         _unlink_quiet(state_path)
         _unlink_quiet(sidecar_path)
@@ -380,15 +446,23 @@ def maybe_capture_pb(
         except OSError:
             pass
         if not replaced:
-            log_typewriter_save(
-                "capture_replace_rejected",
-                trigger=trigger_id,
-                room=room_id,
-                score=list(score),
-                **log_ctx,
-            )
+            if is_typewriter:
+                log_typewriter_save(
+                    "capture_replace_rejected",
+                    trigger=trigger_id,
+                    room=room_id,
+                    score=list(score),
+                    **log_ctx,
+                )
             return None
-        cdir = typewriter_champion_dir(project_root, room_id)
+        if callable(champion_dir_for_milestone):
+            cdir = champion_dir_for_milestone(
+                project_root, milestone_id=trigger_id, room_id=room_id
+            )
+        else:
+            cdir = _champion_dir_for_trigger_fallback(
+                project_root, trigger_id, room_id
+            )
         champ_state = cdir / "champion.State"
         champ_side = cdir / "champion.sidecar.json"
         try:
@@ -411,23 +485,20 @@ def maybe_capture_pb(
             "champion": True,
             "score": list(score),
         }
-        from re1_rl import pb_champion as champ
-
-        score_version = getattr(champ, "SCORE_VERSION", None)
-        if score_version is not None:
-            row["score_version"] = int(score_version)
+        row["score_version"] = int(score_version)
         append_manifest_row(states_dir / MANIFEST_FILENAME, row)
         ensure_pb_sync_daemon(project_root)
         push_champion_async(project_root)
-        log_typewriter_save(
-            "capture_ok",
-            trigger=trigger_id,
-            room=room_id,
-            score=list(score),
-            champion_state=rel_state,
-            champion_sidecar=rel_sidecar,
-            **log_ctx,
-        )
+        if is_typewriter:
+            log_typewriter_save(
+                "capture_ok",
+                trigger=trigger_id,
+                room=room_id,
+                score=list(score),
+                champion_state=rel_state,
+                champion_sidecar=rel_sidecar,
+                **log_ctx,
+            )
         return champ_state
 
     try:

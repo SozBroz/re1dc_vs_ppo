@@ -28,9 +28,9 @@ class PbChampionResetWrapper(gym.Wrapper):
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         opts = dict(options or {})
         if "pb_bundle" not in opts and "pb_state_path" not in opts:
-            from re1_rl.pb_curriculum import sample_typewriter_start
+            from re1_rl.pb_curriculum import sample_training_start
 
-            bundle = sample_typewriter_start(self._pb_project_root)
+            bundle = sample_training_start(self._pb_project_root)
             if bundle is not None:
                 opts["pb_bundle"] = bundle
         return self.env.reset(seed=seed, options=opts or None)

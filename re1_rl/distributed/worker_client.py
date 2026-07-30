@@ -127,6 +127,34 @@ class WorkerClient:
             return False
         raise RuntimeError(f"POST /rollout failed with HTTP {code}: {resp[:200]!r}")
 
+    def fetch_go_explore_manifest(self, since_version: int = 0) -> dict[str, Any]:
+        code, body = self._request(
+            "GET", f"/go_explore/manifest?since_version={int(since_version)}"
+        )
+        if code != 200:
+            raise RuntimeError(f"GET /go_explore/manifest failed with HTTP {code}")
+        return json.loads(body.decode("utf-8"))
+
+    def fetch_go_explore_bundle(self, record_id: str) -> bytes:
+        rid = str(record_id).strip()
+        if not rid or "/" in rid or "\\" in rid or ".." in rid:
+            raise ValueError(f"invalid go-explore record_id: {record_id!r}")
+        code, body = self._request("GET", f"/go_explore/bundle/{rid}")
+        if code == 404:
+            raise FileNotFoundError(f"go-explore bundle not found: {rid}")
+        if code != 200:
+            raise RuntimeError(f"GET /go_explore/bundle/{rid} failed with HTTP {code}")
+        # Prefer raw zip; fall back to JSON {bundle_b64: ...}.
+        if body[:2] == b"PK":
+            return body
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return body
+        if isinstance(payload, dict) and payload.get("bundle_b64"):
+            return base64.b64decode(payload["bundle_b64"])
+        return body
+
     def wait_for_learner(self, timeout_s: float, poll_s: float = 2.0) -> None:
         import time
 

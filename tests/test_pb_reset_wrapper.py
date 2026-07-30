@@ -42,7 +42,7 @@ def test_wrapper_injects_sampled_bundle(monkeypatch: pytest.MonkeyPatch, tmp_pat
         return bundle
 
     monkeypatch.setattr(
-        "re1_rl.pb_curriculum.sample_typewriter_start",
+        "re1_rl.pb_curriculum.sample_training_start",
         _fake_sample,
     )
 
@@ -58,7 +58,7 @@ def test_wrapper_fresh_when_sample_returns_none(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
-        "re1_rl.pb_curriculum.sample_typewriter_start",
+        "re1_rl.pb_curriculum.sample_training_start",
         lambda *_a, **_k: None,
     )
     inner = _RecordResetEnv()
@@ -77,7 +77,7 @@ def test_wrapper_preserves_explicit_pb_bundle(
         called = True
         return None
 
-    monkeypatch.setattr("re1_rl.pb_curriculum.sample_typewriter_start", _boom)
+    monkeypatch.setattr("re1_rl.pb_curriculum.sample_training_start", _boom)
     explicit = {"state_path": "x.State", "sidecar_path": "x.sidecar.json"}
     inner = _RecordResetEnv()
     wrapped = PbChampionResetWrapper(inner, project_root=tmp_path)
@@ -97,7 +97,7 @@ def test_wrapper_resamples_each_reset(
         n_calls += 1
         return None
 
-    monkeypatch.setattr("re1_rl.pb_curriculum.sample_typewriter_start", _count)
+    monkeypatch.setattr("re1_rl.pb_curriculum.sample_training_start", _count)
     inner = _RecordResetEnv()
     wrapped = PbChampionResetWrapper(inner, project_root=tmp_path)
     wrapped.reset()

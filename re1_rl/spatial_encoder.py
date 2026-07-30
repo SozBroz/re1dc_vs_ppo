@@ -20,6 +20,7 @@ from typing import Any
 
 import numpy as np
 
+from re1_rl.enemy_motion import clip_vel
 from re1_rl.item_affordances import door_requires_key_index
 from re1_rl.item_todo import ItemTracker, RoomItems, canonical_item
 from re1_rl.memory_map import ITEM_IDS
@@ -58,6 +59,8 @@ _ENEMY_SLOT_FIELDS = [
     ("type_id", "enemy type id / 32"),
     ("hp", "enemy hp / 255"),
     ("alive", "1 = alive"),
+    ("world_vx", "allocentric x delta / VEL_NORM, clip [-1,1]"),
+    ("world_vz", "allocentric z delta / VEL_NORM, clip [-1,1]"),
 ]
 _EXIT_SLOT_FIELDS = [
     ("bearing_sin", "sin(angle to exit door - facing)"),
@@ -95,7 +98,7 @@ def _build_fields() -> list[tuple[str, str]]:
 
 
 SPATIAL_FIELDS: list[tuple[str, str]] = _build_fields()
-SPATIAL_DIM = len(SPATIAL_FIELDS)  # 128 + 4 exits * 3 new fields = 140
+SPATIAL_DIM = len(SPATIAL_FIELDS)  # +10 enemy world velocity (5 slots x 2)
 
 _NAME_TO_ITEM_ID = {name: iid for iid, name in ITEM_IDS.items()}
 
@@ -372,8 +375,10 @@ class SpatialEncoder:
             v[i + 5] = float(e.get("type_id", 0)) / MAX_ENEMY_TYPE
             v[i + 6] = float(np.clip(float(e.get("hp", 0)) / 255.0, 0.0, 1.0))
             v[i + 7] = 1.0
-            i += 8
-        return 1 + ITEM_SLOTS * 8 + 1 + ENEMY_SLOTS * 8
+            v[i + 8] = clip_vel(float(e.get("world_vx", 0)))
+            v[i + 9] = clip_vel(float(e.get("world_vz", 0)))
+            i += 10
+        return 1 + ITEM_SLOTS * 8 + 1 + ENEMY_SLOTS * 10
 
     # --- exits ---
 

@@ -11,10 +11,11 @@ set BASE_PORT=5555
 set LEARNER_PORT=8765
 set SYNC_INTERVAL_S=360
 
-REM Typewriter PB champion — machine-local only (no RE1_PB_SHARED_ROOT sync).
-REM Reset mix: sample_typewriter_start — RE1_PB_FRESH_WEIGHT ignored (legacy).
+REM PB champions: typewriter saves + west-wing danger-room first-entry (108/202/204).
+REM Reset mix: sample_training_start — RE1_PB_FRESH_WEIGHT ignored (legacy).
 set RE1_PB_CAPTURE=1
 set RE1_PB_V1_TYPEWRITER_ONLY=1
+set RE1_PB_DANGER_ROOMS=1
 
 if not exist data\logs mkdir data\logs
 REM Drop wedged PB sync locks before learner/workers come up.

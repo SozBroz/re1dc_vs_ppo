@@ -149,6 +149,30 @@ def _list_filled_champions_fallback(project_root: Path | str) -> list[dict[str, 
     return out
 
 
+def _list_filled_typewriter_champions(project_root: Path | str) -> list[dict[str, Any]]:
+    from re1_rl import pb_champion as champ
+
+    fn = getattr(champ, "list_filled_typewriter_champions", None)
+    if callable(fn):
+        return list(fn(project_root))
+    return _list_filled_champions_fallback(project_root)
+
+
+def _list_filled_danger_room_champions(project_root: Path | str) -> list[dict[str, Any]]:
+    from re1_rl import pb_champion as champ
+
+    fn = getattr(champ, "list_filled_danger_room_champions", None)
+    if callable(fn):
+        return list(fn(project_root))
+    return []
+
+
+def _list_all_filled_champions(project_root: Path | str) -> list[dict[str, Any]]:
+    return _list_filled_typewriter_champions(project_root) + _list_filled_danger_room_champions(
+        project_root
+    )
+
+
 def _list_filled_champions(project_root: Path | str) -> list[dict[str, Any]]:
     from re1_rl import pb_champion as champ
 
@@ -184,24 +208,50 @@ def sample_typewriter_start(
     project_root: Path | str,
     rng: random.Random | None = None,
 ) -> dict[str, str] | None:
-    """Weighted mix of fresh vs filled typewriter champion sidecars.
+    """Weighted mix of fresh vs filled typewriter champion sidecars only.
 
-    ``None`` means a fresh episode start. Filled slots come from
-    ``list_filled_champions``. ``RE1_PB_FRESH_WEIGHT`` is ignored here.
+    ``None`` means a fresh episode start. ``RE1_PB_FRESH_WEIGHT`` is ignored here.
+    Prefer ``sample_training_start`` for the full typewriter + danger-room mix.
     """
     from re1_rl.pb_sync import ensure_pb_sync_daemon
 
     root = Path(project_root)
     ensure_pb_sync_daemon(root)
 
-    filled = _list_filled_champions(root)
+    filled = _list_filled_typewriter_champions(root)
     n = len(filled)
     if n == 0:
         return None
 
     rng = rng or random.Random()
     p_fresh, p_each = typewriter_mix_weights(n)
-    # Outcomes: index 0 = fresh; 1..N = filled[i-1]
+    weights = [p_fresh] + [p_each] * n
+    pick = int(rng.choices(range(n + 1), weights=weights, k=1)[0])
+    if pick == 0:
+        return None
+    return _bundle_dict_from_record(filled[pick - 1])
+
+
+def sample_training_start(
+    project_root: Path | str,
+    rng: random.Random | None = None,
+) -> dict[str, str] | None:
+    """Weighted mix of fresh vs all filled champion sidecars (typewriter + danger rooms).
+
+    ``None`` means a fresh episode start. Sidecars share the non-fresh mass equally.
+    """
+    from re1_rl.pb_sync import ensure_pb_sync_daemon
+
+    root = Path(project_root)
+    ensure_pb_sync_daemon(root)
+
+    filled = _list_all_filled_champions(root)
+    n = len(filled)
+    if n == 0:
+        return None
+
+    rng = rng or random.Random()
+    p_fresh, p_each = typewriter_mix_weights(n)
     weights = [p_fresh] + [p_each] * n
     pick = int(rng.choices(range(n + 1), weights=weights, k=1)[0])
     if pick == 0:
@@ -215,9 +265,9 @@ def sample_champion_or_fresh(
     fresh_weight: float | None = None,
     rng: random.Random | None = None,
 ) -> dict[str, str] | None:
-    """Alias for ``sample_typewriter_start`` (multi-room mix).
+    """Alias for ``sample_training_start`` (typewriter + danger-room mix).
 
     ``fresh_weight`` / ``RE1_PB_FRESH_WEIGHT`` are deprecated and ignored.
     """
-    del fresh_weight  # deprecated; typewriter mix uses fixed N-dependent floors
-    return sample_typewriter_start(project_root, rng=rng)
+    del fresh_weight  # deprecated; mix uses fixed N-dependent floors
+    return sample_training_start(project_root, rng=rng)
