@@ -309,7 +309,7 @@ class GoExploreArchive:
         max_cells_per_room: int | None = None,
         migrate_v1: bool = True,
     ) -> None:
-        self.path = Path(path)
+        self.path = Path(path).resolve()
         self.tile_span = int(tile_span)
         self.max_cells_per_room = (
             int(max_cells_per_room)

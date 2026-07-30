@@ -88,6 +88,8 @@ def test_maybe_capture_writes_bundle_and_proposal(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.setenv("RE1_GO_CANONICAL_STORE", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "500")
     archive_path = tmp_path / "data" / "go_explore" / "archive.json"
     archive = GoExploreArchive(archive_path)
     progress = ProgressTracker()
@@ -106,7 +108,7 @@ def test_maybe_capture_writes_bundle_and_proposal(
         ever_held={"shield_key", "lockpick"},
         project_root=tmp_path,
         env_step=100,
-        capture_state={"last_capture_step": -10**9, "replaces_today": 0, "replace_day": ""},
+        capture_state={"last_capture_step": -10**9},
     )
     assert proposal is not None
     assert proposal["cell_key"].startswith("v2|r=20E|")
@@ -165,6 +167,8 @@ def test_quality_replace_admits_better(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.setenv("RE1_GO_CANONICAL_STORE", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "500")
     archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
     progress = ProgressTracker()
     weak = _good_state(hp=40)
@@ -182,7 +186,7 @@ def test_quality_replace_admits_better(
         ever_held=set(),
         project_root=tmp_path,
         env_step=100,
-        capture_state={"last_capture_step": -10**9, "replaces_today": 0, "replace_day": ""},
+        capture_state={"last_capture_step": -10**9},
     )
     assert first is not None
     second = maybe_capture_cell(
@@ -193,7 +197,7 @@ def test_quality_replace_admits_better(
         ever_held=set(),
         project_root=tmp_path,
         env_step=200,
-        capture_state={"last_capture_step": 100, "replaces_today": 1, "replace_day": ""},
+        capture_state={"last_capture_step": 100},
     )
     assert second is not None
     assert second["quality"][0] == 95
@@ -210,7 +214,7 @@ def test_quality_replace_admits_better(
         ever_held=set(),
         project_root=tmp_path,
         env_step=300,
-        capture_state={"last_capture_step": 200, "replaces_today": 2, "replace_day": ""},
+        capture_state={"last_capture_step": 200},
     )
     assert third is None
 
@@ -219,6 +223,8 @@ def test_capture_cooldown_blocks_rapid_new_cell(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.setenv("RE1_GO_CANONICAL_STORE", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "500")
     monkeypatch.setenv("RE1_GO_CAPTURE_COOLDOWN_STEPS", "60")
     archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
     progress = ProgressTracker()
@@ -229,7 +235,7 @@ def test_capture_cooldown_blocks_rapid_new_cell(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"STATE")
 
-    cap_state = {"last_capture_step": -10**9, "replaces_today": 0, "replace_day": ""}
+    cap_state = {"last_capture_step": -10**9}
     first = maybe_capture_cell(
         state_a,
         progress,
@@ -279,6 +285,8 @@ def test_maybe_capture_skips_on_disk_full_mkdir(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.setenv("RE1_GO_CANONICAL_STORE", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "500")
     archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
     progress = ProgressTracker()
     progress.seed_spawn_room("105")
@@ -289,7 +297,7 @@ def test_maybe_capture_skips_on_disk_full_mkdir(
     real_mkdir = Path.mkdir
 
     def _boom(self: Path, *args: object, **kwargs: object) -> None:
-        if self.name.startswith(".staging_"):
+        if ".capture_staging_" in self.as_posix():
             raise OSError(112, "There is not enough space on the disk")
         real_mkdir(self, *args, **kwargs)
 
@@ -302,7 +310,7 @@ def test_maybe_capture_skips_on_disk_full_mkdir(
         ever_held=set(),
         project_root=tmp_path,
         env_step=100,
-        capture_state={"last_capture_step": -10**9, "replaces_today": 0, "replace_day": ""},
+        capture_state={"last_capture_step": -10**9},
     )
     assert out is None
 
@@ -320,3 +328,113 @@ def test_off_path_room_skipped(
         project_root=tmp_path,
     )
     assert out is None
+
+
+def test_ephemeral_capture_no_cells_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.delenv("RE1_GO_CANONICAL_STORE", raising=False)
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "50")
+    archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+
+    def _save(path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"FAKE_STATE")
+
+    proposal = maybe_capture_cell(
+        _good_state(),
+        progress,
+        archive,
+        save_state=_save,
+        ever_held=set(),
+        project_root=tmp_path,
+        env_step=50,
+        capture_state={"last_capture_step": -10**9},
+    )
+    assert proposal is not None
+    assert proposal.get("bundle_b64")
+    assert not (tmp_path / "data" / "go_explore" / "cells").exists()
+    assert proposal["cell_key"] not in archive.cells
+
+
+def test_capture_budget_persists_and_caps(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "2")
+    archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+
+    def _save(path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"STATE")
+
+    cap_state = {"last_capture_step": -10**9}
+    for step in (10, 100):
+        state = _good_state(x=100 + step * 50, z=200 + step * 50)
+        out = maybe_capture_cell(
+            state,
+            progress,
+            archive,
+            save_state=_save,
+            ever_held=set(),
+            project_root=tmp_path,
+            env_step=step,
+            capture_state=cap_state,
+        )
+        assert out is not None
+    blocked = maybe_capture_cell(
+        _good_state(x=9000, z=9000),
+        progress,
+        archive,
+        save_state=_save,
+        ever_held=set(),
+        project_root=tmp_path,
+        env_step=200,
+        capture_state=cap_state,
+    )
+    assert blocked is None
+
+
+def test_manifest_dedupe_skips_weaker_capture(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "50")
+    archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    digest = compute_digest(_good_state(), progress, ever_held=set())
+    key = cell_key_v2("20E", 1000, 2000, digest)
+    manifest_index = {
+        key: {
+            "cell_key": key,
+            "record_id": "canonical001",
+            "room_id": "20E",
+            "quality": [90, 45, 1, 4, 1],
+        }
+    }
+    saves = 0
+
+    def _save(path: Path) -> None:
+        nonlocal saves
+        saves += 1
+        path.write_bytes(b"x")
+
+    out = maybe_capture_cell(
+        _good_state(hp=50),
+        progress,
+        archive,
+        save_state=_save,
+        ever_held=set(),
+        project_root=tmp_path,
+        env_step=100,
+        capture_state={"last_capture_step": -10**9},
+        manifest_index=manifest_index,
+    )
+    assert out is None
+    assert saves == 0

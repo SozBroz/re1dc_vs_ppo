@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import shutil
+import time
+import uuid
 from datetime import date
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -41,13 +44,21 @@ _ARCHIVE_ENV_VAR = "RE1_GO_EXPLORE_ARCHIVE"
 _COOLDOWN_STEPS_ENV = "RE1_GO_CAPTURE_COOLDOWN_STEPS"
 _MIN_FREE_GB_ENV = "RE1_GO_MIN_FREE_GB"
 _REPLACE_BUDGET_DAY_ENV = "RE1_GO_REPLACE_BUDGET_DAY"
+_MAX_CAPTURES_DAY_ENV = "RE1_GO_MAX_CAPTURES_DAY"
+_MAX_CAPTURE_BYTES_DAY_ENV = "RE1_GO_MAX_CAPTURE_BYTES_DAY"
+_CANONICAL_STORE_ENV = "RE1_GO_CANONICAL_STORE"
 _MIN_HP_DELTA_ENV = "RE1_GO_REPLACE_MIN_HP_DELTA"
 _MIN_AMMO_DELTA_ENV = "RE1_GO_REPLACE_MIN_AMMO_DELTA"
 _DEFAULT_COOLDOWN_STEPS = 60
 _DEFAULT_MIN_FREE_GB = 10.0
 _DEFAULT_REPLACE_BUDGET_DAY = 200
+_DEFAULT_MAX_CAPTURES_DAY = 200
 _DEFAULT_MIN_HP_DELTA = 5
 _DEFAULT_MIN_AMMO_DELTA = 10
+_BUDGET_SCHEMA_VERSION = 1
+_BUDGET_LOCK_NAME = "capture_budget.lock"
+_BUDGET_FILE_NAME = "capture_budget.json"
+_BUDGET_STALE_LOCK_S = 180.0
 _PURGE_DONE: set[str] = set()
 
 CELL_STATE_NAME = "cell.State"
@@ -166,6 +177,218 @@ def replace_budget_per_day() -> int:
     return max(0, _env_int(_REPLACE_BUDGET_DAY_ENV, _DEFAULT_REPLACE_BUDGET_DAY))
 
 
+def max_captures_per_day() -> int:
+    raw = os.environ.get(_MAX_CAPTURES_DAY_ENV, "").strip()
+    if raw:
+        return max(0, _env_int(_MAX_CAPTURES_DAY_ENV, _DEFAULT_MAX_CAPTURES_DAY))
+    return max(0, _env_int(_REPLACE_BUDGET_DAY_ENV, _DEFAULT_REPLACE_BUDGET_DAY))
+
+
+def max_capture_bytes_per_day() -> int:
+    raw = os.environ.get(_MAX_CAPTURE_BYTES_DAY_ENV, "").strip()
+    if not raw:
+        return 0
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 0
+
+
+def canonical_store_enabled() -> bool:
+    """When true, workers install under ``cells/`` locally (learner/tests only)."""
+    return os.environ.get(_CANONICAL_STORE_ENV, "").strip() in {
+        "1",
+        "true",
+        "TRUE",
+        "yes",
+        "YES",
+    }
+
+
+def capture_budget_path(project_root: Path | str | None = None) -> Path:
+    return go_explore_root(project_root) / _BUDGET_FILE_NAME
+
+
+def _capture_budget_lock_path(project_root: Path | str | None = None) -> Path:
+    return go_explore_root(project_root) / _BUDGET_LOCK_NAME
+
+
+def _clear_stale_budget_lock(project_root: Path | str | None) -> bool:
+    lp = _capture_budget_lock_path(project_root)
+    if not lp.is_file():
+        return False
+    try:
+        age = time.time() - lp.stat().st_mtime
+    except OSError:
+        return False
+    if age < _BUDGET_STALE_LOCK_S:
+        return False
+    try:
+        lp.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _acquire_capture_budget_lock(
+    project_root: Path | str | None,
+    *,
+    holder: str = "capture_budget",
+) -> bool:
+    root = go_explore_root(project_root)
+    root.mkdir(parents=True, exist_ok=True)
+    _clear_stale_budget_lock(project_root)
+    lp = _capture_budget_lock_path(project_root)
+    if lp.is_file():
+        return False
+    payload = json.dumps(
+        {"holder": holder, "created_unix": time.time(), "pid": os.getpid()},
+        indent=2,
+        sort_keys=True,
+    ) + "\n"
+    try:
+        fd = os.open(str(lp), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(payload)
+        except Exception:
+            os.close(fd)
+            raise
+        return True
+    except FileExistsError:
+        return False
+    except OSError:
+        return False
+
+
+def _release_capture_budget_lock(project_root: Path | str | None) -> None:
+    try:
+        _capture_budget_lock_path(project_root).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _load_capture_budget(project_root: Path | str | None) -> dict[str, Any]:
+    path = capture_budget_path(project_root)
+    if not path.is_file():
+        return {
+            "schema_version": _BUDGET_SCHEMA_VERSION,
+            "day": date.today().isoformat(),
+            "captures": 0,
+            "bytes": 0,
+        }
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {
+            "schema_version": _BUDGET_SCHEMA_VERSION,
+            "day": date.today().isoformat(),
+            "captures": 0,
+            "bytes": 0,
+        }
+    if not isinstance(raw, dict):
+        return {
+            "schema_version": _BUDGET_SCHEMA_VERSION,
+            "day": date.today().isoformat(),
+            "captures": 0,
+            "bytes": 0,
+        }
+    return raw
+
+
+def _save_capture_budget(project_root: Path | str | None, row: dict[str, Any]) -> None:
+    path = capture_budget_path(project_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.parent / f".{path.name}.{os.getpid()}.tmp"
+    payload = dict(row)
+    payload["schema_version"] = _BUDGET_SCHEMA_VERSION
+    payload["updated_at_iso"] = utc_now_iso()
+    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(str(tmp), str(path))
+
+
+def _rollover_budget_row(row: dict[str, Any]) -> dict[str, Any]:
+    today = date.today().isoformat()
+    if str(row.get("day") or "") != today:
+        return {
+            "schema_version": _BUDGET_SCHEMA_VERSION,
+            "day": today,
+            "captures": 0,
+            "bytes": 0,
+        }
+    return {
+        "schema_version": _BUDGET_SCHEMA_VERSION,
+        "day": today,
+        "captures": int(row.get("captures", 0) or 0),
+        "bytes": int(row.get("bytes", 0) or 0),
+    }
+
+
+def try_consume_capture_budget(
+    project_root: Path | str | None,
+    *,
+    nbytes: int = 0,
+) -> bool:
+    """Reserve one capture (new or replace) under machine-wide daily caps."""
+    max_count = max_captures_per_day()
+    max_bytes = max_capture_bytes_per_day()
+    if max_count <= 0 and max_bytes <= 0:
+        return False
+    add_bytes = max(0, int(nbytes))
+    if not _acquire_capture_budget_lock(project_root):
+        return False
+    try:
+        row = _rollover_budget_row(_load_capture_budget(project_root))
+        captures = int(row["captures"])
+        used_bytes = int(row["bytes"])
+        if max_count > 0 and captures >= max_count:
+            return False
+        if max_bytes > 0 and used_bytes + add_bytes > max_bytes:
+            return False
+        row["captures"] = captures + 1
+        row["bytes"] = used_bytes + add_bytes
+        _save_capture_budget(project_root, row)
+        return True
+    finally:
+        _release_capture_budget_lock(project_root)
+
+
+def refund_capture_budget(
+    project_root: Path | str | None,
+    *,
+    nbytes: int = 0,
+) -> None:
+    """Best-effort undo after a reserved capture failed before durable install."""
+    if not _acquire_capture_budget_lock(project_root):
+        return
+    try:
+        row = _rollover_budget_row(_load_capture_budget(project_root))
+        row["captures"] = max(0, int(row.get("captures", 0) or 0) - 1)
+        row["bytes"] = max(0, int(row.get("bytes", 0) or 0) - max(0, int(nbytes)))
+        _save_capture_budget(project_root, row)
+    finally:
+        _release_capture_budget_lock(project_root)
+
+
+def adjust_capture_budget_bytes(
+    project_root: Path | str | None,
+    *,
+    delta_bytes: int,
+) -> None:
+    """Patch byte tally when actual bundle size differs from the reservation."""
+    if delta_bytes == 0:
+        return
+    if not _acquire_capture_budget_lock(project_root):
+        return
+    try:
+        row = _rollover_budget_row(_load_capture_budget(project_root))
+        row["bytes"] = max(0, int(row.get("bytes", 0) or 0) + int(delta_bytes))
+        _save_capture_budget(project_root, row)
+    finally:
+        _release_capture_budget_lock(project_root)
+
+
 def _min_hp_delta() -> int:
     return max(1, _env_int(_MIN_HP_DELTA_ENV, _DEFAULT_MIN_HP_DELTA))
 
@@ -207,21 +430,98 @@ def quality_replace_significant(
 
 
 def _touch_replace_budget(capture_state: dict[str, Any] | None) -> bool:
-    """Increment daily replace counter; return False when budget exhausted."""
-    budget = replace_budget_per_day()
-    if budget <= 0:
-        return False
-    if capture_state is None:
-        return True
-    today = date.today().isoformat()
-    if capture_state.get("replace_day") != today:
-        capture_state["replace_day"] = today
-        capture_state["replaces_today"] = 0
-    used = int(capture_state.get("replaces_today", 0) or 0)
-    if used >= budget:
-        return False
-    capture_state["replaces_today"] = used + 1
+    """Legacy per-env replace counter — superseded by ``try_consume_capture_budget``."""
+    _ = capture_state
     return True
+
+
+def _manifest_entry(
+    manifest_index: dict[str, dict[str, Any]] | None,
+    archive: GoExploreArchive,
+    key: str,
+) -> tuple[Any | None, str | None]:
+    if manifest_index is not None:
+        row = manifest_index.get(key)
+        if not isinstance(row, dict):
+            return None, None
+        q_raw = row.get("quality")
+        if isinstance(q_raw, (list, tuple)) and len(q_raw) >= 5:
+            quality = tuple(int(x) for x in q_raw[:5])
+        else:
+            quality = None
+        rid = str(row.get("record_id") or "") or None
+        return quality, rid
+    existing = archive.cells.get(key)
+    if existing is None:
+        return None, None
+    return existing.quality, existing.record_id
+
+
+def _room_cell_count(
+    room: str,
+    *,
+    manifest_index: dict[str, dict[str, Any]] | None,
+    archive: GoExploreArchive,
+) -> int:
+    room_u = room.upper()
+    if manifest_index is not None:
+        count = 0
+        for row in manifest_index.values():
+            if not isinstance(row, dict):
+                continue
+            rid = str(row.get("room_id") or "").strip().upper()
+            if rid == room_u:
+                count += 1
+        return count
+    return archive._room_cell_count(room)
+
+
+def _build_ephemeral_proposal(
+    *,
+    key: str,
+    record_id: str,
+    room: str,
+    quality: Quality,
+    digest: str,
+    span: int,
+    x: int,
+    z: int,
+    captured_at: str,
+    state_tmp: Path,
+    side_tmp: Path,
+    reason: str,
+) -> dict[str, Any] | None:
+    from re1_rl.go_explore_merge import make_cell_bundle_zip
+
+    state_bytes = state_tmp.read_bytes()
+    sidecar = json.loads(side_tmp.read_text(encoding="utf-8"))
+    meta = {
+        "record_id": record_id,
+        "cell_key": key,
+        "room_id": room,
+        "quality": list(quality),
+        "milestone_digest": digest,
+        "captured_at_iso": captured_at,
+        "tile_span": span,
+        "x": x,
+        "z": z,
+        "integrity": reason,
+    }
+    blob = make_cell_bundle_zip(state_bytes=state_bytes, sidecar=sidecar, meta=meta)
+    state_sha = sha256_file(state_tmp)
+    side_sha = sha256_file(side_tmp)
+    return {
+        "cell_key": key,
+        "record_id": record_id,
+        "quality": list(quality),
+        "room_id": room,
+        "milestone_digest": digest,
+        "bundle_b64": base64.b64encode(blob).decode("ascii"),
+        "state_sha256": state_sha,
+        "sidecar_sha256": side_sha,
+        "captured_at_iso": captured_at,
+        "bundle_path": f"cells/{record_id}",
+    }
 
 
 def purge_orphan_cell_dirs(
@@ -458,11 +758,13 @@ def maybe_capture_cell(
     path_rooms: frozenset[str] | set[str] | None = None,
     env_step: int = 0,
     capture_state: dict[str, Any] | None = None,
+    manifest_index: dict[str, dict[str, Any]] | None = None,
+    persist_locally: bool | None = None,
 ) -> dict[str, Any] | None:
     """Capture a Go-Explore cell when integrity + quality gates pass.
 
-    All admission checks run before ``save_state``. Returns an HTTP merge
-    proposal dict, or ``None`` when skipped.
+    Workers default to ephemeral capture (zip in proposal, no local ``cells/``).
+    Set ``RE1_GO_CANONICAL_STORE=1`` to install bundles locally (learner/tests).
     """
     if not go_explore_capture_enabled():
         return None
@@ -485,82 +787,115 @@ def maybe_capture_cell(
     key = cell_key_v2(room, x, z, digest, tile_span=span)
     quality = compute_quality(env_state)
 
-    existing = archive.cells.get(key)
-    if existing is not None:
-        existing.visit_count += 1
-        if not quality_beats(quality, existing.quality):
+    existing_quality, existing_record_id = _manifest_entry(manifest_index, archive, key)
+    is_replace = existing_quality is not None
+    if is_replace:
+        if not quality_beats(quality, existing_quality):
             return None
-        if not quality_replace_significant(quality, existing.quality):
+        if not quality_replace_significant(quality, existing_quality):
             return None
-        if not _touch_replace_budget(capture_state):
-            return None
-    elif archive._room_cell_count(room) >= archive.max_cells_per_room:
+    elif _room_cell_count(room, manifest_index=manifest_index, archive=archive) >= archive.max_cells_per_room:
         return None
 
     last_step = int((capture_state or {}).get("last_capture_step", -10**9))
     if int(env_step) - last_step < capture_cooldown_steps():
         return None
 
-    root_cells = cells_root(project_root, archive=archive)
-    ensure_cells_root_purged(
-        root_cells,
-        known_record_ids={c.record_id for c in archive.cells.values() if c.record_id},
-    )
-    root_cells.mkdir(parents=True, exist_ok=True)
+    persist = canonical_store_enabled() if persist_locally is None else bool(persist_locally)
 
-    if not acquire_slot_lock(root_cells, holder=f"go_disk:{os.getpid()}"):
+    root_cells = cells_root(project_root, archive=archive)
+    if persist:
+        ensure_cells_root_purged(
+            root_cells,
+            known_record_ids={c.record_id for c in archive.cells.values() if c.record_id},
+        )
+        root_cells.mkdir(parents=True, exist_ok=True)
+
+    if not try_consume_capture_budget(project_root, nbytes=0):
         return None
+
+    reserved_bytes = 0
+    staging: Path | None = None
+    record_id = str(existing_record_id) if existing_record_id else new_record_id()
+    cell_dir = root_cells / record_id
     try:
-        if _disk_free_bytes(root_cells) < min_free_bytes():
+        if persist and not acquire_slot_lock(root_cells, holder=f"go_disk:{os.getpid()}"):
+            refund_capture_budget(project_root, nbytes=0)
+            return None
+        if persist and _disk_free_bytes(root_cells) < min_free_bytes():
+            refund_capture_budget(project_root, nbytes=0)
             return None
 
-        record_id = str(existing.record_id) if existing is not None and existing.record_id else new_record_id()
-        cell_dir = root_cells / record_id
         captured_at = utc_now_iso()
-
-        # Temp staging outside the cell slot until install succeeds.
-        staging = root_cells / f".staging_{record_id}_{os.getpid()}"
+        staging = go_explore_root(project_root) / f".capture_staging_{os.getpid()}_{uuid.uuid4().hex[:8]}"
         if staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
+        staging.mkdir(parents=True, exist_ok=True)
         state_tmp = staging / CELL_STATE_NAME
         side_tmp = staging / CELL_SIDECAR_NAME
 
-        try:
-            staging.mkdir(parents=True, exist_ok=True)
-            save_state(state_tmp)
-            if not state_tmp.is_file():
-                return None
-            sidecar = _dump_sidecar(
-                env=env, progress=progress, state=env_state, captured_at=captured_at
-            )
-            side_tmp.write_text(
-                json.dumps(sidecar, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
-            meta = {
-                "record_id": record_id,
-                "cell_key": key,
-                "room_id": room,
-                "quality": list(quality),
-                "milestone_digest": digest,
-                "captured_at_iso": captured_at,
-                "tile_span": span,
-                "x": x,
-                "z": z,
-            }
-            shas = install_cell_bundle(
-                cell_dir,
-                state_src=state_tmp,
-                sidecar_src=side_tmp,
-                meta=meta,
-            )
-        except (OSError, RuntimeError, ValueError):
-            if cell_dir.is_dir() and not (cell_dir / CELL_STATE_NAME).is_file():
-                shutil.rmtree(cell_dir, ignore_errors=True)
+        save_state(state_tmp)
+        if not state_tmp.is_file():
+            refund_capture_budget(project_root, nbytes=0)
             return None
-        finally:
-            shutil.rmtree(staging, ignore_errors=True)
+        sidecar = _dump_sidecar(
+            env=env, progress=progress, state=env_state, captured_at=captured_at
+        )
+        side_tmp.write_text(
+            json.dumps(sidecar, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+
+        bundle_bytes = state_tmp.stat().st_size + side_tmp.stat().st_size
+        adjust_capture_budget_bytes(project_root, delta_bytes=bundle_bytes - reserved_bytes)
+        reserved_bytes = bundle_bytes
+
+        if not persist:
+            proposal = _build_ephemeral_proposal(
+                key=key,
+                record_id=record_id,
+                room=room,
+                quality=quality,
+                digest=digest,
+                span=span,
+                x=x,
+                z=z,
+                captured_at=captured_at,
+                state_tmp=state_tmp,
+                side_tmp=side_tmp,
+                reason=reason,
+            )
+            if capture_state is not None:
+                capture_state["last_capture_step"] = int(env_step)
+            return proposal
+
+        cell_dir = root_cells / record_id
+        meta = {
+            "record_id": record_id,
+            "cell_key": key,
+            "room_id": room,
+            "quality": list(quality),
+            "milestone_digest": digest,
+            "captured_at_iso": captured_at,
+            "tile_span": span,
+            "x": x,
+            "z": z,
+        }
+        shas = install_cell_bundle(
+            cell_dir,
+            state_src=state_tmp,
+            sidecar_src=side_tmp,
+            meta=meta,
+        )
+    except (OSError, RuntimeError, ValueError):
+        refund_capture_budget(project_root, nbytes=reserved_bytes)
+        if persist and cell_dir.is_dir() and not (cell_dir / CELL_STATE_NAME).is_file():
+            shutil.rmtree(cell_dir, ignore_errors=True)
+        return None
     finally:
-        release_slot_lock(root_cells)
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
+        if persist:
+            release_slot_lock(root_cells)
 
     if capture_state is not None:
         capture_state["last_capture_step"] = int(env_step)
@@ -571,7 +906,7 @@ def maybe_capture_cell(
     except ValueError:
         rel_bundle = (cell_dir / CELL_STATE_NAME).as_posix()
 
-    old_record_id = existing.record_id if existing is not None else None
+    old_record_id = existing_record_id
     cell = archive.upsert(
         room_id=room,
         x=x,
@@ -583,6 +918,7 @@ def maybe_capture_cell(
         meta={"captured_at_iso": captured_at, "integrity": reason},
     )
     if cell is None:
+        refund_capture_budget(project_root, nbytes=reserved_bytes)
         return None
 
     if old_record_id and old_record_id != record_id:

@@ -29,10 +29,9 @@ CELL_META_NAME = "meta.json"
 
 
 def default_archive_path() -> Path:
-    raw = os.environ.get("RE1_GO_EXPLORE_ARCHIVE", "").strip()
-    if raw:
-        return Path(raw)
-    return Path("data") / "go_explore" / "archive.json"
+    from re1_rl.go_explore_capture import resolve_archive_path
+
+    return resolve_archive_path()
 
 
 def go_explore_root(archive_path: Path | str) -> Path:

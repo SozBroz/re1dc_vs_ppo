@@ -65,6 +65,26 @@ def save_local_manifest(local_root: Path | str, manifest: dict[str, Any]) -> Non
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def maybe_poll_manifest(
+    client: _ManifestClient,
+    local_root: Path | str,
+    *,
+    last_poll_mono: float,
+    poll_s: float | None = None,
+) -> float:
+    """Poll learner manifest when interval elapsed. Returns updated monotonic timestamp."""
+    import time
+
+    interval = manifest_poll_s() if poll_s is None else float(poll_s)
+    now = time.monotonic()
+    if now - float(last_poll_mono) < interval:
+        return float(last_poll_mono)
+    local = load_local_manifest(local_root)
+    since = int(local.get("archive_version", 0) or 0)
+    poll_manifest(client, since_version=since, local_root=local_root)
+    return now
+
+
 def poll_manifest(client: _ManifestClient, since_version: int, local_root: Path | str) -> dict[str, Any]:
     """Fetch learner manifest and merge into ``local_manifest.json``.
 
@@ -97,6 +117,18 @@ def poll_manifest(client: _ManifestClient, since_version: int, local_root: Path 
         local["archive_version"] = remote_ver
     save_local_manifest(root, local)
     return local
+
+
+def manifest_index_by_cell_key(local_root: Path | str) -> dict[str, dict[str, Any]]:
+    """``cell_key`` → manifest row for capture dedupe before disk write."""
+    out: dict[str, dict[str, Any]] = {}
+    for row in load_local_manifest(local_root).get("cells") or []:
+        if not isinstance(row, dict):
+            continue
+        key = str(row.get("cell_key") or "").strip()
+        if key:
+            out[key] = row
+    return out
 
 
 def _local_meta_sha(cell_dir: Path) -> str | None:

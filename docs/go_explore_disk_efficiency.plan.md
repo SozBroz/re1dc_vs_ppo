@@ -1,6 +1,6 @@
 # Go-Explore disk efficiency — deferred plan
 
-**Status:** Capture disabled fleet-wide (2026-07-30). Training continues with PB sidecars only; archive cells are not written and not used for resets (`RE1_GO_EXPLORE_RESET_WEIGHT=0`).
+**Status:** P1 shipped; capture still **off** fleet-default. Canary enable ready on pking only (`go_explore_capture_on.env.cmd`).
 
 **Problem:** Shadow capture was writing ~330 GB/day fleet-wide (~13.8 GB/h) into `data/go_explore/cells` — ~100× the `<< 1 GB/day per machine` comment in `fleet/local/go_explore_phase_c.env.cmd`. Canonical archive should cap at ~680 cells (~1 GB); worker-local bundles accumulated without cleanup.
 
@@ -12,36 +12,17 @@
 
 - [x] Set `RE1_GO_EXPLORE_CAPTURE=0` in `fleet/local/go_explore_phase_c.env.cmd` (all launchers source this).
 - [x] Restart fleet with capture off.
-- [ ] Optional: purge existing `data/go_explore/cells` on each machine when convenient (`scripts/fleet_purge_go_explore_cells.ps1`) — reclaims GB already on disk; not required for training.
+- [x] Purge `data/go_explore/cells` fleet-wide (`scripts/fleet_purge_go_explore_cells.ps1`).
 
 ---
 
 ## P1 — before re-enabling capture
 
-### 1. Machine-wide persistent capture budget
-
-- Track **total bundles written per machine per calendar day** in a file under `data/go_explore/` (survives episode reset).
-- Env: e.g. `RE1_GO_MAX_CAPTURES_DAY=200` or `RE1_GO_MAX_CAPTURE_BYTES_DAY=250MB`.
-- `maybe_capture_cell()` returns `None` when budget exhausted — applies to **new and replace** writes.
-
-### 2. Fix per-episode budget reset bug
-
-- `_go_capture_budget` in `env.py` must **not** reset `replaces_today` / `replace_day` on every `reset()` if we keep per-env cooldown state; or move all budgeting to machine-wide file (preferred).
-
-### 3. Learner-canonical storage; workers ephemeral
-
-- Workers emit proposals in rollouts only; **do not retain** installed cell dirs after upload/epoch ack.
-- Learner (`go_explore_merge.py`) is sole writer to durable `data/go_explore/cells/`.
-- On ingest reject/duplicate: delete worker staging, do not leave orphans.
-
-### 4. Dedupe before disk write
-
-- Poll learner manifest (`GET /go_explore/manifest` or local cache) before `save_state`.
-- Skip capture if cell key exists and quality does not beat canonical.
-
-### 5. Raise free-space floor (when capture returns)
-
-- `RE1_GO_MIN_FREE_GB=100` (or 200 on pking) — belt-and-suspenders until retention is proven.
+- [x] Machine-wide persistent capture budget (`capture_budget.json`, `RE1_GO_MAX_CAPTURES_DAY`, optional bytes cap).
+- [x] Fix per-episode budget reset — `env.py` keeps only `last_capture_step` in memory; daily caps live on disk.
+- [x] Learner-canonical storage — workers emit `bundle_b64` proposals; no local `cells/` install unless `RE1_GO_CANONICAL_STORE=1`.
+- [x] Dedupe before disk write — `manifest_index_by_cell_key` + worker heartbeat manifest poll.
+- [x] Raise free-space floor — `RE1_GO_MIN_FREE_GB=100` in `go_explore_phase_c.env.cmd`.
 
 **Target after P1:** ≤0.5 GB/day fleet net growth; canonical archive ~1–5 GB.
 
@@ -70,10 +51,22 @@ Not caused by `data/go_explore` on D:. Monitor `pagefile.sys` vs C: free space.
 
 ## Re-enable checklist
 
-1. P1 items 1–4 implemented and tested on pking only.
-2. 24h soak: `data/go_explore/cells` growth ≤ budget on all machines.
-3. Set `RE1_GO_EXPLORE_CAPTURE=1`; keep `RE1_GO_EXPLORE_RESET_WEIGHT=0` until archive resets validated.
-4. Only then consider `RESET_WEIGHT > 0` for training integration.
+1. [x] P1 items implemented and tested (`tests/test_go_explore_capture.py`).
+2. [x] Fleet cells purged; stale worker `cells/` removed.
+3. [ ] **Canary (pking only):** restart pking with `fleet/local/start_worker_detached_pking_capture_canary.cmd` (sources `go_explore_capture_on.env.cmd` after phase_c defaults). WH1/WH2 keep `RE1_GO_EXPLORE_CAPTURE=0`.
+4. [ ] **24h soak:** pking `cells/` stays ~0 (ephemeral); WH2 learner `cells/` growth ≤ `RE1_GO_MAX_CAPTURE_BYTES_DAY` (250 MB/day) × accepted ingest rate.
+5. [ ] Fleet-wide: add `call go_explore_capture_on.env.cmd` to WH1/WH2 worker launchers (or set in phase_c).
+6. Keep `RE1_GO_EXPLORE_RESET_WEIGHT=0` until archive resets validated.
+7. Only then consider `RESET_WEIGHT > 0` for training integration.
+
+### Canary commands (pking)
+
+```cmd
+REM after git pull on all boxes:
+fleet\local\start_worker_detached_pking_capture_canary.cmd
+```
+
+Monitor: `data/go_explore/capture_budget.json`, WH2 `data/go_explore/cells/`, learner log `go_explore_accepted`.
 
 ---
 
@@ -81,7 +74,9 @@ Not caused by `data/go_explore` on D:. Monitor `pagefile.sys` vs C: free space.
 
 | File | Role |
 |------|------|
-| `fleet/local/go_explore_phase_c.env.cmd` | Capture on/off switch |
+| `fleet/local/go_explore_phase_c.env.cmd` | Capture off + budget knobs (fleet default) |
+| `fleet/local/go_explore_capture_on.env.cmd` | Flip capture on (canary overlay) |
+| `fleet/local/start_worker_detached_pking_capture_canary.cmd` | pking-only capture canary restart |
 | `re1_rl/go_explore_capture.py` | Capture gates, disk lock, bundle write |
 | `re1_rl/env.py` | `_go_capture_budget`, `_maybe_capture_go_explore` |
 | `re1_rl/go_explore_merge.py` | Learner ingest |

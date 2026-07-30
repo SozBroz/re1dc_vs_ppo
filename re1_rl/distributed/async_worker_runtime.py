@@ -408,14 +408,22 @@ def run_async_worker_loop(
     buffered: list[WorkerRollout] = []
     epoch_t0 = time.monotonic()
     last_heartbeat = 0.0
+    last_manifest_poll = 0.0
     hb_stop = threading.Event()
 
     def _heartbeat_loop() -> None:
+        nonlocal last_manifest_poll
         if is_local or not isinstance(rollout_sink, WorkerClient):
             return
         while not hb_stop.is_set() and not stop_event.is_set():
             try:
                 rollout_sink.heartbeat(worker_id, n_envs)
+                from re1_rl.go_explore_capture import go_explore_root
+                from re1_rl.go_explore_worker_cache import maybe_poll_manifest
+
+                last_manifest_poll = maybe_poll_manifest(
+                    rollout_sink, go_explore_root(root), last_poll_mono=last_manifest_poll
+                )
             except Exception as exc:
                 log(machine_name, f"heartbeat error: {exc}")
             hb_stop.wait(heartbeat_s)

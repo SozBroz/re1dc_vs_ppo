@@ -401,7 +401,7 @@ class RE1Env(gym.Env):
         self._pending_episode_failure: str | None = None
         # PB capture: one archive per trigger_id per episode (RE1_PB_CAPTURE=1).
         self._pb_captured_triggers: set[str] = set()
-        self._go_capture_budget = {"last_capture_step": -10**9, "replaces_today": 0, "replace_day": ""}
+        self._go_capture_budget = {"last_capture_step": -10**9}
         from re1_rl.typewriter_save import TypewriterSaveDetector
 
         self._typewriter_save_detector = TypewriterSaveDetector()
@@ -823,13 +823,20 @@ class RE1Env(gym.Env):
         return arc
 
     def _maybe_capture_go_explore(self, state: dict[str, Any]) -> dict[str, Any] | None:
-        from re1_rl.go_explore_capture import go_explore_capture_enabled, maybe_capture_cell
+        from re1_rl.go_explore_capture import (
+            go_explore_capture_enabled,
+            go_explore_root,
+            maybe_capture_cell,
+        )
+        from re1_rl.go_explore_worker_cache import manifest_index_by_cell_key
 
         if not go_explore_capture_enabled():
             return None
 
         def _save(dst: Path) -> None:
             self.bridge.save_savestate(str(dst))
+
+        manifest_index = manifest_index_by_cell_key(go_explore_root(self.project_root))
 
         return maybe_capture_cell(
             state,
@@ -841,6 +848,7 @@ class RE1Env(gym.Env):
             project_root=self.project_root,
             env_step=self._step_count,
             capture_state=self._go_capture_budget,
+            manifest_index=manifest_index,
         )
 
     def _capture_step_obs(self) -> np.ndarray:
@@ -869,7 +877,7 @@ class RE1Env(gym.Env):
         self._pb_captured_triggers = set()
         self._go_explore_capture_pending = []
         self._go_explore_archive_cache = None
-        self._go_capture_budget = {"last_capture_step": -10**9, "replaces_today": 0, "replace_day": ""}
+        self._go_capture_budget = {"last_capture_step": -10**9}
 
         from re1_rl.pb_bundle_io import (
             bundle_room_matches_sidecar,
