@@ -117,7 +117,7 @@ def test_distributed_ppo_hyperparams_match_async_fleet() -> None:
         n_epochs=4,
         learning_rate=3e-4,
         gamma=RL_GAMMA,
-        ent_coef=0.02,
+        ent_coef=0.009,
     )
     assert PPO_HYPERPARAMS["gamma"] == 0.998188
 
