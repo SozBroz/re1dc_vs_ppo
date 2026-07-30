@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import io
 import json
 import os
 import shutil
 import time
 import uuid
+import zipfile
 from datetime import date
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -505,7 +508,11 @@ def _build_ephemeral_proposal(
     side_tmp: Path,
     reason: str,
 ) -> dict[str, Any] | None:
-    from re1_rl.go_explore_merge import make_cell_bundle_zip
+    from re1_rl.go_explore_merge import (
+        CELL_SIDECAR_NAME,
+        CELL_STATE_NAME,
+        make_cell_bundle_zip,
+    )
 
     state_bytes = state_tmp.read_bytes()
     sidecar = json.loads(side_tmp.read_text(encoding="utf-8"))
@@ -522,8 +529,11 @@ def _build_ephemeral_proposal(
         "integrity": reason,
     }
     blob = make_cell_bundle_zip(state_bytes=state_bytes, sidecar=sidecar, meta=meta)
-    state_sha = sha256_file(state_tmp)
-    side_sha = sha256_file(side_tmp)
+    # Hash zip members, not temp files: on Windows write_text() CRLF sidecars do not
+    # match LF bytes inside the zip (learner validates zip contents).
+    with zipfile.ZipFile(io.BytesIO(blob)) as zf:
+        state_sha = hashlib.sha256(zf.read(CELL_STATE_NAME)).hexdigest()
+        side_sha = hashlib.sha256(zf.read(CELL_SIDECAR_NAME)).hexdigest()
     return {
         "cell_key": key,
         "record_id": record_id,

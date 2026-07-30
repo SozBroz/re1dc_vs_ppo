@@ -360,6 +360,39 @@ def test_ephemeral_capture_no_cells_dir(
     assert proposal["cell_key"] not in archive.cells
 
 
+def test_ephemeral_proposal_passes_learner_ingest(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Ephemeral bundle shas must match zip bytes (Windows CRLF temp sidecar)."""
+    from re1_rl.go_explore_merge import GoExploreMerge
+
+    monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.delenv("RE1_GO_CANONICAL_STORE", raising=False)
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "50")
+    archive_path = tmp_path / "data" / "go_explore" / "archive.json"
+    archive = GoExploreArchive(archive_path)
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+
+    def _save(path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"FAKE_STATE")
+
+    proposal = maybe_capture_cell(
+        _good_state(),
+        progress,
+        archive,
+        save_state=_save,
+        ever_held=set(),
+        project_root=tmp_path,
+        env_step=50,
+        capture_state={"last_capture_step": -10**9},
+    )
+    assert proposal is not None
+    merge = GoExploreMerge(archive_path)
+    assert merge.ingest_proposals([proposal]) == [proposal["record_id"]]
+
+
 def test_capture_budget_persists_and_caps(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
