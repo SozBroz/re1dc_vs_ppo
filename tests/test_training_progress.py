@@ -47,6 +47,28 @@ def test_slim_progress_info_keeps_pickups() -> None:
     assert "state" not in slim
 
 
+def test_slim_progress_info_keeps_go_explore_capture() -> None:
+    proposal = {"cell_key": "v2|r=105|x=0|z=0|m=d", "bundle_b64": "AAAA"}
+    slim = slim_progress_info(
+        {
+            "room_id": "105",
+            "state": {"hp": 96},
+            "go_explore_capture": [proposal],
+        }
+    )
+    assert "state" not in slim
+    assert slim["go_explore_capture"] == [proposal]
+
+
+def test_slim_progress_info_transport_to_merge() -> None:
+    from re1_rl.go_explore_merge import extract_proposals_from_infos
+
+    proposal = {"cell_key": "v2|r=105|x=0|z=0|m=d", "record_id": "abc"}
+    slim = slim_progress_info({"go_explore_capture": [proposal]})
+    extracted = extract_proposals_from_infos([slim])
+    assert extracted == [proposal]
+
+
 def test_tracker_first_room_and_rollout_summary(capsys) -> None:
     tracker = TrainingProgressTracker(machine_name="t")
     tracker.consume_infos(

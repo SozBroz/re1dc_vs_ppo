@@ -56,6 +56,12 @@ def slim_progress_info(info: dict[str, Any]) -> dict[str, Any]:
     ever_held = info.get("ever_held")
     if ever_held is not None:
         out["ever_held"] = list(ever_held)
+    caps = info.get("go_explore_capture")
+    if caps:
+        if isinstance(caps, dict):
+            out["go_explore_capture"] = [dict(caps)]
+        elif isinstance(caps, list):
+            out["go_explore_capture"] = [dict(c) for c in caps if isinstance(c, dict)]
     return out
 
 

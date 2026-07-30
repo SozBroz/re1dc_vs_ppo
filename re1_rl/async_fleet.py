@@ -322,6 +322,13 @@ def _actor_process(
     from re1_rl.training_progress import slim_progress_info
 
     try:
+        import cv2
+
+        cv2.setNumThreads(1)
+    except ImportError:
+        pass
+
+    try:
         env = make_env(
             rank,
             curriculum,

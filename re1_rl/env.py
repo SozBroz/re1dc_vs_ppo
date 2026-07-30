@@ -748,54 +748,52 @@ class RE1Env(gym.Env):
                 **tw_log_ctx,
             )
 
-        if not pb_capture_enabled():
-            return
-
-        states_dir = pb_root_dir(self.project_root)
-        triggers = detect_milestone_triggers(
-            prev_state,
-            state,
-            breakdown,
-            already_captured=self._pb_captured_triggers,
-            typewriter_save_complete=typewriter_save_complete,
-            typewriter_save_room=save_room,
-            visited_rooms=self._progress.visited_rooms,
-            rewarded_cutscenes=self._progress.rewarded_cutscenes,
-            kenneth_gate_breached=bool(self._progress.kenneth_gate_breached),
-        )
-        if typewriter_save_complete and not triggers:
-            if self._progress.kenneth_gate_breached:
-                reason = "kenneth_gate"
-            elif save_room and str(state.get("room_id", "") or "") != str(save_room):
-                reason = "room_mismatch"
-            elif any(
-                str(t).startswith("typewriter_save:")
-                for t in self._pb_captured_triggers
-            ):
-                reason = "already_captured_episode"
-            else:
-                reason = "milestone_gate"
-            log_typewriter_save(
-                "capture_skipped",
-                reason=reason,
-                **tw_log_ctx,
+        if pb_capture_enabled():
+            states_dir = pb_root_dir(self.project_root)
+            triggers = detect_milestone_triggers(
+                prev_state,
+                state,
+                breakdown,
+                already_captured=self._pb_captured_triggers,
+                typewriter_save_complete=typewriter_save_complete,
+                typewriter_save_room=save_room,
+                visited_rooms=self._progress.visited_rooms,
+                rewarded_cutscenes=self._progress.rewarded_cutscenes,
+                kenneth_gate_breached=bool(self._progress.kenneth_gate_breached),
             )
-        for trigger_id in triggers:
-            try:
-                maybe_capture_pb(
-                    self,
-                    trigger_id=trigger_id,
-                    states_dir=states_dir,
-                    captured=self._pb_captured_triggers,
+            if typewriter_save_complete and not triggers:
+                if self._progress.kenneth_gate_breached:
+                    reason = "kenneth_gate"
+                elif save_room and str(state.get("room_id", "") or "") != str(save_room):
+                    reason = "room_mismatch"
+                elif any(
+                    str(t).startswith("typewriter_save:")
+                    for t in self._pb_captured_triggers
+                ):
+                    reason = "already_captured_episode"
+                else:
+                    reason = "milestone_gate"
+                log_typewriter_save(
+                    "capture_skipped",
+                    reason=reason,
+                    **tw_log_ctx,
                 )
-            except (OSError, RuntimeError, ValueError) as exc:
-                if str(trigger_id).startswith("typewriter_save:"):
-                    log_typewriter_save(
-                        "capture_error",
-                        trigger=trigger_id,
-                        error=str(exc),
-                        **tw_log_ctx,
+            for trigger_id in triggers:
+                try:
+                    maybe_capture_pb(
+                        self,
+                        trigger_id=trigger_id,
+                        states_dir=states_dir,
+                        captured=self._pb_captured_triggers,
                     )
+                except (OSError, RuntimeError, ValueError) as exc:
+                    if str(trigger_id).startswith("typewriter_save:"):
+                        log_typewriter_save(
+                            "capture_error",
+                            trigger=trigger_id,
+                            error=str(exc),
+                            **tw_log_ctx,
+                        )
 
         proposal = self._maybe_capture_go_explore(state)
         if proposal is not None:

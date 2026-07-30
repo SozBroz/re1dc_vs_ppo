@@ -55,9 +55,11 @@ _DEFAULT_REPLACE_BUDGET_DAY = 200
 _DEFAULT_MAX_CAPTURES_DAY = 200
 _DEFAULT_MIN_HP_DELTA = 5
 _DEFAULT_MIN_AMMO_DELTA = 10
-_BUDGET_SCHEMA_VERSION = 1
+_MAX_BUNDLE_BYTES_ENV = "RE1_GO_MAX_CAPTURE_BUNDLE_BYTES"
+_DEFAULT_MAX_BUNDLE_BYTES = 5_000_000
 _BUDGET_LOCK_NAME = "capture_budget.lock"
 _BUDGET_FILE_NAME = "capture_budget.json"
+_BUDGET_SCHEMA_VERSION = 1
 _BUDGET_STALE_LOCK_S = 180.0
 _PURGE_DONE: set[str] = set()
 
@@ -268,7 +270,7 @@ def _release_capture_budget_lock(project_root: Path | str | None) -> None:
         pass
 
 
-def _load_capture_budget(project_root: Path | str | None) -> dict[str, Any]:
+def _load_capture_budget(project_root: Path | str | None) -> dict[str, Any] | None:
     path = capture_budget_path(project_root)
     if not path.is_file():
         return {
@@ -280,19 +282,9 @@ def _load_capture_budget(project_root: Path | str | None) -> dict[str, Any]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return {
-            "schema_version": _BUDGET_SCHEMA_VERSION,
-            "day": date.today().isoformat(),
-            "captures": 0,
-            "bytes": 0,
-        }
+        return None
     if not isinstance(raw, dict):
-        return {
-            "schema_version": _BUDGET_SCHEMA_VERSION,
-            "day": date.today().isoformat(),
-            "captures": 0,
-            "bytes": 0,
-        }
+        return None
     return raw
 
 
@@ -325,6 +317,16 @@ def _rollover_budget_row(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def max_capture_bundle_bytes() -> int:
+    raw = os.environ.get(_MAX_BUNDLE_BYTES_ENV, "").strip()
+    if not raw:
+        return int(_DEFAULT_MAX_BUNDLE_BYTES)
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return int(_DEFAULT_MAX_BUNDLE_BYTES)
+
+
 def try_consume_capture_budget(
     project_root: Path | str | None,
     *,
@@ -339,7 +341,10 @@ def try_consume_capture_budget(
     if not _acquire_capture_budget_lock(project_root):
         return False
     try:
-        row = _rollover_budget_row(_load_capture_budget(project_root))
+        loaded = _load_capture_budget(project_root)
+        if loaded is None:
+            return False
+        row = _rollover_budget_row(loaded)
         captures = int(row["captures"])
         used_bytes = int(row["bytes"])
         if max_count > 0 and captures >= max_count:
@@ -363,7 +368,10 @@ def refund_capture_budget(
     if not _acquire_capture_budget_lock(project_root):
         return
     try:
-        row = _rollover_budget_row(_load_capture_budget(project_root))
+        loaded = _load_capture_budget(project_root)
+        if loaded is None:
+            return
+        row = _rollover_budget_row(loaded)
         row["captures"] = max(0, int(row.get("captures", 0) or 0) - 1)
         row["bytes"] = max(0, int(row.get("bytes", 0) or 0) - max(0, int(nbytes)))
         _save_capture_budget(project_root, row)
@@ -382,7 +390,10 @@ def adjust_capture_budget_bytes(
     if not _acquire_capture_budget_lock(project_root):
         return
     try:
-        row = _rollover_budget_row(_load_capture_budget(project_root))
+        loaded = _load_capture_budget(project_root)
+        if loaded is None:
+            return
+        row = _rollover_budget_row(loaded)
         row["bytes"] = max(0, int(row.get("bytes", 0) or 0) + int(delta_bytes))
         _save_capture_budget(project_root, row)
     finally:
@@ -398,8 +409,11 @@ def _min_ammo_delta() -> int:
 
 
 def _disk_free_bytes(path: Path) -> int:
+    probe = Path(path)
+    while not probe.exists() and probe.parent != probe:
+        probe = probe.parent
     try:
-        usage = shutil.disk_usage(str(path))
+        usage = shutil.disk_usage(str(probe))
         return int(usage.free)
     except OSError:
         return 0
@@ -804,6 +818,9 @@ def maybe_capture_cell(
     persist = canonical_store_enabled() if persist_locally is None else bool(persist_locally)
 
     root_cells = cells_root(project_root, archive=archive)
+    go_root = go_explore_root(project_root)
+    if _disk_free_bytes(go_root) < min_free_bytes():
+        return None
     if persist:
         ensure_cells_root_purged(
             root_cells,
@@ -811,23 +828,15 @@ def maybe_capture_cell(
         )
         root_cells.mkdir(parents=True, exist_ok=True)
 
-    if not try_consume_capture_budget(project_root, nbytes=0):
-        return None
-
-    reserved_bytes = 0
     staging: Path | None = None
     record_id = str(existing_record_id) if existing_record_id else new_record_id()
     cell_dir = root_cells / record_id
     try:
         if persist and not acquire_slot_lock(root_cells, holder=f"go_disk:{os.getpid()}"):
-            refund_capture_budget(project_root, nbytes=0)
-            return None
-        if persist and _disk_free_bytes(root_cells) < min_free_bytes():
-            refund_capture_budget(project_root, nbytes=0)
             return None
 
         captured_at = utc_now_iso()
-        staging = go_explore_root(project_root) / f".capture_staging_{os.getpid()}_{uuid.uuid4().hex[:8]}"
+        staging = go_root / f".capture_staging_{os.getpid()}_{uuid.uuid4().hex[:8]}"
         if staging.exists():
             shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True, exist_ok=True)
@@ -836,7 +845,6 @@ def maybe_capture_cell(
 
         save_state(state_tmp)
         if not state_tmp.is_file():
-            refund_capture_budget(project_root, nbytes=0)
             return None
         sidecar = _dump_sidecar(
             env=env, progress=progress, state=env_state, captured_at=captured_at
@@ -844,10 +852,6 @@ def maybe_capture_cell(
         side_tmp.write_text(
             json.dumps(sidecar, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-
-        bundle_bytes = state_tmp.stat().st_size + side_tmp.stat().st_size
-        adjust_capture_budget_bytes(project_root, delta_bytes=bundle_bytes - reserved_bytes)
-        reserved_bytes = bundle_bytes
 
         if not persist:
             proposal = _build_ephemeral_proposal(
@@ -864,6 +868,13 @@ def maybe_capture_cell(
                 side_tmp=side_tmp,
                 reason=reason,
             )
+            if proposal is None:
+                return None
+            bundle_bytes = len(base64.b64decode(str(proposal.get("bundle_b64") or "")))
+            if bundle_bytes > max_capture_bundle_bytes():
+                return None
+            if not try_consume_capture_budget(project_root, nbytes=bundle_bytes):
+                return None
             if capture_state is not None:
                 capture_state["last_capture_step"] = int(env_step)
             return proposal
@@ -886,8 +897,18 @@ def maybe_capture_cell(
             sidecar_src=side_tmp,
             meta=meta,
         )
+        bundle_bytes = sum(
+            p.stat().st_size
+            for p in cell_dir.iterdir()
+            if p.is_file()
+        )
+        if bundle_bytes > max_capture_bundle_bytes():
+            shutil.rmtree(cell_dir, ignore_errors=True)
+            return None
+        if not try_consume_capture_budget(project_root, nbytes=bundle_bytes):
+            shutil.rmtree(cell_dir, ignore_errors=True)
+            return None
     except (OSError, RuntimeError, ValueError):
-        refund_capture_budget(project_root, nbytes=reserved_bytes)
         if persist and cell_dir.is_dir() and not (cell_dir / CELL_STATE_NAME).is_file():
             shutil.rmtree(cell_dir, ignore_errors=True)
         return None
@@ -918,7 +939,8 @@ def maybe_capture_cell(
         meta={"captured_at_iso": captured_at, "integrity": reason},
     )
     if cell is None:
-        refund_capture_budget(project_root, nbytes=reserved_bytes)
+        refund_capture_budget(project_root, nbytes=bundle_bytes)
+        shutil.rmtree(cell_dir, ignore_errors=True)
         return None
 
     if old_record_id and old_record_id != record_id:
@@ -944,6 +966,29 @@ def maybe_capture_cell(
         "bundle_path": rel_bundle,
     }
     return proposal
+
+
+def reconcile_archive_missing_bundles(
+    archive: GoExploreArchive,
+    *,
+    project_root: Path | str | None = None,
+) -> int:
+    """Drop archive rows whose on-disk cell bundle is missing (post-purge repair)."""
+    cells = cells_root(project_root, archive=archive)
+    removed = 0
+    for key, cell in list(archive.cells.items()):
+        rid = str(cell.record_id or "").strip()
+        if not rid:
+            del archive.cells[key]
+            removed += 1
+            continue
+        state_path = cells / rid / CELL_STATE_NAME
+        if not state_path.is_file():
+            del archive.cells[key]
+            removed += 1
+    if removed:
+        archive.save()
+    return removed
 
 
 def _normalize_room(room_id: str | int) -> str:

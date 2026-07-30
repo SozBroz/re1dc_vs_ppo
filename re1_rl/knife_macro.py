@@ -1410,7 +1410,7 @@ def _execute_knife_macro_fixed(
         kwargs["scale"] = scale
     schedule = build_knife_frame_buttons(**kwargs)
     # When attack_pins are active, begin/finish already MMF-capture entry/end.
-    # Mid-hold Lua ring_stride PNG→b64 was pure duplicate cost.
+    # Otherwise one Python MMF read at end of hold (no Lua PNG→b64 in step JSON).
     pins = getattr(bridge, "attack_pins", None)
     pin_obs = bool(pins is not None and pins.active and _bridge_uses_frame_ring(bridge))
     _, died = bridge.step(
@@ -1418,7 +1418,7 @@ def _execute_knife_macro_fixed(
         sticky=empty_sticky,
         frame_buttons=schedule,
         echo_joypad=echo_joypad,
-        ring_stride=0 if pin_obs else FrameRingBuffer.STRIDE,
+        ring_stride=0,
         capture_final=not pin_obs,
     )
     if echo_joypad and not died:

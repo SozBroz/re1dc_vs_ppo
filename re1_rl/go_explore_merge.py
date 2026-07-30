@@ -142,6 +142,12 @@ class GoExploreMerge:
         return accepted
 
     def _ingest_one_unlocked(self, prop: dict[str, Any]) -> str | None:
+        from re1_rl.go_explore_capture import (
+            _disk_free_bytes,
+            max_capture_bundle_bytes,
+            min_free_bytes,
+        )
+
         cell_key = str(prop.get("cell_key") or "").strip()
         if not cell_key.startswith("v2|"):
             return None
@@ -161,6 +167,10 @@ class GoExploreMerge:
 
         bundle_bytes = self._decode_bundle(prop)
         if bundle_bytes is not None:
+            if len(bundle_bytes) > max_capture_bundle_bytes():
+                return None
+            if _disk_free_bytes(go_explore_root(self.archive_path)) < min_free_bytes():
+                return None
             ok, reason = self._validate_bundle_bytes(bundle_bytes, prop)
             if not ok:
                 return None

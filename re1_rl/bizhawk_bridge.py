@@ -57,6 +57,8 @@ class BizHawkClient:
         self.screenshot_mmf = bool(screenshot_mmf)
         self.mmf_name = f"re1_screenshot_{port}"
         self._screenshot_mmf_disabled = False
+        self._screenshot_mmf_retries = 3
+        self._screenshot_mmf_retry_sleep_s = 0.05
         self._server: socket.socket | None = None
         self._client: socket.socket | None = None
         self._lock = threading.Lock()
@@ -287,6 +289,28 @@ class BizHawkClient:
             except (ValueError, TypeError, OSError):
                 continue
 
+    def _read_mmf_png(self, name: str, size: int) -> np.ndarray:
+        mm = mmap.mmap(-1, int(size), tagname=str(name), access=mmap.ACCESS_READ)
+        try:
+            raw = mm.read(int(size))
+        finally:
+            mm.close()
+        return self._decode_png_bytes(raw)
+
+    def _ingest_step_final_mmf(self, resp: dict[str, Any]) -> bool:
+        """Load end-of-step frame from MMF tag returned inline by Lua step."""
+        size = resp.get("final_mmf_size")
+        if size is None:
+            return False
+        name = str(resp.get("final_mmf_name") or self.mmf_name)
+        fc = int(resp.get("final_mmf_frame", resp.get("frame", -1)))
+        try:
+            rgb = self._read_mmf_png(name, int(size))
+        except (OSError, RuntimeError, ValueError):
+            return False
+        self.frame_ring.store_rgb(fc, self._maybe_apply_camera_whiten(rgb))
+        return True
+
     def capture_final_ring_frame(self) -> None:
         if self.emulated_frame < 0:
             return
@@ -362,11 +386,14 @@ class BizHawkClient:
         if death_hp_addr is not None:
             req["death_hp_addr"] = int(death_hp_addr)
             req["abort_on_zero_hp"] = bool(abort_on_zero_hp)
-        if ring_stride > 0:
+        if capture_final and self.screenshot_mmf and not self._screenshot_mmf_disabled:
+            req["capture_final_mmf"] = True
+            req["mmf_name"] = self.mmf_name
+            req["port"] = self.port
+        elif ring_stride > 0:
             req["ring_stride"] = int(ring_stride)
             req["mmf_name"] = self.mmf_name
             req["port"] = self.port
-        # Final frame: Python MMF screenshot only (avoids Lua mmf_png_b64 + duplicate).
         resp = self._request(req)
         echo_raw = resp.get("joypad_echo")
         self.last_step_echo = (
@@ -376,7 +403,12 @@ class BizHawkClient:
         self.emulated_frame = int(resp.get("frame", -1))
         self.frame_ring.note_frame(self.emulated_frame)
         if capture_final:
-            self.capture_final_ring_frame()
+            if not (
+                self.screenshot_mmf
+                and not self._screenshot_mmf_disabled
+                and self._ingest_step_final_mmf(resp)
+            ):
+                self.capture_final_ring_frame()
         return (
             self.emulated_frame,
             bool(resp.get("death_during_step", False)),
@@ -484,12 +516,7 @@ class BizHawkClient:
             raise RuntimeError(resp.get("error", "screenshot_mmf failed"))
         name = str(resp.get("mmf_name") or self.mmf_name)
         size = int(resp["size"])
-        mm = mmap.mmap(-1, size, tagname=name, access=mmap.ACCESS_READ)
-        try:
-            raw = mm.read(size)
-        finally:
-            mm.close()
-        return self._decode_png_bytes(raw)
+        return self._read_mmf_png(name, size)
 
     def _screenshot_from_file(self, path: str | None = None) -> np.ndarray:
         """Ask BizHawk to write a PNG, then read it back as RGB uint8 (H,W,3)."""
@@ -597,14 +624,24 @@ class BizHawkClient:
                     "screenshot_mmf disabled after prior failure; refusing disk PNG "
                     f"(port={self.port}). Restart env or fix MMF."
                 )
-            try:
-                return self._maybe_apply_camera_whiten(self._screenshot_from_mmf())
-            except (OSError, RuntimeError, ValueError) as exc:
-                self._screenshot_mmf_disabled = True
-                if allow_file_fallback:
-                    return self._maybe_apply_camera_whiten(self._screenshot_from_file(path))
-                raise RuntimeError(
-                    f"screenshot_mmf failed on port={self.port}; disk PNG fallback "
-                    "disabled for training throughput"
-                ) from exc
+            last_exc: BaseException | None = None
+            for attempt in range(self._screenshot_mmf_retries):
+                try:
+                    return self._maybe_apply_camera_whiten(self._screenshot_from_mmf())
+                except (OSError, RuntimeError, ValueError) as exc:
+                    last_exc = exc
+                    if attempt + 1 < self._screenshot_mmf_retries:
+                        time.sleep(self._screenshot_mmf_retry_sleep_s)
+                        continue
+                    self._screenshot_mmf_disabled = True
+                    if allow_file_fallback:
+                        return self._maybe_apply_camera_whiten(
+                            self._screenshot_from_file(path)
+                        )
+                    raise RuntimeError(
+                        f"screenshot_mmf failed on port={self.port} after "
+                        f"{self._screenshot_mmf_retries} attempt(s); disk PNG fallback "
+                        "disabled for training throughput"
+                    ) from last_exc
+            raise RuntimeError("unreachable")
         return self._maybe_apply_camera_whiten(self._screenshot_from_file(path))

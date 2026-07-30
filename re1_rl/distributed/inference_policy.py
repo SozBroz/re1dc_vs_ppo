@@ -89,8 +89,12 @@ class InferencePolicy:
             if mask.ndim == 1:
                 mask = mask.unsqueeze(0)
             with torch.no_grad():
-                dist = self._model.policy.get_distribution(obs_tensor)
-                logits = dist.distribution.logits.clone()
+                policy = self._model.policy
+                features = policy.extract_features(obs_tensor)
+                latent_pi = policy.mlp_extractor.forward_actor(features)
+                latent_vf = policy.mlp_extractor.forward_critic(features)
+                distribution = policy._get_action_dist_from_latent(latent_pi)
+                logits = distribution.distribution.logits.clone()
                 # Match sb3_contrib MaskableCategorical (-1e8), not dtype min,
                 # so collect logprobs align with MaskablePPO.evaluate_actions.
                 logits[~mask] = torch.tensor(
@@ -99,7 +103,7 @@ class InferencePolicy:
                 cat = torch.distributions.Categorical(logits=logits)
                 actions = cat.sample()
                 log_probs = cat.log_prob(actions)
-                values = self._model.policy.predict_values(obs_tensor)
+                values = policy.value_net(latent_vf)
             return (
                 actions.cpu().numpy(),
                 values.flatten().cpu().numpy(),

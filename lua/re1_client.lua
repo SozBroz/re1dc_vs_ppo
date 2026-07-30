@@ -507,11 +507,8 @@ local function handle_command(cmd)
         -- verify BizHawk actually delivered the schedule (input-delivery QA).
         local echo = cmd.echo_joypad == true
         local joypad_echo = {}
-        local ring_stride = tonumber(cmd.ring_stride) or 0
-        local capture_final = cmd.capture_final == true
+        local capture_final_mmf = cmd.capture_final_mmf == true
         local mmf_name = cmd.mmf_name or ("re1_screenshot_" .. tostring(cmd.port or 0))
-        local ring_frames = {}
-        local ring_png_b64 = {}
         if hp_off then
             local hp = memory.read_u16_le(hp_off, "MainRAM")
             if hp > 0 then
@@ -539,13 +536,6 @@ local function handle_command(cmd)
             end
             apply_patches()
             emu.frameadvance()
-            if ring_stride > 0 and (i % ring_stride == 0) then
-                local fc, b64 = mmf_png_b64(mmf_name)
-                if fc and b64 then
-                    ring_frames[#ring_frames + 1] = fc
-                    ring_png_b64[#ring_png_b64 + 1] = b64
-                end
-            end
             if echo then
                 local j = joypad.get()
                 local held = {}
@@ -577,16 +567,15 @@ local function handle_command(cmd)
             frame = emu.framecount(),
             death_during_step = death_during_step,
         }
-        if capture_final then
-            local fc, b64 = mmf_png_b64(mmf_name)
-            if fc and b64 then
-                ring_frames[#ring_frames + 1] = fc
-                ring_png_b64[#ring_png_b64 + 1] = b64
+        if capture_final_mmf then
+            local got, size, err = mmf_capture(mmf_name)
+            if got and size and size > 0 then
+                resp.final_mmf_name = got
+                resp.final_mmf_size = size
+                resp.final_mmf_frame = emu.framecount()
+            elseif err then
+                resp.final_mmf_error = err
             end
-        end
-        if #ring_frames > 0 then
-            resp.ring_frames = setmetatable(ring_frames, { __jsontype = "array" })
-            resp.ring_png_b64 = setmetatable(ring_png_b64, { __jsontype = "array" })
         end
         if echo then
             -- dkjson needs a hint to keep this an array when frames aborted early

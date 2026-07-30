@@ -400,6 +400,87 @@ def test_capture_budget_persists_and_caps(
     assert blocked is None
 
 
+def test_capture_budget_byte_cap_enforced(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.setenv("RE1_GO_CANONICAL_STORE", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "10")
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURE_BYTES_DAY", "50")
+    archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+
+    def _save(path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"X" * 40)
+
+    cap_state = {"last_capture_step": -10**9}
+    out = maybe_capture_cell(
+        _good_state(x=100, z=200),
+        progress,
+        archive,
+        save_state=_save,
+        ever_held=set(),
+        project_root=tmp_path,
+        env_step=10,
+        capture_state=cap_state,
+    )
+    assert out is None
+    budget_path = tmp_path / "data" / "go_explore" / "capture_budget.json"
+    if budget_path.is_file():
+        row = json.loads(budget_path.read_text())
+        assert int(row.get("captures", 0)) == 0
+
+
+def test_capture_budget_corrupt_file_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "10")
+    budget = tmp_path / "data" / "go_explore" / "capture_budget.json"
+    budget.parent.mkdir(parents=True, exist_ok=True)
+    budget.write_text("{not json", encoding="utf-8")
+    archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+
+    def _save(path: Path) -> None:
+        path.write_bytes(b"STATE")
+
+    out = maybe_capture_cell(
+        _good_state(),
+        progress,
+        archive,
+        save_state=_save,
+        ever_held=set(),
+        project_root=tmp_path,
+        env_step=100,
+        capture_state={"last_capture_step": -10**9},
+    )
+    assert out is None
+
+
+def test_reconcile_archive_missing_bundles(tmp_path: Path) -> None:
+    from re1_rl.go_explore_capture import reconcile_archive_missing_bundles
+
+    archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
+    archive.path.parent.mkdir(parents=True, exist_ok=True)
+    digest = compute_digest(_good_state(), ProgressTracker(), ever_held=set())
+    archive.upsert(
+        room_id="105",
+        x=100,
+        z=200,
+        digest=digest,
+        quality=(80, 10, 0, 2, 1),
+        bundle_path="cells/dead001/cell.State",
+        record_id="dead001",
+    )
+    removed = reconcile_archive_missing_bundles(archive, project_root=tmp_path)
+    assert removed == 1
+    assert not archive.cells
+
+
 def test_manifest_dedupe_skips_weaker_capture(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

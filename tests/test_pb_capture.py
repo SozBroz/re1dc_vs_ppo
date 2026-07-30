@@ -64,6 +64,29 @@ class _FakeEnv:
         }
 
 
+def test_go_explore_capture_independent_of_pb_gate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Go-Explore proposals must emit when RE1_PB_CAPTURE=0."""
+    monkeypatch.setenv("RE1_PB_CAPTURE", "0")
+    monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+
+    from re1_rl.env import RE1Env
+
+    env = RE1Env.__new__(RE1Env)
+    env.project_root = tmp_path
+    env._pb_captured_triggers = set()
+    env._go_explore_capture_pending = []
+    proposal = {"cell_key": "v2|r=20E|x=0|z=0|m=x", "record_id": "stub"}
+
+    def _fake_go_explore(_state: dict) -> dict:
+        return proposal
+
+    env._maybe_capture_go_explore = _fake_go_explore  # type: ignore[method-assign]
+    env._after_reward_step({}, {"room_id": "20E"}, {})
+    assert env._go_explore_capture_pending == [proposal]
+
+
 def test_milestone_id_helpers() -> None:
     assert milestone_id_for_new_key("wooden_emblem") == "key:emblem"
     assert milestone_id_for_new_key("piano_notes") == "key:music_notes"
