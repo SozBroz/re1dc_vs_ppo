@@ -662,8 +662,9 @@ class KnifeAnimValidator:
             "phase_budget": self.phase_budget(
                 total_frames=int(frames),
                 ram_gated_frames=int(frames),
-                link_aim_frames=0,
+                link_aim_frames=int(self._budget_extras.get("link_aim", 0)),
             ),
+            "link_aim_held": bool(self._budget_extras.get("link_aim_held", False)),
             "failure_pattern": (
                 self.failure_pattern() if outcome != "ok" else None
             ),
@@ -862,6 +863,19 @@ def is_crouch_knife_aim_ready(anim: int, aux: int, recovery: int) -> bool:
         and aux == CROUCH_KNIFE_ACTIVE_AUX
         and recovery == 0
     )
+
+
+def is_crouch_knife_link_ready(anim: int, aux: int, recovery: int) -> bool:
+    """Post-swing crouch knife with recovery drained — chain another attack_down."""
+    if recovery != 0:
+        return False
+    if is_crouch_knife_aim_ready(anim, aux, recovery):
+        return True
+    if anim == KNIFE_RECOVERY_ANIM and aux == CROUCH_KNIFE_ACTIVE_AUX:
+        return True
+    if anim == CROUCH_KNIFE_POST_ANIM and aux == CROUCH_KNIFE_ACTIVE_AUX:
+        return True
+    return False
 
 
 def is_knife_animation_idle(anim: int, aux: int, recovery: int) -> bool:
@@ -1299,6 +1313,7 @@ def _execute_knife_macro_ram_gated(
     echo_joypad: bool,
     prev_hp: int,
     episode_start_hp: int,
+    link_aim: bool = False,
 ) -> tuple[bool, int]:
     """RAM-gated crouch knife: aim until hooks ready, swing, hold through recovery."""
     min_swing = max(MIN_BUTTON_PHASE_FRAMES, swing_game * scale)
@@ -1349,11 +1364,17 @@ def _execute_knife_macro_ram_gated(
     entry_recovery_tail = is_knife_swing_recovery_tail(
         entry_anim, entry_aux, entry_recovery
     )
+    entry_link_ready = link_aim and is_crouch_knife_link_ready(
+        entry_anim, entry_aux, entry_recovery
+    )
     anim_val._budget_extras = {
         "entry_standing_ready": entry_standing_ready,
         "entry_mid_swing": entry_mid_swing,
+        "entry_link_ready": entry_link_ready,
         "aim_precooked": False,
         "aim_attempts": 0,
+        "link_aim": 0,
+        "link_aim_held": False,
     }
     if entry_mid_swing:
         max_aim_wait = max(max_aim_wait, KNIFE_SETTLE_MID_SWING_MAX_WAIT_FRAMES * 2)
@@ -1371,8 +1392,13 @@ def _execute_knife_macro_ram_gated(
     settle_run = 0
     early_aim_run = 0
     settle_wait = 0
-    aim_precooked = False
-    if entry_standing_ready:
+    aim_precooked = entry_link_ready
+    if entry_link_ready:
+        anim_val.saw_crouch_aim = True
+        anim_val.saw_settled_idle = True
+        settle_run = aim_ready_streak
+        anim_val._budget_extras["aim_precooked"] = True
+    elif entry_standing_ready:
         # Knife already equipped + standing idle: neutral release only triggers
         # standing_recovery_latch; skip pad-drain settle and go straight to aim.
         anim_val.saw_settled_idle = True
@@ -1594,14 +1620,13 @@ def _execute_knife_macro_ram_gated(
         else:
             swing_idle_streak = 0
 
-    # Phase 3: release Cross and Down, but keep R1 held through recovery.
-    # Holding R1+Down after the slash locks Jill in standing_knife; R1-only
-    # preserves the aim link without that lock.
-    # Do not end recovery while still on 0x14 — wait for 0x13 / crouch_post / idle.
+    # Phase 3: release Cross; hold R1 through recovery until link-ready or idle.
     anim_val.set_phase("recovery")
     max_recovery_wait = max(recovery_game * scale * 4, 64)
     recovery_wait = 0
     recovered = False
+    saw_positive_recovery = False
+    stable = 0
     while total < max_total and recovery_wait < max_recovery_wait:
         if _macro_player_died(
             bridge, prev_hp=prev_hp, episode_start_hp=episode_start_hp
@@ -1609,13 +1634,33 @@ def _execute_knife_macro_ram_gated(
             return _death(total)
         anim, aux, recovery = read_knife_hooks(bridge)
         anim_val.observe(anim, aux, recovery)
+        saw_positive_recovery = saw_positive_recovery or (
+            saw_slash and recovery > 0
+        )
         if is_knife_animation_idle(anim, aux, recovery):
             recovered = True
             break
         if saw_slash and is_knife_swing_recovery_tail(anim, aux, recovery):
             recovered = True
             break
-        if saw_slash and anim == CROUCH_KNIFE_POST_ANIM and aux == CROUCH_KNIFE_ACTIVE_AUX:
+        if (
+            saw_slash
+            and anim == CROUCH_KNIFE_POST_ANIM
+            and aux == CROUCH_KNIFE_ACTIVE_AUX
+            and recovery == 0
+        ):
+            recovered = True
+            break
+        if saw_slash and saw_positive_recovery and recovery == 0:
+            recovered = True
+            break
+        ready_fallback = (
+            saw_slash
+            and recovery == 0
+            and not is_knife_slash_anim(anim, aux, recovery)
+        )
+        stable = stable + 1 if ready_fallback else 0
+        if stable >= MIN_BUTTON_PHASE_FRAMES:
             recovered = True
             break
         if is_knife_macro_interrupted(
@@ -1645,6 +1690,37 @@ def _execute_knife_macro_ram_gated(
         )
         return _abort(total, outcome="recovery_timeout")
 
+    link_held = False
+    anim, aux, recovery = read_knife_hooks(bridge)
+    if link_aim and is_crouch_knife_link_ready(anim, aux, recovery):
+        if _step_one_frame(
+            bridge,
+            AIM_BUTTONS,
+            empty_sticky=empty_sticky,
+            echo_joypad=echo_joypad,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        ):
+            return _death(total + 1)
+        total += 1
+        anim_val._budget_extras["link_aim"] = 1
+        link_held = True
+    else:
+        died_rel, total = _macro_aborted(
+            bridge,
+            empty_sticky=empty_sticky,
+            echo_joypad=echo_joypad,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            frames_so_far=total,
+        )
+        if died_rel:
+            bridge.last_knife_anim_report = anim_val.finish(
+                outcome="death", died=True, frames=total
+            )
+            return True, total
+
+    anim_val._budget_extras["link_aim_held"] = link_held
     died = _macro_player_died(
         bridge, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
@@ -1736,6 +1812,7 @@ def execute_knife_macro(
                 echo_joypad=echo_joypad,
                 prev_hp=prev_hp,
                 episode_start_hp=episode_start_hp,
+                link_aim=link_aim,
             )
         else:
             died, frames = _execute_knife_macro_fixed(
@@ -1746,45 +1823,7 @@ def execute_knife_macro(
                 echo_joypad=echo_joypad,
             )
         report = getattr(bridge, "last_knife_anim_report", None) or {}
-        if link_aim and not died and str(report.get("outcome", "ok")) == "ok":
-            stable = 0
-            link_start = int(frames)
-            for _ in range(240):
-                if _step_one_frame(
-                    bridge,
-                    {"r1": True},
-                    empty_sticky=empty_sticky,
-                    echo_joypad=echo_joypad,
-                    prev_hp=prev_hp,
-                    episode_start_hp=episode_start_hp,
-                ):
-                    died = True
-                    frames += 1
-                    break
-                frames += 1
-                anim, aux, recovery = read_knife_hooks(bridge)
-                ready = recovery == 0 and not is_knife_slash_anim(
-                    anim, aux, recovery
-                )
-                stable = stable + 1 if ready else 0
-                if stable >= MIN_BUTTON_PHASE_FRAMES:
-                    break
-            link_ready = not died and stable >= MIN_BUTTON_PHASE_FRAMES
-            link_frames = int(frames) - link_start
-            if isinstance(report, dict):
-                report = merge_knife_phase_budget_link_aim(
-                    report,
-                    total_frames=int(frames),
-                    link_aim_frames=link_frames,
-                    port=getattr(bridge, "port", "?"),
-                )
-                report["link_aim_held"] = link_ready
-                if died:
-                    report["outcome"] = "death"
-                elif not link_ready:
-                    report["outcome"] = "link_recovery_timeout"
-                bridge.last_knife_anim_report = report
-        elif isinstance(report, dict) and report.get("phase_budget"):
+        if isinstance(report, dict) and report.get("phase_budget"):
             _knife_budget_log(
                 format_knife_phase_budget_line(
                     outcome=str(report.get("outcome") or "ok"),

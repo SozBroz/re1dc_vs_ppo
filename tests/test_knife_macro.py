@@ -318,6 +318,59 @@ def test_merge_knife_phase_budget_link_aim() -> None:
     assert budget["overhead"] == 0
 
 
+def test_crouch_knife_link_aim_ends_in_macro_not_post_poll(capsys) -> None:
+    """link_aim holds crouch aim for chain attacks; no 240f post-macro poll."""
+    bridge = MagicMock()
+    bridge.port = 5755
+    bridge.step.return_value = (0, False)
+    hook_seq = [
+        (0, 0, 0),
+        (0, 0, 0),
+        (0x12, 0x04, 0),
+        (0x12, 0x04, 0),
+        (0x14, 0x04, 0),
+        (0x14, 0x04, 2),
+        (0x13, 0x04, 0),
+    ]
+    hook_iter = iter(hook_seq)
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0x12, 0x04, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    bridge.read_ram.side_effect = read_ram
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, frames = execute_knife_macro(
+        bridge,
+        empty_sticky=empty,
+        phases=(1, 1, 1),
+        scale=2,
+        use_ram_gates=True,
+        link_aim=True,
+        prev_hp=96,
+        episode_start_hp=96,
+    )
+    assert not died
+    report = bridge.last_knife_anim_report
+    budget = report.get("phase_budget") or {}
+    assert report.get("link_aim_held") is True
+    assert int(budget.get("link_aim", 99)) <= 1
+    assert frames <= 20
+    last_buttons = bridge.step.call_args_list[-1].kwargs["frame_buttons"][-1]
+    assert last_buttons.get("r1") and last_buttons.get("down")
+    assert not last_buttons.get("cross")
+
+
 def test_knife_macro_track_and_interrupt() -> None:
     assert is_knife_macro_track(0, 0, 0)
     assert is_knife_macro_track(0, 0, 2)

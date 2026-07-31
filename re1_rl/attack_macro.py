@@ -325,6 +325,7 @@ def _execute_knife_attack_crouch_macro(
         report["pre_state"] = anim_report["pre_state"]
     if anim_report.get("phase_budget"):
         report["phase_budget"] = anim_report["phase_budget"]
+    report["link_aim_held"] = bool(anim_report.get("link_aim_held"))
     return died, frames, report
 
 
