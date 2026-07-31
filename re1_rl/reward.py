@@ -555,7 +555,8 @@ def compute_reward(
     if enemy_kills > 0:
         bd["enemy_kill"] = ENEMY_KILL_REWARD * enemy_kills
 
-    # Miss taxes: gun ammo waste on attack_missed; knife whiff on knife_swing_missed.
+    # Miss taxes: gun ammo waste on attack_missed; knife whiff on knife_swing_missed
+    # (any knife-equipped macro height).
     if state.get("knife_swing_missed"):
         bd["attack_miss"] = KNIFE_MISS_PENALTY
     elif state.get("attack_missed"):

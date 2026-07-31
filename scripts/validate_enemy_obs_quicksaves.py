@@ -19,7 +19,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from re1_rl.action_mask import ATTACK_ACTION, KNIFE_SWING_ACTION, action_mask
+from re1_rl.action_mask import ATTACK_ACTION, ATTACK_DOWN_ACTION, action_mask
 from re1_rl.attack_log_context import room_display_name, room_roster_summary
 from re1_rl.bizhawk_bridge import BizHawkClient
 from re1_rl.enemy_combat import alive_enemy_count, combat_enemy_count, format_enemy_table
@@ -217,7 +217,7 @@ def main() -> int:
                 "proprio_enemy_count": float(proprio[p_idx["enemy_count"]]),
                 "spatial_enemy_count": spatial_enemy_count(spatial, spatial_enc),
                 "room_enemies_obs0": float(room_enemies_obs[0]),
-                "knife_legal": bool(mask[KNIFE_SWING_ACTION]),
+                "knife_legal": bool(mask[ATTACK_DOWN_ACTION]),
                 "attack_legal": bool(mask[ATTACK_ACTION]),
                 "raw_slots": raw_slots,
             }

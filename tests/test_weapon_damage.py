@@ -9,7 +9,6 @@ from re1_rl.action_mask import (
     ATTACK_ACTION,
     ATTACK_DOWN_ACTION,
     ATTACK_UP_ACTION,
-    KNIFE_SWING_ACTION,
 )
 from re1_rl.weapon_damage import (
     AMMO_QTY_NORM,
@@ -154,7 +153,7 @@ def test_pack_last_attack_miss() -> None:
 def test_pack_last_attack_knife_zeros_clip() -> None:
     v = pack_last_attack(
         knife=True,
-        attack=False,
+        attack=True,
         combat_events=[
             {"slot": 1, "hp_before": 8, "hp_after": 6, "damage": 2, "killed": False}
         ],
@@ -163,7 +162,7 @@ def test_pack_last_attack_knife_zeros_clip() -> None:
         clip_before=99,
         clip_after=99,
         ammo_spent=0,
-        action_id=KNIFE_SWING_ACTION,
+        action_id=ATTACK_DOWN_ACTION,
     )
     assert v[0] == 1.0
     assert v[1] == 1.0
@@ -177,7 +176,6 @@ def test_pack_last_attack_knife_zeros_clip() -> None:
 @pytest.mark.parametrize(
     "action_id,macro_idx",
     [
-        (KNIFE_SWING_ACTION, LAST_ATTACK_MACRO_DOWN),
         (ATTACK_ACTION, LAST_ATTACK_MACRO_NEUTRAL),
         (ATTACK_UP_ACTION, LAST_ATTACK_MACRO_UP),
         (ATTACK_DOWN_ACTION, LAST_ATTACK_MACRO_DOWN),
@@ -185,10 +183,10 @@ def test_pack_last_attack_knife_zeros_clip() -> None:
 )
 def test_pack_last_attack_macro_one_hot(action_id: int, macro_idx: int) -> None:
     assert last_attack_macro_from_action(action_id) == macro_idx
-    knife = action_id == KNIFE_SWING_ACTION
+    knife = action_id == ATTACK_DOWN_ACTION and macro_idx == LAST_ATTACK_MACRO_DOWN
     v = pack_last_attack(
         knife=knife,
-        attack=not knife,
+        attack=True,
         combat_events=[],
         enemy_damage=0,
         enemy_kills=0,

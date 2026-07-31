@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from re1_rl.action_mask import KNIFE_SWING_ACTION
+from re1_rl.action_mask import ATTACK_DOWN_ACTION
 from re1_rl.bizhawk_bridge import BizHawkClient
 from re1_rl.env import ACTION_NAMES, RE1Env
 from re1_rl.knife_macro import read_pre_knife_state
@@ -51,8 +51,8 @@ def main() -> int:
         pre = read_pre_knife_state(bridge)
         m = env.unwrapped.action_masks()
         print(f"pre_knife={pre}", flush=True)
-        print(f"knife_legal={m[KNIFE_SWING_ACTION]}", flush=True)
-        _, rew, _, _, info = env.step(KNIFE_SWING_ACTION)
+        print(f"knife_legal={m[ATTACK_DOWN_ACTION]}", flush=True)
+        _, rew, _, _, info = env.step(ATTACK_DOWN_ACTION)
         report = getattr(bridge, "last_knife_anim_report", {}) or {}
         print(
             f"outcome={report.get('outcome')} frames={info.get('state', {}).get('step_emulated_frames')} "

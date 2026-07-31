@@ -4,15 +4,14 @@ Action layout (env.ACTION_NAMES):
   0-5   movement
   6     attack_up          — R1+Up high attack (old quickturn slot; DC has no QT)
   7     interact
-  8     knife_swing
-  9     attack
-  10    use               — open USE menu; then select_slot_N (2-step)
-  11    equip             — open EQUIP menu; then select_slot_N (2-step)
-  12-19 deposit_slot_N
-  20-35 withdraw_box_N
-  36    combine            — open COMBINE menu; select_slot x2 (3-step)
-  37-44 select_slot_N      — shared slot pick (use / equip / combine)
-  45    attack_down        — R1+Down crouch / floor-aim attack macro
+  8     attack             — neutral standing aim+fire for every weapon
+  9     use                — open USE menu; then select_slot_N (2-step)
+  10    equip              — open EQUIP menu; then select_slot_N (2-step)
+  11-18 deposit_slot_N
+  19-34 withdraw_box_N
+  35    combine            — open COMBINE menu; select_slot x2 (3-step)
+  36-43 select_slot_N      — shared slot pick (use / equip / combine)
+  44    attack_down        — R1+Down crouch / floor-aim attack macro
 """
 
 from __future__ import annotations
@@ -34,18 +33,17 @@ from re1_rl.weapon_equip import (
 )
 
 ATTACK_UP_ACTION = 6  # reuses former quickturn index
-KNIFE_SWING_ACTION = 8
-ATTACK_ACTION = 9
-USE_ACTION = 10
-EQUIP_ACTION = 11
-DEPOSIT_ACTION_BASE = EQUIP_ACTION + 1  # 12
+ATTACK_ACTION = 8
+USE_ACTION = 9
+EQUIP_ACTION = 10
+DEPOSIT_ACTION_BASE = EQUIP_ACTION + 1  # 11
 N_DEPOSIT_ACTIONS = 8
-WITHDRAW_ACTION_BASE = DEPOSIT_ACTION_BASE + N_DEPOSIT_ACTIONS  # 20
+WITHDRAW_ACTION_BASE = DEPOSIT_ACTION_BASE + N_DEPOSIT_ACTIONS  # 19
 N_WITHDRAW_ACTIONS = 16
-COMBINE_ACTION = WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS  # 36
-SELECT_SLOT_BASE = COMBINE_ACTION + 1  # 37
+COMBINE_ACTION = WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS  # 35
+SELECT_SLOT_BASE = COMBINE_ACTION + 1  # 36
 N_SELECT_SLOT = 8
-ATTACK_DOWN_ACTION = SELECT_SLOT_BASE + N_SELECT_SLOT  # 45
+ATTACK_DOWN_ACTION = SELECT_SLOT_BASE + N_SELECT_SLOT  # 44
 
 KNIFE_ID = 0x01
 
@@ -63,6 +61,38 @@ _STORY_USE_RECOVERY_ACTIONS = frozenset(
 
 # Document / file examine overlay (doom books, botany book): mash directions + Cross.
 _DOCUMENT_EXAMINE_ACTIONS = frozenset({0, 1, 2, 3, 7})
+
+
+def _height_attack_legal(
+    *,
+    anim_ready: bool,
+    equipped_weapon_id: int | None,
+    equipped_slot_0based: int | None,
+    inventory: list[tuple[int, int]] | None,
+    mask_combat_without_enemies: bool,
+    knife_enemies: int | None,
+    gun_enemies: int | None,
+    alive_enemies_in_room: int | None,
+) -> bool:
+    """Shared legality for attack / attack_up / attack_down (weapon-dispatched macros)."""
+    legal = anim_ready
+    wid: int | None = None
+    if equipped_weapon_id is not None:
+        wid = int(equipped_weapon_id)
+        legal = legal and wid in EQUIPPABLE_WEAPON_IDS
+        if legal and wid != KNIFE_ID and inventory is not None:
+            legal = can_fire_from_equipped_slot(
+                inventory, wid, equipped_slot_0based
+            )
+    if legal and mask_combat_without_enemies:
+        if wid == KNIFE_ID:
+            if knife_enemies is not None:
+                legal = knife_enemies > 0
+        elif gun_enemies is not None:
+            legal = gun_enemies > 0
+        elif alive_enemies_in_room is not None:
+            legal = int(alive_enemies_in_room) > 0
+    return legal
 
 
 def _submenu_active(
@@ -145,9 +175,6 @@ def action_mask(
             int(player_anim), int(player_aux), int(player_recovery)
         )
 
-    enemies_present = True
-    if mask_combat_without_enemies and alive_enemies_in_room is not None:
-        enemies_present = int(alive_enemies_in_room) > 0
     # Prefer weapon-specific near counts when provided (generous knife band < gun).
     knife_enemies = (
         int(knife_enemies_near)
@@ -160,38 +187,20 @@ def action_mask(
         else (int(alive_enemies_in_room) if alive_enemies_in_room is not None else None)
     )
 
-    if not in_submenu and KNIFE_SWING_ACTION < n_actions:
-        legal = anim_ready
-        if mask_combat_without_enemies and knife_enemies is not None:
-            legal = legal and knife_enemies > 0
-        if equipped_weapon_id is not None:
-            legal = legal and int(equipped_weapon_id) == KNIFE_ID
-        mask[KNIFE_SWING_ACTION] = legal
-
-    if not in_submenu and ATTACK_ACTION < n_actions:
-        legal = anim_ready
-        if equipped_weapon_id is not None:
-            wid = int(equipped_weapon_id)
-            legal = legal and wid in EQUIPPABLE_WEAPON_IDS
-            if legal and wid != KNIFE_ID and inventory is not None:
-                legal = can_fire_from_equipped_slot(
-                    inventory, wid, equipped_slot_0based
-                )
-        else:
-            wid = None
-        if legal and mask_combat_without_enemies:
-            if wid == KNIFE_ID:
-                if knife_enemies is not None:
-                    legal = knife_enemies > 0
-            elif gun_enemies is not None:
-                legal = gun_enemies > 0
-            elif alive_enemies_in_room is not None:
-                legal = int(alive_enemies_in_room) > 0
-        mask[ATTACK_ACTION] = legal
-        if ATTACK_UP_ACTION < n_actions:
-            mask[ATTACK_UP_ACTION] = legal
-        if ATTACK_DOWN_ACTION < n_actions:
-            mask[ATTACK_DOWN_ACTION] = legal
+    if not in_submenu:
+        height_legal = _height_attack_legal(
+            anim_ready=anim_ready,
+            equipped_weapon_id=equipped_weapon_id,
+            equipped_slot_0based=equipped_slot_0based,
+            inventory=inventory,
+            mask_combat_without_enemies=mask_combat_without_enemies,
+            knife_enemies=knife_enemies,
+            gun_enemies=gun_enemies,
+            alive_enemies_in_room=alive_enemies_in_room,
+        )
+        for idx in (ATTACK_UP_ACTION, ATTACK_ACTION, ATTACK_DOWN_ACTION):
+            if idx < n_actions:
+                mask[idx] = height_legal
 
     if not in_submenu:
         if inventory is not None and box is not None:

@@ -28,7 +28,8 @@ PRIOR = {
     "run_forward": 0.33,
     "attack_up": 0.02,
     "interact": 0.18,
-    "knife_swing": 0.02,
+    "attack": 0.02,
+    "attack_down": 0.03,
 }
 
 

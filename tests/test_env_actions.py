@@ -15,7 +15,7 @@ def test_interact_maps_to_cross() -> None:
     assert ACTION_BUTTON_MAP[idx] == {"cross": True}
 
 
-def test_knife_swing_action_index() -> None:
-    idx = ACTION_NAMES.index("knife_swing")
+def test_attack_action_index() -> None:
+    idx = ACTION_NAMES.index("attack")
     assert idx == 8
-    assert ACTION_BUTTON_MAP[idx] == {"r1": True, "down": True, "cross": True}
+    assert ACTION_BUTTON_MAP[idx] == {}

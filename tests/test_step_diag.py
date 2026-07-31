@@ -136,7 +136,7 @@ def test_memlog_knife_fail_from_info(monkeypatch, tmp_path: Path) -> None:
 
     logger = sd.try_make_logger(5759, project_root=tmp_path)
     assert logger is not None
-    mask = np.ones(46, dtype=bool)
+    mask = np.ones(45, dtype=bool)
     logger.log_step(
         reward=0.0,
         terminated=False,
@@ -168,11 +168,11 @@ def test_memlog_knife_fail_from_info(monkeypatch, tmp_path: Path) -> None:
                 },
             },
         },
-        action=8,
-        action_name="knife_swing",
+        action=44,
+        action_name="attack_down",
     )
     step = json.loads(log_path.read_text(encoding="utf-8").strip().splitlines()[-1])
-    assert step["action"] == "knife_swing"
+    assert step["action"] == "attack_down"
     kf = step["knife_fail"]
     assert kf["outcome"] == "aim_timeout"
     assert kf["fail_label"] == "crouch_transitional"
@@ -188,7 +188,7 @@ def test_second_logger_same_process_does_not_retruncate(monkeypatch, tmp_path: P
 
     a = sd.try_make_logger(5759, project_root=tmp_path)
     assert a is not None
-    mask = np.ones(46, dtype=bool)
+    mask = np.ones(45, dtype=bool)
     a.log_step(
         reward=1.0,
         terminated=False,

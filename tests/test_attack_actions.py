@@ -14,7 +14,6 @@ from re1_rl.action_mask import (
     COMBINE_ACTION,
     DEPOSIT_ACTION_BASE,
     EQUIP_ACTION,
-    KNIFE_SWING_ACTION,
     N_SELECT_SLOT,
     N_WITHDRAW_ACTIONS,
     SELECT_SLOT_BASE,
@@ -38,14 +37,13 @@ from re1_rl.weapon_equip import (
     magic_equip_slot,
 )
 
-N_ACTIONS = ATTACK_DOWN_ACTION + 1  # 46
+N_ACTIONS = ATTACK_DOWN_ACTION + 1  # 45
 
 
 def test_action_layout_matches_env_names() -> None:
     from re1_rl.env import ACTION_NAMES
 
     assert len(ACTION_NAMES) == N_ACTIONS
-    assert ACTION_NAMES[KNIFE_SWING_ACTION] == "knife_swing"
     assert ACTION_NAMES[ATTACK_ACTION] == "attack"
     assert ACTION_NAMES[ATTACK_UP_ACTION] == "attack_up"
     assert ACTION_NAMES[ATTACK_DOWN_ACTION] == "attack_down"
@@ -133,19 +131,14 @@ def test_knife_attack_legal_without_ammo_items() -> None:
 def test_attack_masked_without_weapon() -> None:
     m = action_mask(N_ACTIONS, None, equipped_weapon_id=0)
     assert not m[ATTACK_ACTION]
-    assert not m[KNIFE_SWING_ACTION]
+    assert not m[ATTACK_DOWN_ACTION]
 
 
-def test_attack_legal_with_gun_but_knife_swing_blocked() -> None:
-    m = action_mask(N_ACTIONS, None, equipped_weapon_id=0x02)
+def test_knife_crouch_legal_with_knife_via_attack_down() -> None:
+    m = action_mask(N_ACTIONS, None, equipped_weapon_id=0x01, knife_enemies_near=1)
+    assert m[ATTACK_DOWN_ACTION]
     assert m[ATTACK_ACTION]
-    assert not m[KNIFE_SWING_ACTION]
-
-
-def test_knife_swing_legal_with_knife() -> None:
-    m = action_mask(N_ACTIONS, None, equipped_weapon_id=0x01)
-    assert m[KNIFE_SWING_ACTION]
-    assert m[ATTACK_ACTION]
+    assert m[ATTACK_UP_ACTION]
 
 
 def test_attack_masked_during_recovery() -> None:
@@ -197,8 +190,8 @@ def test_combat_masked_without_enemies_in_room() -> None:
         player_recovery=0,
         alive_enemies_in_room=0,
     )
-    assert not m[KNIFE_SWING_ACTION]
     assert not m[ATTACK_ACTION]
+    assert not m[ATTACK_DOWN_ACTION]
 
 
 def test_combat_mask_disabled_for_debug() -> None:
@@ -212,8 +205,8 @@ def test_combat_mask_disabled_for_debug() -> None:
         alive_enemies_in_room=0,
         mask_combat_without_enemies=False,
     )
-    assert m[KNIFE_SWING_ACTION]
     assert m[ATTACK_ACTION]
+    assert m[ATTACK_DOWN_ACTION]
 
 
 def test_equip_mask_two_step() -> None:
@@ -675,7 +668,7 @@ def test_attack_knife_uses_neutral_macro_path(monkeypatch) -> None:
     bridge.step.return_value = (0, False)
     # Aim hold is >=32 observes; slash must start after that window.
     hooks = iter(
-        [(0, 0, 0)] * 32
+        [(0x0D, 0x01, 0)] * 8
         + [(0x14, 0x04, 0)] * 8
         + [(0, 0, 0)] * 24
     )
@@ -713,6 +706,7 @@ def test_attack_down_knife_uses_crouch_macro_path(monkeypatch) -> None:
     from unittest.mock import MagicMock
 
     bridge = MagicMock()
+
     def read_ram(fields):
         values = {
             "equipped_weapon_id": 0x01,
@@ -725,30 +719,26 @@ def test_attack_down_knife_uses_crouch_macro_path(monkeypatch) -> None:
 
     bridge.read_ram.side_effect = read_ram
     bridge.step.return_value = (0, False)
+    bridge.last_knife_anim_report = {
+        "outcome": "ok",
+        "saw_slash": True,
+    }
 
-    def fake_height(*_a, **kwargs):
-        return False, 42, {
-            "macro_path": kwargs["macro_path"],
-            "aim_mode": kwargs["aim_mode"],
-            "weapon": kwargs["weapon"],
-            "outcome": "ok",
-            "link_aim_held": True,
-        }
+    def fake_knife_macro(*_a, **_kw):
+        return False, 99
 
-    monkeypatch.setattr(
-        "re1_rl.attack_macro._execute_standing_knife_height_macro", fake_height
-    )
+    monkeypatch.setattr("re1_rl.attack_macro.execute_knife_macro", fake_knife_macro)
     empty = {k: False for k in ("up", "down", "left", "right", "square")}
     died, frames, report = execute_attack_down_macro(
         bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
     )
     assert not died
-    assert frames == 42
+    assert frames == 99
     assert report["macro_path"] == "knife_crouch"
     assert report["aim_mode"] == "down"
     assert report["weapon"] == "knife"
     assert report["outcome"] == "ok"
-    assert report["link_aim_held"] is True
+    assert report["saw_fire_anim"] is True
 
 
 def test_attack_down_beretta_holds_down_and_spends_ammo() -> None:

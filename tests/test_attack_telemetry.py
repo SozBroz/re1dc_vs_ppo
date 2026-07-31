@@ -45,7 +45,7 @@ def test_missed_attack_prints_swing_line(capsys) -> None:
         "frames": 42,
     }
     tel.record(
-        "knife_swing",
+        "attack_down",
         "knife",
         "no_damage",
         macro_report=report,
@@ -54,7 +54,7 @@ def test_missed_attack_prints_swing_line(capsys) -> None:
         reward_breakdown={"step": -0.003, "enemy_damage": 0.0, "enemy_kill": 0.0},
     )
     out = capsys.readouterr().out
-    assert "[attack_swing] port=biz action=knife_swing weapon=knife hit=0" in out
+    assert "[attack_swing] port=biz action=attack_down weapon=knife hit=0" in out
     assert "outcome=no_damage" in out
     assert "room=105" in out
     assert "reward=-0.003000" in out

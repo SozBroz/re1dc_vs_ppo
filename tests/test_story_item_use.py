@@ -29,7 +29,7 @@ from re1_rl.story_item_use import (
     annotate_story_use_success,
 )
 
-N_ACTIONS = 46  # attack_up@6, attack_down@45; no quickturn
+N_ACTIONS = 45  # attack_up@6, attack@8, attack_down@44
 MUSIC_NOTES_ID = 0x23
 EMBLEM_ID = 0x1F
 GOLD_EMBLEM_ID = 0x20

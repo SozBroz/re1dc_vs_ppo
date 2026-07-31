@@ -254,7 +254,6 @@ class StepDiagLogger:
         info = info or {}
         mask = action_masks
         # attack / attack_up / attack_down share one mask bit in action_mask.py.
-        # knife_swing remains a knife-only crouch alias — not logged separately.
         attack_legal = bool(mask[ATTACK_ACTION]) if mask is not None and len(mask) > ATTACK_ACTION else False
         use_slots = _mask_use_slot_names(mask, inventory_slots)
         del hooks  # accepted for call-site stability; not logged

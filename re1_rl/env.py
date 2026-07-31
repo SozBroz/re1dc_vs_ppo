@@ -100,7 +100,7 @@ from re1_rl.reward import (
     stagnation_episode_timeout,
 )
 from re1_rl.room_graph import RoomGraph, load_valid_rooms
-from re1_rl.knife_macro import execute_knife_macro, read_knife_hooks
+from re1_rl.knife_macro import read_knife_hooks
 from re1_rl.sticky_input import StickyInputState
 from re1_rl.action_mask import (
     ATTACK_ACTION,
@@ -110,7 +110,7 @@ from re1_rl.action_mask import (
     DEPOSIT_ACTION_BASE,
     DEPOSIT_ACTION_NAMES,
     EQUIP_ACTION,
-    KNIFE_SWING_ACTION,
+    KNIFE_ID,
     MENU_ACTION_NAMES,
     N_DEPOSIT_ACTIONS,
     N_SELECT_SLOT,
@@ -142,14 +142,13 @@ ACTION_NAMES = [
     "run_forward",
     "attack_up",  # 6 — R1+Up high attack macro (reuses old quickturn slot; not on DC)
     "interact",
-    "knife_swing",
     "attack",  # standing aim+fire macro, any equipped weapon
     "use",  # open USE menu -> select_slot_N (2-step; herbs, sprays)
     "equip",  # open EQUIP menu -> select_slot_N (2-step)
-    *DEPOSIT_ACTION_NAMES,    # 12-19 box deposits (box rooms only)
-    *WITHDRAW_ACTION_NAMES,   # 20-35 box withdrawals (box rooms only)
-    *MENU_ACTION_NAMES,       # 36 combine + 37-44 select_slot_N
-    "attack_down",            # 45 R1+Down crouch / floor-aim attack macro
+    *DEPOSIT_ACTION_NAMES,    # 11-18 box deposits (box rooms only)
+    *WITHDRAW_ACTION_NAMES,   # 19-34 box withdrawals (box rooms only)
+    *MENU_ACTION_NAMES,       # 35 combine + 36-43 select_slot_N
+    "attack_down",            # 44 R1+Down crouch / floor-aim attack macro
 ]
 
 # Map discrete actions to friendly button names (translated to Nymashock core
@@ -165,9 +164,8 @@ ACTION_BUTTON_MAP: dict[int, dict[str, bool]] = {
     5: {"up": True, "square": True},  # run forward (square = run in RE1)
     6: {},  # attack_up macro (see execute_attack_up_macro)
     7: {"cross": True},  # interact / confirm
-    8: {"r1": True, "down": True, "cross": True},  # knife_swing macro entry (not a blind pulse)
 }
-for _idx in range(9, len(ACTION_NAMES)):
+for _idx in range(8, len(ACTION_NAMES)):
     ACTION_BUTTON_MAP[_idx] = {}
 
 # BizHawk RE1 screenshot is 240x350 RGB; left 18 + right 12 px are near-black
@@ -2403,7 +2401,6 @@ class RE1Env(gym.Env):
             if combine_step is not None:
                 return combine_step
 
-        knife = int(action) == KNIFE_SWING_ACTION
         attack = int(action) == ATTACK_ACTION
         attack_up = int(action) == ATTACK_UP_ACTION
         attack_down = int(action) == ATTACK_DOWN_ACTION
@@ -2422,23 +2419,6 @@ class RE1Env(gym.Env):
             try:
                 died_during_step, step_emulated_frames = (
                     execute_grab_escape_noop(self.bridge)
-                )
-            finally:
-                self._macro_active = False
-        elif knife:
-            self._sticky_input.apply(int(action), ACTION_BUTTON_MAP)
-            self._macro_active = True
-            try:
-                died_during_step, step_emulated_frames = execute_knife_macro(
-                    self.bridge,
-                    empty_sticky=self._sticky_input.as_dict(),
-                    phases=self.knife_phases,
-                    scale=self.knife_scale,
-                    echo_joypad=self.knife_echo_joypad,
-                    use_ram_gates=self.knife_use_ram_gates,
-                    link_aim=True,
-                    prev_hp=self._prev_hp,
-                    episode_start_hp=getattr(self, "_episode_start_hp", 0),
                 )
             finally:
                 self._macro_active = False
@@ -2462,6 +2442,10 @@ class RE1Env(gym.Env):
                         ),
                         prev_hp=self._prev_hp,
                         episode_start_hp=getattr(self, "_episode_start_hp", 0),
+                        knife_phases=self.knife_phases,
+                        knife_scale=self.knife_scale,
+                        knife_echo_joypad=self.knife_echo_joypad,
+                        knife_use_ram_gates=self.knife_use_ram_gates,
                     )
                 )
             finally:
@@ -2543,10 +2527,19 @@ class RE1Env(gym.Env):
         if died_during_skip or died_during_step:
             state = dict(state)
             state["dead"] = True
+        knife_weapon = False
+        if combat_attack:
+            wid = int(
+                (attack_report or {}).get("weapon_id")
+                or state.get("equipped_weapon_id")
+                or self._prev_state.get("equipped_weapon_id")
+                or 0
+            )
+            knife_weapon = wid == KNIFE_ID
         state = apply_combat_step_fields(
             self._prev_state,
             state,
-            knife=knife,
+            knife=knife_weapon,
             attack=combat_attack,
         )
         from re1_rl.grab_escape import grab_bite_transition
@@ -2564,11 +2557,11 @@ class RE1Env(gym.Env):
         if attack_report is not None:
             state["ammo_spent"] = int(attack_report.get("ammo_spent", 0))
             state["attack_weapon"] = attack_report.get("weapon")
-        if knife or combat_attack:
+        if combat_attack:
             self._fill_last_attack_obs(
                 self._prev_state,
                 state,
-                knife=knife,
+                knife=knife_weapon,
                 attack=combat_attack,
                 attack_report=attack_report,
                 action_id=int(action),
@@ -2612,7 +2605,7 @@ class RE1Env(gym.Env):
             self._post_skip_reward = 0.0
             self._post_skip_bd = {}
 
-        if knife or combat_attack:
+        if combat_attack:
             self._record_attack_telemetry(
                 action,
                 state,
@@ -2651,7 +2644,9 @@ class RE1Env(gym.Env):
             "reward_breakdown": breakdown,
             "episode_failure": episode_failure,
             "knife_anim_report": (
-                getattr(self.bridge, "last_knife_anim_report", None) if knife else None
+                getattr(self.bridge, "last_knife_anim_report", None)
+                if combat_attack and knife_weapon
+                else None
             ),
             "attack_report": attack_report,
             "grab_detected": grab_detected,

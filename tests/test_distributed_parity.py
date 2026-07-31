@@ -143,10 +143,10 @@ def test_legacy_action_head_transplant_clones_attack_with_low_prior() -> None:
 
     assert torch.equal(new.action_net.weight[:46], old.action_net.weight)
     assert torch.equal(new.action_net.bias[:46], old.action_net.bias)
-    assert torch.equal(new.action_net.weight[46], old.action_net.weight[9])
+    assert torch.equal(new.action_net.weight[46], old.action_net.weight[8])
     assert np.isclose(
         float(new.action_net.bias[46].detach()),
-        float(old.action_net.bias[9].detach()) - np.log(100.0),
+        float(old.action_net.bias[8].detach()) - np.log(100.0),
     )
 
 

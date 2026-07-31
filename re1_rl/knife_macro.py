@@ -1323,46 +1323,72 @@ def _execute_knife_macro_ram_gated(
             anim_val.observe(anim, aux, recovery)
 
     # Phase 1: R1+down until crouch aim animation is stable (skip if settle reached aim).
-    ready_run = aim_ready_streak if aim_precooked else 0
+    aim_retry_max = 2
+    per_attempt_wait = max(max_aim_wait // (aim_retry_max + 1), aim_ready_streak * 2)
+    aim_achieved = aim_precooked
     if not aim_precooked:
-        while ready_run < aim_ready_streak:
-            if total >= max_aim_wait:
+        for attempt in range(aim_retry_max + 1):
+            ready_run = 0
+            attempt_wait = 0
+            while ready_run < aim_ready_streak and attempt_wait < per_attempt_wait:
+                if total >= max_aim_wait:
+                    break
+                if _macro_player_died(
+                    bridge, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+                ):
+                    return _death(total)
+                if _step_one_frame(
+                    bridge,
+                    AIM_BUTTONS,
+                    empty_sticky=empty_sticky,
+                    echo_joypad=echo_joypad,
+                    prev_hp=prev_hp,
+                    episode_start_hp=episode_start_hp,
+                ):
+                    return _death(total + 1)
+                total += 1
+                attempt_wait += 1
+                anim, aux, recovery = read_knife_hooks(bridge)
+                anim_val.observe(anim, aux, recovery)
+                if is_knife_macro_interrupted(
+                    anim,
+                    aux,
+                    recovery,
+                    aim_achieved=False,
+                    swing_started=False,
+                    allow_locomotion=True,
+                ):
+                    anim_val._issue(
+                        f"foreign anim during aim — release "
+                        f"({format_knife_hooks(anim, aux, recovery)})"
+                    )
+                    return _abort(total, outcome="aborted_interrupt")
+                if is_crouch_knife_aim_ready(anim, aux, recovery):
+                    ready_run += 1
+                else:
+                    ready_run = 0
+            if ready_run >= aim_ready_streak:
+                aim_achieved = True
                 break
-            if _macro_player_died(
-                bridge, prev_hp=prev_hp, episode_start_hp=episode_start_hp
-            ):
-                return _death(total)
-            if _step_one_frame(
-                bridge,
-                AIM_BUTTONS,
-                empty_sticky=empty_sticky,
-                echo_joypad=echo_joypad,
-                prev_hp=prev_hp,
-                episode_start_hp=episode_start_hp,
-            ):
-                return _death(total + 1)
-            total += 1
-            anim, aux, recovery = read_knife_hooks(bridge)
-            anim_val.observe(anim, aux, recovery)
-            if is_knife_macro_interrupted(
-                anim,
-                aux,
-                recovery,
-                aim_achieved=False,
-                swing_started=False,
-                allow_locomotion=True,
-            ):
-                anim_val._issue(
-                    f"foreign anim during aim — release "
-                    f"({format_knife_hooks(anim, aux, recovery)})"
-                )
-                return _abort(total, outcome="aborted_interrupt")
-            if is_crouch_knife_aim_ready(anim, aux, recovery):
-                ready_run += 1
-            else:
-                ready_run = 0
+            if attempt < aim_retry_max:
+                for _ in range(aim_ready_streak):
+                    if _macro_player_died(
+                        bridge, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+                    ):
+                        return _death(total)
+                    if _step_one_frame(
+                        bridge,
+                        neutral,
+                        empty_sticky=empty_sticky,
+                        echo_joypad=echo_joypad,
+                        prev_hp=prev_hp,
+                        episode_start_hp=episode_start_hp,
+                    ):
+                        return _death(total + 1)
+                    total += 1
+                    anim, aux, recovery = read_knife_hooks(bridge)
+                    anim_val.observe(anim, aux, recovery)
 
-    aim_achieved = ready_run >= aim_ready_streak
     if not aim_achieved:
         anim_val._issue(
             f"aim timeout after {total} frames (never stabilized crouch_aim 0x12/0x04/0)"

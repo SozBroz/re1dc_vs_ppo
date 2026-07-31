@@ -183,7 +183,6 @@ def last_attack_macro_from_action(action_id: int) -> int | None:
         ATTACK_ACTION,
         ATTACK_DOWN_ACTION,
         ATTACK_UP_ACTION,
-        KNIFE_SWING_ACTION,
     )
 
     aid = int(action_id)
@@ -191,7 +190,7 @@ def last_attack_macro_from_action(action_id: int) -> int | None:
         return LAST_ATTACK_MACRO_NEUTRAL
     if aid == ATTACK_UP_ACTION:
         return LAST_ATTACK_MACRO_UP
-    if aid in (ATTACK_DOWN_ACTION, KNIFE_SWING_ACTION):
+    if aid == ATTACK_DOWN_ACTION:
         return LAST_ATTACK_MACRO_DOWN
     return None
 
