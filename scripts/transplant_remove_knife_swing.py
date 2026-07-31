@@ -1,12 +1,12 @@
 """Shrink PPO action head 46 -> 45 by dropping knife_swing (old index 8).
 
-Preserves trained logits for all other actions; new row i <- old ROW_MAP[i].
+Uses full RE1 policy obs spaces (via load_async_learner / make_re1_policy_spaces).
 
 Usage:
     python scripts/transplant_remove_knife_swing.py
     python scripts/transplant_remove_knife_swing.py \\
-        --src data/checkpoints/reward_tune_1040k/ppo_re1_179950380_steps.zip \\
-        --out data/checkpoints/reward_tune_1040k/ppo_re1_179950380_act45
+        --src data/checkpoints/reward_tune_1040k/ppo_re1_181716050_steps.zip \\
+        --out data/checkpoints/reward_tune_1040k/ppo_re1_181716050_act45
 """
 from __future__ import annotations
 
@@ -23,37 +23,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 OLD_N_ACTIONS = 46
 NEW_N_ACTIONS = 45
-# Drop old row 8 (knife_swing); attack shifts 9->8, attack_down 45->44, etc.
 ROW_MAP = list(range(8)) + list(range(9, 46))
-
-
-def build_env(n_actions: int):
-    import gymnasium as gym
-    from gymnasium import spaces
-
-    from re1_rl.obs_encoder import GOAL_DIM, PROPRIO_DIM
-    from re1_rl.spatial_encoder import SPATIAL_DIM, VISITED_SHAPE
-
-    class StubRE1Env(gym.Env):
-        observation_space = spaces.Dict(
-            {
-                "frame": spaces.Box(0, 255, shape=(84, 84, 4), dtype=np.uint8),
-                "proprio": spaces.Box(-1.0, 1.0, shape=(PROPRIO_DIM,), dtype=np.float32),
-                "goal": spaces.Box(-2.0, 2.0, shape=(GOAL_DIM,), dtype=np.float32),
-                "spatial": spaces.Box(-2.0, 2.0, shape=(SPATIAL_DIM,), dtype=np.float32),
-                "visited": spaces.Box(0.0, 1.0, shape=VISITED_SHAPE, dtype=np.float32),
-            }
-        )
-        action_space = spaces.Discrete(n_actions)
-
-        def reset(self, *, seed=None, options=None):
-            super().reset(seed=seed)
-            return self.observation_space.sample(), {}
-
-        def step(self, action):
-            return self.observation_space.sample(), 0.0, False, False, {}
-
-    return StubRE1Env()
 
 
 @torch.no_grad()
@@ -86,17 +56,18 @@ def policy_logits(policy, obs_tensor: torch.Tensor) -> torch.Tensor:
 
 
 @torch.no_grad()
-def verify(old_model, new_model, n_batches: int = 8, batch: int = 16) -> float:
+def verify(old_model, new_model, n_batches: int = 4, batch: int = 8) -> float:
     from stable_baselines3.common.utils import obs_as_tensor
 
-    env_old = build_env(OLD_N_ACTIONS)
+    from re1_rl.distributed.spaces import make_re1_policy_spaces
+
+    obs_space, _ = make_re1_policy_spaces()
     worst = 0.0
     for _ in range(n_batches):
         obs = {
-            k: np.stack([env_old.observation_space[k].sample() for _ in range(batch)])
-            for k in env_old.observation_space.spaces
+            k: np.stack([obs_space[k].sample() for _ in range(batch)])
+            for k in obs_space.spaces
         }
-        obs["frame"] = obs["frame"].transpose(0, 3, 1, 2)
         for model in (old_model, new_model):
             model.policy.set_training_mode(False)
         t = obs_as_tensor(obs, old_model.device)
@@ -114,7 +85,12 @@ def verify(old_model, new_model, n_batches: int = 8, batch: int = 16) -> float:
 
 
 def main() -> int:
+    from sb3_contrib import MaskablePPO
+
     from re1_rl.checkpoint_io import find_latest_checkpoint
+    from re1_rl.distributed.spaces import make_re1_policy_spaces
+    from re1_rl.distributed.weights import _SpaceHolderEnv
+    from re1_rl.policy_config import POLICY_KWARGS
 
     ap = argparse.ArgumentParser()
     default_src = find_latest_checkpoint(PROJECT_ROOT / "data" / "checkpoints")
@@ -123,16 +99,13 @@ def main() -> int:
     ap.add_argument("--src", default=str(default_src))
     ap.add_argument("--out", default=str(PROJECT_ROOT / "data" / "ppo_re1_act45"))
     ap.add_argument("--backup-src", action="store_true")
+    ap.add_argument("--device", default="cpu")
     args = ap.parse_args()
 
-    from stable_baselines3 import PPO
-
-    from re1_rl.env import ACTION_NAMES
-    from re1_rl.policy_config import POLICY_KWARGS
-
-    if len(ACTION_NAMES) != NEW_N_ACTIONS:
+    if len(__import__("re1_rl.env", fromlist=["ACTION_NAMES"]).ACTION_NAMES) != NEW_N_ACTIONS:
         print(
-            f"[transplant] expected {NEW_N_ACTIONS} actions, got {len(ACTION_NAMES)}",
+            f"[transplant] expected {NEW_N_ACTIONS} actions in env, "
+            f"got {len(__import__('re1_rl.env', fromlist=['ACTION_NAMES']).ACTION_NAMES)}",
             flush=True,
         )
         return 1
@@ -143,15 +116,24 @@ def main() -> int:
         return 1
 
     print(f"[transplant] loading {src}", flush=True)
-    old_model = PPO.load(str(src), env=build_env(OLD_N_ACTIONS), device="cpu")
+    old_model = MaskablePPO.load(str(src), device=str(args.device))
+    old_n = int(old_model.action_space.n)
+    if old_n != OLD_N_ACTIONS:
+        print(f"[transplant] expected {OLD_N_ACTIONS} actions in ckpt, got {old_n}", flush=True)
+        return 1
     print(
-        f"[transplant] old steps={old_model.num_timesteps:,} actions={OLD_N_ACTIONS}",
+        f"[transplant] old steps={old_model.num_timesteps:,} actions={old_n}",
         flush=True,
     )
 
-    new_model = PPO(
+    policy_obs, act_space = make_re1_policy_spaces()
+    if int(act_space.n) != NEW_N_ACTIONS:
+        print(f"[transplant] policy act_space n={act_space.n} != {NEW_N_ACTIONS}", flush=True)
+        return 1
+
+    new_model = MaskablePPO(
         "MultiInputPolicy",
-        build_env(NEW_N_ACTIONS),
+        _SpaceHolderEnv(policy_obs, act_space),
         policy_kwargs=POLICY_KWARGS,
         n_steps=256,
         batch_size=512,
@@ -159,7 +141,7 @@ def main() -> int:
         learning_rate=3e-4,
         gamma=0.99,
         ent_coef=0.01,
-        device="cpu",
+        device=str(args.device),
     )
     narrow_action_head(old_model.policy, new_model.policy)
     new_model.num_timesteps = old_model.num_timesteps
@@ -175,13 +157,12 @@ def main() -> int:
         shutil.copy2(src, bak)
         print(f"[transplant] backed up src -> {bak}", flush=True)
 
-    out_pre = Path(str(args.out) + "_pre_act45.zip")
+    out_base = Path(str(args.out))
     if Path(str(args.out) + ".zip").is_file():
-        shutil.copy2(Path(str(args.out) + ".zip"), out_pre)
-        print(f"[transplant] backed up prior final -> {out_pre}", flush=True)
+        shutil.copy2(Path(str(args.out) + ".zip"), Path(str(args.out) + "_pre_act45.zip"))
 
-    new_model.save(args.out)
-    print(f"[transplant] saved {args.out}.zip", flush=True)
+    new_model.save(str(out_base))
+    print(f"[transplant] saved {out_base}.zip", flush=True)
     print("TRANSPLANT_OK", flush=True)
     return 0
 
