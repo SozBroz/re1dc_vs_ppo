@@ -323,6 +323,8 @@ def _execute_knife_attack_crouch_macro(
         report["issues"] = list(anim_report["issues"])
     if anim_report.get("pre_state"):
         report["pre_state"] = anim_report["pre_state"]
+    if anim_report.get("phase_budget"):
+        report["phase_budget"] = anim_report["phase_budget"]
     return died, frames, report
 
 

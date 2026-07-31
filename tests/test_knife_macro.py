@@ -223,6 +223,99 @@ def test_execute_knife_macro_ram_gated_steps_until_idle() -> None:
     )
     assert not died
     assert bridge.step.call_count >= 5
+    report = bridge.last_knife_anim_report
+    budget = report.get("phase_budget") or {}
+    assert budget.get("expect_total") == KNIFE_MACRO_FRAMES
+    assert int(budget.get("settle", 0)) >= 0
+    assert int(budget.get("aim", 0)) >= 0
+    assert budget.get("aim_top")
+
+
+def test_knife_budget_log_on_finish(capsys, monkeypatch) -> None:
+    monkeypatch.setenv("KNIFE_BUDGET_LOG", "1")
+    import re1_rl.knife_macro as km
+
+    monkeypatch.setattr(km, "KNIFE_BUDGET_LOG_ENABLED", True)
+    bridge = MagicMock()
+    bridge.port = 5755
+    bridge.step.return_value = (0, False)
+    hook_seq = [
+        (0, 0, 0),
+        (0, 0, 0),
+        (0x12, 0x04, 0),
+        (0x12, 0x04, 0),
+        (0x14, 0x04, 0),
+        (0x13, 0x04, 0),
+        (0, 0, 0),
+    ]
+    hook_iter = iter(hook_seq)
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0, 0, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    bridge.read_ram.side_effect = read_ram
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    execute_knife_macro(
+        bridge,
+        empty_sticky=empty,
+        phases=(1, 1, 1),
+        scale=2,
+        use_ram_gates=True,
+        prev_hp=96,
+        episode_start_hp=96,
+    )
+    out = capsys.readouterr().out
+    assert "[knife_budget] port=5755" in out
+    assert "settle=" in out
+    assert "aim=" in out
+
+
+def test_merge_knife_phase_budget_link_aim() -> None:
+    from re1_rl.knife_macro import merge_knife_phase_budget_link_aim
+
+    report = {
+        "outcome": "ok",
+        "died": False,
+        "phase_budget": {
+            "expect_total": 42,
+            "total": 80,
+            "ram_gated": 80,
+            "link_aim": 0,
+            "settle": 2,
+            "aim": 30,
+            "swing": 20,
+            "recovery": 28,
+            "overhead": 0,
+            "aim_top": {"crouch_post": 20},
+            "recovery_top": {},
+            "settle_top": {},
+            "swing_top": {},
+            "pre_label": "idle",
+            "pre_hooks": "anim=0x00 aux=0x00 recovery=0",
+        },
+    }
+    merged = merge_knife_phase_budget_link_aim(
+        report,
+        total_frames=110,
+        link_aim_frames=30,
+        port=1,
+    )
+    budget = merged["phase_budget"]
+    assert budget["total"] == 110
+    assert budget["ram_gated"] == 80
+    assert budget["link_aim"] == 30
+    assert budget["overhead"] == 0
 
 
 def test_knife_macro_track_and_interrupt() -> None:

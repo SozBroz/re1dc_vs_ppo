@@ -156,6 +156,34 @@ def _big_reward_events(breakdown: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _knife_budget_row(info: dict[str, Any]) -> dict[str, Any] | None:
+    """Per-phase crouch-knife frame budget for memlog (all outcomes)."""
+    report = info.get("knife_anim_report")
+    if not isinstance(report, dict):
+        return None
+    budget = report.get("phase_budget")
+    if not isinstance(budget, dict):
+        return None
+    row: dict[str, Any] = {
+        "outcome": str(report.get("outcome") or ""),
+        "total": int(budget.get("total") or report.get("macro_frames") or 0),
+        "expect": int(budget.get("expect_total") or 0),
+        "ram": int(budget.get("ram_gated") or 0),
+        "link": int(budget.get("link_aim") or 0),
+        "settle": int(budget.get("settle") or 0),
+        "aim": int(budget.get("aim") or 0),
+        "swing": int(budget.get("swing") or 0),
+        "rec": int(budget.get("recovery") or 0),
+        "overhead": int(budget.get("overhead") or 0),
+        "aim_try": int(budget.get("aim_attempts") or 0),
+        "precook": bool(budget.get("aim_precooked")),
+        "pre_label": budget.get("pre_label"),
+        "aim_top": budget.get("aim_top"),
+        "rec_top": budget.get("recovery_top"),
+    }
+    return row
+
+
 def _knife_fail_row(info: dict[str, Any]) -> dict[str, Any] | None:
     """Compact knife macro failure pattern for memlog (one env port)."""
     report = info.get("knife_anim_report")
@@ -292,6 +320,9 @@ class StepDiagLogger:
         knife_fail = _knife_fail_row(info)
         if knife_fail is not None:
             row["knife_fail"] = knife_fail
+        knife_budget = _knife_budget_row(info)
+        if knife_budget is not None:
+            row["knife_budget"] = knife_budget
         if terminated or truncated:
             row["ep_return_total"] = round(self.ep_return, 5)
         _append_line(self.path, row)

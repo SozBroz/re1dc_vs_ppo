@@ -29,6 +29,18 @@ _MISS_OUTCOMES = frozenset(
 )
 
 
+def _attack_budget_top(counts: Any) -> str:
+    if not counts:
+        return "-"
+    if isinstance(counts, Counter):
+        items = counts.most_common(3)
+    elif isinstance(counts, dict):
+        items = sorted(counts.items(), key=lambda kv: (-int(kv[1]), kv[0]))[:3]
+    else:
+        return "-"
+    return ",".join(f"{label}:{n}" for label, n in items)
+
+
 class AttackTelemetry:
     """Per-episode attack counters and structured swing logging."""
 
@@ -141,6 +153,18 @@ class AttackTelemetry:
         pre_state = report.get("pre_state") or {}
         hooks = pre_state.get("hooks", "?")
         frames = report.get("frames", "?")
+        budget = report.get("phase_budget") or {}
+        budget_s = ""
+        if budget:
+            budget_s = (
+                f" ram={budget.get('ram_gated', '?')}"
+                f" link={budget.get('link_aim', 0)}"
+                f" settle={budget.get('settle', 0)}"
+                f" aim={budget.get('aim', 0)}"
+                f" swing={budget.get('swing', 0)}"
+                f" rec={budget.get('recovery', 0)}"
+                f" aim_top={_attack_budget_top(budget.get('aim_top'))}"
+            )
         room = state.get("room_id", "?")
         x = state.get("x", "?")
         z = state.get("z", "?")
@@ -157,7 +181,7 @@ class AttackTelemetry:
             f"ammo={ammo_spent} reward={rew_s} step={step_r:+.6f} "
             f"bd_enemy_dmg={dmg_r:+.6f} bd_kill={kill_r:+.6f} "
             f"room={room} pos=({x},{z}) enemies={len(enemies)} "
-            f"frames={frames} issues={len(issues)} hooks={hooks}",
+            f"frames={frames} issues={len(issues)} hooks={hooks}{budget_s}",
             flush=True,
         )
         if issues:

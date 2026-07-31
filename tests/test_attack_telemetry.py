@@ -62,6 +62,38 @@ def test_missed_attack_prints_swing_line(capsys) -> None:
     assert "swing too short; no crouch aim; extra" in out
 
 
+def test_attack_swing_includes_phase_budget(capsys) -> None:
+    tel = AttackTelemetry(port=5755)
+    tel.record(
+        "attack_down",
+        "knife",
+        "ok",
+        macro_report={
+            "pre_state": {"hooks": "anim=0x00 aux=0x00 recovery=0", "label": "idle"},
+            "frames": 139,
+            "phase_budget": {
+                "ram_gated": 97,
+                "link_aim": 42,
+                "settle": 2,
+                "aim": 45,
+                "swing": 28,
+                "recovery": 22,
+                "aim_top": {"crouch_post": 30, "crouch_aim": 8},
+            },
+        },
+        enemy_damage=8,
+        state=_state(room_id="204"),
+        reward=0.05,
+        reward_breakdown={"step": -0.004, "enemy_damage": 0.056, "enemy_kill": 0.0},
+    )
+    out = capsys.readouterr().out
+    assert "frames=139" in out
+    assert "ram=97" in out
+    assert "link=42" in out
+    assert "aim=45" in out
+    assert "aim_top=crouch_post:30,crouch_aim:8" in out
+
+
 def test_hit_attack_prints_swing_line(capsys) -> None:
     tel = AttackTelemetry(port=9)
     tel.record(

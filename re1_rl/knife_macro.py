@@ -110,6 +110,14 @@ KNIFE_ANIM_LOG_ENABLED = os.environ.get("KNIFE_ANIM_LOG", "1").strip().lower() n
     "off",
 )
 
+# Per-phase frame budget on every crouch-knife macro (default on). KNIFE_BUDGET_LOG=0 to silence.
+KNIFE_BUDGET_LOG_ENABLED = os.environ.get("KNIFE_BUDGET_LOG", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+    "off",
+)
+
 # Acceptable animation labels per macro phase (hunt-confirmed crouch knife track).
 _SETTLE_OK = frozenset(
     {
@@ -441,6 +449,9 @@ class KnifeAnimValidator:
         self._aim_max_ready_streak = 0
         self._aim_phase_frames = 0
         self._settle_phase_frames = 0
+        self._swing_phase_frames = 0
+        self._recovery_phase_frames = 0
+        self._budget_extras: dict[str, Any] = {}
 
     def set_phase(self, phase: str) -> None:
         if phase == self.phase:
@@ -469,6 +480,10 @@ class KnifeAnimValidator:
                 self._aim_ready_run = 0
         elif self.phase == "settle":
             self._settle_phase_frames += 1
+        elif self.phase == "swing":
+            self._swing_phase_frames += 1
+        elif self.phase == "recovery":
+            self._recovery_phase_frames += 1
         if label == "crouch_aim":
             self.saw_crouch_aim = True
         # Real slash only (0x14). Aim-hold 0x13 must NOT set swing_anim.
@@ -528,9 +543,10 @@ class KnifeAnimValidator:
                 self._check_swing_frame_count(where=f"abort_{outcome}")
                 if self.phase == "recovery":
                     self._check_recovery_frame_count(where=f"abort_{outcome}")
+        report = self.report(outcome=outcome, died=died, frames=frames)
         if self._issues or outcome != "ok":
             self._emit_summary(outcome=outcome, died=died, frames=frames)
-        return self.report(outcome=outcome, died=died, frames=frames)
+        return report
 
     def failure_pattern(self) -> dict[str, Any]:
         """Structured anim histogram for failed swings (pattern mining)."""
@@ -549,6 +565,53 @@ class KnifeAnimValidator:
             "swing_label_counts": dict(swing_top),
             "aim_phase_frames": int(self._aim_phase_frames),
             "settle_phase_frames": int(self._settle_phase_frames),
+            "aim_max_ready_streak": int(self._aim_max_ready_streak),
+            "saw_crouch_aim": bool(self.saw_crouch_aim),
+            "saw_swing_anim": bool(self.saw_swing_anim),
+            "swing_phase_frames": int(self._swing_phase_frames),
+            "recovery_phase_frames": int(self._recovery_phase_frames),
+        }
+
+    def phase_budget(
+        self,
+        *,
+        total_frames: int,
+        ram_gated_frames: int | None = None,
+        link_aim_frames: int = 0,
+    ) -> dict[str, Any]:
+        """Structured per-phase frame accounting for macro latency diagnosis."""
+        ram = int(ram_gated_frames if ram_gated_frames is not None else total_frames)
+        link = max(int(link_aim_frames), 0)
+        settle = int(self._budget_extras.get("settle", self._settle_phase_frames))
+        aim = int(self._budget_extras.get("aim", self._aim_phase_frames))
+        swing = int(self._budget_extras.get("swing", self._swing_phase_frames))
+        recovery = int(
+            self._budget_extras.get("recovery", self._recovery_phase_frames)
+        )
+        accounted = settle + aim + swing + recovery + link
+        pre = self.pre_state or {}
+        return {
+            "expect_total": int(KNIFE_MACRO_FRAMES),
+            "total": int(total_frames),
+            "ram_gated": ram,
+            "link_aim": link,
+            "settle": settle,
+            "aim": aim,
+            "swing": swing,
+            "recovery": recovery,
+            "overhead": int(total_frames) - accounted,
+            "aim_attempts": int(self._budget_extras.get("aim_attempts", 0)),
+            "aim_precooked": bool(self._budget_extras.get("aim_precooked", False)),
+            "entry_standing_ready": bool(
+                self._budget_extras.get("entry_standing_ready", False)
+            ),
+            "entry_mid_swing": bool(self._budget_extras.get("entry_mid_swing", False)),
+            "pre_label": pre.get("label"),
+            "pre_hooks": pre.get("hooks"),
+            "settle_top": dict(self._phase_label_counts.get("settle") or {}),
+            "aim_top": dict(self._phase_label_counts.get("aim") or {}),
+            "swing_top": dict(self._phase_label_counts.get("swing") or {}),
+            "recovery_top": dict(self._phase_label_counts.get("recovery") or {}),
             "aim_max_ready_streak": int(self._aim_max_ready_streak),
             "saw_crouch_aim": bool(self.saw_crouch_aim),
             "saw_swing_anim": bool(self.saw_swing_anim),
@@ -596,6 +659,11 @@ class KnifeAnimValidator:
             "swing_frame_ok": swing_ok,
             "recovery_frame_ok": recovery_ok,
             "pre_state": self.pre_state,
+            "phase_budget": self.phase_budget(
+                total_frames=int(frames),
+                ram_gated_frames=int(frames),
+                link_aim_frames=0,
+            ),
             "failure_pattern": (
                 self.failure_pattern() if outcome != "ok" else None
             ),
@@ -714,6 +782,77 @@ def _knife_anim_log(msg: str, *, port: Any) -> None:
     if not KNIFE_ANIM_LOG_ENABLED:
         return
     print(f"[knife_anim] port={port} {msg}", flush=True)
+
+
+def _knife_budget_log(msg: str, *, port: Any) -> None:
+    if not KNIFE_BUDGET_LOG_ENABLED:
+        return
+    print(f"[knife_budget] port={port} {msg}", flush=True)
+
+
+def format_knife_phase_budget_line(
+    *,
+    outcome: str,
+    died: bool,
+    budget: dict[str, Any],
+) -> str:
+    """One-line phase frame digest for console / log mining."""
+    pre_label = budget.get("pre_label") or "?"
+    pre_hooks = budget.get("pre_hooks") or "?"
+    return (
+        f"outcome={outcome} died={int(died)} "
+        f"total={budget.get('total', '?')} "
+        f"ram={budget.get('ram_gated', '?')} "
+        f"link={budget.get('link_aim', 0)} "
+        f"expect={budget.get('expect_total', KNIFE_MACRO_FRAMES)} "
+        f"settle={budget.get('settle', 0)} "
+        f"aim={budget.get('aim', 0)} "
+        f"swing={budget.get('swing', 0)} "
+        f"rec={budget.get('recovery', 0)} "
+        f"oh={budget.get('overhead', 0)} "
+        f"aim_try={budget.get('aim_attempts', 0)} "
+        f"precook={int(bool(budget.get('aim_precooked')))} "
+        f"pre={pre_label} {pre_hooks} "
+        f"settle_top={_top_label_counts(budget.get('settle_top') or {})} "
+        f"aim_top={_top_label_counts(budget.get('aim_top') or {})} "
+        f"swing_top={_top_label_counts(budget.get('swing_top') or {})} "
+        f"rec_top={_top_label_counts(budget.get('recovery_top') or {})}"
+    )
+
+
+def merge_knife_phase_budget_link_aim(
+    report: dict[str, Any],
+    *,
+    total_frames: int,
+    link_aim_frames: int,
+    port: Any,
+) -> dict[str, Any]:
+    """Append link-aim hold frames and re-log the full budget line."""
+    budget = dict(report.get("phase_budget") or {})
+    ram = max(int(total_frames) - max(int(link_aim_frames), 0), 0)
+    budget["total"] = int(total_frames)
+    budget["ram_gated"] = ram
+    budget["link_aim"] = max(int(link_aim_frames), 0)
+    accounted = (
+        int(budget.get("settle", 0))
+        + int(budget.get("aim", 0))
+        + int(budget.get("swing", 0))
+        + int(budget.get("recovery", 0))
+        + int(budget.get("link_aim", 0))
+    )
+    budget["overhead"] = int(total_frames) - accounted
+    report = dict(report)
+    report["phase_budget"] = budget
+    report["macro_frames"] = int(total_frames)
+    _knife_budget_log(
+        format_knife_phase_budget_line(
+            outcome=str(report.get("outcome") or "ok"),
+            died=bool(report.get("died")),
+            budget=budget,
+        ),
+        port=port,
+    )
+    return report
 
 
 def is_crouch_knife_aim_ready(anim: int, aux: int, recovery: int) -> bool:
@@ -1210,6 +1349,12 @@ def _execute_knife_macro_ram_gated(
     entry_recovery_tail = is_knife_swing_recovery_tail(
         entry_anim, entry_aux, entry_recovery
     )
+    anim_val._budget_extras = {
+        "entry_standing_ready": entry_standing_ready,
+        "entry_mid_swing": entry_mid_swing,
+        "aim_precooked": False,
+        "aim_attempts": 0,
+    }
     if entry_mid_swing:
         max_aim_wait = max(max_aim_wait, KNIFE_SETTLE_MID_SWING_MAX_WAIT_FRAMES * 2)
         max_total = max(max_total, KNIFE_SETTLE_MID_SWING_MAX_WAIT_FRAMES * 3)
@@ -1293,6 +1438,7 @@ def _execute_knife_macro_ram_gated(
                 aim_precooked = True
                 anim_val.saw_crouch_aim = True
                 anim_val.saw_settled_idle = True
+                anim_val._budget_extras["aim_precooked"] = True
         elif is_knife_settle_complete(anim, aux, recovery):
             settle_run += 1
             early_aim_run = 0
@@ -1328,6 +1474,7 @@ def _execute_knife_macro_ram_gated(
     aim_achieved = aim_precooked
     if not aim_precooked:
         for attempt in range(aim_retry_max + 1):
+            anim_val._budget_extras["aim_attempts"] = attempt + 1
             ready_run = 0
             attempt_wait = 0
             while ready_run < aim_ready_streak and attempt_wait < per_attempt_wait:
@@ -1601,6 +1748,7 @@ def execute_knife_macro(
         report = getattr(bridge, "last_knife_anim_report", None) or {}
         if link_aim and not died and str(report.get("outcome", "ok")) == "ok":
             stable = 0
+            link_start = int(frames)
             for _ in range(240):
                 if _step_one_frame(
                     bridge,
@@ -1622,14 +1770,29 @@ def execute_knife_macro(
                 if stable >= MIN_BUTTON_PHASE_FRAMES:
                     break
             link_ready = not died and stable >= MIN_BUTTON_PHASE_FRAMES
+            link_frames = int(frames) - link_start
             if isinstance(report, dict):
-                report["frames"] = int(frames)
+                report = merge_knife_phase_budget_link_aim(
+                    report,
+                    total_frames=int(frames),
+                    link_aim_frames=link_frames,
+                    port=getattr(bridge, "port", "?"),
+                )
                 report["link_aim_held"] = link_ready
                 if died:
                     report["outcome"] = "death"
                 elif not link_ready:
                     report["outcome"] = "link_recovery_timeout"
                 bridge.last_knife_anim_report = report
+        elif isinstance(report, dict) and report.get("phase_budget"):
+            _knife_budget_log(
+                format_knife_phase_budget_line(
+                    outcome=str(report.get("outcome") or "ok"),
+                    died=bool(report.get("died")),
+                    budget=report["phase_budget"],
+                ),
+                port=getattr(bridge, "port", "?"),
+            )
         return died, frames
     finally:
         if own_pins and pins is not None:

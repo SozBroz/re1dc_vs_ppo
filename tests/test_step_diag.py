@@ -180,6 +180,53 @@ def test_memlog_knife_fail_from_info(monkeypatch, tmp_path: Path) -> None:
     assert kf["aim_label_counts"]["crouch_transitional"] == 10
 
 
+def test_memlog_knife_budget_from_info(monkeypatch, tmp_path: Path) -> None:
+    log_path = tmp_path / "pking_top_right_memlog.jsonl"
+    monkeypatch.setenv("RE1_STEP_DIAG_PORT", "5759")
+    monkeypatch.setenv("RE1_STEP_DIAG_LOG", str(log_path))
+    sd._OPENED_PATHS.clear()
+
+    logger = sd.try_make_logger(5759, project_root=tmp_path)
+    assert logger is not None
+    mask = np.ones(45, dtype=bool)
+    logger.log_step(
+        reward=0.05,
+        terminated=False,
+        truncated=False,
+        action_masks=mask,
+        inventory_slots=[("knife", 1)],
+        hooks=None,
+        info={
+            "knife_anim_report": {
+                "outcome": "ok",
+                "macro_frames": 139,
+                "phase_budget": {
+                    "expect_total": 42,
+                    "total": 139,
+                    "ram_gated": 97,
+                    "link_aim": 42,
+                    "settle": 2,
+                    "aim": 45,
+                    "swing": 28,
+                    "recovery": 22,
+                    "overhead": 0,
+                    "aim_top": {"crouch_post": 30},
+                    "recovery_top": {"crouch_post": 10},
+                    "pre_label": "idle",
+                },
+            },
+        },
+        action=44,
+        action_name="attack_down",
+    )
+    step = json.loads(log_path.read_text(encoding="utf-8").strip().splitlines()[-1])
+    kb = step["knife_budget"]
+    assert kb["total"] == 139
+    assert kb["link"] == 42
+    assert kb["aim"] == 45
+    assert kb["aim_top"]["crouch_post"] == 30
+
+
 def test_second_logger_same_process_does_not_retruncate(monkeypatch, tmp_path: Path) -> None:
     log_path = tmp_path / "pking_top_right_memlog.jsonl"
     monkeypatch.setenv("RE1_STEP_DIAG_PORT", "5759")
