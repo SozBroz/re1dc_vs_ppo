@@ -131,6 +131,15 @@ def manifest_index_by_cell_key(local_root: Path | str) -> dict[str, dict[str, An
     return out
 
 
+def manifest_semantic_index(
+    local_root: Path | str,
+) -> dict[tuple[str, str], list[dict[str, Any]]]:
+    """``(room_id, milestone_digest)`` → manifest rows for pose-cap pre-filter."""
+    from re1_rl.go_explore_semantic import manifest_index_by_semantic_bucket
+
+    return manifest_index_by_semantic_bucket(load_local_manifest(local_root))
+
+
 def _local_meta_sha(cell_dir: Path) -> str | None:
     meta_p = cell_dir / CELL_META_NAME
     if not meta_p.is_file():

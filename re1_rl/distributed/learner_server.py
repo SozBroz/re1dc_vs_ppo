@@ -83,6 +83,8 @@ class LearnerState:
             go_explore_merge if go_explore_merge is not None else _go_explore_merge_from_env()
         )
         self.go_explore_accepted = 0
+        self.go_explore_rejected_semantic = 0
+        self.go_explore_evicted = 0
 
     def set_current_version(self, version: int) -> None:
         with self.lock:
@@ -198,9 +200,12 @@ class LearnerState:
         except Exception as exc:
             log(self.machine_name, f"go_explore merge failed: {exc}")
             return []
-        if accepted:
-            with self.lock:
+        with self.lock:
+            if accepted:
                 self.go_explore_accepted += len(accepted)
+            self.go_explore_rejected_semantic = int(merge.rejected_semantic)
+            self.go_explore_evicted = int(merge.evicted)
+        if accepted:
             log(
                 self.machine_name,
                 f"go_explore merged {len(accepted)} cell(s) from {rollout.worker_id}",
@@ -377,6 +382,24 @@ class _LearnerHandler(BaseHTTPRequestHandler):
             # them while already holding it (threading.Lock is not re-entrant).
             epoch = self.state.epoch_status()
             pitch = self.state.pitch_summary()
+            go_stats: dict[str, Any] | None = None
+            merge = self.state.go_explore_merge
+            if merge is not None:
+                cells = merge.archive.cells
+                bytes_total = 0
+                for cell in cells.values():
+                    meta = cell.meta or {}
+                    nbytes = meta.get("bytes")
+                    if nbytes is not None:
+                        bytes_total += int(nbytes)
+                with self.state.lock:
+                    go_stats = {
+                        "admitted": self.state.go_explore_accepted,
+                        "rejected_semantic": self.state.go_explore_rejected_semantic,
+                        "evicted": self.state.go_explore_evicted,
+                        "cells_total": len(cells),
+                        "bytes_total": bytes_total,
+                    }
             with self.state.lock:
                 payload = {
                     "policy_version": version,
@@ -395,6 +418,8 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "pitch": pitch,
                     "epoch": epoch,
                 }
+                if go_stats is not None:
+                    payload["go_explore_stats"] = go_stats
             self._send_json(200, payload)
             return
 

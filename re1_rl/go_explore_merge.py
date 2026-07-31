@@ -21,7 +21,14 @@ from re1_rl.go_explore_archive import (
     new_record_id,
     quality_beats,
 )
-from re1_rl.milestone_digest import parse_cell_key_v2
+from re1_rl.go_explore_semantic import (
+    max_archive_cells,
+    pose_cap,
+    pose_evict_enabled,
+    semantic_bucket_key,
+    weakest_incumbent,
+)
+from re1_rl.milestone_digest import YAWN_PATH_ROOMS, parse_cell_key_v2
 
 CELL_STATE_NAME = "cell.State"
 CELL_SIDECAR_NAME = "cell.sidecar.json"
@@ -83,6 +90,8 @@ class GoExploreMerge:
         self.archive_path = Path(archive_path) if archive_path is not None else default_archive_path()
         self.archive_version = 0
         self.archive = GoExploreArchive(self.archive_path)
+        self.rejected_semantic = 0
+        self.evicted = 0
         self._load()
 
     def _load(self) -> None:
@@ -141,6 +150,74 @@ class GoExploreMerge:
                 self._persist_unlocked()
         return accepted
 
+    def _evict_cell_unlocked(self, cell: ArchiveCell, *, for_record_id: str) -> None:
+        """Remove incumbent from archive + delete its bundle directory."""
+        removed = self.archive.remove_cell(cell.record_id)
+        if removed is None:
+            # Fallback: drop by cell_key if record_id mismatch.
+            self.archive.cells.pop(cell.cell_key, None)
+            removed = cell
+        old_dir = self.cell_dir(removed.record_id)
+        if old_dir.is_dir():
+            shutil.rmtree(old_dir, ignore_errors=True)
+        self.evicted += 1
+        print(
+            f"go_explore evicted {removed.record_id} "
+            f"bucket={removed.room_id}/{removed.milestone_digest} "
+            f"for {for_record_id}",
+            flush=True,
+        )
+
+    def _plan_new_key_evictions(
+        self,
+        *,
+        room: str,
+        digest: str,
+        quality: tuple[int, int, int, int, int],
+    ) -> list[ArchiveCell] | None:
+        """Return cells to evict before admitting a new key, or None to reject."""
+        bucket = semantic_bucket_key(room, digest)
+        bucket_cells = list(self.archive.cells_by_semantic_bucket().get(bucket) or ())
+        to_evict: list[ArchiveCell] = []
+
+        if len(bucket_cells) >= pose_cap():
+            if not pose_evict_enabled():
+                self.rejected_semantic += 1
+                return None
+            weak = weakest_incumbent(bucket_cells)
+            if weak is None or not quality_beats(quality, weak.quality):
+                self.rejected_semantic += 1
+                return None
+            to_evict.append(weak)
+
+        evict_ids = {c.record_id for c in to_evict}
+        projected = len(self.archive.cells) - len(to_evict) + 1
+        if projected > max_archive_cells():
+            remaining = [
+                c for c in self.archive.cells.values() if c.record_id not in evict_ids
+            ]
+            room_present = any(c.room_id == room for c in self.archive.cells.values())
+            is_new_yawn_room = room in YAWN_PATH_ROOMS and not room_present
+            global_weak = weakest_incumbent(remaining)
+            if global_weak is None:
+                self.rejected_semantic += 1
+                return None
+            if not is_new_yawn_room and not quality_beats(quality, global_weak.quality):
+                self.rejected_semantic += 1
+                return None
+            if global_weak.record_id not in evict_ids:
+                to_evict.append(global_weak)
+
+        room_count = sum(
+            1
+            for c in self.archive.cells.values()
+            if c.room_id == room and c.record_id not in evict_ids
+        )
+        if room_count >= self.archive.max_cells_per_room:
+            self.rejected_semantic += 1
+            return None
+        return to_evict
+
     def _ingest_one_unlocked(self, prop: dict[str, Any]) -> str | None:
         from re1_rl.go_explore_capture import (
             _disk_free_bytes,
@@ -165,6 +242,17 @@ class GoExploreMerge:
             existing.visit_count += 1
             return None
 
+        room = str(parsed["room_id"])
+        tb = tuple(parsed["tile_bin"])
+        digest = str(parsed["milestone_digest"])
+
+        to_evict: list[ArchiveCell] = []
+        if existing is None:
+            planned = self._plan_new_key_evictions(room=room, digest=digest, quality=quality)
+            if planned is None:
+                return None
+            to_evict = planned
+
         bundle_bytes = self._decode_bundle(prop)
         if bundle_bytes is not None:
             if len(bundle_bytes) > max_capture_bundle_bytes():
@@ -174,16 +262,17 @@ class GoExploreMerge:
             ok, reason = self._validate_bundle_bytes(bundle_bytes, prop)
             if not ok:
                 return None
+            for victim in to_evict:
+                self._evict_cell_unlocked(victim, for_record_id=record_id)
             bundle_sha = _sha256_bytes(bundle_bytes)
             rel_path = self._write_bundle_unlocked(record_id, bundle_bytes, prop, bundle_sha)
         else:
             # Metadata-only admit (shadow / tests); no on-disk State yet.
+            for victim in to_evict:
+                self._evict_cell_unlocked(victim, for_record_id=record_id)
             bundle_sha = str(prop.get("bundle_sha256") or "")
             rel_path = None
 
-        room = str(parsed["room_id"])
-        tb = tuple(parsed["tile_bin"])
-        digest = str(parsed["milestone_digest"])
         meta = dict(prop.get("meta") or {})
         for k in ("worker_id", "captured_at_step", "state_sha256", "sidecar_sha256"):
             if k in prop and prop[k] is not None:
@@ -192,10 +281,6 @@ class GoExploreMerge:
             meta["bundle_sha256"] = bundle_sha
 
         if existing is None:
-            # Cap check for new keys.
-            room_count = sum(1 for c in self.archive.cells.values() if c.room_id == room)
-            if room_count >= self.archive.max_cells_per_room:
-                return None
             cell = ArchiveCell(
                 record_id=record_id,
                 cell_key=cell_key,

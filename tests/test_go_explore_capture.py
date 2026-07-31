@@ -552,3 +552,145 @@ def test_manifest_dedupe_skips_weaker_capture(
     )
     assert out is None
     assert saves == 0
+
+
+def _budget_captures(tmp_path: Path) -> int:
+    budget_path = tmp_path / "data" / "go_explore" / "capture_budget.json"
+    if not budget_path.is_file():
+        return 0
+    return int(json.loads(budget_path.read_text()).get("captures", 0) or 0)
+
+
+def test_semantic_prefilter_rejects_weaker_at_cap_no_budget(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "50")
+    monkeypatch.setenv("RE1_GO_MAX_POSES_PER_BUCKET", "3")
+    monkeypatch.setenv("RE1_GO_POSE_EVICT", "1")
+    archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    state = _good_state(hp=40)
+    digest = compute_digest(state, progress, ever_held=set())
+    rows = []
+    for i in range(3):
+        key = cell_key_v2("20E", 1000 + i * 4096, 2000, digest)
+        rows.append(
+            {
+                "cell_key": key,
+                "record_id": f"inc{i}",
+                "room_id": "20E",
+                "quality": [90, 45, 1, 4, 1],
+            }
+        )
+    manifest_index = {r["cell_key"]: r for r in rows}
+    saves = 0
+
+    def _save(path: Path) -> None:
+        nonlocal saves
+        saves += 1
+        path.write_bytes(b"x")
+
+    # Different tile → new cell_key, same semantic bucket, weaker quality.
+    out = maybe_capture_cell(
+        _good_state(hp=40, x=1000 + 9 * 4096, z=2000),
+        progress,
+        archive,
+        save_state=_save,
+        ever_held=set(),
+        project_root=tmp_path,
+        env_step=100,
+        capture_state={"last_capture_step": -10**9},
+        manifest_index=manifest_index,
+    )
+    assert out is None
+    assert saves == 0
+    assert _budget_captures(tmp_path) == 0
+
+
+def test_semantic_prefilter_allows_stronger_at_cap(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.delenv("RE1_GO_CANONICAL_STORE", raising=False)
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "50")
+    monkeypatch.setenv("RE1_GO_MAX_POSES_PER_BUCKET", "3")
+    monkeypatch.setenv("RE1_GO_POSE_EVICT", "1")
+    archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    digest = compute_digest(_good_state(), progress, ever_held=set())
+    rows = []
+    for i in range(3):
+        key = cell_key_v2("20E", 1000 + i * 4096, 2000, digest)
+        rows.append(
+            {
+                "cell_key": key,
+                "record_id": f"inc{i}",
+                "room_id": "20E",
+                "quality": [50, 10, 0, 2, 1],
+            }
+        )
+    manifest_index = {r["cell_key"]: r for r in rows}
+
+    def _save(path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"STATE")
+
+    out = maybe_capture_cell(
+        _good_state(hp=99, x=1000 + 9 * 4096, z=2000),
+        progress,
+        archive,
+        save_state=_save,
+        ever_held=set(),
+        project_root=tmp_path,
+        env_step=100,
+        capture_state={"last_capture_step": -10**9},
+        manifest_index=manifest_index,
+    )
+    assert out is not None
+    assert out.get("bundle_b64")
+    assert _budget_captures(tmp_path) == 1
+
+
+def test_semantic_prefilter_new_digest_passes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
+    monkeypatch.delenv("RE1_GO_CANONICAL_STORE", raising=False)
+    monkeypatch.setenv("RE1_GO_MAX_CAPTURES_DAY", "50")
+    monkeypatch.setenv("RE1_GO_MAX_POSES_PER_BUCKET", "3")
+    archive = GoExploreArchive(tmp_path / "data" / "go_explore" / "archive.json")
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    # Incumbents use a different digest so the proposal's bucket is empty.
+    rows = []
+    for i in range(3):
+        key = cell_key_v2("20E", 1000 + i * 4096, 2000, "other:digest")
+        rows.append(
+            {
+                "cell_key": key,
+                "record_id": f"inc{i}",
+                "room_id": "20E",
+                "quality": [99, 99, 9, 9, 1],
+            }
+        )
+    manifest_index = {r["cell_key"]: r for r in rows}
+
+    def _save(path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"STATE")
+
+    out = maybe_capture_cell(
+        _good_state(hp=40),
+        progress,
+        archive,
+        save_state=_save,
+        ever_held=set(),
+        project_root=tmp_path,
+        env_step=100,
+        capture_state={"last_capture_step": -10**9},
+        manifest_index=manifest_index,
+    )
+    assert out is not None

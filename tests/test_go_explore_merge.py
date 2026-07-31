@@ -133,3 +133,85 @@ def test_integrity_rejects_bad_state_sha(tmp_path: Path) -> None:
     prop["state_sha256"] = "0" * 64
     assert merge.ingest_proposals([prop]) == []
     assert merge.archive.cells == {}
+
+
+def test_semantic_pose_cap_evicts_to_six(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_MAX_POSES_PER_BUCKET", "6")
+    monkeypatch.setenv("RE1_GO_POSE_EVICT", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CELLS_PER_ROOM", "40")
+    merge = GoExploreMerge(tmp_path / "archive.json")
+    digest = "gallery:idle"
+    props = []
+    for i in range(8):
+        key = cell_key_v2("20E", 4096 * i, 0, digest)
+        # Later poses are stronger so they displace weak early ones.
+        props.append(
+            _proposal(
+                record_id=f"pose{i}",
+                quality=[10 + i, 0, 0, 0, 1],
+                cell_key=key,
+            )
+        )
+    accepted = merge.ingest_proposals(props)
+    assert len(accepted) == 8
+    assert len(merge.archive.cells) == 6
+    assert merge.evicted == 2
+    # Weakest early poses should be gone; strongest remain.
+    remaining_ids = {c.record_id for c in merge.archive.cells.values()}
+    assert "pose0" not in remaining_ids
+    assert "pose1" not in remaining_ids
+    assert "pose7" in remaining_ids
+    assert not (tmp_path / "cells" / "pose0").exists()
+    assert (tmp_path / "cells" / "pose7" / CELL_STATE_NAME).is_file()
+
+
+def test_global_cap_evicts_weakest(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_MAX_ARCHIVE_CELLS", "3")
+    monkeypatch.setenv("RE1_GO_MAX_POSES_PER_BUCKET", "10")
+    monkeypatch.setenv("RE1_GO_POSE_EVICT", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CELLS_PER_ROOM", "40")
+    merge = GoExploreMerge(tmp_path / "archive.json")
+    # Fill archive with 3 weak cells in room 105.
+    for i in range(3):
+        key = cell_key_v2("105", 4096 * i, 0, f"d{i}")
+        assert merge.ingest_proposals(
+            [_proposal(record_id=f"old{i}", quality=[5, 0, 0, 0, 1], cell_key=key)]
+        ) == [f"old{i}"]
+    assert len(merge.archive.cells) == 3
+    # Stronger cell in a different room should admit via global eviction.
+    new_key = cell_key_v2("106", 0, 0, "fresh")
+    accepted = merge.ingest_proposals(
+        [_proposal(record_id="new1", quality=[90, 0, 0, 0, 1], cell_key=new_key)]
+    )
+    assert accepted == ["new1"]
+    assert len(merge.archive.cells) == 3
+    assert merge.evicted >= 1
+    remaining = {c.record_id for c in merge.archive.cells.values()}
+    assert "new1" in remaining
+    assert len(remaining & {"old0", "old1", "old2"}) == 2
+    assert len([p for p in (tmp_path / "cells").iterdir() if p.is_dir()]) == 3
+
+
+def test_semantic_reject_when_evict_disabled(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_MAX_POSES_PER_BUCKET", "2")
+    monkeypatch.setenv("RE1_GO_POSE_EVICT", "0")
+    merge = GoExploreMerge(tmp_path / "archive.json")
+    digest = "gallery:idle"
+    for i in range(2):
+        key = cell_key_v2("20E", 4096 * i, 0, digest)
+        merge.ingest_proposals(
+            [_proposal(record_id=f"p{i}", quality=[50, 0, 0, 0, 1], cell_key=key)]
+        )
+    key3 = cell_key_v2("20E", 4096 * 2, 0, digest)
+    accepted = merge.ingest_proposals(
+        [_proposal(record_id="p2", quality=[99, 0, 0, 0, 1], cell_key=key3)]
+    )
+    assert accepted == []
+    assert len(merge.archive.cells) == 2
+    assert merge.rejected_semantic >= 1

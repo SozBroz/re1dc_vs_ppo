@@ -493,6 +493,27 @@ class GoExploreArchive:
         rng.shuffle(head)
         return head[:k]
 
+    def cells_by_semantic_bucket(self) -> dict[tuple[str, str], list[ArchiveCell]]:
+        """Group cells by ``(room_id, milestone_digest)`` for pose-cap eviction."""
+        from re1_rl.go_explore_semantic import semantic_bucket_key
+
+        out: dict[tuple[str, str], list[ArchiveCell]] = {}
+        for cell in self.cells.values():
+            key = semantic_bucket_key(cell.room_id, cell.milestone_digest)
+            out.setdefault(key, []).append(cell)
+        return out
+
+    def remove_cell(self, record_id: str) -> ArchiveCell | None:
+        """Drop the cell with ``record_id`` from the in-memory index."""
+        rid = str(record_id or "").strip()
+        if not rid:
+            return None
+        for key, cell in list(self.cells.items()):
+            if cell.record_id == rid:
+                del self.cells[key]
+                return cell
+        return None
+
     def stats(self) -> dict[str, Any]:
         rooms = {c.room_id for c in self.cells.values()}
         return {

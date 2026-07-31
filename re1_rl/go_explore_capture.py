@@ -783,6 +783,7 @@ def maybe_capture_cell(
     env_step: int = 0,
     capture_state: dict[str, Any] | None = None,
     manifest_index: dict[str, dict[str, Any]] | None = None,
+    semantic_index: dict[tuple[str, str], list[dict[str, Any]]] | None = None,
     persist_locally: bool | None = None,
 ) -> dict[str, Any] | None:
     """Capture a Go-Explore cell when integrity + quality gates pass.
@@ -819,6 +820,29 @@ def maybe_capture_cell(
         if not quality_replace_significant(quality, existing_quality):
             return None
     elif _room_cell_count(room, manifest_index=manifest_index, archive=archive) >= archive.max_cells_per_room:
+        return None
+
+    # Semantic pose-cap pre-filter before save_state / budget consume.
+    from re1_rl.go_explore_semantic import (
+        manifest_index_by_semantic_bucket,
+        semantic_admission_allowed,
+    )
+
+    sem_index = semantic_index
+    effective_manifest = manifest_index
+    if effective_manifest is None and archive.cells:
+        # Canonical/local path: mirror archive rows as a cell_key index.
+        effective_manifest = {k: c.to_json() for k, c in archive.cells.items()}
+    if sem_index is None and effective_manifest is not None:
+        sem_index = manifest_index_by_semantic_bucket(effective_manifest)
+    if not semantic_admission_allowed(
+        room,
+        digest,
+        key,
+        quality,
+        manifest_index=effective_manifest,
+        semantic_index=sem_index,
+    ):
         return None
 
     last_step = int((capture_state or {}).get("last_capture_step", -10**9))
