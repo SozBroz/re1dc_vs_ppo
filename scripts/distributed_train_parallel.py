@@ -210,7 +210,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument(
         "--tile-windows",
         action="store_true",
-        help="tile BizHawk windows in a monitor grid (use with --no-headless)",
+        help="tile EmuHawk windows in a monitor grid (headless chromeless or --no-headless)",
     )
     ap.add_argument("--grid-cols", type=int, default=4, help="grid columns per monitor")
     ap.add_argument("--grid-rows", type=int, default=2, help="grid rows per monitor")
