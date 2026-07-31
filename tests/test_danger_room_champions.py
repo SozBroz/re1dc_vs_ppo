@@ -21,7 +21,12 @@ from re1_rl.pb_champion import (
     list_filled_danger_room_champions,
     try_replace_champion,
 )
-from re1_rl.pb_curriculum import sample_training_start, sample_typewriter_start
+from re1_rl.pb_curriculum import (
+    sample_focus_room_start,
+    sample_other_champion_start,
+    sample_training_start,
+    sample_typewriter_start,
+)
 from re1_rl.pb_milestones import (
     DANGER_ROOM_MILESTONES,
     detect_milestone_triggers,
@@ -244,3 +249,20 @@ def test_sample_training_start_mixes_typewriter_and_danger(
         if picked and "room_108" in picked["state_path"]:
             danger_hits += 1
     assert danger_hits == 0
+
+
+def test_focus_and_other_champion_samplers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("RE1_PB_SHARED_ROOT", raising=False)
+    _seed_danger_champion(tmp_path, "108", 90, b"L")
+    _seed_danger_champion(tmp_path, "202", 80, b"D")
+
+    focus = sample_focus_room_start(tmp_path, "108")
+    assert focus is not None
+    assert "room_108" in focus["state_path"]
+
+    other = sample_other_champion_start(tmp_path, exclude_room_id="108", rng=random.Random(0))
+    assert other is not None
+    assert "room_108" not in other["state_path"]
+    assert "room_202" in other["state_path"]

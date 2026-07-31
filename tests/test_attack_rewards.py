@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
     AMMO_PICKUP_BONUS,
+    ATTACK_MISS_TAX_SCALE,
     ENEMY_DAMAGE_REWARD,
     ENEMY_KILL_REWARD,
     ITEM_PICKUP_BONUS,
@@ -28,13 +29,13 @@ from tests.test_scaffolding import make_planner, make_state
 
 def test_miss_tax_formula_handgun_and_shotgun() -> None:
     assert ammo_waste_per_missed_round(0x02) == pytest.approx(
-        -AMMO_PICKUP_BONUS / 15
+        -AMMO_PICKUP_BONUS / 15 * ATTACK_MISS_TAX_SCALE
     )
     assert ammo_waste_per_missed_round(0x03) == pytest.approx(
-        -AMMO_PICKUP_BONUS / 7
+        -AMMO_PICKUP_BONUS / 7 * ATTACK_MISS_TAX_SCALE
     )
-    assert ammo_waste_per_missed_round(0x02) == pytest.approx(-2.0 / 15)
-    assert ammo_waste_per_missed_round(0x05) == pytest.approx(-2.0 / 6)
+    assert ammo_waste_per_missed_round(0x02) == pytest.approx(-2.0 / 15 * ATTACK_MISS_TAX_SCALE)
+    assert ammo_waste_per_missed_round(0x05) == pytest.approx(-2.0 / 6 * ATTACK_MISS_TAX_SCALE)
     assert ammo_waste_per_missed_round(0x01) == 0.0  # knife
     assert ammo_waste_per_missed_round(0x06) == 0.0  # flamethrower
 
@@ -62,7 +63,7 @@ def test_attack_missed_taxes_ammo_by_clip() -> None:
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
     assert bd["attack_miss"] == 0.0
-    assert bd["ammo_waste"] == pytest.approx(-2.0 / 15)
+    assert bd["ammo_waste"] == pytest.approx(-2.0 / 15 * ATTACK_MISS_TAX_SCALE)
     assert bd["step"] == STEP_PENALTY * (42 / REFERENCE_STEP_FRAMES)
 
 
@@ -90,7 +91,7 @@ def test_ammo_spent_on_miss_scales_waste() -> None:
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
     assert bd["ammo_waste"] == pytest.approx(ammo_waste_penalty(0x02, 3))
-    assert bd["ammo_waste"] == pytest.approx(-6.0 / 15)
+    assert bd["ammo_waste"] == pytest.approx(-6.0 / 15 * ATTACK_MISS_TAX_SCALE)
 
 
 def test_shotgun_miss_uses_seven_round_clip() -> None:
@@ -103,7 +104,7 @@ def test_shotgun_miss_uses_seven_round_clip() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["ammo_waste"] == pytest.approx(-AMMO_PICKUP_BONUS / 7)
+    assert bd["ammo_waste"] == pytest.approx(-AMMO_PICKUP_BONUS / 7 * ATTACK_MISS_TAX_SCALE)
 
 
 def test_no_ammo_waste_without_miss_flag() -> None:

@@ -28,7 +28,7 @@ Legacy fixed schedule (``use_ram_gates=False``): blind 5/5/11 game-frame phases.
 from __future__ import annotations
 
 import os
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import Any
 
@@ -431,6 +431,16 @@ class KnifeAnimValidator:
         self._trail: list[str] = []
         self._trail_cap = 16
         self.pre_state: dict[str, Any] | None = None
+        self._label_counts: Counter[str] = Counter()
+        self._phase_label_counts: dict[str, Counter[str]] = defaultdict(Counter)
+        self._last_anim = 0
+        self._last_aux = 0
+        self._last_recovery = 0
+        self._last_label = "idle"
+        self._aim_ready_run = 0
+        self._aim_max_ready_streak = 0
+        self._aim_phase_frames = 0
+        self._settle_phase_frames = 0
 
     def set_phase(self, phase: str) -> None:
         if phase == self.phase:
@@ -442,6 +452,23 @@ class KnifeAnimValidator:
     def observe(self, anim: int, aux: int, recovery: int) -> None:
         self.frame += 1
         label = classify_knife_anim(anim, aux, recovery)
+        self._last_anim = int(anim)
+        self._last_aux = int(aux)
+        self._last_recovery = int(recovery)
+        self._last_label = label
+        self._label_counts[label] += 1
+        self._phase_label_counts[self.phase][label] += 1
+        if self.phase == "aim":
+            self._aim_phase_frames += 1
+            if label == "crouch_aim":
+                self._aim_ready_run += 1
+                self._aim_max_ready_streak = max(
+                    self._aim_max_ready_streak, self._aim_ready_run
+                )
+            else:
+                self._aim_ready_run = 0
+        elif self.phase == "settle":
+            self._settle_phase_frames += 1
         if label == "crouch_aim":
             self.saw_crouch_aim = True
         # Real slash only (0x14). Aim-hold 0x13 must NOT set swing_anim.
@@ -501,9 +528,31 @@ class KnifeAnimValidator:
                 self._check_swing_frame_count(where=f"abort_{outcome}")
                 if self.phase == "recovery":
                     self._check_recovery_frame_count(where=f"abort_{outcome}")
-        if self._issues:
+        if self._issues or outcome != "ok":
             self._emit_summary(outcome=outcome, died=died, frames=frames)
         return self.report(outcome=outcome, died=died, frames=frames)
+
+    def failure_pattern(self) -> dict[str, Any]:
+        """Structured anim histogram for failed swings (pattern mining)."""
+        aim_top = self._phase_label_counts.get("aim") or Counter()
+        settle_top = self._phase_label_counts.get("settle") or Counter()
+        swing_top = self._phase_label_counts.get("swing") or Counter()
+        return {
+            "fail_phase": self.phase,
+            "fail_label": self._last_label,
+            "fail_hooks": format_knife_hooks(
+                self._last_anim, self._last_aux, self._last_recovery
+            ),
+            "label_counts": dict(self._label_counts),
+            "aim_label_counts": dict(aim_top),
+            "settle_label_counts": dict(settle_top),
+            "swing_label_counts": dict(swing_top),
+            "aim_phase_frames": int(self._aim_phase_frames),
+            "settle_phase_frames": int(self._settle_phase_frames),
+            "aim_max_ready_streak": int(self._aim_max_ready_streak),
+            "saw_crouch_aim": bool(self.saw_crouch_aim),
+            "saw_swing_anim": bool(self.saw_swing_anim),
+        }
 
     def report(self, *, outcome: str, died: bool, frames: int) -> dict[str, Any]:
         swing_tol = _frame_count_tolerance(self._expect_swing)
@@ -547,6 +596,9 @@ class KnifeAnimValidator:
             "swing_frame_ok": swing_ok,
             "recovery_frame_ok": recovery_ok,
             "pre_state": self.pre_state,
+            "failure_pattern": (
+                self.failure_pattern() if outcome != "ok" else None
+            ),
         }
 
     def _check_swing_frame_count(self, *, where: str) -> None:
@@ -612,6 +664,40 @@ class KnifeAnimValidator:
             _knife_anim_log(f"  - {issue}", port=self._port)
         if self._trail:
             _knife_anim_log(f"  trail: {' | '.join(self._trail)}", port=self._port)
+
+
+def _top_label_counts(counts: dict[str, int] | Counter[str], *, limit: int = 5) -> str:
+    if not counts:
+        return "-"
+    items = Counter(counts).most_common(limit)
+    return ",".join(f"{label}:{n}" for label, n in items)
+
+
+def format_knife_failure_pattern(
+    *,
+    outcome: str,
+    died: bool,
+    frames: int,
+    failure_pattern: dict[str, Any],
+    pre_label: str = "?",
+    pre_hooks: str = "?",
+) -> str:
+    """One-line failure digest (memlog / offline tools)."""
+    fp = failure_pattern or {}
+    return (
+        f"outcome={outcome} died={int(died)} frames={frames} "
+        f"pre={pre_label} {pre_hooks} "
+        f"fail_phase={fp.get('fail_phase', '?')} "
+        f"fail={fp.get('fail_label', '?')} {fp.get('fail_hooks', '?')} "
+        f"aim_frames={fp.get('aim_phase_frames', 0)} "
+        f"aim_max_streak={fp.get('aim_max_ready_streak', 0)} "
+        f"saw_aim={int(bool(fp.get('saw_crouch_aim')))} "
+        f"saw_swing={int(bool(fp.get('saw_swing_anim')))} "
+        f"settle_top={_top_label_counts(fp.get('settle_label_counts') or {})} "
+        f"aim_top={_top_label_counts(fp.get('aim_label_counts') or {})} "
+        f"swing_top={_top_label_counts(fp.get('swing_label_counts') or {})} "
+        f"all_top={_top_label_counts(fp.get('label_counts') or {})}"
+    )
 
 
 def _expected_labels(phase: str) -> str:

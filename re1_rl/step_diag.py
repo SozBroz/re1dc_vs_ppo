@@ -156,6 +156,45 @@ def _big_reward_events(breakdown: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _knife_fail_row(info: dict[str, Any]) -> dict[str, Any] | None:
+    """Compact knife macro failure pattern for memlog (one env port)."""
+    report = info.get("knife_anim_report")
+    if not isinstance(report, dict):
+        return None
+    outcome = str(report.get("outcome") or "")
+    if outcome in ("", "ok"):
+        return None
+    fp = report.get("failure_pattern")
+    if not isinstance(fp, dict):
+        return None
+    pre = report.get("pre_state") if isinstance(report.get("pre_state"), dict) else {}
+    row: dict[str, Any] = {
+        "outcome": outcome,
+        "macro_frames": int(report.get("macro_frames") or 0),
+        "died": bool(report.get("died")),
+        "pre_label": pre.get("label"),
+        "pre_hooks": pre.get("hooks"),
+        "issues": list(report.get("issues") or [])[:3],
+    }
+    for key in (
+        "fail_phase",
+        "fail_label",
+        "fail_hooks",
+        "aim_phase_frames",
+        "settle_phase_frames",
+        "aim_max_ready_streak",
+        "saw_crouch_aim",
+        "saw_swing_anim",
+        "aim_label_counts",
+        "settle_label_counts",
+        "swing_label_counts",
+        "label_counts",
+    ):
+        if key in fp:
+            row[key] = fp[key]
+    return row
+
+
 class StepDiagLogger:
     """Append-only JSONL step logger for one env port."""
 
@@ -251,6 +290,9 @@ class StepDiagLogger:
         }
         if big:
             row["big_rewards"] = big
+        knife_fail = _knife_fail_row(info)
+        if knife_fail is not None:
+            row["knife_fail"] = knife_fail
         if terminated or truncated:
             row["ep_return_total"] = round(self.ep_return, 5)
         _append_line(self.path, row)

@@ -96,7 +96,8 @@ SOFTLOCK_TIMEOUT_PENALTY = -0.06666666666666667
 
 ENEMY_DAMAGE_REWARD = 0.007
 ENEMY_KILL_REWARD = 0.24
-KNIFE_MISS_PENALTY = -0.01
+ATTACK_MISS_TAX_SCALE = 0.25  # 75% reduction from baseline miss taxes
+KNIFE_MISS_PENALTY = -0.01 * ATTACK_MISS_TAX_SCALE
 # Flat legacy miss flag (unused); live knife tax uses KNIFE_MISS_PENALTY above.
 ATTACK_MISS_PENALTY = 0.0
 AMMO_WASTE_PENALTY = 0.0  # legacy stub; not read by compute_reward
@@ -163,7 +164,7 @@ def ammo_waste_per_missed_round(weapon_id: int) -> float:
     clip = MISS_TAX_CLIP_SIZE.get(int(weapon_id) & 0xFF)
     if clip is None or clip <= 0:
         return 0.0
-    return -AMMO_PICKUP_BONUS / float(clip)
+    return -AMMO_PICKUP_BONUS / float(clip) * ATTACK_MISS_TAX_SCALE
 
 
 def ammo_waste_penalty(weapon_id: int, rounds_spent: int) -> float:

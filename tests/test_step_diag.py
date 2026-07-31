@@ -128,6 +128,58 @@ def test_truncate_in_place_not_unlink(monkeypatch, tmp_path: Path) -> None:
     assert end["ep_return_total"] == round(0.12346 + -0.01, 5)
 
 
+def test_memlog_knife_fail_from_info(monkeypatch, tmp_path: Path) -> None:
+    log_path = tmp_path / "pking_top_right_memlog.jsonl"
+    monkeypatch.setenv("RE1_STEP_DIAG_PORT", "5759")
+    monkeypatch.setenv("RE1_STEP_DIAG_LOG", str(log_path))
+    sd._OPENED_PATHS.clear()
+
+    logger = sd.try_make_logger(5759, project_root=tmp_path)
+    assert logger is not None
+    mask = np.ones(46, dtype=bool)
+    logger.log_step(
+        reward=0.0,
+        terminated=False,
+        truncated=False,
+        action_masks=mask,
+        inventory_slots=[("knife", 1)],
+        hooks=None,
+        info={
+            "knife_anim_report": {
+                "outcome": "aim_timeout",
+                "died": False,
+                "macro_frames": 40,
+                "issues": ["aim timeout after 40 frames"],
+                "pre_state": {
+                    "label": "standing_recovery_latch",
+                    "hooks": "anim=0x0D aux=0x01 recovery=2",
+                },
+                "failure_pattern": {
+                    "fail_phase": "aim",
+                    "fail_label": "crouch_transitional",
+                    "fail_hooks": "anim=0x12 aux=0x04 recovery=3",
+                    "aim_phase_frames": 12,
+                    "settle_phase_frames": 8,
+                    "aim_max_ready_streak": 1,
+                    "saw_crouch_aim": False,
+                    "saw_swing_anim": False,
+                    "aim_label_counts": {"crouch_transitional": 10},
+                    "settle_label_counts": {"standing_recovery_latch": 8},
+                },
+            },
+        },
+        action=8,
+        action_name="knife_swing",
+    )
+    step = json.loads(log_path.read_text(encoding="utf-8").strip().splitlines()[-1])
+    assert step["action"] == "knife_swing"
+    kf = step["knife_fail"]
+    assert kf["outcome"] == "aim_timeout"
+    assert kf["fail_label"] == "crouch_transitional"
+    assert kf["aim_max_ready_streak"] == 1
+    assert kf["aim_label_counts"]["crouch_transitional"] == 10
+
+
 def test_second_logger_same_process_does_not_retruncate(monkeypatch, tmp_path: Path) -> None:
     log_path = tmp_path / "pking_top_right_memlog.jsonl"
     monkeypatch.setenv("RE1_STEP_DIAG_PORT", "5759")

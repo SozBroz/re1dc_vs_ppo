@@ -208,6 +208,7 @@ def make_env(
             bridge=bridge,
             project_root=PROJECT_ROOT,
             async_cutscene_skip=async_cutscene_skip,
+            camera_whiten=False,
         )
         env._ram_skip.training_speed = training_speed
         env._ram_skip.cutscene_speed = training_speed
@@ -271,7 +272,7 @@ def _build_model(
         n_epochs=4,
         learning_rate=3e-4,
         gamma=RL_GAMMA,
-        ent_coef=0.02,
+        ent_coef=0.01,
         verbose=1,
         device=device,
         tensorboard_log=tb_log,

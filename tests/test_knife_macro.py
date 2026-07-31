@@ -1117,6 +1117,53 @@ def test_anim_validator_summary_on_failed_macro(monkeypatch, capsys) -> None:
 
     monkeypatch.setattr(km, "KNIFE_ANIM_LOG_ENABLED", True)
     val = KnifeAnimValidator(bridge=type("B", (), {"port": 5555})())
+    val.set_phase("aim")
+    val.observe(0x0D, 0x01, 5)
+    val.observe(0x12, 0x04, 3)
+    val.finish(outcome="aim_timeout", died=False, frames=12)
+    out = capsys.readouterr().out
+    assert "SUMMARY" in out
+    assert "standing_recovery_latch" in out or "crouch_transitional" in out
+    rep = val.report(outcome="aim_timeout", died=False, frames=12)
+    assert rep["failure_pattern"]["aim_max_ready_streak"] == 0
+    assert rep["failure_pattern"]["fail_label"] == "crouch_transitional"
+
+
+def test_format_knife_failure_pattern_compact() -> None:
+    from re1_rl.knife_macro import format_knife_failure_pattern
+
+    line = format_knife_failure_pattern(
+        outcome="aim_timeout",
+        died=False,
+        frames=40,
+        failure_pattern={
+            "fail_phase": "aim",
+            "fail_label": "crouch_transitional",
+            "fail_hooks": "anim=0x12 aux=0x04 recovery=3",
+            "label_counts": {"crouch_transitional": 8, "standing_recovery_latch": 4},
+            "aim_label_counts": {"crouch_transitional": 8},
+            "settle_label_counts": {"standing_recovery_latch": 4},
+            "swing_label_counts": {},
+            "aim_phase_frames": 8,
+            "settle_phase_frames": 4,
+            "aim_max_ready_streak": 0,
+            "saw_crouch_aim": False,
+            "saw_swing_anim": False,
+        },
+        pre_label="standing_recovery_latch",
+        pre_hooks="anim=0x0D aux=0x01 recovery=2",
+    )
+    assert "outcome=aim_timeout" in line
+    assert "aim_top=crouch_transitional:8" in line
+    assert "aim_max_streak=0" in line
+
+
+def test_anim_validator_summary_on_failed_macro_legacy(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("KNIFE_ANIM_LOG", "1")
+    import re1_rl.knife_macro as km
+
+    monkeypatch.setattr(km, "KNIFE_ANIM_LOG_ENABLED", True)
+    val = KnifeAnimValidator(bridge=type("B", (), {"port": 5555})())
     val.set_phase("swing")
     val.finish(outcome="aim_timeout", died=False, frames=12)
     out = capsys.readouterr().out

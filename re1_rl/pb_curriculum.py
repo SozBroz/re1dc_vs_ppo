@@ -189,6 +189,60 @@ def _bundle_dict_from_record(rec: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _normalize_room_id(room_id: str) -> str:
+    return str(room_id or "").strip().upper()
+
+
+def champion_for_room(
+    project_root: Path | str,
+    room_id: str,
+) -> dict[str, str] | None:
+    """Return the filled champion bundle for ``room_id``, if any."""
+    target = _normalize_room_id(room_id)
+    if not target:
+        return None
+    for rec in _list_all_filled_champions(project_root):
+        if _normalize_room_id(str(rec.get("room_id") or "")) == target:
+            return _bundle_dict_from_record(rec)
+    return None
+
+
+def sample_focus_room_start(
+    project_root: Path | str,
+    room_id: str,
+    rng: random.Random | None = None,
+) -> dict[str, str] | None:
+    """Sample the champion sidecar for a focus room (e.g. L Passage / 108)."""
+    del rng  # one champion slot per danger room today
+    from re1_rl.pb_sync import ensure_pb_sync_daemon
+
+    ensure_pb_sync_daemon(Path(project_root))
+    return champion_for_room(project_root, room_id)
+
+
+def sample_other_champion_start(
+    project_root: Path | str,
+    *,
+    exclude_room_id: str = "",
+    rng: random.Random | None = None,
+) -> dict[str, str] | None:
+    """Sample any filled champion except ``exclude_room_id``."""
+    from re1_rl.pb_sync import ensure_pb_sync_daemon
+
+    root = Path(project_root)
+    ensure_pb_sync_daemon(root)
+    exclude = _normalize_room_id(exclude_room_id)
+    pool = [
+        rec
+        for rec in _list_all_filled_champions(root)
+        if _normalize_room_id(str(rec.get("room_id") or "")) != exclude
+    ]
+    if not pool:
+        return None
+    rng = rng or random.Random()
+    return _bundle_dict_from_record(rng.choice(pool))
+
+
 def typewriter_mix_weights(n_filled: int) -> tuple[float, float]:
     """Return ``(p_fresh, p_each_sidecar)`` for ``N`` filled champion slots.
 

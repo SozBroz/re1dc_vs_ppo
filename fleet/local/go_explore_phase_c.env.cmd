@@ -1,8 +1,8 @@
 @echo off
 REM Phase C — shadow Go-Explore: capture OFF until disk retention fixed (see docs/go_explore_disk_efficiency.plan.md).
-REM Archive resets still off (RE1_GO_EXPLORE_RESET_WEIGHT=0); PB sidecars unchanged.
+call "%~dp0obs_raw.env.cmd"
+call "%~dp0reset_mix_l_passage.env.cmd"
 set RE1_GO_EXPLORE_CAPTURE=0
-set RE1_GO_EXPLORE_RESET_WEIGHT=0
 set RE1_GO_EXPLORE_ARCHIVE=data\go_explore\archive.json
 set RE1_GO_EXPLORE_MANIFEST_POLL_S=60
 REM Disk guards (steady-state << 1 GB/day per machine).
