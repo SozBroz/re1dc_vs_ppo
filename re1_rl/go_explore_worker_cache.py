@@ -56,6 +56,7 @@ def load_local_manifest(local_root: Path | str) -> dict[str, Any]:
     return {
         "archive_version": int(raw.get("archive_version", 0) or 0),
         "cells": list(raw.get("cells") or []),
+        "cache_stats": dict(raw.get("cache_stats") or {}),
     }
 
 
@@ -63,6 +64,109 @@ def save_local_manifest(local_root: Path | str, manifest: dict[str, Any]) -> Non
     path = local_manifest_path(local_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def manifest_client_from_env() -> _ManifestClient | None:
+    """Build a learner HTTP client for lazy bundle fetch (worker subprocesses)."""
+    host = (
+        os.environ.get("RE1_LEARNER_HOST", "").strip()
+        or os.environ.get("LEARNER_HOST", "").strip()
+    )
+    if not host:
+        return None
+    port_raw = (
+        os.environ.get("RE1_LEARNER_PORT", "").strip()
+        or os.environ.get("FLEET_LEARNER_PORT", "").strip()
+        or "8765"
+    )
+    try:
+        port = int(port_raw)
+    except ValueError:
+        port = 8765
+    machine = os.environ.get("MACHINE_NAME", "worker").strip() or "worker"
+    from re1_rl.distributed.worker_client import WorkerClient
+
+    return WorkerClient(host, port, machine_name=machine, timeout=30.0)
+
+
+def count_cached_bundles(local_root: Path | str) -> int:
+    root = cells_dir(local_root)
+    if not root.is_dir():
+        return 0
+    n = 0
+    for p in root.iterdir():
+        if not p.is_dir() or p.name.startswith("."):
+            continue
+        if (p / CELL_STATE_NAME).is_file() and (p / CELL_SIDECAR_NAME).is_file():
+            n += 1
+    return n
+
+
+def prune_stale_cell_dirs(local_root: Path | str, valid_record_ids: set[str]) -> int:
+    """Remove cached cell dirs not present in the authoritative manifest."""
+    root = cells_dir(local_root)
+    if not root.is_dir():
+        return 0
+    removed = 0
+    for p in root.iterdir():
+        if not p.is_dir() or p.name.startswith("."):
+            continue
+        if p.name not in valid_record_ids:
+            shutil.rmtree(p, ignore_errors=True)
+            removed += 1
+    return removed
+
+
+def _normalize_manifest_rows(remote_cells: list[Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for row in remote_cells:
+        if isinstance(row, dict) and row.get("record_id"):
+            rows.append(dict(row))
+    return rows
+
+
+def poll_manifest(client: _ManifestClient, since_version: int, local_root: Path | str) -> dict[str, Any]:
+    """Fetch learner manifest and mirror into ``local_manifest.json``.
+
+    When the learner returns a non-empty ``cells`` list, treat it as a **full
+    snapshot** (replace local rows, prune evicted cache dirs). When the learner
+    reports ``cell_count`` that differs from the local mirror, force a full
+    resync with ``since_version=0``.
+    """
+    root = go_explore_root(local_root)
+    root.mkdir(parents=True, exist_ok=True)
+    remote = client.fetch_go_explore_manifest(since_version=int(since_version))
+    remote_ver = int(remote.get("archive_version", 0) or 0)
+    remote_cells = list(remote.get("cells") or [])
+    remote_cell_count = remote.get("cell_count")
+
+    local = load_local_manifest(root)
+    pruned = 0
+
+    if remote_cells:
+        rows = _normalize_manifest_rows(remote_cells)
+        valid_ids = {str(r["record_id"]) for r in rows}
+        pruned = prune_stale_cell_dirs(root, valid_ids)
+        local = {
+            "archive_version": remote_ver,
+            "cells": rows,
+        }
+    elif remote_cell_count is not None:
+        local_count = len(local.get("cells") or [])
+        if int(remote_cell_count) != local_count and int(since_version) != 0:
+            return poll_manifest(client, since_version=0, local_root=local_root)
+        local["archive_version"] = remote_ver
+    else:
+        local["archive_version"] = remote_ver
+
+    local["cache_stats"] = {
+        "manifest_cells": len(local.get("cells") or []),
+        "cached_bundles": count_cached_bundles(root),
+        "pruned_dirs_last_poll": pruned,
+        "remote_cell_count": int(remote_cell_count) if remote_cell_count is not None else None,
+    }
+    save_local_manifest(root, local)
+    return local
 
 
 def maybe_poll_manifest(
@@ -83,40 +187,6 @@ def maybe_poll_manifest(
     since = int(local.get("archive_version", 0) or 0)
     poll_manifest(client, since_version=since, local_root=local_root)
     return now
-
-
-def poll_manifest(client: _ManifestClient, since_version: int, local_root: Path | str) -> dict[str, Any]:
-    """Fetch learner manifest and merge into ``local_manifest.json``.
-
-    Returns the updated local manifest. When the learner reports no delta
-    (``cells`` empty and version unchanged / already current), local index
-    is left intact aside from refreshing ``archive_version``.
-    """
-    root = go_explore_root(local_root)
-    root.mkdir(parents=True, exist_ok=True)
-    remote = client.fetch_go_explore_manifest(since_version=int(since_version))
-    remote_ver = int(remote.get("archive_version", 0) or 0)
-    remote_cells = list(remote.get("cells") or [])
-
-    local = load_local_manifest(root)
-    if remote_cells:
-        by_id = {
-            str(c.get("record_id")): c
-            for c in local.get("cells") or []
-            if isinstance(c, dict) and c.get("record_id")
-        }
-        for row in remote_cells:
-            if not isinstance(row, dict) or not row.get("record_id"):
-                continue
-            by_id[str(row["record_id"])] = row
-        local = {
-            "archive_version": remote_ver,
-            "cells": list(by_id.values()),
-        }
-    else:
-        local["archive_version"] = remote_ver
-    save_local_manifest(root, local)
-    return local
 
 
 def manifest_index_by_cell_key(local_root: Path | str) -> dict[str, dict[str, Any]]:
@@ -231,3 +301,31 @@ def resolve_local_bundle(local_root: Path | str, record_id: str) -> dict[str, st
         "sidecar_path": str(side_p),
         "record_id": str(record_id),
     }
+
+
+def resolve_archive_bundle_for_reset(
+    local_root: Path | str,
+    row: dict[str, Any],
+    *,
+    client: _ManifestClient | None = None,
+) -> dict[str, Any] | None:
+    """Ensure bundle is cached locally, then return pb_bundle dict for reset."""
+    rid = str(row.get("record_id") or "")
+    if not rid:
+        return None
+    manifest_client = client or manifest_client_from_env()
+    if manifest_client is not None:
+        sha = str(row.get("bundle_sha256") or "") or None
+        ensure_bundle_cached(
+            manifest_client,
+            rid,
+            local_root,
+            expected_sha256=sha,
+        )
+    resolved = resolve_local_bundle(local_root, rid)
+    if resolved is None:
+        return None
+    out = dict(resolved)
+    if row.get("cell_key"):
+        out["milestone_id"] = str(row["cell_key"])
+    return out

@@ -881,6 +881,19 @@ def test_knife_action_ready_whitelist() -> None:
     assert is_standing_pre_knife_hook(0x0D, 0x01)
 
 
+def test_knife_crouch_action_ready_blocks_mid_swing() -> None:
+    from re1_rl.knife_macro import knife_crouch_action_ready
+
+    assert not knife_crouch_action_ready(0x14, 0x04, 0)
+    assert not knife_crouch_action_ready(0x14, 0x00, 0)
+    assert knife_crouch_action_ready(0x06, 0x00, 0)
+    assert knife_crouch_action_ready(0x12, 0x04, 0)
+    assert knife_crouch_action_ready(0x13, 0x04, 0)
+    assert knife_crouch_action_ready(0x15, 0x04, 0)
+    assert knife_crouch_action_ready(0, 0, 0)
+    assert knife_crouch_action_ready(0x01, 0x00, 0)
+
+
 def test_ram_gated_skips_settle_when_entry_standing_idle_then_recovery_latch() -> None:
     """Repro agent-ram #1140: standing idle entry, latch after neutral release."""
     bridge = MagicMock()

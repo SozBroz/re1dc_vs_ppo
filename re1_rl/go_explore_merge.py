@@ -385,8 +385,13 @@ class GoExploreMerge:
                 self.archive_version = int(raw.get("archive_version", 0) or 0)
                 self.archive.load()
             ver = int(self.archive_version)
+            cell_count = len(self.archive.cells)
             if int(since_version) >= ver:
-                return {"archive_version": ver, "cells": []}
+                return {
+                    "archive_version": ver,
+                    "cells": [],
+                    "cell_count": cell_count,
+                }
             cells_out: list[dict[str, Any]] = []
             for cell in self.archive.cells.values():
                 meta = cell.meta or {}
@@ -407,7 +412,11 @@ class GoExploreMerge:
                         "bytes": int(nbytes or 0),
                     }
                 )
-            return {"archive_version": ver, "cells": cells_out}
+            return {
+                "archive_version": ver,
+                "cells": cells_out,
+                "cell_count": len(cells_out),
+            }
 
     def pack_bundle_zip(self, record_id: str) -> bytes | None:
         """Zip bytes for ``GET /go_explore/bundle/<record_id>``."""

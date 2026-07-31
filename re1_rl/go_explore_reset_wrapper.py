@@ -10,7 +10,8 @@ import gymnasium as gym
 
 from re1_rl.go_explore_worker_cache import (
     load_local_manifest,
-    resolve_local_bundle,
+    manifest_client_from_env,
+    resolve_archive_bundle_for_reset,
 )
 from re1_rl.reset_curriculum import (
     ResetMixSource,
@@ -63,6 +64,7 @@ class GoExploreResetWrapper(gym.Wrapper):
         self._rng = rng or random.Random()
         self._reset_mix = reset_mix_from_env()
         self._focus_room = focus_room_from_env()
+        self._manifest_client = manifest_client_from_env()
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         opts = dict(options or {})
@@ -177,17 +179,17 @@ class GoExploreResetWrapper(gym.Wrapper):
         cells = [c for c in (manifest.get("cells") or []) if isinstance(c, dict)]
         if not cells:
             return None
-        row = self._rng.choice(cells)
-        rid = str(row.get("record_id") or "")
-        if not rid:
-            return None
-        resolved = resolve_local_bundle(self._go_explore_root, rid)
-        if resolved is None:
-            return None
-        out = dict(resolved)
-        if row.get("cell_key"):
-            out["milestone_id"] = str(row["cell_key"])
-        return out
+        order = list(cells)
+        self._rng.shuffle(order)
+        for row in order:
+            bundle = resolve_archive_bundle_for_reset(
+                self._go_explore_root,
+                row,
+                client=self._manifest_client,
+            )
+            if bundle is not None:
+                return bundle
+        return None
 
     def action_masks(self):
         fn = getattr(self.env, "action_masks", None)

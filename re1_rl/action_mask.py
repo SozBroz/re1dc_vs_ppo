@@ -25,7 +25,7 @@ from re1_rl.story_item_use import (
     legal_story_use_slots,
     slot_legal_for_story_use,
 )
-from re1_rl.knife_macro import knife_action_ready
+from re1_rl.knife_macro import knife_action_ready, knife_crouch_action_ready
 from re1_rl.weapon_equip import (
     EQUIPPABLE_WEAPON_IDS,
     any_legal_equip_slot,
@@ -166,12 +166,16 @@ def action_mask(
         mask[:] = False
 
     anim_ready = True
+    crouch_anim_ready = True
     if (
         player_anim is not None
         and player_aux is not None
         and player_recovery is not None
     ):
         anim_ready = knife_action_ready(
+            int(player_anim), int(player_aux), int(player_recovery)
+        )
+        crouch_anim_ready = knife_crouch_action_ready(
             int(player_anim), int(player_aux), int(player_recovery)
         )
 
@@ -201,6 +205,22 @@ def action_mask(
         for idx in (ATTACK_UP_ACTION, ATTACK_ACTION, ATTACK_DOWN_ACTION):
             if idx < n_actions:
                 mask[idx] = height_legal
+        if ATTACK_DOWN_ACTION < n_actions and mask[ATTACK_DOWN_ACTION]:
+            down_ready = (
+                crouch_anim_ready
+                if equipped_weapon_id == KNIFE_ID
+                else anim_ready
+            )
+            mask[ATTACK_DOWN_ACTION] = _height_attack_legal(
+                anim_ready=down_ready,
+                equipped_weapon_id=equipped_weapon_id,
+                equipped_slot_0based=equipped_slot_0based,
+                inventory=inventory,
+                mask_combat_without_enemies=mask_combat_without_enemies,
+                knife_enemies=knife_enemies,
+                gun_enemies=gun_enemies,
+                alive_enemies_in_room=alive_enemies_in_room,
+            )
 
     if not in_submenu:
         if inventory is not None and box is not None:

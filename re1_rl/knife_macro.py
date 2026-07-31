@@ -369,6 +369,27 @@ def knife_action_ready(anim: int, aux: int, recovery: int) -> bool:
     )
 
 
+def knife_crouch_action_ready(anim: int, aux: int, recovery: int) -> bool:
+    """Stricter gate for attack_down — block mid-slash 0x14, not walk (macro drains 0x06)."""
+    if is_crouch_knife_link_ready(anim, aux, recovery):
+        return True
+    if knife_action_blocked_by_recovery(anim, aux, recovery):
+        return False
+    if recovery == 0 and anim == STANDING_KNIFE_ANIM and aux in (
+        0,
+        CROUCH_KNIFE_ACTIVE_AUX,
+        0x03,
+    ):
+        return False
+    if is_knife_animation_idle(anim, aux, recovery):
+        return True
+    if is_standing_pre_knife_idle(anim, aux, recovery):
+        return True
+    if is_knife_locomotion(anim, aux):
+        return True
+    return False
+
+
 def classify_knife_anim(anim: int, aux: int, recovery: int) -> str:
     """Human-readable knife animation bucket for validation logs."""
     if is_knife_animation_idle(anim, aux, recovery):
@@ -1386,6 +1407,7 @@ def _execute_knife_macro_ram_gated(
         if entry_mid_swing
         else KNIFE_SETTLE_MAX_WAIT_FRAMES
     )
+    saw_locomotion = is_knife_locomotion(entry_anim, entry_aux)
 
     # Phase 0: release all buttons until settled (0/0/0 or weapon-ready standing).
     # Mid-swing / crouch_post entry drains under neutral; foreign/hurt aborts now.
@@ -1407,7 +1429,17 @@ def _execute_knife_macro_ram_gated(
         anim_val.saw_settled_idle = True
         settle_run = aim_ready_streak
     settle_saw_positive_recovery = entry_recovery > 0
-    while settle_run < aim_ready_streak and early_aim_run < aim_ready_streak:
+    neutral_drain = 0
+    while (
+        settle_run < aim_ready_streak
+        or (
+            saw_locomotion
+            and neutral_drain < MIN_BUTTON_PHASE_FRAMES * 2
+            and not (
+                entry_link_ready or entry_standing_ready or entry_recovery_tail
+            )
+        )
+    ) and early_aim_run < aim_ready_streak:
         if settle_wait >= max_settle_wait:
             anim_val._issue(
                 f"settle timeout after {settle_wait} frames "
@@ -1429,8 +1461,13 @@ def _execute_knife_macro_ram_gated(
             return _death(total + 1)
         total += 1
         settle_wait += 1
+        neutral_drain += 1
         anim, aux, recovery = read_knife_hooks(bridge)
         anim_val.observe(anim, aux, recovery)
+        if is_knife_locomotion(anim, aux):
+            saw_locomotion = True
+            settle_run = 0
+            early_aim_run = 0
         if is_knife_foreign_anim(anim, aux, recovery):
             anim_val._issue(
                 f"foreign anim during settle — release "
@@ -1625,8 +1662,6 @@ def _execute_knife_macro_ram_gated(
     max_recovery_wait = max(recovery_game * scale * 4, 64)
     recovery_wait = 0
     recovered = False
-    saw_positive_recovery = False
-    stable = 0
     while total < max_total and recovery_wait < max_recovery_wait:
         if _macro_player_died(
             bridge, prev_hp=prev_hp, episode_start_hp=episode_start_hp
@@ -1634,33 +1669,10 @@ def _execute_knife_macro_ram_gated(
             return _death(total)
         anim, aux, recovery = read_knife_hooks(bridge)
         anim_val.observe(anim, aux, recovery)
-        saw_positive_recovery = saw_positive_recovery or (
-            saw_slash and recovery > 0
-        )
         if is_knife_animation_idle(anim, aux, recovery):
             recovered = True
             break
-        if saw_slash and is_knife_swing_recovery_tail(anim, aux, recovery):
-            recovered = True
-            break
-        if (
-            saw_slash
-            and anim == CROUCH_KNIFE_POST_ANIM
-            and aux == CROUCH_KNIFE_ACTIVE_AUX
-            and recovery == 0
-        ):
-            recovered = True
-            break
-        if saw_slash and saw_positive_recovery and recovery == 0:
-            recovered = True
-            break
-        ready_fallback = (
-            saw_slash
-            and recovery == 0
-            and not is_knife_slash_anim(anim, aux, recovery)
-        )
-        stable = stable + 1 if ready_fallback else 0
-        if stable >= MIN_BUTTON_PHASE_FRAMES:
+        if is_crouch_knife_link_ready(anim, aux, recovery):
             recovered = True
             break
         if is_knife_macro_interrupted(
@@ -1673,7 +1685,7 @@ def _execute_knife_macro_ram_gated(
             return _abort(total, outcome="aborted_interrupt")
         if _step_one_frame(
             bridge,
-            {"r1": True},
+            AIM_BUTTONS,
             empty_sticky=empty_sticky,
             echo_joypad=echo_joypad,
             prev_hp=prev_hp,

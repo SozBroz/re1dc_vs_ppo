@@ -399,6 +399,7 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                         "evicted": self.state.go_explore_evicted,
                         "cells_total": len(cells),
                         "bytes_total": bytes_total,
+                        "archive_version": int(merge.archive_version),
                     }
             with self.state.lock:
                 payload = {

@@ -180,3 +180,59 @@ def test_worker_cache_poll_and_lazy_fetch(learner_http, tmp_path: Path) -> None:
         expected_sha256=local["cells"][0].get("bundle_sha256") or None,
     )
     assert dest2 == dest
+
+
+def test_poll_manifest_replaces_snapshot_and_prunes_stale_cache(
+    learner_http, tmp_path: Path
+) -> None:
+    ctx = learner_http
+    client: WorkerClient = ctx["client"]
+    merge: GoExploreMerge = ctx["merge"]
+    merge.ingest_proposals([_bundle_prop("keep_me", [5, 3, 1, 1, 0])])
+    merge.ingest_proposals([_bundle_prop("drop_me", [4, 2, 1, 1, 0])])
+
+    worker_root = tmp_path / "worker_cache"
+    poll_manifest(client, since_version=0, local_root=worker_root)
+    stale_dir = worker_root / "cells" / "orphan_local"
+    stale_dir.mkdir(parents=True)
+    (stale_dir / CELL_STATE_NAME).write_bytes(b"x")
+    (stale_dir / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+
+    # Simulate learner eviction: only keep_me remains.
+    merge.archive.remove_cell("drop_me")
+    merge.archive_version = int(merge.archive_version) + 1
+    merge._persist_unlocked()
+
+    local = poll_manifest(client, since_version=0, local_root=worker_root)
+    ids = {str(r["record_id"]) for r in local["cells"]}
+    assert ids == {"keep_me"}
+    assert not (worker_root / "cells" / "orphan_local").exists()
+    assert local["cache_stats"]["pruned_dirs_last_poll"] >= 1
+
+
+def test_poll_manifest_reconciles_cell_count_without_rows(
+    learner_http, tmp_path: Path
+) -> None:
+    ctx = learner_http
+    client: WorkerClient = ctx["client"]
+    merge: GoExploreMerge = ctx["merge"]
+    merge.ingest_proposals([_bundle_prop("only_one", [3, 2, 0, 0, 0])])
+
+    worker_root = tmp_path / "worker_cache"
+    poll_manifest(client, since_version=0, local_root=worker_root)
+    manifest_path = worker_root / "local_manifest.json"
+    raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    raw["cells"].append(
+        {
+            "record_id": "stale_local_only",
+            "cell_key": "v2|r=105|x=0|z=0|m=gallery:idle",
+            "room_id": "105",
+            "quality": [1, 1, 0, 0, 0],
+            "bytes": 100,
+        }
+    )
+    manifest_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    local = poll_manifest(client, since_version=int(raw["archive_version"]), local_root=worker_root)
+    ids = {str(r["record_id"]) for r in local["cells"]}
+    assert ids == {"only_one"}

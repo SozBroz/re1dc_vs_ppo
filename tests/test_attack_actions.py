@@ -180,6 +180,21 @@ def test_attack_link_boundaries_are_legal_next_frame() -> None:
         assert mask[ATTACK_DOWN_ACTION], (weapon_id, anim, aux)
 
 
+def test_attack_down_masked_mid_standing_knife_swing() -> None:
+    mask = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x01,
+        player_anim=0x14,
+        player_aux=0x04,
+        player_recovery=0,
+        knife_enemies_near=1,
+    )
+    assert mask[ATTACK_ACTION]
+    assert mask[ATTACK_UP_ACTION]
+    assert not mask[ATTACK_DOWN_ACTION]
+
+
 def test_combat_masked_without_enemies_in_room() -> None:
     m = action_mask(
         N_ACTIONS,
