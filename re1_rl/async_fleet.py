@@ -347,6 +347,83 @@ def _copy_compatible_policy_weights(src_policy, dst_policy) -> int:
     return len(filtered)
 
 
+def _transplant_state_dict_with_input_pad(
+    old_sd: dict[str, Any],
+    new_sd: dict[str, Any],
+) -> dict[str, list[str]]:
+    """Copy matching tensors; zero-pad widened linear input columns in-place."""
+    report: dict[str, list[str]] = {"copied": [], "remapped": [], "skipped": []}
+    for key, old_t in old_sd.items():
+        if key not in new_sd:
+            report["skipped"].append(f"missing {key}")
+            continue
+        new_t = new_sd[key]
+        if tuple(old_t.shape) == tuple(new_t.shape):
+            new_t.copy_(old_t)
+            report["copied"].append(key)
+            continue
+        if (
+            key.endswith(".mlp.0.weight")
+            and old_t.ndim == 2
+            and new_t.ndim == 2
+            and old_t.shape[0] == new_t.shape[0]
+            and old_t.shape[1] < new_t.shape[1]
+        ):
+            new_t.zero_()
+            new_t[:, : old_t.shape[1]] = old_t
+            report["remapped"].append(
+                f"{key} pad_in {old_t.shape[1]}->{new_t.shape[1]}"
+            )
+            continue
+        report["skipped"].append(f"{key} {tuple(old_t.shape)} -> {tuple(new_t.shape)}")
+    return report
+
+
+def transplant_combat_efficient_checkpoint(
+    src_zip: Path,
+    out_base: Path,
+    *,
+    device: str = "cpu",
+):
+    """Load donor zip, transplant into current CombatEfficientPPO, save survivor."""
+    import io
+    import json
+    import zipfile
+
+    import torch
+
+    from re1_rl.distributed.weights import _SpaceHolderEnv
+    from re1_rl.policy_config import POLICY_KWARGS
+
+    LearnerCls, extra = _make_learner_cls()
+    policy_obs, act_space = _policy_obs_and_act_spaces()
+    hp = {
+        **PPO_HYPERPARAMS,
+        "verbose": 0,
+        "device": device,
+        "policy_kwargs": POLICY_KWARGS,
+        **extra,
+    }
+    with zipfile.ZipFile(src_zip) as zf:
+        old_sd = torch.load(io.BytesIO(zf.read("policy.pth")), map_location="cpu")
+        meta = json.loads(zf.read("data"))
+    donor_steps = int(meta.get("num_timesteps", 0) or 0)
+    model = LearnerCls(
+        "MultiInputPolicy",
+        _SpaceHolderEnv(policy_obs, act_space),
+        **hp,
+    )
+    new_sd = model.policy.state_dict()
+    report = _transplant_state_dict_with_input_pad(old_sd, new_sd)
+    model.policy.load_state_dict(new_sd, strict=False)
+    _reload_world_catalog_buffers_if_needed(model)
+    model.num_timesteps = donor_steps
+    out_base.parent.mkdir(parents=True, exist_ok=True)
+    model.save(str(out_base))
+    out_zip = out_base if out_base.suffix == ".zip" else Path(str(out_base) + ".zip")
+    return model, out_zip, report
+
+
 def _make_learner_cls():
     from re1_rl.combat_ppo import CombatEfficientPPO
     from re1_rl.policy_config import AUX_COEF, USE_GROUPED_ENTROPY

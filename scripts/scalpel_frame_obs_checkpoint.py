@@ -94,13 +94,24 @@ def main() -> int:
     try:
         model = load_async_learner(device=str(args.device), resume=src, tb_log=None)
     except RuntimeError as exc:
-        print(f"[scalpel] load_async_learner failed ({exc}); doc04 catalog transplant", flush=True)
-        from re1_rl.doc04_catalog_transplant import transplant_doc04_checkpoint
+        print(f"[scalpel] load_async_learner failed ({exc}); combat-efficient transplant", flush=True)
+        from re1_rl.async_fleet import transplant_combat_efficient_checkpoint
 
         out_base = out_zip.with_suffix("")
-        model, out_zip, report = transplant_doc04_checkpoint(
-            src, out_base, device=str(args.device)
-        )
+        try:
+            model, out_zip, report = transplant_combat_efficient_checkpoint(
+                src, out_base, device=str(args.device)
+            )
+        except Exception as combat_exc:
+            print(
+                f"[scalpel] combat transplant failed ({combat_exc}); doc04 catalog transplant",
+                flush=True,
+            )
+            from re1_rl.doc04_catalog_transplant import transplant_doc04_checkpoint
+
+            model, out_zip, report = transplant_doc04_checkpoint(
+                src, out_base, device=str(args.device)
+            )
         for line in report.get("copied", [])[:8]:
             print(f"[scalpel] copied {line}", flush=True)
         for line in report.get("remapped", []):
