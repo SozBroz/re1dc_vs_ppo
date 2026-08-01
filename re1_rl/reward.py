@@ -96,7 +96,10 @@ SOFTLOCK_TIMEOUT_PENALTY = -0.06666666666666667
 
 ENEMY_DAMAGE_REWARD = 0.007
 ENEMY_KILL_REWARD = 0.24
-ATTACK_MISS_TAX_SCALE = 0.0  # no miss tax
+# Conservative ammo-waste tax.  A full inverse pickup tax (1.0) made scarce
+# weapons too expensive to explore; 0.10 keeps successful damage comfortably
+# more valuable while giving confirmed misses a small, immediate signal.
+ATTACK_MISS_TAX_SCALE = 0.10
 KNIFE_MISS_PENALTY = -0.01 * ATTACK_MISS_TAX_SCALE
 # Flat legacy miss flag (unused); live knife tax uses KNIFE_MISS_PENALTY above.
 ATTACK_MISS_PENALTY = 0.0

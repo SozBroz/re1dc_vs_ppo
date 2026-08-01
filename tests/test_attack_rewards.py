@@ -25,11 +25,11 @@ from tests.test_scaffolding import make_planner, make_state
 
 
 def test_miss_tax_formula_handgun_and_shotgun() -> None:
-    assert ATTACK_MISS_TAX_SCALE == 0.0
-    assert KNIFE_MISS_PENALTY == 0.0
-    assert ammo_waste_per_missed_round(0x02) == 0.0
-    assert ammo_waste_per_missed_round(0x03) == 0.0
-    assert ammo_waste_per_missed_round(0x05) == 0.0
+    assert ATTACK_MISS_TAX_SCALE == pytest.approx(0.10)
+    assert KNIFE_MISS_PENALTY == pytest.approx(-0.001)
+    assert ammo_waste_per_missed_round(0x02) == pytest.approx(-2.0 / 15.0 * 0.10)
+    assert ammo_waste_per_missed_round(0x03) == pytest.approx(-2.0 / 7.0 * 0.10)
+    assert ammo_waste_per_missed_round(0x05) == pytest.approx(-2.0 / 6.0 * 0.10)
     assert ammo_waste_per_missed_round(0x01) == 0.0  # knife
     assert ammo_waste_per_missed_round(0x06) == 0.0  # flamethrower
 
@@ -57,7 +57,7 @@ def test_attack_missed_taxes_ammo_by_clip() -> None:
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
     assert bd["attack_miss"] == 0.0
-    assert bd["ammo_waste"] == 0.0
+    assert bd["ammo_waste"] == pytest.approx(ammo_waste_per_missed_round(0x02))
     assert bd["step"] == STEP_PENALTY * (42 / REFERENCE_STEP_FRAMES)
 
 
@@ -70,7 +70,7 @@ def test_knife_swing_missed_penalty_no_ammo_tax() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["attack_miss"] == 0.0
+    assert bd["attack_miss"] == pytest.approx(KNIFE_MISS_PENALTY)
     assert bd["ammo_waste"] == 0.0
 
 
@@ -84,7 +84,9 @@ def test_ammo_spent_on_miss_scales_waste() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["ammo_waste"] == 0.0
+    assert bd["ammo_waste"] == pytest.approx(
+        3 * ammo_waste_per_missed_round(0x02)
+    )
 
 
 def test_shotgun_miss_uses_seven_round_clip() -> None:
@@ -97,7 +99,7 @@ def test_shotgun_miss_uses_seven_round_clip() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["ammo_waste"] == 0.0
+    assert bd["ammo_waste"] == pytest.approx(ammo_waste_per_missed_round(0x03))
 
 
 def test_no_ammo_waste_without_miss_flag() -> None:
