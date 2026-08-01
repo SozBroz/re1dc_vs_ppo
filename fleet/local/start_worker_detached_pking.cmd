@@ -5,12 +5,12 @@ cd /d D:\re1_rl
 
 if not exist data\logs mkdir data\logs
 
-REM Kill only the regular pking worker; the independent pking-memlog worker survives.
-for /f "tokens=2 delims=," %%P in ('wmic process where "name='python.exe' and CommandLine like '%%distributed_train%%' and CommandLine not like '%%worker-id pking-memlog%%' and (CommandLine like '%%machine-name pking%%' or CommandLine like '%%base-port 5755%%')" get ProcessId /format:csv ^| findstr /r "[0-9]"') do taskkill /F /PID %%P >nul 2>&1
+REM Kill all pking train workers (including former memlog). No memlog in 20-env headless mix.
+for /f "tokens=2 delims=," %%P in ('wmic process where "name='python.exe' and CommandLine like '%%distributed_train%%' and (CommandLine like '%%machine-name pking%%' or CommandLine like '%%worker-id pking%%' or CommandLine like '%%base-port 5755%%')" get ProcessId /format:csv ^| findstr /r "[0-9]"') do taskkill /F /PID %%P >nul 2>&1
 
-REM Free regular actor ports but preserve reserved memlog port 5759.
+REM Free all pking actor ports (5755-5774 inclusive).
 powershell -NoProfile -Command ^
-  "$ports = 5755..5774 | Where-Object { $_ -ne 5759 }; Get-NetTCPConnection -LocalPort $ports -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
+  "$ports = 5755..5774; Get-NetTCPConnection -LocalPort $ports -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
 
 timeout /t 2 /nobreak >nul
 

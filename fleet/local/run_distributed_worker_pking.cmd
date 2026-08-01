@@ -7,8 +7,8 @@ call "%~dp0..\fleet_hosts.cmd"
 set MACHINE_NAME=pking
 set LEARNER_HOST=%FLEET_LEARNER_HOST%
 set BASE_PORT=5755
-set N_ENVS=19
-set ACTOR_RANKS=0-3,5-19
+set N_ENVS=20
+set ACTOR_RANKS=0-19
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
 
 REM PB champions: typewriter saves + west-wing danger-room first-entry (108/202/204).

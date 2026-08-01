@@ -28,7 +28,7 @@ from re1_rl.go_explore_semantic import (
     semantic_bucket_key,
     weakest_incumbent,
 )
-from re1_rl.milestone_digest import YAWN_PATH_ROOMS, parse_cell_key_v2
+from re1_rl.milestone_digest import parse_cell_key_v2
 
 CELL_STATE_NAME = "cell.State"
 CELL_SIDECAR_NAME = "cell.sidecar.json"
@@ -196,26 +196,43 @@ class GoExploreMerge:
             remaining = [
                 c for c in self.archive.cells.values() if c.record_id not in evict_ids
             ]
+            # Never delete the last cell of a room (coverage preserve).
+            room_counts: dict[str, int] = {}
+            for c in remaining:
+                room_counts[c.room_id] = room_counts.get(c.room_id, 0) + 1
+            evictable = [c for c in remaining if room_counts.get(c.room_id, 0) > 1]
             room_present = any(c.room_id == room for c in self.archive.cells.values())
-            is_new_yawn_room = room in YAWN_PATH_ROOMS and not room_present
-            global_weak = weakest_incumbent(remaining)
+            is_new_room = not room_present
+            global_weak = weakest_incumbent(evictable) if evictable else None
             if global_weak is None:
                 self.rejected_semantic += 1
                 return None
-            if not is_new_yawn_room and not quality_beats(quality, global_weak.quality):
+            if not is_new_room and not quality_beats(quality, global_weak.quality):
                 self.rejected_semantic += 1
                 return None
             if global_weak.record_id not in evict_ids:
                 to_evict.append(global_weak)
 
-        room_count = sum(
-            1
+        room_cells = [
+            c
             for c in self.archive.cells.values()
             if c.room_id == room and c.record_id not in evict_ids
-        )
-        if room_count >= self.archive.max_cells_per_room:
-            self.rejected_semantic += 1
-            return None
+        ]
+        if len(room_cells) >= self.archive.max_cells_per_room:
+            # Room full: replace weakest room cell when quality is meaningfully better
+            # (same spirit as PB champion upgrade — avoid resource-starved traps).
+            from re1_rl.go_explore_capture import quality_replace_significant
+
+            weak_room = weakest_incumbent(room_cells)
+            if (
+                weak_room is None
+                or not quality_beats(quality, weak_room.quality)
+                or not quality_replace_significant(quality, weak_room.quality)
+            ):
+                self.rejected_semantic += 1
+                return None
+            if weak_room.record_id not in evict_ids:
+                to_evict.append(weak_room)
         return to_evict
 
     def _ingest_one_unlocked(self, prop: dict[str, Any]) -> str | None:
@@ -237,10 +254,15 @@ class GoExploreMerge:
             return None
         record_id = str(prop.get("record_id") or "").strip() or new_record_id()
 
+        from re1_rl.go_explore_capture import quality_replace_significant
+
         existing = self.archive.cells.get(cell_key)
-        if existing is not None and not quality_beats(quality, existing.quality):
-            existing.visit_count += 1
-            return None
+        if existing is not None:
+            if not quality_beats(quality, existing.quality) or not quality_replace_significant(
+                quality, existing.quality
+            ):
+                existing.visit_count += 1
+                return None
 
         room = str(parsed["room_id"])
         tb = tuple(parsed["tile_bin"])
@@ -277,6 +299,8 @@ class GoExploreMerge:
         for k in ("worker_id", "captured_at_step", "state_sha256", "sidecar_sha256"):
             if k in prop and prop[k] is not None:
                 meta[k] = prop[k]
+        if prop.get("capture_reasons"):
+            meta["capture_reasons"] = list(prop["capture_reasons"])
         if bundle_sha:
             meta["bundle_sha256"] = bundle_sha
 

@@ -818,6 +818,7 @@ class RE1Env(gym.Env):
                             **tw_log_ctx,
                         )
 
+        self._queue_go_explore_progress(prev_state, state, breakdown)
         proposal = self._maybe_capture_go_explore(state)
         if proposal is not None:
             pending = getattr(self, "_go_explore_capture_pending", None)
@@ -843,6 +844,79 @@ class RE1Env(gym.Env):
         self._go_explore_archive_cache = arc
         return arc
 
+    def _queue_go_explore_progress(
+        self,
+        prev_state: dict[str, Any],
+        state: dict[str, Any],
+        breakdown: dict[str, float],
+    ) -> None:
+        from re1_rl.go_explore_capture import go_explore_capture_enabled
+        from re1_rl.go_explore_progress import detect_go_explore_progress_events
+
+        if not go_explore_capture_enabled():
+            return
+        fired = getattr(self, "_go_explore_fired_reasons", None)
+        if fired is None:
+            self._go_explore_fired_reasons = set()
+            fired = self._go_explore_fired_reasons
+        pending = getattr(self, "_go_explore_pending_reasons", None)
+        if pending is None:
+            self._go_explore_pending_reasons = []
+            pending = self._go_explore_pending_reasons
+        for reason in detect_go_explore_progress_events(
+            prev_state, state, breakdown, already=fired
+        ):
+            if reason not in pending:
+                pending.append(reason)
+
+    def _go_explore_capture_reasons(self, state: dict[str, Any]) -> list[str]:
+        """Progress pending + coverage debt + same-key quality upgrade eligibility."""
+        from re1_rl.go_explore_capture import (
+            compute_quality,
+            go_explore_root,
+            quality_replace_significant,
+        )
+        from re1_rl.go_explore_progress import coverage_reason, quality_improve_reason
+        from re1_rl.go_explore_worker_cache import manifest_index_by_cell_key
+        from re1_rl.milestone_digest import cell_key_v2, compute_digest
+
+        reasons: list[str] = []
+        pending = list(getattr(self, "_go_explore_pending_reasons", None) or [])
+        reasons.extend(pending)
+
+        room = str(state.get("room_id", "") or "").strip().upper()
+        if not room:
+            return reasons
+
+        root = go_explore_root(self.project_root)
+        manifest_index = manifest_index_by_cell_key(root)
+        covered = any(
+            str(row.get("room_id") or "").strip().upper() == room
+            for row in (manifest_index or {}).values()
+            if isinstance(row, dict)
+        )
+        attempted = getattr(self, "_go_explore_coverage_attempted", None)
+        if attempted is None:
+            self._go_explore_coverage_attempted = set()
+            attempted = self._go_explore_coverage_attempted
+        if not covered and room not in attempted:
+            reasons.append(coverage_reason(room))
+
+        # Same-key quality upgrade (resource-richer revisit of an existing pose).
+        held = self._items.ever_held
+        digest = compute_digest(state, self._progress, ever_held=held)
+        x = int(state.get("x", state.get("player_x", 0)) or 0)
+        z = int(state.get("z", state.get("player_z", 0)) or 0)
+        key = cell_key_v2(room, x, z, digest)
+        row = (manifest_index or {}).get(key)
+        if isinstance(row, dict):
+            old_q = row.get("quality")
+            if isinstance(old_q, (list, tuple)) and len(old_q) >= 5:
+                new_q = compute_quality(state)
+                if quality_replace_significant(new_q, old_q):
+                    reasons.append(quality_improve_reason(key))
+        return reasons
+
     def _maybe_capture_go_explore(self, state: dict[str, Any]) -> dict[str, Any] | None:
         from re1_rl.go_explore_capture import (
             go_explore_capture_enabled,
@@ -854,12 +928,16 @@ class RE1Env(gym.Env):
         if not go_explore_capture_enabled():
             return None
 
+        reasons = self._go_explore_capture_reasons(state)
+        if not reasons:
+            return None
+
         def _save(dst: Path) -> None:
             self.bridge.save_savestate(str(dst))
 
         manifest_index = manifest_index_by_cell_key(go_explore_root(self.project_root))
 
-        return maybe_capture_cell(
+        proposal = maybe_capture_cell(
             state,
             self._progress,
             self._go_explore_archive(),
@@ -870,7 +948,25 @@ class RE1Env(gym.Env):
             env_step=self._step_count,
             capture_state=self._go_capture_budget,
             manifest_index=manifest_index,
+            capture_reasons=reasons,
+            require_reason=True,
         )
+        if proposal is not None:
+            fired = getattr(self, "_go_explore_fired_reasons", None)
+            if fired is None:
+                self._go_explore_fired_reasons = set()
+                fired = self._go_explore_fired_reasons
+            for r in reasons:
+                fired.add(r)
+            self._go_explore_pending_reasons = []
+            room = str(state.get("room_id", "") or "").strip().upper()
+            if room:
+                attempted = getattr(self, "_go_explore_coverage_attempted", None)
+                if attempted is None:
+                    self._go_explore_coverage_attempted = set()
+                    attempted = self._go_explore_coverage_attempted
+                attempted.add(room)
+        return proposal
 
     def _capture_step_obs(self) -> np.ndarray:
         """Store the live framebuffer at ``emulated_frame`` and build [t-12..t]."""
@@ -899,6 +995,10 @@ class RE1Env(gym.Env):
         self._go_explore_capture_pending = []
         self._go_explore_archive_cache = None
         self._go_capture_budget = {"last_capture_step": -10**9}
+        # Progress reasons waiting for in_control (cutscene/pickup settle).
+        self._go_explore_pending_reasons: list[str] = []
+        self._go_explore_fired_reasons: set[str] = set()
+        self._go_explore_coverage_attempted: set[str] = set()
 
         from re1_rl.pb_bundle_io import (
             bundle_room_matches_sidecar,

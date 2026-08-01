@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+import os
 import random
 from pathlib import Path
 from typing import Any
@@ -24,15 +26,42 @@ from re1_rl.reset_curriculum import (
 )
 
 
+def _pb_weight_from_env(default: float = 0.5) -> float:
+    """Share of non-archive resets that use a PB sidecar (default 0.5 → 30/30 with archive=0.4)."""
+    raw = os.environ.get("RE1_PB_FRESH_WEIGHT", "").strip()
+    if not raw:
+        return float(default)
+    try:
+        # RE1_PB_FRESH_WEIGHT is P(fresh|not archive); pb share is the complement.
+        fresh = max(0.0, min(1.0, float(raw)))
+        return 1.0 - fresh
+    except ValueError:
+        return float(default)
+
+
+def _cell_quality_score(row: dict[str, Any]) -> float:
+    q = row.get("quality")
+    if not isinstance(q, (list, tuple)) or len(q) < 5:
+        return 0.0
+    # Prefer ammo + healing + free slots heavily; HP secondary.
+    return (
+        float(q[1]) * 2.0
+        + float(q[2]) * 8.0
+        + float(q[3]) * 4.0
+        + float(q[4]) * 3.0
+        + float(q[0]) * 0.05
+    )
+
+
 class GoExploreResetWrapper(gym.Wrapper):
     """Like ``PbChampionResetWrapper``, plus archive resets from local cache.
 
     Archive sampling uses ``local_manifest.json`` + ``cells/<record_id>/`` under
     ``go_explore_root``. Missing local bundles fall back to PB/fresh — never SMB.
 
-    When ``RE1_RESET_FOCUS_ROOM`` is set (default mix 30/30/30/10), sampling uses
-    fresh | focus-room PB | other PB | archive. Otherwise the legacy 3-way mix
-    (``RE1_GO_EXPLORE_RESET_WEIGHT`` + ``pb_weight``) applies.
+    Default fleet mix (no focus room): 30% fresh / 30% any PB sidecar / 40% archive
+    via ``RE1_GO_EXPLORE_RESET_WEIGHT=0.40`` and ``RE1_PB_FRESH_WEIGHT=0.50``.
+    When ``RE1_RESET_FOCUS_ROOM`` is set, the 4-way mix still applies.
     """
 
     def __init__(
@@ -42,7 +71,7 @@ class GoExploreResetWrapper(gym.Wrapper):
         *,
         go_explore_root: Path | str | None = None,
         archive_weight: float | None = None,
-        pb_weight: float = 0.5,
+        pb_weight: float | None = None,
         rng: random.Random | None = None,
     ) -> None:
         super().__init__(env)
@@ -61,7 +90,9 @@ class GoExploreResetWrapper(gym.Wrapper):
             if archive_weight is not None
             else archive_weight_from_env(0.0)
         )
-        self._pb_weight = float(pb_weight)
+        self._pb_weight = (
+            float(pb_weight) if pb_weight is not None else _pb_weight_from_env(0.5)
+        )
         self._rng = rng or random.Random()
         self._reset_mix = reset_mix_from_env()
         self._focus_room = focus_room_from_env()
@@ -176,12 +207,61 @@ class GoExploreResetWrapper(gym.Wrapper):
         return False
 
     def _sample_archive_bundle(self) -> dict[str, Any] | None:
+        """Sample an archive cell, preferring resource-rich and under-covered rooms."""
         manifest = load_local_manifest(self._go_explore_root)
         cells = [c for c in (manifest.get("cells") or []) if isinstance(c, dict)]
         if not cells:
             return None
-        order = list(cells)
-        self._rng.shuffle(order)
+
+        # Skip known probe / stub rows (tiny or named probe ids).
+        usable: list[dict[str, Any]] = []
+        for row in cells:
+            rid = str(row.get("record_id") or "")
+            if rid in {"biglive", "probe_live_001"} or rid.startswith("probe_"):
+                continue
+            nbytes = int(row.get("bytes") or 0)
+            if 0 < nbytes < 50_000:
+                continue
+            usable.append(row)
+        if not usable:
+            usable = list(cells)
+
+        room_counts: dict[str, int] = {}
+        for row in usable:
+            room = str(row.get("room_id") or "").strip().upper()
+            room_counts[room] = room_counts.get(room, 0) + 1
+
+        # 80% weighted by quality / sparse-room; 20% uniform explore.
+        if self._rng.random() < 0.20:
+            order = list(usable)
+            self._rng.shuffle(order)
+        else:
+            weights: list[float] = []
+            for row in usable:
+                room = str(row.get("room_id") or "").strip().upper()
+                sparse = 1.0 / math.sqrt(max(1, room_counts.get(room, 1)))
+                q = max(0.1, _cell_quality_score(row))
+                weights.append(sparse * q)
+            # Weighted shuffle without replacement (sample then remove).
+            order = []
+            pool = list(usable)
+            wpool = list(weights)
+            while pool:
+                total = sum(wpool)
+                if total <= 0:
+                    order.extend(pool)
+                    break
+                u = self._rng.random() * total
+                acc = 0.0
+                pick = 0
+                for i, w in enumerate(wpool):
+                    acc += w
+                    if u < acc:
+                        pick = i
+                        break
+                order.append(pool.pop(pick))
+                wpool.pop(pick)
+
         for row in order:
             bundle = resolve_archive_bundle_for_reset(
                 self._go_explore_root,

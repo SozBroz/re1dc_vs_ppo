@@ -106,14 +106,26 @@ def test_replace_better_quality(tmp_path: Path) -> None:
     merge = GoExploreMerge(archive)
     key = _key()
     merge.ingest_proposals([_proposal(record_id="rec_old", quality=[5, 5, 0, 0, 0], cell_key=key)])
+    # Significant ammo gain (noise-thresholded replace, like PB champions).
     accepted = merge.ingest_proposals(
-        [_proposal(record_id="rec_new", quality=[6, 5, 0, 0, 0], cell_key=key)]
+        [_proposal(record_id="rec_new", quality=[5, 20, 0, 0, 0], cell_key=key)]
     )
     assert accepted == ["rec_new"]
     assert merge.archive.cells[key].record_id == "rec_new"
-    assert merge.archive.cells[key].quality[0] == 6
+    assert merge.archive.cells[key].quality[1] == 20
     assert not (tmp_path / "cells" / "rec_old").exists()
     assert (tmp_path / "cells" / "rec_new" / CELL_STATE_NAME).is_file()
+
+
+def test_replace_rejects_hp_noise(tmp_path: Path) -> None:
+    merge = GoExploreMerge(tmp_path / "archive.json")
+    key = _key()
+    merge.ingest_proposals([_proposal(record_id="rec_old", quality=[5, 5, 0, 0, 0], cell_key=key)])
+    accepted = merge.ingest_proposals(
+        [_proposal(record_id="rec_new", quality=[6, 5, 0, 0, 0], cell_key=key)]
+    )
+    assert accepted == []
+    assert merge.archive.cells[key].record_id == "rec_old"
 
 
 def test_manifest_versioning(tmp_path: Path) -> None:

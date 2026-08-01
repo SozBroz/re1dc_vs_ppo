@@ -24,7 +24,6 @@ from re1_rl.go_explore_archive import (
 from re1_rl.item_todo import canonical_item
 from re1_rl.milestone_digest import (
     DEFAULT_TILE_SPAN,
-    YAWN_PATH_ROOMS,
     cell_key_v2,
     compute_digest,
 )
@@ -507,6 +506,7 @@ def _build_ephemeral_proposal(
     state_tmp: Path,
     side_tmp: Path,
     reason: str,
+    capture_reasons: list[str] | None = None,
 ) -> dict[str, Any] | None:
     from re1_rl.go_explore_merge import (
         CELL_SIDECAR_NAME,
@@ -516,6 +516,7 @@ def _build_ephemeral_proposal(
 
     state_bytes = state_tmp.read_bytes()
     sidecar = json.loads(side_tmp.read_text(encoding="utf-8"))
+    reasons = list(capture_reasons or [])
     meta = {
         "record_id": record_id,
         "cell_key": key,
@@ -527,6 +528,7 @@ def _build_ephemeral_proposal(
         "x": x,
         "z": z,
         "integrity": reason,
+        "capture_reasons": reasons,
     }
     blob = make_cell_bundle_zip(state_bytes=state_bytes, sidecar=sidecar, meta=meta)
     # Hash zip members, not temp files: on Windows write_text() CRLF sidecars do not
@@ -545,6 +547,8 @@ def _build_ephemeral_proposal(
         "sidecar_sha256": side_sha,
         "captured_at_iso": captured_at,
         "bundle_path": f"cells/{record_id}",
+        "capture_reasons": reasons,
+        "meta": {"capture_reasons": reasons},
     }
 
 
@@ -769,6 +773,38 @@ def install_cell_bundle(
         release_slot_lock(slot)
 
 
+def _weakest_room_quality(
+    room: str,
+    *,
+    manifest_index: dict[str, dict[str, Any]] | None,
+    archive: GoExploreArchive,
+) -> Quality | None:
+    """Lowest quality tuple among cells for ``room`` (resource-upgrade replace)."""
+    room_u = room.upper()
+    worst: Quality | None = None
+    if manifest_index is not None:
+        rows = [
+            row
+            for row in manifest_index.values()
+            if isinstance(row, dict)
+            and str(row.get("room_id") or "").strip().upper() == room_u
+        ]
+    else:
+        rows = [
+            c.to_json()
+            for c in archive.cells.values()
+            if str(c.room_id).upper() == room_u
+        ]
+    for row in rows:
+        q_raw = row.get("quality") if isinstance(row, dict) else None
+        if not isinstance(q_raw, (list, tuple)) or len(q_raw) < 5:
+            continue
+        q = (int(q_raw[0]), int(q_raw[1]), int(q_raw[2]), int(q_raw[3]), int(q_raw[4]))
+        if worst is None or q < worst:
+            worst = q
+    return worst
+
+
 def maybe_capture_cell(
     env_state: dict[str, Any],
     progress: ProgressTracker,
@@ -785,11 +821,17 @@ def maybe_capture_cell(
     manifest_index: dict[str, dict[str, Any]] | None = None,
     semantic_index: dict[tuple[str, str], list[dict[str, Any]]] | None = None,
     persist_locally: bool | None = None,
+    capture_reasons: list[str] | tuple[str, ...] | None = None,
+    require_reason: bool | None = None,
 ) -> dict[str, Any] | None:
     """Capture a Go-Explore cell when integrity + quality gates pass.
 
     Workers default to ephemeral capture (zip in proposal, no local ``cells/``).
     Set ``RE1_GO_CANONICAL_STORE=1`` to install bundles locally (learner/tests).
+
+    When ``require_reason`` is True, capture only fires if ``capture_reasons`` is
+    non-empty (progress / coverage / quality upgrade). Default: require a reason
+    when ``capture_reasons`` is explicitly passed; otherwise admit (unit tests).
     """
     if not go_explore_capture_enabled():
         return None
@@ -799,9 +841,21 @@ def maybe_capture_cell(
         return None
 
     room = str(env_state.get("room_id", "") or "").strip().upper()
-    allowed = path_rooms if path_rooms is not None else YAWN_PATH_ROOMS
-    if room not in {_normalize_room(r) for r in allowed}:
+    if not room:
         return None
+    # Optional allowlist; default admits any legal room (progress-gated upstream).
+    if path_rooms is not None and room not in {_normalize_room(r) for r in path_rooms}:
+        return None
+
+    reasons = [str(r) for r in (capture_reasons or ()) if r]
+    must_reason = (
+        bool(require_reason)
+        if require_reason is not None
+        else capture_reasons is not None
+    )
+    if must_reason and not reasons:
+        return None
+    priority = bool(reasons)
 
     x = int(env_state.get("x", env_state.get("player_x", 0)) or 0)
     z = int(env_state.get("z", env_state.get("player_z", 0)) or 0)
@@ -819,8 +873,22 @@ def maybe_capture_cell(
             return None
         if not quality_replace_significant(quality, existing_quality):
             return None
-    elif _room_cell_count(room, manifest_index=manifest_index, archive=archive) >= archive.max_cells_per_room:
-        return None
+        if not any(r.startswith("quality_improve:") for r in reasons):
+            reasons.append(f"quality_improve:{key}")
+    else:
+        room_count = _room_cell_count(
+            room, manifest_index=manifest_index, archive=archive
+        )
+        if room_count >= archive.max_cells_per_room:
+            # Room full: only admit if this state meaningfully beats the weakest
+            # cell in the room (resource upgrade — avoid forever-stuck cells).
+            worst = _weakest_room_quality(
+                room, manifest_index=manifest_index, archive=archive
+            )
+            if worst is None or not quality_replace_significant(quality, worst):
+                return None
+            if not any(r.startswith("room_upgrade:") for r in reasons):
+                reasons.append(f"room_upgrade:{room}")
 
     # Semantic pose-cap pre-filter before save_state / budget consume.
     from re1_rl.go_explore_semantic import (
@@ -846,7 +914,7 @@ def maybe_capture_cell(
         return None
 
     last_step = int((capture_state or {}).get("last_capture_step", -10**9))
-    if int(env_step) - last_step < capture_cooldown_steps():
+    if (not priority) and int(env_step) - last_step < capture_cooldown_steps():
         return None
 
     persist = canonical_store_enabled() if persist_locally is None else bool(persist_locally)
@@ -901,6 +969,7 @@ def maybe_capture_cell(
                 state_tmp=state_tmp,
                 side_tmp=side_tmp,
                 reason=reason,
+                capture_reasons=reasons,
             )
             if proposal is None:
                 return None
@@ -924,6 +993,7 @@ def maybe_capture_cell(
             "tile_span": span,
             "x": x,
             "z": z,
+            "capture_reasons": list(reasons),
         }
         shas = install_cell_bundle(
             cell_dir,
@@ -998,6 +1068,8 @@ def maybe_capture_cell(
         "sidecar_sha256": shas["sidecar_sha256"],
         "captured_at_iso": captured_at,
         "bundle_path": rel_bundle,
+        "capture_reasons": list(reasons),
+        "meta": {"capture_reasons": list(reasons)},
     }
     return proposal
 

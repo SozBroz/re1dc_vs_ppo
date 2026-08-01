@@ -315,9 +315,11 @@ def test_maybe_capture_skips_on_disk_full_mkdir(
     assert out is None
 
 
-def test_off_path_room_skipped(
+def test_off_path_room_skipped_when_allowlist_set(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    from re1_rl.milestone_digest import YAWN_PATH_ROOMS
+
     monkeypatch.setenv("RE1_GO_EXPLORE_CAPTURE", "1")
     archive = GoExploreArchive(tmp_path / "archive.json")
     out = maybe_capture_cell(
@@ -326,6 +328,7 @@ def test_off_path_room_skipped(
         archive,
         save_state=lambda p: p.write_bytes(b"x"),
         project_root=tmp_path,
+        path_rooms=YAWN_PATH_ROOMS,
     )
     assert out is None
 
