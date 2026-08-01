@@ -81,6 +81,7 @@ from re1_rl.world_state_encoder import WORLD_STATE_DIM, encode_world_state
 from re1_rl.key_items import KEY_ITEM_NAMES, KEYS_HELD_DIM, encode_keys_held
 from re1_rl.maps_files import MAPS_FILES_DIM, encode_maps_files_flags
 from re1_rl.milestone_features import MILESTONE_DIM, encode_milestones
+from re1_rl.named_state import NAMED_STATE_DIM, encode_named_state
 from re1_rl.room_signature import ENEMY_ROSTER_DIM, RoomEnemyRoster
 from re1_rl.spatial_encoder import (
     SPATIAL_DIM,
@@ -307,6 +308,8 @@ class RE1Env(gym.Env):
                 ),
                 "milestones": spaces.Box(0.0, 1.0, shape=(MILESTONE_DIM,), dtype=np.float32),
                 "maps_files": spaces.Box(0.0, 1.0, shape=(MAPS_FILES_DIM,), dtype=np.float32),
+                # Verified runtime bits only (no unmapped interaction_prompt).
+                "named_state": spaces.Box(0.0, 1.0, shape=(NAMED_STATE_DIM,), dtype=np.float32),
             }
         )
         self.action_space = spaces.Discrete(len(ACTION_NAMES))
@@ -482,6 +485,10 @@ class RE1Env(gym.Env):
             "game_mode": int(ram.get("game_mode", 0)),
             "scene_flag": int(ram.get("scene_flag", 0)),
             "msg_flag": int(ram.get("msg_flag", 0)),
+            # Confirmed DEFAULT_RAM_FIELDS — exposed for named_state tower.
+            "door_flags": int(ram.get("door_flags", 0)),
+            "game_timer": int(ram.get("game_timer", 0)),
+            "lab_timer": int(ram.get("lab_timer", 0)),
             "stage_id": int(ram.get("stage_id", 0)),
             "room_byte": int(ram.get("room_id", 0)),
             "enemies": enemies,
@@ -686,6 +693,7 @@ class RE1Env(gym.Env):
                 cutscenes_hit=len(self._progress.rewarded_cutscenes),
             ),
             "maps_files": encode_maps_files_flags(state.get("maps_files_flags")),
+            "named_state": encode_named_state(state),
         }
 
     def _sync_episode_history(self, state: dict[str, Any]) -> None:

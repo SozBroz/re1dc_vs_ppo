@@ -27,6 +27,7 @@ OUTCOMES_PER_HEIGHT = 6
 N_ATTACK_HEIGHTS = 3
 COMBAT_OUTCOME_DIM = OUTCOMES_PER_HEIGHT * N_ATTACK_HEIGHTS  # 18
 
+# Compact rollout vector — no unsupervised channels (player_damage removed).
 COMBAT_TARGET_FIELDS: tuple[str, ...] = (
     "selected_height",  # 0=neutral, 1=up, 2=down, -1=non-attack
     "hit",
@@ -35,12 +36,10 @@ COMBAT_TARGET_FIELDS: tuple[str, ...] = (
     "kill",
     "ammo_spent",
     "macro_failure",
-    "player_damage",
     "mask",  # 1 = supervise this transition
 )
-
-# Compact float vector stored on rollouts (fixed width).
-COMBAT_TARGET_DIM = 9
+COMBAT_TARGET_DIM = len(COMBAT_TARGET_FIELDS)  # 8
+COMBAT_TARGET_MASK_INDEX = 7
 
 WORLD_EVENT_FIELDS: tuple[str, ...] = (
     "room_transition",
@@ -53,42 +52,7 @@ WORLD_EVENT_FIELDS: tuple[str, ...] = (
     "combat_kill",
     "combat_wasted",
     "combat_macro_fail",
-    # Reserved factual slots (masked unless telemetry present)
-    "reserved_0",
-    "reserved_1",
-    "reserved_2",
-    "reserved_3",
-    "reserved_4",
-    "reserved_5",
-    "reserved_6",
-    "reserved_7",
-    "reserved_8",
-    "reserved_9",
-    "reserved_10",
-    "reserved_11",
-    "reserved_12",
-    "reserved_13",
-    "reserved_14",
-    "reserved_15",
-    "reserved_16",
-    "reserved_17",
-    "reserved_18",
-    "reserved_19",
-    "reserved_20",
-    "reserved_21",
-    "reserved_22",
-    "reserved_23",
-    "reserved_24",
-    "reserved_25",
-    "reserved_26",
-    "reserved_27",
-    "reserved_28",
-    "reserved_29",
-    "reserved_30",
-    "reserved_31",
-    "reserved_32",
-    "reserved_33",
-)
+) + tuple(f"reserved_{i}" for i in range(34))
 # First 10 are active; remaining 34 pad to 44 for the aux head.
 WORLD_EVENT_DIM = 44
 WORLD_EVENT_ACTIVE = 10
@@ -125,7 +89,6 @@ def pack_combat_target(
     kills: float = 0.0,
     ammo_spent: float = 0.0,
     macro_failure: bool = False,
-    player_damage: float = 0.0,
     knife: bool = False,
 ) -> np.ndarray:
     """Pack supervised combat outcomes for one transition.
@@ -150,8 +113,7 @@ def pack_combat_target(
     v[4] = float(np.clip(float(kills) / KILLS_NORM, 0.0, 1.0))
     v[5] = float(np.clip(spent / AMMO_QTY_NORM, 0.0, 1.0))
     v[6] = 1.0 if macro_failure else 0.0
-    v[7] = float(np.clip(float(player_damage) / 20.0, 0.0, 1.0))
-    v[8] = 1.0
+    v[COMBAT_TARGET_MASK_INDEX] = 1.0
     return v
 
 
@@ -162,6 +124,7 @@ def pack_combat_target_from_info(
     prev_hp: float | None = None,
 ) -> np.ndarray:
     """Build combat targets from env ``info`` after a step."""
+    del prev_hp  # player HP delta is a world-event channel, not combat 18-d
     info = info or {}
     if not is_attack_action(action_id):
         return empty_combat_target()
@@ -178,18 +141,9 @@ def pack_combat_target_from_info(
     if knife_report and knife_report.get("failed"):
         macro_failure = True
     knife = bool(report.get("weapon") == "knife" or knife_report is not None)
-    # Prefer explicit knife id when equipped.
-    inv = info.get("inventory")
     equipped = state.get("equipped_weapon_id")
     if equipped == 0x01:
         knife = True
-    hp = info.get("hp")
-    player_damage = 0.0
-    if prev_hp is not None and hp is not None:
-        player_damage = max(0.0, float(prev_hp) - float(hp))
-    elif info.get("damage_taken"):
-        # Episode-level flag only — leave continuous target 0 unless delta known.
-        player_damage = 0.0
     return pack_combat_target(
         action_id=int(action_id),
         hit=hit,
@@ -197,7 +151,6 @@ def pack_combat_target_from_info(
         kills=kills,
         ammo_spent=ammo_spent,
         macro_failure=macro_failure,
-        player_damage=player_damage,
         knife=knife,
     )
 
@@ -233,15 +186,11 @@ def pack_world_event_target_from_info(
     ) else 0.0
     y[5] = 1.0 if info.get("damage_taken") else 0.0
     combat = pack_combat_target_from_info(action_id, info)
-    if combat[8] > 0.5:
+    if combat[COMBAT_TARGET_MASK_INDEX] > 0.5:
         y[6] = combat[1]
         y[7] = 1.0 if combat[4] > 0 else 0.0
         y[8] = combat[2]
         y[9] = combat[6]
-    else:
-        # Non-attack: still factual zeros; keep mask on combat class channels.
-        pass
-    # Reserved pads stay masked off.
     m[WORLD_EVENT_ACTIVE:] = 0.0
     return y, m
 
@@ -260,7 +209,7 @@ def combat_target_to_outcome_vector(target: np.ndarray) -> tuple[np.ndarray, np.
     """Expand compact target → (18,) values and (18,) height mask."""
     y = np.zeros(COMBAT_OUTCOME_DIM, dtype=np.float32)
     m = np.zeros(COMBAT_OUTCOME_DIM, dtype=np.float32)
-    if float(target[8]) < 0.5:
+    if float(target[COMBAT_TARGET_MASK_INDEX]) < 0.5:
         return y, m
     h = int(target[0])
     if h < 0 or h >= N_ATTACK_HEIGHTS:

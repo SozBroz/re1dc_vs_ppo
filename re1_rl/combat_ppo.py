@@ -115,7 +115,9 @@ def combat_auxiliary_loss(
         stats["train/aux_combat_bce"] = float(bin_loss.detach().cpu())
 
     if m[:, cont_idx].sum() > 0:
-        pred = outcome_pred[:, cont_idx]
+        # Continuous heads share the linear outcome layer; sigmoid maps to [0, 1]
+        # before Huber against normalized damage / ammo targets.
+        pred = th.sigmoid(outcome_pred[:, cont_idx])
         target = y[:, cont_idx]
         cm = m[:, cont_idx]
         huber = F.smooth_l1_loss(pred, target, reduction="none")

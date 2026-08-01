@@ -27,6 +27,7 @@ from re1_rl.item_affordances import AFFORDANCES_DIM, KEY_HINTS_DIM
 from re1_rl.key_items import KEYS_HELD_DIM
 from re1_rl.maps_files import MAPS_FILES_DIM
 from re1_rl.milestone_features import MILESTONE_DIM
+from re1_rl.named_state import NAMED_STATE_DIM
 from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, INVENTORY_OBS_DIM, PROPRIO_DIM, ROOM_VISITED_DIM
 from re1_rl.room_signature import ENEMY_ROSTER_DIM
 from re1_rl.spatial_encoder import SPATIAL_DIM, VISITED_SHAPE
@@ -61,6 +62,7 @@ def _stub_obs_space(*, with_world_state: bool = True, with_key_hints: bool = Fal
         ),
         "milestones": spaces.Box(0.0, 1.0, shape=(MILESTONE_DIM,), dtype=np.float32),
         "maps_files": spaces.Box(0.0, 1.0, shape=(MAPS_FILES_DIM,), dtype=np.float32),
+        "named_state": spaces.Box(0.0, 1.0, shape=(NAMED_STATE_DIM,), dtype=np.float32),
     }
     if with_world_state:
         spaces_map["world_state"] = spaces.Box(

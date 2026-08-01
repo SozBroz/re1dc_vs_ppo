@@ -19,7 +19,7 @@ def test_codec_roundtrip_with_aux_targets() -> None:
     n_steps, n_envs, n_actions = 4, 2, 45
     combat = np.zeros((n_steps, n_envs, COMBAT_TARGET_DIM), dtype=np.float32)
     combat[0, 0] = empty_combat_target()
-    combat[1, 0] = np.array([0, 1, 0, 0.1, 0, 0.01, 0, 0, 1], dtype=np.float32)
+    combat[1, 0] = np.array([0, 1, 0, 0.1, 0, 0.01, 0, 1], dtype=np.float32)
     world = np.zeros((n_steps, n_envs, WORLD_EVENT_DIM), dtype=np.float32)
     wmask = np.zeros((n_steps, n_envs, WORLD_EVENT_DIM), dtype=np.float32)
     wmask[..., :10] = 1.0

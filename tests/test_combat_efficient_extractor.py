@@ -1,4 +1,4 @@
-"""Combat-efficient extractor: shapes, param cap, aux heads, persistent deferral."""
+"""Combat-efficient extractor: shapes, param cap, aux heads, named-state tower."""
 
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ from re1_rl.combat_targets import (
     pack_combat_target,
 )
 from re1_rl.env import ACTION_NAMES
+from re1_rl.named_state import NAMED_STATE_DIM
 from re1_rl.policy_config import POLICY_KWARGS
 from tests.test_doc04_medium_extractor import _fake_batch, _stub_obs_space
 
@@ -43,12 +44,23 @@ def test_combat_efficient_forward_shape() -> None:
     assert extractor.features_dim == FEATURES_DIM
 
 
-def test_persistent_state_deferred_when_unverified() -> None:
-    assert PERSISTENT_STATE_DIM == 0
+def test_named_state_tower_enabled() -> None:
+    assert PERSISTENT_STATE_DIM == NAMED_STATE_DIM == 63
     obs_space = _stub_obs_space(with_world_state=True)
     extractor = RE1CombatEfficientExtractor(obs_space, project_root=PROJECT_ROOT)
-    assert extractor.persistent_encoder is None
-    assert TOWER_OUT_DIM == extractor._tower_out_dim
+    assert extractor.persistent_encoder is not None
+    assert TOWER_OUT_DIM == 1728
+    assert extractor._tower_out_dim == TOWER_OUT_DIM
+
+
+def test_named_state_absent_defaults_to_zeros() -> None:
+    obs_space = _stub_obs_space(with_world_state=True)
+    extractor = RE1CombatEfficientExtractor(obs_space, project_root=PROJECT_ROOT)
+    batch = _fake_batch(obs_space, batch=2)
+    del batch["named_state"]
+    out = extractor(batch)
+    assert out.shape == (2, FEATURES_DIM)
+    assert torch.isfinite(out).all()
 
 
 def test_aux_heads_and_no_nan_grads() -> None:
@@ -73,6 +85,20 @@ def test_aux_heads_and_no_nan_grads() -> None:
     assert "train/aux_loss" in stats
 
 
+def test_continuous_aux_uses_sigmoid_before_huber() -> None:
+    """Huge positive logits for continuous channels must not explode Huber."""
+    pred = torch.zeros(2, COMBAT_OUTCOME_DIM, requires_grad=True)
+    # Neutral height continuous slots: damage (2), ammo (4)
+    with torch.no_grad():
+        pred[:, 2] = 50.0
+        pred[:, 4] = 50.0
+    t = pack_combat_target(action_id=8, hit=True, damage=10, ammo_spent=1)
+    targets = np.stack([t, t], axis=0)
+    loss, _ = combat_auxiliary_loss(pred, torch.as_tensor(targets))
+    assert torch.isfinite(loss)
+    assert float(loss) < 10.0
+
+
 def test_param_cap() -> None:
     obs_space = _stub_obs_space(with_world_state=True)
     model = CombatEfficientPPO(
@@ -88,7 +114,6 @@ def test_param_cap() -> None:
     )
     n = sum(p.numel() for p in model.policy.parameters())
     assert n <= PARAM_HARD_CAP, f"params {n} exceed hard cap {PARAM_HARD_CAP}"
-    # Extractor alone should be well under total.
     assert count_extractor_params(model.policy.features_extractor) < n
 
 

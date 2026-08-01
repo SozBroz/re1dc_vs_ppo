@@ -12,6 +12,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from re1_rl.action_mask import ATTACK_ACTION, ATTACK_DOWN_ACTION, ATTACK_UP_ACTION
 from re1_rl.combat_targets import (
+    COMBAT_TARGET_DIM,
+    COMBAT_TARGET_MASK_INDEX,
     combat_target_to_outcome_vector,
     empty_combat_target,
     is_attack_action,
@@ -21,9 +23,14 @@ from re1_rl.combat_targets import (
 )
 
 
+def test_compact_dim_has_no_player_damage() -> None:
+    assert COMBAT_TARGET_DIM == 8
+    assert COMBAT_TARGET_MASK_INDEX == 7
+
+
 def test_non_attack_has_false_mask() -> None:
     t = pack_combat_target(action_id=0, hit=True, damage=99, ammo_spent=1)
-    assert t[8] == 0.0
+    assert t[COMBAT_TARGET_MASK_INDEX] == 0.0
     assert t[0] == -1.0
     y, m = combat_target_to_outcome_vector(t)
     assert m.sum() == 0
@@ -47,10 +54,10 @@ def test_pack_from_info_attack() -> None:
         "hp": 100,
     }
     t = pack_combat_target_from_info(ATTACK_UP_ACTION, info, prev_hp=110)
-    assert t[8] == 1.0
+    assert t[COMBAT_TARGET_MASK_INDEX] == 1.0
     assert t[0] == 1.0  # up
     assert t[1] == 1.0  # hit
-    assert t[7] > 0  # player damage
+    assert t.shape[0] == COMBAT_TARGET_DIM
 
 
 def test_world_events_room_and_pickup() -> None:
@@ -70,4 +77,4 @@ def test_is_attack_action() -> None:
     assert is_attack_action(ATTACK_UP_ACTION)
     assert is_attack_action(ATTACK_DOWN_ACTION)
     assert not is_attack_action(1)
-    assert empty_combat_target()[8] == 0.0
+    assert empty_combat_target()[COMBAT_TARGET_MASK_INDEX] == 0.0

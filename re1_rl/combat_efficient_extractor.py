@@ -20,6 +20,7 @@ from re1_rl.episode_history import ACQUISITION_LOG_DIM, ACQUISITION_LOG_K, ROOM_
 from re1_rl.key_items import KEYS_HELD_DIM
 from re1_rl.maps_files import MAPS_FILES_DIM
 from re1_rl.milestone_features import MILESTONE_DIM
+from re1_rl.named_state import NAMED_STATE_DIM
 from re1_rl.obs_encoder import (
     BOX_DIM,
     INVENTORY_OBS_DIM,
@@ -64,11 +65,10 @@ ITEM_EMBED_DIM = 16
 ENEMY_TYPE_EMBED_DIM = 8
 MAX_ENEMY_TYPE_ID = 32
 
-# Verified named persistent-state bits only. Empty until door/SCD/prompt RAM lands.
-# Do not invent INTERACTION_PROMPT / door / SCD addresses here.
-PERSISTENT_STATE_FIELDS: tuple[str, ...] = ()
-PERSISTENT_STATE_DIM = len(PERSISTENT_STATE_FIELDS)
+# Verified named persistent-state (see named_state.py). No interaction_prompt.
+PERSISTENT_STATE_DIM = NAMED_STATE_DIM
 PERSISTENT_TOWER_DIM = 96
+NAMED_STATE_OBS_KEY = "named_state"
 
 FEATURES_DIM = 1024
 PARAM_HARD_CAP = 5_800_000
@@ -96,7 +96,7 @@ def _tower_out_dim(*, persistent_enabled: bool) -> int:
     return width
 
 
-TOWER_OUT_DIM = _tower_out_dim(persistent_enabled=PERSISTENT_STATE_DIM > 0)
+TOWER_OUT_DIM = _tower_out_dim(persistent_enabled=PERSISTENT_STATE_DIM > 0)  # 1728 when named_state on
 
 
 class _MaskedPool(nn.Module):
@@ -549,7 +549,7 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
             self.world_context(observations),
         ]
         if self._persistent_enabled and self.persistent_encoder is not None:
-            pers = self._optional_tensor(observations, "persistent_state", self._persistent_dim)
+            pers = self._optional_tensor(observations, NAMED_STATE_OBS_KEY, self._persistent_dim)
             parts.append(self.persistent_encoder(pers))
         tower = th.cat(parts, dim=-1)
         fused = self.fusion_proj(self.fusion_norm(tower))

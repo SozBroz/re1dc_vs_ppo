@@ -60,6 +60,7 @@ GUIDEBOOK_OBS_KEYS = frozenset(
         "cutscene_ledger",
         "milestones",
         "maps_files",
+        "named_state",
     }
 )
 
