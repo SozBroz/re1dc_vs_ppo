@@ -525,6 +525,10 @@ class RE1Env(gym.Env):
             "maps_files_flags": int(ram.get("maps_files_flags", 0)),
             "gallery_progress": int(ram.get("gallery_progress", 0)),
             "gallery_confirm": int(ram.get("gallery_confirm", 0)),
+            "dining_statue_flag": int(ram.get("dining_statue_flag", 0)),
+            "dining_statue_knocked": bool(
+                int(ram.get("dining_statue_flag", 0) or 0) & 0x10
+            ),
             "player_anim": int(ram.get("player_anim", 0)),
             "player_aux": int(ram.get("player_aux", 0)),
             "anim_history": list(getattr(self, "_anim_history", [])),
@@ -703,6 +707,7 @@ class RE1Env(gym.Env):
                 cutscene_ledger=cutscene_ledger,
                 ever_held=self._items.ever_held,
                 cutscenes_hit=len(self._progress.rewarded_cutscenes),
+                dining_statue_knocked=bool(state.get("dining_statue_knocked")),
             ),
             "maps_files": encode_maps_files_flags(state.get("maps_files_flags")),
             "named_state": encode_named_state(state),

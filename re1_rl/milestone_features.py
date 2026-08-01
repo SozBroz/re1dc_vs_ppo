@@ -31,6 +31,7 @@ MILESTONE_FEATURE_NAMES: tuple[str, ...] = (
     "rooms_in_deque_frac",
     "main_hall_in_history",
     "cutscenes_hit_this_run",
+    "dining_statue_knocked",
 )
 
 MILESTONE_DIM = len(MILESTONE_FEATURE_NAMES)
@@ -70,6 +71,7 @@ def encode_milestones(
     cutscene_ledger: np.ndarray,
     ever_held: set[str] | frozenset[str] | None,
     cutscenes_hit: int = 0,
+    dining_statue_knocked: bool = False,
 ) -> np.ndarray:
     v = np.zeros(MILESTONE_DIM, dtype=np.float32)
     rooms = [rid for rid, _ in episode_history.room_deque.entries]
@@ -100,4 +102,5 @@ def encode_milestones(
     v[10] = min(len(rooms), int(cap)) / cap
     v[11] = 1.0 if _MAIN_HALL in rooms else 0.0
     v[12] = min(max(int(cutscenes_hit), 0), int(CUTSCENE_COUNT_NORM)) / CUTSCENE_COUNT_NORM
+    v[13] = 1.0 if dining_statue_knocked else 0.0
     return v

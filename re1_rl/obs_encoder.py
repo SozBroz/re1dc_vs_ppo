@@ -105,10 +105,11 @@ GOAL_FIELDS: list[tuple[str, str]] = [
     ("gallery_bearing_cos", "cos(angle to next Gallery portrait - facing)"),
     ("gallery_distance", "distance to next Gallery portrait / 4096"),
     ("gallery_progress", "correct Gallery switches / 6"),
+    ("dining_statue_knocked", "1 = dining 2F statue pushed off balcony"),
 ]
 
 PROPRIO_DIM = len(PROPRIO_FIELDS)  # 28
-GOAL_DIM = len(GOAL_FIELDS)  # 24
+GOAL_DIM = len(GOAL_FIELDS)  # 25
 
 ANIM_HISTORY_LEN = 4
 ANIM_RECOVERY_NORM = 32.0
@@ -212,11 +213,13 @@ class ObsEncoder:
         read the scripted route. Rewards use per-episode new-room/cutscene
         bonuses instead of checkpoint-path shaping.
         """
+        from re1_rl.dining_statue_puzzle import encode_dining_statue_goal
         from re1_rl.gallery_puzzle import encode_gallery_hint
 
         del planner, item_tracker, room_items
         v = np.zeros(GOAL_DIM, dtype=np.float32)
-        v[-4:] = encode_gallery_hint(state)
+        v[-5:-1] = encode_gallery_hint(state)
+        v[-1] = encode_dining_statue_goal(state)
         return v
 
 

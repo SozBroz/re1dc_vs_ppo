@@ -74,6 +74,8 @@ MAPS_FILES_FLAGS = 0x800C8714  # [CONFIRMED]
 # this byte with a step-specific one-hot; an out-of-order Yes clears it to 0.
 GALLERY_PROGRESS = 0x800C3008  # u8 [CONFIRMED live, QuickSave3, 2026-07-17]
 GALLERY_CONFIRM = 0x800C3009  # u8; changes on any portrait Yes confirmation
+# Dining 2F statue knocked (blue jewel balcony puzzle). QS1=0, post-push=0x10.
+DINING_STATUE_FLAG = 0x800C8702  # u8 [CONFIRMED live, QS1 monitor 2026-08-01]
 # Player entity block [CONFIRMED via live walk trace 2026-07-02, verify_pos.py]:
 # X/Z step ~64-162 units per frame while walking; facing full circle = 4096
 # (0x1000), turning ~192/quarter-second. Y is elevation (0 on ground floor).
@@ -425,6 +427,7 @@ DEFAULT_RAM_FIELDS: list[tuple[str, int, str]] = [
     ("maps_files_flags", MAPS_FILES_FLAGS, "u16"),
     ("gallery_progress", GALLERY_PROGRESS, "u8"),
     ("gallery_confirm", GALLERY_CONFIRM, "u8"),
+    ("dining_statue_flag", DINING_STATUE_FLAG, "u8"),
     ("player_x", PLAYER_X, "s16"),
     ("player_y", PLAYER_Y, "s16"),
     ("player_z", PLAYER_Z, "s16"),

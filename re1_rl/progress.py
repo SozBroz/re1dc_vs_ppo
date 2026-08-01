@@ -50,6 +50,7 @@ class ProgressTracker:
     gallery_pending_reward: float = 0.0
     gallery_completed: bool = False
     gallery_needs_reentry: bool = False
+    dining_statue_rewarded: bool = False
 
     def seed_spawn_room(self, room_id: str) -> None:
         """Mark spawn visited and arm one-shot spawn ``new_room`` credit."""
@@ -126,7 +127,7 @@ class ProgressTracker:
 
         Progress is defined in ``compute_reward``: new room, document examine,
         new cutscene, new key item, first weapon acquire this episode, story
-        use, or gallery. Revisiting rooms, reopening a paid document room,
+        use, or gallery, or dining statue knocked. Revisiting rooms, reopening a paid document room,
         junk pickups, and shotgun rack re-takes do not reset.
         Each env step advances stagnation by ``step_frames`` (macro steps count more).
         """
@@ -274,6 +275,17 @@ class ProgressTracker:
             self.gallery_needs_reentry = True
             return clawback
         return 0.0
+
+    def claim_dining_statue_bonus(
+        self, *, knocked: bool, prev_knocked: bool
+    ) -> bool:
+        """True once per episode on rising edge of dining statue flag."""
+        if self.dining_statue_rewarded:
+            return False
+        if knocked and not prev_knocked:
+            self.dining_statue_rewarded = True
+            return True
+        return False
 
     def claim_success_room_bonus(self, room_id: str, success_room: str | None) -> bool:
         """True once per episode on first arrival in ``success_room``."""

@@ -15,7 +15,7 @@ from re1_rl.named_state import NAMED_STATE_DIM, NAMED_STATE_FIELDS, encode_named
 
 
 def test_named_state_dim_and_no_interaction_prompt() -> None:
-    assert NAMED_STATE_DIM == 63
+    assert NAMED_STATE_DIM == 64
     assert NAMED_STATE_DIM == len(NAMED_STATE_FIELDS)
     names = {n for n, _ in NAMED_STATE_FIELDS}
     assert "interaction_prompt" not in names
@@ -59,7 +59,8 @@ def test_encode_named_state_verified_bits() -> None:
     assert v[off + 3] == 1.0  # lab_timer
     assert abs(v[off + 4] - 0.5) < 1e-5
     assert abs(v[off + 5] - (128 / 255.0)) < 1e-5
-    assert v[off + 6] == 1.0
-    # No extra channel for interaction_prompt (7 trailing scalars).
-    assert v.shape[0] == off + 7
+    assert v[off + 6] == 0.0  # dining_statue_knocked
+    assert v[off + 7] == 1.0  # poisoned
+    # No extra channel for interaction_prompt (8 trailing scalars).
+    assert v.shape[0] == off + 8
     assert v.shape[0] == NAMED_STATE_DIM

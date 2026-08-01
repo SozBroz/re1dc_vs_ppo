@@ -123,7 +123,22 @@ def compute_digest(
         tokens.append("event:kenneth_done")
 
     tokens.append(gallery_token(progress_tracker))
+    if bool(progress_tracker.dining_statue_rewarded) or dining_statue_knocked_from_progress(
+        state, progress_tracker
+    ):
+        tokens.append("event:dining_statue_down")
     return "|".join(tokens)
+
+
+def dining_statue_knocked_from_progress(
+    state: dict[str, Any] | None,
+    progress_tracker: ProgressTracker,
+) -> bool:
+    from re1_rl.dining_statue_puzzle import dining_statue_knocked_from_state
+
+    if dining_statue_knocked_from_state(state):
+        return True
+    return bool(progress_tracker.dining_statue_rewarded)
 
 
 def cell_key_v2(

@@ -45,7 +45,7 @@ def test_combat_efficient_forward_shape() -> None:
 
 
 def test_named_state_tower_enabled() -> None:
-    assert PERSISTENT_STATE_DIM == NAMED_STATE_DIM == 63
+    assert PERSISTENT_STATE_DIM == NAMED_STATE_DIM == 64
     obs_space = _stub_obs_space(with_world_state=True)
     extractor = RE1CombatEfficientExtractor(obs_space, project_root=PROJECT_ROOT)
     assert extractor.persistent_encoder is not None

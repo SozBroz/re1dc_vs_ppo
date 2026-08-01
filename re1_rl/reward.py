@@ -59,6 +59,8 @@ TYPEWRITER_SAVE_BONUS = 0.3
 KEY_ITEM_PICKUP_BONUS = 4.0
 # Story inventory USE at a curated site (piano, fireplace, …).
 STORY_ITEM_USE_BONUS = 4.0
+# Dining 2F balcony statue knocked (blue jewel puzzle).
+DINING_STATUE_BONUS = 4.0
 # 10F alcove: put gold_emblem back without leaving the wooden emblem (anti-hack).
 # Intended path is USE wooden emblem → +4 story use.
 GOLD_EMBLEM_RETURN_PENALTY = -4.0
@@ -340,6 +342,7 @@ def compute_reward(
         "key_item": 0.0,
         "story_use": 0.0,
         "gallery": 0.0,
+        "dining_statue": 0.0,
         "gold_emblem_return": 0.0,
         "shotgun_return": 0.0,
         "new_weapon": 0.0,
@@ -506,6 +509,13 @@ def compute_reward(
             confirm=int(state.get("gallery_confirm", 0) or 0),
             star_crest_held="star_crest" in inventory,
         )
+        from re1_rl.dining_statue_puzzle import dining_statue_knocked_from_state
+
+        if progress.claim_dining_statue_bonus(
+            knocked=dining_statue_knocked_from_state(state),
+            prev_knocked=dining_statue_knocked_from_state(prev_state),
+        ):
+            bd["dining_statue"] = DINING_STATUE_BONUS
     room = str(state.get("room_id", "") or "")
     shotgun_removed_at_rack = (
         room in SHOTGUN_RACK_ROOMS
@@ -580,6 +590,7 @@ def compute_reward(
             or bd["document_examine"] != 0.0
             or bd["key_item"] != 0.0
             or bd["story_use"] != 0.0
+            or bd["dining_statue"] != 0.0
             or weapon_progress
             or ammo_progress
         ):
@@ -592,6 +603,7 @@ def compute_reward(
             or bd["key_item"] != 0.0
             or bd["story_use"] != 0.0
             or bd["gallery"] > 0.0
+            or bd["dining_statue"] > 0.0
             or weapon_progress
         )
         # Pause idle clock during cutscenes / doors (not in_control).

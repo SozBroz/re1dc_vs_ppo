@@ -29,10 +29,11 @@ NAMED_STATE_FIELDS: list[tuple[str, str]] = (
         ("lab_timer_norm", "lab_timer / 65535"),
         ("gallery_progress", "gallery_progress / 6"),
         ("gallery_confirm", "gallery_confirm / 255"),
+        ("dining_statue_knocked", "dining 2F statue knocked (0x800C8702 bit 4)"),
         ("poisoned", "player poisoned"),
     ]
 )
-NAMED_STATE_DIM = len(NAMED_STATE_FIELDS)  # 63 verified scalars
+NAMED_STATE_DIM = len(NAMED_STATE_FIELDS)  # 64 verified scalars
 
 
 def encode_named_state(state: dict[str, Any] | None) -> np.ndarray:
@@ -65,5 +66,9 @@ def encode_named_state(state: dict[str, Any] | None) -> np.ndarray:
     v[off + 3] = float(int(state.get("lab_timer", 0) or 0) & 0xFFFF) / 65535.0
     v[off + 4] = float(np.clip(float(state.get("gallery_progress", 0) or 0) / 6.0, 0.0, 1.0))
     v[off + 5] = float(np.clip(float(state.get("gallery_confirm", 0) or 0) / 255.0, 0.0, 1.0))
-    v[off + 6] = 1.0 if state.get("poisoned") else 0.0
+    knocked = state.get("dining_statue_knocked")
+    if knocked is None:
+        knocked = bool(int(state.get("dining_statue_flag", 0) or 0) & 0x10)
+    v[off + 6] = 1.0 if knocked else 0.0
+    v[off + 7] = 1.0 if state.get("poisoned") else 0.0
     return v
