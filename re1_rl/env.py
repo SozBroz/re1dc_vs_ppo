@@ -1000,8 +1000,10 @@ class RE1Env(gym.Env):
         self._go_explore_fired_reasons: set[str] = set()
         self._go_explore_coverage_attempted: set[str] = set()
 
+        from re1_rl.go_explore_capture import CELL_SIDECAR_NAME, CELL_STATE_NAME
         from re1_rl.pb_bundle_io import (
             bundle_room_matches_sidecar,
+            is_slot_locked,
             verify_champion_bundle,
         )
         from re1_rl.pb_capture import load_sidecar_json, resolve_pb_bundle
@@ -1022,6 +1024,26 @@ class RE1Env(gym.Env):
                     flush=True,
                 )
                 pb_bundle = None
+            elif state_path.name == CELL_STATE_NAME:
+                # Go-Explore cells use cell.State / cell.sidecar.json (not champion.*).
+                if is_slot_locked(slot_dir):
+                    print(
+                        f"[pb] refusing locked go-explore cell dir={slot_dir}; "
+                        f"falling back to fresh",
+                        flush=True,
+                    )
+                    pb_bundle = None
+                elif (
+                    not state_path.is_file()
+                    or not sidecar_path.is_file()
+                    or sidecar_path.name != CELL_SIDECAR_NAME
+                ):
+                    print(
+                        f"[pb] refusing incomplete go-explore cell state={state_path} "
+                        f"sidecar={sidecar_path}; falling back to fresh",
+                        flush=True,
+                    )
+                    pb_bundle = None
             else:
                 ok, reason = verify_champion_bundle(slot_dir, require_unlocked=True)
                 if not ok:
