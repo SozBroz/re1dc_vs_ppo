@@ -1,17 +1,15 @@
 """Legal action masks for RE1 discrete control.
 
 Action layout (env.ACTION_NAMES):
-  0-5   movement
-  6     attack_up          — R1+Up high attack (old quickturn slot; DC has no QT)
-  7     interact
-  8     attack             — neutral standing aim+fire for every weapon
-  9     use                — open USE menu; then select_slot_N (2-step)
-  10    equip              — open EQUIP menu; then select_slot_N (2-step)
-  11-18 deposit_slot_N
-  19-34 withdraw_box_N
-  35    combine            — open COMBINE menu; select_slot x2 (3-step)
-  36-43 select_slot_N      — shared slot pick (use / equip / combine)
-  44    attack_down        — R1+Down crouch / floor-aim attack macro
+  0-5   movement (curved run via sticky: run_forward + turn_*)
+  6-8   attack_up / attack / attack_down
+  9     interact
+  10    use                — open USE menu; then select_slot_N (2-step)
+  11    equip              — open EQUIP menu; then select_slot_N (2-step)
+  12-19 deposit_slot_N
+  20-35 withdraw_box_N
+  36    combine            — open COMBINE menu; select_slot x2 (3-step)
+  37-44 select_slot_N      — shared slot pick (use / equip / combine)
 """
 
 from __future__ import annotations
@@ -32,18 +30,19 @@ from re1_rl.weapon_equip import (
     slot_legal_for_equip,
 )
 
-ATTACK_UP_ACTION = 6  # reuses former quickturn index
-ATTACK_ACTION = 8
-USE_ACTION = 9
-EQUIP_ACTION = 10
-DEPOSIT_ACTION_BASE = EQUIP_ACTION + 1  # 11
+ATTACK_UP_ACTION = 6
+ATTACK_ACTION = 7
+ATTACK_DOWN_ACTION = 8
+INTERACT_ACTION = 9
+USE_ACTION = 10
+EQUIP_ACTION = 11
+DEPOSIT_ACTION_BASE = EQUIP_ACTION + 1  # 12
 N_DEPOSIT_ACTIONS = 8
-WITHDRAW_ACTION_BASE = DEPOSIT_ACTION_BASE + N_DEPOSIT_ACTIONS  # 19
+WITHDRAW_ACTION_BASE = DEPOSIT_ACTION_BASE + N_DEPOSIT_ACTIONS  # 20
 N_WITHDRAW_ACTIONS = 16
-COMBINE_ACTION = WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS  # 35
-SELECT_SLOT_BASE = COMBINE_ACTION + 1  # 36
+COMBINE_ACTION = WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS  # 36
+SELECT_SLOT_BASE = COMBINE_ACTION + 1  # 37
 N_SELECT_SLOT = 8
-ATTACK_DOWN_ACTION = SELECT_SLOT_BASE + N_SELECT_SLOT  # 44
 
 KNIFE_ID = 0x01
 
@@ -53,14 +52,14 @@ MENU_ACTION_NAMES = ["combine"] + [
     f"select_slot_{i}" for i in range(N_SELECT_SLOT)
 ]
 
-# Tank controls + interact: allowed while story USE is pending so Jill can turn
-# toward the interact point after opening the USE submenu. Combat macros excluded.
-_STORY_USE_RECOVERY_ACTIONS = frozenset(
-    i for i in range(8) if i != ATTACK_UP_ACTION
-)
+# Tank controls, runs, and interact are allowed while story USE is pending so
+# Jill can turn toward the interact point after opening the USE submenu.
+# Combat macros are deliberately excluded.
+_MOVEMENT_ACTION_COUNT = 6
+_STORY_USE_RECOVERY_ACTIONS = frozenset((*range(_MOVEMENT_ACTION_COUNT), INTERACT_ACTION))
 
 # Document / file examine overlay (doom books, botany book): mash directions + Cross.
-_DOCUMENT_EXAMINE_ACTIONS = frozenset({0, 1, 2, 3, 7})
+_DOCUMENT_EXAMINE_ACTIONS = frozenset({0, 1, 2, 3, INTERACT_ACTION})
 
 
 def _height_attack_legal(

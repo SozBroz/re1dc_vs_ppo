@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import numpy as np
 
 from re1_rl import step_diag as sd
-from re1_rl.action_mask import ATTACK_ACTION, SELECT_SLOT_BASE
+from re1_rl.action_mask import ATTACK_ACTION, ATTACK_DOWN_ACTION, SELECT_SLOT_BASE
 from re1_rl.window_grid import build_slots
 
 
@@ -61,7 +61,7 @@ def test_truncate_in_place_not_unlink(monkeypatch, tmp_path: Path) -> None:
         if inode_before and inode_after:
             assert inode_after == inode_before
 
-    mask = np.zeros(46, dtype=bool)
+    mask = np.zeros(45, dtype=bool)
     mask[ATTACK_ACTION] = True
     mask[SELECT_SLOT_BASE + 2] = True
     logger.note_value(1.23456789)
@@ -168,7 +168,7 @@ def test_memlog_knife_fail_from_info(monkeypatch, tmp_path: Path) -> None:
                 },
             },
         },
-        action=44,
+        action=ATTACK_DOWN_ACTION,
         action_name="attack_down",
     )
     step = json.loads(log_path.read_text(encoding="utf-8").strip().splitlines()[-1])
@@ -216,7 +216,7 @@ def test_memlog_knife_budget_from_info(monkeypatch, tmp_path: Path) -> None:
                 },
             },
         },
-        action=44,
+        action=ATTACK_DOWN_ACTION,
         action_name="attack_down",
     )
     step = json.loads(log_path.read_text(encoding="utf-8").strip().splitlines()[-1])

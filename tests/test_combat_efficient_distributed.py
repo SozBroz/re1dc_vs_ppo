@@ -16,6 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from re1_rl.combat_efficient_extractor import PARAM_HARD_CAP
+from re1_rl.action_mask import ATTACK_ACTION, ATTACK_DOWN_ACTION, ATTACK_UP_ACTION
 from re1_rl.combat_ppo import CombatEfficientPPO
 from re1_rl.combat_targets import (
     COMBAT_TARGET_DIM,
@@ -71,7 +72,11 @@ def _fake_rollout(
         wmask = np.zeros((n_steps, n_envs, WORLD_EVENT_DIM), dtype=np.float32)
         for t in range(n_steps):
             for e in range(n_envs):
-                if int(actions[t, e]) in (6, 8, 44):
+                if int(actions[t, e]) in (
+                    ATTACK_UP_ACTION,
+                    ATTACK_ACTION,
+                    ATTACK_DOWN_ACTION,
+                ):
                     combat[t, e] = pack_combat_target(
                         action_id=int(actions[t, e]),
                         hit=True,

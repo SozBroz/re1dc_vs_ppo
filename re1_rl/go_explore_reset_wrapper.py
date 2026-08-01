@@ -12,6 +12,7 @@ from re1_rl.go_explore_worker_cache import (
     load_local_manifest,
     manifest_client_from_env,
     resolve_archive_bundle_for_reset,
+    resolve_local_bundle,
 )
 from re1_rl.reset_curriculum import (
     ResetMixSource,

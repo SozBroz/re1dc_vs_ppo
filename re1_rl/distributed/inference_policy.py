@@ -82,6 +82,43 @@ class InferencePolicy:
         action_masks: bool array shaped (n_envs, n_actions) or (n_actions,) for one env.
         Returns (actions, values, log_probs) arrays like predict_batch.
         """
+        actions, values, log_probs, _, _ = self._predict_masked_batch(
+            obs, action_masks, diagnostics=False
+        )
+        return actions, values, log_probs
+
+    def predict_masked_batch_with_diagnostics(
+        self,
+        obs: dict[str, np.ndarray],
+        action_masks: np.ndarray,
+    ) -> tuple[
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+    ]:
+        """Sample masked actions and return raw logits and masked probabilities."""
+        actions, values, log_probs, raw_logits, masked_probs = (
+            self._predict_masked_batch(obs, action_masks, diagnostics=True)
+        )
+        assert raw_logits is not None
+        assert masked_probs is not None
+        return actions, values, log_probs, raw_logits, masked_probs
+
+    def _predict_masked_batch(
+        self,
+        obs: dict[str, np.ndarray],
+        action_masks: np.ndarray,
+        *,
+        diagnostics: bool,
+    ) -> tuple[
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray | None,
+        np.ndarray | None,
+    ]:
         with self._lock:
             obs = prepare_obs_for_policy(obs, self._model.observation_space)
             obs_tensor = obs_as_tensor(obs, self._device)
@@ -93,7 +130,10 @@ class InferencePolicy:
                 features = policy.extract_features(obs_tensor)
                 latent_pi = policy.mlp_extractor.forward_actor(features)
                 latent_vf = policy.mlp_extractor.forward_critic(features)
-                distribution = policy._get_action_dist_from_latent(latent_pi)
+                raw_logits = policy.action_net(latent_pi)
+                distribution = policy.action_dist.proba_distribution(
+                    action_logits=raw_logits
+                )
                 logits = distribution.distribution.logits.clone()
                 # Match sb3_contrib MaskableCategorical (-1e8), not dtype min,
                 # so collect logprobs align with MaskablePPO.evaluate_actions.
@@ -108,6 +148,8 @@ class InferencePolicy:
                 actions.cpu().numpy(),
                 values.flatten().cpu().numpy(),
                 log_probs.cpu().numpy(),
+                raw_logits.cpu().numpy() if diagnostics else None,
+                cat.probs.cpu().numpy() if diagnostics else None,
             )
 
     def predict_masked(

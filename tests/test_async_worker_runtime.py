@@ -21,6 +21,7 @@ from re1_rl.distributed.async_worker_runtime import (
     worker_rollout_from_actor_msg,
 )
 from re1_rl.async_fleet import _serve_needs_batch
+from re1_rl.async_fleet import _wait_for_actor_spawn
 from re1_rl.distributed.rollout_types import WorkerRollout
 from re1_rl.env import ACTION_NAMES
 from re1_rl.async_fleet import DISTRIBUTED_EPOCH_HYPERPARAMS, PPO_HYPERPARAMS
@@ -33,6 +34,7 @@ class _FakePolicy:
         self.policy_version = 7
         self.masked_calls = 0
         self.batch_calls = 0
+        self.diagnostic_calls = 0
 
     def predict_masked(self, obs, masks):
         self.masked_calls += 1
@@ -49,6 +51,17 @@ class _FakePolicy:
             np.full(n, 3, dtype=np.int64),
             np.full(n, 0.5, dtype=np.float32),
             np.full(n, -0.1, dtype=np.float32),
+        )
+
+    def predict_masked_batch_with_diagnostics(self, obs, masks):
+        self.diagnostic_calls += 1
+        n = int(masks.shape[0])
+        return (
+            np.full(n, 4, dtype=np.int64),
+            np.full(n, 0.75, dtype=np.float32),
+            np.full(n, -0.25, dtype=np.float32),
+            np.full((n, N_ACTIONS), 2.0, dtype=np.float32),
+            np.full((n, N_ACTIONS), 1.0 / N_ACTIONS, dtype=np.float32),
         )
 
     def predict_batch(self, obs):
@@ -128,6 +141,60 @@ def test_serve_needs_batch_one_forward_for_many_needs() -> None:
     for conn, _ in pairs:
         payload = conn.send.call_args[0][0]
         assert payload["action"] == 3
+
+
+def test_serve_needs_batch_routes_diagnostics_only_to_requester() -> None:
+    policy = _FakePolicy()
+    masks = np.ones(N_ACTIONS, dtype=bool)
+    regular = MagicMock()
+    diagnostic = MagicMock()
+    _serve_needs_batch(
+        [
+            (regular, {"t": "need", "obs": _fake_obs(), "action_masks": masks}),
+            (
+                diagnostic,
+                {
+                    "t": "need",
+                    "obs": _fake_obs(),
+                    "action_masks": masks,
+                    "want_policy_diagnostics": True,
+                },
+            ),
+        ],
+        policy,
+        max_batch=32,
+    )
+    assert policy.masked_calls == 1
+    assert policy.diagnostic_calls == 1
+    normal_payload = regular.send.call_args[0][0]
+    diag_payload = diagnostic.send.call_args[0][0]
+    assert "raw_logits" not in normal_payload
+    assert "masked_probs" not in normal_payload
+    assert diag_payload["action"] == 4
+    assert diag_payload["raw_logits"].shape == (N_ACTIONS,)
+    assert diag_payload["masked_probs"].shape == (N_ACTIONS,)
+
+
+def test_wait_for_actor_spawn_accepts_arbitrary_logical_ranks() -> None:
+    import multiprocessing as mp
+
+    parents = []
+    children = []
+    for rank in (0, 3, 5):
+        parent, child = mp.Pipe(duplex=True)
+        child.send({"t": "spawned", "rank": rank})
+        parents.append(parent)
+        children.append(child)
+    try:
+        _wait_for_actor_spawn(
+            parents,
+            3,
+            actor_ranks=[0, 3, 5],
+            timeout_s=1.0,
+        )
+    finally:
+        for conn in parents + children:
+            conn.close()
 
 
 def test_serve_need_falls_back_to_predict_batch() -> None:

@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -83,6 +84,43 @@ def test_predict_masked_batch_never_samples_illegal() -> None:
             {k: v[:1] for k, v in obs.items()}, one_mask
         )
         assert act == 3
+
+
+def test_predict_masked_batch_diagnostics_match_sampling_distribution() -> None:
+    policy_obs_space, act_space = _chw_obs_space()
+    n_actions = int(act_space.n)
+    policy = InferencePolicy(policy_obs_space, act_space, device="cpu")
+    n_envs = 3
+    obs = _hwc_batch(policy_obs_space, n_envs=n_envs)
+    masks = np.zeros((n_envs, n_actions), dtype=bool)
+    masks[0, [0, 3, 5]] = True
+    masks[1, [1, 2, 7, 8]] = True
+    masks[2, [4, 6]] = True
+
+    torch.manual_seed(1234)
+    expected = policy.predict_masked_batch(obs, masks)
+    torch.manual_seed(1234)
+    actions, values, log_probs, raw_logits, masked_probs = (
+        policy.predict_masked_batch_with_diagnostics(obs, masks)
+    )
+
+    assert actions.shape == (n_envs,)
+    assert values.shape == (n_envs,)
+    assert log_probs.shape == (n_envs,)
+    assert raw_logits.shape == (n_envs, n_actions)
+    assert masked_probs.shape == (n_envs, n_actions)
+    np.testing.assert_array_equal(actions, expected[0])
+    np.testing.assert_array_equal(values, expected[1])
+    np.testing.assert_array_equal(log_probs, expected[2])
+
+    np.testing.assert_allclose(masked_probs[~masks], 0.0, atol=0.0)
+    np.testing.assert_allclose(masked_probs.sum(axis=1), 1.0, rtol=1e-6)
+    np.testing.assert_allclose(
+        log_probs,
+        np.log(masked_probs[np.arange(n_envs), actions]),
+        rtol=1e-6,
+    )
+    assert np.isfinite(raw_logits[~masks]).all()
 
 
 def test_stack_action_masks_from_vec_env() -> None:

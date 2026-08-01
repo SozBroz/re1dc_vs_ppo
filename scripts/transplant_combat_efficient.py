@@ -38,7 +38,10 @@ COMPATIBLE_SUFFIXES = (
 def _load_policy_state_dict(path: Path) -> dict:
     with zipfile.ZipFile(path, "r") as zf:
         names = zf.namelist()
-        pth = next(n for n in names if n.endswith(".pth"))
+        if "policy.pth" in names:
+            pth = "policy.pth"
+        else:
+            pth = next(n for n in names if n.endswith(".pth"))
         with zf.open(pth) as f:
             data = torch.load(io.BytesIO(f.read()), map_location="cpu", weights_only=False)
     if isinstance(data, dict) and "policy" in data:

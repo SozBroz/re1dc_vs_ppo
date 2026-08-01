@@ -37,13 +37,14 @@ from re1_rl.weapon_equip import (
     magic_equip_slot,
 )
 
-N_ACTIONS = ATTACK_DOWN_ACTION + 1  # 45
+from re1_rl.env import ACTION_NAMES
+
+N_ACTIONS = len(ACTION_NAMES)
 
 
 def test_action_layout_matches_env_names() -> None:
-    from re1_rl.env import ACTION_NAMES
-
-    assert len(ACTION_NAMES) == N_ACTIONS
+    assert N_ACTIONS == 45
+    assert (ATTACK_UP_ACTION, ATTACK_ACTION, ATTACK_DOWN_ACTION) == (6, 7, 8)
     assert ACTION_NAMES[ATTACK_ACTION] == "attack"
     assert ACTION_NAMES[ATTACK_UP_ACTION] == "attack_up"
     assert ACTION_NAMES[ATTACK_DOWN_ACTION] == "attack_down"

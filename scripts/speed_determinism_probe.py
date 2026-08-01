@@ -17,6 +17,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from re1_rl.action_mask import ATTACK_ACTION  # noqa: E402
+
 EMUHAWK = PROJECT_ROOT / "tools" / "BizHawk-2.11.1" / "EmuHawk.exe"
 ROM = PROJECT_ROOT / "roms" / "Resident Evil - Director's Cut.cue"
 LUA = PROJECT_ROOT / "lua" / "re1_client.lua"
@@ -28,11 +30,11 @@ ACTION_SCRIPT = (
     + [1] * 6        # forward
     + [3] * 3        # turn left
     + [1] * 4        # forward
-    + [8]           # knife swing
+    + [ATTACK_ACTION]  # knife swing
     + [4] * 3        # turn right
-    + [8]           # knife swing
+    + [ATTACK_ACTION]  # knife swing
     + [2] * 3        # backward
-    + [8]           # knife swing
+    + [ATTACK_ACTION]  # knife swing
     + [0] * 2        # noop
 )
 

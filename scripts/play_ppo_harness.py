@@ -8,10 +8,11 @@ Keys (keyboard)
 ---------------
   WASD / arrows     movement (forward / back / turn)
   Shift + W         run forward
-  1                 attack       (action 8, neutral aim+fire)
+  Shift + W + A/D   run forward + turn (two composed PPO steps)
+  1                 attack       (action 7, neutral aim+fire)
   2                 attack_up    (action 6)
-  3                 attack_down  (action 44)
-  Z / E             interact     (action 7)
+  3                 attack_down  (action 8)
+  Z / E             interact     (action 9)
   Esc / Q           quit
 
 Usage
@@ -38,9 +39,15 @@ from re1_rl.action_mask import (  # noqa: E402
     ATTACK_ACTION,
     ATTACK_DOWN_ACTION,
     ATTACK_UP_ACTION,
+    INTERACT_ACTION,
 )
 from re1_rl.env import ACTION_NAMES, RE1Env
-from re1_rl.pushable import FORWARD_ACTION, RUN_FORWARD_ACTION
+from re1_rl.pushable import (
+    FORWARD_ACTION,
+    RUN_FORWARD_ACTION,
+    TURN_LEFT_ACTION,
+    TURN_RIGHT_ACTION,
+)
 from re1_rl.sticky_input import human_step_gate
 from scripts.play_human import (  # noqa: E402
     DEFAULT_CURRICULUM,
@@ -67,22 +74,34 @@ COMBAT_ACTIONS = frozenset(COMBAT_KEY_ACTIONS.values())
 MOVEMENT_KEYS = frozenset({"up", "down", "left", "right", "square"})
 
 
-def _resolve_movement_action(buttons: dict[str, bool]) -> int | None:
-    """Map latched movement buttons to a single discrete env action."""
+def _resolve_movement_actions(buttons: dict[str, bool]) -> list[int]:
+    """Map latched movement buttons to one or more discrete env actions.
+
+    Curved run uses sticky composition (run_forward then turn_*), matching PPO.
+    """
     up = bool(buttons.get("up"))
     down = bool(buttons.get("down"))
     left = bool(buttons.get("left"))
     right = bool(buttons.get("right"))
     run = bool(buttons.get("square"))
+    if up and run and left and not down and not right:
+        return [RUN_FORWARD_ACTION, TURN_LEFT_ACTION]
+    if up and run and right and not down and not left:
+        return [RUN_FORWARD_ACTION, TURN_RIGHT_ACTION]
     if up and not down and not left and not right:
-        return RUN_FORWARD_ACTION if run else FORWARD_ACTION
+        return [RUN_FORWARD_ACTION if run else FORWARD_ACTION]
     if down and not up and not left and not right:
-        return 2
+        return [2]
     if left and not up and not down and not right:
-        return 3
+        return [3]
     if right and not up and not down and not left:
-        return 4
-    return None
+        return [4]
+    return []
+
+
+def _resolve_movement_action(buttons: dict[str, bool]) -> int | None:
+    actions = _resolve_movement_actions(buttons)
+    return actions[0] if actions else None
 
 
 def _combat_key_edge(kb, prev: set[str]) -> int | None:
@@ -328,8 +347,10 @@ def main() -> int:
             combat_action = _combat_key_edge(kb, combat_keys_prev)
             combat_keys_prev = _pressed_combat_keys(kb)
 
-            action: int | None = combat_action
-            if action is None:
+            actions_to_run: list[int] = []
+            if combat_action is not None:
+                actions_to_run = [int(combat_action)]
+            else:
                 gate_buttons = {k: v for k, v in buttons.items() if k in MOVEMENT_KEYS}
                 if buttons.get("cross") and not gate_buttons:
                     gate_buttons = {"cross": True}
@@ -340,29 +361,34 @@ def main() -> int:
                 if buttons.get("cross") and not any(
                     buttons.get(k) for k in MOVEMENT_KEYS
                 ):
-                    action = 7
+                    actions_to_run = [INTERACT_ACTION]
                 else:
-                    action = _resolve_movement_action(buttons)
-                if action is None:
+                    actions_to_run = _resolve_movement_actions(buttons)
+                if not actions_to_run:
                     time.sleep(IDLE_POLL_S)
                     continue
 
-            obs, reward, terminated, truncated, info = env.step(int(action))
-            step_idx += 1
-            breakdown = dict(info.get("reward_breakdown") or {})
-            info["state"] = env._prev_state
-            print(
-                _format_combat_panel(
-                    step_idx=step_idx,
-                    action=int(action),
-                    reward=float(reward),
-                    breakdown=breakdown,
-                    info=info,
-                ),
-                flush=True,
-            )
-            if args.show_mask:
-                print(_format_combat_mask(env, env._prev_state), flush=True)
+            terminated = truncated = False
+            info: dict[str, Any] = {}
+            for action_id in actions_to_run:
+                obs, reward, terminated, truncated, info = env.step(int(action_id))
+                step_idx += 1
+                breakdown = dict(info.get("reward_breakdown") or {})
+                info["state"] = env._prev_state
+                print(
+                    _format_combat_panel(
+                        step_idx=step_idx,
+                        action=int(action_id),
+                        reward=float(reward),
+                        breakdown=breakdown,
+                        info=info,
+                    ),
+                    flush=True,
+                )
+                if args.show_mask:
+                    print(_format_combat_mask(env, env._prev_state), flush=True)
+                if terminated or truncated:
+                    break
             if terminated or truncated:
                 reason = info.get("episode_failure") or "done"
                 print(f"[ppo] episode ended: {reason}", flush=True)

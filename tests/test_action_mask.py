@@ -174,7 +174,8 @@ def test_action_mask_shape() -> None:
 
     m = action_mask(N_ACTIONS, None)
 
-    assert m.shape == (N_ACTIONS,)
+    assert N_ACTIONS == 45
+    assert m.shape == (45,)
 
     assert m.dtype == np.bool_
 

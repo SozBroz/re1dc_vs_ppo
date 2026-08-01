@@ -98,6 +98,7 @@ from re1_rl.reward import (
     DEATH_PENALTY,
     MAIN_HALL_BEFORE_KENNETH_PENALTY,
     REWARD_SCALE,
+    softlock_frame_threshold,
     stagnation_episode_timeout,
 )
 from re1_rl.room_graph import RoomGraph, load_valid_rooms
@@ -111,6 +112,7 @@ from re1_rl.action_mask import (
     DEPOSIT_ACTION_BASE,
     DEPOSIT_ACTION_NAMES,
     EQUIP_ACTION,
+    INTERACT_ACTION,
     KNIFE_ID,
     MENU_ACTION_NAMES,
     N_DEPOSIT_ACTIONS,
@@ -141,15 +143,15 @@ ACTION_NAMES = [
     "turn_left",
     "turn_right",
     "run_forward",
-    "attack_up",  # 6 — R1+Up high attack macro (reuses old quickturn slot; not on DC)
+    "attack_up",
+    "attack",
+    "attack_down",
     "interact",
-    "attack",  # standing aim+fire macro, any equipped weapon
     "use",  # open USE menu -> select_slot_N (2-step; herbs, sprays)
     "equip",  # open EQUIP menu -> select_slot_N (2-step)
-    *DEPOSIT_ACTION_NAMES,    # 11-18 box deposits (box rooms only)
-    *WITHDRAW_ACTION_NAMES,   # 19-34 box withdrawals (box rooms only)
-    *MENU_ACTION_NAMES,       # 35 combine + 36-43 select_slot_N
-    "attack_down",            # 44 R1+Down crouch / floor-aim attack macro
+    *DEPOSIT_ACTION_NAMES,    # 12-19 box deposits (box rooms only)
+    *WITHDRAW_ACTION_NAMES,   # 20-35 box withdrawals (box rooms only)
+    *MENU_ACTION_NAMES,       # 36 combine + 37-44 select_slot_N
 ]
 
 # Map discrete actions to friendly button names (translated to Nymashock core
@@ -164,10 +166,20 @@ ACTION_BUTTON_MAP: dict[int, dict[str, bool]] = {
     4: {"right": True},
     5: {"up": True, "square": True},  # run forward (square = run in RE1)
     6: {},  # attack_up macro (see execute_attack_up_macro)
-    7: {"cross": True},  # interact / confirm
+    7: {},  # attack macro (see execute_attack_macro)
+    8: {},  # attack_down macro (see execute_attack_down_macro)
+    9: {"cross": True},  # interact / confirm
 }
-for _idx in range(8, len(ACTION_NAMES)):
+for _idx in range(10, len(ACTION_NAMES)):
     ACTION_BUTTON_MAP[_idx] = {}
+
+
+def _apply_action_input(
+    sticky_input: StickyInputState,
+    action: int,
+) -> tuple[dict[str, bool], dict[str, bool] | None, dict[str, bool] | None]:
+    """Apply one canonical PPO action to sticky/pulsed controller state."""
+    return sticky_input.apply(int(action), ACTION_BUTTON_MAP)
 
 # BizHawk RE1 screenshot is 240x350 RGB; left 18 + right 12 px are near-black
 # pillarbox. Pipeline: crop 320x240 game plane → gray → INTER_AREA to 84x63
@@ -2473,12 +2485,11 @@ class RE1Env(gym.Env):
             )
         else:
             from re1_rl.sticky_input import (
-                INTERACT_ACTION,
                 INTERACT_HOLD_EXTRA_FRAMES,
             )
 
-            sticky, pulse, pulse_hold = self._sticky_input.apply(
-                int(action), ACTION_BUTTON_MAP
+            sticky, pulse, pulse_hold = _apply_action_input(
+                self._sticky_input, int(action)
             )
             hold_n = forward_hold_frames(
                 self._prev_state,
@@ -2633,6 +2644,23 @@ class RE1Env(gym.Env):
 
         obs = self._build_obs(frame_obs, state)
         damage_taken = self._episode_min_hp < self._episode_start_hp
+        idle_frame_limit = softlock_frame_threshold(self._progress)
+        idle_frames_used = self._progress.stagnation_frames
+        idle_frames_left = max(0, idle_frame_limit - idle_frames_used)
+        max_episode_steps = int(self._stage.get("max_steps", 3000))
+        steps_left = (
+            max(0, max_episode_steps - self._step_count)
+            if max_episode_steps > 0
+            else None
+        )
+        step_limit_frames_left = (
+            steps_left * self.frame_skip if steps_left is not None else None
+        )
+        episode_reset_frames_left = (
+            min(idle_frames_left, step_limit_frames_left)
+            if step_limit_frames_left is not None
+            else idle_frames_left
+        )
         info = {
             "room_id": state["room_id"],
             "hp": state["hp"],
@@ -2651,6 +2679,11 @@ class RE1Env(gym.Env):
             "action_name": ACTION_NAMES[int(action)],
             "reward_breakdown": breakdown,
             "episode_failure": episode_failure,
+            "episode_reset_frames_left": episode_reset_frames_left,
+            "episode_idle_frames_left": idle_frames_left,
+            "episode_step_limit_frames_left": step_limit_frames_left,
+            "episode_idle_frames_used": idle_frames_used,
+            "episode_idle_frame_limit": idle_frame_limit,
             "knife_anim_report": (
                 getattr(self.bridge, "last_knife_anim_report", None)
                 if combat_attack and knife_weapon

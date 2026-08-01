@@ -7,15 +7,58 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from re1_rl.action_mask import ATTACK_ACTION, ATTACK_DOWN_ACTION, ATTACK_UP_ACTION
 from re1_rl.env import ACTION_BUTTON_MAP, ACTION_NAMES
+from re1_rl.pushable import RUN_FORWARD_ACTION, TURN_LEFT_ACTION, TURN_RIGHT_ACTION
+from scripts.play_ppo_harness import _resolve_movement_actions
 
 
-def test_interact_maps_to_cross() -> None:
-    idx = ACTION_NAMES.index("interact")
-    assert ACTION_BUTTON_MAP[idx] == {"cross": True}
+def test_exact_action_names_order() -> None:
+    assert ACTION_NAMES == [
+        "noop",
+        "forward",
+        "back",
+        "turn_left",
+        "turn_right",
+        "run_forward",
+        "attack_up",
+        "attack",
+        "attack_down",
+        "interact",
+        "use",
+        "equip",
+        *(f"deposit_slot_{i}" for i in range(8)),
+        *(f"withdraw_box_{i}" for i in range(16)),
+        "combine",
+        *(f"select_slot_{i}" for i in range(8)),
+    ]
 
 
-def test_attack_action_index() -> None:
-    idx = ACTION_NAMES.index("attack")
-    assert idx == 8
-    assert ACTION_BUTTON_MAP[idx] == {}
+def test_exact_action_button_maps() -> None:
+    expected = {
+        0: {},
+        1: {"up": True},
+        2: {"down": True},
+        3: {"left": True},
+        4: {"right": True},
+        5: {"up": True, "square": True},
+        6: {},
+        7: {},
+        8: {},
+        9: {"cross": True},
+        **{i: {} for i in range(10, 45)},
+    }
+    assert ACTION_BUTTON_MAP == expected
+
+
+def test_attacks_are_adjacent() -> None:
+    assert (ATTACK_UP_ACTION, ATTACK_ACTION, ATTACK_DOWN_ACTION) == (6, 7, 8)
+
+
+def test_harness_composes_diagonal_run_actions() -> None:
+    assert _resolve_movement_actions(
+        {"up": True, "left": True, "square": True}
+    ) == [RUN_FORWARD_ACTION, TURN_LEFT_ACTION]
+    assert _resolve_movement_actions(
+        {"up": True, "right": True, "square": True}
+    ) == [RUN_FORWARD_ACTION, TURN_RIGHT_ACTION]

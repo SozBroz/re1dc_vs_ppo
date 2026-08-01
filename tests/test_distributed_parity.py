@@ -134,21 +134,125 @@ def test_legacy_action_head_transplant_clones_attack_with_low_prior() -> None:
             super().__init__()
             self.action_net = nn.Linear(3, actions)
 
-    old = Policy(46)
-    new = Policy(47)
+    old = Policy(44)
+    new = Policy(45)
     with torch.no_grad():
-        old.action_net.weight.copy_(torch.arange(138).reshape(46, 3))
-        old.action_net.bias.copy_(torch.arange(46))
+        old.action_net.weight.copy_(torch.arange(132).reshape(44, 3))
+        old.action_net.bias.copy_(torch.arange(44))
 
     _copy_compatible_policy_weights(old, new)
 
-    assert torch.equal(new.action_net.weight[:46], old.action_net.weight)
-    assert torch.equal(new.action_net.bias[:46], old.action_net.bias)
-    assert torch.equal(new.action_net.weight[46], old.action_net.weight[8])
+    assert torch.equal(new.action_net.weight[:44], old.action_net.weight)
+    assert torch.equal(new.action_net.bias[:44], old.action_net.bias)
+    assert torch.equal(new.action_net.weight[44], old.action_net.weight[8])
     assert np.isclose(
-        float(new.action_net.bias[46].detach()),
+        float(new.action_net.bias[44].detach()),
         float(old.action_net.bias[8].detach()) - np.log(100.0),
     )
+
+
+def test_45_action_head_reorder_transplant_preserves_action_semantics() -> None:
+    old_action_names = (
+        "noop",
+        "forward",
+        "back",
+        "turn_left",
+        "turn_right",
+        "run_forward",
+        "attack_up",
+        "interact",
+        "attack",
+        "use",
+        "equip",
+        *(f"deposit_slot_{i}" for i in range(8)),
+        *(f"withdraw_box_{i}" for i in range(16)),
+        "combine",
+        *(f"select_slot_{i}" for i in range(8)),
+        "attack_down",
+    )
+    new_action_names = tuple(ACTION_NAMES)
+
+    class Policy(nn.Module):
+        def __init__(self, actions: int) -> None:
+            super().__init__()
+            self.action_net = nn.Linear(3, actions)
+            self.value_net = nn.Linear(3, 1)
+
+    old = Policy(45)
+    new = Policy(45)
+    with torch.no_grad():
+        old.action_net.weight.copy_(
+            torch.arange(45, dtype=torch.float32).unsqueeze(1).repeat(1, 3)
+        )
+        old.action_net.bias.copy_(torch.arange(45, dtype=torch.float32) + 1000)
+        old.value_net.weight.fill_(123.0)
+        old.value_net.bias.fill_(456.0)
+
+    _copy_compatible_policy_weights(old, new)
+
+    old_index = {name: index for index, name in enumerate(old_action_names)}
+    assert len(old_index) == 45
+    assert len(new_action_names) == 45
+    for new_index, name in enumerate(new_action_names):
+        source_index = old_index[name]
+        assert torch.equal(
+            new.action_net.weight[new_index], old.action_net.weight[source_index]
+        )
+        assert torch.equal(
+            new.action_net.bias[new_index], old.action_net.bias[source_index]
+        )
+    assert torch.equal(new.value_net.weight, old.value_net.weight)
+    assert torch.equal(new.value_net.bias, old.value_net.bias)
+
+
+def test_47_action_head_downgrade_drops_diagonal_runs() -> None:
+    old_action_names = (
+        "noop",
+        "forward",
+        "back",
+        "turn_left",
+        "turn_right",
+        "run_forward",
+        "run_forward_left",
+        "run_forward_right",
+        "attack_up",
+        "attack",
+        "attack_down",
+        "interact",
+        "use",
+        "equip",
+        *(f"deposit_slot_{i}" for i in range(8)),
+        *(f"withdraw_box_{i}" for i in range(16)),
+        "combine",
+        *(f"select_slot_{i}" for i in range(8)),
+    )
+    new_action_names = tuple(ACTION_NAMES)
+
+    class Policy(nn.Module):
+        def __init__(self, actions: int) -> None:
+            super().__init__()
+            self.action_net = nn.Linear(3, actions)
+
+    old = Policy(47)
+    new = Policy(45)
+    with torch.no_grad():
+        old.action_net.weight.copy_(
+            torch.arange(141, dtype=torch.float32).reshape(47, 3)
+        )
+        old.action_net.bias.copy_(torch.arange(47, dtype=torch.float32))
+
+    _copy_compatible_policy_weights(old, new)
+
+    old_index = {name: index for index, name in enumerate(old_action_names)}
+    for new_index, name in enumerate(new_action_names):
+        assert torch.equal(
+            new.action_net.weight[new_index],
+            old.action_net.weight[old_index[name]],
+        )
+        assert torch.equal(
+            new.action_net.bias[new_index],
+            old.action_net.bias[old_index[name]],
+        )
 
 
 def test_load_async_learner_fresh_uses_policy_chw_spaces() -> None:

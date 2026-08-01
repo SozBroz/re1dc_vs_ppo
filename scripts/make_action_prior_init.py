@@ -25,7 +25,7 @@ PRIOR = {
     "back": 0.02,
     "turn_left": 0.12,
     "turn_right": 0.12,
-    "run_forward": 0.33,
+    "run_forward": 0.35,
     "attack_up": 0.02,
     "interact": 0.18,
     "attack": 0.02,

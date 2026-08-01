@@ -53,6 +53,38 @@ from re1_rl.distributed.worker_runtime import (  # noqa: E402
 )
 
 
+def parse_actor_ranks(value: str) -> list[int]:
+    """Parse comma-separated logical ranks and inclusive ranges."""
+    ranks: list[int] = []
+    seen: set[int] = set()
+    for raw_part in str(value).split(","):
+        part = raw_part.strip()
+        if not part:
+            raise argparse.ArgumentTypeError("actor ranks contain an empty item")
+        if "-" in part:
+            bounds = part.split("-")
+            if len(bounds) != 2 or not all(bound.strip().isdigit() for bound in bounds):
+                raise argparse.ArgumentTypeError(f"invalid actor rank range {part!r}")
+            first, last = (int(bound.strip()) for bound in bounds)
+            if last < first:
+                raise argparse.ArgumentTypeError(
+                    f"actor rank range must be ascending: {part!r}"
+                )
+            expanded = range(first, last + 1)
+        else:
+            if not part.isdigit():
+                raise argparse.ArgumentTypeError(f"invalid actor rank {part!r}")
+            expanded = (int(part),)
+        for rank in expanded:
+            if rank in seen:
+                raise argparse.ArgumentTypeError(f"duplicate actor rank {rank}")
+            seen.add(rank)
+            ranks.append(rank)
+    if not ranks:
+        raise argparse.ArgumentTypeError("at least one actor rank is required")
+    return ranks
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Distributed PPO learner / worker training")
     ap.add_argument(
@@ -167,6 +199,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     ap.add_argument("--n-envs", type=int, default=12)
+    ap.add_argument(
+        "--actor-ranks",
+        type=parse_actor_ranks,
+        default=None,
+        help=(
+            "logical actor ranks as comma/ranges (for example 0-3,5-19); "
+            "ports remain base_port+rank and n-envs becomes the selected count"
+        ),
+    )
+    ap.add_argument(
+        "--memlog",
+        action="store_true",
+        help="enable independent control/telemetry for selected logical rank 4",
+    )
     ap.add_argument("--total-steps", type=int, default=2_000_000,
                     help="training timesteps (0 = no limit, run until interrupted)")
     ap.add_argument("--curriculum", default="curriculum/m0_dining_to_main_hall.json")
@@ -278,8 +324,14 @@ def _maybe_start_grid_tiler(args: argparse.Namespace) -> threading.Event | None:
         return None
     from re1_rl.window_grid import start_grid_tiler
 
+    actor_ranks = getattr(args, "actor_ranks", None)
+    expected_slots = (
+        max(int(rank) for rank in actor_ranks) + 1
+        if actor_ranks
+        else int(args.n_envs)
+    )
     stop, _thread = start_grid_tiler(
-        expected=int(args.n_envs),
+        expected=expected_slots,
         cols=int(args.grid_cols),
         rows=int(args.grid_rows),
         gap=int(args.grid_gap),
@@ -359,6 +411,8 @@ def _run_local_worker(
                 headless=bool(args.headless),
                 screenshot_mmf=args.screenshot_mmf,
                 inference_batch_max=int(args.inference_batch_max),
+                actor_ranks=getattr(args, "actor_ranks", None),
+                memlog_actor_rank=4 if bool(getattr(args, "memlog", False)) else None,
             )
         finally:
             if learner_state is not None:
@@ -438,6 +492,8 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
                 headless=bool(args.headless),
                 screenshot_mmf=args.screenshot_mmf,
                 inference_batch_max=int(args.inference_batch_max),
+                actor_ranks=getattr(args, "actor_ranks", None),
+                memlog_actor_rank=4 if bool(getattr(args, "memlog", False)) else None,
             )
     except KeyboardInterrupt:
         log(args.machine_name, "remote worker interrupted")
@@ -812,6 +868,13 @@ def main() -> int:
         log("pb", f"warm_pb_champions_for_training skipped: {exc!r}")
 
     args = build_parser().parse_args()
+    if args.actor_ranks is not None:
+        args.n_envs = len(args.actor_ranks)
+    if args.memlog:
+        if args.synced_envs:
+            raise SystemExit("--memlog requires the default async actor runtime")
+        if args.actor_ranks is None or 4 not in args.actor_ranks:
+            raise SystemExit("--memlog requires --actor-ranks containing logical rank 4")
     role = args.role
     if role == "both":
         role = "learner"

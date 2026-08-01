@@ -378,6 +378,8 @@ def run_async_worker_loop(
     screenshot_mmf: bool | None = None,
     inference_batch_max: int = 32,
     weight_store: Any | None = None,
+    actor_ranks: list[int] | None = None,
+    memlog_actor_rank: int | None = None,
 ) -> None:
     """Spawn desync actors and serve local inference until ``stop_event``.
 
@@ -386,9 +388,22 @@ def run_async_worker_loop(
     ``weight_store`` only at epoch flush (no mid-horizon hot-swap).
     Remotes also heartbeat so the learner can drop dead machines.
     """
+    ranks = (
+        list(range(int(n_envs)))
+        if actor_ranks is None
+        else [int(rank) for rank in actor_ranks]
+    )
+    if len(ranks) != int(n_envs) or len(set(ranks)) != len(ranks):
+        raise ValueError("n_envs must equal the number of unique actor ranks")
+    if any(rank < 0 for rank in ranks):
+        raise ValueError("actor ranks must be non-negative")
+    if memlog_actor_rank is not None and int(memlog_actor_rank) not in ranks:
+        raise ValueError("memlog actor rank must be one of actor_ranks")
+    actor_count = len(ranks)
     log(
         machine_name,
-        f"async worker starting ({worker_id}, {n_envs} desync actors, "
+        f"async worker starting ({worker_id}, {actor_count} desync actors "
+        f"ranks={ranks}, "
         f"n_steps={n_steps}, sync_interval_s={sync_interval_s:.0f}, "
         f"headless={headless}, screenshot_mmf={screenshot_mmf}, "
         f"inference_batch_max={inference_batch_max})",
@@ -417,7 +432,7 @@ def run_async_worker_loop(
             return
         while not hb_stop.is_set() and not stop_event.is_set():
             try:
-                rollout_sink.heartbeat(worker_id, n_envs)
+                rollout_sink.heartbeat(worker_id, actor_count)
                 from re1_rl.go_explore_capture import go_explore_root
                 from re1_rl.go_explore_worker_cache import maybe_poll_manifest
 
@@ -434,12 +449,12 @@ def run_async_worker_loop(
 
     try:
         if not is_local and isinstance(rollout_sink, WorkerClient):
-            rollout_sink.register(worker_id, n_envs, is_local=False)
-            rollout_sink.heartbeat(worker_id, n_envs)
+            rollout_sink.register(worker_id, actor_count, is_local=False)
+            rollout_sink.heartbeat(worker_id, actor_count)
             last_heartbeat = time.monotonic()
             hb_thread.start()
 
-        for rank in range(n_envs):
+        for rank in ranks:
             parent_conn, child_conn = ctx.Pipe(duplex=True)
             proc = ctx.Process(
                 target=_actor_process,
@@ -454,6 +469,12 @@ def run_async_worker_loop(
                     "capture_checkpoints": capture_checkpoints,
                     "headless": headless,
                     "screenshot_mmf": screenshot_mmf,
+                    "memlog_directory": (
+                        str(root / "data" / "memlog")
+                        if memlog_actor_rank is not None
+                        and rank == int(memlog_actor_rank)
+                        else None
+                    ),
                 },
                 name=f"dist-async-actor-{rank}",
             )
@@ -462,8 +483,13 @@ def run_async_worker_loop(
             processes.append(proc)
             parent_conns.append(parent_conn)
 
-        _wait_for_actor_spawn(parent_conns, n_envs, processes=processes)
-        log(machine_name, f"async worker fleet ready ({n_envs} actors)")
+        _wait_for_actor_spawn(
+            parent_conns,
+            actor_count,
+            processes=processes,
+            actor_ranks=ranks,
+        )
+        log(machine_name, f"async worker fleet ready ({actor_count} actors)")
         for conn in parent_conns:
             conn.send({"t": "start"})
 

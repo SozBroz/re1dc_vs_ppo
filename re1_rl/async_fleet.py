@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import multiprocessing as mp
+import os
 import time
 from multiprocessing.connection import Connection, wait
 from pathlib import Path
@@ -48,6 +49,44 @@ DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
 )
 DEFAULT_SYNC_INTERVAL_S = 360.0
 
+_LEGACY_45_ACTION_NAMES = (
+    "noop",
+    "forward",
+    "back",
+    "turn_left",
+    "turn_right",
+    "run_forward",
+    "attack_up",
+    "interact",
+    "attack",
+    "use",
+    "equip",
+    *(f"deposit_slot_{i}" for i in range(8)),
+    *(f"withdraw_box_{i}" for i in range(16)),
+    "combine",
+    *(f"select_slot_{i}" for i in range(8)),
+    "attack_down",
+)
+_CURRENT_45_ACTION_NAMES = (
+    "noop",
+    "forward",
+    "back",
+    "turn_left",
+    "turn_right",
+    "run_forward",
+    "attack_up",
+    "attack",
+    "attack_down",
+    "interact",
+    "use",
+    "equip",
+    *(f"deposit_slot_{i}" for i in range(8)),
+    *(f"withdraw_box_{i}" for i in range(16)),
+    "combine",
+    *(f"select_slot_{i}" for i in range(8)),
+)
+_LEGACY_GENERIC_ATTACK_ACTION = 8
+
 
 def _obs_batch_for_one(obs: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     return {k: np.expand_dims(v, 0) for k, v in obs.items()}
@@ -70,9 +109,10 @@ def _serve_needs_batch(
     """Answer one or more actor ``need`` messages with batched inference."""
     if not pairs:
         return
-    chunk_size = max(1, int(max_batch))
-    for start in range(0, len(pairs), chunk_size):
-        chunk = pairs[start : start + chunk_size]
+
+    def _serve_regular(chunk: list[tuple[Connection, dict[str, Any]]]) -> None:
+        if not chunk:
+            return
         msgs = [msg for _, msg in chunk]
         obs_batch = _obs_batch_for_many(msgs)
         masks_list = [msg.get("action_masks") for msg in msgs]
@@ -97,7 +137,7 @@ def _serve_needs_batch(
                         "policy_version": policy_version,
                     }
                 )
-            continue
+            return
         masks = np.asarray(masks_list, dtype=bool)
         actions, values, log_probs = policy.predict_masked_batch(obs_batch, masks)
         policy_version = int(getattr(policy, "policy_version", 0) or 0)
@@ -111,6 +151,52 @@ def _serve_needs_batch(
                     "policy_version": policy_version,
                 }
             )
+
+    def _serve_diagnostics(chunk: list[tuple[Connection, dict[str, Any]]]) -> None:
+        if not chunk:
+            return
+        usable = [
+            pair for pair in chunk if pair[1].get("action_masks") is not None
+        ]
+        fallback = [
+            pair for pair in chunk if pair[1].get("action_masks") is None
+        ]
+        _serve_regular(fallback)
+        if not usable:
+            return
+        msgs = [msg for _, msg in usable]
+        obs_batch = _obs_batch_for_many(msgs)
+        masks = np.asarray([msg["action_masks"] for msg in msgs], dtype=bool)
+        actions, values, log_probs, raw_logits, masked_probs = (
+            policy.predict_masked_batch_with_diagnostics(obs_batch, masks)
+        )
+        policy_version = int(getattr(policy, "policy_version", 0) or 0)
+        for i, (conn, _) in enumerate(usable):
+            conn.send(
+                {
+                    "t": "act",
+                    "action": int(actions[i]),
+                    "value": float(values[i]),
+                    "logprob": float(log_probs[i]),
+                    "policy_version": policy_version,
+                    "raw_logits": np.asarray(raw_logits[i]),
+                    "masked_probs": np.asarray(masked_probs[i]),
+                }
+            )
+
+    chunk_size = max(1, int(max_batch))
+    for start in range(0, len(pairs), chunk_size):
+        chunk = pairs[start : start + chunk_size]
+        regular = [
+            pair for pair in chunk
+            if not bool(pair[1].get("want_policy_diagnostics"))
+        ]
+        diagnostic = [
+            pair for pair in chunk
+            if bool(pair[1].get("want_policy_diagnostics"))
+        ]
+        _serve_regular(regular)
+        _serve_diagnostics(diagnostic)
 
 
 def _drain_actor_messages(
@@ -178,14 +264,48 @@ def _checkpoint_spaces_compatible(model) -> bool:
     return True
 
 
+_LEGACY_47_ACTION_NAMES = (
+    "noop",
+    "forward",
+    "back",
+    "turn_left",
+    "turn_right",
+    "run_forward",
+    "run_forward_left",
+    "run_forward_right",
+    "attack_up",
+    "attack",
+    "attack_down",
+    "interact",
+    "use",
+    "equip",
+    *(f"deposit_slot_{i}" for i in range(8)),
+    *(f"withdraw_box_{i}" for i in range(16)),
+    "combine",
+    *(f"select_slot_{i}" for i in range(8)),
+)
+
+
+def _remap_action_head_tensor(
+    old: Any,
+    new: Any,
+    old_names: tuple[str, ...],
+    new_names: tuple[str, ...],
+) -> Any:
+    old_index = {name: index for index, name in enumerate(old_names)}
+    remapped = new.clone()
+    for new_index, name in enumerate(new_names):
+        remapped[new_index] = old[old_index[name]]
+    return remapped
+
+
 def _copy_compatible_policy_weights(src_policy, dst_policy) -> int:
     """Copy compatible tensors, expanding a legacy action head safely.
 
     ``strict=False`` still errors on shape mismatches for shared keys; filter first.
-    New action rows inherit ``attack`` semantics with a 100x lower prior.
+    The canonical 45-action reorder migration follows action names across the
+    reordered head. Other expansions retain the legacy attack-clone behavior.
     """
-    from re1_rl.action_mask import ATTACK_ACTION
-
     src = src_policy.state_dict()
     dst = dst_policy.state_dict()
     filtered = {
@@ -197,16 +317,32 @@ def _copy_compatible_policy_weights(src_policy, dst_policy) -> int:
             continue
         old = src[key]
         new = dst[key]
-        if old.ndim != new.ndim or old.shape[0] >= new.shape[0]:
+        if old.ndim != new.ndim:
             continue
         if old.ndim == 2 and old.shape[1:] != new.shape[1:]:
             continue
-        expanded = new.clone()
-        expanded[: old.shape[0]] = old
-        expanded[old.shape[0] :] = old[ATTACK_ACTION]
-        if old.ndim == 1:
-            expanded[old.shape[0] :] -= float(np.log(100.0))
-        filtered[key] = expanded
+
+        remapped = None
+        if old.shape[0] == new.shape[0] == 45 and (
+            tuple(_LEGACY_45_ACTION_NAMES) != tuple(_CURRENT_45_ACTION_NAMES)
+        ):
+            remapped = _remap_action_head_tensor(
+                old, new, _LEGACY_45_ACTION_NAMES, _CURRENT_45_ACTION_NAMES
+            )
+        elif old.shape[0] == 47 and new.shape[0] == 45:
+            remapped = _remap_action_head_tensor(
+                old, new, _LEGACY_47_ACTION_NAMES, _CURRENT_45_ACTION_NAMES
+            )
+        elif old.shape[0] < new.shape[0]:
+            expanded = new.clone()
+            expanded[: old.shape[0]] = old
+            expanded[old.shape[0] :] = old[_LEGACY_GENERIC_ATTACK_ACTION]
+            if old.ndim == 1:
+                expanded[old.shape[0] :] -= float(np.log(100.0))
+            remapped = expanded
+
+        if remapped is not None:
+            filtered[key] = remapped
     dst_policy.load_state_dict(filtered, strict=False)
     return len(filtered)
 
@@ -345,6 +481,7 @@ def _actor_process(
     capture_checkpoints: bool,
     headless: bool = True,
     screenshot_mmf: bool | None = None,
+    memlog_directory: str | None = None,
 ) -> None:
     from scripts.train_parallel import make_env
     from re1_rl.training_progress import slim_progress_info
@@ -397,6 +534,8 @@ def _actor_process(
     episode_infos: list[dict[str, Any]] = []
     step_i = 0
     horizon_policy_version = 0
+    memlog_control = None
+    memlog_telemetry = None
 
     def _reset_bufs() -> None:
         nonlocal obs_bufs, mask_bufs, step_i, episode_infos, horizon_policy_version
@@ -433,12 +572,49 @@ def _actor_process(
     _reset_bufs()
 
     try:
+        if memlog_directory is not None:
+            from re1_rl.memlog_runtime import MemlogControl, MemlogTelemetry
+
+            raw_env = getattr(env, "unwrapped", env)
+            memlog_control = MemlogControl(
+                Path(memlog_directory),
+                bridge=raw_env.bridge,
+                ram_skipper=raw_env._ram_skip,
+                initial_speed=training_speed,
+                rank=rank,
+                run_id=os.environ.get("RE1_MEMLOG_RUN_ID"),
+            )
+            memlog_telemetry = MemlogTelemetry(
+                Path(memlog_directory),
+                run_id=memlog_control.state.run_id,
+                rank=rank,
+                n_steps=n_steps,
+            )
+
+        def _wait_for_control() -> bool:
+            if memlog_control is None:
+                return False
+            state = memlog_control.wait_until_runnable(
+                heartbeat=(
+                    lambda current: memlog_telemetry.heartbeat(
+                        current, horizon_step=step_i
+                    )
+                    if memlog_telemetry is not None
+                    else None
+                )
+            )
+            return bool(state.shutdown)
+
         while not stop_flag.value:
+            if _wait_for_control():
+                break
             req: dict[str, Any] = {"t": "need", "rank": rank, "obs": obs}
             masks_now = None
             if hasattr(env, "action_masks"):
                 masks_now = np.asarray(env.action_masks(), dtype=bool)
                 req["action_masks"] = masks_now
+            if memlog_telemetry is not None:
+                req["want_policy_diagnostics"] = True
             conn.send(req)
             msg = conn.recv()
             if msg.get("t") == "stop":
@@ -454,6 +630,8 @@ def _actor_process(
 
             obs_before = obs
             masks_before = masks_now
+            if _wait_for_control():
+                break
             # Top-right memlog (RE1_STEP_DIAG_PORT): stash critic V for this step.
             try:
                 _diag = getattr(getattr(env, "unwrapped", env), "_step_diag", None)
@@ -462,6 +640,25 @@ def _actor_process(
             except (AttributeError, TypeError, ValueError):
                 pass
             obs, rew, done, trunc, info = env.step(action)
+            if memlog_telemetry is not None and memlog_control is not None:
+                telemetry_mask = masks_before
+                if telemetry_mask is None:
+                    telemetry_mask = np.ones(int(env.action_space.n), dtype=bool)
+                memlog_telemetry.publish_step(
+                    obs=obs_before,
+                    action_mask=telemetry_mask,
+                    action=action,
+                    value=value,
+                    logprob=logprob,
+                    policy_version=int(msg.get("policy_version", 0) or 0),
+                    raw_logits=msg.get("raw_logits"),
+                    masked_probs=msg.get("masked_probs"),
+                    reward=float(rew),
+                    info=info,
+                    done=bool(done or trunc),
+                    horizon_step=step_i,
+                    control=memlog_control.state,
+                )
             if info:
                 episode_infos.append(slim_progress_info(info))
 
@@ -487,11 +684,18 @@ def _actor_process(
                 if step_i > 0:
                     _emit_rollout(step_i)
                     _reset_bufs()
+                if _wait_for_control():
+                    break
                 obs, _ = env.reset()
             elif step_i >= n_steps:
                 _emit_rollout(n_steps)
                 _reset_bufs()
     finally:
+        if step_i > 0:
+            try:
+                _emit_rollout(step_i)
+            except (BrokenPipeError, EOFError, OSError):
+                pass
         try:
             env.close()
         except Exception:
@@ -503,16 +707,29 @@ def _wait_for_actor_spawn(
     n_envs: int,
     *,
     processes: list[mp.Process] | None = None,
+    actor_ranks: list[int] | None = None,
     timeout_s: float = 600.0,
 ) -> None:
+    expected_ranks = (
+        set(range(int(n_envs)))
+        if actor_ranks is None
+        else {int(rank) for rank in actor_ranks}
+    )
+    if len(expected_ranks) != int(n_envs):
+        raise ValueError("n_envs must equal the number of unique actor ranks")
+    ordered_ranks = (
+        list(range(int(n_envs)))
+        if actor_ranks is None
+        else [int(rank) for rank in actor_ranks]
+    )
     spawned: set[int] = set()
     errors: dict[int, str] = {}
     deadline = time.perf_counter() + timeout_s
     last_report = 0.0
-    while len(spawned) < n_envs:
+    while spawned != expected_ranks:
         remaining = deadline - time.perf_counter()
         if remaining <= 0:
-            missing = sorted(set(range(n_envs)) - spawned)
+            missing = sorted(expected_ranks - spawned)
             err_lines = [f"  rank {r}: {errors[r]}" for r in sorted(errors)]
             detail = "\n".join(err_lines) if err_lines else ""
             raise TimeoutError(
@@ -521,7 +738,11 @@ def _wait_for_actor_spawn(
             )
         if processes and time.perf_counter() - last_report >= 10.0:
             alive = sum(1 for p in processes if p.is_alive())
-            dead = [i for i, p in enumerate(processes) if not p.is_alive() and i not in spawned]
+            dead = [
+                rank
+                for rank, proc in zip(ordered_ranks, processes)
+                if not proc.is_alive() and rank not in spawned
+            ]
             print(
                 f"[train:async] warmup {len(spawned)}/{n_envs} spawned, "
                 f"{alive} actors alive"
@@ -530,13 +751,13 @@ def _wait_for_actor_spawn(
             )
             last_report = time.perf_counter()
         if processes:
-            for i, proc in enumerate(processes):
-                if i in spawned or proc.is_alive():
+            for rank, proc in zip(ordered_ranks, processes):
+                if rank in spawned or proc.is_alive():
                     continue
                 proc.join(timeout=0)
                 raise RuntimeError(
-                    f"actor {i} died during warmup (exit={proc.exitcode}); "
-                    f"see [actor {i}] lines above if printed"
+                    f"actor {rank} died during warmup (exit={proc.exitcode}); "
+                    f"see [actor {rank}] lines above if printed"
                 )
         ready = wait(conns, timeout=min(1.0, remaining))
         for conn in ready:

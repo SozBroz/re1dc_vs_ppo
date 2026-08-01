@@ -9,7 +9,15 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from re1_rl.action_mask import ATTACK_ACTION, SELECT_SLOT_BASE, USE_ACTION, action_mask
+from re1_rl.action_mask import (
+    ATTACK_ACTION,
+    ATTACK_DOWN_ACTION,
+    ATTACK_UP_ACTION,
+    INTERACT_ACTION,
+    SELECT_SLOT_BASE,
+    USE_ACTION,
+    action_mask,
+)
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
     GOLD_EMBLEM_RETURN_PENALTY,
@@ -29,7 +37,7 @@ from re1_rl.story_item_use import (
     annotate_story_use_success,
 )
 
-N_ACTIONS = 45  # attack_up@6, attack@8, attack_down@44
+N_ACTIONS = 47
 MUSIC_NOTES_ID = 0x23
 EMBLEM_ID = 0x1F
 GOLD_EMBLEM_ID = 0x20
@@ -231,8 +239,9 @@ def test_story_use_mask_allows_movement_while_pending() -> None:
         player_z=8020,
         rewarded_story_uses=set(),
     )
-    assert m[1]  # forward — reorient before slot pick
-    assert m[3]  # turn_left
+    assert m[:6].all()  # movement (curved run via sticky composition)
+    assert m[INTERACT_ACTION]
+    assert not m[[ATTACK_UP_ACTION, ATTACK_ACTION, ATTACK_DOWN_ACTION]].any()
     assert m[SELECT_SLOT_BASE]
 
 
@@ -677,6 +686,7 @@ def test_document_examine_mask_allows_mash_actions() -> None:
         episode_start_hp=96,
         document_examine_open=True,
     )
-    assert m[0] and m[1] and m[2] and m[3] and m[7]
+    assert m[0] and m[1] and m[2] and m[3] and m[INTERACT_ACTION]
+    assert not m[7]
     assert not m[USE_ACTION]
     assert not m[ATTACK_ACTION]

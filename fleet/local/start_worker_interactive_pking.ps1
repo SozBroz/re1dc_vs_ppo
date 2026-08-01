@@ -7,11 +7,16 @@ $ErrorActionPreference = 'Continue'
 Set-Location $RepoRoot
 New-Item -ItemType Directory -Force -Path 'data\logs' | Out-Null
 
-Write-Host 'Stopping stale EmuHawk / distributed_train...'
-Stop-Process -Name EmuHawk -Force -ErrorAction SilentlyContinue
+Write-Host 'Stopping stale regular pking actors (preserving pking-memlog)...'
 Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
-    Where-Object { $_.CommandLine -match 'distributed_train' } |
+    Where-Object {
+        $_.CommandLine -match 'distributed_train' -and
+        $_.CommandLine -notmatch 'worker-id pking-memlog'
+    } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+$regularPorts = 5755..5774 | Where-Object { $_ -ne 5759 }
+Get-NetTCPConnection -LocalPort $regularPorts -State Listen -ErrorAction SilentlyContinue |
+    ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
 Start-Sleep -Seconds 2
 
 $wrapper = Join-Path $RepoRoot 'fleet\local\run_distributed_worker_pking.cmd'

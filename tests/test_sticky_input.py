@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from re1_rl.env import ACTION_BUTTON_MAP, ACTION_NAMES
+from re1_rl.env import ACTION_BUTTON_MAP, ACTION_NAMES, _apply_action_input
 from re1_rl.sticky_input import StickyInputState, human_buttons_to_step, human_step_gate
 
 
@@ -29,24 +29,48 @@ def test_forward_sticks_up_across_steps() -> None:
 
 def test_run_forward_sticks_square() -> None:
     s = StickyInputState()
-    s.apply(_idx("run_forward"), ACTION_BUTTON_MAP)
-    sticky, _, _ = s.apply(_idx("run_forward"), ACTION_BUTTON_MAP)
+    _apply_action_input(s, _idx("run_forward"))
+    sticky, _, _ = _apply_action_input(s, _idx("run_forward"))
     assert sticky["up"] is True
     assert sticky["square"] is True
 
 
+def test_run_forward_diagonals_compose_via_sticky_latch() -> None:
+    left = StickyInputState()
+    _apply_action_input(left, _idx("run_forward"))
+    left_sticky, _, _ = _apply_action_input(left, _idx("turn_left"))
+    assert left_sticky == {
+        "up": True,
+        "down": False,
+        "left": True,
+        "right": False,
+        "square": True,
+    }
+
+    right = StickyInputState()
+    _apply_action_input(right, _idx("run_forward"))
+    right_sticky, _, _ = _apply_action_input(right, _idx("turn_right"))
+    assert right_sticky == {
+        "up": True,
+        "down": False,
+        "left": False,
+        "right": True,
+        "square": True,
+    }
+
+
 def test_forward_clears_run() -> None:
     s = StickyInputState()
-    s.apply(_idx("run_forward"), ACTION_BUTTON_MAP)
-    sticky, _, _ = s.apply(_idx("forward"), ACTION_BUTTON_MAP)
+    _apply_action_input(s, _idx("run_forward"))
+    sticky, _, _ = _apply_action_input(s, _idx("forward"))
     assert sticky["up"] is True
     assert sticky["square"] is False
 
 
 def test_turn_keeps_forward_and_run() -> None:
     s = StickyInputState()
-    s.apply(_idx("run_forward"), ACTION_BUTTON_MAP)
-    sticky, _, _ = s.apply(_idx("turn_left"), ACTION_BUTTON_MAP)
+    _apply_action_input(s, _idx("run_forward"))
+    sticky, _, _ = _apply_action_input(s, _idx("turn_left"))
     assert sticky["up"] is True
     assert sticky["square"] is True
     assert sticky["left"] is True
@@ -68,8 +92,8 @@ def test_noop_clears_sticky() -> None:
 
 def test_interact_holds_cross_full_step() -> None:
     s = StickyInputState()
-    s.apply(_idx("forward"), ACTION_BUTTON_MAP)
-    sticky, pulse, pulse_hold = s.apply(_idx("interact"), ACTION_BUTTON_MAP)
+    _apply_action_input(s, _idx("forward"))
+    sticky, pulse, pulse_hold = _apply_action_input(s, _idx("interact"))
     assert sticky["up"] is True
     assert pulse is None
     assert pulse_hold == {"cross": True}
@@ -109,7 +133,7 @@ def test_human_step_gate_one_chunk_per_press() -> None:
 
 
 def test_attack_up_slot_is_macro_not_pulse() -> None:
-    """Slot 6 is attack_up; no quickturn pulse buttons."""
+    """Slot 8 is attack_up; no quickturn pulse buttons."""
     s = StickyInputState()
     s.apply(_idx("forward"), ACTION_BUTTON_MAP)
     sticky, pulse, _ = s.apply(_idx("attack_up"), ACTION_BUTTON_MAP)

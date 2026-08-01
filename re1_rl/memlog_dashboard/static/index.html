@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RE1 Memlog</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>RE1 Memlog</h1>
+      <div id="heartbeat" class="status">Waiting for snapshot…</div>
+    </div>
+    <div class="controls">
+      <button id="start">Start</button><button id="stop" class="danger">Stop</button>
+      <button id="pause">Pause</button><button id="resume">Resume</button>
+      <span class="speed-presets"></span>
+      <label>Speed <input id="speed" type="number" min="1" max="10000" value="6400">%</label>
+      <button id="set-speed">Set</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel wide">
+      <h2>Four-frame policy input <span id="frame-error"></span></h2>
+      <div id="frames" class="frames"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Reward</h2>
+      <div id="reward-summary" class="metrics"></div>
+      <div class="gauge"><div id="contempt-bar"></div></div>
+      <div id="contempt-label" class="muted"></div>
+      <div id="events" class="event-list"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Infrastructure</h2>
+      <div id="infrastructure" class="kv"></div>
+    </section>
+
+    <section class="panel wide">
+      <div class="panel-title">
+        <h2>Policy actions</h2>
+        <label>Sort <select id="action-sort"><option value="index">index</option><option value="score">score</option></select></label>
+      </div>
+      <div id="action-metrics" class="metrics"></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>action</th><th>raw logit</th><th>post-mask probability</th><th>state</th></tr></thead>
+        <tbody id="actions"></tbody>
+      </table></div>
+    </section>
+
+    <section class="panel wide">
+      <div class="panel-title">
+        <h2>Observation inspector</h2>
+      </div>
+      <div id="observations"></div>
+    </section>
+  </main>
+
+  <div id="toast" role="status"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

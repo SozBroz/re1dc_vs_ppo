@@ -1,9 +1,9 @@
 """Per-weapon attack macros for height-synced discrete combat actions.
 
 Discrete actions (env):
-  - ``attack`` (8)       — **neutral** aim for every weapon
-  - ``attack_up`` (6)    — **high** (R1+Up) for every weapon (old quickturn slot)
-  - ``attack_down`` (44) — **crouch / floor** (R1+Down) for every weapon
+  - ``attack_up`` (8)   — **high** (R1+Up) for every weapon
+  - ``attack`` (9)      — **neutral** aim for every weapon
+  - ``attack_down`` (10) — **crouch / floor** (R1+Down) for every weapon
 
 Weapon paths:
   - **knife** — standing R1 (neutral), R1+Up (high), crouch R1+Down via ``execute_knife_macro``
