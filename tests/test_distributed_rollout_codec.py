@@ -115,6 +115,6 @@ def test_rollout_codec_v2_frame_roundtrip() -> None:
     original = _sample_rollout()
     original.obs["frame"] = np.zeros_like(original.obs["frame"], dtype=np.uint8)
     blob_v2 = encode_rollout(original)
-    assert blob_v2[4] == 2  # codec version
+    assert blob_v2[4] in (2, 3)  # codec version (v3 adds optional aux targets)
     restored = decode_rollout(blob_v2)
     assert np.array_equal(restored.obs["frame"], original.obs["frame"])

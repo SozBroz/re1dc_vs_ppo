@@ -26,6 +26,10 @@ class WorkerRollout:
     episode_infos: list[dict[str, Any]] = field(default_factory=list)
     # Legacy optional field; unused (softlock is in scalar rewards).
     rewards_softlock: np.ndarray | None = None
+    # Aligned aux targets: (n_steps, n_envs, dim); optional for back-compat decode.
+    combat_targets: np.ndarray | None = None
+    world_event_targets: np.ndarray | None = None
+    world_event_masks: np.ndarray | None = None
 
     def num_timesteps(self) -> int:
         return int(self.n_envs * self.n_steps)

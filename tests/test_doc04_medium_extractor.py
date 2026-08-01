@@ -28,10 +28,15 @@ from re1_rl.key_items import KEYS_HELD_DIM
 from re1_rl.maps_files import MAPS_FILES_DIM
 from re1_rl.milestone_features import MILESTONE_DIM
 from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, INVENTORY_OBS_DIM, PROPRIO_DIM, ROOM_VISITED_DIM
-from re1_rl.policy_config import POLICY_KWARGS
 from re1_rl.room_signature import ENEMY_ROSTER_DIM
 from re1_rl.spatial_encoder import SPATIAL_DIM, VISITED_SHAPE
 from re1_rl.weapon_damage import LAST_ATTACK_DIM, WEAPON_CARD_DIM
+
+DOC04_POLICY_KWARGS: dict = dict(
+    net_arch=dict(pi=[512, 512], vf=[512, 512]),
+    features_extractor_class=RE1Doc04MediumExtractor,
+    features_extractor_kwargs=dict(cnn_output_dim=512, features_dim=FEATURES_DIM),
+)
 
 
 def _stub_obs_space(*, with_world_state: bool = True, with_key_hints: bool = False) -> spaces.Dict:
@@ -132,7 +137,7 @@ def test_ppo_accepts_doc04_medium_extractor() -> None:
     model = PPO(
         "MultiInputPolicy",
         StubEnv(),
-        policy_kwargs=POLICY_KWARGS,
+        policy_kwargs=DOC04_POLICY_KWARGS,
         n_steps=32,
         batch_size=16,
         n_epochs=1,

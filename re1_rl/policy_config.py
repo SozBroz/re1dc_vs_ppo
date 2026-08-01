@@ -1,21 +1,27 @@
-"""Single source of truth for PPO policy sizing (Doc 04 Medium campaign).
+"""Single source of truth for PPO policy sizing (combat-efficient campaign).
 
-Doc 04 Medium (WH2 8GB fit):
-  - NatureCNN 512-d (transplant-compatible conv weights only)
-  - Typed modality towers (no 975-d anonymous flatten)
-  - Concat + LayerNorm fusion -> 1280-d
+Combat-efficient (WH2 8GB fit, hard cap 5.8M):
+  - NatureCNN 512-d (transplant-compatible conv weights)
+  - Typed modality towers + joint 128-d combat latent
+  - Concat + LayerNorm fusion -> 1024-d
   - pi/vf trunks [512, 512]
+  - flat 45-action MaskablePPO distribution
   - affordances path-hint and goal compass omitted from forward
 
-Fresh training required — old ~2M / 1615-d checkpoints are not shape-compatible.
-See docs/campaign_doc04_medium.md and backup/pre-doc04-medium-2026-07-22.
+Fresh training / one-time graft required — Doc04-medium 1280-d checkpoints are
+not shape-compatible. See scripts/transplant_combat_efficient.py.
 """
 from __future__ import annotations
 
-from re1_rl.doc04_medium_extractor import FEATURES_DIM, RE1Doc04MediumExtractor
+from re1_rl.combat_efficient_extractor import FEATURES_DIM, RE1CombatEfficientExtractor
 
 POLICY_KWARGS: dict = dict(
     net_arch=dict(pi=[512, 512], vf=[512, 512]),
-    features_extractor_class=RE1Doc04MediumExtractor,
+    features_extractor_class=RE1CombatEfficientExtractor,
     features_extractor_kwargs=dict(cnn_output_dim=512, features_dim=FEATURES_DIM),
 )
+
+# Learner algorithm class (workers only need the policy / state_dict).
+PPO_ALGORITHM = "CombatEfficientPPO"
+USE_GROUPED_ENTROPY = False  # ablation flag; baseline uses stock MaskablePPO entropy
+AUX_COEF = 0.02

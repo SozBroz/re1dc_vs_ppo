@@ -13,7 +13,7 @@ import numpy as np
 from re1_rl.distributed.rollout_types import WorkerRollout
 
 _MAGIC = b"RE1R"
-_VERSION = 2
+_VERSION = 3  # + optional combat/world aux targets
 _FRAME_KEY = "frame"
 
 
@@ -49,6 +49,8 @@ def encode_rollout(rollout: WorkerRollout) -> bytes:
         "frame_compressed": frame_blob is not None,
         "frame_shape": frame_shape,
         "has_action_masks": True,
+        "has_combat_targets": rollout.combat_targets is not None,
+        "has_world_event_targets": rollout.world_event_targets is not None,
     }
     npz = BytesIO()
     save_kwargs: dict[str, np.ndarray] = {
@@ -61,6 +63,16 @@ def encode_rollout(rollout: WorkerRollout) -> bytes:
         "action_masks": np.asarray(rollout.action_masks, dtype=np.bool_),
         "rewards_softlock": rollout.softlock_rewards(),
     }
+    if rollout.combat_targets is not None:
+        save_kwargs["combat_targets"] = np.asarray(rollout.combat_targets, dtype=np.float32)
+    if rollout.world_event_targets is not None:
+        save_kwargs["world_event_targets"] = np.asarray(
+            rollout.world_event_targets, dtype=np.float32
+        )
+    if rollout.world_event_masks is not None:
+        save_kwargs["world_event_masks"] = np.asarray(
+            rollout.world_event_masks, dtype=np.float32
+        )
     for key, arr in obs_rest.items():
         save_kwargs[f"obs__{key}"] = arr
     np.savez_compressed(npz, **save_kwargs)
@@ -84,9 +96,9 @@ def decode_rollout(data: bytes) -> WorkerRollout:
         meta_len, npz_len = struct.unpack("<II", data[5:13])
         frame_len = 0
         off = 13
-    elif version == 2:
+    elif version in (2, 3):
         if len(data) < 17:
-            raise ValueError("truncated rollout v2 header")
+            raise ValueError("truncated rollout v2/v3 header")
         meta_len, npz_len, frame_len = struct.unpack("<III", data[5:17])
         off = 17
     else:
@@ -95,7 +107,7 @@ def decode_rollout(data: bytes) -> WorkerRollout:
     off += meta_len
     npz_bytes = data[off : off + npz_len]
     off += npz_len
-    if version == 2:
+    if version in (2, 3):
         frame_bytes = data[off : off + frame_len]
         if len(frame_bytes) != frame_len:
             raise ValueError("truncated rollout frame blob")
@@ -125,6 +137,21 @@ def decode_rollout(data: bytes) -> WorkerRollout:
             if "rewards_softlock" in loaded.files
             else np.zeros_like(loaded["rewards"], dtype=np.float32)
         )
+        combat_targets = (
+            np.asarray(loaded["combat_targets"], dtype=np.float32)
+            if "combat_targets" in loaded.files
+            else None
+        )
+        world_event_targets = (
+            np.asarray(loaded["world_event_targets"], dtype=np.float32)
+            if "world_event_targets" in loaded.files
+            else None
+        )
+        world_event_masks = (
+            np.asarray(loaded["world_event_masks"], dtype=np.float32)
+            if "world_event_masks" in loaded.files
+            else None
+        )
         return WorkerRollout(
             worker_id=str(meta["worker_id"]),
             policy_version=int(meta["policy_version"]),
@@ -140,4 +167,7 @@ def decode_rollout(data: bytes) -> WorkerRollout:
             action_masks=np.asarray(loaded["action_masks"], dtype=np.bool_),
             episode_infos=list(meta.get("episode_infos") or []),
             rewards_softlock=np.asarray(softlock, dtype=np.float32),
+            combat_targets=combat_targets,
+            world_event_targets=world_event_targets,
+            world_event_masks=world_event_masks,
         )

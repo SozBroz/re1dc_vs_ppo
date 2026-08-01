@@ -61,7 +61,10 @@ _ENEMY_SLOT_FIELDS = [
     ("alive", "1 = alive"),
     ("world_vx", "allocentric x delta / VEL_NORM, clip [-1,1]"),
     ("world_vz", "allocentric z delta / VEL_NORM, clip [-1,1]"),
+    ("active", "enemy active_byte / 255 (0 if unknown/static spawn)"),
+    ("hittable", "1 = in-room combat-present (combat_near or alive+active)"),
 ]
+ENEMY_SLOT_DIM = len(_ENEMY_SLOT_FIELDS)
 _EXIT_SLOT_FIELDS = [
     ("bearing_sin", "sin(angle to exit door - facing)"),
     ("bearing_cos", "cos(angle to exit door - facing)"),
@@ -377,8 +380,18 @@ class SpatialEncoder:
             v[i + 7] = 1.0
             v[i + 8] = clip_vel(float(e.get("world_vx", 0)))
             v[i + 9] = clip_vel(float(e.get("world_vz", 0)))
-            i += 10
-        return 1 + ITEM_SLOTS * 8 + 1 + ENEMY_SLOTS * 10
+            active_byte = float(e.get("active_byte", 0) or 0)
+            v[i + 10] = float(np.clip(active_byte / 255.0, 0.0, 1.0))
+            if "combat_near" in e:
+                hittable = 1.0 if int(e.get("combat_near", 0)) else 0.0
+            elif "hittable" in e:
+                hittable = 1.0 if e.get("hittable") else 0.0
+            else:
+                # Static spawn fallback: listed alive enemies count as hittable.
+                hittable = 1.0
+            v[i + 11] = hittable
+            i += ENEMY_SLOT_DIM
+        return 1 + ITEM_SLOTS * 8 + 1 + ENEMY_SLOTS * ENEMY_SLOT_DIM
 
     # --- exits ---
 

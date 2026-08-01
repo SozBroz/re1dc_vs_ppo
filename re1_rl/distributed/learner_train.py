@@ -28,6 +28,8 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 
 
+from re1_rl.combat_targets import COMBAT_TARGET_DIM, WORLD_EVENT_DIM, empty_combat_target, empty_world_event_mask, empty_world_event_target
+
 from re1_rl.distributed.log_util import log
 
 from re1_rl.distributed.obs_preprocess import prepare_obs_for_policy
@@ -109,6 +111,9 @@ def _release_rollout_arrays(rollouts: list[WorkerRollout]) -> None:
         r.last_values = np.empty(0)
 
         r.action_masks = np.empty(0)
+        r.combat_targets = None
+        r.world_event_targets = None
+        r.world_event_masks = None
 
 
 
@@ -287,7 +292,29 @@ def merge_rollouts(rollouts: list[WorkerRollout]) -> dict[str, Any]:
 
     episode_starts = _episode_starts_from_dones(dones)
 
+    def _merge_optional_targets(attr: str, dim: int, empty_fn) -> np.ndarray:
+        parts = []
+        for r in rollouts:
+            arr = getattr(r, attr, None)
+            if arr is None:
+                fill = np.zeros((r.n_steps, r.n_envs, dim), dtype=np.float32)
+                for t in range(r.n_steps):
+                    for e in range(r.n_envs):
+                        fill[t, e] = empty_fn()
+                parts.append(fill)
+            else:
+                parts.append(np.asarray(arr, dtype=np.float32))
+        return np.concatenate(parts, axis=1)
 
+    combat_targets = _merge_optional_targets(
+        "combat_targets", COMBAT_TARGET_DIM, empty_combat_target
+    )
+    world_event_targets = _merge_optional_targets(
+        "world_event_targets", WORLD_EVENT_DIM, empty_world_event_target
+    )
+    world_event_masks = _merge_optional_targets(
+        "world_event_masks", WORLD_EVENT_DIM, empty_world_event_mask
+    )
 
     return {
 
@@ -314,6 +341,12 @@ def merge_rollouts(rollouts: list[WorkerRollout]) -> dict[str, Any]:
         "action_masks": action_masks,
 
         "episode_starts": episode_starts,
+
+        "combat_targets": combat_targets,
+
+        "world_event_targets": world_event_targets,
+
+        "world_event_masks": world_event_masks,
 
     }
 
@@ -459,6 +492,13 @@ def _train_one_version(
 
     ensure_training_logger(model)
 
+    if hasattr(model, "set_auxiliary_targets"):
+        model.set_auxiliary_targets(
+            merged.get("combat_targets"),
+            merged.get("world_event_targets"),
+            merged.get("world_event_masks"),
+        )
+
     saved_norm_adv = bool(getattr(model, "normalize_advantage", False))
     model.normalize_advantage = False
     weight_snapshot = _snapshot_policy_state_dict(model)
@@ -471,6 +511,8 @@ def _train_one_version(
         raise
     finally:
         model.normalize_advantage = saved_norm_adv
+        if hasattr(model, "set_auxiliary_targets"):
+            model.set_auxiliary_targets(None, None, None)
 
     model.num_timesteps += int(timesteps)
 

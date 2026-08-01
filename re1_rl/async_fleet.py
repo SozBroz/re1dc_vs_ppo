@@ -211,16 +211,26 @@ def _copy_compatible_policy_weights(src_policy, dst_policy) -> int:
     return len(filtered)
 
 
-def _transplant_into_current_spaces(model, *, tb_log: str | None, hp: dict):
-    from sb3_contrib import MaskablePPO
+def _make_learner_cls():
+    from re1_rl.combat_ppo import CombatEfficientPPO
+    from re1_rl.policy_config import AUX_COEF, USE_GROUPED_ENTROPY
 
+    return CombatEfficientPPO, {
+        "aux_coef": AUX_COEF,
+        "use_grouped_entropy": USE_GROUPED_ENTROPY,
+        "gae_lambda": 1.0,
+    }
+
+
+def _transplant_into_current_spaces(model, *, tb_log: str | None, hp: dict):
     from re1_rl.distributed.weights import _SpaceHolderEnv
 
+    LearnerCls, extra = _make_learner_cls()
     policy_obs, act_space = _policy_obs_and_act_spaces()
-    fresh = MaskablePPO(
+    fresh = LearnerCls(
         "MultiInputPolicy",
         _SpaceHolderEnv(policy_obs, act_space),
-        **hp,
+        **{**hp, **extra},
     )
     n_copied = _copy_compatible_policy_weights(model.policy, fresh.policy)
     fresh.num_timesteps = int(model.num_timesteps)
@@ -233,6 +243,10 @@ def _transplant_into_current_spaces(model, *, tb_log: str | None, hp: dict):
 
 
 def _reload_world_catalog_buffers_if_needed(model) -> None:
+    from re1_rl.combat_efficient_extractor import (
+        RE1CombatEfficientExtractor,
+        reload_combat_efficient_world_catalog_buffers,
+    )
     from re1_rl.doc04_medium_extractor import (
         RE1Doc04MediumExtractor,
         reload_doc04_world_catalog_buffers,
@@ -240,7 +254,10 @@ def _reload_world_catalog_buffers_if_needed(model) -> None:
     from re1_rl.features_extractor import RE1WorldAwareExtractor, reload_world_catalog_buffers
 
     extractor = model.policy.features_extractor
-    if isinstance(extractor, RE1Doc04MediumExtractor):
+    if isinstance(extractor, RE1CombatEfficientExtractor):
+        reload_combat_efficient_world_catalog_buffers(model.policy)
+        print("[train:async] reloaded world catalog buffers from data files", flush=True)
+    elif isinstance(extractor, RE1Doc04MediumExtractor):
         reload_doc04_world_catalog_buffers(model.policy)
         print("[train:async] reloaded world catalog buffers from data files", flush=True)
     elif isinstance(extractor, RE1WorldAwareExtractor):
@@ -249,20 +266,27 @@ def _reload_world_catalog_buffers_if_needed(model) -> None:
 
 
 def load_async_learner(*, device: str, resume: Path | None, tb_log: str | None):
-    """MaskablePPO learner shell; accepts PPO or MaskablePPO checkpoint zips."""
+    """CombatEfficientPPO learner shell; accepts PPO / MaskablePPO checkpoint zips."""
     from sb3_contrib import MaskablePPO
     from stable_baselines3 import PPO
 
     from re1_rl.distributed.weights import _SpaceHolderEnv
     from re1_rl.policy_config import POLICY_KWARGS
 
-    hp = {**PPO_HYPERPARAMS, "verbose": 1, "device": device, "policy_kwargs": POLICY_KWARGS}
+    LearnerCls, extra = _make_learner_cls()
+    hp = {
+        **PPO_HYPERPARAMS,
+        "verbose": 1,
+        "device": device,
+        "policy_kwargs": POLICY_KWARGS,
+        **extra,
+    }
     if tb_log:
         hp["tensorboard_log"] = tb_log
 
     def _fresh_maskable(obs_space=None, act_space=None):
         policy_obs_space, default_act = _policy_obs_and_act_spaces()
-        return MaskablePPO(
+        return LearnerCls(
             "MultiInputPolicy",
             _SpaceHolderEnv(
                 obs_space if obs_space is not None else policy_obs_space,
@@ -273,24 +297,28 @@ def load_async_learner(*, device: str, resume: Path | None, tb_log: str | None):
 
     if resume is not None and resume.is_file():
         loaded = None
-        load_kind = "MaskablePPO"
+        load_kind = "CombatEfficientPPO"
         try:
-            loaded = MaskablePPO.load(str(resume), device=device)
-            load_kind = "MaskablePPO"
+            loaded = LearnerCls.load(str(resume), device=device)
+            load_kind = "CombatEfficientPPO"
         except (TypeError, ValueError, RuntimeError):
             try:
-                plain = PPO.load(str(resume), device=device)
-                loaded = _fresh_maskable(plain.observation_space, plain.action_space)
-                _copy_compatible_policy_weights(plain.policy, loaded.policy)
-                loaded.num_timesteps = int(plain.num_timesteps)
-                load_kind = "PPO"
-            except (TypeError, ValueError, RuntimeError) as exc:
-                raise RuntimeError(f"failed to load resume checkpoint {resume}") from exc
+                loaded = MaskablePPO.load(str(resume), device=device)
+                load_kind = "MaskablePPO"
+            except (TypeError, ValueError, RuntimeError):
+                try:
+                    plain = PPO.load(str(resume), device=device)
+                    loaded = _fresh_maskable(plain.observation_space, plain.action_space)
+                    _copy_compatible_policy_weights(plain.policy, loaded.policy)
+                    loaded.num_timesteps = int(plain.num_timesteps)
+                    load_kind = "PPO"
+                except (TypeError, ValueError, RuntimeError) as exc:
+                    raise RuntimeError(f"failed to load resume checkpoint {resume}") from exc
 
         if tb_log:
             loaded.tensorboard_log = tb_log
         print(
-            f"[train:async] resumed {load_kind} into MaskablePPO from {resume} "
+            f"[train:async] resumed {load_kind} into CombatEfficientPPO from {resume} "
             f"(num_timesteps={loaded.num_timesteps})",
             flush=True,
         )

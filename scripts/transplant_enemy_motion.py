@@ -34,8 +34,9 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 from transplant_widen import build_stub_env  # noqa: E402
 
 OLD_ENEMY_SLOT_FIELDS = 8
-NEW_ENEMY_SLOT_FIELDS = 10
-OLD_SPATIAL_DELTA = 10  # ENEMY_SLOTS * 2
+# Current spatial enemy slot includes world_vx/vz + active/hittable.
+NEW_ENEMY_SLOT_FIELDS = 12
+OLD_SPATIAL_DELTA = 20  # ENEMY_SLOTS * (12 - 8)
 OLD_PROPRIO_DELTA = 2
 
 
@@ -82,7 +83,7 @@ def remap_spatial_weight(old_w: torch.Tensor, new_w: torch.Tensor) -> None:
         new_w[:, n0 : n0 + OLD_ENEMY_SLOT_FIELDS].copy_(
             old_w[:, o0 : o0 + OLD_ENEMY_SLOT_FIELDS]
         )
-        # n0+8, n0+9 remain zero (world_vx / world_vz)
+        # n0+8..n0+11 remain zero (world_vx/vz + active/hittable)
 
     old_suffix = start + ENEMY_SLOTS * OLD_ENEMY_SLOT_FIELDS
     new_suffix = start + ENEMY_SLOTS * NEW_ENEMY_SLOT_FIELDS

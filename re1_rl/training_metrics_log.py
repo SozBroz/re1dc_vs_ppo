@@ -23,6 +23,14 @@ PPO_TRAIN_TAGS = (
     "train/learning_rate",
     "train/n_updates",
     "train/std",
+    "train/aux_loss",
+    "train/aux_coef",
+    "train/aux_combat_bce",
+    "train/aux_combat_huber",
+    "train/aux_world_bce",
+    "train/grouped_entropy",
+    "train/engage_prob",
+    "train/conditional_combat_entropy",
 )
 
 ROLLOUT_TAGS = (

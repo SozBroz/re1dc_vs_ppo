@@ -7,6 +7,15 @@ from typing import Any
 import numpy as np
 from stable_baselines3.common.vec_env import VecEnv
 
+from re1_rl.combat_targets import (
+    COMBAT_TARGET_DIM,
+    WORLD_EVENT_DIM,
+    empty_combat_target,
+    empty_world_event_mask,
+    empty_world_event_target,
+    pack_combat_target_from_info,
+    pack_world_event_target_from_info,
+)
 from re1_rl.distributed.inference_policy import InferencePolicy
 from re1_rl.distributed.rollout_types import WorkerRollout
 
@@ -15,6 +24,38 @@ def _stack_action_masks(vec_env: VecEnv) -> np.ndarray:
     """Fetch per-env bool masks via ActionMasker / env.action_masks()."""
     masks = vec_env.env_method("action_masks")
     return np.stack([np.asarray(m, dtype=bool) for m in masks], axis=0)
+
+
+def _pack_step_targets(
+    actions: np.ndarray,
+    infos: list[dict[str, Any]],
+    *,
+    prev_rooms: list[str | None],
+    prev_hps: list[float | None],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[str | None], list[float | None]]:
+    n_envs = len(actions)
+    combat = np.zeros((n_envs, COMBAT_TARGET_DIM), dtype=np.float32)
+    world = np.zeros((n_envs, WORLD_EVENT_DIM), dtype=np.float32)
+    wmask = np.zeros((n_envs, WORLD_EVENT_DIM), dtype=np.float32)
+    next_rooms: list[str | None] = []
+    next_hps: list[float | None] = []
+    for i in range(n_envs):
+        info = infos[i] if i < len(infos) and isinstance(infos[i], dict) else {}
+        combat[i] = pack_combat_target_from_info(
+            int(actions[i]), info, prev_hp=prev_hps[i] if i < len(prev_hps) else None
+        )
+        y, m = pack_world_event_target_from_info(
+            int(actions[i]),
+            info,
+            prev_room=prev_rooms[i] if i < len(prev_rooms) else None,
+        )
+        world[i] = y
+        wmask[i] = m
+        room = info.get("room_id")
+        next_rooms.append(str(room) if room is not None else prev_rooms[i] if i < len(prev_rooms) else None)
+        hp = info.get("hp")
+        next_hps.append(float(hp) if hp is not None else (prev_hps[i] if i < len(prev_hps) else None))
+    return combat, world, wmask, next_rooms, next_hps
 
 
 def collect_rollout(
@@ -30,6 +71,9 @@ def collect_rollout(
     Pass ``obs=None`` to ``reset()`` once at the start of a session. Pass the
     returned next-obs on subsequent calls so episodes continue across horizons
     (parity with desync actors).
+
+    Aux targets align post-action outcomes to the pre-action obs already stored
+    for that transition (no same-transition outcome leakage into obs).
     """
     n_envs = vec_env.num_envs
     if obs is None:
@@ -47,8 +91,17 @@ def collect_rollout(
     log_probs = np.zeros((n_steps, n_envs), dtype=np.float32)
     n_actions = int(vec_env.action_space.n)
     action_masks = np.zeros((n_steps, n_envs, n_actions), dtype=np.bool_)
+    combat_targets = np.zeros((n_steps, n_envs, COMBAT_TARGET_DIM), dtype=np.float32)
+    world_event_targets = np.zeros((n_steps, n_envs, WORLD_EVENT_DIM), dtype=np.float32)
+    world_event_masks = np.zeros((n_steps, n_envs, WORLD_EVENT_DIM), dtype=np.float32)
+    for e in range(n_envs):
+        combat_targets[:, e] = empty_combat_target()
+        world_event_targets[:, e] = empty_world_event_target()
+        world_event_masks[:, e] = empty_world_event_mask()
 
     episode_infos: list[dict[str, Any]] = []
+    prev_rooms: list[str | None] = [None] * n_envs
+    prev_hps: list[float | None] = [None] * n_envs
 
     for step in range(n_steps):
         masks = _stack_action_masks(vec_env)
@@ -64,9 +117,20 @@ def collect_rollout(
         obs, rew, done, infos = vec_env.step(act)
         rewards[step] = rew
         dones[step] = done
+        combat, world, wmask, prev_rooms, prev_hps = _pack_step_targets(
+            act, list(infos), prev_rooms=prev_rooms, prev_hps=prev_hps
+        )
+        combat_targets[step] = combat
+        world_event_targets[step] = world
+        world_event_masks[step] = wmask
         for info in infos:
             if info:
                 episode_infos.append(dict(info))
+        # Reset room/hp tracking on episode boundaries for next transition.
+        for i, d in enumerate(done):
+            if d:
+                prev_rooms[i] = None
+                prev_hps[i] = None
 
     last_values = policy.predict_values(obs)
 
@@ -84,5 +148,8 @@ def collect_rollout(
         last_values=last_values,
         action_masks=action_masks,
         episode_infos=episode_infos,
+        combat_targets=combat_targets,
+        world_event_targets=world_event_targets,
+        world_event_masks=world_event_masks,
     )
     return rollout, obs
