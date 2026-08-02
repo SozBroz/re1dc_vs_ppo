@@ -40,6 +40,8 @@ def _qualify(
     start_hp: int = 96,
     rewarded_cutscenes=None,
     blocked_room: str | None = None,
+    peak_scene_flag: int | None = None,
+    peak_msg_flag: int | None = None,
 ):
     return qualify_cutscene_reward(
         skip_frames=skip_frames,
@@ -48,6 +50,8 @@ def _qualify(
         episode_start_hp=start_hp,
         rewarded_cutscenes=rewarded_cutscenes,
         cutscene_blocked_after_pickup_room=blocked_room,
+        peak_scene_flag=peak_scene_flag,
+        peak_msg_flag=peak_msg_flag,
     )
 
 
@@ -72,6 +76,52 @@ def test_long_idle_freeze_pays_without_scene_or_peak_evidence() -> None:
     prev = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0)
     cur = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0)
     assert _qualify(prev, cur, skip_frames=450) == "105:2:s0"
+
+
+def test_message_box_long_skip_does_not_pay_cutscene() -> None:
+    from re1_rl.memory_map import MESSAGE_FLAG_MASK
+
+    prev = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0)
+    cur = make_state(room="105", cam_id=2, hp=96, scene_flag=0x80, msg_flag=0)
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=450,
+            peak_msg_flag=MESSAGE_FLAG_MASK,
+            peak_scene_flag=0x80,
+        )
+        is None
+    )
+    assert (
+        cutscene_disqualify_reason(
+            skip_frames=450,
+            prev_state=prev,
+            new_state=cur,
+            episode_start_hp=96,
+            peak_msg_flag=MESSAGE_FLAG_MASK,
+            peak_scene_flag=0x80,
+        )
+        == "talk/examine message box (not exploration cutscene)"
+    )
+
+
+def test_message_box_skip_still_pays_when_scene_script_seen() -> None:
+    from re1_rl.memory_map import MESSAGE_FLAG_MASK
+
+    prev = make_state(room="104", cam_id=0, hp=96, scene_flag=0x84, msg_flag=0)
+    cur = make_state(room="104", cam_id=0, hp=96, scene_flag=0x80, msg_flag=0)
+    assert (
+        _qualify(
+            prev,
+            cur,
+            skip_frames=450,
+            peak_msg_flag=MESSAGE_FLAG_MASK,
+            peak_scene_flag=0x84,
+            rewarded_cutscenes={"105:0:s0"},
+        )
+        == "104:0:s0"
+    )
 
 
 def test_short_examine_and_short_door_do_not_pay() -> None:

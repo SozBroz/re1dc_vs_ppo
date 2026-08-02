@@ -213,6 +213,8 @@ def test_post_skip_sync_pays_cutscene_bonus_when_frames_recorded() -> None:
     env._progress = ProgressTracker()
     env._cutscene_skip_entry_prev = None
     env._pending_skip_room_crossings = []
+    env._ram_skip.last_skip_peak_scene_flag = 0x84
+    env._ram_skip.last_skip_peak_msg_flag = 0x00
     env._prev_state = {
         "room_id": "104",
         "hp": 96,
@@ -252,6 +254,58 @@ def test_post_skip_sync_pays_cutscene_bonus_when_frames_recorded() -> None:
     )
     env._apply_post_skip_sync()
     assert env._post_skip_bd.get("new_cutscene") == NEW_CUTSCENE_BONUS
+
+
+def test_post_skip_sync_message_text_no_cutscene() -> None:
+    from re1_rl.progress import ProgressTracker
+    from re1_rl.reward import NEW_CUTSCENE_BONUS
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skip_session_frames = 450
+    env._progress = ProgressTracker()
+    env._pending_skip_room_crossings = []
+    env._ram_skip.last_skip_peak_scene_flag = 0x80
+    env._ram_skip.last_skip_peak_msg_flag = MESSAGE_FLAG_MASK
+    env._prev_state = {
+        "room_id": "105",
+        "hp": 96,
+        "cam_id": 1,
+        "inventory": [],
+        "stage_id": 0,
+        "character_id": 1,
+        "game_mode": 0x80,
+        "game_state": 0x80800004,
+        "scene_flag": 0x80,
+        "msg_flag": 0,
+    }
+    env._cutscene_skip_entry_prev = dict(env._prev_state)
+    env._read_state = MagicMock(
+        return_value={
+            "hp": 96,
+            "room_id": "105",
+            "cam_id": 1,
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "facing": 0,
+            "in_control": True,
+            "dead": False,
+            "inventory": [],
+            "inventory_slots": [],
+            "new_items": [],
+            "enemies": [],
+            "interaction_prompt": False,
+            "game_mode": 0x80,
+            "game_state": 0x80800004,
+            "scene_flag": 0x80,
+            "msg_flag": 0,
+            "stage_id": 0,
+            "character_id": 1,
+        }
+    )
+    env._apply_post_skip_sync()
+    assert env._post_skip_bd.get("new_cutscene", 0.0) == 0.0
+    assert env._post_skip_bd.get("new_cutscene", 0.0) != NEW_CUTSCENE_BONUS
 
 
 def test_post_skip_door_crossing_pays_new_room_not_cutscene() -> None:

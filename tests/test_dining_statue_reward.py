@@ -57,6 +57,24 @@ def test_dining_statue_no_pay_when_already_knocked_at_episode_start() -> None:
     assert progress.dining_statue_rewarded is False
 
 
+def test_dining_statue_no_pay_outside_room_202() -> None:
+    progress = ProgressTracker()
+    prev = make_state(room="105", dining_statue_flag=0, in_control=True)
+    cur = make_state(room="105", dining_statue_flag=0x10, in_control=True)
+    _total, bd = _reward(progress, prev, cur)
+    assert bd["dining_statue"] == 0.0
+    assert progress.dining_statue_rewarded is False
+
+
+def test_dining_statue_no_pay_during_skip() -> None:
+    progress = ProgressTracker()
+    prev = make_state(room="202", dining_statue_flag=0, in_control=True)
+    cur = make_state(room="202", dining_statue_flag=0x10, in_control=False)
+    _total, bd = _reward(progress, prev, cur)
+    assert bd["dining_statue"] == 0.0
+    assert progress.dining_statue_rewarded is False
+
+
 def test_dining_statue_knocked_from_state() -> None:
     assert not dining_statue_knocked_from_state(make_state(dining_statue_flag=0))
     assert dining_statue_knocked_from_state(make_state(dining_statue_flag=0x10))

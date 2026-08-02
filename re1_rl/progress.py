@@ -277,10 +277,17 @@ class ProgressTracker:
         return 0.0
 
     def claim_dining_statue_bonus(
-        self, *, knocked: bool, prev_knocked: bool
+        self,
+        *,
+        knocked: bool,
+        prev_knocked: bool,
+        room_id: str | int = "",
     ) -> bool:
-        """True once per episode on rising edge of dining statue flag."""
+        """True once per episode on rising edge of dining statue flag in room 202."""
         if self.dining_statue_rewarded:
+            return False
+        room = str(room_id).strip().upper()
+        if room != "202":
             return False
         if knocked and not prev_knocked:
             self.dining_statue_rewarded = True

@@ -258,6 +258,46 @@ def inventory_acquired(
     return _inventory_name_set(new_state) - _inventory_name_set(prev_state)
 
 
+def message_box_cutscene_disqualified(
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None,
+    *,
+    peak_scene_flag: int | None = None,
+    peak_msg_flag: int | None = None,
+) -> bool:
+    """Same-room skip driven by talk/examine text boxes — not exploration cutscene.
+
+    Modal ``msg_flag`` (Barry dialogue, plaque examine, etc.) keeps ``in_control``
+    set and burns skip time while the agent mashes ``interact``. Duration-only
+    qualify was paying ``new_cutscene`` on those spans; Kenneth / camera scripts
+    still pay when ``scene_flag`` shows script at entry, exit, or skip peak.
+    """
+    if room_change_cutscene_disqualified(prev_state, new_state):
+        return False
+
+    def _script_at(state: dict[str, Any] | None) -> bool:
+        if not state:
+            return False
+        return scene_flag_shows_script(int(state.get("scene_flag", 0) or 0))
+
+    if _script_at(prev_state) or _script_at(new_state):
+        return False
+    if scene_flag_shows_script(int(peak_scene_flag or 0)):
+        return False
+
+    from re1_rl.memory_map import MESSAGE_FLAG_MASK
+    from re1_rl.ram_skip import document_examine_ui_from_ram, message_open_from_ram
+
+    def _message_ui(state: dict[str, Any] | None) -> bool:
+        if not state:
+            return False
+        ram = _ram_view_from_state(state)
+        return message_open_from_ram(ram) or document_examine_ui_from_ram(ram)
+
+    peak_msg = int(peak_msg_flag or 0) & int(MESSAGE_FLAG_MASK)
+    return bool(peak_msg or _message_ui(prev_state) or _message_ui(new_state))
+
+
 def pickup_cutscene_disqualified(
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any] | None,
@@ -288,6 +328,8 @@ def qualify_cutscene_reward(
     rewarded_cutscenes: Collection[str] | None = None,
     visited_rooms: Collection[str] | None = None,
     cutscene_blocked_after_pickup_room: str | None = None,
+    peak_scene_flag: int | None = None,
+    peak_msg_flag: int | None = None,
 ) -> str | None:
     """Return a key when a non-exempt freeze lasts at least 450 frames."""
     del visited_rooms
@@ -345,6 +387,14 @@ def qualify_cutscene_reward(
     if hall_room == MAIN_HALL_ROOM and not kenneth_cutscene_seen(rewarded_cutscenes):
         return None
 
+    if message_box_cutscene_disqualified(
+        prev_state,
+        new_state,
+        peak_scene_flag=peak_scene_flag,
+        peak_msg_flag=peak_msg_flag,
+    ):
+        return None
+
     return key
 
 
@@ -357,6 +407,8 @@ def cutscene_disqualify_reason(
     rewarded_cutscenes: Collection[str] | None = None,
     visited_rooms: Collection[str] | None = None,
     cutscene_blocked_after_pickup_room: str | None = None,
+    peak_scene_flag: int | None = None,
+    peak_msg_flag: int | None = None,
 ) -> str | None:
     """Human-readable reason when ``qualify_cutscene_reward`` returns None."""
     del visited_rooms
@@ -416,6 +468,13 @@ def cutscene_disqualify_reason(
     )
     if hall_room == MAIN_HALL_ROOM and not kenneth_cutscene_seen(rewarded_cutscenes):
         return "pre-Kenneth Main Hall cutscene (Wesker/hall; terminal gate, no pay)"
+    if message_box_cutscene_disqualified(
+        prev_state,
+        new_state,
+        peak_scene_flag=peak_scene_flag,
+        peak_msg_flag=peak_msg_flag,
+    ):
+        return "talk/examine message box (not exploration cutscene)"
     return None
 
 
@@ -441,6 +500,8 @@ def format_cutscene_gate_panel(
     positive_rewards_disabled: bool = False,
     qualified_key: str | None = None,
     breakdown: dict[str, float] | None = None,
+    peak_scene_flag: int | None = None,
+    peak_msg_flag: int | None = None,
 ) -> str:
     """Terminal panel for cutscene reward gating (human monitor harness)."""
     proposed = cutscene_key_from_state(
@@ -456,6 +517,8 @@ def format_cutscene_gate_panel(
             rewarded_cutscenes=rewarded_cutscenes,
             visited_rooms=visited_rooms,
             cutscene_blocked_after_pickup_room=cutscene_blocked_after_pickup_room,
+            peak_scene_flag=peak_scene_flag,
+            peak_msg_flag=peak_msg_flag,
         )
     kenneth = kenneth_cutscene_seen(
         rewarded_cutscenes, visited_rooms=visited_rooms
@@ -480,6 +543,8 @@ def format_cutscene_gate_panel(
         episode_start_hp=episode_start_hp,
         rewarded_cutscenes=rewarded_cutscenes,
         visited_rooms=visited_rooms,
+        peak_scene_flag=peak_scene_flag,
+        peak_msg_flag=peak_msg_flag,
     )
     lines = [
         "[cutscene-gate]",

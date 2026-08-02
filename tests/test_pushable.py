@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from re1_rl.dining_statue_puzzle import DINING_PUSH_GAME_STATE
 from re1_rl.pushable import (
     FORWARD_ACTION,
     JAM_WALK_ANIM,
@@ -21,7 +22,17 @@ def test_touching_pushable_by_game_state() -> None:
 
 
 def test_touching_pushable_by_anim() -> None:
-    assert touching_pushable({"game_state": 0x80800004, "player_anim": PUSH_ANIM})
+    # Bare push anim matches door/settle poses — not pushable without stall.
+    assert not touching_pushable(
+        {"game_state": 0x80800004, "player_anim": PUSH_ANIM, "room_id": "105"}
+    )
+    assert touching_pushable(
+        {"game_state": 0x80800004, "player_anim": PUSH_ANIM},
+        forward_collision_stall=True,
+    )
+    assert touching_pushable(
+        {"game_state": DINING_PUSH_GAME_STATE, "player_anim": PUSH_ANIM, "room_id": "202"}
+    )
     assert touching_pushable({"game_state": 0x80800004, "player_anim": JAM_WALK_ANIM})
 
 

@@ -8,30 +8,54 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.cutscene_reward import MIN_CUTSCENE_SKIP_FRAMES, qualify_cutscene_reward
+from re1_rl.memory_map import MESSAGE_FLAG_MASK
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import compute_reward
 from tests.test_scaffolding import make_planner, make_state
 
 
 def test_short_dining_message_spam_no_cutscene_reward():
-  """Room 105 idle scene: repeated sub-threshold freezes do not pay."""
-  planner = make_planner()
-  progress = ProgressTracker()
-  progress.first_visit("105")
-  prev = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80)
-  total_cutscene = 0.0
-  for i in range(1, 8):
-    cur = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80, step=i)
+    """Room 105 idle scene: repeated sub-threshold freezes do not pay."""
+    planner = make_planner()
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    prev = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80)
+    total_cutscene = 0.0
+    for i in range(1, 8):
+        cur = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80, step=i)
+        cur["cutscene_key"] = qualify_cutscene_reward(
+            skip_frames=MIN_CUTSCENE_SKIP_FRAMES - 1,
+            prev_state=prev,
+            new_state=cur,
+            episode_start_hp=96,
+            rewarded_cutscenes=progress.rewarded_cutscenes,
+        )
+        _, bd = compute_reward(
+            prev, cur, planner, progress=progress, return_breakdown=True,
+        )
+        total_cutscene += bd["new_cutscene"]
+        prev = cur
+    assert total_cutscene == 0.0
+
+
+def test_long_dining_message_spam_no_cutscene_reward() -> None:
+    """Interact-held text boxes must not mint +1.2 after the 450-frame gate."""
+    planner = make_planner()
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    prev = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80, msg_flag=0)
+    cur = make_state(room="105", cam_id=1, hp=96, scene_flag=0x80, msg_flag=0, step=2)
     cur["cutscene_key"] = qualify_cutscene_reward(
-      skip_frames=MIN_CUTSCENE_SKIP_FRAMES - 1,
-      prev_state=prev,
-      new_state=cur,
-      episode_start_hp=96,
-      rewarded_cutscenes=progress.rewarded_cutscenes,
+        skip_frames=MIN_CUTSCENE_SKIP_FRAMES,
+        prev_state=prev,
+        new_state=cur,
+        episode_start_hp=96,
+        rewarded_cutscenes=progress.rewarded_cutscenes,
+        peak_msg_flag=MESSAGE_FLAG_MASK,
+        peak_scene_flag=0x80,
     )
     _, bd = compute_reward(
-      prev, cur, planner, progress=progress, return_breakdown=True
+        prev, cur, planner, progress=progress, return_breakdown=True,
     )
-    total_cutscene += bd["new_cutscene"]
-    prev = cur
-  assert total_cutscene == 0.0
+    assert cur["cutscene_key"] is None
+    assert bd["new_cutscene"] == 0.0

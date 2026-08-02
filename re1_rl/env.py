@@ -1331,6 +1331,7 @@ class RE1Env(gym.Env):
     ) -> str | None:
         from re1_rl.cutscene_reward import qualify_cutscene_reward
 
+        ram_skip = getattr(self, "_ram_skip", None)
         return qualify_cutscene_reward(
             skip_frames=skip_frames,
             prev_state=prev_state,
@@ -1341,6 +1342,8 @@ class RE1Env(gym.Env):
             cutscene_blocked_after_pickup_room=(
                 self._progress.cutscene_blocked_after_pickup_room
             ),
+            peak_scene_flag=getattr(ram_skip, "last_skip_peak_scene_flag", None),
+            peak_msg_flag=getattr(ram_skip, "last_skip_peak_msg_flag", None),
         )
 
     def _merge_post_skip_breakdown(
@@ -1517,9 +1520,9 @@ class RE1Env(gym.Env):
             entry_prev["inventory"] = list(inv_before)
         if inv_after is not None:
             state["inventory"] = list(inv_after)
-        # Reward qualification is duration-only apart from explicit menu,
-        # pickup, death, opening, and pre-Kenneth hall exclusions. Door crossings
-        # keep their new_room credit and contribute to this full-session duration.
+        # Reward qualification is duration-based with explicit exclusions (menu,
+        # pickup, death, opening, pre-Kenneth hall, message-box text). Door
+        # crossings keep their new_room credit and contribute to skip duration.
         state["cutscene_key"] = self._qualify_cutscene_reward(
             int(getattr(self, "_skip_session_frames", 0)),
             entry_prev,

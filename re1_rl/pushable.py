@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from re1_rl.dining_statue_puzzle import DINING_PUSH_GAME_STATE, DINING_STATUE_ROOM_ID
+
 # Live probe 2026-07-10 (QuickSave0 bar bookcase): push engages at ~15 continuous
 # Up frames while collision-stalled. Floor extends beyond frame_skip when jammed.
 PUSHABLE_HOLD_FRAMES = 30
@@ -40,14 +42,23 @@ def touching_pushable(
     Actively pushing is definitive (``gs`` / anim). Pre-push contact uses the
     walk-into-object anim and/or a prior forward/run step that did not move.
     Wall jams share the pre-push heuristic — extending the hold there is cheap.
+
+    ``PUSH_ANIM`` (0x10) alone is *not* enough: door/settle poses reuse it and
+    were extending interact/forward holds into skip+cutscene credit windows.
     """
     if not state:
         return False
-    if int(state.get("game_state", 0)) == PUSH_GAME_STATE:
+    gs = int(state.get("game_state", 0))
+    if gs == PUSH_GAME_STATE:
+        return True
+    room = str(state.get("room_id", "") or "")
+    if gs == DINING_PUSH_GAME_STATE and room == DINING_STATUE_ROOM_ID:
         return True
     anim = int(state.get("player_anim", 0))
-    if anim == PUSH_ANIM or anim == JAM_WALK_ANIM:
+    if anim == JAM_WALK_ANIM:
         return True
+    if anim == PUSH_ANIM:
+        return bool(forward_collision_stall)
     return bool(forward_collision_stall)
 
 

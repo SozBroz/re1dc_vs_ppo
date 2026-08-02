@@ -511,12 +511,12 @@ def compute_reward(
         )
         from re1_rl.dining_statue_puzzle import dining_statue_knocked_from_state
 
-        if progress.claim_dining_statue_bonus(
+        if bool(state.get("in_control")) and progress.claim_dining_statue_bonus(
             knocked=dining_statue_knocked_from_state(state),
             prev_knocked=dining_statue_knocked_from_state(prev_state),
+            room_id=room,
         ):
             bd["dining_statue"] = DINING_STATUE_BONUS
-    room = str(state.get("room_id", "") or "")
     shotgun_removed_at_rack = (
         room in SHOTGUN_RACK_ROOMS
         and "shotgun" in prev_inventory
