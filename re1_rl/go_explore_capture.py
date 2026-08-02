@@ -329,6 +329,35 @@ def max_capture_bundle_bytes() -> int:
         return int(_DEFAULT_MAX_BUNDLE_BYTES)
 
 
+def capture_budget_available(
+    project_root: Path | str | None,
+    *,
+    min_bytes: int = 0,
+) -> bool:
+    """True when a capture may still be attempted under daily caps (no reserve).
+
+    Fail-closed on corrupt/missing readable budget. Used to skip ``save_state``
+    after the day cap is hit — budget consume still runs after the bundle exists.
+    """
+    max_count = max_captures_per_day()
+    max_bytes = max_capture_bytes_per_day()
+    if max_count <= 0 and max_bytes <= 0:
+        return False
+    loaded = _load_capture_budget(project_root)
+    if loaded is None:
+        return False
+    row = _rollover_budget_row(loaded)
+    captures = int(row["captures"])
+    used_bytes = int(row["bytes"])
+    if max_count > 0 and captures >= max_count:
+        return False
+    if max_bytes > 0 and used_bytes >= max_bytes:
+        return False
+    if max_bytes > 0 and used_bytes + max(0, int(min_bytes)) > max_bytes:
+        return False
+    return True
+
+
 def try_consume_capture_budget(
     project_root: Path | str | None,
     *,
@@ -473,23 +502,19 @@ def _manifest_entry(
     return existing.quality, existing.record_id
 
 
-def _room_cell_count(
+def _room_digest_count(
     room: str,
     *,
     manifest_index: dict[str, dict[str, Any]] | None,
     archive: GoExploreArchive,
 ) -> int:
-    room_u = room.upper()
-    if manifest_index is not None:
-        count = 0
-        for row in manifest_index.values():
-            if not isinstance(row, dict):
-                continue
-            rid = str(row.get("room_id") or "").strip().upper()
-            if rid == room_u:
-                count += 1
-        return count
-    return archive._room_cell_count(room)
+    from re1_rl.go_explore_semantic import room_digest_count
+
+    return room_digest_count(
+        room,
+        manifest_index=manifest_index,
+        archive_cells=archive.cells.values() if manifest_index is None else None,
+    )
 
 
 def _build_ephemeral_proposal(
@@ -773,38 +798,6 @@ def install_cell_bundle(
         release_slot_lock(slot)
 
 
-def _weakest_room_quality(
-    room: str,
-    *,
-    manifest_index: dict[str, dict[str, Any]] | None,
-    archive: GoExploreArchive,
-) -> Quality | None:
-    """Lowest quality tuple among cells for ``room`` (resource-upgrade replace)."""
-    room_u = room.upper()
-    worst: Quality | None = None
-    if manifest_index is not None:
-        rows = [
-            row
-            for row in manifest_index.values()
-            if isinstance(row, dict)
-            and str(row.get("room_id") or "").strip().upper() == room_u
-        ]
-    else:
-        rows = [
-            c.to_json()
-            for c in archive.cells.values()
-            if str(c.room_id).upper() == room_u
-        ]
-    for row in rows:
-        q_raw = row.get("quality") if isinstance(row, dict) else None
-        if not isinstance(q_raw, (list, tuple)) or len(q_raw) < 5:
-            continue
-        q = (int(q_raw[0]), int(q_raw[1]), int(q_raw[2]), int(q_raw[3]), int(q_raw[4]))
-        if worst is None or q < worst:
-            worst = q
-    return worst
-
-
 def maybe_capture_cell(
     env_state: dict[str, Any],
     progress: ProgressTracker,
@@ -868,6 +861,24 @@ def maybe_capture_cell(
 
     existing_quality, existing_record_id = _manifest_entry(manifest_index, archive, key)
     is_replace = existing_quality is not None
+
+    from re1_rl.go_explore_semantic import (
+        manifest_index_by_semantic_bucket,
+        semantic_admission_allowed,
+        semantic_bucket_key,
+    )
+
+    sem_index = semantic_index
+    effective_manifest = manifest_index
+    if effective_manifest is None and archive.cells:
+        effective_manifest = {k: c.to_json() for k, c in archive.cells.items()}
+    if sem_index is None and effective_manifest is not None:
+        sem_index = manifest_index_by_semantic_bucket(effective_manifest)
+
+    bucket_key = semantic_bucket_key(room, digest)
+    bucket_rows = list((sem_index or {}).get(bucket_key) or ())
+    is_semantic_replace = (not is_replace) and len(bucket_rows) > 0
+
     if is_replace:
         if not quality_beats(quality, existing_quality):
             return None
@@ -875,34 +886,16 @@ def maybe_capture_cell(
             return None
         if not any(r.startswith("quality_improve:") for r in reasons):
             reasons.append(f"quality_improve:{key}")
+    elif is_semantic_replace:
+        if not any(r.startswith("quality_improve:") for r in reasons):
+            reasons.append(f"quality_improve:bucket:{room}:{digest}")
     else:
-        room_count = _room_cell_count(
+        digest_count = _room_digest_count(
             room, manifest_index=manifest_index, archive=archive
         )
-        if room_count >= archive.max_cells_per_room:
-            # Room full: only admit if this state meaningfully beats the weakest
-            # cell in the room (resource upgrade — avoid forever-stuck cells).
-            worst = _weakest_room_quality(
-                room, manifest_index=manifest_index, archive=archive
-            )
-            if worst is None or not quality_replace_significant(quality, worst):
-                return None
-            if not any(r.startswith("room_upgrade:") for r in reasons):
-                reasons.append(f"room_upgrade:{room}")
+        if digest_count >= archive.max_cells_per_room:
+            return None
 
-    # Semantic pose-cap pre-filter before save_state / budget consume.
-    from re1_rl.go_explore_semantic import (
-        manifest_index_by_semantic_bucket,
-        semantic_admission_allowed,
-    )
-
-    sem_index = semantic_index
-    effective_manifest = manifest_index
-    if effective_manifest is None and archive.cells:
-        # Canonical/local path: mirror archive rows as a cell_key index.
-        effective_manifest = {k: c.to_json() for k, c in archive.cells.items()}
-    if sem_index is None and effective_manifest is not None:
-        sem_index = manifest_index_by_semantic_bucket(effective_manifest)
     if not semantic_admission_allowed(
         room,
         digest,
@@ -922,6 +915,9 @@ def maybe_capture_cell(
     root_cells = cells_root(project_root, archive=archive)
     go_root = go_explore_root(project_root)
     if _disk_free_bytes(go_root) < min_free_bytes():
+        return None
+    # Skip BizHawk save_state when the day cap is already spent (was the SPS cliff).
+    if not capture_budget_available(project_root):
         return None
     if persist:
         ensure_cells_root_purged(

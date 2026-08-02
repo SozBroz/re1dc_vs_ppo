@@ -10,15 +10,18 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.go_explore_semantic import (
+    bucket_champion,
     bucket_pose_count,
     keep_best_rows,
     manifest_index_by_semantic_bucket,
     max_archive_cells,
     pose_cap,
     pose_evict_enabled,
+    room_digest_count,
     semantic_admission_allowed,
     semantic_bucket_key,
     semantic_bucket_key_from_cell_key,
+    semantic_replace_allowed,
     weakest_incumbent,
 )
 from re1_rl.milestone_digest import cell_key_v2
@@ -98,7 +101,7 @@ def test_env_readers(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("RE1_GO_MAX_POSES_PER_BUCKET", raising=False)
     monkeypatch.delenv("RE1_GO_MAX_ARCHIVE_CELLS", raising=False)
     monkeypatch.delenv("RE1_GO_POSE_EVICT", raising=False)
-    assert pose_cap() == 6
+    assert pose_cap() == 1
     assert max_archive_cells() == 8000
     assert pose_evict_enabled() is True
 
@@ -199,4 +202,56 @@ def test_semantic_admission_same_key_replace_rules(
     assert semantic_admission_allowed(
         "105", "d", key, (50, 0, 0, 0, 1),
         manifest_index=manifest_index,
+    )
+
+
+def test_room_digest_count_ignores_pose_duplicates() -> None:
+    rows = [
+        _row(record_id="a", room="105", tx=1, tz=0, digest="gallery:idle", quality=[1, 0, 0, 0, 1]),
+        _row(record_id="b", room="105", tx=2, tz=0, digest="gallery:idle", quality=[2, 0, 0, 0, 1]),
+        _row(record_id="c", room="105", tx=1, tz=0, digest="got:emblem", quality=[3, 0, 0, 0, 1]),
+    ]
+    by_key = {r["cell_key"]: r for r in rows}
+    assert room_digest_count("105", manifest_index=by_key) == 2
+
+
+def test_bucket_champion_picks_strongest() -> None:
+    rows = [
+        _row(record_id="weak", room="105", tx=0, tz=0, digest="d", quality=[10, 0, 0, 0, 1]),
+        _row(record_id="strong", room="105", tx=1, tz=0, digest="d", quality=[90, 0, 0, 0, 1]),
+    ]
+    champ = bucket_champion(rows)
+    assert champ is not None
+    assert champ["record_id"] == "strong"
+
+
+def test_semantic_replace_requires_significant_gain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RE1_GO_REPLACE_MIN_HP_DELTA", "5")
+    assert not semantic_replace_allowed((42, 0, 0, 0, 1), (40, 0, 0, 0, 1))
+    assert semantic_replace_allowed((50, 0, 0, 0, 1), (40, 0, 0, 0, 1))
+
+
+def test_semantic_admission_at_cap_one_pose_rejects_noise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RE1_GO_MAX_POSES_PER_BUCKET", "1")
+    monkeypatch.setenv("RE1_GO_POSE_EVICT", "1")
+    monkeypatch.setenv("RE1_GO_REPLACE_MIN_HP_DELTA", "5")
+    key0 = cell_key_v2("105", 0, 0, "d")
+    manifest_index = {
+        key0: _row(record_id="r0", room="105", tx=0, tz=0, digest="d", quality=[40, 0, 0, 0, 1]),
+    }
+    sem = manifest_index_by_semantic_bucket(manifest_index)
+    new_key = cell_key_v2("105", 4096, 0, "d")
+    assert not semantic_admission_allowed(
+        "105", "d", new_key, (42, 0, 0, 0, 1),
+        manifest_index=manifest_index,
+        semantic_index=sem,
+    )
+    assert semantic_admission_allowed(
+        "105", "d", new_key, (50, 0, 0, 0, 1),
+        manifest_index=manifest_index,
+        semantic_index=sem,
     )

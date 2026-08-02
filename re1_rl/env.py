@@ -877,6 +877,11 @@ class RE1Env(gym.Env):
             quality_replace_significant,
         )
         from re1_rl.go_explore_progress import coverage_reason, quality_improve_reason
+        from re1_rl.go_explore_semantic import (
+            bucket_champion,
+            manifest_index_by_semantic_bucket,
+            semantic_bucket_key,
+        )
         from re1_rl.go_explore_worker_cache import manifest_index_by_cell_key
         from re1_rl.milestone_digest import cell_key_v2, compute_digest
 
@@ -915,10 +920,21 @@ class RE1Env(gym.Env):
                 new_q = compute_quality(state)
                 if quality_replace_significant(new_q, old_q):
                     reasons.append(quality_improve_reason(key))
+        else:
+            sem_index = manifest_index_by_semantic_bucket(manifest_index)
+            bucket_rows = sem_index.get(semantic_bucket_key(room, digest), [])
+            champion = bucket_champion(bucket_rows)
+            if champion is not None:
+                old_q = champion.get("quality")
+                if isinstance(old_q, (list, tuple)) and len(old_q) >= 5:
+                    new_q = compute_quality(state)
+                    if quality_replace_significant(new_q, old_q):
+                        reasons.append(quality_improve_reason(f"bucket:{room}:{digest}"))
         return reasons
 
     def _maybe_capture_go_explore(self, state: dict[str, Any]) -> dict[str, Any] | None:
         from re1_rl.go_explore_capture import (
+            capture_budget_available,
             go_explore_capture_enabled,
             go_explore_root,
             maybe_capture_cell,
@@ -926,6 +942,17 @@ class RE1Env(gym.Env):
         from re1_rl.go_explore_worker_cache import manifest_index_by_cell_key
 
         if not go_explore_capture_enabled():
+            return None
+
+        # After the daily cap, skip manifest/digest work until a new day rolls.
+        if getattr(self, "_go_explore_capture_paused", False):
+            if not capture_budget_available(self.project_root):
+                return None
+            self._go_explore_capture_paused = False
+
+        if not capture_budget_available(self.project_root):
+            self._go_explore_capture_paused = True
+            self._go_explore_pending_reasons = []
             return None
 
         reasons = self._go_explore_capture_reasons(state)
@@ -966,6 +993,10 @@ class RE1Env(gym.Env):
                     self._go_explore_coverage_attempted = set()
                     attempted = self._go_explore_coverage_attempted
                 attempted.add(room)
+        elif not capture_budget_available(self.project_root):
+            # Cap hit mid-attempt — stop replaying pending reasons into save_state.
+            self._go_explore_capture_paused = True
+            self._go_explore_pending_reasons = []
         return proposal
 
     def _capture_step_obs(self) -> np.ndarray:
@@ -999,6 +1030,8 @@ class RE1Env(gym.Env):
         self._go_explore_pending_reasons: list[str] = []
         self._go_explore_fired_reasons: set[str] = set()
         self._go_explore_coverage_attempted: set[str] = set()
+        # Cleared when daily capture budget rolls; set when day cap is spent.
+        self._go_explore_capture_paused = False
 
         from re1_rl.go_explore_capture import CELL_SIDECAR_NAME, CELL_STATE_NAME
         from re1_rl.pb_bundle_io import (

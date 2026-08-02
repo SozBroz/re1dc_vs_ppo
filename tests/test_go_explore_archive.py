@@ -43,13 +43,14 @@ def test_quality_beats_lexicographic() -> None:
 def test_upsert_and_frontier_yawn_filter(tmp_path: Path) -> None:
     path = tmp_path / "archive.json"
     arch = GoExploreArchive(path, max_cells_per_room=40)
-    digest = "gallery:idle"
+    digest_a = "gallery:idle"
+    digest_b = "got:emblem"
 
     arch.upsert(
         room_id="20E",
         x=100,
         z=100,
-        digest=digest,
+        digest=digest_a,
         quality=(5, 1, 0, 1, 1),
         bundle_path="cells/a/cell.State",
     )
@@ -57,7 +58,7 @@ def test_upsert_and_frontier_yawn_filter(tmp_path: Path) -> None:
         room_id="20E",
         x=5000,
         z=100,
-        digest=digest,
+        digest=digest_b,
         quality=(8, 2, 0, 1, 1),
     )
     # Off Yawn path — must not be selected by default frontier.
@@ -65,7 +66,7 @@ def test_upsert_and_frontier_yawn_filter(tmp_path: Path) -> None:
         room_id="300",
         x=0,
         z=0,
-        digest=digest,
+        digest=digest_a,
         quality=(99, 99, 99, 99, 99),
     )
     # Bump visits on the stronger 20E cell so frontier prefers the under-visited one.
@@ -74,7 +75,7 @@ def test_upsert_and_frontier_yawn_filter(tmp_path: Path) -> None:
             room_id="20E",
             x=5000,
             z=100,
-            digest=digest,
+            digest=digest_b,
             quality=(8, 2, 0, 1, 1),
         )
 
@@ -82,6 +83,7 @@ def test_upsert_and_frontier_yawn_filter(tmp_path: Path) -> None:
     assert len(picked) == 1
     assert picked[0].room_id == "20E"
     assert picked[0].visit_count == 1
+    assert picked[0].milestone_digest == digest_a
 
     # Explicit filter still works.
     off = arch.select_frontier(room_ids={"300"}, k=1)
@@ -101,16 +103,23 @@ def test_select_frontier_defaults_to_yawn_rooms(tmp_path: Path) -> None:
 def test_max_cells_per_room_cap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("RE1_GO_MAX_CELLS_PER_ROOM", "2")
     arch = GoExploreArchive(tmp_path / "a.json", max_cells_per_room=2)
-    digest = "gallery:idle"
-    assert arch.upsert(room_id="105", x=0, z=0, digest=digest, quality=(1, 0, 0, 0, 0))
-    assert arch.upsert(room_id="105", x=5000, z=0, digest=digest, quality=(1, 0, 0, 0, 0))
-    rejected = arch.upsert(room_id="105", x=9000, z=0, digest=digest, quality=(9, 9, 9, 9, 9))
-    assert rejected is None
+    digest_a = "gallery:idle"
+    digest_b = "got:emblem"
+    assert arch.upsert(room_id="105", x=0, z=0, digest=digest_a, quality=(1, 0, 0, 0, 0))
+    # Same digest at a new tile replaces the bucket champion (one cell per digest).
+    replaced = arch.upsert(room_id="105", x=5000, z=0, digest=digest_a, quality=(5, 0, 0, 0, 0))
+    assert replaced is not None
+    assert len(arch.cells) == 1
+    assert arch.upsert(room_id="105", x=9000, z=0, digest=digest_b, quality=(1, 0, 0, 0, 0))
     assert len(arch.cells) == 2
+    rejected = arch.upsert(
+        room_id="105", x=10000, z=0, digest="carry:map", quality=(9, 9, 9, 9, 9)
+    )
+    assert rejected is None
     # Existing key still updates.
-    again = arch.upsert(room_id="105", x=0, z=0, digest=digest, quality=(2, 0, 0, 0, 0))
+    again = arch.upsert(room_id="105", x=0, z=0, digest=digest_a, quality=(2, 0, 0, 0, 0))
     assert again is not None
-    assert again.visit_count == 2
+    assert again.visit_count == 1
     assert again.quality[0] == 2
 
 

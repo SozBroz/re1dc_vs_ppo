@@ -227,3 +227,45 @@ def test_semantic_reject_when_evict_disabled(
     assert accepted == []
     assert len(merge.archive.cells) == 2
     assert merge.rejected_semantic >= 1
+
+
+def test_room_digest_cap_rejects_new_milestone(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_MAX_POSES_PER_BUCKET", "1")
+    monkeypatch.setenv("RE1_GO_POSE_EVICT", "1")
+    monkeypatch.setenv("RE1_GO_MAX_CELLS_PER_ROOM", "2")
+    merge = GoExploreMerge(tmp_path / "archive.json")
+    for digest, rid in (("digest_a", "cell_a"), ("digest_b", "cell_b")):
+        key = cell_key_v2("105", 0, 0, digest)
+        assert merge.ingest_proposals(
+            [_proposal(record_id=rid, quality=[50, 0, 0, 0, 1], cell_key=key)]
+        ) == [rid]
+    assert len(merge.archive.cells) == 2
+    key_c = cell_key_v2("105", 0, 0, "digest_c")
+    assert merge.ingest_proposals(
+        [_proposal(record_id="cell_c", quality=[90, 0, 0, 0, 1], cell_key=key_c)]
+    ) == []
+    assert len(merge.archive.cells) == 2
+
+
+def test_semantic_replace_same_digest_different_tile(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RE1_GO_MAX_POSES_PER_BUCKET", "1")
+    monkeypatch.setenv("RE1_GO_POSE_EVICT", "1")
+    monkeypatch.setenv("RE1_GO_REPLACE_MIN_HP_DELTA", "5")
+    merge = GoExploreMerge(tmp_path / "archive.json")
+    digest = "gallery:idle"
+    key0 = cell_key_v2("105", 0, 0, digest)
+    assert merge.ingest_proposals(
+        [_proposal(record_id="weak", quality=[40, 0, 0, 0, 1], cell_key=key0)]
+    ) == ["weak"]
+    key1 = cell_key_v2("105", 4096, 0, digest)
+    assert merge.ingest_proposals(
+        [_proposal(record_id="strong", quality=[50, 0, 0, 0, 1], cell_key=key1)]
+    ) == ["strong"]
+    assert len(merge.archive.cells) == 1
+    assert "weak" not in {c.record_id for c in merge.archive.cells.values()}
+    assert (tmp_path / "cells" / "weak").exists() is False
+    assert (tmp_path / "cells" / "strong" / CELL_STATE_NAME).is_file()

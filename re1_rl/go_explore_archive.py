@@ -375,6 +375,11 @@ class GoExploreArchive:
         with archive_locked(self.path, holder=holder):
             self.save()
 
+    def _room_digest_count(self, room_id: str) -> int:
+        from re1_rl.go_explore_semantic import room_digest_count
+
+        return room_digest_count(room_id, archive_cells=self.cells.values())
+
     def _room_cell_count(self, room_id: str) -> int:
         room = _normalize_room_id(room_id)
         return sum(1 for c in self.cells.values() if c.room_id == room)
@@ -445,8 +450,22 @@ class GoExploreArchive:
                 existing.meta.update(meta)
             return existing
 
-        if self._room_cell_count(room) >= self.max_cells_per_room:
+        digest_str = str(digest)
+        bucket_present = any(
+            c.room_id == room and c.milestone_digest == digest_str
+            for c in self.cells.values()
+        )
+        if not bucket_present and self._room_digest_count(room) >= self.max_cells_per_room:
             return None
+
+        if bucket_present:
+            for old_key, old_cell in list(self.cells.items()):
+                if (
+                    old_cell.room_id == room
+                    and old_cell.milestone_digest == digest_str
+                    and old_key != key
+                ):
+                    del self.cells[old_key]
 
         cell = ArchiveCell(
             record_id=str(record_id or new_record_id()),

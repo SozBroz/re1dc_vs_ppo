@@ -25,7 +25,9 @@ from re1_rl.go_explore_semantic import (
     max_archive_cells,
     pose_cap,
     pose_evict_enabled,
+    room_digest_count,
     semantic_bucket_key,
+    semantic_replace_allowed,
     weakest_incumbent,
 )
 from re1_rl.milestone_digest import parse_cell_key_v2
@@ -185,7 +187,7 @@ class GoExploreMerge:
                 self.rejected_semantic += 1
                 return None
             weak = weakest_incumbent(bucket_cells)
-            if weak is None or not quality_beats(quality, weak.quality):
+            if weak is None or not semantic_replace_allowed(quality, weak.quality):
                 self.rejected_semantic += 1
                 return None
             to_evict.append(weak)
@@ -213,26 +215,19 @@ class GoExploreMerge:
             if global_weak.record_id not in evict_ids:
                 to_evict.append(global_weak)
 
-        room_cells = [
-            c
-            for c in self.archive.cells.values()
-            if c.room_id == room and c.record_id not in evict_ids
-        ]
-        if len(room_cells) >= self.archive.max_cells_per_room:
-            # Room full: replace weakest room cell when quality is meaningfully better
-            # (same spirit as PB champion upgrade — avoid resource-starved traps).
-            from re1_rl.go_explore_capture import quality_replace_significant
-
-            weak_room = weakest_incumbent(room_cells)
-            if (
-                weak_room is None
-                or not quality_beats(quality, weak_room.quality)
-                or not quality_replace_significant(quality, weak_room.quality)
-            ):
+        is_semantic_replace = len(bucket_cells) > 0
+        if not is_semantic_replace:
+            room_digests = room_digest_count(
+                room,
+                archive_cells=[
+                    c
+                    for c in self.archive.cells.values()
+                    if c.record_id not in evict_ids
+                ],
+            )
+            if room_digests >= self.archive.max_cells_per_room:
                 self.rejected_semantic += 1
                 return None
-            if weak_room.record_id not in evict_ids:
-                to_evict.append(weak_room)
         return to_evict
 
     def _ingest_one_unlocked(self, prop: dict[str, Any]) -> str | None:

@@ -12,7 +12,7 @@ from re1_rl.milestone_digest import parse_cell_key_v2
 _POSE_CAP_ENV = "RE1_GO_MAX_POSES_PER_BUCKET"
 _MAX_ARCHIVE_CELLS_ENV = "RE1_GO_MAX_ARCHIVE_CELLS"
 _POSE_EVICT_ENV = "RE1_GO_POSE_EVICT"
-_DEFAULT_POSE_CAP = 6
+_DEFAULT_POSE_CAP = 1
 _DEFAULT_MAX_ARCHIVE_CELLS = 8000
 
 SemanticKey = tuple[str, str]
@@ -150,6 +150,28 @@ def weakest_incumbent(rows: Sequence[Any]) -> Any | None:
     return min(rows, key=lambda r: eviction_sort_key(r, centroid))
 
 
+def bucket_champion(rows: Sequence[Any]) -> Any | None:
+    """Strongest row in a semantic bucket (inverse of :func:`weakest_incumbent`)."""
+    if not rows:
+        return None
+    centroid = _tile_centroid(rows)
+    return max(rows, key=lambda r: eviction_sort_key(r, centroid))
+
+
+def semantic_replace_allowed(
+    new_q: Quality | Sequence[int],
+    old_q: Quality | Sequence[int],
+) -> bool:
+    """True when ``new_q`` may replace a different-tile incumbent in the same bucket."""
+    from re1_rl.go_explore_capture import quality_replace_significant
+
+    o = _as_quality(old_q)
+    n = _as_quality(new_q)
+    if not quality_beats(n, o):
+        return False
+    return quality_replace_significant(n, o)
+
+
 def keep_best_rows(rows: Sequence[Any], n: int) -> list[Any]:
     """Keep the ``n`` strongest rows by inverse eviction score."""
     if n <= 0:
@@ -211,6 +233,54 @@ def manifest_index_by_semantic_bucket(
     return dict(index)
 
 
+def room_digest_count(
+    room: str | int,
+    *,
+    manifest_index: Mapping[str, dict[str, Any]] | None = None,
+    archive_cells: Iterable[Any] | None = None,
+) -> int:
+    """Distinct ``milestone_digest`` values already stored for ``room``."""
+    room_u = str(room).strip()
+    if room_u.lower().startswith("0x"):
+        room_u = room_u[2:]
+    room_u = room_u.upper()
+    digests: set[str] = set()
+    if manifest_index is not None:
+        for row in manifest_index.values():
+            if not isinstance(row, dict):
+                continue
+            rid = str(row.get("room_id") or "").strip().upper()
+            if rid != room_u:
+                continue
+            digest = str(row.get("milestone_digest") or "").strip()
+            if not digest:
+                key_s = str(row.get("cell_key") or "")
+                if key_s.startswith("v2|"):
+                    try:
+                        digest = str(parse_cell_key_v2(key_s)["milestone_digest"])
+                    except ValueError:
+                        continue
+            if digest:
+                digests.add(digest)
+    if archive_cells is not None:
+        for cell in archive_cells:
+            data = _row_as_dict(cell)
+            rid = str(data.get("room_id") or "").strip().upper()
+            if rid != room_u:
+                continue
+            digest = str(data.get("milestone_digest") or "").strip()
+            if not digest:
+                key_s = str(data.get("cell_key") or "")
+                if key_s.startswith("v2|"):
+                    try:
+                        digest = str(parse_cell_key_v2(key_s)["milestone_digest"])
+                    except ValueError:
+                        continue
+            if digest:
+                digests.add(digest)
+    return len(digests)
+
+
 def semantic_admission_allowed(
     room: str | int,
     digest: str,
@@ -259,4 +329,4 @@ def semantic_admission_allowed(
     weak = weakest_incumbent(rows)
     if weak is None:
         return True
-    return quality_beats(q, _as_quality(weak))
+    return semantic_replace_allowed(q, _as_quality(weak))

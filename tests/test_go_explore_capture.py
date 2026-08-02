@@ -405,7 +405,10 @@ def test_capture_budget_persists_and_caps(
     progress = ProgressTracker()
     progress.seed_spawn_room("105")
 
+    saves = {"n": 0}
+
     def _save(path: Path) -> None:
+        saves["n"] += 1
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"STATE")
 
@@ -423,6 +426,7 @@ def test_capture_budget_persists_and_caps(
             capture_state=cap_state,
         )
         assert out is not None
+    assert saves["n"] == 2
     blocked = maybe_capture_cell(
         _good_state(x=9000, z=9000),
         progress,
@@ -434,6 +438,8 @@ def test_capture_budget_persists_and_caps(
         capture_state=cap_state,
     )
     assert blocked is None
+    # Day cap: must not call BizHawk save_state again (SPS cliff fix).
+    assert saves["n"] == 2
 
 
 def test_capture_budget_byte_cap_enforced(
