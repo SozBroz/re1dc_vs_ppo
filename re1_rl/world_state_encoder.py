@@ -88,8 +88,10 @@ def encode_world_state(
     v = np.zeros(WORLD_STATE_DIM, dtype=np.float32)
     held = ever_held or set()
 
-    v[PICKUP_ACTIVE_SLICE] = catalog.pickup_active_mask(held)
-    v[PICKUP_GATED_SLICE] = _pickup_gated_mask(catalog, held)
+    active = catalog.pickup_active_mask(held)
+    gated = _pickup_gated_mask(catalog, held)
+    v[PICKUP_ACTIVE_SLICE.start : PICKUP_ACTIVE_SLICE.start + len(active)] = active
+    v[PICKUP_GATED_SLICE.start : PICKUP_GATED_SLICE.start + len(gated)] = gated
     v[ROOM_REMAINING_SLICE] = _encode_room_remaining(catalog, room_items, held)
 
     if key_hints_vec is None:
