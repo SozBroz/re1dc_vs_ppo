@@ -57,6 +57,19 @@
       "notes": "ROUTE CONFLICT wp35: route says 213 FRONT ELEVATOR; Evil Resource places battery in the Closet adjacent to Elevator 2F, best debug match 219 SHED (stage-2 = 2F). Kept in 219; needs in-game hex confirmation."
     }
   ],
+  "_unresolved_square_crank_shed": {
+    "room_name": "CREST SHED STORE (debug id unresolved)",
+    "items": [
+      {
+        "name": "square_crank",
+        "item_id": 29,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "Separate crest-shed Store Room; explicitly not mansion storeroom 11B. Underscore room is catalog-only (RoomItems skips _) so KEYS_HELD_DIM stays checkpoint-compatible until the real debug id is confirmed."
+      }
+    ]
+  },
   "100": {
     "room_name": "SAVE ROOM",
     "items": [
