@@ -51,6 +51,11 @@ PAUSE_MENU_GAME_MODE = 0x40
 # dismisses; Start does not. Stable across page/cursor taps on QS1.
 DOCUMENT_EXAMINE_GAME_STATE = 0x40808100
 DOCUMENT_EXAMINE_GAME_MODE = PAUSE_MENU_GAME_MODE
+# Post-Richard lab countdown STATUS/ECG overlay (QuickSave8, hunt 2026-08-03).
+# Opens automatically after the 20D serum cutscene deposits Jill in 204. Start
+# does not dismiss; RAM exit to in-control + lab_timer=0 clears the countdown.
+RICHARD_LAB_COUNTDOWN_STATUS_GAME_STATE = 0x40808200
+RICHARD_LAB_COUNTDOWN_STATUS_GAME_MODE = PAUSE_MENU_GAME_MODE
 # STATUS / ECG health-bar sub-screen (live hunt 2026-07-08, play_human :7788).
 # Same 0x008080xx session tag as ITEM but high byte 0x60 and mode 0x60.
 STATUS_ECG_GAME_STATE = 0x60808000
