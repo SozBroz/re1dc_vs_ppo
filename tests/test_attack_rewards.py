@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
+    AMMO_WASTE_MAX_PENALTY,
     ATTACK_MISS_TAX_SCALE,
     ENEMY_DAMAGE_REWARD,
     ENEMY_KILL_REWARD,
@@ -19,6 +20,7 @@ from re1_rl.reward import (
     REFERENCE_STEP_FRAMES,
     STEP_PENALTY,
     ammo_waste_per_missed_round,
+    ammo_waste_penalty,
     compute_reward,
 )
 from tests.test_scaffolding import make_planner, make_state
@@ -43,6 +45,35 @@ def test_miss_tax_clip_table_matches_validated_sizes() -> None:
     assert MISS_TAX_CLIP_SIZE[0x08] == 6
     assert MISS_TAX_CLIP_SIZE[0x09] == 6
     assert MISS_TAX_CLIP_SIZE[0x0A] == 6
+
+
+def test_scaled_miss_tax_ramps_below_two_clips() -> None:
+    base = ammo_waste_per_missed_round(0x02)
+    full = ammo_waste_per_missed_round(0x02, ammo_before=30)
+    one_mag = ammo_waste_per_missed_round(0x02, ammo_before=15)
+    last = ammo_waste_per_missed_round(0x02, ammo_before=1)
+    assert full == pytest.approx(base)
+    assert one_mag == pytest.approx(-0.084, abs=0.001)
+    assert last == pytest.approx(-AMMO_WASTE_MAX_PENALTY)
+
+
+def test_scaled_miss_uses_inventory_before_waste() -> None:
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    cur = make_state(
+        hp=96,
+        step=2,
+        inventory_slots=[("beretta", 14), ("handgun_bullets", 0)],
+    )
+    cur["attack_missed"] = True
+    cur["ammo_spent"] = 1
+    cur["equipped_weapon_id"] = 0x02
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["ammo_waste"] == pytest.approx(
+        ammo_waste_penalty(0x02, 1, ammo_before=15)
+    )
 
 
 def test_attack_missed_taxes_ammo_by_clip() -> None:

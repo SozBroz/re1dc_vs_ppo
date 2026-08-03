@@ -103,6 +103,8 @@ ENEMY_KILL_REWARD = 0.24
 # more valuable while giving confirmed misses a small, immediate signal.
 ATTACK_MISS_TAX_SCALE = 0.10
 KNIFE_MISS_PENALTY = -0.01 * ATTACK_MISS_TAX_SCALE
+# Max per-round miss tax when wasting the last round in inventory.
+AMMO_WASTE_MAX_PENALTY = 0.15
 # Flat legacy miss flag (unused); live knife tax uses KNIFE_MISS_PENALTY above.
 ATTACK_MISS_PENALTY = 0.0
 AMMO_WASTE_PENALTY = 0.0  # legacy stub; not read by compute_reward
@@ -164,20 +166,50 @@ def hp_heal_reward(hp_delta: int) -> float:
     return HP_GAIN_SCALE * float(hp_delta)
 
 
-def ammo_waste_per_missed_round(weapon_id: int) -> float:
-    """Per-round miss tax for ``weapon_id`` (0 if knife / unknown / no clip)."""
-    clip = MISS_TAX_CLIP_SIZE.get(int(weapon_id) & 0xFF)
-    if clip is None or clip <= 0:
+def ammo_waste_per_missed_round(
+    weapon_id: int,
+    *,
+    ammo_before: int | None = None,
+) -> float:
+    """Per-round miss tax for ``weapon_id`` (0 if knife / unknown / no clip).
+
+    When ``ammo_before`` is set and total fireable ammo drops below 2× chamber
+    clip, scale linearly up to ``AMMO_WASTE_MAX_PENALTY`` on the last round.
+    """
+    from re1_rl.ammo_accounting import WEAPON_CLIP_CAPACITY
+
+    wid = int(weapon_id) & 0xFF
+    tax_clip = MISS_TAX_CLIP_SIZE.get(wid)
+    if tax_clip is None or tax_clip <= 0:
         return 0.0
-    return -AMMO_PICKUP_BONUS / float(clip) * ATTACK_MISS_TAX_SCALE
+    base = AMMO_PICKUP_BONUS / float(tax_clip) * ATTACK_MISS_TAX_SCALE
+    if ammo_before is None:
+        return -base
+    chamber = int(WEAPON_CLIP_CAPACITY.get(wid, tax_clip))
+    threshold = 2 * chamber
+    ammo = max(1, int(ammo_before))
+    if ammo >= threshold:
+        return -base
+    if ammo <= 1:
+        return -AMMO_WASTE_MAX_PENALTY
+    t = (threshold - ammo) / float(threshold - 1)
+    mult = 1.0 + t * (AMMO_WASTE_MAX_PENALTY / base - 1.0)
+    return -base * mult
 
 
-def ammo_waste_penalty(weapon_id: int, rounds_spent: int) -> float:
+def ammo_waste_penalty(
+    weapon_id: int,
+    rounds_spent: int,
+    *,
+    ammo_before: int | None = None,
+) -> float:
     """Total ammo-waste penalty for a missed attack that spent ``rounds_spent``."""
     rounds = int(rounds_spent)
     if rounds <= 0:
         return 0.0
-    return ammo_waste_per_missed_round(weapon_id) * float(rounds)
+    return ammo_waste_per_missed_round(
+        weapon_id, ammo_before=ammo_before,
+    ) * float(rounds)
 
 
 # Disabled checkpoint-path terms (exported for tests that assert they stay off).
@@ -581,8 +613,17 @@ def compute_reward(
     elif state.get("attack_missed"):
         rounds = int(state.get("ammo_spent", 0) or 0)
         if rounds > 0:
+            from re1_rl.ammo_accounting import fireable_ammo_before_miss
+
             wid = int(state.get("equipped_weapon_id", 0) or 0)
-            bd["ammo_waste"] = ammo_waste_penalty(wid, rounds)
+            ammo_before = fireable_ammo_before_miss(
+                state, wid, rounds_spent=rounds,
+            )
+            bd["ammo_waste"] = ammo_waste_penalty(
+                wid,
+                rounds,
+                ammo_before=ammo_before,
+            )
 
     if progress is not None and progress.kenneth_gate_breached:
         for term, value in bd.items():
