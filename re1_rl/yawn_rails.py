@@ -68,13 +68,23 @@ def validate_route(
     for i, checkpoint in enumerate(route):
         cid = str(checkpoint.get("checkpoint_id", ""))
         room = str(checkpoint.get("room_id", ""))
+        if checkpoint.get("seq") != i + 1:
+            errors.append(f"{cid or i}: seq must be contiguous and 1-based")
         if not cid or cid in seen_ids:
             errors.append(f"checkpoint[{i}] has missing/duplicate checkpoint_id {cid!r}")
         seen_ids.add(cid)
         if not room:
             errors.append(f"{cid or i}: missing room_id")
-        if not isinstance(checkpoint.get("success_condition"), dict):
+        condition = checkpoint.get("success_condition")
+        if not isinstance(condition, dict):
             errors.append(f"{cid or i}: success_condition must be an object")
+        else:
+            condition_text = json.dumps(condition, sort_keys=True)
+            for item in checkpoint.get("items_gained", []):
+                if f'"item": "{item}"' not in condition_text:
+                    errors.append(
+                        f"{cid or i}: gained item {item!r} is not required by success"
+                    )
         text = json.dumps(checkpoint, sort_keys=True).lower()
         if "serum" in text:
             errors.append(f"{cid or i}: serum is forbidden in the Yawn route")
