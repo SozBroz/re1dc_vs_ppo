@@ -1,0 +1,59 @@
+105- barry cutscene - emblem
+104- Kenneth cutscene
+105- barry cutscene
+106- barry cutscene
+203
+106- barry cutscene
+105
+104- 30 bullets
+10F- Music notes - use the music notes (piano cutscene) - gold emblem - door closing cutscene - place emblem - door opening cutscene
+104
+105 - place gold emblem - shield key
+105
+106 - ink ribbons and save
+107
+108 - 15 bullets
+109 - green herb
+115
+116 - shotgun
+115 - ceiling lowering cutscene, barry cutscene puts you in 109 (you need to interact with both doors in the trap room to get saved by barry)
+109?? you are put here idk if we need this
+10A
+117 - Do the puzzle - star crest
+10A
+11A - Place star crest
+10A
+101 - green herb
+11B - Chemical (inventory is tight - you can put away the knife for a tiny bit of relief.
+101
+201
+204
+203- barry cutscene (you get acid rounds)
+211
+212- bazooka
+211
+203
+202 - push down the statue
+207
+10B
+100 - ink ribbons and save
+10B
+103
+10C - use chemical - armor key - theres like 6 heals in here
+103
+10E - pistol ammo, shutgun shells
+103
+104
+105 - blue jewel
+104
+103
+10D - use the blue jewel, wind crest
+103
+104
+105
+106
+203
+204 
+20D - handgun bullets
+20E 
+210 - Yawn Cutscene trigger, yawn boss fight, yawn leaving cutscene, shotgun shells, moon crest

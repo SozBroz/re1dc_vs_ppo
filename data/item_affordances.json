@@ -527,12 +527,9 @@
   },
   "square_crank": {
     "door_edges": [],
-    "notes": "Crest shed / store room shelf; use at Water Gate (301)",
-    "pickup_rooms": [
-      "11B"
-    ],
+    "notes": "Separate crest-shed Store Room (debug id unresolved; explicitly not 11B); use at Water Gate (301)",
+    "pickup_rooms": [],
     "rooms": [
-      "11B",
       "301"
     ],
     "use_rooms": [

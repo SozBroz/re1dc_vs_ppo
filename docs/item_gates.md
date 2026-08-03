@@ -35,7 +35,6 @@ Requirements use canonical `memory_map.ITEM_IDS` spellings; route aliases (`wood
 | 115 | TRAP ROOM | shotgun | trap | — | Ceiling trap; Jill saved by Barry once |
 | 116 | LIVING ROOM | shotgun | trap | — | Same rack; triggers trap room event |
 | 117 | LARGE GALLERY | star_crest | puzzle | — | Crow paintings life-cycle button order |
-| 11B | STORE ROOM | square_crank | puzzle | — | Stepladder to top shelf |
 | 202 | DINING ROOM 2F | blue_jewel | puzzle | — | Push statue off balcony |
 | 203 | HALL 2F | acid_rounds | event | — | Barry after Forest balcony scene |
 | 205 | ARMOR ROOM | sun_crest | puzzle | — | Statues on grates + center button |
@@ -105,7 +104,7 @@ v[18] = min(room_items.key_items_remaining_in_room(room, held), 4) / 4.0
 | control_room_key | **402** | 402 bathroom | Route wp22 said 401 |
 | dorm_key_002 | **408** | Honeycomb / beehive table | Route wp23 said 406 |
 | red_book | **401** | Room 001 bed | Route wp23 said 406 |
-| square_crank | **11B** | Store room top shelf | Route wp37 said 305 |
+| square_crank | **unresolved (not 11B)** | Separate crest-shed Store Room; debug room id still unverified | Do not collapse into Mansion Storeroom 11B |
 | shotgun | **115** + **116** | Trap room / living room rack | Same item; both marked `trap` |
 
 ## Route-critical gates (Jill any%)

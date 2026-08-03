@@ -5,6 +5,10 @@ call "%~dp0reset_mix_l_passage.env.cmd"
 set RE1_GO_EXPLORE_CAPTURE=1
 set RE1_GO_EXPLORE_ARCHIVE=data\go_explore\archive.json
 set RE1_GO_EXPLORE_MANIFEST_POLL_S=60
+REM Yawn rails checkpoint cells: learner-authoritative sync (eager worker mirror).
+set RE1_YAWN_RAILS_SYNC=1
+set RE1_YAWN_RAILS_ROOT=states\yawn_rails
+set RE1_YAWN_RAILS_MANIFEST_POLL_S=60
 REM Learner HTTP for lazy bundle fetch in worker subprocesses (archive resets).
 if not defined RE1_LEARNER_HOST set RE1_LEARNER_HOST=%FLEET_LEARNER_HOST%
 if not defined RE1_LEARNER_PORT set RE1_LEARNER_PORT=%FLEET_LEARNER_PORT%

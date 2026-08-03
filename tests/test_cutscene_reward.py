@@ -220,7 +220,7 @@ def test_pre_kenneth_hall_is_excluded_but_post_kenneth_hall_pays() -> None:
     )
 
 
-def test_same_camera_key_cap_and_reward_deduplication() -> None:
+def test_same_camera_spam_is_observed_but_never_paid() -> None:
     from re1_rl.cutscene_reward import MAX_SAME_ROOM_CUTSCENE_INDEX
 
     prev = make_state(room="105", cam_id=0, hp=96)
@@ -242,8 +242,25 @@ def test_same_camera_key_cap_and_reward_deduplication() -> None:
     _, duplicate = compute_reward(
         cur, cur, make_planner(), progress=progress, return_breakdown=True
     )
-    assert first["new_cutscene"] == NEW_CUTSCENE_BONUS
+    assert first["new_cutscene"] == 0.0
     assert duplicate["new_cutscene"] == 0.0
+    assert progress.observed_cutscenes == {"105:0:s0"}
+    assert progress.rewarded_cutscenes == set()
+
+
+def test_room_paired_cutscene_pays_once() -> None:
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    progress.observed_cutscenes.add("104:0:s0")  # Kenneth eligibility
+    prev = make_state(room="105", cam_id=2, hp=96)
+    cur = make_state(room="104", cam_id=0, hp=96, cutscene_key="105:2")
+    _, first = compute_reward(
+        prev, cur, make_planner(), progress=progress, return_breakdown=True
+    )
+    assert first["new_room"] > 0.0
+    assert first["new_cutscene"] == NEW_CUTSCENE_BONUS
+    assert "105:2" in progress.observed_cutscenes
+    assert "105:2" in progress.rewarded_cutscenes
 
 
 def test_illegal_main_hall_gate_irreversibly_disables_positive_rewards() -> None:

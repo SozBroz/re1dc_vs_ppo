@@ -21,6 +21,7 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --worker-id pking-memlog ^
   --learner-host %LEARNER_HOST% ^
   --learner-port %FLEET_LEARNER_PORT% ^
+  --curriculum curriculum/yawn_rails_one_leg.json ^
   --n-envs 1 ^
   --actor-ranks 4 ^
   --memlog ^

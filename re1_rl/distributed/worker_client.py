@@ -155,6 +155,33 @@ class WorkerClient:
             return base64.b64decode(payload["bundle_b64"])
         return body
 
+    def fetch_yawn_rails_manifest(self, since_version: int = 0) -> dict[str, Any]:
+        code, body = self._request(
+            "GET", f"/yawn_rails/manifest?since_version={int(since_version)}"
+        )
+        if code != 200:
+            raise RuntimeError(f"GET /yawn_rails/manifest failed with HTTP {code}")
+        return json.loads(body.decode("utf-8"))
+
+    def fetch_yawn_rails_bundle(self, cell_id: str) -> bytes:
+        cid = str(cell_id).strip()
+        if not cid or "/" in cid or "\\" in cid or ".." in cid:
+            raise ValueError(f"invalid yawn_rails cell_id: {cell_id!r}")
+        code, body = self._request("GET", f"/yawn_rails/bundle/{cid}")
+        if code == 404:
+            raise FileNotFoundError(f"yawn_rails bundle not found: {cid}")
+        if code != 200:
+            raise RuntimeError(f"GET /yawn_rails/bundle/{cid} failed with HTTP {code}")
+        if body[:2] == b"PK":
+            return body
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return body
+        if isinstance(payload, dict) and payload.get("bundle_b64"):
+            return base64.b64decode(payload["bundle_b64"])
+        return body
+
     def wait_for_learner(self, timeout_s: float, poll_s: float = 2.0) -> None:
         import time
 

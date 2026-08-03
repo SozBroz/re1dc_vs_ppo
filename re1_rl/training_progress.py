@@ -62,6 +62,14 @@ def slim_progress_info(info: dict[str, Any]) -> dict[str, Any]:
             out["go_explore_capture"] = [dict(caps)]
         elif isinstance(caps, list):
             out["go_explore_capture"] = [dict(c) for c in caps if isinstance(c, dict)]
+    yr_caps = info.get("yawn_rails_capture")
+    if yr_caps:
+        if isinstance(yr_caps, dict):
+            out["yawn_rails_capture"] = [dict(yr_caps)]
+        elif isinstance(yr_caps, list):
+            out["yawn_rails_capture"] = [
+                dict(c) for c in yr_caps if isinstance(c, dict)
+            ]
     return out
 
 

@@ -130,6 +130,10 @@ from re1_rl.attack_macro import (
     execute_attack_up_macro,
 )
 from re1_rl.options_menu_macro import dismiss_options_menu
+from re1_rl.richard_lab import (
+    clear_richard_lab_countdown,
+    richard_lab_countdown_screen_from_ram,
+)
 
 # Mask knife/attack when live RAM shows no living enemies (set 0 to debug combat).
 MASK_ATTACK_WITHOUT_ENEMIES = os.environ.get(
@@ -424,13 +428,22 @@ class RE1Env(gym.Env):
     def _load_stage(self) -> None:
         with self.curriculum_path.open(encoding="utf-8") as f:
             self._stage = json.load(f)
-        route_path = self.project_root / "data" / "route_jill_anypct.json"
+        route_path = self.project_root / self._stage.get(
+            "route_path", "data/route_jill_anypct.json"
+        )
         self._planner = WaypointPlanner(
             route_path,
             waypoints=self._stage.get("waypoints"),
             route_steps=self._stage.get("route_steps"),
             terminal_goal_room=self._stage.get("success_room"),
+            start_index=int(getattr(self, "_route_start_index", 0)),
         )
+        if self._stage.get("mode") == "yawn_rails":
+            from re1_rl.yawn_rails import validate_route
+
+            errors = validate_route(self._planner.route, graph=self.graph)
+            if errors:
+                raise ValueError("invalid Yawn rails route: " + "; ".join(errors))
         from re1_rl.memory_map import ITEM_IDS, WEAPON_ITEM_IDS
 
         weapons = frozenset(
@@ -647,9 +660,17 @@ class RE1Env(gym.Env):
     ) -> tuple[bool, bool, str | None]:
         """Return Gym termination flags, preserving the Wesker terminal mark."""
         kenneth_gate_failure = self._progress.kenneth_gate_breached
-        terminated = bool(state.get("dead")) or kenneth_gate_failure
+        checkpoint_success = (
+            self._stage.get("episode_mode") == "one_leg"
+            and self._progress.checkpoint_success
+        )
+        terminated = bool(state.get("dead")) or kenneth_gate_failure or checkpoint_success
         truncated = False if kenneth_gate_failure else self._episode_truncated()
-        reason = "main_hall_before_kenneth" if kenneth_gate_failure else None
+        reason = (
+            "main_hall_before_kenneth"
+            if kenneth_gate_failure
+            else ("checkpoint_success" if checkpoint_success else None)
+        )
         return terminated, truncated, reason
 
     def _build_obs(self, frame_obs: np.ndarray, state: dict[str, Any]) -> dict[str, np.ndarray]:
@@ -662,7 +683,7 @@ class RE1Env(gym.Env):
             max_episode_steps=max_ep,
         )
         cutscene_ledger = encode_cutscene_ledger(
-            self._progress.rewarded_cutscenes,
+            self._progress.observed_cutscenes,
             wesker_pre_kenneth=self._progress.kenneth_gate_breached,
         )
         goal_state = dict(state)
@@ -706,7 +727,7 @@ class RE1Env(gym.Env):
                 episode_history=self._episode_history,
                 cutscene_ledger=cutscene_ledger,
                 ever_held=self._items.ever_held,
-                cutscenes_hit=len(self._progress.rewarded_cutscenes),
+                cutscenes_hit=len(self._progress.observed_cutscenes),
                 dining_statue_knocked=bool(state.get("dining_statue_knocked")),
             ),
             "maps_files": encode_maps_files_flags(state.get("maps_files_flags")),
@@ -826,6 +847,16 @@ class RE1Env(gym.Env):
                 self._go_explore_capture_pending = []
                 pending = self._go_explore_capture_pending
             pending.append(proposal)
+        if float(breakdown.get("checkpoint_success", 0.0)) > 0.0:
+            from re1_rl.yawn_rails import capture_successor_cell
+
+            yr_prop = capture_successor_cell(self, state, breakdown)
+            if yr_prop is not None:
+                pending_yr = getattr(self, "_yawn_rails_capture_pending", None)
+                if pending_yr is None:
+                    self._yawn_rails_capture_pending = []
+                    pending_yr = self._yawn_rails_capture_pending
+                pending_yr.append(yr_prop)
 
     def _go_explore_archive(self):
         """Lazy-load canonical archive (monolithic / learner-local)."""
@@ -1009,6 +1040,8 @@ class RE1Env(gym.Env):
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)
+        opts = dict(options or {})
+        self._route_start_index = int(opts.get("route_start_index", 0))
         self._stop_bg_skip()
         self._skipping_flag = False
         self._bg_death = False
@@ -1025,6 +1058,7 @@ class RE1Env(gym.Env):
         assert self._planner is not None
         self._pb_captured_triggers = set()
         self._go_explore_capture_pending = []
+        self._yawn_rails_capture_pending = []
         self._go_explore_archive_cache = None
         self._go_capture_budget = {"last_capture_step": -10**9}
         # Progress reasons waiting for in_control (cutscene/pickup settle).
@@ -1043,7 +1077,7 @@ class RE1Env(gym.Env):
         from re1_rl.pb_capture import load_sidecar_json, resolve_pb_bundle
         from re1_rl.pb_sidecar import apply_episode_sidecar
 
-        pb_bundle = resolve_pb_bundle(options)
+        pb_bundle = resolve_pb_bundle(opts)
         if pb_bundle is not None:
             sp = Path(pb_bundle["state_path"])
             state_path = sp if sp.is_absolute() else self.project_root / sp
@@ -1109,6 +1143,7 @@ class RE1Env(gym.Env):
         if self._probe_item_inventory_menu():
             self._try_dismiss_orphan_item_menu()
             self._skip_uncontrolled()
+        self._try_clear_richard_lab_countdown()
 
         if self._stage.get("knife_equipped_start"):
             try:
@@ -1211,6 +1246,7 @@ class RE1Env(gym.Env):
         info = {
             "stage": self._stage.get("stage"),
             "waypoint": self._planner.next_waypoint_room(),
+            "route_start_index": self._route_start_index,
             "state": state,
         }
         if pb_bundle is not None:
@@ -1338,7 +1374,10 @@ class RE1Env(gym.Env):
             prev_state=prev_state,
             new_state=new_state,
             episode_start_hp=int(getattr(self, "_episode_start_hp", 0)),
-            rewarded_cutscenes=self._progress.rewarded_cutscenes,
+            rewarded_cutscenes=(
+                self._progress.observed_cutscenes
+                | self._progress.rewarded_cutscenes
+            ),
             visited_rooms=self._progress.visited_rooms,
             cutscene_blocked_after_pickup_room=(
                 self._progress.cutscene_blocked_after_pickup_room
@@ -1401,7 +1440,10 @@ class RE1Env(gym.Env):
         return illegal_main_hall_before_kenneth_transition(
             str(prev_state.get("room_id", "") or ""),
             str(state.get("room_id", "") or ""),
-            rewarded_cutscenes=self._progress.rewarded_cutscenes,
+            rewarded_cutscenes=(
+                self._progress.observed_cutscenes
+                | self._progress.rewarded_cutscenes
+            ),
             visited_rooms=self._progress.visited_rooms,
         )
 
@@ -1474,6 +1516,7 @@ class RE1Env(gym.Env):
                 progress=self._progress,
                 graph=self.graph,
                 success_room=self._stage.get("success_room"),
+                rails_mode=self._stage.get("mode") == "yawn_rails",
                 typewriter_save_complete=save_complete,
                 return_breakdown=True,
             )
@@ -1529,6 +1572,10 @@ class RE1Env(gym.Env):
             entry_prev,
             state,
         )
+        state["cutscene_paired_new_room"] = (
+            float((getattr(self, "_post_skip_bd", {}) or {}).get("new_room", 0.0))
+            > 0.0
+        )
         save_complete = self._poll_typewriter_save(entry_prev or {}, state)
         reward, bd = compute_reward(
             entry_prev,
@@ -1537,6 +1584,7 @@ class RE1Env(gym.Env):
             progress=self._progress,
             graph=self.graph,
             success_room=self._stage.get("success_room"),
+            rails_mode=self._stage.get("mode") == "yawn_rails",
             typewriter_save_complete=save_complete,
             return_breakdown=True,
         )
@@ -1831,6 +1879,38 @@ class RE1Env(gym.Env):
             return True
         a = int(action)
         return a in (USE_ACTION, EQUIP_ACTION, COMBINE_ACTION)
+
+    def _probe_richard_lab_countdown(self) -> bool:
+        try:
+            ram = self._skip_poll_ram()
+            return richard_lab_countdown_screen_from_ram(ram)
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            return False
+
+    def _try_clear_richard_lab_countdown(self) -> tuple[bool, dict[str, Any]]:
+        """Dismiss post-Richard STATUS trap and zero lab_timer. Returns (recovered, report)."""
+        if not self._probe_richard_lab_countdown():
+            return False, {"skipped": True}
+        self._sticky_input.reset()
+        self._macro_active = True
+        try:
+            still, _frames, report = clear_richard_lab_countdown(
+                self.bridge,
+                prev_hp=self._prev_hp,
+                episode_start_hp=getattr(self, "_episode_start_hp", 0),
+            )
+        finally:
+            self._macro_active = False
+            self._sticky_input.reset()
+        if not still:
+            self._progress.mark_richard_lab_cleared()
+        else:
+            port = getattr(self.bridge, "port", "?")
+            print(
+                f"[richard_lab_clear_fail] port={port} report={report}",
+                flush=True,
+            )
+        return (not still), report
 
     def _probe_item_inventory_menu(self) -> bool:
         from re1_rl.ram_skip import item_inventory_screen_from_ram
@@ -2278,6 +2358,7 @@ class RE1Env(gym.Env):
             progress=self._progress,
             graph=self.graph,
             success_room=self._stage.get("success_room"),
+            rails_mode=self._stage.get("mode") == "yawn_rails",
             typewriter_save_complete=save_complete,
             return_breakdown=True,
         )
@@ -2304,6 +2385,14 @@ class RE1Env(gym.Env):
             "inventory": state["inventory_slots"],
             "state": state,
         }
+        pending_ge = getattr(self, "_go_explore_capture_pending", None) or []
+        if pending_ge:
+            info["go_explore_capture"] = list(pending_ge)
+            self._go_explore_capture_pending = []
+        pending_yr = getattr(self, "_yawn_rails_capture_pending", None) or []
+        if pending_yr:
+            info["yawn_rails_capture"] = list(pending_yr)
+            self._yawn_rails_capture_pending = []
         self._prev_state = state
         if state["hp"] > 0:
             self._prev_hp = state["hp"]
@@ -2542,7 +2631,12 @@ class RE1Env(gym.Env):
         # Orphan START/ITEM pause (policy has no Start): close on a fresh step
         # only — never while equip/use/combine or another bridge macro owns it.
         if not self._inventory_macro_owns_item_menu(int(action)):
-            if self._probe_item_inventory_menu():
+            if self._probe_richard_lab_countdown():
+                recovered, _richard_report = self._try_clear_richard_lab_countdown()
+                if recovered:
+                    self._skipping_flag = False
+                    menu_reason = self._probe_outside_gameplay()
+            elif self._probe_item_inventory_menu():
                 recovered, _item_report = self._try_dismiss_orphan_item_menu()
                 if recovered:
                     self._skipping_flag = False
@@ -2772,6 +2866,7 @@ class RE1Env(gym.Env):
             progress=self._progress,
             graph=self.graph,
             success_room=self._stage.get("success_room"),
+            rails_mode=self._stage.get("mode") == "yawn_rails",
             typewriter_save_complete=save_complete,
             return_breakdown=True,
         )
@@ -2880,6 +2975,10 @@ class RE1Env(gym.Env):
         if pending_ge:
             info["go_explore_capture"] = list(pending_ge)
             self._go_explore_capture_pending = []
+        pending_yr = getattr(self, "_yawn_rails_capture_pending", None) or []
+        if pending_yr:
+            info["yawn_rails_capture"] = list(pending_yr)
+            self._yawn_rails_capture_pending = []
         if breakdown.get("success_room", 0) > 0:
             info["gallery_flawless"] = not damage_taken
         self._forward_collision_stall = update_forward_collision_stall(

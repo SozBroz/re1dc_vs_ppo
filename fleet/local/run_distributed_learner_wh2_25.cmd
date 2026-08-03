@@ -32,6 +32,7 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role learner ^
   --machine-name %MACHINE% ^
   --run-name %RUN% ^
+  --curriculum curriculum/yawn_rails_one_leg.json ^
   --n-envs %N_ENVS% ^
   --base-port %BASE_PORT% ^
   --learner-port %LEARNER_PORT% ^

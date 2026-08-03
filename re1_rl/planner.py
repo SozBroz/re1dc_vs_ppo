@@ -27,13 +27,14 @@ class WaypointPlanner:
         route_steps: list[int] | None = None,
         required_items: list[str] | None = None,
         terminal_goal_room: str | None = None,
+        start_index: int = 0,
     ) -> None:
         self.route_path = Path(route_path)
         self.route: list[dict[str, Any]] = self._load_route()
         self._route_step_seqs: list[int] = [int(s) for s in (route_steps or [])]
         self._required_items: list[str] = list(required_items or [])
         self._terminal_goal_room = str(terminal_goal_room) if terminal_goal_room else None
-        self._index = 0
+        self._index = max(0, int(start_index))
 
         # Explicit route_steps (including []) wins: empty list = no waypoints.
         # Only the legacy None path falls back to the full route JSON.
@@ -143,6 +144,13 @@ class WaypointPlanner:
                 for sub in subs
             )
 
+        if cond_type == "all_of":
+            subs = cond.get("conditions", [])
+            return bool(subs) and all(
+                WaypointPlanner._condition_met(sub, state, wp_room, progress, prev_state)
+                for sub in subs
+            )
+
         if cond_type == "visited_any":
             if progress is None:
                 return False
@@ -184,6 +192,32 @@ class WaypointPlanner:
             inv = {canonical_item(str(x)) for x in state.get("inventory", [])}
             want = canonical_item(str(cond.get("item", "")))
             return bool(want) and want in inv
+        if cond_type == "lacks_item":
+            inv = {canonical_item(str(x)) for x in state.get("inventory", [])}
+            want = canonical_item(str(cond.get("item", "")))
+            return bool(want) and want not in inv
+        if cond_type == "acquired_item":
+            if progress is None:
+                return False
+            want = canonical_item(str(cond.get("item", "")))
+            return bool(want) and want in progress.leg_acquired_items
+        if cond_type == "story_use":
+            if progress is None:
+                return False
+            site = str(cond.get("site_id", ""))
+            return bool(site) and site in progress.rewarded_story_uses
+        if cond_type == "observed_cutscene":
+            if progress is None:
+                return False
+            prefix = str(cond.get("prefix", ""))
+            return bool(prefix) and any(
+                str(key).startswith(prefix) for key in progress.observed_cutscenes
+            )
+        if cond_type == "typewriter_save":
+            return bool(state.get("typewriter_save_complete"))
+        if cond_type == "state_flag":
+            field = str(cond.get("field", ""))
+            return bool(field) and state.get(field) == cond.get("value", True)
         if cond_type == "in_control_steps_in_room":
             if progress is None:
                 return False

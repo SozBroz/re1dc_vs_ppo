@@ -66,17 +66,19 @@ def test_obs_shapes_and_finite():
     assert proprio.shape == (PROPRIO_DIM,)
     assert goal.shape == (GOAL_DIM,)
     assert np.all(np.isfinite(proprio)) and np.all(np.isfinite(goal))
-    assert np.all(goal == 0.0)
+    assert goal[GOAL_IDX["goal_room_index"]] == enc._room_idx_norm("106")
 
 
-def test_goal_vector_is_zeroed():
+def test_goal_vector_encodes_live_compass():
     g = RoomGraph(DOORS)
     enc = ObsEncoder(ROOMS, g)
     planner = make_planner()
     door = g.exit_toward("105", "106")
     s = make_state(x=door.x - 1000, z=door.z, facing=0)
     goal = enc.encode_goal(s, planner)
-    assert np.all(goal == 0.0)
+    assert goal[GOAL_IDX["doors_available"]] == 1.0
+    assert goal[GOAL_IDX["door_distance"]] > 0.0
+    assert goal[GOAL_IDX["goal_room_index"]] == enc._room_idx_norm("106")
 
 
 def test_new_room_bonus_once_per_episode():
@@ -125,7 +127,9 @@ def test_new_cutscene_bonus_once_per_episode():
     _, bd0 = compute_reward(
         prev, cur, planner, progress=progress, return_breakdown=True,
     )
-    assert bd0["new_cutscene"] == NEW_CUTSCENE_BONUS
+    assert bd0["new_cutscene"] == 0.0
+    assert key in progress.observed_cutscenes
+    assert key not in progress.rewarded_cutscenes
 
     cur2 = make_state(room="105", cam_id=2, step=3, cutscene_key="105:2:s0")
     _, bd1 = compute_reward(
@@ -165,7 +169,7 @@ def test_new_cutscene_bonus_once_per_episode():
     assert bd2["new_cutscene"] == NEW_CUTSCENE_BONUS
 
 
-def test_checkpoint_path_shaping_disabled():
+def test_checkpoint_path_shaping_is_opt_in_for_rails():
     g = RoomGraph(DOORS)
     planner = make_planner()
     door = g.exit_toward("105", "106")
@@ -182,6 +186,15 @@ def test_checkpoint_path_shaping_disabled():
     )
     assert bd_t["pbrs_door"] == 0.0
     assert bd_a["pbrs_door"] == 0.0
+    _, rails_t = compute_reward(
+        start, toward, planner, progress=ProgressTracker(), graph=g,
+        rails_mode=True, return_breakdown=True,
+    )
+    _, rails_a = compute_reward(
+        start, away, make_planner(), progress=ProgressTracker(), graph=g,
+        rails_mode=True, return_breakdown=True,
+    )
+    assert rails_t["pbrs_door"] > rails_a["pbrs_door"]
     assert bd_t["waypoint"] == 0.0
 
 
@@ -193,7 +206,7 @@ def test_objective_one_hot():
     assert vec[OBJECTIVE_TYPES.index("scripted_macro")] == 1.0
 
 
-def test_goal_usage_hints_disabled_with_zero_goal():
+def test_goal_usage_hints_are_live():
     from re1_rl.item_todo import ItemTracker
 
     g = RoomGraph(DOORS)
@@ -202,17 +215,17 @@ def test_goal_usage_hints_disabled_with_zero_goal():
     tracker = ItemTracker(todo=[])
     s = make_state(room="10C")
     goal = enc.encode_goal(s, planner, item_tracker=tracker)
-    assert np.all(goal == 0.0)
+    assert goal[GOAL_IDX["obj_use_item"]] == 1.0
+    assert goal[GOAL_IDX["goal_room_index"]] == enc._room_idx_norm("10C")
 
 
-def test_goal_puzzle_macro_disabled_with_zero_goal():
+def test_goal_objective_types_are_distinct():
     g = RoomGraph(DOORS)
     enc = ObsEncoder(ROOMS, g)
     s = make_state(room="107")
     goal_macro = enc.encode_goal(s, make_planner(route_steps=[9]))
     goal_plain = enc.encode_goal(s, make_planner(route_steps=[2]))
-    assert np.all(goal_macro == 0.0)
-    assert np.all(goal_plain == 0.0)
+    assert not np.array_equal(goal_macro, goal_plain)
 
 
 def test_explain_obs_names_every_slot():

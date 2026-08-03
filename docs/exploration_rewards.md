@@ -4,6 +4,23 @@
 
 Policy source: imperator.
 
+## Yawn rails override (approved 2026-08-03)
+
+`curriculum/yawn_rails_one_leg.json` uses a different, goal-conditioned reward
+contract:
+
+- completing the active atomic checkpoint pays `checkpoint_success = +1.2` and
+  terminates the one-leg episode successfully;
+- every other positive component is multiplied by `0.05` in rails mode, making
+  checkpoint completion the strongest positive signal;
+- negative terms retain their magnitudes and anti-farm behavior;
+- a qualified cutscene can pay only on the same transition as a newly rewarded
+  room entry. Same-room interact/message/cutscene spam never pays;
+- `observed_cutscenes` and `rewarded_cutscenes` are separate ledgers. Kenneth
+  progression reads the observed ledger; reward accounting reads the paid ledger.
+
+The exploration magnitudes below remain the archival/non-rails contract.
+
 ## When this applies
 
 - Touching exploration reward shaping / cutscene / room / item / combat pay
@@ -15,7 +32,7 @@ Policy source: imperator.
 | # | Event | Magnitude | Episode | Status |
 |---|--------|-----------|---------|--------|
 | 1 | New room entered | **+4.0** | Extends **+12 min** idle cap | In force |
-| 2 | Uncontrolled freeze lasting **≥7.5s** (450 emulated frames), unless excluded below | **+1.2** | Resets stagnation clock | In force |
+| 2 | Qualified ≥7.5s freeze paired with a newly rewarded room entry | **+1.2** | Resets stagnation clock | In force |
 | 3 | New key item | **+4.0** | Extends **+12 min** idle cap | In force |
 | 4 | Using key item | **+4.0** | Extends **+12 min** idle cap | In force |
 | 5 | Weapon pickup (including wall shotgun) | **+4.0** | Extends **+12 min** idle cap (first acquire of that weapon this episode) | In force |
@@ -29,7 +46,7 @@ Policy source: imperator.
 Buckets:
 
 - **1, 3, 4, 5, 10**: **+4.0** and raise softlock idle truncate floor to **12 min** (weapons: first acquire of that name this episode; documents: first rising edge into examine UI per room this episode)
-- **2**: **+1.2**; resets stagnation but does **not** by itself raise the 12 min floor
+- **2**: **+1.2** only when paired with new-room pay; same-room freezes are observed but unpaid
 - **6–8, 11**: modest crumbs / combat / save
 - **9**: **+0.5** per correct Gallery portrait switch; extends
 
@@ -71,7 +88,7 @@ Gallery room 117 policy:
 **Imperator-approved:** Pre-Kenneth Main Hall entry terminates the episode:
 
 - On a **transition into** Main Hall room **106** before the canonical Kenneth
-  tea-room cutscene (`104:*:sN`) has occurred/paid this episode → apply exactly
+  tea-room cutscene (`104:*:sN`) has been observed this episode → apply exactly
   **−0.05 once** under `main_hall_before_kenneth`, mark the terminal observation,
   and **end the episode immediately**.
 - The 16-wide cutscene ledger's dormant opening slot becomes the persistent
@@ -84,8 +101,8 @@ Gallery room 117 policy:
 - If Jill is actually dead on the same step, the real death path owns the
   ordinary global `death` penalty and the Kenneth gate term does not apply.
 
-Kenneth rewards once when its tea-room freeze reaches the same 450-frame
-duration gate. It does not require scene/message peak evidence.
+Kenneth marks progression when its tea-room freeze reaches the 450-frame gate.
+As a same-room freeze it is observed but does not itself pay cutscene reward.
 
 ## Cutscene duration gate
 

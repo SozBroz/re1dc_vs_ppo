@@ -14,6 +14,7 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --machine-name %MACHINE_NAME% ^
   --learner-host %LEARNER_HOST% ^
   --learner-port %FLEET_LEARNER_PORT% ^
+  --curriculum curriculum/yawn_rails_one_leg.json ^
   --n-envs %N_ENVS% ^
   --base-port %BASE_PORT% ^
   --total-steps 0 ^

@@ -207,17 +207,52 @@ class ObsEncoder:
         item_tracker: ItemTracker | None = None,
         room_items: RoomItems | None = None,
     ) -> np.ndarray:
-        """Checkpoint compass / planner goal vector.
-
-        Disabled for exploration training: always zero so the policy cannot
-        read the scripted route. Rewards use per-episode new-room/cutscene
-        bonuses instead of checkpoint-path shaping.
-        """
+        """Encode the live checkpoint objective and egocentric exit compass."""
         from re1_rl.dining_statue_puzzle import encode_dining_statue_goal
         from re1_rl.gallery_puzzle import encode_gallery_hint
 
-        del planner, item_tracker, room_items
         v = np.zeros(GOAL_DIM, dtype=np.float32)
+        room = str(state.get("room_id", ""))
+        goal = planner.next_waypoint_room()
+        total = max(planner.total_waypoints, 1)
+        idx = min(planner.waypoint_index, total)
+
+        v[0] = self._room_idx_norm(goal)
+        v[1] = idx / float(total)
+        v[2] = max(0, total - idx) / float(total)
+        hops = self.graph.hop_distance(room, goal)
+        v[3] = 1.0 if hops is None else min(float(hops) / 20.0, 1.0)
+        v[4] = 1.0 if goal is not None and room == str(goal) else 0.0
+
+        door = self.graph.exit_toward(room, goal)
+        if door is not None:
+            dx = float(door.x) - float(state.get("x", 0))
+            dz = float(door.z) - float(state.get("z", 0))
+            distance = math.hypot(dx, dz)
+            facing = 2.0 * math.pi * float(state.get("facing", 0)) / FACING_FULL_CIRCLE
+            relative = math.atan2(dz, dx) - facing
+            v[5] = float(np.clip(dx / DIST_NORM, -2.0, 2.0))
+            v[6] = float(np.clip(dz / DIST_NORM, -2.0, 2.0))
+            v[7] = min(distance / DIST_NORM, 2.0)
+            v[8] = math.sin(relative)
+            v[9] = math.cos(relative)
+            v[21] = 1.0
+
+        v[10:15] = planner.objective_one_hot()
+        v[15] = min(max(self.curriculum_stage_index / 10.0, 0.0), 1.0)
+        if item_tracker is not None:
+            done, item_total = item_tracker.progress()
+            v[16] = done / float(max(item_total, 1))
+        if item_tracker is not None and room_items is not None:
+            ever = item_tracker.ever_held
+            v[17] = min(room_items.remaining_in_room(room, ever) / 8.0, 1.0)
+            v[18] = min(room_items.key_items_remaining_in_room(room, ever) / 4.0, 1.0)
+            v[22] = min(room_items.gated_in_room(room, ever) / 4.0, 1.0)
+
+        required = {canonical_item(x) for x in planner.required_items()}
+        inventory = {canonical_item(x) for x in state.get("inventory", [])}
+        v[19] = 1.0 if required.issubset(inventory) else 0.0
+        v[20] = 1.0 if goal is not None and room != str(goal) and hops is None else 0.0
         v[-5:-1] = encode_gallery_hint(state)
         v[-1] = encode_dining_statue_goal(state)
         return v

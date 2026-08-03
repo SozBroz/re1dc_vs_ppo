@@ -1,13 +1,4 @@
-"""Shaped reward for hierarchical RE1 control.
-
-Exploration mode (checkpoint path disabled):
-  - +NEW_ROOM_BONUS once per new room entered per episode
-  - +NEW_DOCUMENT_EXAMINE_BONUS once per room on first document/file examine UI edge
-  - +NEW_CUTSCENE_BONUS once per same-room scripted cutscene (room:cam:sN) per episode
-  - Room-change door skips do not pay new_cutscene (discovery is new_room only)
-  - Goal-vector checkpoint compass is zeroed in obs (see obs_encoder.encode_goal)
-  - No waypoint / PBRS / wrong-room / retreat / success_room shaping
-"""
+"""Shaped reward for hierarchical RE1 control and one-leg rails training."""
 
 from __future__ import annotations
 
@@ -57,6 +48,8 @@ AMMO_PICKUP_BONUS = 2.0
 TYPEWRITER_SAVE_BONUS = 0.3
 # Keys / emblems / crests (room_items.json key_item=true).
 KEY_ITEM_PICKUP_BONUS = 4.0
+# Leaving inventory after a paid key pickup (not story USE / box deposit).
+KEY_ITEM_RETURN_PENALTY = -KEY_ITEM_PICKUP_BONUS
 # Story inventory USE at a curated site (piano, fireplace, …).
 STORY_ITEM_USE_BONUS = 4.0
 # Dining 2F balcony statue knocked (blue jewel puzzle).
@@ -212,19 +205,37 @@ def ammo_waste_penalty(
     ) * float(rounds)
 
 
-# Disabled checkpoint-path terms (exported for tests that assert they stay off).
-# Staticized; ENABLE_CHECKPOINT_PATH=False so these never enter the live path.
 WRONG_ROOM_PENALTY = -0.6
 RETREAT_PENALTY = -0.6
-SUCCESS_ROOM_BONUS = 120.0
-PBRS_GRAPH_WEIGHT = 0.06
-PBRS_DOOR_WEIGHT = 0.6
+SUCCESS_ROOM_BONUS = CHECKPOINT_REWARD
+PBRS_GRAPH_WEIGHT = 0.02
+PBRS_DOOR_WEIGHT = 0.05
 SHAPING_GAMMA = 1.0
 UNKNOWN_HOPS = 8.0
 DIST_NORM = 4096.0
+RAILS_AUX_POSITIVE_SCALE = 0.05
+# Rails clawbacks mirror scaled pickup crumbs (exploration keeps full ±4.0).
+RAILS_SCALED_CLAWBACK_TERMS: frozenset[str] = frozenset({
+    "shotgun_return",
+    "gold_emblem_return",
+    "key_item_return",
+})
 
-# When False, compute_reward ignores checkpoint-path shaping and planner advances.
-ENABLE_CHECKPOINT_PATH = False
+# Kept as a public capability flag; each curriculum still opts in via rails_mode.
+ENABLE_CHECKPOINT_PATH = True
+
+
+def _key_item_return_blocked(
+    *,
+    state: dict[str, Any],
+    room: str,
+) -> bool:
+    """True when a key leaving inventory is not a put-back farm."""
+    if state.get("story_use_success") or state.get("gold_emblem_return"):
+        return True
+    from re1_rl.item_box import is_box_room
+
+    return is_box_room(room)
 
 
 def softlock_frame_threshold(progress: ProgressTracker | None) -> int:
@@ -235,7 +246,9 @@ def softlock_frame_threshold(progress: ProgressTracker | None) -> int:
         return SOFTLOCK_PRE_KENNETH_FRAMES
     from re1_rl.cutscene_reward import kenneth_cutscene_seen
 
-    if kenneth_cutscene_seen(progress.rewarded_cutscenes):
+    if kenneth_cutscene_seen(
+        progress.observed_cutscenes | progress.rewarded_cutscenes
+    ):
         base = SOFTLOCK_POST_KENNETH_FRAMES
     else:
         base = SOFTLOCK_PRE_KENNETH_FRAMES
@@ -315,7 +328,7 @@ def potential(
     graph: RoomGraph | None,
 ) -> tuple[float, float]:
     """(phi_graph, phi_door) for a state. Higher = closer to objective."""
-    if not ENABLE_CHECKPOINT_PATH or graph is None:
+    if graph is None:
         return 0.0, 0.0
     room = str(state.get("room_id", ""))
     goal = planner.next_waypoint_room()
@@ -346,11 +359,12 @@ def compute_reward(
     graph: RoomGraph | None = None,
     softlock_threshold: int | None = None,
     success_room: str | None = None,
+    rails_mode: bool = False,
     typewriter_save_complete: bool = False,
     return_breakdown: bool = False,
 ) -> float | tuple[float, dict[str, float]]:
     """Compute scalar reward from symbolic state dicts."""
-    del success_room  # checkpoint success_room bonus disabled
+    del success_room
     if softlock_threshold is None:
         softlock_threshold = softlock_frame_threshold(progress)
 
@@ -376,8 +390,10 @@ def compute_reward(
         "gallery": 0.0,
         "dining_statue": 0.0,
         "gold_emblem_return": 0.0,
+        "key_item_return": 0.0,
         "shotgun_return": 0.0,
         "new_weapon": 0.0,
+        "checkpoint_success": 0.0,
         "success_room": 0.0,
         "hp": 0.0,
         "death": 0.0,
@@ -406,7 +422,9 @@ def compute_reward(
         illegal_main_hall = illegal_main_hall_before_kenneth_transition(
             prev_room,
             room,
-            rewarded_cutscenes=progress.rewarded_cutscenes,
+            rewarded_cutscenes=(
+                progress.observed_cutscenes | progress.rewarded_cutscenes
+            ),
             visited_rooms=progress.visited_rooms,
         )
         if illegal_main_hall and not state.get("dead"):
@@ -421,24 +439,11 @@ def compute_reward(
             at_route_seq=None,
         )
 
-    if ENABLE_CHECKPOINT_PATH and graph is not None:
+    if rails_mode and ENABLE_CHECKPOINT_PATH and graph is not None:
         pg_prev, pd_prev = potential(prev_state, planner, graph)
         pg_now, pd_now = potential(state, planner, graph)
         bd["pbrs_graph"] = SHAPING_GAMMA * pg_now - pg_prev
         bd["pbrs_door"] = SHAPING_GAMMA * pd_now - pd_prev
-
-        while True:
-            completed_idx = planner.waypoint_index
-            if not planner.advance_if_success(
-                state, progress=progress, prev_state=prev_state
-            ):
-                break
-            if progress is not None:
-                progress.on_waypoint_advanced()
-            claimed = progress.claim_waypoint_bonus(completed_idx) \
-                if progress is not None else True
-            if claimed:
-                bd["waypoint"] += WAYPOINT_ROOM_BONUS
 
         target = planner.next_waypoint_room()
         if room_changed and target is not None:
@@ -482,6 +487,8 @@ def compute_reward(
     ammo_progress = False
     for raw in new_items:
         name = canonical_item(str(raw))
+        if progress is not None:
+            progress.note_leg_acquired(name)
         if name in _KEY_ITEM_NAME_SET:
             if progress is None or progress.claim_key_item_bonus(name):
                 bd["key_item"] += KEY_ITEM_PICKUP_BONUS
@@ -507,14 +514,19 @@ def compute_reward(
         else:
             bd["item"] += ITEM_PICKUP_BONUS
 
-    # Pickup owns its channel (skill a): never also claim new_cutscene this step.
+    # Observation and payout are separate ledgers. A cutscene can pay only when
+    # this exact transition also earned a new-room entry reward.
     cutscene_key = state.get("cutscene_key") if not new_items else None
     if (
         cutscene_key
         and progress is not None
         and not progress.kenneth_gate_breached
     ):
-        if progress.claim_cutscene_bonus(str(cutscene_key)):
+        progress.observe_cutscene(str(cutscene_key))
+        room_paired = (room_changed and is_new_room) or bool(
+            state.get("cutscene_paired_new_room")
+        )
+        if room_paired and progress.claim_cutscene_bonus(str(cutscene_key)):
             bd["new_cutscene"] = NEW_CUTSCENE_BONUS
 
     # Same edge as PB typewriter capture (detector complete). Modest crumb;
@@ -575,10 +587,40 @@ def compute_reward(
         if progress is not None:
             progress._shotgun_return_armed = False
 
+    if (
+        progress is not None
+        and not state.get("dead")
+        and int(state.get("hp", 0) or 0) > 0
+        and not _key_item_return_blocked(state=state, room=room)
+    ):
+        for name in sorted(prev_inventory - inventory):
+            if name not in _KEY_ITEM_NAME_SET:
+                continue
+            if name not in progress.key_items_rewarded:
+                continue
+            bd["key_item_return"] += KEY_ITEM_RETURN_PENALTY
+            progress.release_key_item_reward(name)
+
     story_use_site = state.get("story_use_success")
     if story_use_site and progress is not None:
         if progress.claim_story_use_bonus(str(story_use_site)):
             bd["story_use"] = STORY_ITEM_USE_BONUS
+
+    if rails_mode:
+        state["typewriter_save_complete"] = bool(typewriter_save_complete)
+        completed_idx = planner.waypoint_index
+        if planner.advance_if_success(
+            state, progress=progress, prev_state=prev_state
+        ):
+            if progress is not None:
+                progress.on_waypoint_advanced()
+                claimed = progress.claim_checkpoint_success()
+            else:
+                claimed = True
+            if claimed:
+                bd["checkpoint_success"] = CHECKPOINT_REWARD
+                # Legacy telemetry alias remains zero; checkpoint_success is
+                # intentionally explicit in rollout accounting.
 
     if state.get("gold_emblem_return"):
         bd["gold_emblem_return"] = GOLD_EMBLEM_RETURN_PENALTY
@@ -629,6 +671,15 @@ def compute_reward(
         for term, value in bd.items():
             if value > 0.0:
                 bd[term] = 0.0
+
+    if rails_mode:
+        for term, value in tuple(bd.items()):
+            if term == "checkpoint_success":
+                continue
+            if value > 0.0:
+                bd[term] = value * RAILS_AUX_POSITIVE_SCALE
+            elif value < 0.0 and term in RAILS_SCALED_CLAWBACK_TERMS:
+                bd[term] = value * RAILS_AUX_POSITIVE_SCALE
 
     if progress is not None and not state.get("dead"):
         # Room / document / key get / key use / first weapon → 12 min idle floor.

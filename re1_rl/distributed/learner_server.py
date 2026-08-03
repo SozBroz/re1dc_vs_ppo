@@ -19,6 +19,11 @@ from re1_rl.distributed.rollout_codec import decode_rollout
 from re1_rl.distributed.rollout_types import WorkerRollout
 from re1_rl.distributed.weight_store import WeightStore
 from re1_rl.go_explore_merge import GoExploreMerge, extract_proposals_from_infos
+from re1_rl.yawn_rails_sync import (
+    YawnRailsCellStore,
+    extract_yawn_rails_proposals,
+    yawn_rails_store_from_env,
+)
 
 
 def base_worker_id(worker_id: str) -> str:
@@ -34,6 +39,20 @@ def _go_explore_merge_from_env() -> GoExploreMerge | None:
     return GoExploreMerge(Path(raw))
 
 
+def _yawn_rails_store_from_env() -> YawnRailsCellStore | None:
+    """Attach Yawn rails store unless explicitly disabled."""
+    raw = os.environ.get("RE1_YAWN_RAILS_SYNC", "1").strip().lower()
+    if raw in {"0", "false", "no", "off"}:
+        return None
+    root = os.environ.get("RE1_YAWN_RAILS_ROOT", "").strip()
+    project = os.environ.get("RE1_PROJECT_ROOT", "").strip()
+    if root:
+        return YawnRailsCellStore(Path(root))
+    if project:
+        return yawn_rails_store_from_env(Path(project))
+    return yawn_rails_store_from_env()
+
+
 class LearnerState:
     def __init__(
         self,
@@ -46,6 +65,7 @@ class LearnerState:
         relevance_gate: bool = False,
         relevance_max_age: int | None = None,
         go_explore_merge: GoExploreMerge | None = None,
+        yawn_rails_store: YawnRailsCellStore | None = None,
     ) -> None:
         self.weight_store = weight_store
         self.rollout_queue = rollout_queue
@@ -85,6 +105,13 @@ class LearnerState:
         self.go_explore_accepted = 0
         self.go_explore_rejected_semantic = 0
         self.go_explore_evicted = 0
+        self.yawn_rails_store = (
+            yawn_rails_store
+            if yawn_rails_store is not None
+            else _yawn_rails_store_from_env()
+        )
+        self.yawn_rails_accepted = 0
+        self.yawn_rails_rejected = 0
 
     def set_current_version(self, version: int) -> None:
         with self.lock:
@@ -212,6 +239,30 @@ class LearnerState:
             )
         return accepted
 
+    def ingest_yawn_rails_from_rollout(self, rollout: WorkerRollout) -> list[str]:
+        """Merge Yawn rails checkpoint cells from accepted rollout episode infos."""
+        store = self.yawn_rails_store
+        if store is None:
+            return []
+        proposals = extract_yawn_rails_proposals(rollout.episode_infos)
+        if not proposals:
+            return []
+        try:
+            accepted = store.ingest_proposals(proposals)
+        except Exception as exc:
+            log(self.machine_name, f"yawn_rails merge failed: {exc}")
+            return []
+        with self.lock:
+            if accepted:
+                self.yawn_rails_accepted += len(accepted)
+            self.yawn_rails_rejected = int(store.rejected)
+        if accepted:
+            log(
+                self.machine_name,
+                f"yawn_rails merged {len(accepted)} cell(s) from {rollout.worker_id}",
+            )
+        return accepted
+
     def accept_rollout(self, rollout: WorkerRollout) -> tuple[bool, str]:
         wid = base_worker_id(rollout.worker_id)
         steps = int(rollout.num_timesteps())
@@ -244,6 +295,7 @@ class LearnerState:
         if reason == "ok":
             self.rollout_queue.put(rollout)
         self.ingest_go_explore_from_rollout(rollout)
+        self.ingest_yawn_rails_from_rollout(rollout)
         return True, reason
 
     def record_relevance_stats(
@@ -416,11 +468,20 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "relevance_kept": self.state.relevance_kept,
                     "relevance_dropped": self.state.relevance_dropped,
                     "go_explore_accepted": self.state.go_explore_accepted,
+                    "yawn_rails_accepted": self.state.yawn_rails_accepted,
                     "pitch": pitch,
                     "epoch": epoch,
                 }
                 if go_stats is not None:
                     payload["go_explore_stats"] = go_stats
+                yr_store = self.state.yawn_rails_store
+                if yr_store is not None:
+                    payload["yawn_rails_stats"] = {
+                        "admitted": self.state.yawn_rails_accepted,
+                        "rejected": self.state.yawn_rails_rejected,
+                        "cells_total": len(yr_store.cells),
+                        "archive_version": int(yr_store.archive_version),
+                    }
             self._send_json(200, payload)
             return
 
@@ -443,6 +504,35 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                 self._send_json(400, {"error": "invalid record_id"})
                 return
             blob = merge.pack_bundle_zip(record_id)
+            if blob is None:
+                self._send_json(404, {"error": "bundle not found"})
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Length", str(len(blob)))
+            self.end_headers()
+            self.wfile.write(blob)
+            return
+
+        if path == "/yawn_rails/manifest":
+            store = self.state.yawn_rails_store
+            if store is None:
+                self._send_json(503, {"error": "yawn_rails store not configured"})
+                return
+            since = int(qs.get("since_version", ["0"])[0])
+            self._send_json(200, store.build_manifest(since_version=since))
+            return
+
+        if path.startswith("/yawn_rails/bundle/"):
+            store = self.state.yawn_rails_store
+            if store is None:
+                self._send_json(503, {"error": "yawn_rails store not configured"})
+                return
+            cell_id = path[len("/yawn_rails/bundle/") :].strip("/")
+            if not cell_id or "/" in cell_id or "\\" in cell_id or ".." in cell_id:
+                self._send_json(400, {"error": "invalid cell_id"})
+                return
+            blob = store.pack_bundle_zip(cell_id)
             if blob is None:
                 self._send_json(404, {"error": "bundle not found"})
                 return

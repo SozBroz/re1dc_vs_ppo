@@ -20,9 +20,13 @@ Each JSON file under `curriculum/` defines one training/eval stage for the hiera
 
 | `init_savestate` | string | Path relative to project root to a BizHawk `.state` file |
 
-| `route_steps` | list[int] | Indices into `data/route_jill_anypct.json` steps for `WaypointPlanner` (eval / human play; **not** checkpoint-path reward shaping) |
+| `route_path` | string | Route contract relative to project root (Yawn rails uses `data/yawn_checkpoint_route.json`) |
+| `route_steps` | list[int] | Ordered route `seq` values consumed by `WaypointPlanner` |
 
-| `success_room` | string \| null | Terminal room id for eval truncation / logging (e.g. `"107"`). **Does not pay a reward** — `compute_reward` ignores `success_room` (checkpoint-path rewards are **OFF**). |
+| `mode` | string | `yawn_rails` enables live goal features, dominant checkpoint reward, and curated route-cell resets |
+| `episode_mode` | string | `one_leg`: start at one curated cell, complete one successor checkpoint, terminate |
+| `cells_manifest` | string | Curated route-cell manifest; missing cells are skipped without falling back to PB/archive |
+| `success_room` | string \| null | Final route room for eval/logging |
 
 | `required_items` | list[string] | Item names that trigger pickup reward (empty = any) |
 
@@ -38,7 +42,11 @@ Legacy field `waypoints` (room-id list) is still accepted by `WaypointPlanner` i
 
 
 
-Exploration training uses discovery rewards only (new room, cutscene, items, combat, etc.) per `docs/exploration_rewards.md`. Checkpoint-path shaping — waypoint bonus, PBRS, wrong-room / retreat penalties, and `success_room` bonus — is **disabled** in `re1_rl/reward.py`. `route_steps` and `success_room` remain for planner state, eval, and human play tooling.
+`yawn_rails_one_leg.json` is the active architecture contract: checkpoint
+completion pays an explicit terminal `+1.2`; other positive signals are scaled
+auxiliary hints. Goal compass/progress features are live and fused into the
+policy. PB/Go-Explore capture remains enabled for archival use, but those
+sidecars are not sampled as rails reset sources.
 
 
 
@@ -46,7 +54,7 @@ Exploration training uses discovery rewards only (new room, cutscene, items, com
 
 
 
-See `m0_dining_to_main_hall.json`: spawn from `states/jill_control_fresh.State` with empty `route_steps` (open exploration stub).
+See `yawn_rails_one_leg.json`.
 
 
 
@@ -54,6 +62,8 @@ See `m0_dining_to_main_hall.json`: spawn from `states/jill_control_fresh.State` 
 
 
 
-Stages are consumed by `re1_rl.env.RE1Env` on `reset()` and passed to `WaypointPlanner` for symbolic route state (not checkpoint-path reward shaping).
+Stages are consumed by `re1_rl.env.RE1Env` on `reset()` and passed to
+`WaypointPlanner`. The outer reset wrapper samples only the initial route state
+or a complete curated route-cell bundle when `mode == "yawn_rails"`.
 
 

@@ -57,17 +57,23 @@ Rationale: menu navigation for box management is low-signal tedium, not the stra
 
 ---
 
-## No scripted path
+## Goal-conditioned rails, not scripted navigation
 
-Humans speedrun with a **route**, but they do not receive a compass vector telling them the next room every frame.
+The approved Yawn campaign intentionally replaces free exploration as the
+primary learning mode with atomic route rails. In `yawn_rails` mode the policy
+receives the active checkpoint room, graph distance, next-exit bearing/distance,
+objective type, required-item status, and route progress through `goal`.
 
-Therefore:
+This is guidance, not actuation: the planner never selects buttons, walks Jill,
+solves puzzles, or invokes navigation macros. The policy still learns every
+movement, door interaction, pickup, inventory use, puzzle, and fight.
 
-- **`encode_goal()` stays zeroed** during exploration training — no waypoint index, door bearing to next checkpoint, or `items_left_here` in the goal channel.
-- `data/route_jill_anypct.json` is for **human reference, eval, and optional reward experiments** — not a mandatory policy cheat sheet.
-- Rewards may use sparse discovery signals (new room, cutscene, damage) without encoding the full any% graph into obs.
-
-Re-enabling goal/compass fields requires an explicit north-star change and an ablation plan.
+- Canonical contract: `data/yawn_checkpoint_route.json`
+- Episode mode: one curated route cell → next checkpoint → terminal reset
+- Terminal checkpoint reward: `+1.2`, dominant over scaled auxiliary positives
+- Reset source: curated route cells; PB/Go-Explore sidecars remain archival
+- `data/route_jill_anypct.json` remains historical/full-game reference and is
+  not used by the Yawn rails stage.
 
 ---
 
@@ -160,10 +166,10 @@ Prefer **discrete milestones** over raw action logs:
 
 | Allowed | Forbidden |
 |---------|-----------|
-| “I have visited room 203 this episode” | “My next waypoint is room 106” |
-| “I picked up emblem before entering 10F” | “Door bearing to next checkpoint” |
-| “Cutscene `106:cam3` already played” | `waypoint_index / total` from route JSON |
-| “Last 6 rooms: …” | BFS hop distance to `success_room` |
+| “I have visited room 203 this episode” | Low-level action prescription |
+| “I picked up emblem before entering 10F” | Scripted walk-to-door control |
+| “Cutscene `106:cam3` already played” | Puzzle-solving macro |
+| Rails checkpoint/compass observation | Teleporting or replaying a route |
 
 ### Implementation patterns (explore in priority order)
 
@@ -188,7 +194,7 @@ Prefer signals that **change affordances** (flags, key items, cutscenes) over si
 - A hard-coded any% bot with RL veneer
 - Full autoplay through cutscenes beyond async skip (skip ≠ solve)
 - Magic equip everywhere (weapon quick-switch RAM is a training convenience; keep it from becoming general “solve inventory”)
-- Goal-vector compass that tells the agent the next checkpoint room during exploration training
+- Planner-selected low-level actions or navigation/puzzle macros
 
 ---
 
@@ -199,13 +205,13 @@ Before implementing:
 1. **Classify** — Observation (guidebook), **episode history**, reward, combat macro, or actuation (forbidden)?
 2. **Guidebook test** — Would a human with Evil Resource open **one room page** or **one item page** — not a turn-by-turn route?
 3. **History test** — Does this record **what happened**, without saying **what to do next**?
-4. **Path test** — Does this tell the agent **where to go next** on the speedrun route? If yes, reject or gate behind an ablation flag.
+4. **Path test** — A rails contract may identify the active checkpoint; reject anything that selects or executes low-level navigation actions.
 4. **Purity test** — Does the policy still choose buttons for this skill? Combat macros and box RAM are the only broad exceptions.
 5. **Data provenance** — Prefer `room_items.json`, RDT extracts, RAM hunts, and Evil Resource cross-checks over hand-wavy route notes.
 
 ### Anti-patterns
 
-- Re-enabling full `goal` compass without owner sign-off
+- Using goal features outside an explicitly goal-conditioned curriculum contract
 - Puzzle macros “just to unblock training”
 - Hiding all gated items instead of showing `gated=1` with known prereqs
 - Using `route_jill_anypct.json` step index as obs during exploration
@@ -224,7 +230,7 @@ Before implementing:
 | Episode progress history | **Deque + ledger + milestones** | `history`, `acquisitions`, `cutscene_ledger`, `milestones` |
 | RDT interactables | **In spatial** | `rdt_interactables.json`, nearest box/typewriter/trigger |
 | Map/file flags | **In obs** | `maps_files` u16 bitfield |
-| Goal / checkpoint compass | **Disabled** | `obs_encoder.encode_goal()` → zeros |
+| Goal / checkpoint compass | **Live for Yawn rails** | `obs_encoder.encode_goal()`, fused by `RE1CombatEfficientExtractor` |
 | Combat macros | **Live** | `attack_macro.py`, `knife_macro.py` |
 | Box inventory RAM | **Allowed** | `item_box.py`, magic deposit/withdraw actions |
 | Story / SCD flags | **Sparse** | `scripts/hunt_scd_flags.py` → `data/scd_work_flags.json` |
@@ -266,4 +272,4 @@ When briefing progress against the north star:
 
 ---
 
-*Document version: 1.1 — 2026-07-08. Adds episode progress history as allowed obs. Authoritative over older docs that allow puzzle macros or goal-compass exploration training.*
+*Document version: 1.2 — 2026-08-03. Approves goal-conditioned one-leg Yawn rails while preserving the ban on navigation and puzzle macros.*

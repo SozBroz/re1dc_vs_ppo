@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import os
 import random
+import json
 from pathlib import Path
 from typing import Any
 
@@ -100,6 +101,30 @@ class GoExploreResetWrapper(gym.Wrapper):
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         opts = dict(options or {})
+        base = getattr(self.env, "unwrapped", self.env)
+        curriculum_path = Path(getattr(base, "curriculum_path", ""))
+        if curriculum_path.is_file():
+            try:
+                stage = json.loads(
+                    curriculum_path.read_text(encoding="utf-8")
+                )
+            except (OSError, ValueError):
+                stage = {}
+            if stage.get("mode") == "yawn_rails":
+                if (
+                    "pb_bundle" not in opts
+                    and "pb_state_path" not in opts
+                    and "route_start_index" not in opts
+                ):
+                    from re1_rl.yawn_rails import sample_one_leg_options
+
+                    chooser = random.Random(seed) if seed is not None else self._rng
+                    opts.update(
+                        sample_one_leg_options(
+                            self._pb_project_root, stage, rng=chooser
+                        )
+                    )
+                return self.env.reset(seed=seed, options=opts or None)
         if "pb_bundle" not in opts and "pb_state_path" not in opts:
             if self._reset_mix is not None and self._focus_room:
                 self._apply_focus_mix(opts)

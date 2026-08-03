@@ -586,14 +586,6 @@
         "notes": "herbicide (wiki name; RAM id chemical)"
       },
       {
-        "name": "square_crank",
-        "item_id": 29,
-        "count": 1,
-        "key_item": true,
-        "in_inventory_table": true,
-        "notes": "top shelf in crest shed / store room"
-      },
-      {
         "name": "shotgun_shells",
         "item_id": 12,
         "count": 1,
@@ -836,14 +828,7 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": false,
-        "notes": "search Richard body after serum",
-        "gate": {
-          "type": "event",
-          "requires": [
-            "serum"
-          ],
-          "notes": "Search Richard's body twice after giving him serum (pillar passage)"
-        }
+        "notes": "mandatory ammunition on Richard-skipped Yawn route; no serum prerequisite"
       }
     ]
   },

@@ -424,10 +424,11 @@ def run_async_worker_loop(
     epoch_t0 = time.monotonic()
     last_heartbeat = 0.0
     last_manifest_poll = 0.0
+    last_yawn_rails_poll = 0.0
     hb_stop = threading.Event()
 
     def _heartbeat_loop() -> None:
-        nonlocal last_manifest_poll
+        nonlocal last_manifest_poll, last_yawn_rails_poll
         if is_local or not isinstance(rollout_sink, WorkerClient):
             return
         while not hb_stop.is_set() and not stop_event.is_set():
@@ -435,9 +436,13 @@ def run_async_worker_loop(
                 rollout_sink.heartbeat(worker_id, actor_count)
                 from re1_rl.go_explore_capture import go_explore_root
                 from re1_rl.go_explore_worker_cache import maybe_poll_manifest
+                from re1_rl.yawn_rails_worker_cache import maybe_poll_yawn_rails_manifest
 
                 last_manifest_poll = maybe_poll_manifest(
                     rollout_sink, go_explore_root(root), last_poll_mono=last_manifest_poll
+                )
+                last_yawn_rails_poll = maybe_poll_yawn_rails_manifest(
+                    rollout_sink, root, last_poll_mono=last_yawn_rails_poll
                 )
             except Exception as exc:
                 log(machine_name, f"heartbeat error: {exc}")

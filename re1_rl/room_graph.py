@@ -65,11 +65,18 @@ class RoomGraph:
                 from_room not in self._valid_rooms or to_room not in self._valid_rooms
             ):
                 continue
+            # RDT init/proc/scripted transitions are sometimes emitted as
+            # ordinary doors at (0, 0). They are not walkable compass edges
+            # (notably the bogus 20E->100 shortcut) and must not enter BFS.
+            door_x = int(d["door_x"])
+            door_z = int(d["door_z"])
+            if door_x == 0 and door_z == 0:
+                continue
             door = Door(
                 from_room=from_room,
                 to_room=to_room,
-                x=int(d["door_x"]),
-                z=int(d["door_z"]),
+                x=door_x,
+                z=door_z,
                 entry_x=int(d["entry_x"]) if "entry_x" in d else None,
                 entry_z=int(d["entry_z"]) if "entry_z" in d else None,
                 entry_facing=int(d["entry_facing"]) if "entry_facing" in d else None,

@@ -2,6 +2,30 @@
 
 Human-readable map of **what the agent is learning**, **where checkpoints live**, and how that lines up with the [Evil Resource Resident Evil (1996)](https://www.evilresource.com/resident-evil) mansion walkthrough.
 
+## Active Yawn rails curriculum (2026-08-03)
+
+The operational curriculum is `curriculum/yawn_rails_one_leg.json`, backed by
+the corrected atomic route in `data/yawn_checkpoint_route.json`.
+
+- Each episode restores the initial state or a curated route cell, targets
+  exactly the next checkpoint, and terminates on success.
+- The policy receives live goal room, hop/distance, and egocentric exit compass
+  features; it still chooses every movement, interact, puzzle, and combat action.
+- Success pays explicit `checkpoint_success = +1.2`. Other positive rewards are
+  auxiliary and scaled to 5% in rails mode.
+- Required pickups include route ammo, weapons, and key items. Recovery items
+  are optional and never appear in checkpoint predicates.
+- Richard/serum is skipped. Room 100 is only a save/inventory-logistics
+  checkpoint. Room 20D ammunition remains mandatory with no serum prerequisite.
+- Room 205 and its Sun Crest are not route objectives.
+- Room 11B contains the herbicide/chemical, not the Square Crank. The latter's
+  separate crest-shed debug room id remains unresolved.
+- Curated cells live under `states/yawn_rails/`; PB and Go-Explore sidecars
+  continue to be written for archival use but are not rails reset sources.
+
+The full-game Any% tables later in this document are historical reference and
+must not be mistaken for the active Yawn contract.
+
 Use Evil Resource’s **Maps → Mansion** section while reading this. Room names below match our `data/rooms.json` debug codes (same IDs the autosplitter / RAM `room_id` byte uses).
 
 ---

@@ -18,6 +18,9 @@ class ProgressTracker:
     visited_at_route_seq: dict[str, int] = field(default_factory=dict)
     penalized_offroute_rooms: set[str] = field(default_factory=set)
     rewarded_cutscenes: set[str] = field(default_factory=set)
+    # Every qualified freeze observed this episode, whether or not it paid.
+    # Paid cutscenes remain a strict subset in ``rewarded_cutscenes``.
+    observed_cutscenes: set[str] = field(default_factory=set)
     rewarded_story_uses: set[str] = field(default_factory=set)
     # First rising edge into document/file examine UI per room this episode.
     # No stable document ID in RAM yet — room key matches new_room anti-farm.
@@ -35,6 +38,8 @@ class ProgressTracker:
     # Terminal black mark: set before building the terminal observation.
     # Positive reward/extension guards also prevent same-step leakage.
     kenneth_gate_breached: bool = False
+    # Post-Richard lab countdown cleared (lab_timer forced to 0).
+    richard_lab_cleared: bool = False
     # Spawn room (usually dining 105): visited at reset; no +new_room payout —
     # fresh start matches archive/PB sidecars that already carry spawn credit.
     spawn_room_id: str | None = None
@@ -52,6 +57,10 @@ class ProgressTracker:
     gallery_completed: bool = False
     gallery_needs_reentry: bool = False
     dining_statue_rewarded: bool = False
+    # Pickups made after the current one-leg rails reset. Sidecar history does
+    # not satisfy an ``acquired_item`` checkpoint in a later episode.
+    leg_acquired_items: set[str] = field(default_factory=set)
+    checkpoint_success: bool = False
 
     def seed_spawn_room(self, room_id: str) -> None:
         """Mark spawn visited; consume spawn credit (no ``new_room`` payout)."""
@@ -118,6 +127,13 @@ class ProgressTracker:
         self.softlock_cap_frames = 0
         return True
 
+    def mark_richard_lab_cleared(self) -> bool:
+        """Record post-Richard lab countdown disabled; true only on first clear."""
+        if self.richard_lab_cleared:
+            return False
+        self.richard_lab_cleared = True
+        return True
+
     def note_stagnation_step(
         self,
         *,
@@ -159,6 +175,14 @@ class ProgressTracker:
         self.key_items_rewarded.add(name)
         return True
 
+    def release_key_item_reward(self, item_name: str) -> bool:
+        """Allow a future pickup reward after a put-back clawback."""
+        name = str(item_name or "")
+        if not name or name not in self.key_items_rewarded:
+            return False
+        self.key_items_rewarded.discard(name)
+        return True
+
     def claim_waypoint_bonus(self, waypoint_index: int) -> bool:
         """True exactly once per waypoint index per episode."""
         if waypoint_index in self.rewarded_waypoint_indices:
@@ -182,6 +206,25 @@ class ProgressTracker:
         if not key or key in self.rewarded_cutscenes:
             return False
         self.rewarded_cutscenes.add(key)
+        return True
+
+    def observe_cutscene(self, cutscene_key: str) -> bool:
+        """Record a qualified freeze without implying that it paid."""
+        key = str(cutscene_key)
+        if not key or key in self.observed_cutscenes:
+            return False
+        self.observed_cutscenes.add(key)
+        return True
+
+    def note_leg_acquired(self, item_name: str) -> None:
+        name = str(item_name or "")
+        if name:
+            self.leg_acquired_items.add(name)
+
+    def claim_checkpoint_success(self) -> bool:
+        if self.checkpoint_success:
+            return False
+        self.checkpoint_success = True
         return True
 
     def claim_document_examine_bonus(self, room_id: str) -> bool:

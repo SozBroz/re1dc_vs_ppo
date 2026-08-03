@@ -249,19 +249,24 @@ def run_synced_worker_loop(
     epoch_t0 = time.monotonic()
     hb_stop = threading.Event()
     last_manifest_poll = 0.0
+    last_yawn_rails_poll = 0.0
     obs: dict[str, Any] | None = None
     vec_env: SubprocVecEnv | None = None
 
     def _heartbeat_loop() -> None:
-        nonlocal last_manifest_poll
+        nonlocal last_manifest_poll, last_yawn_rails_poll
         while not hb_stop.is_set() and not stop_event.is_set():
             try:
                 client.heartbeat(worker_id, n_envs)
                 from re1_rl.go_explore_capture import go_explore_root
                 from re1_rl.go_explore_worker_cache import maybe_poll_manifest
+                from re1_rl.yawn_rails_worker_cache import maybe_poll_yawn_rails_manifest
 
                 last_manifest_poll = maybe_poll_manifest(
                     client, go_explore_root(root), last_poll_mono=last_manifest_poll
+                )
+                last_yawn_rails_poll = maybe_poll_yawn_rails_manifest(
+                    client, root, last_poll_mono=last_yawn_rails_poll
                 )
             except Exception as exc:
                 log(machine_name, f"heartbeat error: {exc}")
