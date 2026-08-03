@@ -1,5 +1,5 @@
 @echo off
-REM Progress-gated Go-Explore: capture ON, 30/30/40 reset mix, hard disk caps.
+REM Progress-gated Go-Explore: capture ON, 30/70 fresh/archive reset mix, hard disk caps.
 call "%~dp0obs_raw.env.cmd"
 call "%~dp0reset_mix_l_passage.env.cmd"
 set RE1_GO_EXPLORE_CAPTURE=1
