@@ -112,6 +112,13 @@ def test_compute_digest_filters_unverified_uses() -> None:
     assert "hex_crank" not in digest
 
 
+def test_compute_digest_includes_weapons_progressed() -> None:
+    progress = ProgressTracker()
+    progress.weapons_progressed.add("bazooka_acid")
+    digest = compute_digest({}, progress, ever_held=set())
+    assert digest == "weapon:bazooka_acid|gallery:idle"
+
+
 def test_cell_key_v2_roundtrip() -> None:
     digest = "carry:emblem|gallery:idle"
     key = cell_key_v2("20E", 9000, -100, digest, tile_span=DEFAULT_TILE_SPAN)

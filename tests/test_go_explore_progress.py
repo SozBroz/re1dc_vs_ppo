@@ -12,6 +12,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from re1_rl.go_explore_capture import quality_replace_significant
 from re1_rl.go_explore_progress import (
+    bucket_new_reason,
     coverage_reason,
     detect_go_explore_progress_events,
     quality_improve_reason,
@@ -46,6 +47,7 @@ def test_no_events_on_idle_step() -> None:
 
 def test_coverage_and_quality_reason_helpers() -> None:
     assert coverage_reason("108") == "coverage:108"
+    assert bucket_new_reason("108", "gallery:idle") == "bucket_new:108:gallery:idle"
     assert quality_improve_reason("v2|x").startswith("quality_improve:")
 
 

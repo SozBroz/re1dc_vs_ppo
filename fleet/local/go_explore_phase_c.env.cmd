@@ -16,7 +16,7 @@ set RE1_GO_MAX_CAPTURE_BYTES_DAY=100000000
 set RE1_GO_REPLACE_BUDGET_DAY=50
 set RE1_GO_REPLACE_MIN_HP_DELTA=5
 set RE1_GO_REPLACE_MIN_AMMO_DELTA=10
-REM Semantic admission: one champion per (room, milestone_digest).
+REM Room-first archive: one cell per (room, milestone_digest); pose cap per bucket.
 set RE1_GO_MAX_POSES_PER_BUCKET=1
 set RE1_GO_MAX_ARCHIVE_CELLS=800
 set RE1_GO_POSE_EVICT=1

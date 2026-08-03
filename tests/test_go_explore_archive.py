@@ -61,7 +61,7 @@ def test_upsert_and_frontier_yawn_filter(tmp_path: Path) -> None:
         digest=digest_b,
         quality=(8, 2, 0, 1, 1),
     )
-    # Off Yawn path — must not be selected by default frontier.
+    # Off-path room — still in the frontier pool when no filter is passed.
     arch.upsert(
         room_id="300",
         x=0,
@@ -69,6 +69,14 @@ def test_upsert_and_frontier_yawn_filter(tmp_path: Path) -> None:
         digest=digest_a,
         quality=(99, 99, 99, 99, 99),
     )
+    for _ in range(5):
+        arch.upsert(
+            room_id="300",
+            x=0,
+            z=0,
+            digest=digest_a,
+            quality=(99, 99, 99, 99, 99),
+        )
     # Bump visits on the stronger 20E cell so frontier prefers the under-visited one.
     for _ in range(3):
         arch.upsert(

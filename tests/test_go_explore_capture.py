@@ -78,10 +78,22 @@ def test_compute_quality_tuple() -> None:
     assert q[0] == 90  # hp
     assert q[1] == 15 + 30  # beretta loaded + handgun bullets
     assert q[2] == 1  # green herb
-    assert q[3] == 4  # slots
+    assert q[3] == 4  # ever_held-style distinct items (inventory fallback)
     assert q[4] == 1  # not poisoned
     q_poison = compute_quality(_good_state(poisoned=True))
     assert q_poison[4] == 0
+
+
+def test_compute_quality_slots_uses_ever_held_not_inventory() -> None:
+    state = _good_state(
+        inventory=["beretta"],
+        inventory_slots=[("beretta", 15)],
+    )
+    q = compute_quality(
+        state,
+        ever_held={"beretta", "emblem", "knife", "music_notes"},
+    )
+    assert q[3] == 4
 
 
 def test_maybe_capture_writes_bundle_and_proposal(
@@ -113,7 +125,9 @@ def test_maybe_capture_writes_bundle_and_proposal(
     assert proposal is not None
     assert proposal["cell_key"].startswith("v2|r=20E|")
     assert proposal["record_id"]
-    assert proposal["quality"] == list(compute_quality(state))
+    assert proposal["quality"] == list(
+        compute_quality(state, ever_held={"shield_key", "lockpick"})
+    )
     assert Path(proposal["paths"]["state"]).is_file()
     assert Path(proposal["paths"]["sidecar"]).is_file()
     assert Path(proposal["paths"]["meta"]).is_file()

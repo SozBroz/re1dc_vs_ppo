@@ -649,24 +649,53 @@ def _inventory_slots(state: dict[str, Any]) -> list[tuple[str, int]]:
     return out
 
 
-def compute_quality(state: dict[str, Any]) -> Quality:
+def ever_held_item_count(
+    state: dict[str, Any] | None,
+    *,
+    ever_held: Iterable[str] | None = None,
+    env: Any = None,
+) -> int:
+    """Distinct canonical items ever acquired — same set as sidecar ``ever_held``."""
+    if ever_held is not None or env is not None:
+        return len(_ever_held_from(ever_held, env))
+    if state is not None:
+        raw = state.get("ever_held")
+        if raw is not None:
+            return len({canonical_item(str(n)) for n in raw if n})
+        return len(
+            {
+                name
+                for name, qty in _inventory_slots(state)
+                if name and int(qty) > 0
+            }
+        )
+    return 0
+
+
+def compute_quality(
+    state: dict[str, Any],
+    *,
+    ever_held: Iterable[str] | None = None,
+    env: Any = None,
+) -> Quality:
     """Lexicographic quality: ``(hp, ammo, healing, slots, poison)``.
 
-    ``poison`` is ``1`` when healthy, ``0`` when poisoned (higher is better).
+    ``ammo`` / ``healing`` come from the current inventory. ``slots`` is the
+    count of distinct items in ``ever_held`` (sidecar semantics), not occupied
+    inventory slots. ``poison`` is ``1`` when healthy, ``0`` when poisoned.
     """
     hp = int(state.get("hp", 0) or 0)
     ammo = 0
     healing = 0
-    slots = 0
     for name, qty in _inventory_slots(state):
         q = max(0, int(qty))
         if not name or q <= 0:
             continue
-        slots += 1
         if name in _AMMO_NAMES:
             ammo += q
         if name in _HEALING_NAMES:
             healing += q
+    slots = ever_held_item_count(state, ever_held=ever_held, env=env)
     poisoned = bool(state.get("poisoned")) or bool(
         int(state.get("player_poison", 0) or 0)
     )
@@ -857,7 +886,7 @@ def maybe_capture_cell(
     held = _ever_held_from(ever_held, env)
     digest = compute_digest(env_state, progress, ever_held=held)
     key = cell_key_v2(room, x, z, digest, tile_span=span)
-    quality = compute_quality(env_state)
+    quality = compute_quality(env_state, ever_held=held, env=env)
 
     existing_quality, existing_record_id = _manifest_entry(manifest_index, archive, key)
     is_replace = existing_quality is not None

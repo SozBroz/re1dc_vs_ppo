@@ -1,8 +1,12 @@
 """Progress events that justify a Go-Explore cell capture.
 
-Capture is gated on non-trivial progress (new room, key/weapon, cutscene,
-story use, dining statue, gallery, document) or coverage / quality-upgrade
-reasons — never ordinary movement.
+Policy (room-first archive):
+  - At least one cell per reached room (``coverage:<room>``).
+  - One cell per ``(room, milestone_digest)`` bucket; a new bucket captures on
+    room entry or in-room progress (key item, weapon, cutscene, …).
+  - Revisiting the same bucket may replace the incumbent when quality improves.
+
+Never capture on ordinary movement alone.
 """
 
 from __future__ import annotations
@@ -88,7 +92,14 @@ def detect_go_explore_progress_events(
 
 
 def coverage_reason(room: str) -> str:
+    """Archive has no cell for ``room`` yet — admit on next eligible step."""
     return f"coverage:{str(room).strip().upper()}"
+
+
+def bucket_new_reason(room: str, digest: str) -> str:
+    """Archive has no cell for this ``(room, milestone_digest)`` bucket yet."""
+    room_u = str(room).strip().upper()
+    return f"bucket_new:{room_u}:{digest}"
 
 
 def quality_improve_reason(cell_key: str) -> str:

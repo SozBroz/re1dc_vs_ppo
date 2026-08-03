@@ -1,7 +1,8 @@
-"""Yawn-path milestone digest for Go-Explore v2 cell keys.
+"""Milestone digest for Go-Explore v2 cell keys (all mansion rooms).
 
-Digest tokens (Yawn slice only):
-  carry:<item> | got:<item> | use:<site> | event:kenneth_done | gallery:*
+Digest tokens:
+  carry:<item> | got:<item> | use:<site> | weapon:<name> |
+  event:kenneth_done | event:dining_statue_down | gallery:*
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from re1_rl.item_todo import canonical_item
 from re1_rl.pb_milestones import KEY_ITEM_MILESTONES, STORY_USE_MILESTONES
 from re1_rl.progress import ProgressTracker
 
-# First-Yawn chain rooms (archive frontier + digest scope).
+# Legacy analytics / optional frontier filter — not used for capture admission.
 YAWN_PATH_ROOMS: frozenset[str] = frozenset(
     {
         "105",
@@ -97,10 +98,10 @@ def compute_digest(
     *,
     ever_held: set[str] | frozenset[str] | Iterable[str],
 ) -> str:
-    """Stable pipe-joined digest for Yawn-path Go-Explore cells.
+    """Stable pipe-joined digest for Go-Explore cells.
 
     Example:
-      ``carry:emblem|got:lockpick|use:emblem@10F_alcove|event:kenneth_done|gallery:idle``
+      ``carry:emblem|got:lockpick|use:emblem@10F_alcove|weapon:bazooka_acid|event:kenneth_done|gallery:idle``
     """
     held = {canonical_item(str(n)) for n in (ever_held or ()) if n}
     inv = _inventory_names(state)
@@ -118,6 +119,11 @@ def compute_digest(
     }
     for site in sorted(uses):
         tokens.append(f"use:{site}")
+
+    for weapon in sorted(str(w) for w in (progress_tracker.weapons_progressed or ()) if w):
+        name = canonical_item(weapon)
+        if name:
+            tokens.append(f"weapon:{name}")
 
     if kenneth_cutscene_seen(progress_tracker.rewarded_cutscenes):
         tokens.append("event:kenneth_done")

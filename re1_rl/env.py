@@ -870,13 +870,17 @@ class RE1Env(gym.Env):
                 pending.append(reason)
 
     def _go_explore_capture_reasons(self, state: dict[str, Any]) -> list[str]:
-        """Progress pending + coverage debt + same-key quality upgrade eligibility."""
+        """Progress, room coverage, new digest buckets, and quality upgrades."""
         from re1_rl.go_explore_capture import (
             compute_quality,
             go_explore_root,
             quality_replace_significant,
         )
-        from re1_rl.go_explore_progress import coverage_reason, quality_improve_reason
+        from re1_rl.go_explore_progress import (
+            bucket_new_reason,
+            coverage_reason,
+            quality_improve_reason,
+        )
         from re1_rl.go_explore_semantic import (
             bucket_champion,
             manifest_index_by_semantic_bucket,
@@ -893,23 +897,29 @@ class RE1Env(gym.Env):
         if not room:
             return reasons
 
-        root = go_explore_root(self.project_root)
-        manifest_index = manifest_index_by_cell_key(root)
-        covered = any(
-            str(row.get("room_id") or "").strip().upper() == room
+        manifest_index = manifest_index_by_cell_key(go_explore_root(self.project_root))
+        rows = [
+            row
             for row in (manifest_index or {}).values()
             if isinstance(row, dict)
+        ]
+        has_room_cell = any(
+            str(row.get("room_id") or "").strip().upper() == room for row in rows
         )
-        attempted = getattr(self, "_go_explore_coverage_attempted", None)
-        if attempted is None:
-            self._go_explore_coverage_attempted = set()
-            attempted = self._go_explore_coverage_attempted
-        if not covered and room not in attempted:
-            reasons.append(coverage_reason(room))
+        if not has_room_cell:
+            cov = coverage_reason(room)
+            if cov not in reasons:
+                reasons.append(cov)
 
-        # Same-key quality upgrade (resource-richer revisit of an existing pose).
         held = self._items.ever_held
         digest = compute_digest(state, self._progress, ever_held=held)
+        sem_index = manifest_index_by_semantic_bucket(manifest_index)
+        bucket_rows = list(sem_index.get(semantic_bucket_key(room, digest), []) or [])
+        if not bucket_rows and pending:
+            bucket_reason = bucket_new_reason(room, digest)
+            if bucket_reason not in reasons:
+                reasons.append(bucket_reason)
+
         x = int(state.get("x", state.get("player_x", 0)) or 0)
         z = int(state.get("z", state.get("player_z", 0)) or 0)
         key = cell_key_v2(room, x, z, digest)
@@ -917,17 +927,15 @@ class RE1Env(gym.Env):
         if isinstance(row, dict):
             old_q = row.get("quality")
             if isinstance(old_q, (list, tuple)) and len(old_q) >= 5:
-                new_q = compute_quality(state)
+                new_q = compute_quality(state, ever_held=self._items.ever_held, env=self)
                 if quality_replace_significant(new_q, old_q):
                     reasons.append(quality_improve_reason(key))
-        else:
-            sem_index = manifest_index_by_semantic_bucket(manifest_index)
-            bucket_rows = sem_index.get(semantic_bucket_key(room, digest), [])
+        elif bucket_rows:
             champion = bucket_champion(bucket_rows)
             if champion is not None:
                 old_q = champion.get("quality")
                 if isinstance(old_q, (list, tuple)) and len(old_q) >= 5:
-                    new_q = compute_quality(state)
+                    new_q = compute_quality(state, ever_held=self._items.ever_held, env=self)
                     if quality_replace_significant(new_q, old_q):
                         reasons.append(quality_improve_reason(f"bucket:{room}:{digest}"))
         return reasons
@@ -986,13 +994,6 @@ class RE1Env(gym.Env):
             for r in reasons:
                 fired.add(r)
             self._go_explore_pending_reasons = []
-            room = str(state.get("room_id", "") or "").strip().upper()
-            if room:
-                attempted = getattr(self, "_go_explore_coverage_attempted", None)
-                if attempted is None:
-                    self._go_explore_coverage_attempted = set()
-                    attempted = self._go_explore_coverage_attempted
-                attempted.add(room)
         elif not capture_budget_available(self.project_root):
             # Cap hit mid-attempt — stop replaying pending reasons into save_state.
             self._go_explore_capture_paused = True

@@ -11,7 +11,7 @@ JSON schema (v2)::
         "room_id": "105",
         "tile_bin": [3, 1],
         "milestone_digest": "gallery:idle",
-        "quality": [hp, ammo, healing, slots, poison],
+        "quality": [hp, ammo, healing, ever_held_count, poison],
         "visit_count": 2,
         "bundle_path": null,
         "meta": {}
@@ -38,7 +38,6 @@ from typing import Any, Iterator
 
 from re1_rl.milestone_digest import (
     DEFAULT_TILE_SPAN,
-    YAWN_PATH_ROOMS,
     cell_key_v2,
     parse_cell_key_v2,
 )
@@ -490,12 +489,14 @@ class GoExploreArchive:
     ) -> list[ArchiveCell]:
         """Pick under-visited cells (lowest visit_count; tie-break quality).
 
-        Default ``room_ids`` is ``YAWN_PATH_ROOMS``.
+        When ``room_ids`` is omitted, every archived room is eligible.
         """
         rng = rng or random.Random()
-        allowed_src = YAWN_PATH_ROOMS if room_ids is None else room_ids
-        allowed = {_normalize_room_id(r) for r in allowed_src}
-        pool = [c for c in self.cells.values() if c.room_id in allowed]
+        if room_ids is None:
+            pool = list(self.cells.values())
+        else:
+            allowed = {_normalize_room_id(r) for r in room_ids}
+            pool = [c for c in self.cells.values() if c.room_id in allowed]
         if not pool:
             return []
 
