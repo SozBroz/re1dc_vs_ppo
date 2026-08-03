@@ -4,73 +4,66 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.cutscene_reward import MIN_CUTSCENE_SKIP_FRAMES
-from re1_rl.env import RE1Env
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import NEW_CUTSCENE_BONUS, NEW_ROOM_BONUS, compute_reward
 from tests.test_scaffolding import make_planner, make_state
 
 
 def test_seed_episode_progress_marks_spawn_room_visited():
-    env = MagicMock(spec=RE1Env)
-    env._progress = ProgressTracker()
-    RE1Env._seed_episode_progress(
-        env,
-        make_state(room="105", hp=96),
-    )
-    assert env._episode_start_hp == 96
-    assert "105" in env._progress.visited_rooms
-    assert env._progress.spawn_room_id == "105"
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    assert "105" in progress.visited_rooms
+    assert progress.spawn_room_id == "105"
+    assert progress._spawn_room_bonus_paid is True
 
 
-def test_spawn_dining_new_room_pays_on_first_reward_step():
-    """Dining (spawn) +3 lands on first compute_reward, not a later transition."""
-    env = MagicMock(spec=RE1Env)
-    env._progress = ProgressTracker()
-    RE1Env._seed_episode_progress(env, make_state(room="105", hp=96))
-    assert "105" in env._progress.visited_rooms
+def test_spawn_dining_does_not_pay_new_room_on_first_reward_step():
+    """Fresh start: dining is pre-credited; first room discovery is the next room."""
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    assert "105" in progress.visited_rooms
+    assert progress._spawn_room_bonus_paid is True
 
     _, bd0 = compute_reward(
         make_state(room="105", hp=96),
         make_state(room="105", hp=96),
         make_planner(),
-        progress=env._progress,
+        progress=progress,
         return_breakdown=True,
     )
-    assert bd0["new_room"] == NEW_ROOM_BONUS
-    assert env._progress.softlock_cap_frames > 0
+    assert bd0["new_room"] == 0.0
+    assert progress.softlock_cap_frames == 0
 
     _, bd1 = compute_reward(
         make_state(room="105", hp=96),
         make_state(room="105", hp=96),
         make_planner(),
-        progress=env._progress,
+        progress=progress,
         return_breakdown=True,
     )
     assert bd1["new_room"] == 0.0
 
-    # Re-enter dining after leaving — no second dining discovery.
+    # Leave dining — first real discovery.
     _, bd_leave = compute_reward(
         make_state(room="105", hp=96),
         make_state(room="104", hp=96),
         make_planner(),
-        progress=env._progress,
+        progress=progress,
         return_breakdown=True,
     )
-    assert bd_leave["new_room"] == NEW_ROOM_BONUS  # 104 first visit
+    assert bd_leave["new_room"] == NEW_ROOM_BONUS
     _, bd_back = compute_reward(
         make_state(room="104", hp=96),
         make_state(room="105", hp=96),
         make_planner(),
-        progress=env._progress,
+        progress=progress,
         return_breakdown=True,
     )
     assert bd_back["new_room"] == 0.0
-
 
 def test_cutscene_reward_needs_accumulated_skip_frames():
     """Sub-threshold chunks must not pay; a 450f session total must."""

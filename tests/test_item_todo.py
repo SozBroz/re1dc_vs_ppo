@@ -79,6 +79,23 @@ def test_tracker_repeat_pickups_by_positive_quantity_delta():
     ) == {"green_herb"}
 
 
+def test_presence_only_weapon_menu_flicker_is_not_repeat_pickup():
+    tracker = ItemTracker(
+        build_item_todo(ROUTE),
+        repeat_pickups=True,
+        once_only=frozenset({"emblem"}),
+        presence_only=frozenset({"beretta", "shotgun"}),
+    )
+    assert tracker.update([("beretta", 15)]) == {"beretta"}
+    # Equip/submenu decode gap: beretta slot vanishes then returns.
+    assert tracker.update([("knife", 0)]) == set()
+    assert tracker.update([("knife", 0), ("beretta", 15)]) == set()
+    # Shotgun rack re-take still counts after fully leaving inventory.
+    assert tracker.update([("shotgun", 3)]) == {"shotgun"}
+    assert tracker.update([]) == set()
+    assert tracker.update([("shotgun", 3)]) == {"shotgun"}
+
+
 def test_room_items_remaining(tmp_path):
     table = {
         "_meta": {"source": "test"},

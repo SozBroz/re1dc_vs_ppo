@@ -1223,7 +1223,7 @@ class RE1Env(gym.Env):
         self._episode_min_hp = self._episode_start_hp
 
     def _seed_episode_progress(self, state: dict[str, Any]) -> None:
-        """Mark spawn room visited + arm spawn ``new_room`` on first reward step."""
+        """Mark spawn room visited (no ``new_room`` payout on fresh start)."""
         self._seed_episode_hp(state)
         self._progress.seed_spawn_room(str(state.get("room_id", "")))
 

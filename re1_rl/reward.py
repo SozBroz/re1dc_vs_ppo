@@ -423,11 +423,6 @@ def compute_reward(
 
     if room_changed and is_new_room:
         bd["new_room"] += NEW_ROOM_BONUS
-    # Spawn room (dining 105 in m0): visited at reset; pay +new_room once on the
-    # first compute_reward of the episode so Wesker/door settles cannot steal
-    # credit for "first time in dining".
-    if progress is not None and progress.claim_spawn_room_bonus():
-        bd["new_room"] += NEW_ROOM_BONUS
 
     # Document/file examine overlay: rising edge into mode=0x40 / gs=0x40808100.
     # Assumption: all books share that signature (no stable document ID hunted
@@ -456,13 +451,24 @@ def compute_reward(
     for raw in new_items:
         name = canonical_item(str(raw))
         if name in _KEY_ITEM_NAME_SET:
-            bd["key_item"] += KEY_ITEM_PICKUP_BONUS
-            acquired_key_or_weapon = True
+            if progress is None or progress.claim_key_item_bonus(name):
+                bd["key_item"] += KEY_ITEM_PICKUP_BONUS
+                acquired_key_or_weapon = True
         elif name in _WEAPON_NAME_SET:
-            bd["new_weapon"] += NEW_WEAPON_PICKUP_BONUS
-            acquired_key_or_weapon = True
-            if progress is not None and progress.claim_weapon_progress(name):
-                weapon_progress = True
+            first_weapon = (
+                progress is not None and progress.claim_weapon_progress(name)
+            )
+            shotgun_retake = (
+                name == "shotgun"
+                and progress is not None
+                and "shotgun" in progress.weapons_progressed
+                and not first_weapon
+            )
+            if progress is None or first_weapon or shotgun_retake:
+                bd["new_weapon"] += NEW_WEAPON_PICKUP_BONUS
+                if first_weapon:
+                    acquired_key_or_weapon = True
+                    weapon_progress = True
         elif name in AMMO_ITEM_NAMES:
             bd["ammo_pickup"] += AMMO_PICKUP_BONUS
             ammo_progress = True

@@ -314,6 +314,43 @@ def test_weapon_pickup_resets_idle_timer_and_raises_six_minute_cap():
     assert softlock_frame_threshold(progress) == SOFTLOCK_EXTENSION_FRAMES
 
 
+def test_beretta_inventory_flicker_does_not_repay_weapon():
+    from re1_rl.reward import NEW_WEAPON_PICKUP_BONUS
+
+    progress = ProgressTracker()
+    progress.first_visit("111")
+    progress.claim_weapon_progress("beretta")
+    prev = make_state(
+        room="111",
+        step=65,
+        inventory=["knife", "beretta"],
+    )
+    cur = make_state(
+        room="111",
+        step=66,
+        inventory=["knife", "beretta"],
+        new_items=["beretta"],
+    )
+    _, bd = _step(progress, prev, cur, step_frames=4)
+    assert bd["new_weapon"] == 0.0
+    assert bd["key_item"] == 0.0
+
+
+def test_key_item_flicker_does_not_repay_bonus():
+    progress = ProgressTracker()
+    progress.first_visit("105")
+    progress.claim_key_item_bonus("emblem")
+    prev = make_state(room="105", step=10, inventory=["knife", "beretta", "emblem"])
+    cur = make_state(
+        room="105",
+        step=11,
+        inventory=["knife", "beretta", "emblem"],
+        new_items=["emblem"],
+    )
+    _, bd = _step(progress, prev, cur, step_frames=4)
+    assert bd["key_item"] == 0.0
+
+
 def test_shotgun_wall_loop_is_zero_sum_and_retake_does_not_refarm_idle():
     from re1_rl.reward import (
         NEW_WEAPON_PICKUP_BONUS,

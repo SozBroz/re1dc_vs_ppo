@@ -203,7 +203,12 @@ class ItemTracker:
             name
             for name in increased
             if (name not in self.once_only or name in self.last_newly_held)
-            and (name not in self.presence_only or name in self.last_reappeared)
+            and (
+                name not in self.presence_only
+                or name in self.last_newly_held
+                # Shotgun rack re-take: weapon fully left inventory then came back.
+                or (name == "shotgun" and name in self.last_reappeared)
+            )
         }
 
     def acquired(self) -> list[TodoEntry]:

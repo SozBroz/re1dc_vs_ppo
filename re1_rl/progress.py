@@ -35,14 +35,15 @@ class ProgressTracker:
     # Terminal black mark: set before building the terminal observation.
     # Positive reward/extension guards also prevent same-step leakage.
     kenneth_gate_breached: bool = False
-    # Spawn room (usually dining 105): visited at reset; +new_room paid once on
-    # the first compute_reward of the episode so discovery is not attributed to
-    # a later transition (e.g. Wesker / door settle).
+    # Spawn room (usually dining 105): visited at reset; no +new_room payout —
+    # fresh start matches archive/PB sidecars that already carry spawn credit.
     spawn_room_id: str | None = None
     _spawn_room_bonus_paid: bool = False
     # Weapon names that already granted idle-extend / stagnation reset this ep.
     # Shotgun rack re-takes still pay ±NEW_WEAPON but cannot re-farm the clock.
     weapons_progressed: set[str] = field(default_factory=set)
+    # Key items that already paid KEY_ITEM_PICKUP_BONUS this episode.
+    key_items_rewarded: set[str] = field(default_factory=set)
     # Async skip may present one inventory transition twice. A wall return pays
     # once, then cannot pay again until shotgun possession is observed.
     _shotgun_return_armed: bool | None = None
@@ -53,19 +54,19 @@ class ProgressTracker:
     dining_statue_rewarded: bool = False
 
     def seed_spawn_room(self, room_id: str) -> None:
-        """Mark spawn visited and arm one-shot spawn ``new_room`` credit."""
+        """Mark spawn visited; consume spawn credit (no ``new_room`` payout)."""
         room = str(room_id or "")
         self.spawn_room_id = room or None
-        self._spawn_room_bonus_paid = False
+        self._spawn_room_bonus_paid = True
         if room:
             self.first_visit(room)
 
     def claim_spawn_room_bonus(self) -> bool:
-        """True once: first ``compute_reward`` this episode credits spawn room."""
+        """Legacy no-op: spawn room credit is consumed in ``seed_spawn_room``."""
         if self._spawn_room_bonus_paid or not self.spawn_room_id:
             return False
         self._spawn_room_bonus_paid = True
-        return True
+        return False
 
     def first_visit(
         self,
@@ -148,6 +149,14 @@ class ProgressTracker:
         if not name or name in self.weapons_progressed:
             return False
         self.weapons_progressed.add(name)
+        return True
+
+    def claim_key_item_bonus(self, item_name: str) -> bool:
+        """True once per key-item name per episode (+4 pickup channel)."""
+        name = str(item_name or "")
+        if not name or name in self.key_items_rewarded:
+            return False
+        self.key_items_rewarded.add(name)
         return True
 
     def claim_waypoint_bonus(self, waypoint_index: int) -> bool:

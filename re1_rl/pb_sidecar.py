@@ -66,6 +66,7 @@ def progress_to_sidecar(progress: ProgressTracker) -> dict[str, Any]:
         "spawn_room_id": progress.spawn_room_id,
         "spawn_room_bonus_paid": bool(progress._spawn_room_bonus_paid),
         "weapons_progressed": _sorted_list(progress.weapons_progressed),
+        "key_items_rewarded": _sorted_list(progress.key_items_rewarded),
         "softlock_cap_frames": int(progress.softlock_cap_frames),
         "stagnation_frames": int(progress.stagnation_frames),
         "gallery_step_index": int(progress.gallery_step_index),
@@ -89,6 +90,7 @@ def apply_progress_sidecar(progress: ProgressTracker, data: dict[str, Any]) -> N
     progress.spawn_room_id = str(spawn) if spawn else None
     progress._spawn_room_bonus_paid = bool(data.get("spawn_room_bonus_paid", False))
     progress.weapons_progressed = _as_set(data.get("weapons_progressed"))
+    progress.key_items_rewarded = _as_set(data.get("key_items_rewarded"))
     progress.softlock_cap_frames = int(data.get("softlock_cap_frames", 0))
     progress._stagnation_frames = int(data.get("stagnation_frames", 0))
     progress.gallery_step_index = int(data.get("gallery_step_index", 0))
