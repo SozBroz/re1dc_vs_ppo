@@ -323,6 +323,7 @@ def run_synced_worker_loop(
                 n_steps=n_steps,
                 worker_id=worker_id,
                 obs=obs,
+                curriculum=curriculum,
             )
             local_steps += int(rollout.num_timesteps())
             progress.consume_infos(

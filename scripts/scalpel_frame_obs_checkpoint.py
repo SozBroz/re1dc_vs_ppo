@@ -76,10 +76,43 @@ def main() -> int:
     )
     ap.add_argument("--wipe-others", action="store_true")
     ap.add_argument("--device", default="cpu")
+    ap.add_argument(
+        "--drain-actions",
+        default="",
+        help="Comma-separated ACTION_NAMES to bleed (e.g. equip). Empty = no drain.",
+    )
+    ap.add_argument(
+        "--drain-factor",
+        type=float,
+        default=100.0,
+        help="Subtract log(factor) from drained action bias (default 100, transplant prior).",
+    )
+    ap.add_argument(
+        "--drain-weight-scale",
+        type=float,
+        default=0.25,
+        help="Multiply drained action weight rows by this factor in [0,1].",
+    )
     args = ap.parse_args()
 
+    from re1_rl.action_head_surgery import drain_action_logits, format_drain_report
     from re1_rl.async_fleet import load_async_learner
     from re1_rl.env import FRAME_H, FRAME_W
+
+    drain_names = [s.strip() for s in str(args.drain_actions).split(",") if s.strip()]
+
+    def _maybe_drain(model_obj):
+        if not drain_names:
+            return None
+        report = drain_action_logits(
+            model_obj,
+            actions=drain_names,
+            factor=float(args.drain_factor),
+            weight_scale=float(args.drain_weight_scale),
+        )
+        for line in format_drain_report(report):
+            print(f"[scalpel] {line}", flush=True)
+        return report
 
     src = args.src.resolve() if args.src else _newest_zip(CKPT_DIR)
     if not src.is_file():
@@ -118,6 +151,14 @@ def main() -> int:
             print(f"[scalpel] remapped {line}", flush=True)
         if report.get("skipped"):
             print(f"[scalpel] skipped {len(report['skipped'])} tensors", flush=True)
+        drain_report = _maybe_drain(model)
+        # Re-save after drain (transplant path already wrote once).
+        out_base = out_zip.with_suffix("")
+        model.save(str(out_base))
+        if not out_zip.is_file():
+            candidate = Path(str(out_base) + ".zip")
+            if candidate.is_file():
+                candidate.replace(out_zip)
         steps = int(getattr(model, "num_timesteps", 0) or 0)
         meta = {
             "path": str(out_zip.relative_to(ROOT)).replace("\\", "/"),
@@ -128,6 +169,7 @@ def main() -> int:
                 "src": str(src),
                 "frame": [FRAME_H, FRAME_W],
                 "reason": "doc04 catalog transplant",
+                "drain": drain_report,
             },
         }
         for latest in (
@@ -144,6 +186,8 @@ def main() -> int:
         if args.wipe_others:
             _wipe_other_ckpts(CKPT_DIR, out_zip, ROOT)
         return 0
+
+    drain_report = _maybe_drain(model)
 
     # SB3 save without .zip suffix
     out_base = out_zip.with_suffix("")
@@ -169,6 +213,7 @@ def main() -> int:
             "src": str(src),
             "frame": [FRAME_H, FRAME_W],
             "reason": "63x84 frame obs transplant",
+            "drain": drain_report,
         },
     }
     for latest in (
