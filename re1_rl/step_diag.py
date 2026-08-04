@@ -323,6 +323,10 @@ class StepDiagLogger:
         knife_budget = _knife_budget_row(info)
         if knife_budget is not None:
             row["knife_budget"] = knife_budget
+        if isinstance(info.get("combat_audit"), dict):
+            row["combat"] = info["combat_audit"]
+        if isinstance(info.get("logistics_sample"), dict):
+            row["logistics_sample"] = info["logistics_sample"]
         if terminated or truncated:
             row["ep_return_total"] = round(self.ep_return, 5)
         _append_line(self.path, row)

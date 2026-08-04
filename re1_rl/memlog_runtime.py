@@ -194,6 +194,10 @@ _INFO_KEYS = (
     "episode_step_limit_frames_left",
     "episode_idle_frames_used",
     "episode_idle_frame_limit",
+    "attack_report",
+    "combat_audit",
+    "magic_report",
+    "logistics_sample",
 )
 _IGNORED_EVENT_CHANNELS = frozenset({"step", "softlock"})
 

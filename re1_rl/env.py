@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import threading
 from pathlib import Path
@@ -43,6 +44,7 @@ from re1_rl.memory_map import (
     player_died,
     decode_enemy_table,
     decode_inventory,
+    decode_inventory_slots,
     enemy_table_fields,
 )
 from re1_rl.pushable import (
@@ -54,6 +56,7 @@ from re1_rl.obs_encoder import (
     BOX_DIM,
     GOAL_DIM,
     INVENTORY_OBS_DIM,
+    LOGISTICS_DIM,
     PROPRIO_DIM,
     ROOM_VISITED_DIM,
     ObsEncoder,
@@ -301,6 +304,8 @@ class RE1Env(gym.Env):
                 "box": spaces.Box(0.0, 2.0, shape=(BOX_DIM,), dtype=np.float32),
                 # on-person inventory (8 slots)
                 "inventory": spaces.Box(0.0, 1.0, shape=(INVENTORY_OBS_DIM,), dtype=np.float32),
+                # factual route semantics through the next box or boss
+                "logistics": spaces.Box(-1.0, 1.0, shape=(LOGISTICS_DIM,), dtype=np.float32),
                 # equipped weapon card (clip, nominal dmg, round type, room bonuses)
                 "weapon_card": spaces.Box(0.0, 1.0, shape=(WEAPON_CARD_DIM,), dtype=np.float32),
                 # one-step last knife/attack memory (cleared next step)
@@ -358,6 +363,7 @@ class RE1Env(gym.Env):
         )
         self._items = ItemTracker(todo=[])
         self._box_cache: list[tuple[int, int]] | None = None
+        self._box_departure_snapshot: list[float] | None = None
         self._use_phase = 0
         self._inventory_before_use: list[tuple[int, int]] | None = None
         self._equip_phase = 0
@@ -478,11 +484,12 @@ class RE1Env(gym.Env):
         # stage=0 room=5 -> "105" (Dining Room); matches rooms.json / route.
         room_code = f"{int(ram['stage_id']) + 1}{int(ram['room_id']):02X}"
         hp = int(ram.get("player_hp", 0))
-        inv_slots = decode_inventory(ram)  # [(name, qty), ...]
+        inv_slots = decode_inventory_slots(ram)  # eight RAM-aligned slots
+        occupied_inv = decode_inventory(ram)
         if track_items:
-            new_items = self._items.update(inv_slots)
+            new_items = self._items.update(occupied_inv)
         else:
-            names = {canonical_item(name) for name, _ in inv_slots}
+            names = {canonical_item(name) for name, _ in occupied_inv}
             new_items = names - self._items.ever_held
         in_control = bool(int(ram.get("game_mode", 0)) & IN_CONTROL_MASK)
         px = int(ram.get("player_x", 0))
@@ -518,9 +525,14 @@ class RE1Env(gym.Env):
             "interaction_prompt": bool(
                 int(ram.get("interaction_prompt_raw", 0)) & INTERACTION_PROMPT_MASK
             ),
-            "inventory": [name for name, _ in inv_slots],
+            "inventory": [name for name, _ in occupied_inv],
             "inventory_slots": inv_slots,
             "equipped_weapon_id": int(ram.get("equipped_weapon_id", 0)),
+            "equipped_slot_0based": (
+                int(ram.get("equipped_slot_1based", 0)) - 1
+                if 1 <= int(ram.get("equipped_slot_1based", 0)) <= 8
+                else None
+            ),
             # ever-held-gated: banking an item then re-grabbing it is not "new"
             "new_items": sorted(new_items),
             "step": self._step_count,
@@ -540,6 +552,7 @@ class RE1Env(gym.Env):
             ),
             "player_anim": int(ram.get("player_anim", 0)),
             "player_aux": int(ram.get("player_aux", 0)),
+            "player_recovery": int(ram.get("player_recovery", 0)),
             "anim_history": list(getattr(self, "_anim_history", [])),
         }
 
@@ -588,15 +601,115 @@ class RE1Env(gym.Env):
         return encode_box(self._box_cache, in_box_room=in_box_room)
 
     def _weapon_card_obs(self, state: dict[str, Any]) -> np.ndarray:
-        wid = int(state.get("equipped_weapon_id", 0) or 0)
-        clip = equipped_clip_from_inventory_slots(
-            state.get("inventory_slots"), wid
+        from re1_rl.ammo_accounting import (
+            inventory_slots_to_id_qty,
+            reserve_ammo,
+            total_fireable_ammo,
         )
+        from re1_rl.attack_macro import is_aim_stable
+
+        wid = int(state.get("equipped_weapon_id", 0) or 0)
+        slot = state.get("equipped_slot_0based")
+        slots = list(state.get("inventory_slots") or [])
+        valid = (
+            slot is not None
+            and 0 <= int(slot) < len(slots)
+            and slots[int(slot)][0]
+        )
+        if valid:
+            from re1_rl.memory_map import ITEM_IDS
+
+            valid = ITEM_IDS.get(wid) == slots[int(slot)][0]
+        clip = equipped_clip_from_inventory_slots(
+            slots, wid, int(slot) if valid else None
+        )
+        inventory = inventory_slots_to_id_qty(slots)
+        enemies = [
+            enemy for enemy in (state.get("enemies") or [])
+            if enemy.get("alive", True) and enemy.get("combat_near", False)
+        ]
+        nearest = min(enemies, key=lambda enemy: float(enemy.get("dist", 1e9)), default=None)
+        bearing_sin = bearing_cos = rel_height = distance = 0.0
+        if nearest is not None:
+            dx = float(nearest.get("x", 0)) - float(state.get("x", 0))
+            dz = float(nearest.get("z", 0)) - float(state.get("z", 0))
+            relative = math.atan2(dz, dx) - (
+                2.0 * math.pi * float(state.get("facing", 0)) / 4096.0
+            )
+            bearing_sin, bearing_cos = math.sin(relative), math.cos(relative)
+            distance = float(nearest.get("dist", math.hypot(dx, dz)))
+            rel_height = float(nearest.get("y", state.get("y", 0))) - float(
+                state.get("y", 0)
+            )
+        anim = int(state.get("player_anim", 0))
+        aux = int(state.get("player_aux", 0))
+        recovery = int(state.get("player_recovery", 0))
         return encode_weapon_card(
             weapon_id=wid,
             equipped_clip=clip,
             room_id=state.get("room_id"),
+            equipped_slot_0based=int(slot) if valid else None,
+            reserve_ammo=reserve_ammo(inventory, wid),
+            total_fireable=total_fireable_ammo(inventory, wid),
+            hittable_enemies=len(enemies),
+            nearest_distance=distance,
+            nearest_bearing_sin=bearing_sin,
+            nearest_bearing_cos=bearing_cos,
+            nearest_relative_height=rel_height,
+            aim_ready=is_aim_stable(anim, aux, recovery),
+            recovery_ready=recovery == 0,
+            weapon_state_valid=bool(valid),
         )
+
+    def _combat_audit(
+        self,
+        state: dict[str, Any],
+        attack_report: dict[str, Any] | None,
+        breakdown: dict[str, float],
+    ) -> dict[str, Any]:
+        from re1_rl.ammo_accounting import (
+            inventory_slots_to_id_qty,
+            reserve_ammo,
+            total_fireable_ammo,
+        )
+
+        wid = int(state.get("equipped_weapon_id", 0) or 0)
+        slot = state.get("equipped_slot_0based")
+        slots = state.get("inventory_slots") or []
+        inv = inventory_slots_to_id_qty(slots)
+        nearest = min(
+            (
+                enemy for enemy in (state.get("enemies") or [])
+                if enemy.get("alive", True) and enemy.get("combat_near", False)
+            ),
+            key=lambda enemy: float(enemy.get("dist", 1e9)),
+            default=None,
+        )
+        return {
+            "equipped_weapon_id": wid,
+            "equipped_slot_0based": slot,
+            "loaded_ammo": equipped_clip_from_inventory_slots(slots, wid, slot),
+            "reserve_ammo": reserve_ammo(inv, wid),
+            "total_fireable_ammo": total_fireable_ammo(inv, wid),
+            "nearest_threat_distance": (
+                None if nearest is None else int(nearest.get("dist", 0))
+            ),
+            "hittable_enemy_count": combat_enemy_count(state.get("enemies")),
+            "macro_outcome": (attack_report or {}).get("outcome"),
+            "enemy_damage": int(state.get("enemy_damage", 0) or 0),
+            "enemy_kills": int(state.get("enemy_kills", 0) or 0),
+            "combat_reward_terms": {
+                key: float(breakdown.get(key, 0.0))
+                for key in (
+                    "enemy_damage",
+                    "enemy_kill",
+                    "attack_miss",
+                    "ammo_waste",
+                    "attack_dry_fire",
+                    "attack_macro_failure",
+                )
+            },
+        }
 
     def _fill_last_attack_obs(
         self,
@@ -622,13 +735,15 @@ class RE1Env(gym.Env):
             or 0
         )
         clip_before = equipped_clip_from_inventory_slots(
-            prev_state.get("inventory_slots"), wid
+            prev_state.get("inventory_slots"), wid,
+            prev_state.get("equipped_slot_0based"),
         )
         ammo_spent = int(state.get("ammo_spent", 0) or 0)
         if attack_report is not None:
             ammo_spent = int(attack_report.get("ammo_spent", ammo_spent) or 0)
         clip_after = equipped_clip_from_inventory_slots(
-            state.get("inventory_slots"), wid
+            state.get("inventory_slots"), wid,
+            state.get("equipped_slot_0based"),
         )
         if not knife and clip_after == 0 and clip_before > 0 and ammo_spent > 0:
             clip_after = max(0, clip_before - ammo_spent)
@@ -669,6 +784,65 @@ class RE1Env(gym.Env):
         )
         return terminated, truncated, reason
 
+    def _update_loadout_segment(
+        self,
+        prev_state: dict[str, Any],
+        state: dict[str, Any],
+        breakdown: dict[str, float],
+        *,
+        terminated: bool,
+        truncated: bool,
+    ) -> None:
+        """Carry one semantic box-departure sample to its factual outcome."""
+        from re1_rl.item_box import is_box_room
+
+        prev_room = str(prev_state.get("room_id", ""))
+        room = str(state.get("room_id", ""))
+        left_box = is_box_room(prev_room) and not is_box_room(room)
+        if (
+            left_box
+            and self._progress.loadout_segment is None
+            and self._box_departure_snapshot is not None
+        ):
+            horizon = max(
+                1,
+                int(round(float(self._box_departure_snapshot[9]) * 16.0)),
+            )
+            self._progress.begin_loadout_segment(
+                self._box_departure_snapshot,
+                waypoint_index=int(self._planner.waypoint_index),
+                horizon_checkpoints=horizon,
+                departure_room=prev_room,
+                departure_inventory=list(state.get("inventory_slots") or []),
+            )
+        if self._progress.loadout_segment is None:
+            return
+        reached_next_box = (
+            not is_box_room(prev_room)
+            and is_box_room(room)
+        )
+        boss_complete = (
+            float(breakdown.get("checkpoint_success", 0.0)) > 0.0
+            and int(self._planner.waypoint_index) >= int(self._planner.total_waypoints)
+            and float(self._progress.loadout_segment["features"][10]) > 0.5
+        )
+        if reached_next_box or boss_complete or terminated or truncated:
+            survived = not bool(state.get("dead"))
+            completed = bool(reached_next_box or boss_complete)
+            outcome = (
+                "next_box" if reached_next_box
+                else "boss_complete" if boss_complete
+                else "death" if state.get("dead")
+                else "truncation" if truncated
+                else "failure"
+            )
+            self._progress.finish_loadout_segment(
+                waypoint_index=int(self._planner.waypoint_index),
+                survived=survived,
+                completed=completed,
+                outcome=outcome,
+            )
+
     def _build_obs(self, frame_obs: np.ndarray, state: dict[str, Any]) -> dict[str, np.ndarray]:
         assert self._encoder is not None and self._planner is not None
         self._sync_episode_history(state)
@@ -684,6 +858,13 @@ class RE1Env(gym.Env):
         )
         goal_state = dict(state)
         goal_state["gallery_needs_reentry"] = self._progress.gallery_needs_reentry
+        box_obs = self._box_obs(state)
+        inventory_obs = encode_inventory_slots(state.get("inventory_slots"))
+        logistics_obs = self._encoder.encode_logistics(state, self._planner)
+        if box_obs[-1] > 0.5:
+            self._box_departure_snapshot = np.concatenate(
+                [logistics_obs, inventory_obs, box_obs]
+            ).astype(np.float32).tolist()
         return {
             "frame": frame_obs,
             "proprio": self._encoder.encode_proprio(state, self._prev_hp),
@@ -696,8 +877,9 @@ class RE1Env(gym.Env):
             ),
             "visited": self._visited.plane(state.get("room_id", "")),
             "rooms_visited": self._encoder.encode_rooms_visited(self._progress.visited_rooms),
-            "box": self._box_obs(state),
-            "inventory": encode_inventory_slots(state.get("inventory_slots")),
+            "box": box_obs,
+            "inventory": inventory_obs,
+            "logistics": logistics_obs,
             "weapon_card": self._weapon_card_obs(state),
             "last_attack": np.asarray(self._last_attack_obs, dtype=np.float32),
             "history": hist["history"],
@@ -1178,6 +1360,7 @@ class RE1Env(gym.Env):
         self._enemy_motion.reset()
         self._player_motion.reset()
         self._box_cache = None
+        self._box_departure_snapshot = None
         if getattr(self, "_attack_telemetry", None) is not None:
             self._attack_telemetry.reset_episode()
         if getattr(self, "_step_diag", None) is not None:
@@ -1780,6 +1963,13 @@ class RE1Env(gym.Env):
             if frame_obs.shape != FRAME_SHAPE:
                 frame_obs = np.zeros(FRAME_SHAPE, dtype=np.uint8)
         reward, breakdown = self._episode_failure_penalty(reason)
+        self._update_loadout_segment(
+            self._prev_state,
+            state,
+            breakdown,
+            terminated=True,
+            truncated=False,
+        )
         obs = self._build_obs(frame_obs, state)
         opening_phase = reason if reason.startswith(
             (
@@ -1819,6 +2009,9 @@ class RE1Env(gym.Env):
             "reward_breakdown": breakdown,
             "state": state,
         }
+        loadout_sample = self._progress.pop_loadout_sample()
+        if loadout_sample is not None:
+            info["logistics_sample"] = loadout_sample
         return obs, reward, True, False, info
 
     def _death_step(
@@ -2337,6 +2530,13 @@ class RE1Env(gym.Env):
             typewriter_save_complete=save_complete,
         )
         terminated, truncated, episode_failure = self._termination_flags(state)
+        self._update_loadout_segment(
+            self._prev_state,
+            state,
+            breakdown,
+            terminated=terminated,
+            truncated=truncated,
+        )
         obs = self._build_obs(frame_obs, state)
         info = {
             "room_id": state["room_id"],
@@ -2361,6 +2561,9 @@ class RE1Env(gym.Env):
         if pending_yr:
             info["yawn_rails_capture"] = list(pending_yr)
             self._yawn_rails_capture_pending = []
+        loadout_sample = self._progress.pop_loadout_sample()
+        if loadout_sample is not None:
+            info["logistics_sample"] = loadout_sample
         self._prev_state = state
         if state["hp"] > 0:
             self._prev_hp = state["hp"]
@@ -2500,7 +2703,7 @@ class RE1Env(gym.Env):
             except (OSError, RuntimeError, AttributeError, TypeError, ValueError):
                 document_examine_open = False
         enemies = pose.get("enemies")
-        return build_action_mask(
+        mask = build_action_mask(
             int(self.action_space.n),
             self._prev_action,
             player_anim=anim,
@@ -2532,6 +2735,27 @@ class RE1Env(gym.Env):
             rewarded_story_uses=rewarded_story_uses,
             document_examine_open=document_examine_open,
         )
+        if (
+            in_box_room
+            and inventory is not None
+            and box is not None
+            and getattr(self, "_stage", {}).get("mode") == "yawn_rails"
+            and getattr(self, "_planner", None) is not None
+        ):
+            from re1_rl.yawn_rails import apply_logistics_feasibility_mask
+
+            apply_logistics_feasibility_mask(
+                mask, inventory, box, self._planner
+            )
+        return mask
+
+    def _execution_action_legal(self, action: int) -> bool:
+        """Re-read the live mask immediately before irreversible macro dispatch."""
+        try:
+            mask = self.action_masks()
+            return 0 <= int(action) < len(mask) and bool(mask[int(action)])
+        except (OSError, RuntimeError, AttributeError, TypeError, ValueError):
+            return False
 
     def step(self, action: int):
         action = int(action)
@@ -2665,32 +2889,52 @@ class RE1Env(gym.Env):
                 self._macro_active = False
         elif combat_attack:
             self._sticky_input.apply(0, ACTION_BUTTON_MAP)
-            self._macro_active = True
-            try:
-                from re1_rl.attack_macro import cleared_movement_sticky
-
-                if attack_up:
-                    attack_fn = execute_attack_up_macro
-                elif attack_down:
-                    attack_fn = execute_attack_down_macro
-                else:
-                    attack_fn = execute_attack_macro
-                died_during_step, step_emulated_frames, attack_report = (
-                    attack_fn(
-                        self.bridge,
-                        empty_sticky=cleared_movement_sticky(
-                            self._sticky_input.as_dict()
-                        ),
-                        prev_hp=self._prev_hp,
-                        episode_start_hp=getattr(self, "_episode_start_hp", 0),
-                        knife_phases=self.knife_phases,
-                        knife_scale=self.knife_scale,
-                        knife_echo_joypad=self.knife_echo_joypad,
-                        knife_use_ram_gates=self.knife_use_ram_gates,
-                    )
+            execution_legal = self._execution_action_legal(int(action))
+            if not execution_legal:
+                attack_report = {
+                    "outcome": "illegal_attack",
+                    "weapon_id": self._prev_state.get("equipped_weapon_id"),
+                    "ammo_spent": 0,
+                    "frames": self.frame_skip,
+                }
+                sticky, pulse, pulse_hold = self._sticky_input.apply(
+                    0, ACTION_BUTTON_MAP
                 )
-            finally:
-                self._macro_active = False
+                _, died_during_step = self.bridge.step(
+                    n=self.frame_skip,
+                    sticky=sticky,
+                    pulse=pulse,
+                    pulse_hold=pulse_hold,
+                    ring_stride=0,
+                    capture_final=True,
+                )
+            else:
+                self._macro_active = True
+                try:
+                    from re1_rl.attack_macro import cleared_movement_sticky
+
+                    if attack_up:
+                        attack_fn = execute_attack_up_macro
+                    elif attack_down:
+                        attack_fn = execute_attack_down_macro
+                    else:
+                        attack_fn = execute_attack_macro
+                    died_during_step, step_emulated_frames, attack_report = (
+                        attack_fn(
+                            self.bridge,
+                            empty_sticky=cleared_movement_sticky(
+                                self._sticky_input.as_dict()
+                            ),
+                            prev_hp=self._prev_hp,
+                            episode_start_hp=getattr(self, "_episode_start_hp", 0),
+                            knife_phases=self.knife_phases,
+                            knife_scale=self.knife_scale,
+                            knife_echo_joypad=self.knife_echo_joypad,
+                            knife_use_ram_gates=self.knife_use_ram_gates,
+                        )
+                    )
+                finally:
+                    self._macro_active = False
         elif magic:
             magic_report = self._apply_magic_action(int(action))
             sticky, pulse, pulse_hold = self._sticky_input.apply(
@@ -2797,6 +3041,9 @@ class RE1Env(gym.Env):
         if attack_report is not None:
             state["ammo_spent"] = int(attack_report.get("ammo_spent", 0))
             state["attack_weapon"] = attack_report.get("weapon")
+            outcome = str(attack_report.get("outcome", "") or "")
+            state["attack_macro_failure"] = outcome not in ("", "ok", "dry_fire")
+            state["attack_dry_fire"] = outcome == "dry_fire"
         if combat_attack:
             self._fill_last_attack_obs(
                 self._prev_state,
@@ -2912,6 +3159,7 @@ class RE1Env(gym.Env):
                 else None
             ),
             "attack_report": attack_report,
+            "combat_audit": self._combat_audit(state, attack_report, breakdown),
             "grab_detected": grab_detected,
             "grab_escape": grab_escape,
             "magic_report": magic_report,

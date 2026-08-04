@@ -81,6 +81,21 @@ def total_fireable_ammo(
     return total
 
 
+def reserve_ammo(
+    inventory: list[tuple[int, int]],
+    weapon_id: int,
+) -> int:
+    """Matching reserve stacks only; excludes rounds loaded in weapon slots."""
+    ammo_id = WEAPON_AMMO_ITEM.get(int(weapon_id) & 0xFF)
+    if ammo_id is None:
+        return 0
+    return sum(
+        max(0, int(qty))
+        for item_id, qty in inventory
+        if (int(item_id) & 0xFF) == int(ammo_id)
+    )
+
+
 def can_fire_weapon(
     inventory: list[tuple[int, int]],
     weapon_id: int,
@@ -113,14 +128,12 @@ def inventory_slots_to_id_qty(
                 iid = int(_NAME_TO_ITEM_ID.get(canonical_item(raw_id), 0))
             else:
                 iid = int(raw_id) & 0xFF
-            if iid:
-                out.append((iid, qty))
+            out.append((iid, qty if iid else 0))
         elif isinstance(entry, dict):
             name = canonical_item(str(entry.get("name") or entry.get("item") or ""))
             iid = int(_NAME_TO_ITEM_ID.get(name, 0))
             qty = int(entry.get("qty", 1) or 0)
-            if iid:
-                out.append((iid, qty))
+            out.append((iid, qty if iid else 0))
     return out
 
 

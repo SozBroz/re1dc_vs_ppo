@@ -33,6 +33,7 @@ from re1_rl.knife_macro import (
 )
 from re1_rl.memory_map import (
     EQUIPPED_WEAPON_ID,
+    EQUIPPED_SLOT_INDEX_1BASED,
     INVENTORY_BASE,
     INVENTORY_SLOTS,
     ITEM_IDS,
@@ -150,13 +151,23 @@ def _ammo_count(bridge: Any, weapon_id: int) -> int:
         (f"inv_slot_{i}", INVENTORY_BASE + 2 * i, "u16")
         for i in range(INVENTORY_SLOTS)
     ]
+    fields.append(("equipped_slot_1based", EQUIPPED_SLOT_INDEX_1BASED, "u8"))
     ram = bridge.read_ram(fields)
-    total = 0
+    matches: list[tuple[int, int]] = []
     for i in range(INVENTORY_SLOTS):
         raw = int(ram.get(f"inv_slot_{i}", 0))
         if raw & 0xFF == weapon_id:
-            total += raw >> 8
-    return total
+            matches.append((i, raw >> 8))
+    slot_1b = int(ram.get("equipped_slot_1based", 0))
+    if 1 <= slot_1b <= INVENTORY_SLOTS:
+        slot = slot_1b - 1
+        for index, qty in matches:
+            if index == slot:
+                return qty
+        return 0
+    # Legacy harnesses may omit the slot byte. A unique weapon slot is
+    # unambiguous; duplicate IDs without slot state fail closed.
+    return matches[0][1] if len(matches) == 1 else 0
 
 
 def is_gun_aim_stable(anim: int, aux: int, recovery: int) -> bool:
@@ -241,10 +252,14 @@ def is_standing_knife_aim_ready(anim: int, aux: int, recovery: int) -> bool:
     """Standing R1 aim pose before a knife slash (neutral or up height)."""
     if is_standing_pre_knife_idle(anim, aux, recovery):
         return True
-    return recovery == 0 and anim == AIM_ANIM_STABLE and aux in (
-        0,
-        CROUCH_KNIFE_ACTIVE_AUX,
-    )
+    # Live link-matrix: aim-hold is 0x13/0x04 with recovery draining (rec>0).
+    # Requiring rec==0 never stabilizes from neutral entry — macro retries R1,
+    # visibly raises then lowers without a slash (fleet aim_timeout).
+    if anim == AIM_ANIM_RAISING and aux in (0, CROUCH_KNIFE_ACTIVE_AUX):
+        return True
+    if anim == AIM_ANIM_STABLE and aux in (0, CROUCH_KNIFE_ACTIVE_AUX):
+        return True
+    return False
 
 
 def _hold_aim_with_retry(
@@ -1016,6 +1031,11 @@ def execute_attack_macro(
             report["outcome"] = "no_weapon"
             report["aim_mode"] = "neutral"
             return False, 0, report
+        if weapon_id != KNIFE_WEAPON_ID and _ammo_count(bridge, weapon_id) <= 0:
+            report = _empty_report(weapon_id, weapon)
+            report["outcome"] = "illegal_attack"
+            report["aim_mode"] = "neutral"
+            return False, 0, report
 
         handler = _WEAPON_ATTACK_HANDLERS.get(weapon_id, _execute_ranged_attack_macro)
         died, frames, report = handler(
@@ -1055,6 +1075,11 @@ def execute_attack_up_macro(
         if weapon is None or weapon_id not in WEAPON_ITEM_IDS:
             report = _empty_report(weapon_id, weapon)
             report["outcome"] = "no_weapon"
+            report["aim_mode"] = "up"
+            return False, 0, report
+        if weapon_id != KNIFE_WEAPON_ID and _ammo_count(bridge, weapon_id) <= 0:
+            report = _empty_report(weapon_id, weapon)
+            report["outcome"] = "illegal_attack"
             report["aim_mode"] = "up"
             return False, 0, report
         if weapon_id == KNIFE_WEAPON_ID:
@@ -1098,6 +1123,11 @@ def execute_attack_down_macro(
         if weapon is None or weapon_id not in WEAPON_ITEM_IDS:
             report = _empty_report(weapon_id, weapon)
             report["outcome"] = "no_weapon"
+            report["aim_mode"] = "down"
+            return False, 0, report
+        if weapon_id != KNIFE_WEAPON_ID and _ammo_count(bridge, weapon_id) <= 0:
+            report = _empty_report(weapon_id, weapon)
+            report["outcome"] = "illegal_attack"
             report["aim_mode"] = "down"
             return False, 0, report
         if weapon_id == KNIFE_WEAPON_ID:

@@ -58,9 +58,17 @@ class ProgressTracker:
     # Pickups made after the current rails checkpoint. Sidecar history and
     # acquisitions from an earlier leg do not satisfy a later checkpoint.
     leg_acquired_items: set[str] = field(default_factory=set)
+    # Directed room transitions observed during the current rails leg. This
+    # lets a checkpoint combine a valid entry with an event that settles a few
+    # steps later without accepting an entry from a different room.
+    leg_room_transitions: set[tuple[str, str]] = field(default_factory=set)
     leg_span: int = 1
     legs_completed: int = 0
     checkpoint_success: bool = False
+    # Semantic box-departure state persists until next box, boss outcome, death,
+    # or truncation; rollout boundaries do not reset ProgressTracker.
+    loadout_segment: dict | None = None
+    pending_loadout_sample: dict | None = None
 
     def seed_spawn_room(self, room_id: str) -> None:
         """Mark spawn visited; consume spawn credit (no ``new_room`` payout)."""
@@ -104,6 +112,17 @@ class ProgressTracker:
     def on_waypoint_advanced(self) -> None:
         """Reset per-room step counters so repeated hall objectives work."""
         self._in_control_steps.clear()
+        self.leg_room_transitions.clear()
+
+    def note_leg_room_transition(self, from_room: str, to_room: str) -> None:
+        source = str(from_room or "")
+        target = str(to_room or "")
+        if source and target and source != target:
+            self.leg_room_transitions.add((source, target))
+
+    def leg_entered_from(self, target_room: str, from_rooms: set[str]) -> bool:
+        target = str(target_room or "")
+        return any((str(source), target) in self.leg_room_transitions for source in from_rooms)
 
     @property
     def stagnation_frames(self) -> int:
@@ -221,6 +240,55 @@ class ProgressTracker:
         self.leg_acquired_items.clear()
         self.checkpoint_success = self.legs_completed >= max(1, int(self.leg_span))
         return True
+
+    def begin_loadout_segment(
+        self,
+        features: list[float],
+        *,
+        waypoint_index: int,
+        horizon_checkpoints: int,
+        departure_room: str,
+        departure_inventory: list[tuple[str, int]] | None = None,
+    ) -> None:
+        self.loadout_segment = {
+            "features": [float(x) for x in features],
+            "waypoint_index": int(waypoint_index),
+            "horizon_checkpoints": max(1, int(horizon_checkpoints)),
+            "departure_room": str(departure_room),
+            "departure_inventory": list(departure_inventory or []),
+        }
+
+    def finish_loadout_segment(
+        self,
+        *,
+        waypoint_index: int,
+        survived: bool,
+        completed: bool,
+        outcome: str,
+    ) -> dict | None:
+        segment = self.loadout_segment
+        if segment is None:
+            return None
+        progressed = max(0, int(waypoint_index) - int(segment["waypoint_index"]))
+        progress = min(1.0, progressed / float(segment["horizon_checkpoints"]))
+        sample = {
+            **segment,
+            "labels": [
+                1.0 if completed else 0.0,
+                1.0 if survived else 0.0,
+                float(progress),
+            ],
+            "outcome": str(outcome),
+            "end_waypoint_index": int(waypoint_index),
+        }
+        self.loadout_segment = None
+        self.pending_loadout_sample = sample
+        return sample
+
+    def pop_loadout_sample(self) -> dict | None:
+        sample = self.pending_loadout_sample
+        self.pending_loadout_sample = None
+        return sample
 
     def claim_document_examine_bonus(self, room_id: str) -> bool:
         """True once per room on first document-examine edge this episode."""

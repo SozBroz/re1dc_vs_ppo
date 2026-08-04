@@ -444,6 +444,9 @@ DEFAULT_RAM_FIELDS: list[tuple[str, int, str]] = [
     ("game_mode", GAME_MODE, "u8"),
     ("game_state", GAME_STATE, "u32"),
     ("equipped_weapon_id", EQUIPPED_WEAPON_ID, "u8"),
+    ("equipped_slot_1based", EQUIPPED_SLOT_INDEX_1BASED, "u8"),
+    ("equipped_slot_0based", EQUIPPED_SLOT_INDEX, "u8"),
+    ("player_recovery", PLAYER_RECOVERY_TIMER, "u8"),
     # inventory slots: 2 bytes each (item_id, qty), read as u16 little-endian
     # -> low byte = item_id, high byte = qty
     ("inv_slot_0", INVENTORY_BASE + 0x0, "u16"),
@@ -459,12 +462,19 @@ DEFAULT_RAM_FIELDS: list[tuple[str, int, str]] = [
 
 def decode_inventory(ram: dict[str, int | float]) -> list[tuple[str, int]]:
     """(item_name, qty) for occupied slots from a DEFAULT_RAM_FIELDS read."""
+    return [slot for slot in decode_inventory_slots(ram) if slot[0]]
+
+
+def decode_inventory_slots(
+    ram: dict[str, int | float],
+) -> list[tuple[str, int]]:
+    """All eight RAM-aligned inventory slots, including interior gaps."""
     out: list[tuple[str, int]] = []
     for i in range(INVENTORY_SLOTS):
         raw = int(ram.get(f"inv_slot_{i}", 0))
         item_id, qty = raw & 0xFF, raw >> 8
-        if item_id:
-            out.append((ITEM_IDS.get(item_id, f"unknown_0x{item_id:02X}"), qty))
+        name = ITEM_IDS.get(item_id, f"unknown_0x{item_id:02X}") if item_id else ""
+        out.append((name, qty if item_id else 0))
     return out
 
 

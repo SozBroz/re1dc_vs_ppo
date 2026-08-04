@@ -38,6 +38,7 @@ from re1_rl.weapon_equip import (
 )
 
 from re1_rl.env import ACTION_NAMES
+from re1_rl.env import RE1Env
 
 N_ACTIONS = len(ACTION_NAMES)
 
@@ -133,6 +134,28 @@ def test_attack_masked_without_weapon() -> None:
     m = action_mask(N_ACTIONS, None, equipped_weapon_id=0)
     assert not m[ATTACK_ACTION]
     assert not m[ATTACK_DOWN_ACTION]
+
+
+def test_attack_fails_closed_when_equipped_ram_is_missing() -> None:
+    inv = [(0x02, 15)] + [(0, 0)] * 7
+    m = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=None,
+        inventory=inv,
+        alive_enemies_in_room=1,
+    )
+    assert not m[ATTACK_UP_ACTION:ATTACK_DOWN_ACTION + 1].any()
+
+
+def test_attack_execution_reuses_live_mask_legality() -> None:
+    env = RE1Env.__new__(RE1Env)
+    denied = [True] * N_ACTIONS
+    denied[ATTACK_ACTION] = False
+    env.action_masks = lambda: denied
+    assert not env._execution_action_legal(ATTACK_ACTION)
+    denied[ATTACK_ACTION] = True
+    assert env._execution_action_legal(ATTACK_ACTION)
 
 
 def test_knife_crouch_legal_with_knife_via_attack_down() -> None:
@@ -503,7 +526,7 @@ def test_attack_macro_settles_after_locomotion() -> None:
             inv_reads["n"] += 1
             # First _ammo_count is pre-shot; later reads show one round spent.
             # Packing: high byte = qty, low byte = item id (beretta 0x02).
-            raw = 0x0F02 if inv_reads["n"] <= 1 else 0x0E02
+            raw = 0x0F02 if inv_reads["n"] <= 2 else 0x0E02
             return {n: raw if n == "inv_slot_0" else 0 for n in names}
         try:
             a, x, r = next(hook_iter)
@@ -571,7 +594,7 @@ def test_ranged_macro_strips_down_from_pad_and_sticky() -> None:
             return {"player_hp": 96}
         if any(n.startswith("inv_slot_") for n in names):
             inv_reads["n"] += 1
-            raw = 0x0F02 if inv_reads["n"] <= 1 else 0x0E02
+            raw = 0x0F02 if inv_reads["n"] <= 2 else 0x0E02
             return {n: raw if n == "inv_slot_0" else 0 for n in names}
         try:
             a, x, r = next(hook_iter)
@@ -716,6 +739,59 @@ def test_attack_knife_uses_neutral_macro_path(monkeypatch) -> None:
     assert report["weapon"] == "knife"
     assert report["outcome"] == "ok"
     assert report["saw_fire_anim"] is True
+
+
+def test_standing_knife_aim_ready_accepts_draining_recovery() -> None:
+    from re1_rl.attack_macro import is_standing_knife_aim_ready
+
+    # Live link-matrix aim-hold before slash (QuickSave0 probe).
+    assert is_standing_knife_aim_ready(0x13, 0x04, 13)
+    assert is_standing_knife_aim_ready(0x13, 0x04, 1)
+    assert is_standing_knife_aim_ready(0x12, 0x04, 0)
+    assert not is_standing_knife_aim_ready(0x13, 0x03, 0)
+
+
+def test_standing_knife_macro_aims_from_neutral_with_recovery_drain() -> None:
+    from unittest.mock import MagicMock
+
+    bridge = MagicMock()
+    bridge.attack_pins = None
+    bridge.frame_ring = None
+    bridge.step.return_value = (0, False)
+    hook_seq = (
+        [(0, 0, 0)] * 4
+        + [(0x12, 0x04, 0)] * 4
+        + [(0x13, 0x04, rec) for rec in (13, 12, 11, 10, 9, 8)]
+        + [(0x14, 0x04, rec) for rec in (8, 4, 2, 1, 0)]
+        + [(0, 0, 0)] * 12
+    )
+    hook_iter = iter(hook_seq)
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "equipped_weapon_id" in names:
+            return {"equipped_weapon_id": 0x01}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0, 0, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    bridge.read_ram.side_effect = read_ram
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, frames, report = execute_attack_macro(
+        bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
+    )
+    assert not died
+    assert report["outcome"] == "ok"
+    assert report["saw_fire_anim"] is True
+    assert frames < 40
 
 
 def test_attack_down_knife_uses_crouch_macro_path(monkeypatch) -> None:

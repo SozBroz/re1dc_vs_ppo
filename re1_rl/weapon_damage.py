@@ -80,8 +80,20 @@ WEAPON_CARD_FIELDS: list[tuple[str, str]] = [
     ("in_flame_bonus_room", "1 = current room in flame bonus set"),
     ("acid_bonus_active", "1 = acid room AND acid rounds equipped"),
     ("flame_bonus_active", "1 = flame room AND flame rounds equipped"),
+    ("weapon_id", "equipped weapon item id / 0x4B"),
+    ("equipped_slot", "(true RAM slot + 1) / 8; 0 = unavailable"),
+    ("reserve_ammo", "matching reserve rounds / AMMO_QTY_NORM"),
+    ("total_fireable_ammo", "loaded plus matching reserve / AMMO_QTY_NORM"),
+    ("hittable_enemies", "live combat-near enemies / 6"),
+    ("nearest_distance", "nearest live enemy distance / 20000"),
+    ("nearest_bearing_sin", "sin(enemy bearing - Jill facing)"),
+    ("nearest_bearing_cos", "cos(enemy bearing - Jill facing)"),
+    ("nearest_relative_height", "enemy y minus Jill y / 2048"),
+    ("aim_ready", "1 = current animation is a stable aim state"),
+    ("recovery_ready", "1 = recovery timer is zero"),
+    ("weapon_state_valid", "1 = weapon id and true slot agree with RAM"),
 ]
-WEAPON_CARD_DIM = len(WEAPON_CARD_FIELDS)  # 12
+WEAPON_CARD_DIM = len(WEAPON_CARD_FIELDS)  # 24
 
 # Combat height one-hot inside last_attack (all 0 when valid=0).
 # Weapon identity is equipped_weapon / weapon_card — not duplicated here.
@@ -151,6 +163,17 @@ def encode_weapon_card(
     weapon_id: int,
     equipped_clip: int,
     room_id: str | None,
+    equipped_slot_0based: int | None = None,
+    reserve_ammo: int = 0,
+    total_fireable: int = 0,
+    hittable_enemies: int = 0,
+    nearest_distance: float = 0.0,
+    nearest_bearing_sin: float = 0.0,
+    nearest_bearing_cos: float = 0.0,
+    nearest_relative_height: float = 0.0,
+    aim_ready: bool = False,
+    recovery_ready: bool = False,
+    weapon_state_valid: bool = False,
 ) -> np.ndarray:
     """Always-on weapon card: clip, nominal dmg, round type, room bonuses."""
     v = np.zeros(WEAPON_CARD_DIM, dtype=np.float32)
@@ -167,6 +190,19 @@ def encode_weapon_card(
     v[9] = flags["in_flame_bonus_room"]
     v[10] = flags["acid_bonus_active"]
     v[11] = flags["flame_bonus_active"]
+    v[12] = float(np.clip(wid / 0x4B, 0.0, 1.0))
+    if equipped_slot_0based is not None:
+        v[13] = float(np.clip((int(equipped_slot_0based) + 1) / 8.0, 0.0, 1.0))
+    v[14] = ammo_qty_norm(reserve_ammo)
+    v[15] = ammo_qty_norm(total_fireable)
+    v[16] = float(np.clip(int(hittable_enemies) / 6.0, 0.0, 1.0))
+    v[17] = float(np.clip(float(nearest_distance) / 20000.0, 0.0, 1.0))
+    v[18] = float(np.clip(nearest_bearing_sin, -1.0, 1.0))
+    v[19] = float(np.clip(nearest_bearing_cos, -1.0, 1.0))
+    v[20] = float(np.clip(nearest_relative_height / 2048.0, -1.0, 1.0))
+    v[21] = 1.0 if aim_ready else 0.0
+    v[22] = 1.0 if recovery_ready else 0.0
+    v[23] = 1.0 if weapon_state_valid else 0.0
     return v
 
 
@@ -270,6 +306,7 @@ def pack_last_attack(
 def equipped_clip_from_inventory_slots(
     inventory_slots: list[tuple[str, int]] | list[tuple[int, int]] | None,
     weapon_id: int,
+    equipped_slot_0based: int | None = None,
 ) -> int:
     """Loaded rounds in the equipped weapon from name- or id-keyed slots.
 
@@ -282,7 +319,13 @@ def equipped_clip_from_inventory_slots(
     if wid in (0, 0x01):
         return 0
     name_to_id = {name: iid for iid, name in ITEM_IDS.items()}
-    for slot in inventory_slots or []:
+    slots = list(inventory_slots or [])
+    if equipped_slot_0based is not None:
+        idx = int(equipped_slot_0based)
+        if idx < 0 or idx >= len(slots):
+            return 0
+        slots = [slots[idx]]
+    for slot in slots:
         if not slot or len(slot) < 2:
             continue
         raw_id, qty = slot[0], slot[1]

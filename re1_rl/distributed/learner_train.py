@@ -41,6 +41,10 @@ from re1_rl.distributed.weight_store import WeightStore
 from re1_rl.distributed.weights import export_policy_state_dict
 
 from re1_rl.training_metrics_log import ensure_training_logger
+from re1_rl.loadout_learning import (
+    apply_bounded_loadout_guidance,
+    loadout_samples_from_infos,
+)
 
 
 
@@ -488,9 +492,28 @@ def _train_one_version(
         )
 
     _validate_merged_rollout_finite(merged)
+    loadout_stats: dict[str, float] = {}
+    if hasattr(model, "prepare_loadout_epoch"):
+        samples = loadout_samples_from_infos(
+            info for rollout in rollouts for info in (rollout.episode_infos or [])
+        )
+        loadout_stats = model.prepare_loadout_epoch(samples)
+        guidance = apply_bounded_loadout_guidance(
+            merged,
+            model.frozen_loadout_scorer,
+            device=torch.device(model.device),
+            calibrated=bool(model.loadout_calibrated),
+        )
+        loadout_stats.update({
+            "guidance_transfers": guidance["transfers"],
+            "guidance_total": guidance["total"],
+        })
     model.rollout_buffer = fill_rollout_buffer(model, merged)
 
     ensure_training_logger(model)
+    if getattr(model, "logger", None) is not None:
+        for key, value in loadout_stats.items():
+            model.logger.record(f"train/loadout_{key}", float(value))
 
     if hasattr(model, "set_auxiliary_targets"):
         model.set_auxiliary_targets(

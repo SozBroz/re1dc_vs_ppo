@@ -23,7 +23,20 @@ from re1_rl.story_item_use import (
     legal_story_use_slots,
     slot_legal_for_story_use,
 )
-from re1_rl.knife_macro import knife_action_ready, knife_crouch_action_ready
+from re1_rl.attack_macro import (
+    AIM_ANIM_RAISING,
+    AIM_ANIM_STABLE,
+    FIRE_ANIM,
+    GUN_AUX_TRACK,
+)
+from re1_rl.knife_macro import (
+    CROUCH_KNIFE_ACTIVE_AUX,
+    CROUCH_KNIFE_AIM_ANIM,
+    knife_action_ready,
+    knife_crouch_action_ready,
+    is_crouch_knife_aim_ready,
+    is_knife_mid_swing_state,
+)
 from re1_rl.weapon_equip import (
     EQUIPPABLE_WEAPON_IDS,
     any_legal_equip_slot,
@@ -74,7 +87,8 @@ def _height_attack_legal(
     alive_enemies_in_room: int | None,
 ) -> bool:
     """Shared legality for attack / attack_up / attack_down (weapon-dispatched macros)."""
-    legal = anim_ready
+    # Missing equipped-weapon RAM is not an invitation to attack.
+    legal = anim_ready and equipped_weapon_id is not None
     wid: int | None = None
     if equipped_weapon_id is not None:
         wid = int(equipped_weapon_id)
@@ -92,6 +106,54 @@ def _height_attack_legal(
         elif alive_enemies_in_room is not None:
             legal = int(alive_enemies_in_room) > 0
     return legal
+
+
+def _in_ranged_combat_pose(anim: int, aux: int, recovery: int) -> bool:
+    """True when Jill is actively aiming or firing a gun (not neutral idle)."""
+    if anim in (AIM_ANIM_RAISING, AIM_ANIM_STABLE, FIRE_ANIM, 0x15, 0x16, 0x17) and aux in (
+        0,
+        GUN_AUX_TRACK,
+    ):
+        return True
+    return recovery > 0 and anim in (
+        AIM_ANIM_RAISING,
+        AIM_ANIM_STABLE,
+        FIRE_ANIM,
+        0x15,
+        0x16,
+        0x17,
+    ) and aux in (0, GUN_AUX_TRACK)
+
+
+def _in_knife_combat_pose(anim: int, aux: int, recovery: int) -> bool:
+    """True when Jill is mid knife slash or crouch-knife aim."""
+    if is_knife_mid_swing_state(anim, aux, recovery):
+        return True
+    if is_crouch_knife_aim_ready(anim, aux, recovery):
+        return True
+    return anim == CROUCH_KNIFE_AIM_ANIM and aux == CROUCH_KNIFE_ACTIVE_AUX
+
+
+def menu_action_ready(
+    anim: int,
+    aux: int,
+    recovery: int,
+    *,
+    equipped_weapon_id: int | None,
+) -> bool:
+    """Stricter than knife_action_ready — block ITEM/EQUIP during combat poses.
+
+    Gun stable aim (0x13/0x03) is knife_action_ready for linked attacks but must
+    not open the pause menu before the shot/recovery finishes.
+    """
+    if not knife_action_ready(anim, aux, recovery):
+        return False
+    if equipped_weapon_id is None:
+        return True
+    wid = int(equipped_weapon_id)
+    if wid == KNIFE_ID:
+        return not _in_knife_combat_pose(anim, aux, recovery)
+    return not _in_ranged_combat_pose(anim, aux, recovery)
 
 
 def _submenu_active(
@@ -166,16 +228,19 @@ def action_mask(
 
     anim_ready = True
     crouch_anim_ready = True
+    menu_ready = True
     if (
         player_anim is not None
         and player_aux is not None
         and player_recovery is not None
     ):
-        anim_ready = knife_action_ready(
-            int(player_anim), int(player_aux), int(player_recovery)
-        )
-        crouch_anim_ready = knife_crouch_action_ready(
-            int(player_anim), int(player_aux), int(player_recovery)
+        anim = int(player_anim)
+        aux = int(player_aux)
+        rec = int(player_recovery)
+        anim_ready = knife_action_ready(anim, aux, rec)
+        crouch_anim_ready = knife_crouch_action_ready(anim, aux, rec)
+        menu_ready = menu_action_ready(
+            anim, aux, rec, equipped_weapon_id=equipped_weapon_id
         )
 
     # Prefer weapon-specific near counts when provided (generous knife band < gun).
@@ -271,9 +336,9 @@ def action_mask(
                     episode_start_hp=episode_start_hp,
                 )
                 # Story USE: key item + stand position only (no anim_ready gate).
-                mask[USE_ACTION] = (anim_ready and heal_legal) or story_legal
+                mask[USE_ACTION] = (menu_ready and heal_legal) or story_legal
             if EQUIP_ACTION < n_actions:
-                mask[EQUIP_ACTION] = anim_ready and any_legal_equip_slot(
+                mask[EQUIP_ACTION] = menu_ready and any_legal_equip_slot(
                     inventory,
                     equipped_weapon_id=equipped_weapon_id,
                     equipped_slot_0based=equipped_slot_0based,
@@ -281,7 +346,7 @@ def action_mask(
             if COMBINE_ACTION < n_actions:
                 from re1_rl.inventory_combine import any_valid_combine
 
-                mask[COMBINE_ACTION] = any_valid_combine(inventory)
+                mask[COMBINE_ACTION] = menu_ready and any_valid_combine(inventory)
         elif use_ph == 1:
             if story_legal:
                 for idx in _STORY_USE_RECOVERY_ACTIONS:

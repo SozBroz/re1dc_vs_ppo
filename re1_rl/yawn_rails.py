@@ -57,6 +57,71 @@ def _occupied_inventory_count(state: dict[str, Any]) -> int:
     return min(INVENTORY_SLOTS, int(occupied))
 
 
+def apply_logistics_feasibility_mask(
+    mask: Any,
+    inventory: list[tuple[int, int]],
+    box: list[tuple[int, int]],
+    planner: Any,
+) -> Any:
+    """Mask only route-feasibility violations; never prescribe combat supplies."""
+    from re1_rl.action_mask import (
+        DEPOSIT_ACTION_BASE,
+        N_DEPOSIT_ACTIONS,
+        N_WITHDRAW_ACTIONS,
+        WITHDRAW_ACTION_BASE,
+    )
+    from re1_rl.item_box import plan_withdraw
+
+    rows: list[dict[str, Any]] = []
+    for offset in range(int(getattr(planner, "waypoints_remaining", 0))):
+        step = planner.peek_objective(offset)
+        room = planner.peek_waypoint_room(offset)
+        if step is None or room is None:
+            break
+        rows.append(step)
+        if step.get("action_type") == "fight":
+            break
+        if offset > 0 and is_box_room(str(room)):
+            break
+    required_ids = {
+        _ITEM_NAME_TO_ID[name]
+        for row in rows
+        for item in row.get("required_items", [])
+        if (name := canonical_item(str(item))) in _ITEM_NAME_TO_ID
+    }
+    carried_counts: dict[int, int] = {}
+    for item_id, _qty in inventory:
+        if item_id:
+            carried_counts[int(item_id)] = carried_counts.get(int(item_id), 0) + 1
+    for slot in range(min(N_DEPOSIT_ACTIONS, len(inventory))):
+        action = DEPOSIT_ACTION_BASE + slot
+        item_id = int(inventory[slot][0])
+        if (
+            action < len(mask)
+            and item_id in required_ids
+            and carried_counts.get(item_id, 0) <= 1
+        ):
+            mask[action] = False
+
+    pressure = peak = 0
+    for row in rows:
+        pressure -= len(row.get("consume_before_gain", []))
+        pressure += len(row.get("items_gained", []))
+        peak = max(peak, pressure)
+    required_headroom = min(INVENTORY_SLOTS, max(0, peak))
+    for slot in range(min(N_WITHDRAW_ACTIONS, len(box))):
+        action = WITHDRAW_ACTION_BASE + slot
+        if action >= len(mask) or not mask[action]:
+            continue
+        _new_box, new_inventory, moved = plan_withdraw(inventory, box, slot)
+        if moved <= 0:
+            continue
+        free_after = sum(item_id == 0 for item_id, _qty in new_inventory)
+        if free_after < required_headroom:
+            mask[action] = False
+    return mask
+
+
 def _consume_inventory_item(
     slots: list[tuple[int, int]], item_id: int, qty: int
 ) -> bool:
@@ -90,6 +155,13 @@ def successor_capacity(
         "next_slots_needed": 0,
         "inventory_feasible": True,
         "captured_in_box_room": box_room,
+        "logistics_horizon": "next_box_or_boss",
+        "route_required_items": sorted(
+            canonical_item(str(item))
+            for item in (next_checkpoint or {}).get("required_items", [])
+        ),
+        "declared_gain_count": len(gains),
+        "next_is_boss": (next_checkpoint or {}).get("action_type") == "fight",
     }
     if box_room or not gains:
         return metadata

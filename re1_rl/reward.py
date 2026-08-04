@@ -96,6 +96,8 @@ ENEMY_KILL_REWARD = 0.24
 # more valuable while giving confirmed misses a small, immediate signal.
 ATTACK_MISS_TAX_SCALE = 0.10
 KNIFE_MISS_PENALTY = -0.01 * ATTACK_MISS_TAX_SCALE
+ATTACK_DRY_FIRE_PENALTY = -0.005
+ATTACK_MACRO_FAILURE_PENALTY = -0.01
 # Max per-round miss tax when wasting the last round in inventory.
 AMMO_WASTE_MAX_PENALTY = 0.15
 # Flat legacy miss flag (unused); live knife tax uses KNIFE_MISS_PENALTY above.
@@ -277,7 +279,7 @@ def ammo_waste_penalty(
     ) * float(rounds)
 
 
-WRONG_ROOM_PENALTY = -0.6
+WRONG_ROOM_PENALTY = -1.0
 RETREAT_PENALTY = -0.6
 SUCCESS_ROOM_BONUS = CHECKPOINT_REWARD
 PBRS_GRAPH_WEIGHT = 0.02
@@ -286,6 +288,12 @@ SHAPING_GAMMA = 1.0
 UNKNOWN_HOPS = 8.0
 DIST_NORM = 4096.0
 RAILS_AUX_POSITIVE_SCALE = 0.05
+# Combat must remain locally learnable on rails: miss taxes are unscaled, so
+# scaling only hit/kill positives makes correct shooting systematically worse.
+RAILS_UNSCALED_COMBAT_TERMS: frozenset[str] = frozenset({
+    "enemy_damage",
+    "enemy_kill",
+})
 # Rails clawbacks mirror scaled pickup crumbs (exploration keeps full ±4.0).
 RAILS_SCALED_CLAWBACK_TERMS: frozenset[str] = frozenset({
     "shotgun_return",
@@ -475,6 +483,8 @@ def compute_reward(
         "enemy_kill": 0.0,
         "attack_miss": 0.0,
         "ammo_waste": 0.0,
+        "attack_dry_fire": 0.0,
+        "attack_macro_failure": 0.0,
     }
 
     prev_room = str(prev_state.get("room_id", ""))
@@ -523,8 +533,12 @@ def compute_reward(
                     and planner.next_waypoint_room() == str(target):
                 bd["retreat"] = RETREAT_PENALTY
             elif room != str(target):
-                off_route = graph.hop_distance(room, str(target)) is None
-                if off_route and graph.knows_room(str(target)):
+                prev_hops = graph.hop_distance(prev_room, str(target))
+                now_hops = graph.hop_distance(room, str(target))
+                off_rails = now_hops is None or (
+                    prev_hops is not None and now_hops >= prev_hops
+                )
+                if off_rails and graph.knows_room(str(target)):
                     claimed = progress.claim_offroute_penalty(room) \
                         if progress is not None else True
                     if claimed:
@@ -741,6 +755,10 @@ def compute_reward(
                 rounds,
                 ammo_before=ammo_before,
             )
+    if state.get("attack_dry_fire"):
+        bd["attack_dry_fire"] = ATTACK_DRY_FIRE_PENALTY
+    elif state.get("attack_macro_failure"):
+        bd["attack_macro_failure"] = ATTACK_MACRO_FAILURE_PENALTY
 
     if progress is not None and progress.kenneth_gate_breached:
         for term, value in bd.items():
@@ -751,7 +769,7 @@ def compute_reward(
         for term, value in tuple(bd.items()):
             if term == "checkpoint_success":
                 continue
-            if value > 0.0:
+            if value > 0.0 and term not in RAILS_UNSCALED_COMBAT_TERMS:
                 bd[term] = value * RAILS_AUX_POSITIVE_SCALE
             elif value < 0.0 and term in RAILS_SCALED_CLAWBACK_TERMS:
                 bd[term] = value * RAILS_AUX_POSITIVE_SCALE

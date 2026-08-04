@@ -70,6 +70,8 @@ def slim_progress_info(info: dict[str, Any]) -> dict[str, Any]:
             out["yawn_rails_capture"] = [
                 dict(c) for c in yr_caps if isinstance(c, dict)
             ]
+    if isinstance(info.get("logistics_sample"), dict):
+        out["logistics_sample"] = dict(info["logistics_sample"])
     return out
 
 

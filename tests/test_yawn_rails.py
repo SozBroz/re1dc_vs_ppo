@@ -79,6 +79,13 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     assert '"205"' not in text
     assert "serum" not in text
     assert any(cp["room_id"] == "20D" and "handgun_bullets" in cp["items_gained"] for cp in route)
+    tea_return = next(cp for cp in route if cp["checkpoint_id"] == "ammo_104")
+    assert tea_return["action_type"] == "navigate"
+    assert tea_return["items_gained"] == []
+    assert tea_return["success_condition"] == {
+        "type": "room_enter",
+        "room_id": "104",
+    }
     assert [(cp["room_id"], cp["checkpoint_id"]) for cp in route[43:]] == [
         ("20D", "richard_cutscene_20D"),
         ("204", "richard_forced_return_204"),
@@ -160,6 +167,43 @@ def test_lockpick_is_required_on_return_to_106_not_first_entry() -> None:
         state,
         progress=acquired,
         prev_state=prev,
+    )
+
+
+def test_lockpick_checkpoint_latches_203_entry_until_delayed_pickup() -> None:
+    planner = _planner(start_index=5)
+    progress = ProgressTracker()
+
+    assert not planner.advance_if_success(
+        _state("106"),
+        progress=progress,
+        prev_state=_state("203"),
+    )
+    progress.note_leg_acquired("lockpick")
+    assert planner.advance_if_success(
+        _state("106", inventory=["lockpick"]),
+        progress=progress,
+        prev_state=_state("106"),
+    )
+
+    progress.on_waypoint_advanced()
+    assert not progress.leg_room_transitions
+
+
+def test_lockpick_checkpoint_does_not_latch_wrong_return_room() -> None:
+    planner = _planner(start_index=5)
+    progress = ProgressTracker()
+
+    assert not planner.advance_if_success(
+        _state("106"),
+        progress=progress,
+        prev_state=_state("201"),
+    )
+    progress.note_leg_acquired("lockpick")
+    assert not planner.advance_if_success(
+        _state("106", inventory=["lockpick"]),
+        progress=progress,
+        prev_state=_state("106"),
     )
 
 

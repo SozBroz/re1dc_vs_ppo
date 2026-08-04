@@ -33,7 +33,14 @@ from re1_rl.world_state_encoder import WORLD_STATE_DIM
 from re1_rl.key_items import KEYS_HELD_DIM
 from re1_rl.maps_files import MAPS_FILES_DIM
 from re1_rl.milestone_features import MILESTONE_DIM
-from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, INVENTORY_OBS_DIM, PROPRIO_DIM, ROOM_VISITED_DIM
+from re1_rl.obs_encoder import (
+    BOX_DIM,
+    GOAL_DIM,
+    INVENTORY_OBS_DIM,
+    LOGISTICS_DIM,
+    PROPRIO_DIM,
+    ROOM_VISITED_DIM,
+)
 from re1_rl.weapon_damage import LAST_ATTACK_DIM, WEAPON_CARD_DIM
 from re1_rl.policy_config import POLICY_KWARGS
 from re1_rl.room_signature import ENEMY_ROSTER_DIM
@@ -50,6 +57,7 @@ GUIDEBOOK_OBS_KEYS = frozenset(
         "rooms_visited",
         "box",
         "inventory",
+        "logistics",
         "weapon_card",
         "last_attack",
         "history",
@@ -84,6 +92,7 @@ def test_make_re1_spaces_guidebook_keys_match_env() -> None:
     assert obs_space["rooms_visited"].shape == (ROOM_VISITED_DIM,)
     assert obs_space["box"].shape == (BOX_DIM,)
     assert obs_space["inventory"].shape == (INVENTORY_OBS_DIM,)
+    assert obs_space["logistics"].shape == (LOGISTICS_DIM,)
     assert obs_space["weapon_card"].shape == (WEAPON_CARD_DIM,)
     assert obs_space["last_attack"].shape == (LAST_ATTACK_DIM,)
     assert obs_space["history"].shape == (ROOM_HISTORY_DIM,)

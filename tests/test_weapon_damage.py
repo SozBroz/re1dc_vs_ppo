@@ -230,3 +230,34 @@ def test_equipped_clip_from_named_slots() -> None:
     assert equipped_clip_from_inventory_slots([("beretta", 12)], 0x02) == 12
     assert equipped_clip_from_inventory_slots([("knife", 1)], 0x01) == 0
     assert equipped_clip_from_inventory_slots([(0x02, 8)], 0x02) == 8
+
+
+def test_equipped_clip_uses_true_slot_with_duplicate_weapon_ids() -> None:
+    slots = [("beretta", 2), ("", 0), ("beretta", 11)]
+    assert equipped_clip_from_inventory_slots(slots, 0x02, 2) == 11
+    assert equipped_clip_from_inventory_slots(slots, 0x02, 1) == 0
+
+
+def test_weapon_card_exposes_identity_ammo_and_live_readiness() -> None:
+    card = encode_weapon_card(
+        weapon_id=0x02,
+        equipped_clip=7,
+        room_id="210",
+        equipped_slot_0based=2,
+        reserve_ammo=30,
+        total_fireable=37,
+        hittable_enemies=2,
+        nearest_distance=1000,
+        nearest_bearing_sin=0.5,
+        nearest_bearing_cos=-0.5,
+        nearest_relative_height=128,
+        aim_ready=True,
+        recovery_ready=True,
+        weapon_state_valid=True,
+    )
+    assert card[12] == pytest.approx(0x02 / 0x4B)
+    assert card[13] == pytest.approx(3 / 8)
+    assert card[14] == pytest.approx(30 / AMMO_QTY_NORM)
+    assert card[15] == pytest.approx(37 / AMMO_QTY_NORM)
+    assert card[16] == pytest.approx(2 / 6)
+    assert card[21:24].tolist() == [1.0, 1.0, 1.0]

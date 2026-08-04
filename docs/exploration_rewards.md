@@ -11,8 +11,9 @@ contract:
 
 - completing the active atomic checkpoint pays `checkpoint_success = +1.2` and
   terminates the one-leg episode successfully;
-- every other positive component is multiplied by `0.05` in rails mode, making
-  checkpoint completion the strongest positive signal;
+- every other positive component is multiplied by `0.05` in rails mode except
+  confirmed enemy damage/kill, which stays unscaled so the unscaled miss taxes
+  do not make correct combat systematically unattractive;
 - negative terms retain their magnitudes and anti-farm behavior;
 - a qualified cutscene can pay only on the same transition as a newly rewarded
   room entry. Same-room interact/message/cutscene spam never pays;
@@ -148,23 +149,27 @@ settle. Re-entering dining never pays again.
 
 ## Combat pay (#7 / #8)
 
-Hit / kill pay only when the step is an actual **knife** or **attack** action. Enemy HP flicker on interact / door / cutscene without a combat action must **not** pay. Magnitudes are independent statics: **+0.007** per enemy HP damaged, **+0.24** per kill (not × `CHECKPOINT_REWARD`).
+Hit / kill pay only when the step is an actual **knife** or **attack** action. Enemy HP flicker on interact / door / cutscene without a combat action must **not** pay. Magnitudes are independent statics: **+0.007** per enemy HP damaged, **+0.24** per kill (not × `CHECKPOINT_REWARD`). These combat positives retain the same magnitude in Yawn rails.
 
 ## Miss / ammo waste
 
 On `attack_missed` with `ammo_spent > 0` only (hits pay nothing; knife has no
 clip tax):
 
-`per_missed_round = −ITEM_PICKUP_BONUS / clip_size`
+`per_missed_round = −AMMO_PICKUP_BONUS / clip_size × 0.10`
 
 Full inverse of one junk/ammo pickup, split across the magazine / pack. No 0.5×
 halve (clip amortization is the adjustment).
 
 | Weapon | clip_size | per missed round |
 |--------|-----------|------------------|
-| Beretta / handgun | 15 | −0.01 |
-| Shotgun | 7 | ≈ −0.021429 |
-| Magnum / dumdum | 6 | −0.025 |
+| Beretta / handgun | 15 | ≈ −0.013333 |
+| Shotgun | 7 | ≈ −0.028571 |
+| Magnum / dumdum | 6 | ≈ −0.033333 |
+
+The tax ramps toward `−0.15` for the last remaining round. Knife whiffs pay
+`−0.001`; dry fire pays `−0.005`; rejected/failed attack macros pay `−0.01`.
+All remain unscaled in Yawn rails.
 | Grenade launcher / bazooka / rocket (acid/flame/explosive) | 6 (pack size; chamber holds 1) | −0.025 |
 
 `ATTACK_MISS_PENALTY` / `KNIFE_MISS_PENALTY` / `AMMO_WASTE_PENALTY` remain 0.0

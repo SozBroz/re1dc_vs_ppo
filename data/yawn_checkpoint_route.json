@@ -73,11 +73,11 @@
     "seq": 8,
     "checkpoint_id": "ammo_104",
     "room_id": "104",
-    "objective": "Collect the Tea Room handgun bullets",
-    "action_type": "pickup",
+    "objective": "Pass through the Tea Room toward the Bar",
+    "action_type": "navigate",
     "required_items": [],
-    "items_gained": ["handgun_bullets"],
-    "success_condition": {"type": "all_of", "conditions": [{"type": "room_enter", "room_id": "104"}, {"type": "acquired_item", "item": "handgun_bullets"}]}
+    "items_gained": [],
+    "success_condition": {"type": "room_enter", "room_id": "104"}
   },
   {
     "seq": 9,

@@ -16,5 +16,8 @@
   ],
   "success_room": "210",
   "required_items": [],
+  "logistics_horizon": "next_box_or_boss",
+  "learned_loadout_labels": true,
+  "loadout_shaping_scope": "box_rooms_only",
   "max_steps": 16200
 }

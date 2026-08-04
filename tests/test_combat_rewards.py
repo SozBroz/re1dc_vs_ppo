@@ -15,6 +15,7 @@ from re1_rl.reward import (
     ENEMY_KILL_REWARD,
     REFERENCE_STEP_FRAMES,
     STEP_PENALTY,
+    KNIFE_MISS_PENALTY,
     compute_reward,
 )
 from tests.test_scaffolding import make_planner, make_state
@@ -48,7 +49,7 @@ def test_knife_miss_penalty_and_scaled_step_contempt() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["attack_miss"] == 0.0
+    assert bd["attack_miss"] == pytest.approx(KNIFE_MISS_PENALTY)
     assert bd["step"] == STEP_PENALTY * (42 / REFERENCE_STEP_FRAMES)
 
 

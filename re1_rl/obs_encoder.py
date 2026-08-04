@@ -156,6 +156,27 @@ BOX_FIELDS: list[tuple[str, str]] = [
 
 BOX_DIM = len(BOX_FIELDS)  # 34
 
+LOGISTICS_FIELDS: list[tuple[str, str]] = [
+    ("valid", "1 = route horizon is available"),
+    ("required_item0_id", "required item identity / 0x4B"),
+    ("required_item1_id", "required item identity / 0x4B"),
+    ("required_item2_id", "required item identity / 0x4B"),
+    ("required_item3_id", "required item identity / 0x4B"),
+    ("required_count", "distinct required route items / 8"),
+    ("gained_slots", "declared item gains before horizon end / 8"),
+    ("consumed_slots", "declared consumptions before horizon end / 8"),
+    ("net_slot_pressure", "(gains - consumptions) / 8"),
+    ("checkpoints_remaining", "checkpoints through next box or boss / 16"),
+    ("boss_ahead", "1 = horizon terminates at a fight objective"),
+    ("no_box_ahead", "1 = boss/end occurs before another box"),
+    ("next_box_ahead", "1 = horizon terminates at a later item box"),
+    ("horizon_graph_distance", "door hops to horizon endpoint / 20"),
+    ("mandatory_pickup_slots", "declared gains not also consumed / 8"),
+    ("held_required_fraction", "fraction of required route items currently held"),
+    ("current_free_slots", "free on-person inventory slots / 8"),
+]
+LOGISTICS_DIM = len(LOGISTICS_FIELDS)
+
 # Episode-local visited-room flags; indices match ``room_index`` (116 rooms, /128 pad).
 ROOM_VISITED_DIM = 128
 
@@ -320,6 +341,78 @@ class ObsEncoder:
             slot[15] = 1.0 if str(room).upper() in BOX_ROOMS else 0.0
             slot[16] = projected_free / float(INVENTORY_SLOTS)
 
+    def encode_logistics(
+        self,
+        state: dict[str, Any],
+        planner: WaypointPlanner,
+    ) -> np.ndarray:
+        """Factual route semantics through the next later box or fight."""
+        v = np.zeros(LOGISTICS_DIM, dtype=np.float32)
+        rows: list[dict[str, Any]] = []
+        boss_ahead = False
+        next_box_ahead = False
+        for offset in range(planner.waypoints_remaining):
+            step = planner.peek_objective(offset)
+            room = planner.peek_waypoint_room(offset)
+            if step is None or room is None:
+                break
+            rows.append(step)
+            is_current_box = offset == 0 and str(state.get("room_id", "")).upper() in BOX_ROOMS
+            if step.get("action_type") == "fight":
+                boss_ahead = True
+                break
+            if str(room).upper() in BOX_ROOMS and not is_current_box:
+                next_box_ahead = True
+                break
+        if not rows:
+            return v
+        required = sorted({
+            canonical_item(str(item))
+            for row in rows
+            for item in row.get("required_items", [])
+            if canonical_item(str(item))
+        })
+        gained = [
+            canonical_item(str(item.get("item") if isinstance(item, dict) else item))
+            for row in rows
+            for item in row.get("items_gained", [])
+        ]
+        consumed = [
+            canonical_item(str(item.get("item") if isinstance(item, dict) else item))
+            for row in rows
+            for item in row.get("consume_before_gain", [])
+        ]
+        held = {
+            canonical_item(str(entry[0] if isinstance(entry, (tuple, list)) else entry))
+            for entry in (state.get("inventory_slots") or state.get("inventory") or [])
+            if entry and (not isinstance(entry, (tuple, list)) or entry[0])
+        }
+        occupied = sum(
+            bool(entry and (not isinstance(entry, (tuple, list)) or entry[0]))
+            for entry in (state.get("inventory_slots") or state.get("inventory") or [])
+        )
+        v[0] = 1.0
+        for i, name in enumerate(required[:4]):
+            v[1 + i] = _NAME_TO_ITEM_ID.get(name, 0) / float(MAX_ITEM_ID)
+        v[5] = min(len(required) / 8.0, 1.0)
+        v[6] = min(len(gained) / 8.0, 1.0)
+        v[7] = min(len(consumed) / 8.0, 1.0)
+        v[8] = float(np.clip((len(gained) - len(consumed)) / 8.0, -1.0, 1.0))
+        v[9] = min(len(rows) / 16.0, 1.0)
+        v[10] = 1.0 if boss_ahead else 0.0
+        v[11] = 0.0 if next_box_ahead else 1.0
+        v[12] = 1.0 if next_box_ahead else 0.0
+        endpoint_room = str(rows[-1].get("room_id", ""))
+        hops = self.graph.hop_distance(str(state.get("room_id", "")), endpoint_room)
+        v[13] = 1.0 if hops is None else min(float(hops) / 20.0, 1.0)
+        v[14] = min(len([name for name in gained if name not in consumed]) / 8.0, 1.0)
+        v[15] = (
+            len(set(required) & held) / float(len(required))
+            if required else 1.0
+        )
+        v[16] = max(0, INVENTORY_SLOTS - occupied) / float(INVENTORY_SLOTS)
+        return v
+
 
 def encode_inventory_slots(
     inventory_slots: list[tuple[str, int]] | None,
@@ -376,6 +469,8 @@ def explain_obs(obs: dict[str, np.ndarray]) -> dict[str, Any]:
         out["spatial"] = explain_vector(obs["spatial"], SPATIAL_FIELDS)
     if "box" in obs:
         out["box"] = explain_vector(obs["box"], BOX_FIELDS)
+    if "logistics" in obs:
+        out["logistics"] = explain_vector(obs["logistics"], LOGISTICS_FIELDS)
     if "weapon_card" in obs:
         from re1_rl.weapon_damage import WEAPON_CARD_FIELDS
 
@@ -407,7 +502,7 @@ def format_obs_table(obs: dict[str, np.ndarray], *, spatial_nonzero_only: bool =
     """
     lines: list[str] = []
     ex = explain_obs(obs)
-    for section in ("proprio", "goal", "spatial", "box", "weapon_card", "last_attack"):
+    for section in ("proprio", "goal", "spatial", "box", "logistics", "weapon_card", "last_attack"):
         if section not in ex:
             continue
         lines.append(f"--- {section} ---")

@@ -103,6 +103,22 @@ masked six-checkpoint semantic lookahead in `goal`; only the immediate
 checkpoint owns the door compass. This lets box/inventory choices experience
 their downstream consequences without allowing the planner to select actions.
 
+### Learned box-to-outcome logistics
+
+Inventory planning uses a factual horizon from the current item box through the
+next later box or boss. The `logistics` observation contains route-declared
+requirements, gains/consumptions, slot pressure, checkpoint count, and
+box/boss termination flags. It does **not** prescribe weapons, ammunition, or
+healing quantities, and it does not change the immediate door compass.
+
+When Jill leaves a box, the environment carries a semantic departure snapshot
+across rollout boundaries until the next box, boss completion, death, or
+truncation. A learner-side bounded replay scorer predicts completion, survival,
+and progress from observed outcomes. Only after positive/negative coverage and
+a calibration gate pass may a frozen-per-learner-epoch scorer add clipped
+potential deltas to policy-selected legal box transfers. Guidance is disabled
+outside box rooms and capped well below one checkpoint reward per visit.
+
 ---
 
 ## Evil Resource analogy — the guidebook, not the walkthrough
@@ -266,6 +282,7 @@ Before implementing:
 | RDT interactables | **In spatial** | `rdt_interactables.json`, nearest box/typewriter/trigger |
 | Map/file flags | **In obs** | `maps_files` u16 bitfield |
 | Goal / checkpoint compass | **Live for Yawn rails** | `obs_encoder.encode_goal()`, fused by `RE1CombatEfficientExtractor` |
+| Box-to-next-box/boss logistics | **Live, outcome-trained** | `obs_encoder.encode_logistics()`, `loadout_learning.py` |
 | Combat macros | **Live** | `attack_macro.py`, `knife_macro.py` |
 | Box inventory RAM | **Allowed** | `item_box.py`, magic deposit/withdraw actions |
 | Story / SCD flags | **Sparse** | `scripts/hunt_scd_flags.py` → `data/scd_work_flags.json` |
@@ -307,6 +324,7 @@ When briefing progress against the north star:
 
 ---
 
-*Document version: 1.3 — 2026-08-03. Retires free exploration as the primary
+*Document version: 1.4 — 2026-08-04. Retires free exploration as the primary
 strategy and requires checkpoint/compass goal fusion for rails training while
-preserving the ban on navigation and puzzle actuation macros.*
+preserving the ban on navigation and puzzle actuation macros. Adds factual,
+learned box-to-outcome logistics without scripted loadouts.*

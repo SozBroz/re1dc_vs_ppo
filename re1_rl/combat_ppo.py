@@ -26,6 +26,12 @@ from re1_rl.combat_targets import (
     WORLD_EVENT_DIM,
     combat_target_to_outcome_vector,
 )
+from re1_rl.loadout_learning import (
+    LoadoutReplay,
+    LoadoutValueNet,
+    frozen_copy,
+    train_loadout_scorer,
+)
 
 ATTACK_GROUP = frozenset({ATTACK_ACTION, ATTACK_UP_ACTION, ATTACK_DOWN_ACTION})
 DEFAULT_AUX_COEF = 0.02
@@ -198,6 +204,37 @@ class CombatEfficientPPO(MaskablePPO):
             _init_setup_model=_init_setup_model,
             **kwargs,
         )
+        self.loadout_scorer = LoadoutValueNet().to(self.device)
+        self.loadout_optimizer = th.optim.Adam(
+            self.loadout_scorer.parameters(), lr=1e-3
+        )
+        self.loadout_replay = LoadoutReplay()
+        self.frozen_loadout_scorer = frozen_copy(self.loadout_scorer).to(self.device)
+        self.loadout_calibrated = False
+        self.loadout_stats: dict[str, float] = {}
+
+    def prepare_loadout_epoch(
+        self, samples: list[dict[str, Any]]
+    ) -> dict[str, float]:
+        """Train on bounded replay, then freeze guidance for this learner epoch."""
+        self.loadout_replay.extend(samples)
+        self.loadout_stats = train_loadout_scorer(
+            self.loadout_scorer,
+            self.loadout_replay,
+            self.loadout_optimizer,
+            device=th.device(self.device),
+        )
+        self.loadout_calibrated = bool(self.loadout_stats.get("calibrated", 0.0))
+        self.frozen_loadout_scorer = frozen_copy(self.loadout_scorer).to(self.device)
+        return dict(self.loadout_stats)
+
+    def _get_torch_save_params(self) -> tuple[list[str], list[str]]:
+        state_dicts, variables = super()._get_torch_save_params()
+        return [
+            *state_dicts,
+            "loadout_scorer",
+            "loadout_optimizer",
+        ], variables
 
     def set_auxiliary_targets(
         self,

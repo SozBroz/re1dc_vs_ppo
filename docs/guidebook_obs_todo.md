@@ -20,7 +20,7 @@
 | Enemy signature | HP count only | No positions/types in spatial |
 | Door exits | bearing/dist | No open/locked; `door_flags` read but discarded |
 | Episode history | `rooms_visited` set | No order, cutscenes, or milestones |
-| Goal compass | zeros | Correct per north star |
+| Goal compass | live in Yawn rails | Allowed only by explicit goal-conditioned curriculum contract |
 
 ---
 

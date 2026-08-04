@@ -76,7 +76,10 @@ def test_mask_blocks_knife_from_unmapped_locomotion() -> None:
 
 def test_mask_allows_knife_from_standing_idle_hook() -> None:
 
-    m = action_mask(N_ACTIONS, None, player_anim=0x0D, player_aux=0x01, player_recovery=0)
+    m = action_mask(
+        N_ACTIONS, None, player_anim=0x0D, player_aux=0x01,
+        player_recovery=0, equipped_weapon_id=0x01,
+    )
 
     assert m[ATTACK_ACTION]
 
@@ -86,7 +89,7 @@ def test_mask_allows_knife_from_standing_idle_hook() -> None:
 
 def test_mask_allows_knife_from_idle() -> None:
 
-    m = action_mask(N_ACTIONS, None)
+    m = action_mask(N_ACTIONS, None, equipped_weapon_id=0x01)
 
     assert m[ATTACK_ACTION]
 
@@ -98,7 +101,7 @@ def test_mask_allows_knife_after_run_forward() -> None:
 
     run_forward = ACTION_NAMES.index("run_forward")
 
-    m = action_mask(N_ACTIONS, run_forward)
+    m = action_mask(N_ACTIONS, run_forward, equipped_weapon_id=0x01)
 
     assert m[ATTACK_ACTION]
 
@@ -110,7 +113,7 @@ def test_mask_allows_knife_after_walk() -> None:
 
     forward = ACTION_NAMES.index("forward")
 
-    m = action_mask(N_ACTIONS, forward)
+    m = action_mask(N_ACTIONS, forward, equipped_weapon_id=0x01)
 
     assert m[ATTACK_ACTION]
 
@@ -118,7 +121,7 @@ def test_mask_allows_knife_after_walk() -> None:
 
 
 
-def test_env_action_masks_uses_ram_hooks() -> None:
+def test_env_action_masks_fails_closed_without_ram_bridge() -> None:
 
     from gymnasium import spaces
 
@@ -164,7 +167,7 @@ def test_env_action_masks_uses_ram_hooks() -> None:
 
     }
 
-    assert env.action_masks()[ATTACK_ACTION]
+    assert not env.action_masks()[ATTACK_ACTION]
 
 
 
@@ -218,4 +221,54 @@ def test_knife_vs_gun_near_bands_mask() -> None:
         mask_combat_without_enemies=True,
     )
     assert m_close[ATTACK_DOWN_ACTION]
+
+
+def test_mask_blocks_equip_during_gun_stable_aim() -> None:
+    from re1_rl.action_mask import EQUIP_ACTION, USE_ACTION
+
+    inv = [(0x01, 1), (0x02, 15)]
+    m = action_mask(
+        N_ACTIONS,
+        None,
+        player_anim=0x13,
+        player_aux=0x03,
+        player_recovery=0,
+        equipped_weapon_id=0x02,
+        inventory=inv,
+    )
+    assert m[ATTACK_ACTION]
+    assert not m[EQUIP_ACTION]
+    assert not m[USE_ACTION]
+
+
+def test_mask_blocks_equip_during_gun_raise() -> None:
+    from re1_rl.action_mask import EQUIP_ACTION
+
+    inv = [(0x01, 1), (0x02, 15)]
+    m = action_mask(
+        N_ACTIONS,
+        None,
+        player_anim=0x12,
+        player_aux=0x03,
+        player_recovery=0,
+        equipped_weapon_id=0x02,
+        inventory=inv,
+    )
+    assert not m[EQUIP_ACTION]
+
+
+def test_mask_allows_equip_from_standing_gun_idle() -> None:
+    from re1_rl.action_mask import EQUIP_ACTION
+
+    inv = [(0x01, 1), (0x02, 15)]
+    m = action_mask(
+        N_ACTIONS,
+        None,
+        player_anim=0x0D,
+        player_aux=0x01,
+        player_recovery=0,
+        equipped_weapon_id=0x02,
+        inventory=inv,
+    )
+    assert m[EQUIP_ACTION]
 

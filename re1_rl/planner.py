@@ -147,6 +147,11 @@ class WaypointPlanner:
 
         step = self.current_objective() or {}
         cond = step.get("success_condition")
+        if progress is not None and prev_state is not None:
+            progress.note_leg_room_transition(
+                str(prev_state.get("room_id", "")),
+                str(state.get("room_id", "")),
+            )
 
         if self._condition_met(cond, state, str(wp_room), progress, prev_state):
             self._index += 1
@@ -202,13 +207,17 @@ class WaypointPlanner:
             return False
 
         if cond_type == "room_enter_from":
-            if prev_state is None:
-                return False
             target = str(cond.get("room_id", wp_room))
             from_ids = {str(r) for r in cond.get("from_room_ids", [])}
-            return (
-                str(state.get("room_id", "")) == target
+            immediate = (
+                prev_state is not None
+                and str(state.get("room_id", "")) == target
                 and str(prev_state.get("room_id", "")) in from_ids
+            )
+            return immediate or (
+                progress is not None
+                and str(state.get("room_id", "")) == target
+                and progress.leg_entered_from(target, from_ids)
             )
 
         if cond_type == "observed_cutscene":

@@ -7,7 +7,14 @@ from gymnasium import spaces
 
 from re1_rl.env import ACTION_NAMES, FRAME_SHAPE, FRAME_SHAPE_CHW
 from re1_rl.episode_history import ACQUISITION_LOG_DIM, ROOM_HISTORY_DIM
-from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, INVENTORY_OBS_DIM, PROPRIO_DIM, ROOM_VISITED_DIM
+from re1_rl.obs_encoder import (
+    BOX_DIM,
+    GOAL_DIM,
+    INVENTORY_OBS_DIM,
+    LOGISTICS_DIM,
+    PROPRIO_DIM,
+    ROOM_VISITED_DIM,
+)
 from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM
 from re1_rl.item_affordances import AFFORDANCES_DIM
 from re1_rl.world_state_encoder import WORLD_STATE_DIM
@@ -31,6 +38,7 @@ def make_re1_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
             "rooms_visited": spaces.Box(0.0, 1.0, shape=(ROOM_VISITED_DIM,), dtype="float32"),
             "box": spaces.Box(0.0, 2.0, shape=(BOX_DIM,), dtype="float32"),
             "inventory": spaces.Box(0.0, 1.0, shape=(INVENTORY_OBS_DIM,), dtype="float32"),
+            "logistics": spaces.Box(-1.0, 1.0, shape=(LOGISTICS_DIM,), dtype="float32"),
             "weapon_card": spaces.Box(0.0, 1.0, shape=(WEAPON_CARD_DIM,), dtype="float32"),
             "last_attack": spaces.Box(0.0, 1.0, shape=(LAST_ATTACK_DIM,), dtype="float32"),
             "history": spaces.Box(0.0, 1.0, shape=(ROOM_HISTORY_DIM,), dtype="float32"),

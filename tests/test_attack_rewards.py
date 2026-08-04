@@ -183,3 +183,24 @@ def test_breakdown_keys_present() -> None:
     )
     assert "attack_miss" in bd
     assert "ammo_waste" in bd
+
+
+def test_yawn_rails_keeps_combat_hit_positive_unscaled_against_miss_tax() -> None:
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    hit = make_state(hp=96, step=2)
+    hit["enemy_damage"] = 4
+    _, hit_bd = compute_reward(
+        prev, hit, planner, progress=ProgressTracker(),
+        rails_mode=True, return_breakdown=True,
+    )
+    miss = make_state(hp=96, step=2)
+    miss["attack_missed"] = True
+    miss["ammo_spent"] = 1
+    miss["equipped_weapon_id"] = 0x02
+    _, miss_bd = compute_reward(
+        prev, miss, make_planner(), progress=ProgressTracker(),
+        rails_mode=True, return_breakdown=True,
+    )
+    assert hit_bd["enemy_damage"] == pytest.approx(4 * ENEMY_DAMAGE_REWARD)
+    assert hit_bd["enemy_damage"] > abs(miss_bd["ammo_waste"])

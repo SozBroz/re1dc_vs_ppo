@@ -29,6 +29,7 @@ from re1_rl.obs_encoder import (
     GOAL_LOOKAHEAD_SLOTS,
     INVENTORY_OBS_DIM,
     INVENTORY_SLOTS,
+    LOGISTICS_DIM,
     MAX_ITEM_ID,
     PROPRIO_DIM,
     PROPRIO_FIELDS,
@@ -404,12 +405,16 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
         )
         self.goal_lookahead_pool = _MaskedPool()
         self.goal_lookahead_out = nn.Linear(8, GOAL_TOWER_DIM)
+        self.logistics_mlp = nn.Sequential(
+            nn.Linear(LOGISTICS_DIM, GOAL_TOWER_DIM),
+            nn.ReLU(),
+        )
 
         combat_in = WEAPON_CARD_DIM + LAST_ATTACK_DIM + ENEMY_ROSTER_DIM
         self.combat_mlp = nn.Sequential(
-            nn.Linear(combat_in, 128),
+            nn.Linear(combat_in, 115),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(115, 128),
             nn.ReLU(),
         )
 
@@ -540,6 +545,10 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
         goal = goal + self.goal_lookahead_out(
             self.goal_lookahead_pool(lookahead_tokens, lookahead[:, :, 0])
         )
+        logistics = self.logistics_mlp(
+            self._optional_tensor(observations, "logistics", LOGISTICS_DIM)
+        )
+        goal = goal + logistics
         combat_enc = self.combat_mlp(
             th.cat(
                 [
