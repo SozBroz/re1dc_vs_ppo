@@ -36,8 +36,8 @@
     "objective": "Reach Main Hall after Kenneth",
     "action_type": "navigate",
     "required_items": [],
-    "items_gained": ["lockpick"],
-    "success_condition": {"type": "all_of", "conditions": [{"type": "room_enter", "room_id": "106"}, {"type": "acquired_item", "item": "lockpick"}]}
+    "items_gained": [],
+    "success_condition": {"type": "room_enter", "room_id": "106"}
   },
   {
     "seq": 5,
@@ -53,11 +53,11 @@
     "seq": 6,
     "checkpoint_id": "barry_hall_return_106",
     "room_id": "106",
-    "objective": "Return from 2F to Main Hall",
-    "action_type": "navigate",
+    "objective": "Return from 2F to Main Hall and receive Barry's lockpick",
+    "action_type": "pickup",
     "required_items": [],
-    "items_gained": [],
-    "success_condition": {"type": "room_enter_from", "room_id": "106", "from_room_ids": ["203", "201", "207"]}
+    "items_gained": ["lockpick"],
+    "success_condition": {"type": "all_of", "conditions": [{"type": "room_enter_from", "room_id": "106", "from_room_ids": ["203"]}, {"type": "acquired_item", "item": "lockpick"}]}
   },
   {
     "seq": 7,
@@ -114,11 +114,11 @@
     "seq": 12,
     "checkpoint_id": "ink_106",
     "room_id": "106",
-    "objective": "Collect Main Hall ink ribbons",
+    "objective": "Collect Main Hall ink ribbons and save",
     "action_type": "pickup",
     "required_items": [],
     "items_gained": ["ink_ribbon"],
-    "success_condition": {"type": "all_of", "conditions": [{"type": "room_enter", "room_id": "106"}, {"type": "acquired_item", "item": "ink_ribbon"}]}
+    "success_condition": {"type": "all_of", "conditions": [{"type": "room_enter", "room_id": "106"}, {"type": "acquired_item", "item": "ink_ribbon"}, {"type": "typewriter_save"}, {"type": "lacks_item", "item": "ink_ribbon"}]}
   },
   {
     "seq": 13,
@@ -174,11 +174,11 @@
     "seq": 18,
     "checkpoint_id": "barry_rescue_115",
     "room_id": "115",
-    "objective": "Trigger the ceiling trap rescue",
+    "objective": "Keep the shotgun, re-enter the trap room, and trigger the ceiling-lowering rescue",
     "action_type": "navigate",
     "required_items": ["shotgun"],
     "items_gained": [],
-    "success_condition": {"type": "room_enter_from", "room_id": "115", "from_room_ids": ["116"]}
+    "success_condition": {"type": "all_of", "conditions": [{"type": "room_enter_from", "room_id": "115", "from_room_ids": ["116"]}, {"type": "has_item", "item": "shotgun"}, {"type": "observed_cutscene", "prefix": "115:"}]}
   },
   {
     "seq": 19,

@@ -135,6 +135,77 @@ def test_checkpoint_requires_this_leg_pickup_and_pays_terminal_1_2() -> None:
     assert reward > CHECKPOINT_REWARD - 0.01
 
 
+def test_lockpick_is_required_on_return_to_106_not_first_entry() -> None:
+    first_entry = _planner(start_index=3)
+    assert first_entry.advance_if_success(_state("106"), progress=ProgressTracker())
+
+    return_entry = _planner(start_index=5)
+    prev = _state("203")
+    state = _state("106", inventory=["lockpick"])
+    assert not return_entry.advance_if_success(
+        state,
+        progress=ProgressTracker(),
+        prev_state=prev,
+    )
+
+    acquired = ProgressTracker()
+    acquired.note_leg_acquired("lockpick")
+    wrong_return = _planner(start_index=5)
+    assert not wrong_return.advance_if_success(
+        state,
+        progress=acquired,
+        prev_state=_state("201"),
+    )
+    assert return_entry.advance_if_success(
+        state,
+        progress=acquired,
+        prev_state=prev,
+    )
+
+
+def test_main_hall_ink_checkpoint_requires_pickup_and_save() -> None:
+    planner = _planner(start_index=11)
+    progress = ProgressTracker()
+    progress.note_leg_acquired("ink_ribbon")
+    state = _state("106", inventory=["ink_ribbon"])
+    assert not planner.advance_if_success(state, progress=progress)
+
+    saved = dict(state, typewriter_save_complete=True)
+    assert not planner.advance_if_success(saved, progress=progress)
+
+    ribbons_consumed = _state("106")
+    ribbons_consumed["typewriter_save_complete"] = True
+    assert planner.advance_if_success(ribbons_consumed, progress=progress)
+
+
+def test_shotgun_rescue_requires_reentry_shotgun_and_ceiling_cutscene() -> None:
+    prev = _state("116", inventory=["shotgun"])
+    state = _state("115", inventory=["shotgun"])
+
+    no_cutscene = _planner(start_index=17)
+    assert not no_cutscene.advance_if_success(
+        state,
+        progress=ProgressTracker(),
+        prev_state=prev,
+    )
+
+    no_shotgun = _planner(start_index=17)
+    observed = ProgressTracker()
+    observed.observe_cutscene("115:ceiling_lowering")
+    assert not no_shotgun.advance_if_success(
+        _state("115"),
+        progress=observed,
+        prev_state=prev,
+    )
+
+    rescued = _planner(start_index=17)
+    assert rescued.advance_if_success(
+        state,
+        progress=observed,
+        prev_state=prev,
+    )
+
+
 def test_goal_encodes_selected_one_leg_checkpoint() -> None:
     graph = _graph()
     encoder = ObsEncoder(ROOMS, graph, curriculum_stage_index=1)
