@@ -1,7 +1,7 @@
 @echo off
 REM workhorse2 learner — 28 local envs (Doc04 medium RAM/VRAM budget); sync 360
 REM Headroom: @32 envs 10m soak peak ~41GB used / ~24GB free (pages_input~0).
-REM Package: sync 360 wall + n_steps=1536 (~205s emu / ~4.5 γ HL) + batch_size=4096 + n_epochs=4.
+REM Package: sync 360 wall + n_steps=675 (6x gamma HL) + batch_size=2048 + n_epochs=4.
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE=workhorse2
@@ -47,5 +47,4 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --resume auto ^
   --headless ^
   --screenshot-mmf ^
-  --n-steps 1536 ^
   --inference-batch-max %N_ENVS% >> data\logs\learner_wh2_25.log 2>&1

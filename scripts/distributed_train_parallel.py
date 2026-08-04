@@ -193,8 +193,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=int(DISTRIBUTED_EPOCH_HYPERPARAMS["n_steps"]),
         help=(
             "per-env MC rollout horizon before buffer (default: "
-            f"{int(DISTRIBUTED_EPOCH_HYPERPARAMS['n_steps'])} ≈ 4.5× γ half-life "
-            "emulated; sync_interval_s is wall clock, not emulated time)"
+            f"{int(DISTRIBUTED_EPOCH_HYPERPARAMS['n_steps'])} steps; "
+            "sync_interval_s is wall clock, not emulated time)"
         ),
     )
 

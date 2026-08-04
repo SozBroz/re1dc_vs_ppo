@@ -61,7 +61,11 @@ def _state(room: str, *, inventory=(), new_items=(), x=0, z=0) -> dict:
 
 def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     route = json.loads(ROUTE.read_text(encoding="utf-8"))
+    curriculum = json.loads(
+        (ROOT / "curriculum/yawn_rails_one_leg.json").read_text(encoding="utf-8")
+    )
     assert validate_route(route, graph=_graph()) == []
+    assert curriculum["max_steps"] == 2700  # 6 min at 8 frames/step and 60fps.
     text = json.dumps(route).lower()
     assert '"205"' not in text
     assert "serum" not in text

@@ -31,21 +31,21 @@ The exploration magnitudes below remain the archival/non-rails contract.
 
 | # | Event | Magnitude | Episode | Status |
 |---|--------|-----------|---------|--------|
-| 1 | New room entered | **+4.0** | Extends **+12 min** idle cap | In force |
+| 1 | New room entered | **+4.0** | Extends **+6 min** idle cap | In force |
 | 2 | Qualified ≥7.5s freeze paired with a newly rewarded room entry | **+1.2** | Resets stagnation clock | In force |
-| 3 | New key item | **+4.0** | Extends **+12 min** idle cap | In force |
-| 4 | Using key item | **+4.0** | Extends **+12 min** idle cap | In force |
-| 5 | Weapon pickup (including wall shotgun) | **+4.0** | Extends **+12 min** idle cap (first acquire of that weapon this episode) | In force |
+| 3 | New key item | **+4.0** | Extends **+6 min** idle cap | In force |
+| 4 | Using key item | **+4.0** | Extends **+6 min** idle cap | In force |
+| 5 | Weapon pickup (including wall shotgun) | **+4.0** | Extends **+6 min** idle cap (first acquire of that weapon this episode) | In force |
 | 6 | Every non-key-item pickup | Modest: **0.15** | (no special rule stated) | In force |
 | 7 | Hitting an enemy | Modest: **+0.007 per HP** | (no special rule stated) | In force |
 | 8 | Killing an enemy | Modest: **+0.24** | (no special rule stated) | In force |
 | 9 | Story-driven interaction (Gallery portrait sequence) | Modest: **+0.5 per correct switch** | Extends | In force |
-| 10 | Document / book examine UI entered | **+4.0** | Extends **+12 min** idle cap (same path as new room) | In force |
-| 11 | Typewriter save completed | Modest: **+0.3** | (no 12 min floor raise; PB sidecar start holdoff) | In force |
+| 10 | Document / book examine UI entered | **+4.0** | Extends **+6 min** idle cap (same path as new room) | In force |
+| 11 | Typewriter save completed | Modest: **+0.3** | (no 6 min floor raise; PB sidecar start holdoff) | In force |
 
 Buckets:
 
-- **1, 3, 4, 5, 10**: **+4.0** and raise softlock idle truncate floor to **12 min** (weapons: first acquire of that name this episode; documents: first rising edge into examine UI per room this episode)
+- **1, 3, 4, 5, 10**: **+4.0** and reset the softlock idle truncate budget to **6 min** (weapons: first acquire of that name this episode; documents: first rising edge into examine UI per room this episode)
 - **2**: **+1.2** only when paired with new-room pay; same-room freezes are observed but unpaid
 - **6–8, 11**: modest crumbs / combat / save
 - **9**: **+0.5** per correct Gallery portrait switch; extends
@@ -54,7 +54,7 @@ Typewriter save (#11):
 
 - Same detector as PB capture (`TypewriterSaveDetector`): ink_ribbon drop in a
   typewriter room → save cinema → stable control. Pays **+0.3** on that complete
-  edge (`bd["typewriter_save"]`). Does not raise the 12 min idle floor.
+  edge (`bd["typewriter_save"]`). Does not reset the 6 min idle budget.
 - **Sidecar / PB starts:** holdoff until stable in_control + unchanged ribbon
   count so load settle cannot pay. Real saves after holdoff still pay.
 
@@ -142,7 +142,7 @@ Illegal pre-Kenneth transition into 106 withholds visit credit, applies −0.05,
 marks `wesker_pre_kenneth`, and terminates the episode.
 
 **Spawn room (dining 105 on m0):** marked visited at episode reset; the +4.0
-`new_room` (and 12 min idle floor) pays on the **first** `compute_reward` of the
+`new_room` (and 6 min idle budget) pays on the **first** `compute_reward` of the
 episode. That way dining discovery is not attributed to a later Wesker/door
 settle. Re-entering dining never pays again.
 
@@ -195,19 +195,19 @@ budget **1.0**: Fine→1 chip **−2/3**, death **−1/3**. Per-HP scale
 - The wall shotgun pays **+4.0** whenever Jill takes it and **−4.0** whenever
   she replaces it on the rack. A repeated take/replace loop is therefore net
   zero before step cost; leaving with the shotgun preserves the pickup reward.
-  Re-takes after a return do **not** re-raise the 12 min idle floor or reset
+  Re-takes after a return do **not** reset the 6 min idle budget or reset
   stagnation (blocks rack idle-clock farms).
 - Weapon ammunition increases caused by reloading are not weapon pickups.
 - New rooms, document examine, cutscenes, key items, story uses, gallery pays,
   and **first** weapon acquires reset the stagnation clock (junk/ammo/shotgun
   re-takes and document reopen in an already-paid room do not).
-- Idle contempt: **3 min grace**, then a **3→12 min** ramp. **Starting play
+- Idle contempt: **3 min grace**, then a **3→6 min** ramp. **Starting play
   budget and every progress extension** (new room / document examine / key
   pickup / key use / first weapon / gallery, via `SOFTLOCK_EXTENSION_FRAMES`)
-  are **12 min** emulated — one clock. Contempt budget is the independent
+  are **6 min** emulated — one clock. Contempt budget is the independent
   static **|death|/5 ≈ 0.06666666666666667** (`CONTEMPT_BUDGET_SCALED`).
-  Dense in scalar reward under main γ (**0.998188**, ~45s half-life with step
-  contempt) — no separate softlock MC channel.
+  Dense in scalar reward under main γ (**0.99386**, ~15s pure-discount
+  half-life) — no separate softlock MC channel.
 
 ## Agent rules
 
@@ -222,14 +222,14 @@ budget **1.0**: Fine→1 chip **−2/3**, death **−1/3**. Per-HP scale
 ```
 Event fired?
 ├─ Transition into 106 before Kenneth paid? → mark Wesker ledger bit; −0.05; terminate
-├─ New room (legal)? → pay #1 (+4.0, 12m idle floor)
-├─ Rising edge into document examine UI (0x40808100), unpaid room? → pay #10 (+4.0, 12m idle floor)
+├─ New room (legal)? → pay #1 (+4.0, reset 6m idle budget)
+├─ Rising edge into document examine UI (0x40808100), unpaid room? → pay #10 (+4.0, reset 6m idle budget)
 ├─ Freeze / text / “cutscene”?
 │  ├─ Total uninterrupted freeze <450 frames? → do NOT pay #2
 │  ├─ Menu / pickup / death / opening / pre-Kenneth hall? → do NOT pay #2
 │  └─ Otherwise → pay #2 (+1.2) once per key (long doors included)
-├─ Key item get / use? → #3 / #4 (+4.0, 12m idle floor)
-├─ Weapon get? → #5 (+4.0; first acquire → 12m idle floor); wall shotgun return → −4.0
+├─ Key item get / use? → #3 / #4 (+4.0, reset 6m idle budget)
+├─ Weapon get? → #5 (+4.0; first acquire → reset 6m idle budget); wall shotgun return → −4.0
 ├─ Other non-key item get? → #6 every pickup
 ├─ Hit / kill on knife|attack step? → #7 / #8
 ├─ Gallery portrait sequence? → +0.5 per correct ordered switch; claw back partial attempt on wrong input/exit

@@ -158,11 +158,14 @@ def test_telemetry_latest_schema_and_sparse_reward_events(tmp_path: Path) -> Non
         rank=4,
         run_id="run-4",
     )
+    from re1_rl.async_fleet import DISTRIBUTED_EPOCH_HYPERPARAMS
+
+    n_steps = int(DISTRIBUTED_EPOCH_HYPERPARAMS["n_steps"])
     telemetry = MemlogTelemetry(
         tmp_path,
         run_id=control.state.run_id,
         rank=4,
-        n_steps=1536,
+        n_steps=n_steps,
     )
     frame = np.arange(24, dtype=np.uint8).reshape(2, 3, 4)
     obs = {
@@ -201,7 +204,7 @@ def test_telemetry_latest_schema_and_sparse_reward_events(tmp_path: Path) -> Non
     assert latest["run_id"] == "run-4"
     assert latest["rank"] == 4
     assert latest["horizon_step"] == 7
-    assert latest["n_steps"] == 1536
+    assert latest["n_steps"] == n_steps
     assert set(latest["pre_step"]["observation"]) == set(obs)
     encoded_frame = latest["pre_step"]["observation"]["frame"]
     assert encoded_frame["shape"] == [2, 3, 4]

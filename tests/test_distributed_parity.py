@@ -120,7 +120,7 @@ def test_distributed_ppo_hyperparams_match_async_fleet() -> None:
         gamma=RL_GAMMA,
         ent_coef=0.006,
     )
-    assert PPO_HYPERPARAMS["gamma"] == 0.998188
+    assert PPO_HYPERPARAMS["gamma"] == 0.99386
 
 
 def test_make_re1_policy_spaces_frame_is_chw() -> None:

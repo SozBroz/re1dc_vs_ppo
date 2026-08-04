@@ -33,7 +33,7 @@ class ProgressTracker:
 
     # Idle contempt: emulated frames since last exploration progress (reward.compute_reward).
     _stagnation_frames: int = 0
-    # Floor on softlock truncate after new_room / key / first weapon / key use (12m).
+    # Floor on softlock truncate after new_room / key / first weapon / key use (6m).
     softlock_cap_frames: int = 0
     # Terminal black mark: set before building the terminal observation.
     # Positive reward/extension guards also prevent same-step leakage.
@@ -110,7 +110,7 @@ class ProgressTracker:
         return int(self._stagnation_frames)
 
     def note_softlock_extension(self, frames: int) -> None:
-        """Raise idle truncate floor (and clear the idle clock) for 12m extensions."""
+        """Raise idle truncate floor and clear the idle clock for 6m extensions."""
         if self.kenneth_gate_breached:
             return
         frames = max(0, int(frames))

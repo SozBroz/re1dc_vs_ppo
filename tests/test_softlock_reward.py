@@ -62,9 +62,9 @@ def test_softlock_budget_is_independent_static():
     assert CONTEMPT_BUDGET_SCALED < SURVIVAL_BUDGET_SCALED
 
 
-def test_softlock_start_and_post_kenneth_are_twelve_minutes():
-    assert SOFTLOCK_PRE_KENNETH_FRAMES == 12 * 60 * 60
-    assert SOFTLOCK_POST_KENNETH_FRAMES == 12 * 60 * 60
+def test_softlock_start_and_post_kenneth_are_six_minutes():
+    assert SOFTLOCK_PRE_KENNETH_FRAMES == 6 * 60 * 60
+    assert SOFTLOCK_POST_KENNETH_FRAMES == 6 * 60 * 60
     assert SOFTLOCK_FRAME_THRESHOLD == SOFTLOCK_POST_KENNETH_FRAMES
     progress = ProgressTracker()
     assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES
@@ -72,8 +72,8 @@ def test_softlock_start_and_post_kenneth_are_twelve_minutes():
     assert softlock_frame_threshold(progress) == SOFTLOCK_POST_KENNETH_FRAMES
 
 
-def test_new_room_floors_softlock_cap_at_twelve_minutes():
-    """Progress extension floors idle truncate at 12 min (same as start budget)."""
+def test_new_room_floors_softlock_cap_at_six_minutes():
+    """Progress extension floors idle truncate at 6 min (same as start budget)."""
     from re1_rl.reward import SOFTLOCK_EXTENSION_FRAMES
 
     progress = ProgressTracker()
@@ -113,7 +113,7 @@ def test_kenneth_gate_breach_revokes_and_blocks_softlock_extensions():
 
 
 def test_grace_has_no_softlock_tax():
-    """Under grace on the post-Kenneth 12m cap: no softlock tax."""
+    """Under grace on the post-Kenneth 6m cap: no softlock tax."""
     progress = ProgressTracker()
     progress.first_visit("105")
     progress.rewarded_cutscenes.add("104:0:s0")
@@ -131,8 +131,8 @@ def test_grace_has_no_softlock_tax():
     assert softlock_sum == pytest.approx(0.0)
 
 
-def test_start_budget_truncates_at_twelve_minutes_with_grace_ramp():
-    """Episode starts at 12 min idle cap; 3 min grace then ramp to full contempt."""
+def test_start_budget_truncates_at_six_minutes_with_grace_ramp():
+    """Episode starts at 6 min idle cap; 3 min grace then ramp to full contempt."""
     progress = ProgressTracker()
     progress.first_visit("105")
     prev = make_state(room="105", step=0)

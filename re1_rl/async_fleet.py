@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import multiprocessing as mp
 import os
 import time
@@ -14,6 +15,17 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 from re1_rl.reward import RL_GAMMA
+
+DISTRIBUTED_MC_HALF_LIVES = 6
+
+
+def distributed_n_steps(*, half_lives: int = DISTRIBUTED_MC_HALF_LIVES) -> int:
+    """MC rollout horizon in policy steps (≈6× γ half-life at RL_GAMMA)."""
+    per_half_life = math.log(0.5) / math.log(RL_GAMMA)
+    return int(round(half_lives * per_half_life))
+
+
+_DISTRIBUTED_N_STEPS = distributed_n_steps()
 
 PPO_HYPERPARAMS: dict[str, Any] = dict(
     n_steps=1024,
@@ -30,17 +42,11 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
 # n_steps vs sync_interval_s (wall) vs emulated time:
 #   - sync_interval_s=360 is WALL clock (upload burst + weight pull cadence).
 #   - Actors cut MC/bootstrap rollouts at n_steps, then buffer until the wall flush.
-#   - Env step ≈ 8 frames @ 60fps ⇒ 8/60 s emulated; γ=0.998188 half-life ≈ 45s
-#     emulated (≈337.5 steps). Credit assignment is per n_steps segment, not the
-#     whole sync window.
-#   - 1536 steps ≈ 204.8s emulated ≈ 4.5 half-lives (good MC horizon for +4
-#     progress). Stays under typical wall collect (~6 env-steps/s ⇒ ~2160
-#     steps/env in 360s) so each env still finishes ≥1 rollout per epoch.
-#   - Do NOT set n_steps≈2700 (6 min emulated): at observed SPS that exceeds
-#     steps gathered in one sync window → empty/partial epoch flushes + fat
-#     rollout tensors on WH2 (32 local envs).
+#   - Env step ≈ 8 frames @ 60fps ⇒ 8/60 s emulated; γ=0.99386 half-life ≈ 15s
+#     emulated (≈112.5 steps). n_steps targets 6 half-lives (675 steps ≈ 90s).
+#   - Credit assignment is per n_steps segment, not the whole sync window.
 DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
-    n_steps=1536,
+    n_steps=_DISTRIBUTED_N_STEPS,
     batch_size=2048,  # Doc04 medium + WH2 8GB VRAM; was 4096 on ~2M policy
     n_epochs=4,
     learning_rate=1e-4,

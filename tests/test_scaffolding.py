@@ -309,20 +309,26 @@ def test_damage_and_death_calibrated_to_waypoint():
     assert hp_heal_reward(10) == pytest.approx(-HP_LOSS_SCALE * (-10.0))
 
 
-def test_rl_gamma_half_life_includes_step_contempt():
-    """γ_eff := γ + STEP_PENALTY; half-life ≈ 45s at 8-frame @ 60fps steps."""
+def test_distributed_n_steps_is_six_gamma_half_lives():
+    from re1_rl.async_fleet import DISTRIBUTED_EPOCH_HYPERPARAMS, distributed_n_steps
+
+    assert distributed_n_steps() == 675
+    assert DISTRIBUTED_EPOCH_HYPERPARAMS["n_steps"] == 675
+
+
+def test_rl_gamma_has_fifteen_second_half_life():
+    """Pure discount half-life is ≈15s at 8-frame @ 60fps steps."""
     from re1_rl.reward import REFERENCE_STEP_FRAMES, RL_GAMMA, STEP_PENALTY
 
     dt_s = REFERENCE_STEP_FRAMES / 60.0
-    n_steps_45s = 45.0 / dt_s  # 337.5
-    assert n_steps_45s == pytest.approx(337.5)
+    n_steps_15s = 15.0 / dt_s  # 112.5
+    assert n_steps_15s == pytest.approx(112.5)
     assert STEP_PENALTY == pytest.approx(-0.00024)
-    assert RL_GAMMA == 0.998188
+    assert RL_GAMMA == 0.99386
 
-    gamma_eff = RL_GAMMA + STEP_PENALTY
-    half_life_steps = math.log(0.5) / math.log(gamma_eff)
+    half_life_steps = math.log(0.5) / math.log(RL_GAMMA)
     half_life_s = half_life_steps * dt_s
-    assert half_life_s == pytest.approx(45.0, abs=0.02)
+    assert half_life_s == pytest.approx(15.0, abs=0.02)
 
 
 if __name__ == "__main__":

@@ -34,7 +34,7 @@ REFERENCE_STEP_FRAMES = 8
 # Each signal owns its float; not scaled from CHECKPOINT_REWARD.
 NEW_ROOM_BONUS = 4.0
 NEW_CUTSCENE_BONUS = 1.2
-# Document/file examine UI (gs=0x40808100): same +4 / 12m floor as new room.
+# Document/file examine UI (gs=0x40808100): same +4 / 6m floor as new room.
 NEW_DOCUMENT_EXAMINE_BONUS = 4.0
 
 # Legacy aliases kept for tests / telemetry that import old names.
@@ -65,12 +65,12 @@ NEW_WEAPON_PICKUP_BONUS = 4.0
 SHOTGUN_RETURN_PENALTY = -4.0
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # Idle contempt: no new room / document / cutscene / key / weapon / story / gallery.
-# Start budget and all progress extensions: 12 min. Grace 3 min then 3→12 ramp.
+# Start budget and all progress extensions: 6 min. Grace 3 min then 3→6 ramp.
 # Frames @ 60 emulated fps (PS1 NTSC / BizHawk).
-SOFTLOCK_PRE_KENNETH_FRAMES = 12 * 60 * 60
-SOFTLOCK_POST_KENNETH_FRAMES = 12 * 60 * 60
+SOFTLOCK_PRE_KENNETH_FRAMES = 6 * 60 * 60
+SOFTLOCK_POST_KENNETH_FRAMES = 6 * 60 * 60
 # New room / document / key pickup / key use / first weapon: at least this idle cap.
-SOFTLOCK_EXTENSION_FRAMES = 12 * 60 * 60
+SOFTLOCK_EXTENSION_FRAMES = 6 * 60 * 60
 # Alias: max episode idle cap (tests of the full ramp).
 SOFTLOCK_FRAME_THRESHOLD = SOFTLOCK_POST_KENNETH_FRAMES
 # First 3 min of no-progress: no extra idle tax (living step cost only).
@@ -140,10 +140,9 @@ def _load_ammo_item_names() -> frozenset[str]:
 AMMO_ITEM_NAMES: frozenset[str] = _load_ammo_item_names()
 
 # Dense softlock ramp is already in the scalar reward (bd["softlock"]); one γ.
-# Half-life ≈ 45s emulated time incl. living cost: γ_eff := γ + c with
-# c = STEP_PENALTY (−0.00024), n = 45 / (8/60) = 337.5 ref steps →
-# γ = 0.5^(1/n) − c ≈ 0.998188. (Delayed-+1 PV solve differs slightly; ship γ_eff.)
-RL_GAMMA = 0.998188
+# Yawn one-leg rails target a ≈15s pure-discount half-life at 8-frame,
+# 60fps reference steps: γ = 0.5^(1 / (15 / (8/60))) ≈ 0.99386.
+RL_GAMMA = 0.99386
 
 # Per-HP damage / heal: (2/3) / (JILL_FINE_HP - 1) = (2/3)/95. Exact inverse heal.
 HP_LOSS_SCALE = 0.007017543859649122
@@ -239,7 +238,7 @@ def _key_item_return_blocked(
 
 
 def softlock_frame_threshold(progress: ProgressTracker | None) -> int:
-    """Idle truncate cap: 12 min from start; ≥12 min after room/key/weapon/use."""
+    """Idle truncate cap: 6 min from start and after room/key/weapon/use."""
     if progress is None:
         return SOFTLOCK_PRE_KENNETH_FRAMES
     if progress.kenneth_gate_breached:
@@ -480,7 +479,7 @@ def compute_reward(
     else:
         new_items = set(state.get("inventory", [])) - set(prev_state.get("inventory", []))
     acquired_key_or_weapon = False
-    # First acquire of a weapon type this episode: 12m idle floor + stagnation reset.
+    # First acquire of a weapon type this episode: 6m idle floor + stagnation reset.
     # Shotgun rack re-takes still pay NEW_WEAPON (clawed back on return) but do not
     # count as exploration progress — blocks idle-clock / extension farms.
     weapon_progress = False
@@ -530,7 +529,7 @@ def compute_reward(
             bd["new_cutscene"] = NEW_CUTSCENE_BONUS
 
     # Same edge as PB typewriter capture (detector complete). Modest crumb;
-    # does not extend the 12 min idle floor. Sidecar episode starts suppress
+    # does not extend the 6 min idle floor. Sidecar episode starts suppress
     # the detector until control+ribbon count are stable (see TypewriterSaveDetector).
     if typewriter_save_complete and not (
         progress is not None and progress.kenneth_gate_breached
@@ -682,7 +681,7 @@ def compute_reward(
                 bd[term] = value * RAILS_AUX_POSITIVE_SCALE
 
     if progress is not None and not state.get("dead"):
-        # Room / document / key get / key use / first weapon → 12 min idle floor.
+        # Room / document / key get / key use / first weapon → 6 min idle floor.
         if (
             bd["new_room"] != 0.0
             or bd["document_examine"] != 0.0
