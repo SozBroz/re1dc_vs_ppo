@@ -5,12 +5,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
-from re1_rl.reward import compute_reward
+from re1_rl.reward import WRONG_ROOM_PENALTY, compute_reward
 from re1_rl.room_graph import RoomGraph
 
 ROUTE = PROJECT_ROOT / "data" / "route_jill_anypct.json"
@@ -71,3 +73,44 @@ def test_offroute_room_only_pays_exploration_bonus():
     )
     assert bd["wrong_room"] == 0.0
     assert bd["new_room"] > 0.0
+
+
+def test_rails_connected_detour_overpowers_new_room_reward():
+    g = RoomGraph(DOORS)
+    planner = WaypointPlanner(ROUTE, waypoints=["104"])
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    progress.observe_cutscene("104:0:s0")
+
+    _, bd = compute_reward(
+        make_state("105", step=1),
+        make_state("106", step=2),
+        planner,
+        progress=progress,
+        graph=g,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+
+    assert bd["wrong_room"] == WRONG_ROOM_PENALTY
+    assert bd["wrong_room"] == pytest.approx(-3.0)
+    assert bd["new_room"] > 0.0
+
+
+def test_rails_shortest_path_step_is_not_wrong_room():
+    g = RoomGraph(DOORS)
+    planner = WaypointPlanner(ROUTE, waypoints=["104"])
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+
+    _, bd = compute_reward(
+        make_state("105", step=1),
+        make_state("104", step=2),
+        planner,
+        progress=progress,
+        graph=g,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+
+    assert bd["wrong_room"] == 0.0

@@ -144,6 +144,54 @@ class WaypointPlanner:
             return int(self._route_step_seqs[self._index])
         return None
 
+    def objective_at(self, index: int) -> dict[str, Any] | None:
+        """Return the route objective at an absolute waypoint index."""
+        idx = int(index)
+        if idx < 0:
+            return None
+        if self._route_step_seqs:
+            if idx >= len(self._route_step_seqs):
+                return None
+            return self.step_by_seq(self._route_step_seqs[idx])
+        if idx >= len(self._waypoint_ids):
+            return None
+        wp_room = self._waypoint_ids[idx]
+        for step in self.route:
+            if str(step.get("room_id", "")) == str(wp_room):
+                return step
+        return None
+
+    def index_of_item_gain_checkpoint(self, item_name: str) -> int | None:
+        """First waypoint index whose ``items_gained`` includes ``item_name``."""
+        want = canonical_item(str(item_name))
+        if not want:
+            return None
+        for i in range(self.total_waypoints):
+            step = self.objective_at(i) or {}
+            gains = {
+                canonical_item(str(x))
+                for x in (step.get("items_gained") or [])
+            }
+            if want in gains:
+                return i
+            if str(step.get("checkpoint_id", "")) == "barry_hall_return_106" and want == "lockpick":
+                return i
+        return None
+
+    def snap_forward_on_lockpick(self) -> bool:
+        """Forward-only jump past the lockpick checkpoint when lockpick is acquired.
+
+        Skips upstairs/return gates if Barry already handed the lockpick. Never
+        moves the planner backward if that checkpoint is already cleared.
+        """
+        target = self.index_of_item_gain_checkpoint("lockpick")
+        if target is None:
+            return False
+        if self._index > target:
+            return False
+        self._index = int(target) + 1
+        return True
+
     def advance_if_success(
         self,
         state: dict[str, Any],

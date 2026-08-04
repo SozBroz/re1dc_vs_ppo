@@ -293,7 +293,7 @@ def ammo_waste_penalty(
     ) * float(rounds)
 
 
-WRONG_ROOM_PENALTY = -1.0
+WRONG_ROOM_PENALTY = -3.0
 RETREAT_PENALTY = -0.6
 SUCCESS_ROOM_BONUS = CHECKPOINT_REWARD
 PBRS_GRAPH_WEIGHT = 0.02
@@ -728,10 +728,23 @@ def compute_reward(
 
     if rails_mode:
         state["typewriter_save_complete"] = bool(typewriter_save_complete)
-        completed_idx = planner.waypoint_index
-        if planner.advance_if_success(
-            state, progress=progress, prev_state=prev_state
-        ):
+        # Early Barry lockpick: snap forward past barry_hall_return / skipped 203.
+        advanced = False
+        if "lockpick" in {canonical_item(str(x)) for x in new_items}:
+            advanced = bool(planner.snap_forward_on_lockpick())
+        if not advanced:
+            advanced = bool(
+                planner.advance_if_success(
+                    state, progress=progress, prev_state=prev_state
+                )
+            )
+        elif progress is not None and prev_state is not None:
+            # Keep transition bookkeeping consistent when snap skips advance_if_success.
+            progress.note_leg_room_transition(
+                str(prev_state.get("room_id", "")),
+                str(state.get("room_id", "")),
+            )
+        if advanced:
             if progress is not None:
                 progress.on_waypoint_advanced()
                 claimed = progress.claim_checkpoint_success()

@@ -184,6 +184,36 @@ def test_lockpick_already_held_passes_without_leg_acquire() -> None:
     )
 
 
+def test_lockpick_snap_skips_203_and_finishes_barry_return() -> None:
+    """Getting lockpick early snaps forward past barry_hall_return (cp05)."""
+    planner = _planner(start_index=3)  # main_hall_106 — before 203
+    assert planner.index_of_item_gain_checkpoint("lockpick") == 5
+    assert planner.snap_forward_on_lockpick()
+    assert planner.waypoint_index == 6  # dining_return_105
+    # Forward-only: already past lockpick checkpoint → no snap.
+    assert not planner.snap_forward_on_lockpick()
+    assert planner.waypoint_index == 6
+
+
+def test_lockpick_acquire_pays_checkpoint_via_snap() -> None:
+    planner = _planner(start_index=3)
+    progress = ProgressTracker()
+    progress.seed_spawn_room("106")
+    reward, bd = compute_reward(
+        _state("106"),
+        _state("106", inventory=["lockpick"], new_items=["lockpick"]),
+        planner,
+        progress=progress,
+        graph=_graph(),
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["checkpoint_success"] == pytest.approx(RAILS_CHECKPOINT_REWARD)
+    assert planner.waypoint_index == 6
+    assert progress.checkpoint_success
+    assert reward > RAILS_CHECKPOINT_REWARD - 0.01
+
+
 def test_lockpick_key_items_rewarded_passes_without_inventory() -> None:
     progress = ProgressTracker()
     progress.key_items_rewarded.add("lockpick")
