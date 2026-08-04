@@ -54,6 +54,12 @@
 106
 203
 204 
-20D - handgun bullets
+20D - Richard cutscene (puts you in 204)
+201
+101
+11B (opportunity to reorganize inventory before the yawn fight)
+101
+201
+20D - pistol ammo
 20E 
 210 - Yawn Cutscene trigger, yawn boss fight, yawn leaving cutscene, shotgun shells, moon crest

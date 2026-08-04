@@ -52,8 +52,8 @@ PAUSE_MENU_GAME_MODE = 0x40
 DOCUMENT_EXAMINE_GAME_STATE = 0x40808100
 DOCUMENT_EXAMINE_GAME_MODE = PAUSE_MENU_GAME_MODE
 # Post-Richard lab countdown STATUS/ECG overlay (QuickSave8, hunt 2026-08-03).
-# Opens automatically after the 20D serum cutscene deposits Jill in 204. Start
-# does not dismiss; RAM exit to in-control + lab_timer=0 clears the countdown.
+# Opens automatically after the 20D cutscene deposits Jill in 204. Production
+# observes this signature/timer only; the generic pause-menu macro drives buttons.
 RICHARD_LAB_COUNTDOWN_STATUS_GAME_STATE = 0x40808200
 RICHARD_LAB_COUNTDOWN_STATUS_GAME_MODE = PAUSE_MENU_GAME_MODE
 # STATUS / ECG health-bar sub-screen (live hunt 2026-07-08, play_human :7788).

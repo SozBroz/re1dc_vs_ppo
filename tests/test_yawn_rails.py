@@ -10,7 +10,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from re1_rl.obs_encoder import GOAL_FIELDS, ObsEncoder
+from re1_rl.obs_encoder import (
+    GOAL_BASE_DIM,
+    GOAL_FIELDS,
+    GOAL_LOOKAHEAD_SLOT_DIM,
+    GOAL_LOOKAHEAD_SLOTS,
+    ObsEncoder,
+)
+from re1_rl.item_box import BOX_ROOMS
+from re1_rl.env import RE1Env
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import CHECKPOINT_REWARD, compute_reward
@@ -18,6 +26,7 @@ from re1_rl.room_graph import RoomGraph, load_valid_rooms
 from re1_rl.yawn_rails import (
     capture_successor_cell,
     sample_one_leg_options,
+    successor_capacity,
     validate_route,
 )
 
@@ -40,7 +49,7 @@ def _graph() -> RoomGraph:
 def _planner(start_index: int = 0) -> WaypointPlanner:
     return WaypointPlanner(
         ROUTE,
-        route_steps=list(range(1, 43)),
+        route_steps=list(range(1, 54)),
         start_index=start_index,
     )
 
@@ -70,6 +79,18 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     assert '"205"' not in text
     assert "serum" not in text
     assert any(cp["room_id"] == "20D" and "handgun_bullets" in cp["items_gained"] for cp in route)
+    assert [(cp["room_id"], cp["checkpoint_id"]) for cp in route[43:]] == [
+        ("20D", "richard_cutscene_20D"),
+        ("204", "richard_forced_return_204"),
+        ("201", "east_stairs_201_post_richard"),
+        ("101", "east_stairs_101_post_richard"),
+        ("11B", "yawn_box_prep_11B"),
+        ("101", "east_stairs_101_to_yawn"),
+        ("201", "east_stairs_201_to_yawn"),
+        ("20D", "ammo_20D"),
+        ("20E", "attic_entry_20E"),
+        ("210", "yawn_moon_210"),
+    ]
     for checkpoint in route:
         condition_text = json.dumps(checkpoint["success_condition"])
         for item in checkpoint["items_gained"]:
@@ -117,13 +138,108 @@ def test_checkpoint_requires_this_leg_pickup_and_pays_terminal_1_2() -> None:
 def test_goal_encodes_selected_one_leg_checkpoint() -> None:
     graph = _graph()
     encoder = ObsEncoder(ROOMS, graph, curriculum_stage_index=1)
-    planner = _planner(start_index=40)
+    planner = _planner(start_index=51)
     state = _state("20D", x=1000, z=1000)
     goal = encoder.encode_goal(state, planner)
     assert planner.next_waypoint_room() == "20E"
     assert goal[GOAL_IDX["goal_room_index"]] == encoder._room_idx_norm("20E")
     assert goal[GOAL_IDX["doors_available"]] == 1.0
-    assert goal[GOAL_IDX["waypoints_remaining"]] == pytest.approx(2 / 42)
+    assert goal[GOAL_IDX["waypoints_remaining"]] == pytest.approx(2 / 53)
+
+
+def test_goal_appends_six_masked_checkpoint_semantic_slots() -> None:
+    encoder = ObsEncoder(ROOMS, _graph(), curriculum_stage_index=1)
+    planner = _planner(start_index=48)
+    goal = encoder.encode_goal(
+        _state("101", inventory=["shield_key", "shotgun"]),
+        planner,
+    )
+    slots = goal[GOAL_BASE_DIM:].reshape(
+        GOAL_LOOKAHEAD_SLOTS, GOAL_LOOKAHEAD_SLOT_DIM
+    )
+    assert slots[:, 0].tolist() == [1.0, 1.0, 1.0, 1.0, 1.0, 0.0]
+    assert slots[0, 1] == encoder._room_idx_norm("101")
+    assert slots[2, 3 + 1] == 1.0  # pickup
+    assert slots[2, 12] > 0.0  # gained handgun bullets identity
+    assert slots[3, 8] > 0.0  # required shield key identity
+    assert slots[3, 11] == 1.0
+    assert planner.peek_objective(2)["seq"] == 51
+    assert planner.peek_waypoint_room(4) == "210"
+
+
+def test_two_leg_episode_pays_each_checkpoint_and_resets_acquisitions() -> None:
+    planner = _planner()
+    progress = ProgressTracker(leg_span=2)
+    progress.seed_spawn_room("105")
+    _, first = compute_reward(
+        _state("105"),
+        _state("105", inventory=["emblem"], new_items=["emblem"]),
+        planner,
+        progress=progress,
+        graph=_graph(),
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert first["checkpoint_success"] == pytest.approx(CHECKPOINT_REWARD)
+    assert progress.legs_completed == 1
+    assert not progress.checkpoint_success
+    assert progress.leg_acquired_items == set()
+    assert planner.waypoint_index == 1
+
+    progress.observe_cutscene("104:kenneth")
+    _, second = compute_reward(
+        _state("105", inventory=["emblem"]),
+        _state("104", inventory=["emblem"]),
+        planner,
+        progress=progress,
+        graph=_graph(),
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert second["checkpoint_success"] == pytest.approx(CHECKPOINT_REWARD)
+    assert progress.legs_completed == 2
+    assert progress.checkpoint_success
+    assert planner.waypoint_index == 2
+
+
+def test_yawn_episode_terminates_only_after_configured_leg_span() -> None:
+    progress = ProgressTracker(leg_span=2)
+    env = SimpleNamespace(
+        _progress=progress,
+        _stage={"mode": "yawn_rails"},
+        _episode_truncated=lambda: False,
+    )
+    progress.claim_checkpoint_success()
+    assert RE1Env._termination_flags(env, _state("105")) == (False, False, None)
+    progress.claim_checkpoint_success()
+    assert RE1Env._termination_flags(env, _state("104")) == (
+        True,
+        False,
+        "checkpoint_success",
+    )
+
+
+def test_yawn_box_prep_requires_natural_lab_timer_expiry() -> None:
+    planner = _planner(start_index=47)
+    assert planner.current_objective()["checkpoint_id"] == "yawn_box_prep_11B"
+    assert "11B" in BOX_ROOMS
+
+    active = _state("11B")
+    active["lab_timer"] = 1
+    assert not planner.advance_if_success(active, progress=ProgressTracker())
+
+    expired = _state("11B")
+    expired["lab_timer"] = 0
+    assert planner.advance_if_success(expired, progress=ProgressTracker())
+
+
+def test_richard_checkpoint_accepts_forced_settle_in_204() -> None:
+    planner = _planner(start_index=43)
+    progress = ProgressTracker()
+    progress.observe_cutscene("20D:richard")
+    settled = _state("204")
+    assert planner.advance_if_success(settled, progress=progress)
+    assert planner.current_objective()["checkpoint_id"] == "richard_forced_return_204"
 
 
 def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: Path) -> None:
@@ -146,6 +262,159 @@ def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: P
     assert a == b
     assert a["reset_source"] in {"route_initial", "route_cell"}
     assert a["reset_source"] not in {"pb", "archive"}
+    assert a["leg_span"] == 1
+
+
+def test_chaining_curriculum_samples_bounded_remaining_span(tmp_path: Path) -> None:
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "missing.json",
+        "route_steps": list(range(1, 5)),
+        "legs_per_episode": 6,
+    }
+    opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(1))
+    assert opts["route_start_index"] == 0
+    assert opts["leg_span"] == 4
+    chaining = json.loads(
+        (ROOT / "curriculum/yawn_rails_chaining.json").read_text(encoding="utf-8")
+    )
+    one_leg = json.loads(
+        (ROOT / "curriculum/yawn_rails_one_leg.json").read_text(encoding="utf-8")
+    )
+    assert chaining["legs_per_episode"] == 6
+    assert chaining["episode_mode"] == "multi_leg"
+    assert chaining["route_id"] == "yawn_quest_v2"
+    assert chaining["route_steps"][-1] == 53
+    assert one_leg["episode_mode"] == "one_leg"
+    assert one_leg["route_id"] == "yawn_quest_v2"
+    assert one_leg["route_steps"][-1] == 53
+    assert "legs_per_episode" not in one_leg
+
+
+def test_successor_capacity_uses_stack_headroom_and_consumption() -> None:
+    full = [
+        ("knife", 0),
+        ("beretta", 15),
+        ("first_aid_spray_alt", 1),
+        ("emblem", 1),
+        ("lockpick", 1),
+        ("shotgun", 1),
+        ("handgun_bullets", 59),
+        ("chemical", 1),
+    ]
+    ammo = {"checkpoint_id": "ammo", "items_gained": ["handgun_bullets"]}
+    accepted = successor_capacity(
+        _state("20D") | {"inventory_slots": full},
+        ammo,
+    )
+    assert accepted["inventory_feasible"] is True
+    assert accepted["next_slots_needed"] == 0
+
+    full[6] = ("handgun_bullets", 60)
+    rejected = successor_capacity(
+        _state("20D") | {"inventory_slots": full},
+        ammo,
+    )
+    assert rejected["inventory_feasible"] is False
+    assert rejected["next_slots_needed"] == 1
+
+    swap = {
+        "checkpoint_id": "armor",
+        "items_gained": ["armor_key"],
+        "consume_before_gain": ["chemical"],
+    }
+    consumed = successor_capacity(
+        _state("10C") | {"inventory_slots": full},
+        swap,
+    )
+    assert consumed["inventory_feasible"] is True
+    assert consumed["inventory_free_slots"] == 0
+    assert consumed["next_slots_needed"] == 1
+
+
+def test_successor_capacity_always_allows_box_room() -> None:
+    capacity = successor_capacity(
+        _state("11B") | {"inventory_slots": [("red_herb", 1)] * 8},
+        {"checkpoint_id": "two", "items_gained": ["moon_crest", "shotgun_shells"]},
+    )
+    assert capacity["captured_in_box_room"] is True
+    assert capacity["inventory_feasible"] is True
+
+
+def test_infeasible_successor_is_rejected_before_savestate(tmp_path: Path) -> None:
+    bridge = MagicMock()
+    planner = SimpleNamespace(
+        waypoint_index=1,
+        total_waypoints=2,
+        step_by_seq=lambda seq: (
+            {"checkpoint_id": "pickup", "items_gained": ["moon_crest"]}
+            if seq == 2
+            else {"checkpoint_id": "done", "items_gained": []}
+        ),
+    )
+    env = SimpleNamespace(
+        project_root=tmp_path,
+        _stage={"mode": "yawn_rails"},
+        _planner=planner,
+        bridge=bridge,
+    )
+    state = _state("20E") | {
+        "inventory_slots": [
+            ("knife", 0),
+            ("beretta", 15),
+            ("first_aid_spray_alt", 1),
+            ("emblem", 1),
+            ("lockpick", 1),
+            ("shotgun", 1),
+            ("handgun_bullets", 60),
+            ("chemical", 1),
+        ]
+    }
+    assert capture_successor_cell(
+        env, state, {"checkpoint_success": CHECKPOINT_REWARD}
+    ) is None
+    bridge.save_savestate.assert_not_called()
+
+
+def test_sampling_filters_legacy_and_infeasible_mandatory_pickup_rows(
+    tmp_path: Path,
+) -> None:
+    route = [
+        {"checkpoint_id": "done", "items_gained": []},
+        {"checkpoint_id": "pickup", "items_gained": ["emblem"]},
+    ]
+    (tmp_path / "route.json").write_text(json.dumps(route), encoding="utf-8")
+    cells = []
+    for idx, extra in enumerate((
+        {},
+        {
+            "inventory_feasible": False,
+            "inventory_free_slots": 0,
+            "next_slots_needed": 1,
+            "captured_in_box_room": False,
+        },
+    )):
+        cell = tmp_path / f"states/cp{idx}"
+        cell.mkdir(parents=True)
+        (cell / "cell.State").write_bytes(b"state")
+        (cell / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+        cells.append({
+            "checkpoint_index": 0,
+            "state_path": f"states/cp{idx}/cell.State",
+            "sidecar_path": f"states/cp{idx}/cell.sidecar.json",
+            **extra,
+        })
+    (tmp_path / "manifest.json").write_text(
+        json.dumps({"schema_version": 1, "route_id": "test", "cells": cells}),
+        encoding="utf-8",
+    )
+    stage = {
+        "route_id": "test",
+        "route_path": "route.json",
+        "cells_manifest": "manifest.json",
+    }
+    chosen = sample_one_leg_options(tmp_path, stage, rng=random.Random(0))
+    assert chosen["reset_source"] == "route_initial"
 
 
 def test_checkpoint_success_captures_successor_cell(
@@ -187,6 +456,8 @@ def test_checkpoint_success_captures_successor_cell(
     )
     assert manifest["cells"][0]["checkpoint_index"] == 0
     assert manifest["cells"][0]["checkpoint_id"] == "emblem_105"
+    assert manifest["cells"][0]["inventory_feasible"] is True
+    assert proposal["next_checkpoint_id"] == "kenneth_104"
 
 
 def test_11b_almanac_has_chemical_but_not_square_crank() -> None:

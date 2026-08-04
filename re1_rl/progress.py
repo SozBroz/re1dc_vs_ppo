@@ -38,8 +38,6 @@ class ProgressTracker:
     # Terminal black mark: set before building the terminal observation.
     # Positive reward/extension guards also prevent same-step leakage.
     kenneth_gate_breached: bool = False
-    # Post-Richard lab countdown cleared (lab_timer forced to 0).
-    richard_lab_cleared: bool = False
     # Spawn room (usually dining 105): visited at reset; no +new_room payout —
     # fresh start matches archive/PB sidecars that already carry spawn credit.
     spawn_room_id: str | None = None
@@ -57,9 +55,11 @@ class ProgressTracker:
     gallery_completed: bool = False
     gallery_needs_reentry: bool = False
     dining_statue_rewarded: bool = False
-    # Pickups made after the current one-leg rails reset. Sidecar history does
-    # not satisfy an ``acquired_item`` checkpoint in a later episode.
+    # Pickups made after the current rails checkpoint. Sidecar history and
+    # acquisitions from an earlier leg do not satisfy a later checkpoint.
     leg_acquired_items: set[str] = field(default_factory=set)
+    leg_span: int = 1
+    legs_completed: int = 0
     checkpoint_success: bool = False
 
     def seed_spawn_room(self, room_id: str) -> None:
@@ -125,13 +125,6 @@ class ProgressTracker:
             return False
         self.kenneth_gate_breached = True
         self.softlock_cap_frames = 0
-        return True
-
-    def mark_richard_lab_cleared(self) -> bool:
-        """Record post-Richard lab countdown disabled; true only on first clear."""
-        if self.richard_lab_cleared:
-            return False
-        self.richard_lab_cleared = True
         return True
 
     def note_stagnation_step(
@@ -224,7 +217,9 @@ class ProgressTracker:
     def claim_checkpoint_success(self) -> bool:
         if self.checkpoint_success:
             return False
-        self.checkpoint_success = True
+        self.legs_completed += 1
+        self.leg_acquired_items.clear()
+        self.checkpoint_success = self.legs_completed >= max(1, int(self.leg_span))
         return True
 
     def claim_document_examine_bonus(self, room_id: str) -> bool:

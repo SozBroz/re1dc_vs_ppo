@@ -1,5 +1,58 @@
 {
   "schema_version": 1,
-  "route_id": "yawn_quest_v1",
-  "cells": []
+  "archive_version": 6,
+  "route_id": "yawn_quest_v2",
+  "cells": [
+    {
+      "checkpoint_index": 0,
+      "checkpoint_id": "emblem_105",
+      "room_id": "105",
+      "state_path": "states/yawn_rails/cells/cp00/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp00/cell.sidecar.json",
+      "quality": [
+        96,
+        15,
+        1,
+        4,
+        0
+      ],
+      "bundle_sha256": "f47d606806966ec633f459a9761cdf1b0bcd012aeeed8cc6ec7d1757a25a4a34"
+    },
+    {
+      "checkpoint_index": 1,
+      "checkpoint_id": "kenneth_104",
+      "room_id": "104",
+      "state_path": "states/yawn_rails/cells/cp01/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp01/cell.sidecar.json",
+      "quality": [
+        96,
+        15,
+        1,
+        4,
+        0
+      ],
+      "bundle_sha256": "41cc4f651115cd02d402626f4194b6f2e7ff19d72cb08de8bd81239a568a6409"
+    },
+    {
+      "checkpoint_index": 2,
+      "checkpoint_id": "barry_return_105",
+      "room_id": "105",
+      "state_path": "states/yawn_rails/cells/cp02/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp02/cell.sidecar.json",
+      "quality": [
+        96,
+        15,
+        1,
+        4,
+        0
+      ],
+      "bundle_sha256": "600ed4235d48e3adcdfa7f9d8f44ec0ce8a17be87d0e58350340c23435933964"
+    }
+  ],
+  "cache_stats": {
+    "manifest_cells": 3,
+    "fetched_last_poll": 0,
+    "pruned_dirs_last_poll": 0,
+    "remote_cell_count": 3
+  }
 }

@@ -35,17 +35,31 @@
       "id": "blue_jewel@10D_tiger_eye",
       "item": "blue_jewel",
       "room": "10D",
-      "_draft": true,
+      "x": 4837,
+      "z": 4394,
+      "radius": 1500,
       "consumes": true,
-      "notes": "BEST-EFFORT: Tiger statue eye — insert blue jewel; statue slides to reveal wind crest (item_affordances use_rooms 10D; room_items gate on wind_crest)"
+      "notes": "Tiger statue eye — insert blue jewel; statue slides to reveal wind crest (QuickSave6 2026-08-03 stand 4837/4394; RDT trigger 3800/4256)"
+    },
+    {
+      "id": "red_jewel@10D_tiger_eye",
+      "item": "red_jewel",
+      "room": "10D",
+      "x": 4837,
+      "z": 4394,
+      "radius": 1500,
+      "consumes": true,
+      "notes": "Tiger statue eye — insert red jewel; alcove reveals Colt Python (same stand as blue jewel; QuickSave6 2026-08-03)"
     },
     {
       "id": "chemical@10C_greenhouse_pump",
       "item": "chemical",
       "room": "10C",
-      "_draft": true,
+      "x": 16200,
+      "z": 5400,
+      "radius": 1500,
       "consumes": true,
-      "notes": "BEST-EFFORT: Greenhouse pump — pour herbicide/chemical to kill vines on armor-key crest plaque"
+      "notes": "Greenhouse pump — pour herbicide/chemical to kill vines on armor-key crest (RDT interactable 16200/5400)"
     },
     {
       "id": "sun_crest@11A_crest_slot",

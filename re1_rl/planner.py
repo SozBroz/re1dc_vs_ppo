@@ -78,17 +78,55 @@ class WaypointPlanner:
         return req
 
     def current_objective(self) -> dict[str, Any] | None:
-        if self._route_step_seqs:
-            if self._index >= len(self._route_step_seqs):
-                return None
-            return self.step_by_seq(self._route_step_seqs[self._index])
-        wp_room = self.next_waypoint_room()
-        if wp_room is None:
+        return self.peek_objective(0)
+
+    def peek_objective(self, offset: int = 0) -> dict[str, Any] | None:
+        """Return a route objective relative to the active checkpoint."""
+        index = self._index + int(offset)
+        if index < 0:
             return None
+        if self._route_step_seqs:
+            if index >= len(self._route_step_seqs):
+                return None
+            return self.step_by_seq(self._route_step_seqs[index])
+        if index >= len(self._waypoint_ids):
+            return None
+        wp_room = self._waypoint_ids[index]
         for step in self.route:
             if str(step.get("room_id", "")) == str(wp_room):
                 return step
         return None
+
+    def peek_waypoint_room(self, offset: int = 0) -> str | None:
+        """Return a checkpoint room relative to the active checkpoint."""
+        index = self._index + int(offset)
+        if index < 0 or index >= len(self._waypoint_ids):
+            return None
+        return self._waypoint_ids[index]
+
+    def peek_objective_type(self, offset: int = 0) -> str:
+        """Return a normalized action type for a future checkpoint."""
+        step = self.peek_objective(offset)
+        if step is None:
+            return "navigate"
+        action_type = step.get("action_type", "navigate")
+        return action_type if action_type in OBJECTIVE_TYPES else "navigate"
+
+    def peek_required_items(self, offset: int = 0) -> list[str]:
+        """Return stage plus checkpoint prerequisites for lookahead encoding."""
+        step = self.peek_objective(offset)
+        if step is None:
+            return []
+        return [*self._required_items, *step.get("required_items", [])]
+
+    def peek_items_gained(self, offset: int = 0) -> list[str]:
+        """Return declared acquisitions for a future checkpoint."""
+        step = self.peek_objective(offset)
+        return list(step.get("items_gained", [])) if step is not None else []
+
+    @property
+    def waypoints_remaining(self) -> int:
+        return max(0, self.total_waypoints - self._index)
 
     def current_route_seq(self) -> int | None:
         if self._route_step_seqs and self._index < len(self._route_step_seqs):
@@ -171,6 +209,14 @@ class WaypointPlanner:
             return (
                 str(state.get("room_id", "")) == target
                 and str(prev_state.get("room_id", "")) in from_ids
+            )
+
+        if cond_type == "observed_cutscene":
+            if progress is None:
+                return False
+            prefix = str(cond.get("prefix", ""))
+            return bool(prefix) and any(
+                str(key).startswith(prefix) for key in progress.observed_cutscenes
             )
 
         if str(state.get("room_id", "")) != wp_room:

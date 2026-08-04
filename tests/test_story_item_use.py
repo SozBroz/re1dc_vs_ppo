@@ -41,6 +41,13 @@ N_ACTIONS = 47
 MUSIC_NOTES_ID = 0x23
 EMBLEM_ID = 0x1F
 GOLD_EMBLEM_ID = 0x20
+CHEMICAL_ID = 0x26
+BLUE_JEWEL_ID = 0x21
+RED_JEWEL_ID = 0x22
+PUMP_X = 16200
+PUMP_Z = 5400
+TIGER_X = 4837
+TIGER_Z = 4394
 ALCOVE_X = 9750
 ALCOVE_Z = 8600
 
@@ -60,6 +67,129 @@ def test_load_music_notes_piano_site() -> None:
     assert piano["item"] == "music_notes"
     assert piano["x"] == 9737
     assert piano["z"] == 8020
+
+
+def test_load_chemical_greenhouse_pump_site() -> None:
+    load_story_use_sites.cache_clear()
+    sites = load_story_use_sites()
+    pump = next(s for s in sites if s["id"] == "chemical@10C_greenhouse_pump")
+    assert pump["room"] == "10C"
+    assert pump["item"] == "chemical"
+    assert pump["x"] == PUMP_X
+    assert pump["z"] == PUMP_Z
+    assert not pump.get("_draft")
+
+
+def test_story_use_legal_at_greenhouse_pump() -> None:
+    inv = _inv((CHEMICAL_ID, 1))
+    assert any_legal_story_use_slot(
+        inv, room="10C", x=PUMP_X, z=PUMP_Z, rewarded_site_ids=set()
+    )
+    assert not any_legal_story_use_slot(
+        inv, room="10C", x=5000, z=5000, rewarded_site_ids=set()
+    )
+
+
+def test_annotate_chemical_pump_consumed() -> None:
+    load_story_use_sites.cache_clear()
+    inv_before = _inv((CHEMICAL_ID, 1))
+    inv_after = _inv((0, 0))
+    prev = {
+        "room_id": "10C",
+        "x": PUMP_X,
+        "z": PUMP_Z,
+        "scene_flag": 0x80,
+        "msg_flag": 0,
+        "in_control": True,
+    }
+    after = dict(prev)
+    after["in_control"] = False
+    out = annotate_story_use_success(
+        after,
+        prev_state=prev,
+        inventory_before=inv_before,
+        inventory_after=inv_after,
+        rewarded_site_ids=set(),
+    )
+    assert out.get("story_use_success") == "chemical@10C_greenhouse_pump"
+
+
+def test_load_tiger_jewel_sites() -> None:
+    load_story_use_sites.cache_clear()
+    sites = load_story_use_sites()
+    blue = next(s for s in sites if s["id"] == "blue_jewel@10D_tiger_eye")
+    red = next(s for s in sites if s["id"] == "red_jewel@10D_tiger_eye")
+    assert blue["room"] == "10D"
+    assert red["room"] == "10D"
+    assert blue["x"] == TIGER_X
+    assert blue["z"] == TIGER_Z
+    assert red["x"] == TIGER_X
+    assert red["z"] == TIGER_Z
+    assert not blue.get("_draft")
+    assert not red.get("_draft")
+
+
+def test_story_use_legal_at_tiger_statue() -> None:
+    inv = _inv((BLUE_JEWEL_ID, 1))
+    assert any_legal_story_use_slot(
+        inv, room="10D", x=TIGER_X, z=TIGER_Z, rewarded_site_ids=set()
+    )
+    inv_red = _inv((RED_JEWEL_ID, 1))
+    assert any_legal_story_use_slot(
+        inv_red, room="10D", x=TIGER_X, z=TIGER_Z, rewarded_site_ids=set()
+    )
+    assert not any_legal_story_use_slot(
+        inv, room="10D", x=1000, z=1000, rewarded_site_ids=set()
+    )
+
+
+def test_annotate_blue_jewel_tiger_consumed() -> None:
+    load_story_use_sites.cache_clear()
+    inv_before = _inv((BLUE_JEWEL_ID, 1))
+    inv_after = _inv((0, 0))
+    prev = {
+        "room_id": "10D",
+        "x": TIGER_X,
+        "z": TIGER_Z,
+        "scene_flag": 0x80,
+        "msg_flag": 0,
+        "in_control": True,
+    }
+    after = dict(prev)
+    after["in_control"] = False
+    out = annotate_story_use_success(
+        after,
+        prev_state=prev,
+        inventory_before=inv_before,
+        inventory_after=inv_after,
+        rewarded_site_ids=set(),
+    )
+    assert out.get("story_use_success") == "blue_jewel@10D_tiger_eye"
+
+
+def test_annotate_red_jewel_tiger_consumed() -> None:
+    load_story_use_sites.cache_clear()
+    inv_before = _inv((RED_JEWEL_ID, 1))
+    inv_after = _inv((0, 0))
+    prev = {
+        "room_id": "10D",
+        "x": TIGER_X,
+        "z": TIGER_Z,
+        "scene_flag": 0x80,
+        "msg_flag": 0,
+        "in_control": True,
+    }
+    after = dict(prev)
+    after["scene_flag"] = 0x88
+    after["in_control"] = False
+    out = annotate_story_use_success(
+        after,
+        prev_state=prev,
+        inventory_before=inv_before,
+        inventory_after=inv_after,
+        rewarded_site_ids=set(),
+    )
+    assert out.get("story_use_success") == "red_jewel@10D_tiger_eye"
 
 
 def test_story_use_masked_away_from_piano() -> None:

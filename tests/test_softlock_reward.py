@@ -275,6 +275,99 @@ def test_junk_item_pickup_does_not_reset_idle_timer():
     assert progress.stagnation_frames == 4
 
 
+def _health_pickup_breakdown(
+    item: str,
+    *,
+    before: list[tuple[str, int]],
+    after: list[tuple[str, int]],
+    rails_mode: bool = False,
+) -> dict[str, float]:
+    prev = make_state(
+        room="105",
+        step=0,
+        inventory=[name for name, _ in before],
+        inventory_slots=before,
+    )
+    cur = make_state(
+        room="105",
+        step=1,
+        inventory=[name for name, _ in after],
+        inventory_slots=after,
+        new_items=[item],
+    )
+    _, bd = compute_reward(
+        prev,
+        cur,
+        make_planner(),
+        progress=ProgressTracker(),
+        rails_mode=rails_mode,
+        return_breakdown=True,
+    )
+    return bd
+
+
+def test_health_pickup_crumb_requires_missing_resource_class() -> None:
+    filler = [("knife", 0), ("beretta", 15), ("emblem", 1), ("lockpick", 1)]
+    first_hp = _health_pickup_breakdown(
+        "green_herb", before=filler, after=filler + [("green_herb", 1)]
+    )
+    assert first_hp["item"] == ITEM_PICKUP_BONUS
+
+    before_hp = filler[:3] + [("green_herb", 1)]
+    duplicate_hp = _health_pickup_breakdown(
+        "red_herb",
+        before=before_hp,
+        after=before_hp + [("red_herb", 1)],
+    )
+    assert duplicate_hp["item"] == 0.0
+
+    independent_cure = _health_pickup_breakdown(
+        "blue_herb",
+        before=before_hp,
+        after=before_hp + [("blue_herb", 1)],
+    )
+    assert independent_cure["item"] == ITEM_PICKUP_BONUS
+
+
+def test_dual_purpose_health_pickup_can_supply_either_missing_class() -> None:
+    base = [("knife", 0), ("beretta", 15), ("emblem", 1)]
+    for held in ("green_herb", "blue_herb"):
+        before = base + [(held, 1)]
+        bd = _health_pickup_breakdown(
+            "mixed_herbs_gb",
+            before=before,
+            after=before + [("mixed_herbs_gb", 1)],
+        )
+        assert bd["item"] == ITEM_PICKUP_BONUS
+
+    before_both = base + [("mixed_herbs_gb", 1)]
+    duplicate = _health_pickup_breakdown(
+        "mixed_herbs_grb",
+        before=before_both,
+        after=before_both + [("mixed_herbs_grb", 1)],
+    )
+    assert duplicate["item"] == 0.0
+
+
+def test_health_pickup_capacity_gate_precedes_rails_scale() -> None:
+    four = [("knife", 0), ("beretta", 15), ("emblem", 1), ("lockpick", 1)]
+    three_free = _health_pickup_breakdown(
+        "red_herb",
+        before=four,
+        after=four + [("red_herb", 1)],
+        rails_mode=True,
+    )
+    assert three_free["item"] == pytest.approx(ITEM_PICKUP_BONUS * 0.05)
+
+    five = four + [("shotgun", 1)]
+    two_free = _health_pickup_breakdown(
+        "red_herb",
+        before=five,
+        after=five + [("red_herb", 1)],
+    )
+    assert two_free["item"] == 0.0
+
+
 def test_ammo_pickup_extends_idle_cap_and_clears_stagnation_clock():
     progress = ProgressTracker()
     progress.seed_spawn_room("105")

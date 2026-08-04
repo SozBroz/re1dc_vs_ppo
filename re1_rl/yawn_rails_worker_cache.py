@@ -220,6 +220,17 @@ def poll_yawn_rails_manifest(
                     row.get("sidecar_path")
                     or f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}"
                 ),
+                **{
+                    key: row[key]
+                    for key in (
+                        "inventory_free_slots",
+                        "next_checkpoint_id",
+                        "next_slots_needed",
+                        "inventory_feasible",
+                        "captured_in_box_room",
+                    )
+                    if key in row
+                },
             }
             rows.append(out_row)
         pruned = prune_stale_yawn_cells(project_root, valid)

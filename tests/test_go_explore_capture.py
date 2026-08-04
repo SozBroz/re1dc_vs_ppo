@@ -274,9 +274,15 @@ def test_capture_cooldown_blocks_rapid_new_cell(
     assert blocked is None
 
 
-def test_quality_replace_requires_significant_gain() -> None:
-    assert quality_replace_significant((50, 0, 0, 0, 1), (40, 0, 0, 0, 1))
-    assert not quality_replace_significant((42, 0, 0, 0, 1), (40, 0, 0, 0, 1))
+def test_quality_replace_accepts_one_unit_resource_gain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("RE1_GO_REPLACE_MIN_HP_DELTA", raising=False)
+    monkeypatch.delenv("RE1_GO_REPLACE_MIN_AMMO_DELTA", raising=False)
+    old = (40, 10, 0, 0, 1)
+    assert quality_replace_significant((41, 10, 0, 0, 1), old)
+    assert quality_replace_significant((40, 11, 0, 0, 1), old)
+    assert not quality_replace_significant(old, old)
 
 
 def test_purge_orphan_cell_dirs(tmp_path: Path) -> None:

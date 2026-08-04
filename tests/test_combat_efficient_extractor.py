@@ -29,6 +29,7 @@ from re1_rl.combat_targets import (
 )
 from re1_rl.env import ACTION_NAMES
 from re1_rl.named_state import NAMED_STATE_DIM
+from re1_rl.obs_encoder import GOAL_BASE_DIM, GOAL_DIM
 from re1_rl.policy_config import POLICY_KWARGS
 from tests.test_doc04_medium_extractor import _fake_batch, _stub_obs_space
 
@@ -49,7 +50,7 @@ def test_named_state_tower_enabled() -> None:
     obs_space = _stub_obs_space(with_world_state=True)
     extractor = RE1CombatEfficientExtractor(obs_space, project_root=PROJECT_ROOT)
     assert extractor.persistent_encoder is not None
-    assert TOWER_OUT_DIM == 1728
+    assert TOWER_OUT_DIM == 1776
     assert extractor._tower_out_dim == TOWER_OUT_DIM
 
 
@@ -135,14 +136,32 @@ def test_grouped_entropy_finite() -> None:
     assert torch.isfinite(ent).all()
 
 
-def test_ignores_goal_affordances() -> None:
+def test_consumes_goal_but_ignores_legacy_affordances() -> None:
     obs_space = _stub_obs_space(with_world_state=True)
     extractor = RE1CombatEfficientExtractor(obs_space, project_root=PROJECT_ROOT)
     a = _fake_batch(obs_space)
     b = {k: v.clone() for k, v in a.items()}
-    b["goal"] = torch.zeros_like(b["goal"])
     b["affordances"] = torch.zeros_like(b["affordances"])
     assert torch.allclose(extractor(a), extractor(b))
+    c = {k: v.clone() for k, v in a.items()}
+    c["goal"] = torch.zeros_like(c["goal"])
+    assert not torch.allclose(extractor(a), extractor(c))
+
+
+def test_goal_tower_consumes_widened_lookahead() -> None:
+    obs_space = _stub_obs_space(with_world_state=True)
+    extractor = RE1CombatEfficientExtractor(obs_space, project_root=PROJECT_ROOT)
+    assert extractor.goal_mlp[0].in_features == GOAL_BASE_DIM
+    a = _fake_batch(obs_space)
+    b = {k: v.clone() for k, v in a.items()}
+    b["goal"][:, GOAL_BASE_DIM:] = 0.0
+    a["goal"][:, GOAL_BASE_DIM:] = 1.0
+    with torch.no_grad():
+        extractor.goal_lookahead_token[0].weight.fill_(0.1)
+        extractor.goal_lookahead_token[0].bias.zero_()
+        extractor.goal_lookahead_out.weight.fill_(0.1)
+        extractor.goal_lookahead_out.bias.zero_()
+    assert not torch.allclose(extractor(a), extractor(b))
 
 
 class _StubEnv(gym.Env):

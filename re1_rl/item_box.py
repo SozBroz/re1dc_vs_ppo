@@ -45,7 +45,7 @@ BOX_SLOTS = 16
 INVENTORY_SLOTS = 8
 LOCKPICK_ITEM_ID = 0x31
 
-BOX_ROOMS = frozenset({"100", "118", "30E", "403", "502", "50E", "600", "618"})
+BOX_ROOMS = frozenset({"100", "118", "11B", "30E", "403", "502", "50E", "600", "618"})
 
 
 class _BridgeReadWrite(Protocol):
@@ -266,7 +266,7 @@ def apply_withdraw(bridge: _BridgeReadWrite, box_slot: int) -> dict[str, Any]:
 
 
 def is_box_room(room_id: str) -> bool:
-    """True when ``room_id`` is a known item-box room (e.g. ``'100'``, ``'11B'`` excluded)."""
+    """True when ``room_id`` is a known item-box room."""
     return str(room_id).strip().upper() in BOX_ROOMS
 
 

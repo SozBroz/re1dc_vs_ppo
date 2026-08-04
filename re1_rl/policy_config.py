@@ -6,7 +6,7 @@ Combat-efficient (WH2 8GB fit, hard cap 5.8M):
   - Concat + LayerNorm fusion -> 1024-d
   - pi/vf trunks [512, 512]
   - flat 45-action MaskablePPO distribution
-  - affordances path-hint and goal compass omitted from forward
+  - legacy affordances path-hint omitted; live rails goal fused through its own tower
 
 Fresh training / one-time graft required — Doc04-medium 1280-d checkpoints are
 not shape-compatible. See scripts/transplant_combat_efficient.py.

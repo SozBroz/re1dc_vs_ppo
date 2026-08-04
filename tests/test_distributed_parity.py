@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import sys
 import zipfile
 from pathlib import Path
@@ -151,6 +152,38 @@ def test_legacy_action_head_transplant_clones_attack_with_low_prior() -> None:
     )
 
 
+def test_goal_lookahead_transplant_preserves_legacy_goal_tower() -> None:
+    class Extractor(nn.Module):
+        def __init__(self, *, with_lookahead: bool) -> None:
+            super().__init__()
+            self.goal_mlp = nn.Sequential(nn.Linear(28, 4), nn.ReLU())
+            if with_lookahead:
+                self.goal_lookahead_out = nn.Linear(8, 4)
+
+    class Policy(nn.Module):
+        def __init__(self, *, with_lookahead: bool) -> None:
+            super().__init__()
+            self.features_extractor = Extractor(with_lookahead=with_lookahead)
+
+    old = Policy(with_lookahead=False)
+    new = Policy(with_lookahead=True)
+    lookahead_before = new.features_extractor.goal_lookahead_out.weight.detach().clone()
+    with torch.no_grad():
+        old.features_extractor.goal_mlp[0].weight.fill_(3.0)
+        old.features_extractor.goal_mlp[0].bias.fill_(4.0)
+    _copy_compatible_policy_weights(old, new)
+    weight = new.features_extractor.goal_mlp[0].weight
+    assert torch.equal(weight, old.features_extractor.goal_mlp[0].weight)
+    assert torch.equal(
+        new.features_extractor.goal_mlp[0].bias,
+        old.features_extractor.goal_mlp[0].bias,
+    )
+    assert torch.equal(
+        new.features_extractor.goal_lookahead_out.weight,
+        lookahead_before,
+    )
+
+
 def test_45_action_head_reorder_transplant_preserves_action_semantics() -> None:
     old_action_names = (
         "noop",
@@ -294,6 +327,42 @@ def test_load_async_learner_transplants_missing_obs_key(tmp_path: Path) -> None:
     assert model.observation_space["frame"].shape == FRAME_SHAPE_CHW
     assert set(model.observation_space.spaces.keys()) == set(policy_obs.spaces.keys())
     assert int(model.num_timesteps) == 1234
+
+
+def test_load_async_learner_raw_transplants_new_goal_module(tmp_path: Path) -> None:
+    policy_obs, act_space = make_re1_policy_spaces()
+    donor = PPO(
+        "MultiInputPolicy",
+        _SpaceHolderEnv(policy_obs, act_space),
+        policy_kwargs=POLICY_KWARGS,
+        n_steps=8,
+        batch_size=8,
+        n_epochs=1,
+        device="cpu",
+        verbose=0,
+    )
+    donor.num_timesteps = 4321
+    ckpt = tmp_path / "legacy_goal_module.zip"
+    donor.save(str(ckpt))
+    legacy_sd = {
+        key: value
+        for key, value in donor.policy.state_dict().items()
+        if "goal_lookahead" not in key
+    }
+    policy_buf = io.BytesIO()
+    torch.save(legacy_sd, policy_buf)
+    rewritten = tmp_path / "rewritten.zip"
+    with zipfile.ZipFile(ckpt) as source, zipfile.ZipFile(rewritten, "w") as dest:
+        for info in source.infolist():
+            if info.filename != "policy.pth":
+                dest.writestr(info, source.read(info.filename))
+        dest.writestr("policy.pth", policy_buf.getvalue())
+    rewritten.replace(ckpt)
+
+    model = load_async_learner(device="cpu", resume=ckpt, tb_log=None)
+    assert int(model.num_timesteps) == 4321
+    assert hasattr(model.policy.features_extractor, "goal_lookahead_token")
+    assert model.observation_space["goal"].shape == (GOAL_DIM,)
 
 
 def test_distributed_build_learner_reuses_load_async_learner(tmp_path: Path, monkeypatch) -> None:

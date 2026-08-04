@@ -23,6 +23,10 @@ from re1_rl.milestone_features import MILESTONE_DIM
 from re1_rl.named_state import NAMED_STATE_DIM
 from re1_rl.obs_encoder import (
     BOX_DIM,
+    GOAL_BASE_DIM,
+    GOAL_DIM,
+    GOAL_LOOKAHEAD_SLOT_DIM,
+    GOAL_LOOKAHEAD_SLOTS,
     INVENTORY_OBS_DIM,
     INVENTORY_SLOTS,
     MAX_ITEM_ID,
@@ -56,6 +60,7 @@ SPATIAL_TOWER_DIM = 192
 INVENTORY_TOWER_DIM = 160
 HISTORY_TOWER_DIM = 192
 FLAGS_TOWER_DIM = 64
+GOAL_TOWER_DIM = 48
 JOINT_COMBAT_DIM = 128
 WORLD_CONTEXT_DIM = 320
 ROOM_EMBED_DIM = 64
@@ -74,7 +79,7 @@ FEATURES_DIM = 1024
 PARAM_HARD_CAP = 5_800_000
 PARAM_TARGET = 5_610_000
 
-_OMIT_OBS_KEYS = frozenset({"frame", "world_state", "key_hints", "goal", "affordances"})
+_OMIT_OBS_KEYS = frozenset({"frame", "world_state", "key_hints", "affordances"})
 
 _INTERACTABLE_SLOT_DIM = 4
 _ITEM_SLOT_DIM = 8
@@ -88,6 +93,7 @@ def _tower_out_dim(*, persistent_enabled: bool) -> int:
         + INVENTORY_TOWER_DIM
         + HISTORY_TOWER_DIM
         + FLAGS_TOWER_DIM
+        + GOAL_TOWER_DIM
         + JOINT_COMBAT_DIM
         + WORLD_CONTEXT_DIM
     )
@@ -386,6 +392,18 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
             nn.Linear(128, FLAGS_TOWER_DIM),
             nn.ReLU(),
         )
+        self.goal_mlp = nn.Sequential(
+            nn.Linear(GOAL_BASE_DIM, 128),
+            nn.ReLU(),
+            nn.Linear(128, GOAL_TOWER_DIM),
+            nn.ReLU(),
+        )
+        self.goal_lookahead_token = nn.Sequential(
+            nn.Linear(GOAL_LOOKAHEAD_SLOT_DIM, 4),
+            nn.ReLU(),
+        )
+        self.goal_lookahead_pool = _MaskedPool()
+        self.goal_lookahead_out = nn.Linear(8, GOAL_TOWER_DIM)
 
         combat_in = WEAPON_CARD_DIM + LAST_ATTACK_DIM + ENEMY_ROSTER_DIM
         self.combat_mlp = nn.Sequential(
@@ -513,6 +531,15 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
                 dim=-1,
             )
         )
+        goal_obs = self._optional_tensor(observations, "goal", GOAL_DIM)
+        goal = self.goal_mlp(goal_obs[:, :GOAL_BASE_DIM])
+        lookahead = goal_obs[:, GOAL_BASE_DIM:].reshape(
+            goal_obs.shape[0], GOAL_LOOKAHEAD_SLOTS, GOAL_LOOKAHEAD_SLOT_DIM
+        )
+        lookahead_tokens = self.goal_lookahead_token(lookahead)
+        goal = goal + self.goal_lookahead_out(
+            self.goal_lookahead_pool(lookahead_tokens, lookahead[:, :, 0])
+        )
         combat_enc = self.combat_mlp(
             th.cat(
                 [
@@ -545,6 +572,7 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
             inventory,
             history,
             flags,
+            goal,
             joint,
             self.world_context(observations),
         ]

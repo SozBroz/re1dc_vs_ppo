@@ -130,10 +130,6 @@ from re1_rl.attack_macro import (
     execute_attack_up_macro,
 )
 from re1_rl.options_menu_macro import dismiss_options_menu
-from re1_rl.richard_lab import (
-    clear_richard_lab_countdown,
-    richard_lab_countdown_screen_from_ram,
-)
 
 # Mask knife/attack when live RAM shows no living enemies (set 0 to debug combat).
 MASK_ATTACK_WITHOUT_ENEMIES = os.environ.get(
@@ -661,7 +657,7 @@ class RE1Env(gym.Env):
         """Return Gym termination flags, preserving the Wesker terminal mark."""
         kenneth_gate_failure = self._progress.kenneth_gate_breached
         checkpoint_success = (
-            self._stage.get("episode_mode") == "one_leg"
+            self._stage.get("mode") == "yawn_rails"
             and self._progress.checkpoint_success
         )
         terminated = bool(state.get("dead")) or kenneth_gate_failure or checkpoint_success
@@ -1056,6 +1052,12 @@ class RE1Env(gym.Env):
         self._pending_episode_failure = None
         self._load_stage()
         assert self._planner is not None
+        requested_leg_span = int(
+            opts.get("leg_span", self._stage.get("legs_per_episode", 1))
+        )
+        self._leg_span = max(
+            1, min(requested_leg_span, max(1, self._planner.waypoints_remaining))
+        )
         self._pb_captured_triggers = set()
         self._go_explore_capture_pending = []
         self._yawn_rails_capture_pending = []
@@ -1143,8 +1145,6 @@ class RE1Env(gym.Env):
         if self._probe_item_inventory_menu():
             self._try_dismiss_orphan_item_menu()
             self._skip_uncontrolled()
-        self._try_clear_richard_lab_countdown()
-
         if self._stage.get("knife_equipped_start"):
             try:
                 equip_knife_from_pause_menu(self.bridge)
@@ -1173,7 +1173,7 @@ class RE1Env(gym.Env):
         self._frame_stack = []
         self.bridge.frame_ring.clear()
         self.bridge.attack_pins.clear()
-        self._progress = ProgressTracker()
+        self._progress = ProgressTracker(leg_span=self._leg_span)
         self._visited.reset()
         self._enemy_motion.reset()
         self._player_motion.reset()
@@ -1210,7 +1210,7 @@ class RE1Env(gym.Env):
                 if self._ram_skip.use_engine_patches:
                     self._ram_skip.install_engine_patches()
                 self._skip_uncontrolled()
-                self._progress = ProgressTracker()
+                self._progress = ProgressTracker(leg_span=self._leg_span)
                 self._visited.reset()
                 self._box_cache = None
                 state = self._read_state(track_items=True)
@@ -1879,38 +1879,6 @@ class RE1Env(gym.Env):
             return True
         a = int(action)
         return a in (USE_ACTION, EQUIP_ACTION, COMBINE_ACTION)
-
-    def _probe_richard_lab_countdown(self) -> bool:
-        try:
-            ram = self._skip_poll_ram()
-            return richard_lab_countdown_screen_from_ram(ram)
-        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
-            return False
-
-    def _try_clear_richard_lab_countdown(self) -> tuple[bool, dict[str, Any]]:
-        """Dismiss post-Richard STATUS trap and zero lab_timer. Returns (recovered, report)."""
-        if not self._probe_richard_lab_countdown():
-            return False, {"skipped": True}
-        self._sticky_input.reset()
-        self._macro_active = True
-        try:
-            still, _frames, report = clear_richard_lab_countdown(
-                self.bridge,
-                prev_hp=self._prev_hp,
-                episode_start_hp=getattr(self, "_episode_start_hp", 0),
-            )
-        finally:
-            self._macro_active = False
-            self._sticky_input.reset()
-        if not still:
-            self._progress.mark_richard_lab_cleared()
-        else:
-            port = getattr(self.bridge, "port", "?")
-            print(
-                f"[richard_lab_clear_fail] port={port} report={report}",
-                flush=True,
-            )
-        return (not still), report
 
     def _probe_item_inventory_menu(self) -> bool:
         from re1_rl.ram_skip import item_inventory_screen_from_ram
@@ -2631,12 +2599,7 @@ class RE1Env(gym.Env):
         # Orphan START/ITEM pause (policy has no Start): close on a fresh step
         # only — never while equip/use/combine or another bridge macro owns it.
         if not self._inventory_macro_owns_item_menu(int(action)):
-            if self._probe_richard_lab_countdown():
-                recovered, _richard_report = self._try_clear_richard_lab_countdown()
-                if recovered:
-                    self._skipping_flag = False
-                    menu_reason = self._probe_outside_gameplay()
-            elif self._probe_item_inventory_menu():
+            if self._probe_item_inventory_menu():
                 recovered, _item_report = self._try_dismiss_orphan_item_menu()
                 if recovered:
                     self._skipping_flag = False

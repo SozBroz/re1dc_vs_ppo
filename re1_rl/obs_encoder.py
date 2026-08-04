@@ -21,6 +21,7 @@ from typing import Any
 import numpy as np
 
 from re1_rl.enemy_motion import clip_vel
+from re1_rl.item_box import BOX_ROOMS
 from re1_rl.item_todo import ItemTracker, RoomItems, canonical_item, canonicalize
 from re1_rl.memory_map import ITEM_IDS
 from re1_rl.planner import OBJECTIVE_TYPES, WaypointPlanner
@@ -107,9 +108,36 @@ GOAL_FIELDS: list[tuple[str, str]] = [
     ("gallery_progress", "correct Gallery switches / 6"),
     ("dining_statue_knocked", "1 = dining 2F statue pushed off balcony"),
 ]
+GOAL_BASE_DIM = len(GOAL_FIELDS)
+
+GOAL_LOOKAHEAD_SLOTS = 6
+GOAL_LOOKAHEAD_SLOT_FIELDS: list[tuple[str, str]] = [
+    ("mask", "1 = checkpoint exists"),
+    ("room_index", "checkpoint room table index / 128"),
+    ("offset", "checkpoint offset / 5 (0 = active)"),
+    *(("obj_" + name, f"objective one-hot: {name}") for name in OBJECTIVE_TYPES),
+    ("required_item0_id", "first required item id / 0x4B"),
+    ("required_item1_id", "second required item id / 0x4B"),
+    ("required_count", "required item count / 4"),
+    ("has_required_items", "1 = all checkpoint prerequisites currently held"),
+    ("gained_item0_id", "first gained item id / 0x4B"),
+    ("gained_item1_id", "second gained item id / 0x4B"),
+    ("gained_count", "declared gained item count / 4"),
+    ("target_has_box", "1 = checkpoint room has an item box"),
+    ("projected_headroom", "free inventory slots after declared gains / 8"),
+]
+GOAL_LOOKAHEAD_SLOT_DIM = len(GOAL_LOOKAHEAD_SLOT_FIELDS)
+GOAL_FIELDS.extend(
+    (
+        f"lookahead{slot}_{name}",
+        f"checkpoint lookahead slot {slot}: {description}",
+    )
+    for slot in range(GOAL_LOOKAHEAD_SLOTS)
+    for name, description in GOAL_LOOKAHEAD_SLOT_FIELDS
+)
 
 PROPRIO_DIM = len(PROPRIO_FIELDS)  # 28
-GOAL_DIM = len(GOAL_FIELDS)  # 25
+GOAL_DIM = len(GOAL_FIELDS)
 
 ANIM_HISTORY_LEN = 4
 ANIM_RECOVERY_NORM = 32.0
@@ -253,9 +281,44 @@ class ObsEncoder:
         inventory = {canonical_item(x) for x in state.get("inventory", [])}
         v[19] = 1.0 if required.issubset(inventory) else 0.0
         v[20] = 1.0 if goal is not None and room != str(goal) and hops is None else 0.0
-        v[-5:-1] = encode_gallery_hint(state)
-        v[-1] = encode_dining_statue_goal(state)
+        v[23:27] = encode_gallery_hint(state)
+        v[27] = encode_dining_statue_goal(state)
+        self._encode_goal_lookahead(v, state, planner)
         return v
+
+    def _encode_goal_lookahead(
+        self,
+        vector: np.ndarray,
+        state: dict[str, Any],
+        planner: WaypointPlanner,
+    ) -> None:
+        """Append masked checkpoint semantics; the exit compass stays immediate."""
+        inventory = {canonical_item(x) for x in state.get("inventory", [])}
+        projected_free = max(0, INVENTORY_SLOTS - len(state.get("inventory", [])))
+        base = GOAL_BASE_DIM
+        for offset in range(GOAL_LOOKAHEAD_SLOTS):
+            step = planner.peek_objective(offset)
+            room = planner.peek_waypoint_room(offset)
+            if step is None or room is None:
+                continue
+            start = base + offset * GOAL_LOOKAHEAD_SLOT_DIM
+            slot = vector[start : start + GOAL_LOOKAHEAD_SLOT_DIM]
+            required = [canonical_item(x) for x in planner.peek_required_items(offset)]
+            gained = [canonical_item(x) for x in planner.peek_items_gained(offset)]
+            projected_free = max(0, projected_free - len(gained))
+            slot[0] = 1.0
+            slot[1] = self._room_idx_norm(room)
+            slot[2] = offset / float(max(GOAL_LOOKAHEAD_SLOTS - 1, 1))
+            slot[3 + OBJECTIVE_TYPES.index(planner.peek_objective_type(offset))] = 1.0
+            for item_offset, item_name in enumerate(required[:2]):
+                slot[8 + item_offset] = _NAME_TO_ITEM_ID.get(item_name, 0) / float(MAX_ITEM_ID)
+            slot[10] = min(len(required) / 4.0, 1.0)
+            slot[11] = 1.0 if set(required).issubset(inventory) else 0.0
+            for item_offset, item_name in enumerate(gained[:2]):
+                slot[12 + item_offset] = _NAME_TO_ITEM_ID.get(item_name, 0) / float(MAX_ITEM_ID)
+            slot[14] = min(len(gained) / 4.0, 1.0)
+            slot[15] = 1.0 if str(room).upper() in BOX_ROOMS else 0.0
+            slot[16] = projected_free / float(INVENTORY_SLOTS)
 
 
 def encode_inventory_slots(

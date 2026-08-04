@@ -285,8 +285,8 @@ def test_apply_deposit_does_not_unequip_other_item():
 def test_is_box_room():
     assert is_box_room("100")
     assert is_box_room("30e")
+    assert is_box_room("11B")
     assert not is_box_room("105")
-    assert not is_box_room("11B")
 
 
 if __name__ == "__main__":

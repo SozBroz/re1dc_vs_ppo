@@ -139,6 +139,79 @@ def _load_ammo_item_names() -> frozenset[str]:
 
 AMMO_ITEM_NAMES: frozenset[str] = _load_ammo_item_names()
 
+HP_HEAL_RESOURCE_ITEMS: frozenset[str] = frozenset({
+    "first_aid_spray",
+    "first_aid_spray_alt",
+    "green_herb",
+    "red_herb",
+    "mixed_herbs_gr",
+    "mixed_herbs_gg",
+    "mixed_herbs_gb",
+    "mixed_herbs_grb",
+    "mixed_herbs_ggg",
+    "mixed_herbs_ggb",
+})
+POISON_CURE_RESOURCE_ITEMS: frozenset[str] = frozenset({
+    "blue_herb",
+    "mixed_herbs_gb",
+    "mixed_herbs_grb",
+    "mixed_herbs_ggb",
+})
+HEALTH_RESOURCE_ITEMS = HP_HEAL_RESOURCE_ITEMS | POISON_CURE_RESOURCE_ITEMS
+
+
+def _inventory_names(state: dict[str, Any]) -> set[str]:
+    raw_slots = state.get("inventory_slots")
+    if raw_slots is None:
+        return {
+            canonical_item(str(name))
+            for name in (state.get("inventory") or [])
+            if name
+        }
+    names: set[str] = set()
+    for entry in raw_slots:
+        if isinstance(entry, dict):
+            name = entry.get("name") or entry.get("item")
+        elif isinstance(entry, (list, tuple)) and entry:
+            name = entry[0]
+        else:
+            name = None
+        if name:
+            names.add(canonical_item(str(name)))
+    return names
+
+
+def _free_inventory_slots(state: dict[str, Any]) -> int:
+    raw_slots = state.get("inventory_slots")
+    if raw_slots is None:
+        occupied = len(state.get("inventory") or [])
+    else:
+        occupied = 0
+        for entry in raw_slots:
+            if isinstance(entry, dict):
+                occupied += bool(entry.get("name") or entry.get("item"))
+            elif isinstance(entry, (list, tuple)) and entry:
+                occupied += bool(entry[0])
+    return max(0, 8 - int(occupied))
+
+
+def _health_pickup_adds_resource(
+    name: str,
+    *,
+    prev_state: dict[str, Any],
+    state: dict[str, Any],
+) -> bool:
+    if name not in HEALTH_RESOURCE_ITEMS or _free_inventory_slots(state) < 3:
+        return False
+    held = _inventory_names(prev_state)
+    has_hp = bool(held & HP_HEAL_RESOURCE_ITEMS)
+    has_cure = bool(held & POISON_CURE_RESOURCE_ITEMS)
+    return (
+        (name in HP_HEAL_RESOURCE_ITEMS and not has_hp)
+        or (name in POISON_CURE_RESOURCE_ITEMS and not has_cure)
+    )
+
+
 # Dense softlock ramp is already in the scalar reward (bd["softlock"]); one γ.
 # Yawn one-leg rails target a ≈15s pure-discount half-life at 8-frame,
 # 60fps reference steps: γ = 0.5^(1 / (15 / (8/60))) ≈ 0.99386.
@@ -511,7 +584,10 @@ def compute_reward(
             bd["ammo_pickup"] += AMMO_PICKUP_BONUS
             ammo_progress = True
         else:
-            bd["item"] += ITEM_PICKUP_BONUS
+            if name not in HEALTH_RESOURCE_ITEMS or _health_pickup_adds_resource(
+                name, prev_state=prev_state, state=state
+            ):
+                bd["item"] += ITEM_PICKUP_BONUS
 
     # Observation and payout are separate ledgers. A cutscene can pay only when
     # this exact transition also earned a new-room entry reward.

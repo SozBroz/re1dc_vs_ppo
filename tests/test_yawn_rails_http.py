@@ -84,6 +84,13 @@ def _write_local_cell(tmp: Path, *, idx: int = 0, quality=(96, 15, 1, 2, 1)) -> 
         state_path=state_p,
         sidecar_path=side_p,
         worker_id="workhorse1",
+        capacity={
+            "inventory_free_slots": 3,
+            "next_checkpoint_id": f"cp_{idx + 1}",
+            "next_slots_needed": 1,
+            "inventory_feasible": True,
+            "captured_in_box_room": False,
+        },
     )
 
 
@@ -132,6 +139,8 @@ def test_manifest_and_bundle_roundtrip(yawn_http, tmp_path: Path) -> None:
     assert man["archive_version"] == 1
     assert len(man["cells"]) == 1
     assert man["cells"][0]["checkpoint_index"] == 0
+    assert man["cells"][0]["inventory_free_slots"] == 3
+    assert man["cells"][0]["next_checkpoint_id"] == "cp_1"
 
     man2 = client.fetch_yawn_rails_manifest(since_version=1)
     assert man2["cells"] == []
@@ -168,6 +177,31 @@ def test_quality_replace_and_reject(yawn_http, tmp_path: Path) -> None:
     assert store.cells[1]["quality"][0] == 96
 
 
+def test_capacity_metadata_upgrades_legacy_row_even_with_lower_quality(
+    yawn_http, tmp_path: Path
+) -> None:
+    store: YawnRailsCellStore = yawn_http["store"]
+    legacy = _write_local_cell(
+        tmp_path / "legacy", idx=5, quality=[96, 20, 2, 3, 1]
+    )
+    for key in (
+        "inventory_free_slots",
+        "next_checkpoint_id",
+        "next_slots_needed",
+        "inventory_feasible",
+        "captured_in_box_room",
+    ):
+        legacy.pop(key)
+    assert store.ingest_proposals([legacy]) == ["cp05"]
+    assert "inventory_feasible" not in store.cells[5]
+
+    recaptured = _write_local_cell(
+        tmp_path / "recaptured", idx=5, quality=[80, 10, 1, 2, 1]
+    )
+    assert store.ingest_proposals([recaptured]) == ["cp05"]
+    assert store.cells[5]["inventory_feasible"] is True
+
+
 def test_worker_eager_poll_mirrors_bundles(yawn_http, tmp_path: Path) -> None:
     store: YawnRailsCellStore = yawn_http["store"]
     client: WorkerClient = yawn_http["client"]
@@ -180,6 +214,8 @@ def test_worker_eager_poll_mirrors_bundles(yawn_http, tmp_path: Path) -> None:
     local = poll_yawn_rails_manifest(client, worker_root, since_version=0)
     assert local["archive_version"] == 1
     assert load_local_yawn_manifest(worker_root)["cells"]
+    assert local["cells"][0]["inventory_feasible"] is True
+    assert local["cells"][0]["next_slots_needed"] == 1
     mirrored = worker_root / "states" / "yawn_rails" / "cells" / "cp02" / "cell.State"
     assert mirrored.is_file()
     assert mirrored.read_bytes().startswith(b"STATE_cp02")

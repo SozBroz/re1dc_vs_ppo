@@ -10,13 +10,22 @@
 
 ## Fixed goal (do not drift)
 
-**Beat RE1 Director's Cut via DRL.** The policy chooses movement, camera, interact, combat, and inventory menu actions. It must **learn** navigation and puzzles from pixels + privileged sensors — not follow a baked-in any% route.
+**Beat RE1 Director's Cut via DRL on explicit goal-conditioned rails.** The
+trainer tells the policy **what checkpoint comes next** and supplies a compass
+toward the relevant exit. The policy still chooses movement, camera, interact,
+combat, inventory, and puzzle actions; the rails never press buttons or execute
+the route.
+
+The former “let it freely explore until it discovers progression” paradigm is
+retired as the primary training strategy. Route objectives are now privileged
+NN inputs, not reward-only hints.
 
 When evaluating any proposal, ask:
 
 1. Does the policy still have to **learn** which buttons to press for movement and puzzles?
-2. Does it improve **sample efficiency** without handing the agent the solution path?
-3. Does it stay faithful to the **Evil Resource mental model** (room guidebook + item affordances), not a walkthrough script?
+2. Does it make the active rails objective legible without selecting actions
+   for the policy?
+3. Does the policy still learn **how** to reach and complete that objective?
 
 ---
 
@@ -59,10 +68,22 @@ Rationale: menu navigation for box management is low-signal tedium, not the stra
 
 ## Goal-conditioned rails, not scripted navigation
 
-The approved Yawn campaign intentionally replaces free exploration as the
-primary learning mode with atomic route rails. In `yawn_rails` mode the policy
-receives the active checkpoint room, graph distance, next-exit bearing/distance,
-objective type, required-item status, and route progress through `goal`.
+The approved Yawn campaign replaces free exploration as the primary learning
+mode with atomic route rails. In `yawn_rails` mode, the following `goal` fields
+are **required live NN inputs**, not optional telemetry:
+
+- active checkpoint / target room
+- checkpoint and route progress
+- graph distance to the target
+- egocentric bearing and distance to the next relevant exit
+- objective type (`navigate`, `pickup`, `use_item`, or `fight`)
+- required-item readiness
+- current-room remaining and gated-item context
+
+`RE1CombatEfficientExtractor` must fuse `goal` into the policy features. Merely
+placing `goal` in the Gym observation dictionary while omitting it from the
+extractor does **not** satisfy the rails contract. Any architecture or checkpoint
+change that drops or zeroes these fields is a release blocker for rails training.
 
 This is guidance, not actuation: the planner never selects buttons, walks Jill,
 solves puzzles, or invokes navigation macros. The policy still learns every
@@ -74,6 +95,13 @@ movement, door interaction, pickup, inventory use, puzzle, and fight.
 - Reset source: curated route cells; PB/Go-Explore sidecars remain archival
 - `data/route_jill_anypct.json` remains historical/full-game reference and is
   not used by the Yawn rails stage.
+
+One-leg episodes are the skill-acquisition phase, not the final planning
+horizon. After contiguous route-cell coverage exists, rails training widens to
+multi-leg segments while retaining one-leg samples. The policy receives a
+masked six-checkpoint semantic lookahead in `goal`; only the immediate
+checkpoint owns the door compass. This lets box/inventory choices experience
+their downstream consequences without allowing the planner to select actions.
 
 ---
 
@@ -160,7 +188,9 @@ Prefer **discrete milestones** over raw action logs:
 | **SCD / door flag flipped** | `dining_emblem_placed` | Runtime world state persistence |
 | **Key item used** (if detectable) | `gold_emblem` on fireplace | Puzzle progress without macro |
 
-**Avoid:** full button replay, per-step action n-grams, or history that encodes the any% **route index** (that is compass leakage).
+**Avoid:** full button replay and per-step action n-grams. Route/checkpoint
+progress belongs in the explicit rails `goal` channel, not hidden inside episode
+history.
 
 ### History vs compass (critical distinction)
 
@@ -204,17 +234,22 @@ Before implementing:
 
 1. **Classify** — Observation (guidebook), **episode history**, reward, combat macro, or actuation (forbidden)?
 2. **Guidebook test** — Would a human with Evil Resource open **one room page** or **one item page** — not a turn-by-turn route?
-3. **History test** — Does this record **what happened**, without saying **what to do next**?
-4. **Path test** — A rails contract may identify the active checkpoint; reject anything that selects or executes low-level navigation actions.
-4. **Purity test** — Does the policy still choose buttons for this skill? Combat macros and box RAM are the only broad exceptions.
-5. **Data provenance** — Prefer `room_items.json`, RDT extracts, RAM hunts, and Evil Resource cross-checks over hand-wavy route notes.
+3. **History test** — Does this record **what happened**, while next-objective
+   guidance stays in the explicit `goal` channel?
+4. **Rails-input test** — Does the live policy actually consume checkpoint,
+   objective, distance, and exit-compass features?
+5. **Actuation test** — Reject anything that selects or executes low-level
+   navigation or puzzle actions. The policy must still choose the buttons.
+6. **Purity test** — Combat macros and box RAM are the only broad actuation exceptions.
+7. **Data provenance** — Prefer `room_items.json`, RDT extracts, RAM hunts, and Evil Resource cross-checks over hand-wavy route notes.
 
 ### Anti-patterns
 
-- Using goal features outside an explicitly goal-conditioned curriculum contract
+- Dropping, zeroing, or failing to fuse `goal` during rails training
 - Puzzle macros “just to unblock training”
 - Hiding all gated items instead of showing `gated=1` with known prereqs
-- Using `route_jill_anypct.json` step index as obs during exploration
+- Using the historical `route_jill_anypct.json` instead of the active,
+  validated rails contract
 - Expanding RAM magic beyond box-room inventory management
 
 ---
@@ -272,4 +307,6 @@ When briefing progress against the north star:
 
 ---
 
-*Document version: 1.2 — 2026-08-03. Approves goal-conditioned one-leg Yawn rails while preserving the ban on navigation and puzzle macros.*
+*Document version: 1.3 — 2026-08-03. Retires free exploration as the primary
+strategy and requires checkpoint/compass goal fusion for rails training while
+preserving the ban on navigation and puzzle actuation macros.*

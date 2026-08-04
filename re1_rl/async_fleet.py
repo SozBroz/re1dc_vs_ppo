@@ -270,6 +270,27 @@ def _checkpoint_spaces_compatible(model) -> bool:
     return True
 
 
+def _checkpoint_missing_policy_keys(checkpoint: Path, model) -> list[str]:
+    """Inspect donor policy keys so SB3's non-exact fallback is never silent."""
+    import io
+    import zipfile
+
+    import torch
+
+    try:
+        with zipfile.ZipFile(checkpoint) as zf:
+            donor = torch.load(
+                io.BytesIO(zf.read("policy.pth")),
+                map_location="cpu",
+                weights_only=True,
+            )
+    except (OSError, KeyError, RuntimeError, zipfile.BadZipFile) as exc:
+        raise RuntimeError(
+            f"cannot inspect resume checkpoint policy state: {checkpoint}"
+        ) from exc
+    return sorted(set(model.policy.state_dict()) - set(donor))
+
+
 _LEGACY_47_ACTION_NAMES = (
     "noop",
     "forward",
@@ -318,6 +339,19 @@ def _copy_compatible_policy_weights(src_policy, dst_policy) -> int:
         k: v for k, v in src.items()
         if k in dst and tuple(dst[k].shape) == tuple(v.shape)
     }
+    goal_input_key = "features_extractor.goal_mlp.0.weight"
+    if goal_input_key in src and goal_input_key in dst:
+        old = src[goal_input_key]
+        new = dst[goal_input_key]
+        if (
+            old.ndim == new.ndim == 2
+            and old.shape[0] == new.shape[0]
+            and old.shape[1] < new.shape[1]
+        ):
+            widened = new.clone()
+            widened.zero_()
+            widened[:, : old.shape[1]] = old
+            filtered[goal_input_key] = widened
     for key in ("action_net.weight", "action_net.bias"):
         if key not in src or key not in dst:
             continue
@@ -369,7 +403,7 @@ def _transplant_state_dict_with_input_pad(
             report["copied"].append(key)
             continue
         if (
-            key.endswith(".mlp.0.weight")
+            (key.endswith(".mlp.0.weight") or key.endswith(".goal_mlp.0.weight"))
             and old_t.ndim == 2
             and new_t.ndim == 2
             and old_t.shape[0] == new_t.shape[0]
@@ -531,8 +565,35 @@ def load_async_learner(*, device: str, resume: Path | None, tb_log: str | None):
                     _copy_compatible_policy_weights(plain.policy, loaded.policy)
                     loaded.num_timesteps = int(plain.num_timesteps)
                     load_kind = "PPO"
-                except (TypeError, ValueError, RuntimeError) as exc:
-                    raise RuntimeError(f"failed to load resume checkpoint {resume}") from exc
+                except (TypeError, ValueError, RuntimeError):
+                    try:
+                        import io
+                        import json
+                        import zipfile
+
+                        import torch
+
+                        with zipfile.ZipFile(resume) as zf:
+                            old_sd = torch.load(
+                                io.BytesIO(zf.read("policy.pth")),
+                                map_location="cpu",
+                                weights_only=True,
+                            )
+                            meta = json.loads(zf.read("data"))
+                        loaded = _fresh_maskable()
+                        new_sd = loaded.policy.state_dict()
+                        report = _transplant_state_dict_with_input_pad(old_sd, new_sd)
+                        loaded.policy.load_state_dict(new_sd, strict=False)
+                        loaded.num_timesteps = int(meta.get("num_timesteps", 0) or 0)
+                        load_kind = (
+                            "raw-policy transplant "
+                            f"({len(report['copied'])} copied, "
+                            f"{len(report['remapped'])} remapped)"
+                        )
+                    except (OSError, KeyError, ValueError, RuntimeError, zipfile.BadZipFile) as exc:
+                        raise RuntimeError(
+                            f"failed to load or transplant resume checkpoint {resume}"
+                        ) from exc
 
         if tb_log:
             loaded.tensorboard_log = tb_log
@@ -541,6 +602,18 @@ def load_async_learner(*, device: str, resume: Path | None, tb_log: str | None):
             f"(num_timesteps={loaded.num_timesteps})",
             flush=True,
         )
+        if _checkpoint_spaces_compatible(loaded):
+            missing_keys = _checkpoint_missing_policy_keys(resume, loaded)
+            if missing_keys:
+                print(
+                    "[train:async] checkpoint policy layout mismatch; "
+                    f"{len(missing_keys)} current tensors absent from donor; "
+                    "using compatible-weight transplant",
+                    flush=True,
+                )
+                loaded = _transplant_into_current_spaces(
+                    loaded, tb_log=tb_log, hp=hp,
+                )
         if not _checkpoint_spaces_compatible(loaded):
             loaded = _transplant_into_current_spaces(
                 loaded, tb_log=tb_log, hp=hp,

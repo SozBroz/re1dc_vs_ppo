@@ -1,8 +1,9 @@
 {
-  "stage": "yawn_rails_one_leg",
-  "stage_index": 1,
+  "stage": "yawn_rails_chaining",
+  "stage_index": 2,
   "mode": "yawn_rails",
-  "episode_mode": "one_leg",
+  "episode_mode": "multi_leg",
+  "legs_per_episode": 6,
   "route_id": "yawn_quest_v2",
   "route_path": "data/yawn_checkpoint_route.json",
   "cells_manifest": "states/yawn_rails/manifest.json",
@@ -15,5 +16,5 @@
   ],
   "success_room": "210",
   "required_items": [],
-  "max_steps": 2700
+  "max_steps": 16200
 }

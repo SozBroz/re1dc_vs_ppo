@@ -118,6 +118,7 @@ def build_capture_proposal(
     state_path: Path,
     sidecar_path: Path,
     worker_id: str | None = None,
+    capacity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Pack a local cell capture into a rollout proposal dict."""
     state_bytes = Path(state_path).read_bytes()
@@ -135,6 +136,18 @@ def build_capture_proposal(
     }
     if worker_id:
         meta["worker_id"] = str(worker_id)
+    capacity_meta = {
+        key: (capacity or {}).get(key)
+        for key in (
+            "inventory_free_slots",
+            "next_checkpoint_id",
+            "next_slots_needed",
+            "inventory_feasible",
+            "captured_in_box_room",
+        )
+        if key in (capacity or {})
+    }
+    meta.update(capacity_meta)
     blob = pack_cell_bundle(state_bytes=state_bytes, sidecar=sidecar, meta=meta)
     with zipfile.ZipFile(io.BytesIO(blob)) as zf:
         state_sha = _sha256_bytes(zf.read(CELL_STATE_NAME))
@@ -152,6 +165,7 @@ def build_capture_proposal(
         "bytes": len(blob),
         "worker_id": worker_id,
         "meta": meta,
+        **capacity_meta,
     }
 
 
@@ -311,16 +325,31 @@ class YawnRailsCellStore:
             return None
         if route_id and not self.route_id:
             self.route_id = route_id
+        if prop.get("inventory_feasible") is False:
+            self.rejected += 1
+            return None
 
         existing = self.cells.get(idx)
         if existing is not None:
             old_q = _as_quality(existing.get("quality"))
-            if old_q is not None and not quality_beats(quality, old_q):
+            capacity_upgrade = (
+                "inventory_feasible" not in existing
+                and prop.get("inventory_feasible") is True
+            )
+            if (
+                not capacity_upgrade
+                and old_q is not None
+                and not quality_beats(quality, old_q)
+            ):
                 self.rejected += 1
                 return None
             from re1_rl.go_explore_capture import quality_replace_significant
 
-            if old_q is not None and not quality_replace_significant(quality, old_q):
+            if (
+                not capacity_upgrade
+                and old_q is not None
+                and not quality_replace_significant(quality, old_q)
+            ):
                 self.rejected += 1
                 return None
 
@@ -349,6 +378,15 @@ class YawnRailsCellStore:
                 f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}"
             ),
         }
+        for key in (
+            "inventory_free_slots",
+            "next_checkpoint_id",
+            "next_slots_needed",
+            "inventory_feasible",
+            "captured_in_box_room",
+        ):
+            if key in prop:
+                row[key] = prop[key]
         if prop.get("worker_id"):
             row["worker_id"] = str(prop["worker_id"])
         self.cells[idx] = row
@@ -413,6 +451,15 @@ class YawnRailsCellStore:
                 "bytes": len(bundle_bytes),
                 "route_id": prop.get("route_id") or self.route_id,
             }
+            for key in (
+                "inventory_free_slots",
+                "next_checkpoint_id",
+                "next_slots_needed",
+                "inventory_feasible",
+                "captured_in_box_room",
+            ):
+                if key in prop:
+                    meta[key] = prop[key]
             (incoming / CELL_META_NAME).write_text(
                 json.dumps(meta, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
@@ -450,6 +497,17 @@ class YawnRailsCellStore:
                         "cell_id": cell_dir_name(idx),
                         "state_path": row.get("state_path"),
                         "sidecar_path": row.get("sidecar_path"),
+                        **{
+                            key: row[key]
+                            for key in (
+                                "inventory_free_slots",
+                                "next_checkpoint_id",
+                                "next_slots_needed",
+                                "inventory_feasible",
+                                "captured_in_box_room",
+                            )
+                            if key in row
+                        },
                     }
                 )
             return {

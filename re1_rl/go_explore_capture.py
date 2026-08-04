@@ -55,8 +55,8 @@ _DEFAULT_COOLDOWN_STEPS = 60
 _DEFAULT_MIN_FREE_GB = 10.0
 _DEFAULT_REPLACE_BUDGET_DAY = 200
 _DEFAULT_MAX_CAPTURES_DAY = 200
-_DEFAULT_MIN_HP_DELTA = 5
-_DEFAULT_MIN_AMMO_DELTA = 10
+_DEFAULT_MIN_HP_DELTA = 1
+_DEFAULT_MIN_AMMO_DELTA = 1
 _MAX_BUNDLE_BYTES_ENV = "RE1_GO_MAX_CAPTURE_BUNDLE_BYTES"
 _DEFAULT_MAX_BUNDLE_BYTES = 5_000_000
 _BUDGET_LOCK_NAME = "capture_budget.lock"
@@ -454,7 +454,7 @@ def quality_replace_significant(
     new_q: Quality,
     old_q: Quality | list[int] | tuple[int, ...],
 ) -> bool:
-    """Ignore HP/ammo noise; require meaningful survival-resource gains."""
+    """Require at least one unit of survival-resource improvement."""
     o = tuple(int(x) for x in old_q)
     n = tuple(int(x) for x in new_q)
     while len(o) < 5:
