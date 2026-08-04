@@ -148,6 +148,9 @@ def test_checkpoint_success_captures_successor_cell(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     bridge = MagicMock()
+    bridge.save_savestate.side_effect = (
+        lambda path: Path(path).write_bytes(b"state")
+    )
     planner = _planner()
     planner._index = 1
     env = SimpleNamespace(
@@ -165,13 +168,15 @@ def test_checkpoint_success_captures_successor_cell(
         lambda *_args, **_kwargs: {"schema_version": 1},
     )
 
-    captured = capture_successor_cell(
+    proposal = capture_successor_cell(
         env,
         _state("105"),
         {"checkpoint_success": CHECKPOINT_REWARD},
     )
 
-    assert captured == tmp_path / "states/yawn_rails/cells/cp00/cell.State"
+    captured = tmp_path / "states/yawn_rails/cells/cp00/cell.State"
+    assert proposal is not None
+    assert proposal["checkpoint_index"] == 0
     bridge.save_savestate.assert_called_once_with(str(captured))
     manifest = json.loads(
         (tmp_path / "states/yawn_rails/manifest.json").read_text(encoding="utf-8")

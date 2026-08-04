@@ -59,10 +59,12 @@ def progress_to_sidecar(progress: ProgressTracker) -> dict[str, Any]:
     return {
         "visited_rooms": _sorted_list(progress.visited_rooms),
         "rewarded_cutscenes": _sorted_list(progress.rewarded_cutscenes),
+        "observed_cutscenes": _sorted_list(progress.observed_cutscenes),
         "rewarded_story_uses": _sorted_list(progress.rewarded_story_uses),
         "rewarded_document_rooms": _sorted_list(progress.rewarded_document_rooms),
         "cutscene_blocked_after_pickup_room": progress.cutscene_blocked_after_pickup_room,
         "kenneth_gate_breached": bool(progress.kenneth_gate_breached),
+        "richard_lab_cleared": bool(progress.richard_lab_cleared),
         "spawn_room_id": progress.spawn_room_id,
         "spawn_room_bonus_paid": bool(progress._spawn_room_bonus_paid),
         "weapons_progressed": _sorted_list(progress.weapons_progressed),
@@ -81,11 +83,15 @@ def apply_progress_sidecar(progress: ProgressTracker, data: dict[str, Any]) -> N
     """Restore ``ProgressTracker`` fields from a progress sidecar dict."""
     progress.visited_rooms = _as_set(data.get("visited_rooms"))
     progress.rewarded_cutscenes = _as_set(data.get("rewarded_cutscenes"))
+    progress.observed_cutscenes = _as_set(
+        data.get("observed_cutscenes", data.get("rewarded_cutscenes"))
+    )
     progress.rewarded_story_uses = _as_set(data.get("rewarded_story_uses"))
     progress.rewarded_document_rooms = _as_set(data.get("rewarded_document_rooms"))
     blocked = data.get("cutscene_blocked_after_pickup_room")
     progress.cutscene_blocked_after_pickup_room = str(blocked) if blocked else None
     progress.kenneth_gate_breached = bool(data.get("kenneth_gate_breached", False))
+    progress.richard_lab_cleared = bool(data.get("richard_lab_cleared", False))
     spawn = data.get("spawn_room_id")
     progress.spawn_room_id = str(spawn) if spawn else None
     progress._spawn_room_bonus_paid = bool(data.get("spawn_room_bonus_paid", False))
