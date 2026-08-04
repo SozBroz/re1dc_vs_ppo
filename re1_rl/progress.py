@@ -55,8 +55,9 @@ class ProgressTracker:
     gallery_completed: bool = False
     gallery_needs_reentry: bool = False
     dining_statue_rewarded: bool = False
-    # Pickups made after the current rails checkpoint. Sidecar history and
-    # acquisitions from an earlier leg do not satisfy a later checkpoint.
+    # Pickups made after the current rails checkpoint. For non-key/non-weapon
+    # items, only this set satisfies ``acquired_item``. Key items and weapons
+    # also accept current inventory / earlier episode reward bookkeeping.
     leg_acquired_items: set[str] = field(default_factory=set)
     # Directed room transitions observed during the current rails leg. This
     # lets a checkpoint combine a valid entry with an event that settles a few

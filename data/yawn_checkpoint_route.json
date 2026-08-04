@@ -114,11 +114,11 @@
     "seq": 12,
     "checkpoint_id": "ink_106",
     "room_id": "106",
-    "objective": "Collect Main Hall ink ribbons and save",
-    "action_type": "pickup",
+    "objective": "Return through Main Hall",
+    "action_type": "navigate",
     "required_items": [],
-    "items_gained": ["ink_ribbon"],
-    "success_condition": {"type": "all_of", "conditions": [{"type": "room_enter", "room_id": "106"}, {"type": "acquired_item", "item": "ink_ribbon"}, {"type": "typewriter_save"}, {"type": "lacks_item", "item": "ink_ribbon"}]}
+    "items_gained": [],
+    "success_condition": {"type": "room_enter", "room_id": "106"}
   },
   {
     "seq": 13,
@@ -314,11 +314,11 @@
     "seq": 32,
     "checkpoint_id": "save_100",
     "room_id": "100",
-    "objective": "Use the Mansion Save Room for inventory logistics and save",
+    "objective": "Reach the Mansion Save Room",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
-    "success_condition": {"type": "all_of", "conditions": [{"type": "room_enter", "room_id": "100"}, {"type": "typewriter_save"}]}
+    "success_condition": {"type": "room_enter", "room_id": "100"}
   },
   {
     "seq": 33,

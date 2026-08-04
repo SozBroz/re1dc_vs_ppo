@@ -9,9 +9,20 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from re1_rl.item_todo import canonical_item
+from re1_rl.key_items import KEY_ITEM_NAMES
+from re1_rl.memory_map import ITEM_IDS, WEAPON_ITEM_IDS
 
 if TYPE_CHECKING:
     from re1_rl.progress import ProgressTracker
+
+_KEY_ITEM_NAME_SET: frozenset[str] = frozenset(KEY_ITEM_NAMES)
+_WEAPON_NAME_SET: frozenset[str] = frozenset(
+    ITEM_IDS[i] for i in WEAPON_ITEM_IDS if i in ITEM_IDS
+)
+
+
+def _is_key_or_weapon(name: str) -> bool:
+    return name in _KEY_ITEM_NAME_SET or name in _WEAPON_NAME_SET
 
 # Order matters: index in this tuple = position in the objective one-hot.
 OBJECTIVE_TYPES = ("navigate", "pickup", "use_item", "fight", "scripted_macro")
@@ -252,10 +263,25 @@ class WaypointPlanner:
             want = canonical_item(str(cond.get("item", "")))
             return bool(want) and want not in inv
         if cond_type == "acquired_item":
+            want = canonical_item(str(cond.get("item", "")))
+            if not want:
+                return False
+            # This-leg pickup always counts (ammo / ink / junk stay leg-only).
+            if progress is not None and want in progress.leg_acquired_items:
+                return True
+            # Key items + weapons: already held / earlier acquisition passes so
+            # savestate cells and delayed settles are not softlocked.
+            if not _is_key_or_weapon(want):
+                return False
+            inv = {canonical_item(str(x)) for x in state.get("inventory", [])}
+            if want in inv:
+                return True
             if progress is None:
                 return False
-            want = canonical_item(str(cond.get("item", "")))
-            return bool(want) and want in progress.leg_acquired_items
+            return (
+                want in progress.key_items_rewarded
+                or want in progress.weapons_progressed
+            )
         if cond_type == "story_use":
             if progress is None:
                 return False

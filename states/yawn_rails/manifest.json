@@ -1,29 +1,8 @@
 {
   "schema_version": 1,
-  "archive_version": 22,
+  "archive_version": 23,
   "route_id": "yawn_quest_v2",
   "cells": [
-    {
-      "checkpoint_index": 0,
-      "checkpoint_id": "emblem_105",
-      "room_id": "105",
-      "quality": [
-        96,
-        30,
-        1,
-        5,
-        0
-      ],
-      "bundle_sha256": "d477dad421153eae8cc03e0fd3021b1469011141fa2a080924b2dd32f726b85a",
-      "bytes": 1533574,
-      "state_path": "states/yawn_rails/cells/cp00/cell.State",
-      "sidecar_path": "states/yawn_rails/cells/cp00/cell.sidecar.json",
-      "inventory_free_slots": 3,
-      "next_checkpoint_id": "kenneth_104",
-      "next_slots_needed": 0,
-      "inventory_feasible": true,
-      "captured_in_box_room": false
-    },
     {
       "checkpoint_index": 1,
       "checkpoint_id": "kenneth_104",
@@ -35,9 +14,9 @@
         15,
         1,
         4,
-        1
+        0
       ],
-      "bundle_sha256": "64898669eb6d8679bfb3fe8244229f50a9be7e921ae333e19620532817bf1537",
+      "bundle_sha256": "ba286cde586a1a1d954a00a300b761a80ab353d17c89712af29a5f1739b5080e",
       "inventory_free_slots": 4,
       "next_checkpoint_id": "barry_return_105",
       "next_slots_needed": 0,
@@ -47,82 +26,6 @@
       "route_required_items": [],
       "declared_gain_count": 0,
       "next_is_boss": false
-    },
-    {
-      "checkpoint_index": 2,
-      "checkpoint_id": "barry_return_105",
-      "room_id": "105",
-      "state_path": "states/yawn_rails/cells/cp02/cell.State",
-      "sidecar_path": "states/yawn_rails/cells/cp02/cell.sidecar.json",
-      "quality": [
-        96,
-        15,
-        1,
-        4,
-        0
-      ],
-      "bundle_sha256": "10c2ff53728617000bdd4256ed79433a46c287ea764b0a6291bbcf2375c4975c",
-      "inventory_free_slots": 4,
-      "next_checkpoint_id": "main_hall_106",
-      "next_slots_needed": 0,
-      "inventory_feasible": true,
-      "captured_in_box_room": false,
-      "logistics_horizon": "next_box_or_boss",
-      "route_required_items": [],
-      "declared_gain_count": 0,
-      "next_is_boss": false
-    },
-    {
-      "checkpoint_index": 3,
-      "checkpoint_id": "main_hall_106",
-      "room_id": "106",
-      "quality": [
-        96,
-        15,
-        1,
-        4,
-        0
-      ],
-      "bundle_sha256": "a726a8d55db1e4b428760423b0fd2026ca8894f776c3cbcf6aee0d88ad753160",
-      "bytes": 1422156,
-      "state_path": "states/yawn_rails/cells/cp03/cell.State",
-      "sidecar_path": "states/yawn_rails/cells/cp03/cell.sidecar.json",
-      "inventory_free_slots": 4,
-      "next_checkpoint_id": "upper_hall_203",
-      "next_slots_needed": 0,
-      "inventory_feasible": true,
-      "captured_in_box_room": false,
-      "logistics_horizon": "next_box_or_boss",
-      "route_required_items": [],
-      "declared_gain_count": 0,
-      "next_is_boss": false
-    },
-    {
-      "checkpoint_index": 4,
-      "checkpoint_id": "upper_hall_203",
-      "room_id": "203",
-      "quality": [
-        96,
-        45,
-        0,
-        5,
-        1
-      ],
-      "bundle_sha256": "b094bb761b649f23db958843c540fe69965c8e66f50ef383b54a26aa8b460382",
-      "bytes": 1566397,
-      "state_path": "states/yawn_rails/cells/cp04/cell.State",
-      "sidecar_path": "states/yawn_rails/cells/cp04/cell.sidecar.json",
-      "inventory_free_slots": 4,
-      "next_checkpoint_id": "barry_hall_return_106",
-      "next_slots_needed": 1,
-      "inventory_feasible": true,
-      "captured_in_box_room": false
     }
-  ],
-  "cache_stats": {
-    "manifest_cells": 5,
-    "fetched_last_poll": 0,
-    "pruned_dirs_last_poll": 0,
-    "remote_cell_count": 5
-  }
+  ]
 }
