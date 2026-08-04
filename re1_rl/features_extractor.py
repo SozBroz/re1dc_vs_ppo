@@ -184,22 +184,25 @@ class RE1WorldAwareExtractor(BaseFeaturesExtractor):
         pickup_active = ws[:, PICKUP_ACTIVE_OFF : PICKUP_ACTIVE_OFF + NUM_PICKUP_ROWS]
         pickup_gated = ws[:, PICKUP_GATED_OFF : PICKUP_GATED_OFF + NUM_PICKUP_ROWS]
         room_remaining = ws[:, ROOM_REMAINING_OFF : ROOM_REMAINING_OFF + NUM_ROOMS]
+        catalog_pickups = int(self.pickup_requires_mask.shape[0])
+        pickup_active_join = pickup_active[:, :catalog_pickups]
+        pickup_gated_join = pickup_gated[:, :catalog_pickups]
 
-        requires_join = pickup_active @ self.pickup_requires_mask
+        requires_join = pickup_active_join @ self.pickup_requires_mask
 
         pickup_join = th.stack(
             [
-                (pickup_active * self.pickup_item_id.unsqueeze(0)).sum(dim=1),
-                (pickup_active * self.pickup_category.unsqueeze(0)).sum(dim=1),
-                (pickup_active * self.pickup_key_flag.unsqueeze(0)).sum(dim=1),
-                pickup_active.sum(dim=1),
+                (pickup_active_join * self.pickup_item_id.unsqueeze(0)).sum(dim=1),
+                (pickup_active_join * self.pickup_category.unsqueeze(0)).sum(dim=1),
+                (pickup_active_join * self.pickup_key_flag.unsqueeze(0)).sum(dim=1),
+                pickup_active_join.sum(dim=1),
             ],
             dim=-1,
         )
         gated_join = th.stack(
             [
-                (pickup_gated * self.pickup_item_id.unsqueeze(0)).sum(dim=1),
-                pickup_gated.sum(dim=1),
+                (pickup_gated_join * self.pickup_item_id.unsqueeze(0)).sum(dim=1),
+                pickup_gated_join.sum(dim=1),
             ],
             dim=-1,
         )
