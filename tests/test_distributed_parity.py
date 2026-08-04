@@ -120,7 +120,7 @@ def test_resolve_resume_path_uses_latest_json(tmp_path: Path) -> None:
 
 
 def test_distributed_ppo_hyperparams_match_async_fleet() -> None:
-    from re1_rl.reward import RL_GAMMA
+    from re1_rl.reward import RL_GAMMA, gamma_for_emulated_half_life, RAILS_CREDIT_HALF_LIFE_S
 
     assert PPO_HYPERPARAMS == dict(
         n_steps=1024,
@@ -130,7 +130,7 @@ def test_distributed_ppo_hyperparams_match_async_fleet() -> None:
         gamma=RL_GAMMA,
         ent_coef=0.006,
     )
-    assert PPO_HYPERPARAMS["gamma"] == 0.99386
+    assert RL_GAMMA == gamma_for_emulated_half_life(RAILS_CREDIT_HALF_LIFE_S)
 
 
 def test_make_re1_policy_spaces_frame_is_chw() -> None:

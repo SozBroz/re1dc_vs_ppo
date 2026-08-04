@@ -15,7 +15,7 @@ from re1_rl.reward import (
     KEY_ITEM_PICKUP_BONUS,
     KEY_ITEM_RETURN_PENALTY,
     NEW_WEAPON_PICKUP_BONUS,
-    RAILS_AUX_POSITIVE_SCALE,
+    RAILS_NAV_POSITIVE_SCALE,
     SHOTGUN_RETURN_PENALTY,
     compute_reward,
 )
@@ -69,9 +69,9 @@ def test_rails_shotgun_take_return_is_net_zero():
     pickup = _reward(empty, held, rails=True, progress=progress)
     ret = _reward(held, returned, rails=True, progress=progress)
 
-    scaled_weapon = NEW_WEAPON_PICKUP_BONUS * RAILS_AUX_POSITIVE_SCALE
+    scaled_weapon = NEW_WEAPON_PICKUP_BONUS * RAILS_NAV_POSITIVE_SCALE
     assert pickup["new_weapon"] == scaled_weapon
-    assert ret["shotgun_return"] == SHOTGUN_RETURN_PENALTY * RAILS_AUX_POSITIVE_SCALE
+    assert ret["shotgun_return"] == SHOTGUN_RETURN_PENALTY * RAILS_NAV_POSITIVE_SCALE
     assert pickup["new_weapon"] + ret["shotgun_return"] == 0.0
 
 
@@ -98,9 +98,9 @@ def test_rails_key_item_take_return_is_net_zero():
     pickup = _reward(empty, held, rails=True, progress=progress)
     ret = _reward(held, returned, rails=True, progress=progress)
 
-    scaled_key = KEY_ITEM_PICKUP_BONUS * RAILS_AUX_POSITIVE_SCALE
+    scaled_key = KEY_ITEM_PICKUP_BONUS * RAILS_NAV_POSITIVE_SCALE
     assert pickup["key_item"] == scaled_key
-    assert ret["key_item_return"] == KEY_ITEM_RETURN_PENALTY * RAILS_AUX_POSITIVE_SCALE
+    assert ret["key_item_return"] == KEY_ITEM_RETURN_PENALTY * RAILS_NAV_POSITIVE_SCALE
     assert pickup["key_item"] + ret["key_item_return"] == 0.0
     assert "emblem" not in progress.key_items_rewarded
 
@@ -131,4 +131,4 @@ def test_rails_gold_emblem_return_scales_with_pickup():
     ret = make_state("10F", step=2, inventory=[], gold_emblem_return=True)
 
     bd = _reward(prev, ret, rails=True, progress=progress)
-    assert bd["gold_emblem_return"] == GOLD_EMBLEM_RETURN_PENALTY * RAILS_AUX_POSITIVE_SCALE
+    assert bd["gold_emblem_return"] == GOLD_EMBLEM_RETURN_PENALTY * RAILS_NAV_POSITIVE_SCALE

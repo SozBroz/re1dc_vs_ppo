@@ -214,10 +214,24 @@ def _health_pickup_adds_resource(
     )
 
 
+def gamma_for_emulated_half_life(
+    half_life_s: float,
+    *,
+    step_frames: int = REFERENCE_STEP_FRAMES,
+) -> float:
+    """Pure discount γ so a reward halves every ``half_life_s`` emulated seconds."""
+    if half_life_s <= 0:
+        raise ValueError("half_life_s must be positive")
+    steps = half_life_s / (step_frames / 60.0)
+    return 0.5 ** (1.0 / steps)
+
+
 # Dense softlock ramp is already in the scalar reward (bd["softlock"]); one γ.
-# Yawn one-leg rails target a ≈15s pure-discount half-life at 8-frame,
-# 60fps reference steps: γ = 0.5^(1 / (15 / (8/60))) ≈ 0.99386.
-RL_GAMMA = 0.99386
+# Yawn rails MC credit: ~25s emulated half-life (20–30s band).  Longer reach
+# for navigation chains comes from full-size nav crumbs + dominant checkpoint,
+# not an extreme γ.
+RAILS_CREDIT_HALF_LIFE_S = 25.0
+RL_GAMMA = gamma_for_emulated_half_life(RAILS_CREDIT_HALF_LIFE_S)
 
 # Per-HP damage / heal: (2/3) / (JILL_FINE_HP - 1) = (2/3)/95. Exact inverse heal.
 HP_LOSS_SCALE = 0.007017543859649122
@@ -287,14 +301,31 @@ PBRS_DOOR_WEIGHT = 0.05
 SHAPING_GAMMA = 1.0
 UNKNOWN_HOPS = 8.0
 DIST_NORM = 4096.0
-RAILS_AUX_POSITIVE_SCALE = 0.05
+# Dominant terminal pulse on one-leg rails (unscaled; exploration uses CHECKPOINT_REWARD).
+RAILS_CHECKPOINT_REWARD = 12.0
+# Navigation milestones keep full exploration magnitudes on rails (+4 / +2 ammo).
+RAILS_NAV_POSITIVE_SCALE = 1.0
+RAILS_NAV_POSITIVE_TERMS: frozenset[str] = frozenset({
+    "new_room",
+    "new_cutscene",
+    "document_examine",
+    "key_item",
+    "story_use",
+    "dining_statue",
+    "new_weapon",
+    "ammo_pickup",
+    "gallery",
+})
+# PBRS, junk pickups, typewriter, etc.
+RAILS_MINOR_POSITIVE_SCALE = 0.05
+RAILS_AUX_POSITIVE_SCALE = RAILS_MINOR_POSITIVE_SCALE
 # Combat must remain locally learnable on rails: miss taxes are unscaled, so
 # scaling only hit/kill positives makes correct shooting systematically worse.
 RAILS_UNSCALED_COMBAT_TERMS: frozenset[str] = frozenset({
     "enemy_damage",
     "enemy_kill",
 })
-# Rails clawbacks mirror scaled pickup crumbs (exploration keeps full ±4.0).
+# Rails clawbacks mirror nav pickup crumbs (exploration keeps full ±4.0).
 RAILS_SCALED_CLAWBACK_TERMS: frozenset[str] = frozenset({
     "shotgun_return",
     "gold_emblem_return",
@@ -707,7 +738,9 @@ def compute_reward(
             else:
                 claimed = True
             if claimed:
-                bd["checkpoint_success"] = CHECKPOINT_REWARD
+                bd["checkpoint_success"] = (
+                    RAILS_CHECKPOINT_REWARD if rails_mode else CHECKPOINT_REWARD
+                )
                 # Legacy telemetry alias remains zero; checkpoint_success is
                 # intentionally explicit in rollout accounting.
 
@@ -770,9 +803,14 @@ def compute_reward(
             if term == "checkpoint_success":
                 continue
             if value > 0.0 and term not in RAILS_UNSCALED_COMBAT_TERMS:
-                bd[term] = value * RAILS_AUX_POSITIVE_SCALE
+                scale = (
+                    RAILS_NAV_POSITIVE_SCALE
+                    if term in RAILS_NAV_POSITIVE_TERMS
+                    else RAILS_MINOR_POSITIVE_SCALE
+                )
+                bd[term] = value * scale
             elif value < 0.0 and term in RAILS_SCALED_CLAWBACK_TERMS:
-                bd[term] = value * RAILS_AUX_POSITIVE_SCALE
+                bd[term] = value * RAILS_NAV_POSITIVE_SCALE
 
     if progress is not None and not state.get("dead"):
         # Room / document / key get / key use / first weapon → 6 min idle floor.

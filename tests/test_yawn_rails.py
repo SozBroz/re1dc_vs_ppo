@@ -21,7 +21,7 @@ from re1_rl.item_box import BOX_ROOMS
 from re1_rl.env import RE1Env
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
-from re1_rl.reward import CHECKPOINT_REWARD, compute_reward
+from re1_rl.reward import RAILS_CHECKPOINT_REWARD, compute_reward
 from re1_rl.room_graph import RoomGraph, load_valid_rooms
 from re1_rl.yawn_rails import (
     capture_successor_cell,
@@ -110,7 +110,24 @@ def test_zero_coordinate_rdt_rows_are_not_walkable_edges() -> None:
     assert graph.get_exit("20E", "210") is not None
 
 
-def test_checkpoint_requires_this_leg_pickup_and_pays_terminal_1_2() -> None:
+def test_rails_nav_crumbs_keep_full_exploration_magnitudes() -> None:
+    planner = _planner()
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    _, bd = compute_reward(
+        _state("105"),
+        _state("104", inventory=["emblem"]),
+        planner,
+        progress=progress,
+        graph=_graph(),
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["new_room"] == pytest.approx(4.0)
+    assert bd["checkpoint_success"] == 0.0
+
+
+def test_checkpoint_requires_this_leg_pickup_and_pays_terminal_reward() -> None:
     planner = _planner()
     progress = ProgressTracker()
     progress.seed_spawn_room("105")
@@ -136,10 +153,10 @@ def test_checkpoint_requires_this_leg_pickup_and_pays_terminal_1_2() -> None:
         rails_mode=True,
         return_breakdown=True,
     )
-    assert hit["checkpoint_success"] == pytest.approx(CHECKPOINT_REWARD)
+    assert hit["checkpoint_success"] == pytest.approx(RAILS_CHECKPOINT_REWARD)
     assert progress.checkpoint_success
-    assert max(v for k, v in hit.items() if k != "checkpoint_success") < CHECKPOINT_REWARD
-    assert reward > CHECKPOINT_REWARD - 0.01
+    assert max(v for k, v in hit.items() if k != "checkpoint_success") < RAILS_CHECKPOINT_REWARD
+    assert reward > RAILS_CHECKPOINT_REWARD - 0.01
 
 
 def test_lockpick_is_required_on_return_to_106_not_first_entry() -> None:
@@ -295,7 +312,7 @@ def test_two_leg_episode_pays_each_checkpoint_and_resets_acquisitions() -> None:
         rails_mode=True,
         return_breakdown=True,
     )
-    assert first["checkpoint_success"] == pytest.approx(CHECKPOINT_REWARD)
+    assert first["checkpoint_success"] == pytest.approx(RAILS_CHECKPOINT_REWARD)
     assert progress.legs_completed == 1
     assert not progress.checkpoint_success
     assert progress.leg_acquired_items == set()
@@ -311,7 +328,7 @@ def test_two_leg_episode_pays_each_checkpoint_and_resets_acquisitions() -> None:
         rails_mode=True,
         return_breakdown=True,
     )
-    assert second["checkpoint_success"] == pytest.approx(CHECKPOINT_REWARD)
+    assert second["checkpoint_success"] == pytest.approx(RAILS_CHECKPOINT_REWARD)
     assert progress.legs_completed == 2
     assert progress.checkpoint_success
     assert planner.waypoint_index == 2
@@ -486,7 +503,7 @@ def test_infeasible_successor_is_rejected_before_savestate(tmp_path: Path) -> No
         ]
     }
     assert capture_successor_cell(
-        env, state, {"checkpoint_success": CHECKPOINT_REWARD}
+        env, state, {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
     ) is None
     bridge.save_savestate.assert_not_called()
 
@@ -559,7 +576,7 @@ def test_checkpoint_success_captures_successor_cell(
     proposal = capture_successor_cell(
         env,
         _state("105"),
-        {"checkpoint_success": CHECKPOINT_REWARD},
+        {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
     )
 
     captured = tmp_path / "states/yawn_rails/cells/cp00/cell.State"

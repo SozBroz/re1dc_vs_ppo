@@ -4,16 +4,24 @@
 
 Policy source: imperator.
 
-## Yawn rails override (approved 2026-08-03)
+## Yawn rails override (approved 2026-08-03, credit update 2026-08-04)
 
 `curriculum/yawn_rails_one_leg.json` uses a different, goal-conditioned reward
 contract:
 
-- completing the active atomic checkpoint pays `checkpoint_success = +1.2` and
+- completing the active atomic checkpoint pays `checkpoint_success = +12.0` and
   terminates the one-leg episode successfully;
-- every other positive component is multiplied by `0.05` in rails mode except
-  confirmed enemy damage/kill, which stays unscaled so the unscaled miss taxes
-  do not make correct combat systematically unattractive;
+- navigation milestones (new room, key get/use, weapon, ammo, cutscene, document,
+  gallery puzzle steps) keep **full** exploration magnitudes (+4 / +2 ammo / +0.5
+  per gallery switch);
+- minor positives (junk pickup, PBRS door/graph shaping, typewriter) stay at `×0.05`;
+- confirmed enemy damage/kill stay unscaled so unscaled miss taxes do not make
+  correct combat systematically unattractive;
+- negative terms retain their magnitudes and anti-farm behavior;
+- PPO `RL_GAMMA` targets a **~25s** emulated pure-discount half-life (20–30s
+  band). Longer navigation credit comes from stacked nav crumbs + dominant
+  checkpoint, not an extreme γ;
+- distributed `n_steps` ≈ 6 half-lives (~1125 steps ≈ 150s emulated);
 - negative terms retain their magnitudes and anti-farm behavior;
 - a qualified cutscene can pay only on the same transition as a newly rewarded
   room entry. Same-room interact/message/cutscene spam never pays;
@@ -211,7 +219,7 @@ budget **1.0**: Fine→1 chip **−2/3**, death **−1/3**. Per-HP scale
   pickup / key use / first weapon / gallery, via `SOFTLOCK_EXTENSION_FRAMES`)
   are **6 min** emulated — one clock. Contempt budget is the independent
   static **|death|/5 ≈ 0.06666666666666667** (`CONTEMPT_BUDGET_SCALED`).
-  Dense in scalar reward under main γ (**0.99386**, ~15s pure-discount
+  Dense in scalar reward under main γ (**~0.996314**, ~25s pure-discount
   half-life) — no separate softlock MC channel.
 
 ## Agent rules

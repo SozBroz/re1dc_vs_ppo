@@ -46,6 +46,22 @@ def _reward(progress: ProgressTracker, prev: dict, state: dict):
     )
 
 
+def test_gallery_reward_stays_full_magnitude_on_rails() -> None:
+    progress = ProgressTracker()
+    progress.first_visit("117")
+    prev = _state()
+    state = _state(raw=GALLERY_STEP_VALUES[0])
+    _total, bd = compute_reward(
+        prev,
+        state,
+        make_planner(),
+        progress=progress,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["gallery"] == pytest.approx(GALLERY_STEP_REWARD)
+
+
 def test_all_six_ordered_switches_pay_and_extend() -> None:
     progress = ProgressTracker()
     progress.first_visit("117")
@@ -149,7 +165,7 @@ def test_star_crest_finalizes_sequence_without_gallery_double_pay() -> None:
 
 
 def test_gallery_hint_uses_existing_four_goal_slots() -> None:
-    assert [name for name, _ in GOAL_FIELDS[-4:]] == [
+    assert [name for name, _ in GOAL_FIELDS[-5:-1]] == [
         "gallery_bearing_sin",
         "gallery_bearing_cos",
         "gallery_distance",

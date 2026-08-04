@@ -42,8 +42,9 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
 # n_steps vs sync_interval_s (wall) vs emulated time:
 #   - sync_interval_s=360 is WALL clock (upload burst + weight pull cadence).
 #   - Actors cut MC/bootstrap rollouts at n_steps, then buffer until the wall flush.
-#   - Env step ≈ 8 frames @ 60fps ⇒ 8/60 s emulated; γ=0.99386 half-life ≈ 15s
-#     emulated (≈112.5 steps). n_steps targets 6 half-lives (675 steps ≈ 90s).
+#   - Env step ≈ 8 frames @ 60fps ⇒ 8/60 s emulated; γ half-life ≈ 25s
+#     emulated (RAILS_CREDIT_HALF_LIFE_S). n_steps targets 6 half-lives
+#     (≈1125 steps ≈ 150s emulated).
 #   - Credit assignment is per n_steps segment, not the whole sync window.
 DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     n_steps=_DISTRIBUTED_N_STEPS,
