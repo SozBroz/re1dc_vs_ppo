@@ -3,9 +3,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+def normalize_curriculum_id(curriculum: str | Path | None) -> str:
+    """Stable curriculum identity for ingest matching (posix, curriculum/…)."""
+    if curriculum is None:
+        return ""
+    s = str(curriculum).replace("\\", "/").strip()
+    if not s:
+        return ""
+    marker = "curriculum/"
+    idx = s.rfind(marker)
+    if idx >= 0:
+        return s[idx:]
+    return Path(s).name
 
 
 @dataclass
@@ -30,6 +44,11 @@ class WorkerRollout:
     combat_targets: np.ndarray | None = None
     world_event_targets: np.ndarray | None = None
     world_event_masks: np.ndarray | None = None
+    # Policy-consistent ModDrop presence (n_steps, n_envs, MOD_DROP_DIM); optional.
+    mod_drop_masks: np.ndarray | None = None
+    # Fleet identity — empty / 0 means legacy (pre-identity) payload.
+    curriculum_id: str = ""
+    obs_schema_version: int = 0
 
     def num_timesteps(self) -> int:
         return int(self.n_envs * self.n_steps)

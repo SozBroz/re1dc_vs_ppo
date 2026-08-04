@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlparse
 from re1_rl.distributed.log_util import log
 from re1_rl.distributed.relevance_gate import DEFAULT_RELEVANCE_MAX_AGE
 from re1_rl.distributed.rollout_codec import decode_rollout
-from re1_rl.distributed.rollout_types import WorkerRollout
+from re1_rl.distributed.rollout_types import WorkerRollout, normalize_curriculum_id
 from re1_rl.distributed.weight_store import WeightStore
 from re1_rl.go_explore_merge import GoExploreMerge, extract_proposals_from_infos
 from re1_rl.yawn_rails_sync import (
@@ -66,6 +66,8 @@ class LearnerState:
         relevance_max_age: int | None = None,
         go_explore_merge: GoExploreMerge | None = None,
         yawn_rails_store: YawnRailsCellStore | None = None,
+        expected_curriculum_id: str = "",
+        expected_obs_schema_version: int | None = None,
     ) -> None:
         self.weight_store = weight_store
         self.rollout_queue = rollout_queue
@@ -79,6 +81,13 @@ class LearnerState:
             relevance_max_age
             if relevance_max_age is not None
             else max(int(max_staleness), DEFAULT_RELEVANCE_MAX_AGE)
+        )
+        # Empty / None = identity checks disabled (unit tests). Production passes both.
+        self.expected_curriculum_id = normalize_curriculum_id(expected_curriculum_id)
+        self.expected_obs_schema_version = (
+            None
+            if expected_obs_schema_version is None
+            else int(expected_obs_schema_version)
         )
         self.current_policy_version = 0
         self.lock = threading.Lock()
@@ -95,6 +104,8 @@ class LearnerState:
         self.steps_stale_queued = 0
         self.steps_relevance_kept = 0
         self.steps_relevance_dropped = 0
+        self.rollouts_rejected_identity = 0
+        self.steps_rejected_identity = 0
         self.epoch_id = 0
         self.epoch_contributors: set[str] = set()
         self.epoch_expected: set[str] = set()
@@ -112,6 +123,20 @@ class LearnerState:
         )
         self.yawn_rails_accepted = 0
         self.yawn_rails_rejected = 0
+
+    def check_rollout_identity(self, rollout: WorkerRollout) -> tuple[bool, str]:
+        """Fail closed when curriculum/schema does not match the learner."""
+        if self.expected_curriculum_id:
+            cid = normalize_curriculum_id(rollout.curriculum_id)
+            if not cid:
+                return False, "missing_curriculum_id"
+            if cid != self.expected_curriculum_id:
+                return False, "curriculum_mismatch"
+        if self.expected_obs_schema_version is not None:
+            schema = int(rollout.obs_schema_version or 0)
+            if schema != int(self.expected_obs_schema_version):
+                return False, "obs_schema_mismatch"
+        return True, "ok"
 
     def set_current_version(self, version: int) -> None:
         with self.lock:
@@ -266,6 +291,14 @@ class LearnerState:
     def accept_rollout(self, rollout: WorkerRollout) -> tuple[bool, str]:
         wid = base_worker_id(rollout.worker_id)
         steps = int(rollout.num_timesteps())
+        identity_ok, identity_reason = self.check_rollout_identity(rollout)
+        if not identity_ok:
+            with self.lock:
+                self.rollouts_rejected += 1
+                self.rollouts_rejected_identity += 1
+                self.steps_rejected_ingest += steps
+                self.steps_rejected_identity += steps
+            return False, identity_reason
         with self.lock:
             min_ok = self.current_policy_version - self.max_staleness
             if rollout.policy_version < min_ok:

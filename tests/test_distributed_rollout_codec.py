@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.distributed.rollout_codec import decode_rollout, encode_rollout
 from re1_rl.distributed.rollout_types import WorkerRollout
+from re1_rl.distributed.spaces import OBS_SCHEMA_VERSION
 from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, PROPRIO_DIM
 
 
@@ -38,6 +39,8 @@ def _sample_rollout() -> WorkerRollout:
         last_values=np.random.randn(n_envs).astype(np.float32),
         action_masks=np.ones((n_steps, n_envs, n_actions), dtype=np.bool_),
         episode_infos=[{"room_id": "101"}],
+        curriculum_id="curriculum/yawn_rails_one_leg.json",
+        obs_schema_version=OBS_SCHEMA_VERSION,
     )
 
 
@@ -49,6 +52,8 @@ def test_rollout_codec_roundtrip() -> None:
     assert restored.policy_version == original.policy_version
     assert restored.n_envs == original.n_envs
     assert restored.n_steps == original.n_steps
+    assert restored.curriculum_id == original.curriculum_id
+    assert restored.obs_schema_version == original.obs_schema_version
     for key in original.obs:
         assert np.array_equal(restored.obs[key], original.obs[key])
     assert np.array_equal(restored.actions, original.actions)

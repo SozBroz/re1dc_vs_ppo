@@ -18,6 +18,7 @@ Single-machine dev (learner + local worker, no remote workers):
 from __future__ import annotations
 
 import argparse
+import os
 import queue
 import sys
 import threading
@@ -215,7 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--total-steps", type=int, default=2_000_000,
                     help="training timesteps (0 = no limit, run until interrupted)")
-    ap.add_argument("--curriculum", default="curriculum/m0_dining_to_main_hall.json")
+    ap.add_argument("--curriculum", default="curriculum/yawn_rails_one_leg.json")
     ap.add_argument("--resume", default=None, help="checkpoint .zip to continue from (learner only)")
     ap.add_argument("--base-port", type=int, default=5555,
                     help="first TCP/EmuHawk port; offset per concurrent run")
@@ -307,6 +308,11 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         if getattr(model, "policy", None) is not None and hasattr(model.policy, "optimizer"):
             for group in model.policy.optimizer.param_groups:
                 group["lr"] = lr
+    # Ops-only Baseline E probe (default remains None). Example: RE1_TARGET_KL=0.02
+    _tk_raw = os.environ.get("RE1_TARGET_KL", "").strip()
+    if _tk_raw:
+        model.target_kl = float(_tk_raw)
+        log(args.machine_name, f"RE1_TARGET_KL override -> target_kl={model.target_kl}")
     if resume_path is not None:
         log(args.machine_name, f"resumed learner from {resume_path}")
     log(
@@ -314,7 +320,8 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         f"epoch hyperparams lr={DISTRIBUTED_EPOCH_HYPERPARAMS['learning_rate']} "
         f"batch_size={DISTRIBUTED_EPOCH_HYPERPARAMS['batch_size']} "
         f"n_epochs={DISTRIBUTED_EPOCH_HYPERPARAMS['n_epochs']} "
-        f"gamma={DISTRIBUTED_EPOCH_HYPERPARAMS['gamma']}",
+        f"gamma={DISTRIBUTED_EPOCH_HYPERPARAMS['gamma']} "
+        f"target_kl={getattr(model, 'target_kl', None)}",
     )
     return model, ckpt_dir
 
@@ -531,15 +538,18 @@ def _run_learner(args: argparse.Namespace) -> int:
 
     model, ckpt_dir = _build_learner_model(args, device)
     from re1_rl.training_metrics_log import (
-        TrainingMetricsJsonlCallback,
+        build_fleet_epoch_record,
         configure_training_logger,
+        emit_fleet_epoch_metrics,
+        policy_version_lag_hist,
         training_metrics_jsonl_path,
     )
 
     tb_run_dir = PROJECT_ROOT / "logs" / "tb" / (args.run_name or "distributed")
     configure_training_logger(model, log_dir=tb_run_dir)
     metrics_jsonl = training_metrics_jsonl_path(PROJECT_ROOT, run_name=args.run_name)
-    metrics_cb = TrainingMetricsJsonlCallback(metrics_jsonl)
+    # Baseline E: one JSONL / [train:metrics] emit per fleet epoch after packed
+    # train (not SB3 on_rollout_end callback — that would duplicate / miss fleet fields).
     log(args.machine_name, f"metrics jsonl -> {metrics_jsonl}")
     from re1_rl.training_progress import TrainingProgressTracker
 
@@ -550,6 +560,9 @@ def _run_learner(args: argparse.Namespace) -> int:
     )
     weight_store = WeightStore()
     rollout_queue: queue.Queue = queue.Queue()
+    from re1_rl.distributed.rollout_types import normalize_curriculum_id
+    from re1_rl.distributed.spaces import OBS_SCHEMA_VERSION
+
     learner_state = LearnerState(
         weight_store,
         rollout_queue,
@@ -558,6 +571,8 @@ def _run_learner(args: argparse.Namespace) -> int:
         worker_liveness_s=float(args.worker_liveness_s),
         relevance_gate=bool(args.relevance_gate),
         relevance_max_age=args.relevance_max_age,
+        expected_curriculum_id=normalize_curriculum_id(args.curriculum),
+        expected_obs_schema_version=int(OBS_SCHEMA_VERSION),
     )
     local_rollout_sink = LearnerRolloutSink(learner_state)
 
@@ -631,7 +646,6 @@ def _run_learner(args: argparse.Namespace) -> int:
             name_prefix="ppo_re1",
             verbose=2,
         ),
-        metrics_cb.get_callback(),
     ]
     for cb in callbacks:
         cb.init_callback(model)
@@ -724,6 +738,13 @@ def _run_learner(args: argparse.Namespace) -> int:
             batch_infos: list[dict[str, Any]] = []
             for rollout in pending:
                 batch_infos.extend(rollout.episode_infos)
+            collection_wall_s = time.monotonic() - epoch_t0
+            pre_train_version = int(learner_state.current_policy_version)
+            lag_hist = policy_version_lag_hist(
+                pending, current_policy_version=pre_train_version
+            )
+            epoch_update = int(status["epoch_id"])
+            status_contributors = list(status.get("contributors") or [])
             try:
                 from re1_rl.distributed.relevance_gate import RelevanceGateConfig
 
@@ -734,22 +755,26 @@ def _run_learner(args: argparse.Namespace) -> int:
                         prob_floor=float(args.relevance_prob_floor),
                         keep_frac=float(args.relevance_keep_frac),
                     )
+                fleet_metrics: dict[str, Any] = {}
+                train_t0 = time.monotonic()
                 trained = train_on_rollouts(
                     model,
                     pending,
                     machine_name=args.machine_name,
-                    current_policy_version=int(learner_state.current_policy_version),
+                    current_policy_version=pre_train_version,
                     max_staleness=int(args.max_staleness),
                     relevance_gate=bool(args.relevance_gate),
                     relevance_config=relevance_cfg,
                     learner_state=learner_state,
+                    fleet_metrics=fleet_metrics,
                 )
+                train_wall_s = time.monotonic() - train_t0
                 version = weight_store.publish(export_policy_state_dict(model))
                 learner_state.set_current_version(version)
                 log(
                     args.machine_name,
                     f"epoch train {trained} steps from {len(pending)} rollouts "
-                    f"merged_envs={merged_envs} contributors={status['contributors']} -> "
+                    f"merged_envs={merged_envs} contributors={status_contributors} -> "
                     f"policy_version={version} total={model.num_timesteps}",
                 )
                 pitch = learner_state.pitch_summary()
@@ -766,12 +791,60 @@ def _run_learner(args: argparse.Namespace) -> int:
                     f"packets_rej={pitch['rollouts_rejected']} "
                     f"packets_stale_q={pitch['rollouts_stale_queued']}",
                 )
+                contributors = list(
+                    fleet_metrics.get("contributors") or status_contributors
+                )
+                record = build_fleet_epoch_record(
+                    model,
+                    update=epoch_update,
+                    policy_version=int(version),
+                    accepted_steps=int(
+                        fleet_metrics.get("accepted_steps", trained) or 0
+                    ),
+                    contributors=contributors,
+                    curriculum_id=str(
+                        fleet_metrics.get("curriculum_id")
+                        or learner_state.expected_curriculum_id
+                        or ""
+                    ),
+                    collection_wall_s=collection_wall_s,
+                    train_wall_s=train_wall_s,
+                    policy_version_lag_hist=lag_hist,
+                    policy_version_counts=fleet_metrics.get("policy_version_counts"),
+                    relevance_keep_rate=fleet_metrics.get("relevance_keep_rate"),
+                    relevance_step_keep_rate=fleet_metrics.get(
+                        "relevance_step_keep_rate"
+                    ),
+                    rate_steps_s=(
+                        float(trained) / train_wall_s if train_wall_s > 0 else 0.0
+                    ),
+                    extra={
+                        "logger_scalars": fleet_metrics.get("logger_scalars") or {},
+                    },
+                )
+                emit_fleet_epoch_metrics(metrics_jsonl, record)
                 progress.consume_infos(batch_infos, num_timesteps=int(model.num_timesteps))
                 progress.log_rollout_end(
                     model,
                     num_timesteps=int(model.num_timesteps),
                     episode_infos=batch_infos,
                 )
+                try:
+                    from re1_rl.yawn_rails_plr import observe_episode_infos, plr_enabled_from_env
+                    from re1_rl.yawn_rails_eval import maybe_log_equal_weight_from_infos
+
+                    if plr_enabled_from_env():
+                        observe_episode_infos(PROJECT_ROOT, batch_infos)
+                    maybe_log_equal_weight_from_infos(
+                        PROJECT_ROOT,
+                        batch_infos,
+                        update=int(learner_state.current_policy_version),
+                        policy_version=int(learner_state.current_policy_version),
+                        num_timesteps=int(model.num_timesteps),
+                        model=model,
+                    )
+                except Exception as exc:
+                    log(args.machine_name, f"yawn rails eval/plr side-job skipped: {exc}")
                 for cb in callbacks:
                     cb.on_rollout_end()
                     cb.on_step()

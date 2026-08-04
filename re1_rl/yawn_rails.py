@@ -250,6 +250,70 @@ def load_manifest(project_root: Path, stage: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def iter_loadable_cells(
+    project_root: Path,
+    stage: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Eligible atomic reset rows with on-disk state + sidecar."""
+    root = Path(project_root)
+    out: list[dict[str, Any]] = []
+    for row in load_manifest(root, stage)["cells"]:
+        state = root / str(row.get("state_path", ""))
+        sidecar = root / str(row.get("sidecar_path", ""))
+        if (
+            state.is_file()
+            and sidecar.is_file()
+            and _sampling_row_eligible(root, stage, row)
+        ):
+            out.append(dict(row))
+    return sorted(out, key=lambda r: int(r["checkpoint_index"]))
+
+
+def validate_manifest_cells(
+    project_root: Path,
+    stage: dict[str, Any],
+    *,
+    require_contiguous_prefix: int = 5,
+) -> list[str]:
+    """Smoke-check manifest wiring / early-route contiguity (no BizHawk needed)."""
+    root = Path(project_root)
+    errors: list[str] = []
+    try:
+        manifest = load_manifest(root, stage)
+    except ValueError as exc:
+        return [str(exc)]
+    cells = [
+        row for row in manifest.get("cells", []) if isinstance(row, dict)
+    ]
+    by_idx: dict[int, dict[str, Any]] = {}
+    for row in cells:
+        try:
+            idx = int(row["checkpoint_index"])
+        except (KeyError, TypeError, ValueError):
+            errors.append(f"cell missing checkpoint_index: {row!r}")
+            continue
+        if idx in by_idx:
+            errors.append(f"duplicate checkpoint_index {idx}")
+        by_idx[idx] = row
+        state = root / str(row.get("state_path", ""))
+        sidecar = root / str(row.get("sidecar_path", ""))
+        if not state.is_file():
+            errors.append(f"cp{idx:02d}: missing state {state}")
+        elif state.stat().st_size < 50_000:
+            errors.append(f"cp{idx:02d}: state suspiciously small ({state.stat().st_size} bytes)")
+        if not sidecar.is_file():
+            errors.append(f"cp{idx:02d}: missing sidecar {sidecar}")
+    prefix = int(require_contiguous_prefix)
+    if prefix > 0:
+        missing = [i for i in range(prefix) if i not in by_idx]
+        if missing:
+            errors.append(
+                "early route not contiguous; missing "
+                + ", ".join(f"cp{i:02d}" for i in missing)
+            )
+    return errors
+
+
 def sample_one_leg_options(
     project_root: Path,
     stage: dict[str, Any],
@@ -260,19 +324,17 @@ def sample_one_leg_options(
     candidates: list[dict[str, Any]] = [
         {"checkpoint_index": -1, "source": "route_initial"}
     ]
-    for row in load_manifest(project_root, stage)["cells"]:
-        state = project_root / str(row.get("state_path", ""))
-        sidecar = project_root / str(row.get("sidecar_path", ""))
-        if (
-            state.is_file()
-            and sidecar.is_file()
-            and _sampling_row_eligible(project_root, stage, row)
-        ):
-            candidates.append(dict(row))
+    candidates.extend(iter_loadable_cells(project_root, stage))
+    from re1_rl.yawn_rails_plr import plr_enabled_from_env, sample_plr_options
+
+    if plr_enabled_from_env():
+        return sample_plr_options(project_root, stage, candidates, rng=rng)
     chosen = candidates[rng.randrange(len(candidates))]
     start_index = int(chosen["checkpoint_index"]) + 1
     route_steps = list(stage.get("route_steps", []))
     remaining = max(1, len(route_steps) - start_index)
+    # Global legs_per_episode remains a hard cap for non-PLR mode; PLR widens
+    # per endpoint instead of jumping the whole curriculum to 6-leg episodes.
     leg_span = min(max(1, int(stage.get("legs_per_episode", 1))), remaining)
     opts: dict[str, Any] = {
         "route_start_index": start_index,

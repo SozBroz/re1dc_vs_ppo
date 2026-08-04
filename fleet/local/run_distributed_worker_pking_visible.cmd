@@ -43,5 +43,5 @@ call "%~dp0flush_log.cmd" data\logs\worker_pking.log
 
 
 
-venv\Scripts\python.exe scripts\distributed_train_parallel.py --role worker --machine-name %MACHINE_NAME% --worker-id pking --learner-host %LEARNER_HOST% --learner-port %FLEET_LEARNER_PORT% --n-envs %N_ENVS% --actor-ranks %ACTOR_RANKS% --base-port %BASE_PORT% --total-steps 0 --training-speed 6400 --skip-chunk 600 --sync-interval-s %SYNC_INTERVAL_S% --capture-checkpoints --no-headless --tile-windows --grid-cols 5 --grid-rows 4 --screenshot-mmf --inference-batch-max %N_ENVS% >> data\logs\worker_pking.log 2>&1
+venv\Scripts\python.exe scripts\distributed_train_parallel.py --role worker --machine-name %MACHINE_NAME% --worker-id pking --learner-host %LEARNER_HOST% --learner-port %FLEET_LEARNER_PORT% --curriculum curriculum/yawn_rails_one_leg.json --n-envs %N_ENVS% --actor-ranks %ACTOR_RANKS% --base-port %BASE_PORT% --total-steps 0 --training-speed 6400 --skip-chunk 600 --sync-interval-s %SYNC_INTERVAL_S% --capture-checkpoints --no-headless --tile-windows --grid-cols 5 --grid-rows 4 --screenshot-mmf --inference-batch-max %N_ENVS% >> data\logs\worker_pking.log 2>&1
 

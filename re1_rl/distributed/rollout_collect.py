@@ -17,7 +17,10 @@ from re1_rl.combat_targets import (
     pack_world_event_target_from_info,
 )
 from re1_rl.distributed.inference_policy import InferencePolicy
-from re1_rl.distributed.rollout_types import WorkerRollout
+from re1_rl.distributed.rollout_types import WorkerRollout, normalize_curriculum_id
+from re1_rl.distributed.spaces import OBS_SCHEMA_VERSION
+from re1_rl.modality_ablations import MOD_DROP_DIM, ModDropEpisodeState
+from re1_rl.modality_config import mod_drop_enabled
 
 
 def _stack_action_masks(vec_env: VecEnv) -> np.ndarray:
@@ -65,6 +68,7 @@ def collect_rollout(
     n_steps: int,
     worker_id: str,
     obs: dict[str, np.ndarray] | None = None,
+    curriculum: str = "",
 ) -> tuple[WorkerRollout, dict[str, np.ndarray]]:
     """Collect ``n_steps`` lockstep transitions.
 
@@ -79,6 +83,7 @@ def collect_rollout(
     if obs is None:
         obs = vec_env.reset()
     policy_version = policy.policy_version
+    curriculum_id = normalize_curriculum_id(curriculum)
 
     obs_bufs: dict[str, np.ndarray] = {}
     for key, arr in obs.items():
@@ -99,6 +104,12 @@ def collect_rollout(
         world_event_targets[:, e] = empty_world_event_target()
         world_event_masks[:, e] = empty_world_event_mask()
 
+    use_mod_drop = mod_drop_enabled()
+    mod_drop_state = ModDropEpisodeState(n_envs) if use_mod_drop else None
+    mod_drop_masks = (
+        np.ones((n_steps, n_envs, MOD_DROP_DIM), dtype=np.float32) if use_mod_drop else None
+    )
+
     episode_infos: list[dict[str, Any]] = []
     prev_rooms: list[str | None] = [None] * n_envs
     prev_hps: list[float | None] = [None] * n_envs
@@ -106,6 +117,10 @@ def collect_rollout(
     for step in range(n_steps):
         masks = _stack_action_masks(vec_env)
         action_masks[step] = masks
+        # Mask chosen before action; fixed for episode; stored for PPO epochs.
+        if mod_drop_state is not None and mod_drop_masks is not None:
+            mod_drop_masks[step] = mod_drop_state.masks
+            policy.set_mod_drop_masks(mod_drop_state.masks)
         act, val, lp = policy.predict_masked_batch(obs, masks)
         actions[step] = act
         values[step] = val
@@ -131,7 +146,11 @@ def collect_rollout(
             if d:
                 prev_rooms[i] = None
                 prev_hps[i] = None
+        if mod_drop_state is not None:
+            mod_drop_state.on_dones(done)
 
+    if use_mod_drop:
+        policy.set_mod_drop_masks(None)
     last_values = policy.predict_values(obs)
 
     rollout = WorkerRollout(
@@ -151,5 +170,8 @@ def collect_rollout(
         combat_targets=combat_targets,
         world_event_targets=world_event_targets,
         world_event_masks=world_event_masks,
+        mod_drop_masks=mod_drop_masks,
+        curriculum_id=curriculum_id,
+        obs_schema_version=int(OBS_SCHEMA_VERSION),
     )
     return rollout, obs

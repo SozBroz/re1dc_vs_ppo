@@ -320,6 +320,22 @@ def merge_rollouts(rollouts: list[WorkerRollout]) -> dict[str, Any]:
         "world_event_masks", WORLD_EVENT_DIM, empty_world_event_mask
     )
 
+    # ModDrop: only merge when at least one rollout carried masks (flag-on path).
+    mod_drop_masks = None
+    if any(getattr(r, "mod_drop_masks", None) is not None for r in rollouts):
+        from re1_rl.modality_ablations import MOD_DROP_DIM
+
+        parts = []
+        for r in rollouts:
+            arr = getattr(r, "mod_drop_masks", None)
+            if arr is None:
+                parts.append(
+                    np.ones((r.n_steps, r.n_envs, MOD_DROP_DIM), dtype=np.float32)
+                )
+            else:
+                parts.append(np.asarray(arr, dtype=np.float32))
+        mod_drop_masks = np.concatenate(parts, axis=1)
+
     return {
 
         "n_steps": n_steps,
@@ -351,6 +367,8 @@ def merge_rollouts(rollouts: list[WorkerRollout]) -> dict[str, Any]:
         "world_event_targets": world_event_targets,
 
         "world_event_masks": world_event_masks,
+
+        "mod_drop_masks": mod_drop_masks,
 
     }
 
@@ -521,6 +539,8 @@ def _train_one_version(
             merged.get("world_event_targets"),
             merged.get("world_event_masks"),
         )
+    if hasattr(model, "set_mod_drop_masks"):
+        model.set_mod_drop_masks(merged.get("mod_drop_masks"))
 
     saved_norm_adv = bool(getattr(model, "normalize_advantage", False))
     model.normalize_advantage = False
@@ -536,6 +556,8 @@ def _train_one_version(
         model.normalize_advantage = saved_norm_adv
         if hasattr(model, "set_auxiliary_targets"):
             model.set_auxiliary_targets(None, None, None)
+        if hasattr(model, "set_mod_drop_masks"):
+            model.set_mod_drop_masks(None)
 
     model.num_timesteps += int(timesteps)
 
@@ -571,18 +593,38 @@ def train_on_rollouts(
 
     learner_state: Any | None = None,
 
+    fleet_metrics: dict[str, Any] | None = None,
+
 ) -> int:
 
-    """Train PPO on rollouts, grouped by policy_version and rollout length.
+    """Train PPO on accepted rollouts via one packed sample-weighted update.
 
     When ``relevance_gate`` is True and ``current_policy_version`` is set, rollouts
     older than ``current - max_staleness`` are kept only if π_new still owns enough
     of the logged actions (see ``relevance_gate`` module). Fresh rollouts pass
     through unchanged. NaN / non-finite ratios fail closed at the transition level.
+
+    Compatible ``(policy_version, n_steps)`` segments are still merged for return
+    computation, then flattened into a single fleet buffer and one ``model.train()``.
+
+    When ``fleet_metrics`` is provided it is cleared then filled with this epoch's
+    pack metadata (contributors, curriculum_id, version counts, per-epoch
+    relevance keep rates). Callers attach wall times / lag hist for JSONL emit.
     """
 
-    if not rollouts:
+    if fleet_metrics is not None:
+        fleet_metrics.clear()
 
+    if not rollouts:
+        if fleet_metrics is not None:
+            fleet_metrics.update(
+                {
+                    "accepted_steps": 0,
+                    "contributors": [],
+                    "curriculum_id": "",
+                    "policy_version_counts": {},
+                }
+            )
         return 0
 
     if relevance_gate and current_policy_version is not None:
@@ -629,6 +671,16 @@ def train_on_rollouts(
 
             )
 
+        gate_dict = gate_stats.as_dict()
+        if fleet_metrics is not None:
+            fleet_metrics["relevance_keep_rate"] = float(
+                gate_dict["relevance_keep_rate"]
+            )
+            fleet_metrics["relevance_step_keep_rate"] = float(
+                gate_dict["relevance_step_keep_rate"]
+            )
+            fleet_metrics["relevance_considered"] = int(gate_stats.considered)
+
         if machine_name and gate_stats.considered:
 
             step_total = gate_stats.steps_kept + gate_stats.steps_dropped
@@ -657,7 +709,7 @@ def train_on_rollouts(
 
                 f"{gate_stats.transitions_total} "
 
-                f"keep_rate={gate_stats.as_dict()['relevance_keep_rate']:.3f} "
+                f"keep_rate={gate_dict['relevance_keep_rate']:.3f} "
 
                 f"(batch {before}->{len(kept)})",
 
@@ -672,33 +724,55 @@ def train_on_rollouts(
         rollouts = kept
 
         if not rollouts:
-
+            if fleet_metrics is not None:
+                fleet_metrics.update(
+                    {
+                        "accepted_steps": 0,
+                        "contributors": [],
+                        "curriculum_id": "",
+                        "policy_version_counts": {},
+                    }
+                )
             return 0
 
-    groups = group_rollouts_for_train(rollouts)
+    from re1_rl.distributed.packed_train import (
+        filter_rollouts_by_identity,
+        train_packed_on_rollouts,
+    )
 
-    total = 0
+    if learner_state is not None:
+        before_id = len(rollouts)
+        rollouts = filter_rollouts_by_identity(
+            rollouts,
+            expected_curriculum_id=str(
+                getattr(learner_state, "expected_curriculum_id", "") or ""
+            ),
+            expected_obs_schema_version=getattr(
+                learner_state, "expected_obs_schema_version", None
+            ),
+            machine_name=machine_name,
+        )
+        if before_id and not rollouts:
+            if fleet_metrics is not None:
+                fleet_metrics.update(
+                    {
+                        "accepted_steps": 0,
+                        "contributors": [],
+                        "curriculum_id": "",
+                        "policy_version_counts": {},
+                    }
+                )
+            return 0
 
     try:
-
-        for key in sorted(groups):
-
-            total += _train_one_version(
-
-                model,
-
-                groups[key],
-
-                machine_name=machine_name,
-
-            )
-
-        return total
-
+        return train_packed_on_rollouts(
+            model,
+            rollouts,
+            machine_name=machine_name,
+            fleet_metrics=fleet_metrics,
+        )
     finally:
-
         _release_rollout_arrays(rollouts)
-
         gc.collect()
 
 

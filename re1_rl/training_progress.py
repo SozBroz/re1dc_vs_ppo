@@ -50,6 +50,21 @@ def slim_progress_info(info: dict[str, Any]) -> dict[str, Any]:
         out["gallery_flawless"] = info["gallery_flawless"]
     if info.get("episode_failure") is not None:
         out["episode_failure"] = info.get("episode_failure")
+    for key in (
+        "episode_outcome",
+        "route_start_index",
+        "leg_span",
+        "reset_source",
+        "rails_cell_index",
+        "rails_cell_id",
+        "held_out_eval",
+        "plr_level",
+        "endpoint_max_legs",
+        "episode_wall_s",
+        "episode_length",
+    ):
+        if key in info and info.get(key) is not None:
+            out[key] = info.get(key)
     new_items = info.get("new_items")
     if new_items:
         out["new_items"] = list(new_items)

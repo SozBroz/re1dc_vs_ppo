@@ -27,6 +27,7 @@ from re1_rl.yawn_rails import (
     capture_successor_cell,
     sample_one_leg_options,
     successor_capacity,
+    validate_manifest_cells,
     validate_route,
 )
 
@@ -74,6 +75,7 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
         (ROOT / "curriculum/yawn_rails_one_leg.json").read_text(encoding="utf-8")
     )
     assert validate_route(route, graph=_graph()) == []
+    assert validate_manifest_cells(ROOT, curriculum, require_contiguous_prefix=5) == []
     assert curriculum["max_steps"] == 2700  # 6 min at 8 frames/step and 60fps.
     text = json.dumps(route).lower()
     assert '"205"' not in text

@@ -20,6 +20,12 @@ from re1_rl.episode_history import ACQUISITION_LOG_DIM, ACQUISITION_LOG_K, ROOM_
 from re1_rl.key_items import KEYS_HELD_DIM
 from re1_rl.maps_files import MAPS_FILES_DIM
 from re1_rl.milestone_features import MILESTONE_DIM
+from re1_rl.modality_ablations import (
+    MOD_DROP_DIM,
+    IdentityFiLM,
+    apply_mod_drop_to_parts,
+)
+from re1_rl.modality_config import goal_film_enabled, mod_drop_enabled
 from re1_rl.named_state import NAMED_STATE_DIM
 from re1_rl.obs_encoder import (
     BOX_DIM,
@@ -347,6 +353,8 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
         normalized_image: bool = False,
         features_dim: int = FEATURES_DIM,
         persistent_state_dim: int | None = None,
+        goal_film: bool | None = None,
+        mod_drop: bool | None = None,
     ) -> None:
         if not isinstance(observation_space, spaces.Dict):
             raise TypeError(
@@ -363,6 +371,10 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
         )
         self._persistent_enabled = self._persistent_dim > 0
         self._tower_out_dim = _tower_out_dim(persistent_enabled=self._persistent_enabled)
+        self._goal_film_enabled = bool(goal_film_enabled() if goal_film is None else goal_film)
+        self._mod_drop_enabled = bool(mod_drop_enabled() if mod_drop is None else mod_drop)
+        self._mod_drop_batch: th.Tensor | None = None
+        self._last_tower_parts: dict[str, th.Tensor] | None = None
 
         self.cnn_extractor = NatureCNN(
             observation_space.spaces["frame"],
@@ -461,6 +473,22 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
             nn.ReLU(),
         )
 
+        # Optional goal FiLM (identity-init). Constructed only when enabled.
+        if self._goal_film_enabled:
+            self.goal_film_vision = IdentityFiLM(GOAL_TOWER_DIM, cnn_output_dim)
+            self.goal_film_spatial = IdentityFiLM(GOAL_TOWER_DIM, SPATIAL_TOWER_DIM)
+        else:
+            self.goal_film_vision = None
+            self.goal_film_spatial = None
+
+        # Optional ModDrop presence projection (zero-init → no effect at start).
+        if self._mod_drop_enabled:
+            self.mod_drop_presence = nn.Linear(MOD_DROP_DIM, features_dim)
+            nn.init.zeros_(self.mod_drop_presence.weight)
+            nn.init.zeros_(self.mod_drop_presence.bias)
+        else:
+            self.mod_drop_presence = None
+
         # Caches for auxiliary losses (set during forward when return_aux=True).
         self._last_combat_latent: th.Tensor | None = None
         self._last_outcome_pred: th.Tensor | None = None
@@ -500,6 +528,10 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
         if tensor.dim() > 2:
             return tensor.flatten(start_dim=1)
         return tensor
+
+    def set_mod_drop_batch(self, presence: th.Tensor | None) -> None:
+        """Set per-sample ModDrop presence (B, MOD_DROP_DIM); 1=keep, 0=drop."""
+        self._mod_drop_batch = presence
 
     def forward_features(
         self,
@@ -549,6 +581,16 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
             self._optional_tensor(observations, "logistics", LOGISTICS_DIM)
         )
         goal = goal + logistics
+
+        # Identity-init FiLM: γ(g)⊙h+β(g) on vision/spatial (goal fields intact).
+        if (
+            self._goal_film_enabled
+            and self.goal_film_vision is not None
+            and self.goal_film_spatial is not None
+        ):
+            vision = self.goal_film_vision(vision, goal)
+            spatial = self.goal_film_spatial(spatial, goal)
+
         combat_enc = self.combat_mlp(
             th.cat(
                 [
@@ -574,22 +616,33 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
                 dim=-1,
             )
         )
-        parts = [
-            vision,
-            control,
-            spatial,
-            inventory,
-            history,
-            flags,
-            goal,
-            joint,
-            self.world_context(observations),
-        ]
+        world = self.world_context(observations)
+        parts_dict: dict[str, th.Tensor] = {
+            "vision": vision,
+            "control": control,
+            "spatial": spatial,
+            "inventory": inventory,
+            "history": history,
+            "flags": flags,
+            "goal": goal,
+            "joint": joint,
+            "world": world,
+        }
         if self._persistent_enabled and self.persistent_encoder is not None:
             pers = self._optional_tensor(observations, NAMED_STATE_OBS_KEY, self._persistent_dim)
-            parts.append(self.persistent_encoder(pers))
-        tower = th.cat(parts, dim=-1)
+            parts_dict["persistent"] = self.persistent_encoder(pers)
+
+        # Apply stored ModDrop whenever a batch is attached (diagnostics / train).
+        # Presence projection only exists when constructed with mod_drop=True.
+        presence = self._mod_drop_batch
+        if presence is not None:
+            parts_dict = apply_mod_drop_to_parts(parts_dict, presence)
+
+        self._last_tower_parts = parts_dict
+        tower = th.cat(list(parts_dict.values()), dim=-1)
         fused = self.fusion_proj(self.fusion_norm(tower))
+        if self.mod_drop_presence is not None and presence is not None:
+            fused = fused + self.mod_drop_presence(presence)
 
         outcome_pred = self.outcome_head(joint)
         world_event_pred = self.world_event_head(self.world_event_proj(tower))
@@ -615,6 +668,7 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
     def predict_aux(self, observations: TensorDict) -> dict[str, th.Tensor]:
         _, aux = self.forward_features(observations, return_aux=True)  # type: ignore[misc]
         return aux
+
 
 
 def count_extractor_params(extractor: nn.Module) -> int:

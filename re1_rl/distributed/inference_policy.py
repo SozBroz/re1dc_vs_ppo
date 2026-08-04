@@ -52,6 +52,18 @@ class InferencePolicy:
         state_dict = state_dict_from_policy_bytes(policy_bytes)
         self.load_from_state_dict(state_dict, policy_version)
 
+    def set_mod_drop_masks(self, masks: np.ndarray | None) -> None:
+        """Set ModDrop presence on the features extractor for the next forward."""
+        with self._lock:
+            extractor = self._model.policy.features_extractor
+            if hasattr(extractor, "set_mod_drop_batch"):
+                if masks is None:
+                    extractor.set_mod_drop_batch(None)
+                else:
+                    extractor.set_mod_drop_batch(
+                        torch.as_tensor(masks, device=self._device, dtype=torch.float32)
+                    )
+
     def predict_batch(self, obs: dict[str, np.ndarray]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         with self._lock:
             obs = prepare_obs_for_policy(obs, self._model.observation_space)

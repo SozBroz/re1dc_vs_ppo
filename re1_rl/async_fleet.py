@@ -107,6 +107,19 @@ def _obs_batch_for_many(need_msgs: list[dict[str, Any]]) -> dict[str, np.ndarray
     return {key: np.concatenate([part[key] for part in parts], axis=0) for key in parts[0]}
 
 
+def _apply_mod_drop_from_needs(policy: Any, msgs: list[dict[str, Any]]) -> None:
+    """Set stored ModDrop presence on the inference policy when actors send it."""
+    if not hasattr(policy, "set_mod_drop_masks"):
+        return
+    if not msgs or any(m.get("mod_drop_mask") is None for m in msgs):
+        policy.set_mod_drop_masks(None)
+        return
+    stacked = np.stack(
+        [np.asarray(m["mod_drop_mask"], dtype=np.float32) for m in msgs], axis=0
+    )
+    policy.set_mod_drop_masks(stacked)
+
+
 def _serve_needs_batch(
     pairs: list[tuple[Connection, dict[str, Any]]],
     policy: Any,
@@ -128,13 +141,18 @@ def _serve_needs_batch(
                 obs_one = _obs_batch_for_one(msg["obs"])
                 masks = msg.get("action_masks")
                 policy_version = int(getattr(policy, "policy_version", 0) or 0)
-                if masks is not None:
-                    act, val, lp = policy.predict_masked(
-                        obs_one, np.asarray(masks, dtype=bool)
-                    )
-                else:
-                    act_a, val_a, lp_a = policy.predict_batch(obs_one)
-                    act, val, lp = int(act_a[0]), float(val_a[0]), float(lp_a[0])
+                _apply_mod_drop_from_needs(policy, [msg])
+                try:
+                    if masks is not None:
+                        act, val, lp = policy.predict_masked(
+                            obs_one, np.asarray(masks, dtype=bool)
+                        )
+                    else:
+                        act_a, val_a, lp_a = policy.predict_batch(obs_one)
+                        act, val, lp = int(act_a[0]), float(val_a[0]), float(lp_a[0])
+                finally:
+                    if hasattr(policy, "set_mod_drop_masks"):
+                        policy.set_mod_drop_masks(None)
                 conn.send(
                     {
                         "t": "act",
@@ -146,7 +164,12 @@ def _serve_needs_batch(
                 )
             return
         masks = np.asarray(masks_list, dtype=bool)
-        actions, values, log_probs = policy.predict_masked_batch(obs_batch, masks)
+        _apply_mod_drop_from_needs(policy, msgs)
+        try:
+            actions, values, log_probs = policy.predict_masked_batch(obs_batch, masks)
+        finally:
+            if hasattr(policy, "set_mod_drop_masks"):
+                policy.set_mod_drop_masks(None)
         policy_version = int(getattr(policy, "policy_version", 0) or 0)
         for i, (conn, _) in enumerate(chunk):
             conn.send(
@@ -174,9 +197,14 @@ def _serve_needs_batch(
         msgs = [msg for _, msg in usable]
         obs_batch = _obs_batch_for_many(msgs)
         masks = np.asarray([msg["action_masks"] for msg in msgs], dtype=bool)
-        actions, values, log_probs, raw_logits, masked_probs = (
-            policy.predict_masked_batch_with_diagnostics(obs_batch, masks)
-        )
+        _apply_mod_drop_from_needs(policy, msgs)
+        try:
+            actions, values, log_probs, raw_logits, masked_probs = (
+                policy.predict_masked_batch_with_diagnostics(obs_batch, masks)
+            )
+        finally:
+            if hasattr(policy, "set_mod_drop_masks"):
+                policy.set_mod_drop_masks(None)
         policy_version = int(getattr(policy, "policy_version", 0) or 0)
         for i, (conn, _) in enumerate(usable):
             conn.send(
@@ -683,6 +711,7 @@ def _actor_process(
 
     obs_bufs: dict[str, np.ndarray] | None = None
     mask_bufs: np.ndarray | None = None
+    mod_drop_bufs: np.ndarray | None = None
     actions = np.zeros(n_steps, dtype=np.int64)
     rewards = np.zeros(n_steps, dtype=np.float32)
     dones = np.zeros(n_steps, dtype=np.bool_)
@@ -694,37 +723,47 @@ def _actor_process(
     memlog_control = None
     memlog_telemetry = None
 
+    from re1_rl.modality_config import mod_drop_enabled
+    from re1_rl.modality_ablations import MOD_DROP_DIM, ModDropEpisodeState
+
+    use_mod_drop = mod_drop_enabled()
+    mod_drop_state = ModDropEpisodeState(1) if use_mod_drop else None
+
     def _reset_bufs() -> None:
-        nonlocal obs_bufs, mask_bufs, step_i, episode_infos, horizon_policy_version
+        nonlocal obs_bufs, mask_bufs, mod_drop_bufs, step_i, episode_infos, horizon_policy_version
         obs_bufs = {
             k: np.zeros((n_steps, *env.observation_space[k].shape), dtype=env.observation_space[k].dtype)
             for k in env.observation_space.spaces
         }
         n_actions = int(env.action_space.n)
         mask_bufs = np.zeros((n_steps, n_actions), dtype=np.bool_)
+        mod_drop_bufs = (
+            np.ones((n_steps, MOD_DROP_DIM), dtype=np.float32) if use_mod_drop else None
+        )
         step_i = 0
         episode_infos = []
         horizon_policy_version = 0
 
     def _emit_rollout(n: int) -> None:
         assert obs_bufs is not None and mask_bufs is not None
-        conn.send(
-            {
-                "t": "rollout",
-                "rank": rank,
-                "n_steps": int(n),
-                "obs": {k: v[:n].copy() for k, v in obs_bufs.items()},
-                "actions": actions[:n].copy(),
-                "rewards": rewards[:n].copy(),
-                "dones": dones[:n].copy(),
-                "values": values[:n].copy(),
-                "log_probs": log_probs[:n].copy(),
-                "action_masks": mask_bufs[:n].copy(),
-                "policy_version": horizon_policy_version,
-                "last_obs": obs,
-                "episode_infos": episode_infos,
-            }
-        )
+        payload: dict[str, Any] = {
+            "t": "rollout",
+            "rank": rank,
+            "n_steps": int(n),
+            "obs": {k: v[:n].copy() for k, v in obs_bufs.items()},
+            "actions": actions[:n].copy(),
+            "rewards": rewards[:n].copy(),
+            "dones": dones[:n].copy(),
+            "values": values[:n].copy(),
+            "log_probs": log_probs[:n].copy(),
+            "action_masks": mask_bufs[:n].copy(),
+            "policy_version": horizon_policy_version,
+            "last_obs": obs,
+            "episode_infos": episode_infos,
+        }
+        if mod_drop_bufs is not None:
+            payload["mod_drop_masks"] = mod_drop_bufs[:n].copy()
+        conn.send(payload)
 
     _reset_bufs()
 
@@ -770,6 +809,9 @@ def _actor_process(
             if hasattr(env, "action_masks"):
                 masks_now = np.asarray(env.action_masks(), dtype=bool)
                 req["action_masks"] = masks_now
+            if mod_drop_state is not None:
+                # Chosen before action; fixed until episode done.
+                req["mod_drop_mask"] = mod_drop_state.masks[0].copy()
             if memlog_telemetry is not None:
                 req["want_policy_diagnostics"] = True
             conn.send(req)
@@ -830,6 +872,8 @@ def _actor_process(
             if masks_before is None:
                 masks_before = np.ones(int(env.action_space.n), dtype=bool)
             mask_bufs[step_i] = masks_before
+            if mod_drop_bufs is not None and mod_drop_state is not None:
+                mod_drop_bufs[step_i] = mod_drop_state.masks[0]
             actions[step_i] = action
             values[step_i] = value
             log_probs[step_i] = logprob
@@ -841,6 +885,8 @@ def _actor_process(
                 if step_i > 0:
                     _emit_rollout(step_i)
                     _reset_bufs()
+                if mod_drop_state is not None:
+                    mod_drop_state.on_dones([True])
                 if _wait_for_control():
                     break
                 obs, _ = env.reset()
@@ -1056,6 +1102,15 @@ def run_async_fleet_training(
                 rank = int(msg["rank"])
                 last_values = policy.predict_values(_obs_batch_for_one(msg["last_obs"]))
                 obs = {k: np.expand_dims(v, axis=1) for k, v in msg["obs"].items()}
+                from re1_rl.distributed.rollout_types import normalize_curriculum_id
+                from re1_rl.distributed.spaces import OBS_SCHEMA_VERSION
+
+                mod_drop = msg.get("mod_drop_masks")
+                mod_drop_masks = (
+                    None
+                    if mod_drop is None
+                    else np.expand_dims(np.asarray(mod_drop, dtype=np.float32), 1)
+                )
                 pending.append(
                     WorkerRollout(
                         worker_id=f"actor_{rank}",
@@ -1073,6 +1128,9 @@ def run_async_fleet_training(
                             np.asarray(msg["action_masks"], dtype=np.bool_), 1
                         ),
                         episode_infos=list(msg.get("episode_infos") or []),
+                        mod_drop_masks=mod_drop_masks,
+                        curriculum_id=normalize_curriculum_id(curriculum),
+                        obs_schema_version=int(OBS_SCHEMA_VERSION),
                     )
                 )
                 pending_steps += n_steps
@@ -1091,6 +1149,23 @@ def run_async_fleet_training(
                 num_timesteps=int(model.num_timesteps),
                 episode_infos=batch_infos,
             )
+            try:
+                from re1_rl.yawn_rails_plr import observe_episode_infos, plr_enabled_from_env
+                from re1_rl.yawn_rails_eval import maybe_log_equal_weight_from_infos
+
+                if plr_enabled_from_env():
+                    observe_episode_infos(PROJECT_ROOT, batch_infos)
+                maybe_log_equal_weight_from_infos(
+                    PROJECT_ROOT,
+                    batch_infos,
+                    update=n_updates + 1,
+                    policy_version=policy_version,
+                    num_timesteps=int(model.num_timesteps),
+                    model=model,
+                    run_name=run_name,
+                )
+            except Exception as exc:
+                print(f"[train:async] yawn rails eval/plr side-job skipped: {exc}", flush=True)
             policy_version += 1
             policy.load_from_state_dict(export_policy_state_dict(model), policy_version)
             n_updates += 1

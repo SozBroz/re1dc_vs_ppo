@@ -32,6 +32,17 @@ from re1_rl.loadout_learning import (
     frozen_copy,
     train_loadout_scorer,
 )
+from re1_rl.modality_ablations import (
+    MOD_DROP_DIM,
+    ModuleFreezeHandle,
+    maybe_apply_discriminative_optimizer,
+)
+from re1_rl.modality_config import modality_diag_enabled
+from re1_rl.modality_diagnostics import (
+    compute_update_to_weight_snapshot,
+    finalize_update_to_weight,
+    maybe_log_modality_diagnostics,
+)
 
 ATTACK_GROUP = frozenset({ATTACK_ACTION, ATTACK_UP_ACTION, ATTACK_DOWN_ACTION})
 DEFAULT_AUX_COEF = 0.02
@@ -179,6 +190,9 @@ class CombatEfficientPPO(MaskablePPO):
         self._combat_targets_flat: np.ndarray | None = None
         self._world_targets_flat: np.ndarray | None = None
         self._world_masks_flat: np.ndarray | None = None
+        self._mod_drop_masks_flat: np.ndarray | None = None
+        self._mod_drop_masks_gpu: th.Tensor | None = None
+        self._module_freeze: ModuleFreezeHandle | None = None
         super().__init__(
             policy=policy,
             env=env,
@@ -204,6 +218,7 @@ class CombatEfficientPPO(MaskablePPO):
             _init_setup_model=_init_setup_model,
             **kwargs,
         )
+        maybe_apply_discriminative_optimizer(self)
         self.loadout_scorer = LoadoutValueNet().to(self.device)
         self.loadout_optimizer = th.optim.Adam(
             self.loadout_scorer.parameters(), lr=1e-3
@@ -242,7 +257,13 @@ class CombatEfficientPPO(MaskablePPO):
         world_targets: np.ndarray | None = None,
         world_masks: np.ndarray | None = None,
     ) -> None:
-        """Attach flat (n_steps * n_envs, dim) targets matching buffer order."""
+        """Attach flat (n_steps * n_envs, dim) targets matching buffer order.
+
+        Uploads tensors to ``self.device`` once; ``_aux_batch`` indexes on-device.
+        """
+        self._combat_targets_gpu = None
+        self._world_targets_gpu = None
+        self._world_masks_gpu = None
         if combat_targets is None:
             self._combat_targets_flat = None
         else:
@@ -251,6 +272,7 @@ class CombatEfficientPPO(MaskablePPO):
                 # (n_steps, n_envs, dim) → SB3 swap_and_flatten order
                 arr = arr.swapaxes(0, 1).reshape(-1, arr.shape[-1])
             self._combat_targets_flat = arr
+            self._combat_targets_gpu = th.as_tensor(arr, device=self.device)
         if world_targets is None:
             self._world_targets_flat = None
         else:
@@ -258,6 +280,7 @@ class CombatEfficientPPO(MaskablePPO):
             if arr.ndim == 3:
                 arr = arr.swapaxes(0, 1).reshape(-1, arr.shape[-1])
             self._world_targets_flat = arr
+            self._world_targets_gpu = th.as_tensor(arr, device=self.device)
         if world_masks is None:
             self._world_masks_flat = None
         else:
@@ -265,12 +288,59 @@ class CombatEfficientPPO(MaskablePPO):
             if arr.ndim == 3:
                 arr = arr.swapaxes(0, 1).reshape(-1, arr.shape[-1])
             self._world_masks_flat = arr
+            self._world_masks_gpu = th.as_tensor(arr, device=self.device)
+
+    def set_mod_drop_masks(self, masks: np.ndarray | None) -> None:
+        """Attach ModDrop presence masks aligned with rollout buffer order.
+
+        Shape ``(n_steps, n_envs, MOD_DROP_DIM)`` or flat ``(N, MOD_DROP_DIM)``.
+        Same mask is reused for every PPO epoch (policy-consistent).
+        """
+        self._mod_drop_masks_gpu = None
+        if masks is None:
+            self._mod_drop_masks_flat = None
+            return
+        arr = np.asarray(masks, dtype=np.float32)
+        if arr.ndim == 3:
+            arr = arr.swapaxes(0, 1).reshape(-1, arr.shape[-1])
+        if arr.shape[-1] != MOD_DROP_DIM:
+            raise ValueError(
+                f"mod_drop masks last dim must be {MOD_DROP_DIM}, got {arr.shape[-1]}"
+            )
+        self._mod_drop_masks_flat = arr
+        self._mod_drop_masks_gpu = th.as_tensor(arr, device=self.device)
+
+    def _mod_drop_batch(self, indices: np.ndarray) -> th.Tensor | None:
+        if self._mod_drop_masks_flat is None:
+            return None
+        idx = th.as_tensor(indices, device=self.device, dtype=th.long)
+        if self._mod_drop_masks_gpu is not None:
+            return self._mod_drop_masks_gpu[idx]
+        return th.as_tensor(self._mod_drop_masks_flat[indices], device=self.device)
+
+    def set_module_freeze(self, handle: ModuleFreezeHandle | None) -> None:
+        """Attach a short freeze schedule (tick'd once per ``train()``)."""
+        self._module_freeze = handle
 
     def _aux_batch(
         self, indices: np.ndarray
     ) -> tuple[th.Tensor | None, th.Tensor | None, th.Tensor | None]:
         if self._combat_targets_flat is None:
             return None, None, None
+        idx = th.as_tensor(indices, device=self.device, dtype=th.long)
+        if getattr(self, "_combat_targets_gpu", None) is not None:
+            ct = self._combat_targets_gpu[idx]
+            wt = (
+                self._world_targets_gpu[idx]
+                if getattr(self, "_world_targets_gpu", None) is not None
+                else None
+            )
+            wm = (
+                self._world_masks_gpu[idx]
+                if getattr(self, "_world_masks_gpu", None) is not None
+                else None
+            )
+            return ct, wt, wm
         ct = th.as_tensor(self._combat_targets_flat[indices], device=self.device)
         wt = (
             th.as_tensor(self._world_targets_flat[indices], device=self.device)
@@ -299,11 +369,22 @@ class CombatEfficientPPO(MaskablePPO):
         aux_losses: list[float] = []
         aux_stats_acc: dict[str, list[float]] = {}
         continue_training = True
+        optimizer_steps = 0
+        minibatch_sizes: list[int] = []
+        n_epochs_completed = 0
+        early_stop = False
 
         buffer = self.rollout_buffer
         assert buffer.full, "rollout buffer must be full before CombatEfficientPPO.train()"
         n_samples = int(buffer.buffer_size * buffer.n_envs)
         last_loss = 0.0
+        diag_obs: dict[str, th.Tensor] | None = None
+        diag_masks: th.Tensor | None = None
+        u2w_snap = (
+            compute_update_to_weight_snapshot(self.policy)
+            if modality_diag_enabled()
+            else {}
+        )
 
         # Match MaskableDictRolloutBuffer.get() flatten-once semantics.
         if not buffer.generator_ready:
@@ -313,6 +394,7 @@ class CombatEfficientPPO(MaskablePPO):
                 buffer.__dict__[tensor] = buffer.swap_and_flatten(buffer.__dict__[tensor])
             buffer.generator_ready = True
 
+        extractor = self.policy.features_extractor
         for epoch in range(self.n_epochs):
             approx_kl_divs = []
             indices = np.random.permutation(n_samples)
@@ -323,9 +405,22 @@ class CombatEfficientPPO(MaskablePPO):
                 start += batch_size
                 rollout_data = buffer._get_samples(batch_inds)  # noqa: SLF001
 
+                # Policy-consistent ModDrop: same stored mask at every PPO epoch.
+                if isinstance(extractor, RE1CombatEfficientExtractor):
+                    extractor.set_mod_drop_batch(self._mod_drop_batch(batch_inds))
+
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
                     actions = rollout_data.actions.long().flatten()
+
+                if diag_obs is None and modality_diag_enabled():
+                    diag_obs = {
+                        k: v[:8].detach()
+                        for k, v in rollout_data.observations.items()
+                        if isinstance(v, th.Tensor)
+                    }
+                    if rollout_data.action_masks is not None:
+                        diag_masks = rollout_data.action_masks[:8].detach()
 
                 values, log_prob, entropy = self.policy.evaluate_actions(
                     rollout_data.observations,
@@ -371,7 +466,6 @@ class CombatEfficientPPO(MaskablePPO):
 
                 loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
 
-                extractor = self.policy.features_extractor
                 if isinstance(extractor, RE1CombatEfficientExtractor) and self.aux_coef > 0:
                     aux = extractor.predict_aux(rollout_data.observations)
                     ct, wt, wm = self._aux_batch(batch_inds)
@@ -384,9 +478,11 @@ class CombatEfficientPPO(MaskablePPO):
                             world_masks=wm,
                         )
                         loss = loss + self.aux_coef * aux_loss
-                        aux_losses.append(float(aux_loss.detach().cpu()))
+                        aux_losses.append(float(aux_loss.detach()))
                         for k, v in aux_stats.items():
-                            aux_stats_acc.setdefault(k, []).append(v)
+                            aux_stats_acc.setdefault(k, []).append(
+                                float(v.detach()) if isinstance(v, th.Tensor) else v
+                            )
 
                 with th.no_grad():
                     log_ratio = log_prob - rollout_data.old_log_prob
@@ -395,6 +491,7 @@ class CombatEfficientPPO(MaskablePPO):
 
                 if self.target_kl is not None and approx_kl_div > 1.5 * self.target_kl:
                     continue_training = False
+                    early_stop = True
                     if self.verbose >= 1:
                         print(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl_div:.2f}")
                     break
@@ -403,14 +500,28 @@ class CombatEfficientPPO(MaskablePPO):
                 loss.backward()
                 th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
                 self.policy.optimizer.step()
+                optimizer_steps += 1
+                minibatch_sizes.append(int(len(batch_inds)))
                 last_loss = float(loss.detach().cpu())
 
+            n_epochs_completed += 1
             self._n_updates += 1
             if not continue_training:
                 break
 
+        if isinstance(extractor, RE1CombatEfficientExtractor):
+            extractor.set_mod_drop_batch(None)
+
+        if self._module_freeze is not None:
+            still = self._module_freeze.tick(1)
+            if not still:
+                self._module_freeze = None
+
         explained_var = explained_variance(
             self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten()
+        )
+        effective_batch = (
+            float(np.mean(minibatch_sizes)) if minibatch_sizes else 0.0
         )
         self.logger.record("train/entropy_loss", np.mean(entropy_losses) if entropy_losses else 0.0)
         self.logger.record("train/policy_gradient_loss", np.mean(pg_losses) if pg_losses else 0.0)
@@ -421,6 +532,10 @@ class CombatEfficientPPO(MaskablePPO):
         self.logger.record("train/explained_variance", explained_var)
         self.logger.record("train/n_updates", self._n_updates)
         self.logger.record("train/clip_range", clip_range)
+        self.logger.record("train/optimizer_steps", float(optimizer_steps))
+        self.logger.record("train/n_epochs_completed", float(n_epochs_completed))
+        self.logger.record("train/effective_batch", float(effective_batch))
+        self.logger.record("train/early_stop", float(1.0 if early_stop else 0.0))
         if self.use_grouped_entropy:
             self.logger.record("train/grouped_entropy", 1.0)
         if aux_losses:
@@ -430,3 +545,7 @@ class CombatEfficientPPO(MaskablePPO):
                 self.logger.record(k, float(np.mean(vals)))
         if clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
+        if u2w_snap:
+            for key, value in finalize_update_to_weight(self.policy, u2w_snap).items():
+                self.logger.record(key, float(value))
+        maybe_log_modality_diagnostics(self, diag_obs, action_masks=diag_masks)

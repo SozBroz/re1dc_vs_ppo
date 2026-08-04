@@ -29,7 +29,8 @@ from re1_rl.async_fleet import (
 )
 from re1_rl.distributed.inference_policy import InferencePolicy
 from re1_rl.distributed.log_util import log
-from re1_rl.distributed.rollout_types import WorkerRollout
+from re1_rl.distributed.rollout_types import WorkerRollout, normalize_curriculum_id
+from re1_rl.distributed.spaces import OBS_SCHEMA_VERSION
 from re1_rl.distributed.worker_client import WorkerClient
 from re1_rl.training_progress import TrainingProgressTracker
 
@@ -40,6 +41,7 @@ def worker_rollout_from_actor_msg(
     policy: InferencePolicy,
     worker_id: str,
     n_steps: int,
+    curriculum: str = "",
 ) -> WorkerRollout:
     """Build a 1-env ``WorkerRollout`` from an actor ``rollout`` pipe message."""
     rank = int(msg["rank"])
@@ -52,6 +54,12 @@ def worker_rollout_from_actor_msg(
     masks_arr = np.asarray(masks, dtype=np.bool_)[:actual_steps]
     # Prefer version stamped at horizon start (first act), not delivery-time policy.
     policy_version = int(msg.get("policy_version", policy.policy_version))
+    mod_drop = msg.get("mod_drop_masks")
+    mod_drop_masks = None
+    if mod_drop is not None:
+        mod_drop_masks = np.expand_dims(
+            np.asarray(mod_drop, dtype=np.float32)[:actual_steps], axis=1
+        )
     return WorkerRollout(
         worker_id=f"{worker_id}:actor_{rank}",
         policy_version=policy_version,
@@ -66,6 +74,9 @@ def worker_rollout_from_actor_msg(
         last_values=last_values,
         action_masks=np.expand_dims(masks_arr, 1),
         episode_infos=list(msg.get("episode_infos") or []),
+        mod_drop_masks=mod_drop_masks,
+        curriculum_id=normalize_curriculum_id(curriculum),
+        obs_schema_version=int(OBS_SCHEMA_VERSION),
     )
 
 
@@ -75,16 +86,35 @@ def pack_rollouts(rollouts: list[WorkerRollout], *, worker_id: str) -> WorkerRol
         raise ValueError("empty rollout list")
     n_steps = rollouts[0].n_steps
     version = rollouts[0].policy_version
+    curriculum_id = rollouts[0].curriculum_id
+    schema = int(rollouts[0].obs_schema_version)
     for r in rollouts:
         if r.n_steps != n_steps:
             raise ValueError("pack_rollouts requires identical n_steps")
         if r.policy_version != version:
             raise ValueError("pack_rollouts requires identical policy_version")
+        if r.curriculum_id != curriculum_id:
+            raise ValueError("pack_rollouts requires identical curriculum_id")
+        if int(r.obs_schema_version) != schema:
+            raise ValueError("pack_rollouts requires identical obs_schema_version")
     total_envs = sum(r.n_envs for r in rollouts)
     obs = {
         key: np.concatenate([r.obs[key] for r in rollouts], axis=1)
         for key in rollouts[0].obs
     }
+    mod_drop_masks = None
+    if any(r.mod_drop_masks is not None for r in rollouts):
+        from re1_rl.modality_ablations import MOD_DROP_DIM
+
+        parts = []
+        for r in rollouts:
+            if r.mod_drop_masks is None:
+                parts.append(
+                    np.ones((r.n_steps, r.n_envs, MOD_DROP_DIM), dtype=np.float32)
+                )
+            else:
+                parts.append(np.asarray(r.mod_drop_masks, dtype=np.float32))
+        mod_drop_masks = np.concatenate(parts, axis=1)
     return WorkerRollout(
         worker_id=worker_id,
         policy_version=version,
@@ -99,6 +129,9 @@ def pack_rollouts(rollouts: list[WorkerRollout], *, worker_id: str) -> WorkerRol
         last_values=np.concatenate([r.last_values for r in rollouts], axis=0),
         action_masks=np.concatenate([r.action_masks for r in rollouts], axis=1),
         episode_infos=[info for r in rollouts for info in r.episode_infos],
+        mod_drop_masks=mod_drop_masks,
+        curriculum_id=curriculum_id,
+        obs_schema_version=schema,
     )
 
 
@@ -552,6 +585,7 @@ def run_async_worker_loop(
                     policy=policy,
                     worker_id=worker_id,
                     n_steps=n_steps,
+                    curriculum=curriculum,
                 )
                 local_steps += int(rollout.num_timesteps())
                 progress.consume_infos(

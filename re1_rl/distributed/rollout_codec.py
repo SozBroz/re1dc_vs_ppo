@@ -51,6 +51,9 @@ def encode_rollout(rollout: WorkerRollout) -> bytes:
         "has_action_masks": True,
         "has_combat_targets": rollout.combat_targets is not None,
         "has_world_event_targets": rollout.world_event_targets is not None,
+        "has_mod_drop_masks": rollout.mod_drop_masks is not None,
+        "curriculum_id": str(rollout.curriculum_id or ""),
+        "obs_schema_version": int(rollout.obs_schema_version or 0),
     }
     npz = BytesIO()
     save_kwargs: dict[str, np.ndarray] = {
@@ -72,6 +75,10 @@ def encode_rollout(rollout: WorkerRollout) -> bytes:
     if rollout.world_event_masks is not None:
         save_kwargs["world_event_masks"] = np.asarray(
             rollout.world_event_masks, dtype=np.float32
+        )
+    if rollout.mod_drop_masks is not None:
+        save_kwargs["mod_drop_masks"] = np.asarray(
+            rollout.mod_drop_masks, dtype=np.float32
         )
     for key, arr in obs_rest.items():
         save_kwargs[f"obs__{key}"] = arr
@@ -152,6 +159,11 @@ def decode_rollout(data: bytes) -> WorkerRollout:
             if "world_event_masks" in loaded.files
             else None
         )
+        mod_drop_masks = (
+            np.asarray(loaded["mod_drop_masks"], dtype=np.float32)
+            if "mod_drop_masks" in loaded.files
+            else None
+        )
         return WorkerRollout(
             worker_id=str(meta["worker_id"]),
             policy_version=int(meta["policy_version"]),
@@ -170,4 +182,7 @@ def decode_rollout(data: bytes) -> WorkerRollout:
             combat_targets=combat_targets,
             world_event_targets=world_event_targets,
             world_event_masks=world_event_masks,
+            mod_drop_masks=mod_drop_masks,
+            curriculum_id=str(meta.get("curriculum_id") or ""),
+            obs_schema_version=int(meta.get("obs_schema_version") or 0),
         )

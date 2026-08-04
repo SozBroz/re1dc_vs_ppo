@@ -60,6 +60,28 @@ def test_slim_progress_info_keeps_go_explore_capture() -> None:
     assert slim["go_explore_capture"] == [proposal]
 
 
+def test_slim_progress_info_keeps_yawn_rails_eval_fields() -> None:
+    slim = slim_progress_info(
+        {
+            "room_id": "106",
+            "state": {"hp": 96},
+            "episode": {"r": 12.0, "l": 80},
+            "episode_outcome": "checkpoint_success",
+            "rails_cell_id": "cp03",
+            "rails_cell_index": 3,
+            "route_start_index": 4,
+            "leg_span": 1,
+            "reset_source": "route_cell",
+            "held_out_eval": True,
+        }
+    )
+    assert slim["rails_cell_id"] == "cp03"
+    assert slim["rails_cell_index"] == 3
+    assert slim["episode_outcome"] == "checkpoint_success"
+    assert slim["held_out_eval"] is True
+    assert "state" not in slim
+
+
 def test_slim_progress_info_transport_to_merge() -> None:
     from re1_rl.go_explore_merge import extract_proposals_from_infos
 
