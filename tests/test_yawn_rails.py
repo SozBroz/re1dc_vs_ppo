@@ -431,6 +431,7 @@ def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: P
 
 
 def test_reset_mix_prefers_latest_cell_then_fresh_then_older(tmp_path: Path) -> None:
+    # 3 cells → latest 50%; remaining 50% uniform over fresh + 2 older (= 1/6 each).
     manifest = {
         "schema_version": 1,
         "route_id": "test",
@@ -443,9 +444,11 @@ def test_reset_mix_prefers_latest_cell_then_fresh_then_older(tmp_path: Path) -> 
         "route_steps": list(range(1, 10)),
     }
     counts = {"latest": 0, "fresh": 0, "older": 0}
-    for seed in range(2000):
+    per_start: dict[int, int] = {}
+    for seed in range(3000):
         opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
         start = int(opts["route_start_index"])
+        per_start[start] = per_start.get(start, 0) + 1
         if start == 0:
             counts["fresh"] += 1
         elif start == 3:  # latest cell index 2 → start 3
@@ -453,9 +456,12 @@ def test_reset_mix_prefers_latest_cell_then_fresh_then_older(tmp_path: Path) -> 
         else:
             counts["older"] += 1
     total = sum(counts.values())
-    assert counts["latest"] / total == pytest.approx(0.50, abs=0.05)
-    assert counts["fresh"] / total == pytest.approx(0.25, abs=0.05)
-    assert counts["older"] / total == pytest.approx(0.25, abs=0.05)
+    assert counts["latest"] / total == pytest.approx(0.50, abs=0.04)
+    # fresh, cp00→start1, cp01→start2 each get 0.5/3
+    assert counts["fresh"] / total == pytest.approx(0.5 / 3, abs=0.04)
+    assert counts["older"] / total == pytest.approx(0.5 * 2 / 3, abs=0.04)
+    assert per_start.get(1, 0) / total == pytest.approx(0.5 / 3, abs=0.04)
+    assert per_start.get(2, 0) / total == pytest.approx(0.5 / 3, abs=0.04)
 
 
 def test_reset_latest_only_env_pins_newest_cell(

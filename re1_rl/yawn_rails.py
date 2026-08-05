@@ -314,11 +314,9 @@ def validate_manifest_cells(
     return errors
 
 
-# Non-PLR reset mix: frontier cell / fresh Jill / older cells.
-# 50% latest checkpoint; remaining 50% splits fresh + older.
+# Non-PLR reset mix: 50% frontier cell; remaining 50% is uniform over
+# ``route_initial`` plus each older cell (fresh counts as one peer).
 RESET_LATEST_CELL_WEIGHT = 0.50
-RESET_FRESH_START_WEIGHT = 0.25
-RESET_OTHER_CELLS_WEIGHT = 0.25
 _RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
 
 
@@ -334,7 +332,7 @@ def _choose_reset_candidate(
     rng: random.Random,
     latest_only: bool = False,
 ) -> dict[str, Any]:
-    """50% latest cell, 25% fresh start, 25% older cells (fallback if empty)."""
+    """50% latest; else uniform over fresh + each older cell."""
     fresh = {"checkpoint_index": -1, "source": "route_initial"}
     if not cells:
         return fresh
@@ -342,17 +340,11 @@ def _choose_reset_candidate(
     if latest_only:
         return latest
     older = cells[:-1]
-    roll = rng.random()
-    latest_cut = float(RESET_LATEST_CELL_WEIGHT)
-    fresh_cut = latest_cut + float(RESET_FRESH_START_WEIGHT)
-    if roll < latest_cut:
+    if rng.random() < float(RESET_LATEST_CELL_WEIGHT):
         return latest
-    if roll < fresh_cut:
-        return fresh
-    if older:
-        return older[rng.randrange(len(older))]
-    # No older cells yet: split the leftover bucket between latest and fresh.
-    return latest if rng.random() < 0.5 else fresh
+    # Remaining 50%: fresh and every older cell share equal probability.
+    pool: list[dict[str, Any]] = [fresh, *older]
+    return pool[rng.randrange(len(pool))]
 
 
 def sample_one_leg_options(
@@ -363,8 +355,8 @@ def sample_one_leg_options(
 ) -> dict[str, Any]:
     """Choose a curated start and bounded checkpoint span.
 
-    Non-PLR mix: 50% latest cell, 25% ``route_initial``, 25% older cells.
-    ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell (memlog pin).
+    Non-PLR mix: 50% latest cell; remaining 50% uniform over ``route_initial``
+    and each older cell. ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
     """
     cells = iter_loadable_cells(project_root, stage)
     candidates: list[dict[str, Any]] = [
