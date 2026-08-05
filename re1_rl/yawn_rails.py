@@ -506,7 +506,39 @@ def capture_successor_cell(
         capacity=capacity,
     )
 
-    # Local sampling manifest (learner poll will overwrite with canonical rows).
+    # Bind this State to its proposal sha so poll cannot treat a stale learner
+    # meta.json as a cache hit after a rejected local overwrite.
+    meta_path = cell_dir / "meta.json"
+    meta_path.write_text(
+        json.dumps(
+            {
+                "route_id": route_id,
+                "checkpoint_index": completed,
+                "checkpoint_id": checkpoint_id,
+                "room_id": room_id,
+                "quality": list(quality),
+                "bundle_sha256": str(proposal.get("bundle_sha256") or ""),
+                "bytes": int(proposal.get("bytes") or 0),
+                **{
+                    k: capacity[k]
+                    for k in (
+                        "inventory_free_slots",
+                        "next_checkpoint_id",
+                        "next_slots_needed",
+                        "inventory_feasible",
+                        "captured_in_box_room",
+                    )
+                    if k in capacity
+                },
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # Local sampling manifest (learner poll overwrites only after verified fetch).
     manifest_path = root / stage["cells_manifest"]
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest = load_manifest(root, stage)

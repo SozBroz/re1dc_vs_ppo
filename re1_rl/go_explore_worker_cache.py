@@ -237,12 +237,9 @@ def ensure_bundle_cached(
     if state_p.is_file() and side_p.is_file():
         if expected_sha256:
             local_sha = _local_meta_sha(dest)
-            if local_sha and local_sha == str(expected_sha256):
-                return dest
-            if local_sha is None and expected_sha256:
-                # Have files but no meta — treat as hit if files present.
-                return dest
-            if local_sha == str(expected_sha256):
+            # Missing meta sha is a miss — files alone can be a rejected local
+            # overwrite that must not masquerade as the learner bundle.
+            if local_sha is not None and local_sha == str(expected_sha256):
                 return dest
         else:
             return dest

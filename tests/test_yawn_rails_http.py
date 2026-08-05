@@ -221,6 +221,88 @@ def test_worker_eager_poll_mirrors_bundles(yawn_http, tmp_path: Path) -> None:
     assert mirrored.read_bytes().startswith(b"STATE_cp02")
 
 
+def test_poll_refetches_when_meta_sha_missing_after_local_overwrite(
+    yawn_http, tmp_path: Path
+) -> None:
+    """Rejected local overwrite left State dirty; missing meta must not cache-hit."""
+    store: YawnRailsCellStore = yawn_http["store"]
+    client: WorkerClient = yawn_http["client"]
+    prop = _write_local_cell(tmp_path / "canon", idx=17, quality=[96, 45, 0, 8, 1])
+    store.ingest_proposals([prop])
+
+    worker_root = tmp_path / "worker_desync"
+    poll_yawn_rails_manifest(client, worker_root, since_version=0)
+    slot = worker_root / "states" / "yawn_rails" / "cells" / "cp17"
+    assert (slot / "cell.State").read_bytes().startswith(b"STATE_cp17")
+
+    # Simulate rejected local capture: overwrite State, drop meta sha binding.
+    (slot / "cell.State").write_bytes(b"STATE_cp17_DIRTY_15_AMMO")
+    meta_p = slot / "meta.json"
+    if meta_p.is_file():
+        meta_p.unlink()
+    (slot / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+
+    local = poll_yawn_rails_manifest(client, worker_root, since_version=0)
+    assert local["cells"][0]["quality"][1] == 45
+    assert (slot / "cell.State").read_bytes().startswith(b"STATE_cp17")
+    assert not (slot / "cell.State").read_bytes().startswith(b"STATE_cp17_DIRTY")
+
+
+def test_poll_refetches_when_local_meta_sha_mismatches_learner(
+    yawn_http, tmp_path: Path
+) -> None:
+    store: YawnRailsCellStore = yawn_http["store"]
+    client: WorkerClient = yawn_http["client"]
+    prop = _write_local_cell(tmp_path / "canon2", idx=16, quality=[96, 45, 0, 8, 1])
+    store.ingest_proposals([prop])
+
+    worker_root = tmp_path / "worker_mismatch"
+    poll_yawn_rails_manifest(client, worker_root, since_version=0)
+    slot = worker_root / "states" / "yawn_rails" / "cells" / "cp16"
+    (slot / "cell.State").write_bytes(b"STATE_cp16_LOCAL_REJECT")
+    (slot / "meta.json").write_text(
+        json.dumps({"bundle_sha256": "deadbeef" * 8, "checkpoint_index": 16})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    poll_yawn_rails_manifest(client, worker_root, since_version=0)
+    assert (slot / "cell.State").read_bytes().startswith(b"STATE_cp16")
+    assert b"LOCAL_REJECT" not in (slot / "cell.State").read_bytes()
+
+
+def test_poll_drops_cell_when_fetch_fails_after_dirty_overwrite(
+    yawn_http, tmp_path: Path
+) -> None:
+    """Fetch failure must not keep learner quality paired with dirty State."""
+    store: YawnRailsCellStore = yawn_http["store"]
+    client: WorkerClient = yawn_http["client"]
+    prop = _write_local_cell(tmp_path / "canon3", idx=15, quality=[96, 45, 0, 8, 1])
+    store.ingest_proposals([prop])
+
+    worker_root = tmp_path / "worker_fetch_fail"
+    poll_yawn_rails_manifest(client, worker_root, since_version=0)
+    slot = worker_root / "states" / "yawn_rails" / "cells" / "cp15"
+    (slot / "cell.State").write_bytes(b"STATE_cp15_DIRTY")
+    (slot / "meta.json").write_text(
+        json.dumps({"bundle_sha256": "cafebabe" * 8, "checkpoint_index": 15})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    class _FailBundleClient:
+        def fetch_yawn_rails_manifest(self, since_version: int = 0) -> dict:
+            return client.fetch_yawn_rails_manifest(since_version=since_version)
+
+        def fetch_yawn_rails_bundle(self, cell_id: str) -> bytes:
+            raise RuntimeError("bundle unavailable")
+
+    local = poll_yawn_rails_manifest(
+        _FailBundleClient(), worker_root, since_version=0
+    )
+    assert local["cells"] == []
+
+
 def test_slim_progress_keeps_yawn_rails_capture() -> None:
     prop = {
         "checkpoint_index": 0,

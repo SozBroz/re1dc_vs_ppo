@@ -99,7 +99,9 @@ def ensure_yawn_bundle_cached(
     if state_p.is_file() and side_p.is_file():
         if expected_sha256:
             local_sha = _local_meta_sha(dest)
-            if local_sha is None or local_sha == str(expected_sha256):
+            # Missing meta sha used to count as a hit and let poll adopt remote
+            # quality while keeping a locally overwritten State — ammo desync.
+            if local_sha is not None and local_sha == str(expected_sha256):
                 return dest
         else:
             return dest
@@ -190,6 +192,14 @@ def poll_yawn_rails_manifest(
     fetched = 0
 
     if remote_cells:
+        prev_by_idx: dict[int, dict[str, Any]] = {}
+        for r in local.get("cells") or []:
+            if not isinstance(r, dict):
+                continue
+            try:
+                prev_by_idx[int(r["checkpoint_index"])] = r
+            except (KeyError, TypeError, ValueError):
+                continue
         rows: list[dict[str, Any]] = []
         valid: set[int] = set()
         for row in remote_cells:
@@ -199,12 +209,29 @@ def poll_yawn_rails_manifest(
                 idx = int(row["checkpoint_index"])
             except (KeyError, TypeError, ValueError):
                 continue
-            valid.add(idx)
             sha = str(row.get("bundle_sha256") or "") or None
-            if ensure_yawn_bundle_cached(
+            cached = ensure_yawn_bundle_cached(
                 client, idx, project_root, expected_sha256=sha
-            ) is not None:
-                fetched += 1
+            )
+            if cached is None:
+                # Keep prior row only if local files still match that row's sha.
+                # Otherwise drop the slot so reset cannot pair remote quality
+                # with a rejected local overwrite while fetch is failing.
+                prev = prev_by_idx.get(idx)
+                if prev is not None:
+                    prev_sha = str(prev.get("bundle_sha256") or "") or None
+                    slot = cell_slot_dir(yawn_rails_root(project_root), idx)
+                    if (
+                        prev_sha
+                        and _local_meta_sha(slot) == prev_sha
+                        and (slot / CELL_STATE_NAME).is_file()
+                        and (slot / CELL_SIDECAR_NAME).is_file()
+                    ):
+                        rows.append(dict(prev))
+                        valid.add(idx)
+                continue
+            fetched += 1
+            valid.add(idx)
             out_row = {
                 "checkpoint_index": idx,
                 "checkpoint_id": row.get("checkpoint_id", ""),
