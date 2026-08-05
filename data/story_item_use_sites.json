@@ -22,6 +22,16 @@
       "notes": "Secret alcove after piano — USE wooden emblem (same stand as gold_emblem pickup 9750/8600). Swap keeps gold; putting gold back alone is gold_emblem_return −2 (not this site)."
     },
     {
+      "id": "emblem@10F_wall",
+      "item": "emblem",
+      "room": "10F",
+      "x": 8850,
+      "z": 19300,
+      "radius": 1500,
+      "consumes": false,
+      "notes": "Bar wooden-emblem USE at alternate RDT tile (QuickSave0 2026-08-05 stand 8780/18780; RDT ~8850/19300). Required for mask legality away from the post-piano alcove."
+    },
+    {
       "id": "gold_emblem@105_fireplace",
       "item": "gold_emblem",
       "room": "105",
