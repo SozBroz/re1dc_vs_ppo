@@ -38,8 +38,8 @@
       "x": 2900,
       "z": 8100,
       "radius": 1500,
-      "consumes": false,
-      "notes": "Dining fireplace — clock reveals shield key (empirical latest QuickSave4 2026-07-17 22:03:09.497 stand 3746/8186; RDT trigger 2900/8100, r=1500)"
+      "consumes": true,
+      "notes": "Dining fireplace — clock reveals shield key (QuickSave4 stand 3746/8186; RDT 2900/8100). consumes=true — gold must leave inventory; scene flicker alone must not credit."
     },
     {
       "id": "blue_jewel@10D_tiger_eye",
@@ -117,7 +117,8 @@
       "room": "306",
       "_draft": true,
       "consumes": false,
-      "notes": "BEST-EFFORT: Item passage — push statue / align on tile with hex crank"
+      "reusable": true,
+      "notes": "BEST-EFFORT: Item passage — push statue / align on tile with hex crank (stays in inventory)"
     },
     {
       "id": "hex_crank@310_underground_entry",
@@ -125,7 +126,8 @@
       "room": "310",
       "_draft": true,
       "consumes": false,
-      "notes": "BEST-EFFORT: Underground entry crank wall"
+      "reusable": true,
+      "notes": "BEST-EFFORT: Underground entry crank wall (stays in inventory)"
     },
     {
       "id": "hex_crank@30B_boulder_alcove",
@@ -133,7 +135,8 @@
       "room": "30B",
       "_draft": true,
       "consumes": false,
-      "notes": "BEST-EFFORT: Boulder alcove wall crank (pickup 30A)"
+      "reusable": true,
+      "notes": "BEST-EFFORT: Boulder alcove wall crank (pickup 30A; stays in inventory)"
     },
     {
       "id": "doom_book_1@119_examine",

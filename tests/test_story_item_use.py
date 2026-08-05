@@ -280,38 +280,55 @@ def test_story_use_success_consumed_item() -> None:
     assert ok
 
 
-def test_story_use_success_scene_change() -> None:
-    """Non-emblem sites may still resolve via scene change without inventory leave."""
-    site = {"item": "gold_emblem", "consumes": False, "id": "gold_emblem@105_fireplace"}
+def test_reusable_tool_may_resolve_via_scene_while_held() -> None:
+    from re1_rl.memory_map import ITEM_IDS
+
+    crank_id = next(i for i, n in ITEM_IDS.items() if n == "hex_crank")
+    site = {
+        "item": "hex_crank",
+        "consumes": False,
+        "reusable": True,
+        "id": "hex_crank@306_item_passage",
+    }
     ok = story_use_succeeded(
         before={"scene_flag": 0x80, "msg_flag": 0, "in_control": True},
         after={"scene_flag": 0x90, "msg_flag": 0, "in_control": False},
         site=site,
         slot=1,
-        inventory_before=[(0, 0), (GOLD_EMBLEM_ID, 0)],
-        inventory_after=[(0, 0), (GOLD_EMBLEM_ID, 0)],
+        inventory_before=[(0, 0), (crank_id, 0)],
+        inventory_after=[(0, 0), (crank_id, 0)],
     )
     assert ok
 
 
-def test_wooden_emblem_scene_alone_does_not_resolve() -> None:
-    site = {"item": "emblem", "consumes": True, "id": "emblem@10F_wall"}
-    assert not story_use_succeeded(
-        before={"scene_flag": 0x80, "msg_flag": 0, "in_control": True},
-        after={"scene_flag": 0x90, "msg_flag": 0, "in_control": False},
-        site=site,
-        slot=1,
-        inventory_before=[(0, 0), (EMBLEM_ID, 0)],
-        inventory_after=[(0, 0), (EMBLEM_ID, 0)],
-    )
-    assert story_use_succeeded(
-        before={"scene_flag": 0x80, "msg_flag": 0, "in_control": True},
-        after={"scene_flag": 0x90, "msg_flag": 0, "in_control": False},
-        site=site,
-        slot=1,
-        inventory_before=[(0, 0), (EMBLEM_ID, 0)],
-        inventory_after=[(0, 0), (0, 0)],
-    )
+def test_key_item_scene_alone_does_not_resolve_while_held() -> None:
+    for site, item_id in (
+        ({"item": "emblem", "consumes": True, "id": "emblem@10F_wall"}, EMBLEM_ID),
+        (
+            {
+                "item": "gold_emblem",
+                "consumes": True,
+                "id": "gold_emblem@105_fireplace",
+            },
+            GOLD_EMBLEM_ID,
+        ),
+    ):
+        assert not story_use_succeeded(
+            before={"scene_flag": 0x80, "msg_flag": 0, "in_control": True},
+            after={"scene_flag": 0x90, "msg_flag": 0, "in_control": False},
+            site=site,
+            slot=1,
+            inventory_before=[(0, 0), (item_id, 0)],
+            inventory_after=[(0, 0), (item_id, 0)],
+        )
+        assert story_use_succeeded(
+            before={"scene_flag": 0x80, "msg_flag": 0, "in_control": True},
+            after={"scene_flag": 0x90, "msg_flag": 0, "in_control": False},
+            site=site,
+            slot=1,
+            inventory_before=[(0, 0), (item_id, 0)],
+            inventory_after=[(0, 0), (0, 0)],
+        )
 
 
 def test_story_use_macro_ignores_menu_msg_only() -> None:
@@ -710,11 +727,20 @@ def test_fireplace_gold_emblem_site_still_works() -> None:
     after = dict(prev)
     after["scene_flag"] = 0x88
     after["in_control"] = False
+    # Scene-only while still holding gold must not credit (same class of bug as wooden).
+    out_held = annotate_story_use_success(
+        after,
+        prev_state=prev,
+        inventory_before=inv,
+        inventory_after=inv,
+        rewarded_site_ids=set(),
+    )
+    assert not out_held.get("story_use_success")
     out = annotate_story_use_success(
         after,
         prev_state=prev,
         inventory_before=inv,
-        inventory_after=inv,  # consumes=false fireplace
+        inventory_after=_inv((0, 0)),
         rewarded_site_ids=set(),
     )
     assert out.get("story_use_success") == "gold_emblem@105_fireplace"

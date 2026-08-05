@@ -278,7 +278,7 @@
     "seq": 15,
     "checkpoint_id": "place_gold_emblem_105",
     "room_id": "105",
-    "objective": "Place the gold emblem on the dining fireplace",
+    "objective": "Place the gold emblem on the dining fireplace (must leave inventory)",
     "action_type": "use_item",
     "required_items": [
       "gold_emblem"
@@ -297,6 +297,10 @@
         {
           "type": "story_use",
           "site_id": "gold_emblem@105_fireplace"
+        },
+        {
+          "type": "lacks_item",
+          "item": "gold_emblem"
         }
       ]
     }

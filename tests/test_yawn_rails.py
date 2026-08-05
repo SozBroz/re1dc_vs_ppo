@@ -125,7 +125,11 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     gold = next(cp for cp in route if cp["checkpoint_id"] == "gold_emblem_10F")
     assert gold["seq"] < place["seq"]
     assert "gold_emblem" in gold["items_gained"]
-    assert any(cp["checkpoint_id"] == "place_gold_emblem_105" for cp in route)
+    place_gold = next(cp for cp in route if cp["checkpoint_id"] == "place_gold_emblem_105")
+    place_gold_cond = json.dumps(place_gold["success_condition"])
+    assert "gold_emblem@105_fireplace" in place_gold_cond
+    assert '"lacks_item"' in place_gold_cond
+    assert '"item": "gold_emblem"' in place_gold_cond
     for checkpoint in route:
         condition_text = json.dumps(checkpoint["success_condition"])
         for item in checkpoint["items_gained"]:

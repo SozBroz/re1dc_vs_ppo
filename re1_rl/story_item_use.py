@@ -281,11 +281,17 @@ def story_use_succeeded(
     )
 
 
-def _site_requires_inventory_leave(site: dict[str, Any]) -> bool:
-    """Wooden bar emblem USE must remove the item; scene flicker alone is not enough."""
-    item = canonical_item(str(site.get("item", "")))
-    site_id = str(site.get("id", ""))
-    return item == "emblem" or site_id.startswith("emblem@10F_")
+def _site_is_reusable_tool(site: dict[str, Any]) -> bool:
+    """True for tools that stay in inventory after USE (e.g. hex crank).
+
+    One-shot key placements must not use this path — scene flicker while still
+    holding the item is how false story_use credits are born.
+    """
+    if site.get("mash_pages"):
+        return False
+    if site.get("reusable") is True:
+        return True
+    return False
 
 
 def story_use_macro_resolved(
@@ -321,8 +327,8 @@ def story_use_macro_resolved(
             ):
                 return True
 
-    # Wooden emblem place: never credit on scene/msg alone while still holding it.
-    if _site_requires_inventory_leave(site):
+    # Key-item placements: never credit on scene/msg alone while still holding it.
+    if held_after and not _site_is_reusable_tool(site):
         return False
 
     in_menu = bool(after.get("in_item_menu", False))
