@@ -203,7 +203,7 @@ def apply_episode_sidecar(
     """Restore episode-side trackers from a PB sidecar dict.
 
     When *reset_softlock* is True (default for curriculum PB starts), do **not**
-    restore capture-time stagnation / softlock_cap — grant a fresh 6-minute
+    restore capture-time stagnation / softlock_cap — grant a fresh 12-minute
     progress budget every time.
     """
     _check_schema_version(data)

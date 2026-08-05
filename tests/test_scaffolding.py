@@ -211,19 +211,19 @@ def test_goal_usage_hints_are_live():
 
     g = RoomGraph(DOORS)
     enc = ObsEncoder(ROOMS, g)
-    planner = make_planner(route_steps=[11])
+    planner = make_planner(route_steps=[14])  # place_gold_emblem_105 use_item
     tracker = ItemTracker(todo=[])
-    s = make_state(room="10C")
+    s = make_state(room="105")
     goal = enc.encode_goal(s, planner, item_tracker=tracker)
     assert goal[GOAL_IDX["obj_use_item"]] == 1.0
-    assert goal[GOAL_IDX["goal_room_index"]] == enc._room_idx_norm("10C")
+    assert goal[GOAL_IDX["goal_room_index"]] == enc._room_idx_norm("105")
 
 
 def test_goal_objective_types_are_distinct():
     g = RoomGraph(DOORS)
     enc = ObsEncoder(ROOMS, g)
     s = make_state(room="107")
-    goal_macro = enc.encode_goal(s, make_planner(route_steps=[9]))
+    goal_macro = enc.encode_goal(s, make_planner(route_steps=[11]))  # piano use_item
     goal_plain = enc.encode_goal(s, make_planner(route_steps=[2]))
     assert not np.array_equal(goal_macro, goal_plain)
 

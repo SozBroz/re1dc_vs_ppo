@@ -33,8 +33,10 @@ class ProgressTracker:
 
     # Idle contempt: emulated frames since last exploration progress (reward.compute_reward).
     _stagnation_frames: int = 0
-    # Floor on softlock truncate after new_room / key / first weapon / key use (6m).
+    # Floor on softlock truncate after progress / rails checkpoint (12m chunks).
     softlock_cap_frames: int = 0
+    # Additive hard ``max_steps`` budget beyond curriculum base (12m per cell).
+    max_steps_bonus: int = 0
     # Terminal black mark: set before building the terminal observation.
     # Positive reward/extension guards also prevent same-step leakage.
     kenneth_gate_breached: bool = False
@@ -130,7 +132,7 @@ class ProgressTracker:
         return int(self._stagnation_frames)
 
     def note_softlock_extension(self, frames: int) -> None:
-        """Raise idle truncate floor and clear the idle clock for 6m extensions."""
+        """Raise idle truncate floor and clear the idle clock (12m chunks)."""
         if self.kenneth_gate_breached:
             return
         frames = max(0, int(frames))
@@ -138,6 +140,15 @@ class ProgressTracker:
             return
         self.softlock_cap_frames = max(int(self.softlock_cap_frames), frames)
         self._stagnation_frames = 0
+
+    def note_max_steps_extension(self, steps: int) -> None:
+        """Add hard episode-step budget (used when a rails checkpoint completes)."""
+        if self.kenneth_gate_breached:
+            return
+        steps = max(0, int(steps))
+        if steps <= 0:
+            return
+        self.max_steps_bonus = int(self.max_steps_bonus) + steps
 
     def breach_kenneth_gate(self) -> bool:
         """Set the terminal black mark; true only on the first breach."""

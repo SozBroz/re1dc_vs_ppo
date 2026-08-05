@@ -21,7 +21,12 @@ from re1_rl.item_box import BOX_ROOMS
 from re1_rl.env import RE1Env
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
-from re1_rl.reward import RAILS_CHECKPOINT_REWARD, compute_reward
+from re1_rl.reward import (
+    CHECKPOINT_MAX_STEPS_EXTENSION,
+    RAILS_CHECKPOINT_REWARD,
+    SOFTLOCK_EXTENSION_FRAMES,
+    compute_reward,
+)
 from re1_rl.room_graph import RoomGraph, load_valid_rooms
 from re1_rl.yawn_rails import (
     capture_successor_cell,
@@ -50,7 +55,7 @@ def _graph() -> RoomGraph:
 def _planner(start_index: int = 0) -> WaypointPlanner:
     return WaypointPlanner(
         ROUTE,
-        route_steps=list(range(1, 54)),
+        route_steps=list(range(1, 58)),
         start_index=start_index,
     )
 
@@ -77,7 +82,7 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     assert validate_route(route, graph=_graph()) == []
     # Cells may be wiped between capture cycles; empty manifest is valid.
     assert validate_manifest_cells(ROOT, curriculum, require_contiguous_prefix=0) == []
-    assert curriculum["max_steps"] == 2700  # 6 min at 8 frames/step and 60fps.
+    assert curriculum["max_steps"] == 5400  # 12 min at 8 frames/step and 60fps.
     text = json.dumps(route).lower()
     assert '"205"' not in text
     assert "serum" not in text
@@ -89,7 +94,7 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
         "type": "room_enter",
         "room_id": "104",
     }
-    assert [(cp["room_id"], cp["checkpoint_id"]) for cp in route[43:]] == [
+    assert [(cp["room_id"], cp["checkpoint_id"]) for cp in route[-10:]] == [
         ("20D", "richard_cutscene_20D"),
         ("204", "richard_forced_return_204"),
         ("201", "east_stairs_201_post_richard"),
@@ -101,6 +106,14 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
         ("20E", "attic_entry_20E"),
         ("210", "yawn_moon_210"),
     ]
+    bar_ids = [cp["checkpoint_id"] for cp in route if cp["room_id"] == "10F"]
+    assert bar_ids == [
+        "bar_enter_10F",
+        "music_notes_10F",
+        "piano_music_notes_10F",
+        "gold_emblem_10F",
+    ]
+    assert any(cp["checkpoint_id"] == "place_gold_emblem_105" for cp in route)
     for checkpoint in route:
         condition_text = json.dumps(checkpoint["success_condition"])
         for item in checkpoint["items_gained"]:
@@ -189,6 +202,8 @@ def test_barry_hall_return_pays_checkpoint_on_stairs_down() -> None:
     assert bd["checkpoint_success"] == pytest.approx(RAILS_CHECKPOINT_REWARD)
     assert planner.waypoint_index == 6
     assert progress.checkpoint_success
+    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
+    assert progress.max_steps_bonus == CHECKPOINT_MAX_STEPS_EXTENSION
     assert reward > RAILS_CHECKPOINT_REWARD - 0.01
 
 
@@ -223,12 +238,12 @@ def test_barry_hall_return_does_not_latch_wrong_from_room() -> None:
 
 
 def test_main_hall_ink_checkpoint_is_room_enter_only() -> None:
-    planner = _planner(start_index=11)
+    planner = _planner(start_index=15)  # ink_106 after bar/emblem split
     assert planner.advance_if_success(_state("106"), progress=ProgressTracker())
 
 
 def test_save_100_checkpoint_is_room_enter_only() -> None:
-    planner = _planner(start_index=31)
+    planner = _planner(start_index=35)  # save_100 after bar/emblem split
     assert planner.advance_if_success(_state("100"), progress=ProgressTracker())
 
 
@@ -236,14 +251,14 @@ def test_shotgun_rescue_requires_reentry_shotgun_and_ceiling_cutscene() -> None:
     prev = _state("116", inventory=["shotgun"])
     state = _state("115", inventory=["shotgun"])
 
-    no_cutscene = _planner(start_index=17)
+    no_cutscene = _planner(start_index=21)  # barry_rescue_115
     assert not no_cutscene.advance_if_success(
         state,
         progress=ProgressTracker(),
         prev_state=prev,
     )
 
-    no_shotgun = _planner(start_index=17)
+    no_shotgun = _planner(start_index=21)
     observed = ProgressTracker()
     observed.observe_cutscene("115:ceiling_lowering")
     assert not no_shotgun.advance_if_success(
@@ -252,7 +267,7 @@ def test_shotgun_rescue_requires_reentry_shotgun_and_ceiling_cutscene() -> None:
         prev_state=prev,
     )
 
-    rescued = _planner(start_index=17)
+    rescued = _planner(start_index=21)
     assert rescued.advance_if_success(
         state,
         progress=observed,
@@ -263,18 +278,18 @@ def test_shotgun_rescue_requires_reentry_shotgun_and_ceiling_cutscene() -> None:
 def test_goal_encodes_selected_one_leg_checkpoint() -> None:
     graph = _graph()
     encoder = ObsEncoder(ROOMS, graph, curriculum_stage_index=1)
-    planner = _planner(start_index=51)
+    planner = _planner(start_index=55)  # attic_entry_20E
     state = _state("20D", x=1000, z=1000)
     goal = encoder.encode_goal(state, planner)
     assert planner.next_waypoint_room() == "20E"
     assert goal[GOAL_IDX["goal_room_index"]] == encoder._room_idx_norm("20E")
     assert goal[GOAL_IDX["doors_available"]] == 1.0
-    assert goal[GOAL_IDX["waypoints_remaining"]] == pytest.approx(2 / 53)
+    assert goal[GOAL_IDX["waypoints_remaining"]] == pytest.approx(2 / 57)
 
 
 def test_goal_appends_six_masked_checkpoint_semantic_slots() -> None:
     encoder = ObsEncoder(ROOMS, _graph(), curriculum_stage_index=1)
-    planner = _planner(start_index=48)
+    planner = _planner(start_index=52)
     goal = encoder.encode_goal(
         _state("101", inventory=["shield_key", "shotgun"]),
         planner,
@@ -288,7 +303,7 @@ def test_goal_appends_six_masked_checkpoint_semantic_slots() -> None:
     assert slots[2, 12] > 0.0  # gained handgun bullets identity
     assert slots[3, 8] > 0.0  # required shield key identity
     assert slots[3, 11] == 1.0
-    assert planner.peek_objective(2)["seq"] == 51
+    assert planner.peek_objective(2)["seq"] == 55
     assert planner.peek_waypoint_room(4) == "210"
 
 
@@ -345,7 +360,7 @@ def test_yawn_episode_terminates_only_after_configured_leg_span() -> None:
 
 
 def test_yawn_box_prep_requires_natural_lab_timer_expiry() -> None:
-    planner = _planner(start_index=47)
+    planner = _planner(start_index=51)
     assert planner.current_objective()["checkpoint_id"] == "yawn_box_prep_11B"
     assert "11B" in BOX_ROOMS
 
@@ -359,7 +374,7 @@ def test_yawn_box_prep_requires_natural_lab_timer_expiry() -> None:
 
 
 def test_richard_checkpoint_accepts_forced_settle_in_204() -> None:
-    planner = _planner(start_index=43)
+    planner = _planner(start_index=47)
     progress = ProgressTracker()
     progress.observe_cutscene("20D:richard")
     settled = _state("204")
@@ -367,18 +382,27 @@ def test_richard_checkpoint_accepts_forced_settle_in_204() -> None:
     assert planner.current_objective()["checkpoint_id"] == "richard_forced_return_204"
 
 
+def _write_cell(tmp_path: Path, idx: int) -> dict:
+    cell = tmp_path / f"states/cp{idx}"
+    cell.mkdir(parents=True, exist_ok=True)
+    (cell / "cell.State").write_bytes(b"state")
+    (cell / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+    return {
+        "checkpoint_index": idx,
+        "state_path": f"states/cp{idx}/cell.State",
+        "sidecar_path": f"states/cp{idx}/cell.sidecar.json",
+        "inventory_feasible": True,
+        "inventory_free_slots": 4,
+        "next_slots_needed": 0,
+        "captured_in_box_room": False,
+    }
+
+
 def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: Path) -> None:
-    (tmp_path / "states/cp0").mkdir(parents=True)
-    (tmp_path / "states/cp0/cell.State").write_bytes(b"state")
-    (tmp_path / "states/cp0/cell.sidecar.json").write_text("{}", encoding="utf-8")
     manifest = {
         "schema_version": 1,
         "route_id": "test",
-        "cells": [{
-            "checkpoint_index": 0,
-            "state_path": "states/cp0/cell.State",
-            "sidecar_path": "states/cp0/cell.sidecar.json",
-        }],
+        "cells": [_write_cell(tmp_path, 0)],
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     stage = {"route_id": "test", "cells_manifest": "manifest.json"}
@@ -388,6 +412,34 @@ def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: P
     assert a["reset_source"] in {"route_initial", "route_cell"}
     assert a["reset_source"] not in {"pb", "archive"}
     assert a["leg_span"] == 1
+
+
+def test_reset_mix_prefers_latest_cell_then_fresh_then_older(tmp_path: Path) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in range(3)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 10)),
+    }
+    counts = {"latest": 0, "fresh": 0, "older": 0}
+    for seed in range(2000):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        start = int(opts["route_start_index"])
+        if start == 0:
+            counts["fresh"] += 1
+        elif start == 3:  # latest cell index 2 → start 3
+            counts["latest"] += 1
+        else:
+            counts["older"] += 1
+    total = sum(counts.values())
+    assert counts["latest"] / total == pytest.approx(0.40, abs=0.05)
+    assert counts["fresh"] / total == pytest.approx(0.30, abs=0.05)
+    assert counts["older"] / total == pytest.approx(0.30, abs=0.05)
 
 
 def test_chaining_curriculum_samples_bounded_remaining_span(tmp_path: Path) -> None:
@@ -409,10 +461,10 @@ def test_chaining_curriculum_samples_bounded_remaining_span(tmp_path: Path) -> N
     assert chaining["legs_per_episode"] == 6
     assert chaining["episode_mode"] == "multi_leg"
     assert chaining["route_id"] == "yawn_quest_v2"
-    assert chaining["route_steps"][-1] == 53
+    assert chaining["route_steps"][-1] == 57
     assert one_leg["episode_mode"] == "one_leg"
     assert one_leg["route_id"] == "yawn_quest_v2"
-    assert one_leg["route_steps"][-1] == 53
+    assert one_leg["route_steps"][-1] == 57
     assert "legs_per_episode" not in one_leg
 
 

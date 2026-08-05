@@ -314,22 +314,56 @@ def validate_manifest_cells(
     return errors
 
 
+# Non-PLR reset mix: frontier cell / fresh Jill / older cells.
+RESET_LATEST_CELL_WEIGHT = 0.40
+RESET_FRESH_START_WEIGHT = 0.30
+RESET_OTHER_CELLS_WEIGHT = 0.30
+
+
+def _choose_reset_candidate(
+    cells: list[dict[str, Any]],
+    *,
+    rng: random.Random,
+) -> dict[str, Any]:
+    """40% latest cell, 30% fresh start, 30% older cells (fallback if empty)."""
+    fresh = {"checkpoint_index": -1, "source": "route_initial"}
+    if not cells:
+        return fresh
+    latest = cells[-1]
+    older = cells[:-1]
+    roll = rng.random()
+    latest_cut = float(RESET_LATEST_CELL_WEIGHT)
+    fresh_cut = latest_cut + float(RESET_FRESH_START_WEIGHT)
+    if roll < latest_cut:
+        return latest
+    if roll < fresh_cut:
+        return fresh
+    if older:
+        return older[rng.randrange(len(older))]
+    # No older cells yet: split the leftover bucket between latest and fresh.
+    return latest if rng.random() < 0.5 else fresh
+
+
 def sample_one_leg_options(
     project_root: Path,
     stage: dict[str, Any],
     *,
     rng: random.Random,
 ) -> dict[str, Any]:
-    """Choose a deterministic curated start and bounded checkpoint span."""
+    """Choose a curated start and bounded checkpoint span.
+
+    Non-PLR mix: 40% latest cell, 30% ``route_initial``, 30% older cells.
+    """
+    cells = iter_loadable_cells(project_root, stage)
     candidates: list[dict[str, Any]] = [
-        {"checkpoint_index": -1, "source": "route_initial"}
+        {"checkpoint_index": -1, "source": "route_initial"},
+        *cells,
     ]
-    candidates.extend(iter_loadable_cells(project_root, stage))
     from re1_rl.yawn_rails_plr import plr_enabled_from_env, sample_plr_options
 
     if plr_enabled_from_env():
         return sample_plr_options(project_root, stage, candidates, rng=rng)
-    chosen = candidates[rng.randrange(len(candidates))]
+    chosen = _choose_reset_candidate(cells, rng=rng)
     start_index = int(chosen["checkpoint_index"]) + 1
     route_steps = list(stage.get("route_steps", []))
     remaining = max(1, len(route_steps) - start_index)

@@ -34,7 +34,7 @@ REFERENCE_STEP_FRAMES = 8
 # Each signal owns its float; not scaled from CHECKPOINT_REWARD.
 NEW_ROOM_BONUS = 4.0
 NEW_CUTSCENE_BONUS = 1.2
-# Document/file examine UI (gs=0x40808100): same +4 / 6m floor as new room.
+# Document/file examine UI (gs=0x40808100): same +4 / 12m floor as new room.
 NEW_DOCUMENT_EXAMINE_BONUS = 4.0
 
 # Legacy aliases kept for tests / telemetry that import old names.
@@ -65,14 +65,16 @@ NEW_WEAPON_PICKUP_BONUS = 4.0
 SHOTGUN_RETURN_PENALTY = -4.0
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # Idle contempt: no new room / document / cutscene / key / weapon / story / gallery.
-# Start budget and all progress extensions: 6 min. Grace 3 min then 3→6 ramp.
+# Start budget and progress extensions: 12 min. Grace 3 min then ramp to cap.
 # Frames @ 60 emulated fps (PS1 NTSC / BizHawk).
-SOFTLOCK_PRE_KENNETH_FRAMES = 6 * 60 * 60
-SOFTLOCK_POST_KENNETH_FRAMES = 6 * 60 * 60
-# New room / document / key pickup / key use / first weapon: at least this idle cap.
-SOFTLOCK_EXTENSION_FRAMES = 6 * 60 * 60
+SOFTLOCK_PRE_KENNETH_FRAMES = 12 * 60 * 60
+SOFTLOCK_POST_KENNETH_FRAMES = 12 * 60 * 60
+# New room / document / key / story use / weapon / rails checkpoint: idle floor.
+SOFTLOCK_EXTENSION_FRAMES = 12 * 60 * 60
 # Alias: max episode idle cap (tests of the full ramp).
 SOFTLOCK_FRAME_THRESHOLD = SOFTLOCK_POST_KENNETH_FRAMES
+# Hard episode wall extension when a rails cell/checkpoint completes (8 f/step).
+CHECKPOINT_MAX_STEPS_EXTENSION = SOFTLOCK_EXTENSION_FRAMES // 8  # 5400 steps / 12 min
 # First 3 min of no-progress: no extra idle tax (living step cost only).
 CONTEMPT_GRACE_FRAMES = 3 * 60 * 60
 
@@ -350,7 +352,7 @@ def _key_item_return_blocked(
 
 
 def softlock_frame_threshold(progress: ProgressTracker | None) -> int:
-    """Idle truncate cap: 6 min from start and after room/key/weapon/use."""
+    """Idle truncate cap: 12 min from start and after room/key/weapon/use/cell."""
     if progress is None:
         return SOFTLOCK_PRE_KENNETH_FRAMES
     if progress.kenneth_gate_breached:
@@ -597,7 +599,7 @@ def compute_reward(
     else:
         new_items = set(state.get("inventory", [])) - set(prev_state.get("inventory", []))
     acquired_key_or_weapon = False
-    # First acquire of a weapon type this episode: 6m idle floor + stagnation reset.
+    # First acquire of a weapon type this episode: 12m idle floor + stagnation reset.
     # Shotgun rack re-takes still pay NEW_WEAPON (clawed back on return) but do not
     # count as exploration progress — blocks idle-clock / extension farms.
     weapon_progress = False
@@ -650,7 +652,7 @@ def compute_reward(
             bd["new_cutscene"] = NEW_CUTSCENE_BONUS
 
     # Same edge as PB typewriter capture (detector complete). Modest crumb;
-    # does not extend the 6 min idle floor. Sidecar episode starts suppress
+    # does not extend the 12 min idle floor. Sidecar episode starts suppress
     # the detector until control+ribbon count are stable (see TypewriterSaveDetector).
     if typewriter_save_complete and not (
         progress is not None and progress.kenneth_gate_breached
@@ -815,18 +817,21 @@ def compute_reward(
                 bd[term] = value * RAILS_NAV_POSITIVE_SCALE
 
     if progress is not None and not state.get("dead"):
-        # Room / document / key get / key use / first weapon → 6 min idle floor.
+        # Room / document / key / story / weapon / rails checkpoint → 12 min idle.
         if (
             bd["new_room"] != 0.0
             or bd["document_examine"] != 0.0
             or bd["key_item"] != 0.0
             or bd["story_use"] != 0.0
             or bd["dining_statue"] != 0.0
+            or bd["checkpoint_success"] != 0.0
             or weapon_progress
             or ammo_progress
         ):
             progress.note_softlock_extension(SOFTLOCK_EXTENSION_FRAMES)
             softlock_threshold = softlock_frame_threshold(progress)
+        if bd["checkpoint_success"] != 0.0:
+            progress.note_max_steps_extension(CHECKPOINT_MAX_STEPS_EXTENSION)
         made_progress = (
             bd["new_room"] != 0.0
             or bd["document_examine"] != 0.0

@@ -760,8 +760,16 @@ class RE1Env(gym.Env):
             action_id=int(action_id),
         )
 
+    def _max_episode_steps(self) -> int:
+        """Curriculum ``max_steps`` plus per-checkpoint hard-wall extensions."""
+        base = int(self._stage.get("max_steps", 3000))
+        if base <= 0:
+            return 0
+        bonus = int(getattr(self._progress, "max_steps_bonus", 0) or 0)
+        return base + max(0, bonus)
+
     def _episode_truncated(self) -> bool:
-        max_ep = int(self._stage.get("max_steps", 3000))
+        max_ep = self._max_episode_steps()
         if max_ep > 0 and self._step_count >= max_ep:
             return True
         return stagnation_episode_timeout(self._progress)
@@ -846,7 +854,7 @@ class RE1Env(gym.Env):
     def _build_obs(self, frame_obs: np.ndarray, state: dict[str, Any]) -> dict[str, np.ndarray]:
         assert self._encoder is not None and self._planner is not None
         self._sync_episode_history(state)
-        max_ep = int(self._stage.get("max_steps", 48000))
+        max_ep = self._max_episode_steps() or int(self._stage.get("max_steps", 48000))
         hist = self._episode_history.encode(
             current_step=int(state.get("step", self._step_count)),
             room_index=self._encoder.room_index,
@@ -3116,7 +3124,7 @@ class RE1Env(gym.Env):
         idle_frame_limit = softlock_frame_threshold(self._progress)
         idle_frames_used = self._progress.stagnation_frames
         idle_frames_left = max(0, idle_frame_limit - idle_frames_used)
-        max_episode_steps = int(self._stage.get("max_steps", 3000))
+        max_episode_steps = self._max_episode_steps()
         steps_left = (
             max(0, max_episode_steps - self._step_count)
             if max_episode_steps > 0
