@@ -158,8 +158,8 @@ def test_playstation_logo_still_needs_skip() -> None:
     )
 
 
-def test_pause_menu_yes_no_prompt_needs_cross_advance() -> None:
-    """Emblem 'Will you take?' — msg open on ITEM screen must auto-accept."""
+def test_pause_menu_yes_no_prompt_not_turbo_skipped() -> None:
+    """'Will you take?' stays on the policy path (noop→Cross), not async skip."""
     ram = {
         "game_mode": PAUSE_MENU_GAME_MODE,
         "game_state": PAUSE_MENU_GAME_STATE,
@@ -167,7 +167,7 @@ def test_pause_menu_yes_no_prompt_needs_cross_advance() -> None:
         "scene_flag": 0x80,
     }
     assert pause_menu_modal_from_ram(ram)
-    assert needs_skip_from_ram(ram)
+    assert not needs_skip_from_ram(ram)
 
 
 def test_status_ecg_health_screen_never_needs_skip() -> None:

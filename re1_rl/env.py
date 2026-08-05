@@ -177,12 +177,27 @@ for _idx in range(10, len(ACTION_NAMES)):
     ACTION_BUTTON_MAP[_idx] = {}
 
 
+def button_map_for_action(
+    action: int,
+    *,
+    pause_menu_modal: bool = False,
+) -> dict[int, dict[str, bool]]:
+    """Return joypad map for ``action``. Pause Yes/No: noop taps Cross."""
+    if int(action) == 0 and pause_menu_modal:
+        out = dict(ACTION_BUTTON_MAP)
+        out[0] = {"cross": True}
+        return out
+    return ACTION_BUTTON_MAP
+
+
 def _apply_action_input(
     sticky_input: StickyInputState,
     action: int,
+    *,
+    button_map: dict[int, dict[str, bool]] | None = None,
 ) -> tuple[dict[str, bool], dict[str, bool] | None, dict[str, bool] | None]:
     """Apply one canonical PPO action to sticky/pulsed controller state."""
-    return sticky_input.apply(int(action), ACTION_BUTTON_MAP)
+    return sticky_input.apply(int(action), button_map or ACTION_BUTTON_MAP)
 
 # BizHawk RE1 screenshot is 240x350 RGB; left 18 + right 12 px are near-black
 # pillarbox. Pipeline: crop 320x240 game plane → gray → INTER_AREA to 84x63
@@ -2961,8 +2976,20 @@ class RE1Env(gym.Env):
                 INTERACT_HOLD_EXTRA_FRAMES,
             )
 
+            pause_modal = False
+            if int(action) == 0:
+                try:
+                    from re1_rl.ram_skip import pause_menu_modal_from_ram
+
+                    pause_modal = pause_menu_modal_from_ram(self._skip_poll_ram())
+                except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                    pause_modal = False
             sticky, pulse, pulse_hold = _apply_action_input(
-                self._sticky_input, int(action)
+                self._sticky_input,
+                int(action),
+                button_map=button_map_for_action(
+                    int(action), pause_menu_modal=pause_modal
+                ),
             )
             hold_n = forward_hold_frames(
                 self._prev_state,

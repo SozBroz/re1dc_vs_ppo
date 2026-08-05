@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.action_mask import ATTACK_ACTION, ATTACK_DOWN_ACTION, ATTACK_UP_ACTION
-from re1_rl.env import ACTION_BUTTON_MAP, ACTION_NAMES
+from re1_rl.env import ACTION_BUTTON_MAP, ACTION_NAMES, button_map_for_action
 from re1_rl.pushable import RUN_FORWARD_ACTION, TURN_LEFT_ACTION, TURN_RIGHT_ACTION
 from scripts.play_ppo_harness import _resolve_movement_actions
 
@@ -49,6 +49,13 @@ def test_exact_action_button_maps() -> None:
         **{i: {} for i in range(10, 45)},
     }
     assert ACTION_BUTTON_MAP == expected
+
+
+def test_noop_taps_cross_on_pause_menu_yes_no() -> None:
+    """Pickup confirm clears in_control; masked noop must still press Cross."""
+    assert button_map_for_action(0, pause_menu_modal=False)[0] == {}
+    assert button_map_for_action(0, pause_menu_modal=True)[0] == {"cross": True}
+    assert button_map_for_action(9, pause_menu_modal=True)[9] == {"cross": True}
 
 
 def test_attacks_are_adjacent() -> None:

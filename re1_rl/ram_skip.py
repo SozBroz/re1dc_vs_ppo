@@ -169,8 +169,10 @@ def document_examine_ui_from_ram(ram: dict[str, int | float]) -> bool:
 
 def needs_skip_from_ram(ram: dict[str, int | float]) -> bool:
     if pause_menu_tree_from_ram(ram):
-        # ECG / STATUS idle pages: no turbo. Yes/No examine prompts: mash cross.
-        return pause_menu_modal_from_ram(ram)
+        # ITEM/STATUS/ECG clear in_control; never turbo-skip them. Pickup
+        # Yes/No (msg open) is confirmed by env noop→Cross, not Lua mash —
+        # async skip was parking agents on "Will you take …?" with only noop.
+        return False
     if options_menu_from_ram(ram):
         return False
     return (
