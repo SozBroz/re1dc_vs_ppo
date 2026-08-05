@@ -11,7 +11,7 @@ JSON schema (v2)::
         "room_id": "105",
         "tile_bin": [3, 1],
         "milestone_digest": "gallery:idle",
-        "quality": [hp, ammo, healing, ever_held_count, poison],
+        "quality": [hp, ammo, healing, ever_held_count, poison, -ink_ribbons],
         "visit_count": 2,
         "bundle_path": null,
         "meta": {}
@@ -50,7 +50,28 @@ _STALE_LOCK_S = 180.0
 _MAX_CELLS_PER_ROOM_ENV = "RE1_GO_MAX_CELLS_PER_ROOM"
 _DEFAULT_MAX_CELLS_PER_ROOM = 40
 
-Quality = tuple[int, int, int, int, int]
+# (hp, ammo, healing, ever_held_count, poison_ok, -ink_ribbons_in_inventory)
+Quality = tuple[int, int, int, int, int, int]
+QUALITY_LEN = 6
+
+
+def normalize_quality(
+    raw: Quality | list[int] | tuple[int, ...] | None,
+) -> Quality:
+    """Pad/truncate to the current quality arity (legacy 5-tuples get ``-ribbons=0``)."""
+    if raw is None:
+        return (0, 0, 0, 0, 0, 0)
+    vals = [int(x) for x in list(raw)[:QUALITY_LEN]]
+    while len(vals) < QUALITY_LEN:
+        vals.append(0)
+    return (
+        int(vals[0]),
+        int(vals[1]),
+        int(vals[2]),
+        int(vals[3]),
+        int(vals[4]),
+        int(vals[5]),
+    )
 
 
 def max_cells_per_room_default() -> int:
@@ -73,7 +94,7 @@ def quality_beats(a: Quality | list[int] | tuple[int, ...], b: Quality | list[in
     """True if *a* should replace *b* (lexicographic, higher better)."""
     if b is None:
         return True
-    return tuple(int(x) for x in a) > tuple(int(x) for x in b)
+    return normalize_quality(a) > normalize_quality(b)
 
 
 def new_record_id() -> str:
@@ -208,7 +229,7 @@ class ArchiveCell:
     room_id: str
     tile_bin: tuple[int, int]
     milestone_digest: str
-    quality: Quality = (0, 0, 0, 0, 0)
+    quality: Quality = (0, 0, 0, 0, 0, 0)
     visit_count: int = 0
     bundle_path: str | None = None
     meta: dict[str, Any] = field(default_factory=dict)
@@ -250,17 +271,14 @@ class ArchiveCell:
             if not key:
                 key = cell_key_v2(room, tb[0] * DEFAULT_TILE_SPAN, tb[1] * DEFAULT_TILE_SPAN, digest)
 
-        q_raw = data.get("quality") or [0, 0, 0, 0, 0]
-        q = tuple(int(x) for x in list(q_raw)[:5])
-        while len(q) < 5:
-            q = q + (0,)
+        q_raw = data.get("quality") or [0, 0, 0, 0, 0, 0]
         return cls(
             record_id=str(data.get("record_id") or new_record_id()),
             cell_key=key,
             room_id=_normalize_room_id(room),
             tile_bin=(int(tb[0]), int(tb[1])),
             milestone_digest=digest,
-            quality=(int(q[0]), int(q[1]), int(q[2]), int(q[3]), int(q[4])),
+            quality=normalize_quality(q_raw),
             visit_count=int(data.get("visit_count", 0) or 0),
             bundle_path=data.get("bundle_path") or data.get("state_path"),
             meta=dict(data.get("meta") or {}),
@@ -431,16 +449,13 @@ class GoExploreArchive:
         """
         room = _normalize_room_id(room_id)
         key = cell_key_v2(room, x, z, digest, tile_span=self.tile_span)
-        q = tuple(int(v) for v in quality)
-        while len(q) < 5:
-            q = q + (0,)
-        q5: Quality = (int(q[0]), int(q[1]), int(q[2]), int(q[3]), int(q[4]))
+        q_norm = normalize_quality(quality)
 
         existing = self.cells.get(key)
         if existing is not None:
             existing.visit_count += 1
-            if quality_beats(q5, existing.quality):
-                existing.quality = q5
+            if quality_beats(q_norm, existing.quality):
+                existing.quality = q_norm
                 if record_id:
                     existing.record_id = str(record_id)
                 if bundle_path is not None:
@@ -472,7 +487,7 @@ class GoExploreArchive:
             room_id=room,
             tile_bin=tile_bin(x, z, tile_span=self.tile_span),
             milestone_digest=str(digest),
-            quality=q5,
+            quality=q_norm,
             visit_count=1,
             bundle_path=bundle_path,
             meta=dict(meta or {}),

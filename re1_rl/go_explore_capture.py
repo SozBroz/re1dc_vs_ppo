@@ -455,12 +455,10 @@ def quality_replace_significant(
     old_q: Quality | list[int] | tuple[int, ...],
 ) -> bool:
     """Require at least one unit of survival-resource improvement."""
-    o = tuple(int(x) for x in old_q)
-    n = tuple(int(x) for x in new_q)
-    while len(o) < 5:
-        o = o + (0,)
-    while len(n) < 5:
-        n = n + (0,)
+    from re1_rl.go_explore_archive import normalize_quality
+
+    o = normalize_quality(old_q)
+    n = normalize_quality(new_q)
     if n[0] - o[0] >= _min_hp_delta():
         return True
     if n[1] - o[1] >= _min_ammo_delta():
@@ -470,6 +468,9 @@ def quality_replace_significant(
     if n[3] > o[3]:
         return True
     if n[4] > o[4]:
+        return True
+    # Fewer on-person ink ribbons (higher -ribbons) is a real logistics win.
+    if n[5] > o[5]:
         return True
     return False
 
@@ -491,7 +492,9 @@ def _manifest_entry(
             return None, None
         q_raw = row.get("quality")
         if isinstance(q_raw, (list, tuple)) and len(q_raw) >= 5:
-            quality = tuple(int(x) for x in q_raw[:5])
+            from re1_rl.go_explore_archive import normalize_quality
+
+            quality = normalize_quality(q_raw)
         else:
             quality = None
         rid = str(row.get("record_id") or "") or None
@@ -678,18 +681,24 @@ def compute_quality(
     ever_held: Iterable[str] | None = None,
     env: Any = None,
 ) -> Quality:
-    """Lexicographic quality: ``(hp, ammo, healing, slots, poison)``.
+    """Lexicographic quality: ``(hp, ammo, healing, slots, poison, -ink_ribbons)``.
 
-    ``ammo`` / ``healing`` come from the current inventory. ``slots`` is the
-    count of distinct items in ``ever_held`` (sidecar semantics), not occupied
-    inventory slots. ``poison`` is ``1`` when healthy, ``0`` when poisoned.
+    ``ammo`` / ``healing`` / ``ink_ribbons`` come from the current on-person
+    inventory. ``slots`` is the count of distinct items in ``ever_held``
+    (sidecar semantics), not occupied inventory slots. ``poison`` is ``1`` when
+    healthy, ``0`` when poisoned. Holding ink ribbons is penalized (same spirit
+    as typewriter PB champions) so cells that spend them beat ribbon hoards.
     """
     hp = int(state.get("hp", 0) or 0)
     ammo = 0
     healing = 0
+    ribbons = 0
     for name, qty in _inventory_slots(state):
         q = max(0, int(qty))
         if not name or q <= 0:
+            continue
+        if name == "ink_ribbon":
+            ribbons += q
             continue
         if name in _AMMO_NAMES:
             ammo += q
@@ -700,7 +709,7 @@ def compute_quality(
         int(state.get("player_poison", 0) or 0)
     )
     poison_ok = 0 if poisoned else 1
-    return (hp, ammo, healing, slots, poison_ok)
+    return (hp, ammo, healing, slots, poison_ok, -int(ribbons))
 
 
 def integrity_gate_ok(

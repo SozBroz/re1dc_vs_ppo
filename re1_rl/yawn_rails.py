@@ -318,18 +318,28 @@ def validate_manifest_cells(
 RESET_LATEST_CELL_WEIGHT = 0.40
 RESET_FRESH_START_WEIGHT = 0.30
 RESET_OTHER_CELLS_WEIGHT = 0.30
+_RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
+
+
+def reset_latest_only_from_env() -> bool:
+    """``RE1_YAWN_RESET_LATEST_ONLY=1`` — always start from the newest loadable cell."""
+    raw = os.environ.get(_RESET_LATEST_ONLY_ENV, "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 def _choose_reset_candidate(
     cells: list[dict[str, Any]],
     *,
     rng: random.Random,
+    latest_only: bool = False,
 ) -> dict[str, Any]:
     """40% latest cell, 30% fresh start, 30% older cells (fallback if empty)."""
     fresh = {"checkpoint_index": -1, "source": "route_initial"}
     if not cells:
         return fresh
     latest = cells[-1]
+    if latest_only:
+        return latest
     older = cells[:-1]
     roll = rng.random()
     latest_cut = float(RESET_LATEST_CELL_WEIGHT)
@@ -353,17 +363,19 @@ def sample_one_leg_options(
     """Choose a curated start and bounded checkpoint span.
 
     Non-PLR mix: 40% latest cell, 30% ``route_initial``, 30% older cells.
+    ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell (memlog pin).
     """
     cells = iter_loadable_cells(project_root, stage)
     candidates: list[dict[str, Any]] = [
         {"checkpoint_index": -1, "source": "route_initial"},
         *cells,
     ]
+    latest_only = reset_latest_only_from_env()
     from re1_rl.yawn_rails_plr import plr_enabled_from_env, sample_plr_options
 
-    if plr_enabled_from_env():
+    if plr_enabled_from_env() and not latest_only:
         return sample_plr_options(project_root, stage, candidates, rng=rng)
-    chosen = _choose_reset_candidate(cells, rng=rng)
+    chosen = _choose_reset_candidate(cells, rng=rng, latest_only=latest_only)
     start_index = int(chosen["checkpoint_index"]) + 1
     route_steps = list(stage.get("route_steps", []))
     remaining = max(1, len(route_steps) - start_index)

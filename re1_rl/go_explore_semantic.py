@@ -6,7 +6,7 @@ import os
 from collections import defaultdict
 from typing import Any, Iterable, Mapping, Sequence
 
-from re1_rl.go_explore_archive import quality_beats
+from re1_rl.go_explore_archive import Quality, normalize_quality, quality_beats
 from re1_rl.milestone_digest import parse_cell_key_v2
 
 _POSE_CAP_ENV = "RE1_GO_MAX_POSES_PER_BUCKET"
@@ -16,7 +16,6 @@ _DEFAULT_POSE_CAP = 1
 _DEFAULT_MAX_ARCHIVE_CELLS = 8000
 
 SemanticKey = tuple[str, str]
-Quality = tuple[int, int, int, int, int]
 
 
 def _env_int(name: str, default: int) -> int:
@@ -70,8 +69,8 @@ def _as_quality(raw: Any) -> Quality:
     elif hasattr(raw, "quality"):
         raw = raw.quality
     if not isinstance(raw, (list, tuple)) or len(raw) < 5:
-        return (0, 0, 0, 0, 0)
-    return (int(raw[0]), int(raw[1]), int(raw[2]), int(raw[3]), int(raw[4]))
+        return normalize_quality(None)
+    return normalize_quality(raw)
 
 
 def _row_as_dict(row: Any) -> dict[str, Any]:
@@ -83,7 +82,7 @@ def _row_as_dict(row: Any) -> dict[str, Any]:
         "record_id": getattr(row, "record_id", ""),
         "cell_key": getattr(row, "cell_key", ""),
         "room_id": getattr(row, "room_id", ""),
-        "quality": list(getattr(row, "quality", (0, 0, 0, 0, 0))),
+        "quality": list(getattr(row, "quality", (0, 0, 0, 0, 0, 0))),
         "visit_count": int(getattr(row, "visit_count", 0) or 0),
         "tile_bin": list(getattr(row, "tile_bin", (0, 0))),
         "meta": dict(getattr(row, "meta", {}) or {}),

@@ -80,6 +80,7 @@ def test_compute_quality_tuple() -> None:
     assert q[2] == 1  # green herb
     assert q[3] == 4  # ever_held-style distinct items (inventory fallback)
     assert q[4] == 1  # not poisoned
+    assert q[5] == 0  # no ink ribbons
     q_poison = compute_quality(_good_state(poisoned=True))
     assert q_poison[4] == 0
 
@@ -94,6 +95,25 @@ def test_compute_quality_slots_uses_ever_held_not_inventory() -> None:
         ever_held={"beretta", "emblem", "knife", "music_notes"},
     )
     assert q[3] == 4
+
+
+def test_compute_quality_penalizes_ink_ribbons_in_inventory() -> None:
+    from re1_rl.go_explore_archive import quality_beats
+
+    base = _good_state(
+        inventory=["beretta", "ink_ribbon"],
+        inventory_slots=[("beretta", 15), ("ink_ribbon", 3)],
+    )
+    spent = _good_state(
+        inventory=["beretta"],
+        inventory_slots=[("beretta", 15)],
+    )
+    q_hoard = compute_quality(base, ever_held={"beretta", "ink_ribbon"})
+    q_spent = compute_quality(spent, ever_held={"beretta", "ink_ribbon"})
+    assert q_hoard[5] == -3
+    assert q_spent[5] == 0
+    assert quality_beats(q_spent, q_hoard)
+    assert not quality_beats(q_hoard, q_spent)
 
 
 def test_maybe_capture_writes_bundle_and_proposal(

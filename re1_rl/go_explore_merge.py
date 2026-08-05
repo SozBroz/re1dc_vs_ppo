@@ -53,14 +53,15 @@ def cells_dir(archive_path: Path | str) -> Path:
     return go_explore_root(archive_path) / "cells"
 
 
-def _as_quality(raw: Any) -> tuple[int, int, int, int, int] | None:
+def _as_quality(raw: Any) -> tuple[int, int, int, int, int, int] | None:
     if not isinstance(raw, (list, tuple)) or len(raw) < 5:
         return None
     try:
-        q = tuple(int(x) for x in raw[:5])
+        from re1_rl.go_explore_archive import normalize_quality
+
+        return normalize_quality(raw)
     except (TypeError, ValueError):
         return None
-    return (int(q[0]), int(q[1]), int(q[2]), int(q[3]), int(q[4]))
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -175,7 +176,7 @@ class GoExploreMerge:
         *,
         room: str,
         digest: str,
-        quality: tuple[int, int, int, int, int],
+        quality: tuple[int, int, int, int, int, int],
     ) -> list[ArchiveCell] | None:
         """Return cells to evict before admitting a new key, or None to reject."""
         bucket = semantic_bucket_key(room, digest)

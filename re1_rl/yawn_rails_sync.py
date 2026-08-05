@@ -58,14 +58,15 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _as_quality(raw: Any) -> tuple[int, int, int, int, int] | None:
+def _as_quality(raw: Any) -> tuple[int, int, int, int, int, int] | None:
     if not isinstance(raw, (list, tuple)) or len(raw) < 5:
         return None
     try:
-        q = tuple(int(x) for x in raw[:5])
+        from re1_rl.go_explore_archive import normalize_quality
+
+        return normalize_quality(raw)
     except (TypeError, ValueError):
         return None
-    return (int(q[0]), int(q[1]), int(q[2]), int(q[3]), int(q[4]))
 
 
 def extract_yawn_rails_proposals(
@@ -124,7 +125,9 @@ def build_capture_proposal(
     state_bytes = Path(state_path).read_bytes()
     side_text = Path(sidecar_path).read_text(encoding="utf-8")
     sidecar = json.loads(side_text)
-    q = list(int(x) for x in quality[:5])
+    from re1_rl.go_explore_archive import normalize_quality
+
+    q = list(normalize_quality(quality))
     while len(q) < 5:
         q.append(0)
     meta = {

@@ -157,7 +157,7 @@ def test_save_load_roundtrip(tmp_path: Path) -> None:
     assert isinstance(cell, ArchiveCell)
     assert cell.room_id == "10F"
     assert cell.milestone_digest == digest
-    assert cell.quality == (7, 4, 1, 2, 1)
+    assert cell.quality == (7, 4, 1, 2, 1, 0)
     assert cell.bundle_path == "cells/x/cell.State"
     assert cell.meta["worker"] == "test"
     assert cell.record_id
