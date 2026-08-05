@@ -5,41 +5,49 @@
       "id": "music_notes@10F_piano",
       "item": "music_notes",
       "room": "10F",
-      "x": 9737,
-      "z": 8020,
-      "radius": 1500,
+      "x": 8800,
+      "z": 7200,
+      "w": 1500,
+      "h": 1700,
+      "pad": 400,
       "consumes": true,
-      "notes": "Bar piano USE tile (empirical QuickSave1 2026-07-16; RDT trigger also at 8850/19300)"
+      "notes": "Bar piano USE — RDT ITEM_SET zone (ROOM10F0 slot1). Empirical stand ~9737/8020 inside padded AABB."
     },
     {
       "id": "emblem@10F_alcove",
       "item": "emblem",
       "room": "10F",
-      "x": 9750,
-      "z": 8600,
-      "radius": 1500,
+      "x": 9500,
+      "z": 8200,
+      "w": 500,
+      "h": 800,
+      "pad": 400,
       "consumes": true,
-      "notes": "After taking gold: USE wooden emblem into bookshelf (9750/8600). Wooden must leave inventory; gold stays. Putting gold back alone is gold_emblem_return (not this site)."
+      "notes": "Post-piano bookshelf alcove — RDT zone origin 9500/8200 wh 500x800 (center 9750/8600). Wooden must leave inventory."
     },
     {
       "id": "emblem@10F_wall",
       "item": "emblem",
       "room": "10F",
-      "x": 8850,
-      "z": 19300,
-      "radius": 1500,
+      "x": 8100,
+      "z": 18800,
+      "w": 1500,
+      "h": 1000,
+      "pad": 400,
       "consumes": true,
-      "notes": "Bar wooden-emblem USE at alternate RDT tile (QuickSave0 2026-08-05 stand 8780/18780; RDT ~8850/19300). consumes=true — scene-flag alone must not credit this site."
+      "notes": "Bar wooden-emblem wall USE — RDT ITEM_SET 8100/18800 wh 1500x1000 (center 8850/19300). pad=400 covers cp11/empirical stands just outside raw AABB."
     },
     {
       "id": "gold_emblem@105_fireplace",
       "item": "gold_emblem",
       "room": "105",
-      "x": 3746,
-      "z": 8191,
-      "radius": 2800,
+      "x": 2000,
+      "z": 7200,
+      "w": 1800,
+      "h": 1800,
+      "pad": 400,
       "consumes": true,
-      "notes": "Dining fireplace — USE gold emblem (QuickSave0 2026-08-05 stand 3746/8191; RDT ~2900/8100). Generous radius so approach pose still legal. consumes=true — gold must leave inventory."
+      "notes": "Dining fireplace — RDT ITEM_SET 2000/7200 wh 1800x1800 (center 2900/8100). Same interact box as game + body pad. QuickSave0 stand 3746/8191 is inside."
     },
     {
       "id": "blue_jewel@10D_tiger_eye",

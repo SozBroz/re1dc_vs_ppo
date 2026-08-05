@@ -65,8 +65,11 @@ def test_load_music_notes_piano_site() -> None:
     piano = next(s for s in sites if s["id"] == "music_notes@10F_piano")
     assert piano["room"] == "10F"
     assert piano["item"] == "music_notes"
-    assert piano["x"] == 9737
-    assert piano["z"] == 8020
+    # RDT ITEM_SET origin + size (not empirical stand alone).
+    assert piano["x"] == 8800
+    assert piano["z"] == 7200
+    assert piano["w"] == 1500
+    assert piano["h"] == 1700
 
 
 def test_load_chemical_greenhouse_pump_site() -> None:
@@ -255,15 +258,21 @@ def test_story_use_requires_positive_qty() -> None:
 def test_story_use_not_repeatable_after_reward() -> None:
     inv = _inv((MUSIC_NOTES_ID, 1))
     rewarded = {"music_notes@10F_piano"}
-    assert not any_legal_story_use_slot(
+    # Premature credit must not zero the USE mask while the item is still held.
+    assert any_legal_story_use_slot(
         inv, room="10F", x=9737, z=8020, rewarded_site_ids=rewarded
     )
-    assert not matching_story_sites(
+    assert matching_story_sites(
         room="10F",
         x=9737,
         z=8020,
         inventory=inv,
         rewarded_site_ids=rewarded,
+    )
+    # After the item is gone, the rewarded site stays suppressed.
+    inv_spent = _inv((0, 0))
+    assert not any_legal_story_use_slot(
+        inv_spent, room="10F", x=9737, z=8020, rewarded_site_ids=rewarded
     )
 
 
@@ -520,10 +529,16 @@ def test_alcove_site_matches_gold_emblem_pickup_coords() -> None:
     alcove = next(s for s in sites if s["id"] == ALCOVE_EMBLEM_SITE_ID)
     assert alcove["room"] == "10F"
     assert alcove["item"] == "emblem"
-    assert alcove["x"] == ALCOVE_X
-    assert alcove["z"] == ALCOVE_Z
-    # Pickup table (data/rdt_item_positions.json 10F:gold_emblem) uses same stand.
-    assert alcove["x"] == 9750 and alcove["z"] == 8600
+    # RDT zone origin; center of the box is the old 9750/8600 stand.
+    assert alcove["x"] == 9500 and alcove["z"] == 8200
+    assert alcove["w"] == 500 and alcove["h"] == 800
+    assert any_legal_story_use_slot(
+        _inv((EMBLEM_ID, 0)),
+        room="10F",
+        x=ALCOVE_X,
+        z=ALCOVE_Z,
+        rewarded_site_ids=set(),
+    )
 
 
 def test_emblem_use_legal_at_alcove() -> None:
@@ -705,16 +720,24 @@ def test_fireplace_gold_emblem_site_still_works() -> None:
     fireplace = next(s for s in sites if s["id"] == "gold_emblem@105_fireplace")
     assert fireplace["room"] == "105"
     assert fireplace["item"] == "gold_emblem"
-    assert float(fireplace["radius"]) >= 2500
+    assert fireplace["w"] == 1800 and fireplace["h"] == 1800
     stand_x, stand_z = 3746, 8191
 
     inv = _inv((GOLD_EMBLEM_ID, 0))
     assert any_legal_story_use_slot(
         inv, room="105", x=stand_x, z=stand_z, rewarded_site_ids=set()
     )
-    # RDT trigger pose still inside the generous radius.
+    # RDT center pose.
     assert any_legal_story_use_slot(
         inv, room="105", x=2900, z=8100, rewarded_site_ids=set()
+    )
+    # Premature fireplace credit must not strangle USE while gold is held.
+    assert any_legal_story_use_slot(
+        inv,
+        room="105",
+        x=stand_x,
+        z=stand_z,
+        rewarded_site_ids={"gold_emblem@105_fireplace"},
     )
     # Alcove put-back must not fire in the dining room.
     assert not gold_emblem_return_detected(
@@ -805,9 +828,17 @@ def test_fireplace_site_covers_latest_quicksave4_pose() -> None:
     )
     assert bool(submenu_mask[SELECT_SLOT_BASE + 3])
     assert not bool(submenu_mask[SELECT_SLOT_BASE + 2])
-    # Once rewarded, site stays masked off.
-    assert not any_legal_story_use_slot(
+    # Premature credit while gold is still held must keep USE legal.
+    assert any_legal_story_use_slot(
         inv,
+        room="105",
+        x=px,
+        z=pz,
+        rewarded_site_ids={"gold_emblem@105_fireplace"},
+    )
+    # After gold leaves inventory, rewarded site is suppressed.
+    assert not any_legal_story_use_slot(
+        _inv((0x01, 0), (0x02, 15)),
         room="105",
         x=px,
         z=pz,

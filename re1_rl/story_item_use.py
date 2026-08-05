@@ -45,26 +45,30 @@ def load_story_use_sites(path: str = str(_DEFAULT_SITES_PATH)) -> tuple[dict[str
         site_id = str(row.get("id", "")).strip() or f"{item}@{room}"
         if not item or not room:
             continue
-        out.append(
-            {
-                "id": site_id,
-                "item": item,
-                "room": room,
-                "x": float(row.get("x", 0)),
-                "z": float(row.get("z", 0)),
-                "radius": float(row.get("radius", 1500)),
-                "consumes": bool(row.get("consumes", False)),
-                "notes": str(row.get("notes", "")),
-                "_draft": bool(row.get("_draft", False)),
-                "room_wide": bool(row.get("room_wide", False)),
-                "mash_pages": bool(row.get("mash_pages", False)),
-                "reward_items": [
-                    canonical_item(str(r))
-                    for r in (row.get("reward_items") or [])
-                    if r
-                ],
-            }
-        )
+        entry: dict[str, Any] = {
+            "id": site_id,
+            "item": item,
+            "room": room,
+            "x": float(row.get("x", 0)),
+            "z": float(row.get("z", 0)),
+            "radius": float(row.get("radius", 1500)),
+            "consumes": bool(row.get("consumes", False)),
+            "reusable": bool(row.get("reusable", False)),
+            "notes": str(row.get("notes", "")),
+            "_draft": bool(row.get("_draft", False)),
+            "room_wide": bool(row.get("room_wide", False)),
+            "mash_pages": bool(row.get("mash_pages", False)),
+            "reward_items": [
+                canonical_item(str(r))
+                for r in (row.get("reward_items") or [])
+                if r
+            ],
+        }
+        if row.get("w") is not None and row.get("h") is not None:
+            entry["w"] = float(row["w"])
+            entry["h"] = float(row["h"])
+            entry["pad"] = float(row.get("pad", 400))
+        out.append(entry)
     return tuple(out)
 
 
@@ -181,20 +185,45 @@ def matching_story_sites(
     for site in sites:
         if site.get("_draft"):
             continue
-        if str(site["id"]) in rewarded:
-            continue
         if str(site["room"]) != str(room):
             continue
         item_id = _NAME_TO_ITEM_ID.get(str(site["item"]), 0)
         if item_id not in held_ids:
             continue
+        site_id = str(site["id"])
+        # Do not strangle placement USE: a premature story_use credit used to
+        # zero the mask while the key was still held. Only suppress after the
+        # item is truly gone (or the site is non-consuming / already done).
+        if site_id in rewarded:
+            if bool(site.get("consumes")) and item_id in held_ids:
+                pass
+            else:
+                continue
         if site.get("room_wide"):
             hits.append(site)
             continue
-        if _dist(px, pz, float(site["x"]), float(site["z"])) > float(site["radius"]):
+        if not _pose_in_story_site(px, pz, site):
             continue
         hits.append(site)
     return hits
+
+
+def _pose_in_story_site(px: float, pz: float, site: dict[str, Any]) -> bool:
+    """True when stand is inside the site zone (RDT AABB if present, else circle)."""
+    w = site.get("w")
+    h = site.get("h")
+    if w is not None and h is not None:
+        # ``x``/``z`` are zone origin (min corner), matching RDT ITEM_SET.
+        x0 = float(site["x"])
+        z0 = float(site["z"])
+        pad = float(site.get("pad", 400))
+        return (
+            (x0 - pad) <= px <= (x0 + float(w) + pad)
+            and (z0 - pad) <= pz <= (z0 + float(h) + pad)
+        )
+    return _dist(px, pz, float(site["x"]), float(site["z"])) <= float(
+        site.get("radius", 1500)
+    )
 
 
 def story_site_for_slot(
@@ -401,7 +430,7 @@ def gold_emblem_return_detected(
         return False
     px = float(prev_state.get("x") or 0)
     pz = float(prev_state.get("z") or 0)
-    if _dist(px, pz, float(site["x"]), float(site["z"])) > float(site["radius"]):
+    if not _pose_in_story_site(px, pz, site):
         return False
     if not _inventory_holds_named_key(inventory_before, "gold_emblem"):
         return False
