@@ -1,4 +1,4 @@
-"""Checkpoint-path reward guards are disabled in exploration mode."""
+"""Checkpoint-path wrong_room guards (pre-L sparse vs post-L terminal)."""
 
 from __future__ import annotations
 
@@ -12,17 +12,33 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
-from re1_rl.reward import WRONG_ROOM_PENALTY, compute_reward
+from re1_rl.reward import (
+    WRONG_ROOM_PENALTY,
+    WRONG_ROOM_TERMINAL_PENALTY,
+    compute_reward,
+)
 from re1_rl.room_graph import RoomGraph
 
 ROUTE = PROJECT_ROOT / "data" / "route_jill_anypct.json"
+YAWN_ROUTE = PROJECT_ROOT / "data" / "yawn_checkpoint_route.json"
 DOORS = PROJECT_ROOT / "data" / "doors_empirical.json"
 
 
 def make_state(room, step=1, **kw):
-    s = {"room_id": room, "x": 30000, "y": 0, "z": 7500, "facing": 0,
-         "hp": 96, "cam_id": 0, "character_id": 1, "in_control": True,
-         "inventory": [], "dead": False, "step": step}
+    s = {
+        "room_id": room,
+        "x": 30000,
+        "y": 0,
+        "z": 7500,
+        "facing": 0,
+        "hp": 96,
+        "cam_id": 0,
+        "character_id": 1,
+        "in_control": True,
+        "inventory": [],
+        "dead": False,
+        "step": step,
+    }
     s.update(kw)
     return s
 
@@ -75,7 +91,8 @@ def test_offroute_room_only_pays_exploration_bonus():
     assert bd["new_room"] > 0.0
 
 
-def test_rails_connected_detour_overpowers_new_room_reward():
+def test_rails_connected_detour_pre_l_keeps_sparse_fine():
+    """Finished early-route cells still use -3 and do not end the episode."""
     g = RoomGraph(DOORS)
     planner = WaypointPlanner(ROUTE, waypoints=["104"])
     progress = ProgressTracker()
@@ -95,6 +112,7 @@ def test_rails_connected_detour_overpowers_new_room_reward():
     assert bd["wrong_room"] == WRONG_ROOM_PENALTY
     assert bd["wrong_room"] == pytest.approx(-3.0)
     assert bd["new_room"] > 0.0
+    assert progress.wrong_room_breached is False
 
 
 def test_rails_shortest_path_step_is_not_wrong_room():
@@ -114,3 +132,61 @@ def test_rails_shortest_path_step_is_not_wrong_room():
     )
 
     assert bd["wrong_room"] == 0.0
+
+
+def _yawn_planner(checkpoint_id: str) -> WaypointPlanner:
+    import json
+
+    route = json.loads(YAWN_ROUTE.read_text(encoding="utf-8"))
+    idx = next(i for i, row in enumerate(route) if row["checkpoint_id"] == checkpoint_id)
+    return WaypointPlanner(
+        YAWN_ROUTE,
+        route_steps=list(range(1, len(route) + 1)),
+        start_index=idx,
+    )
+
+
+def test_post_l_passage_detour_is_terminal_minus_four():
+    """After L enter: wrong room pays -4, zeros new_room, marks episode terminal."""
+    g = RoomGraph(DOORS)
+    # Active objective = enter 108; detour 107 -> 106 is away from 108.
+    planner = _yawn_planner("l_passage_enter_108")
+    assert planner.current_objective()["checkpoint_id"] == "l_passage_enter_108"
+    progress = ProgressTracker()
+    progress.seed_spawn_room("107")
+
+    _, bd = compute_reward(
+        make_state("107", step=1),
+        make_state("106", step=2),
+        planner,
+        progress=progress,
+        graph=g,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+
+    assert bd["wrong_room"] == WRONG_ROOM_TERMINAL_PENALTY
+    assert bd["wrong_room"] == pytest.approx(-4.0)
+    assert bd["new_room"] == 0.0
+    assert progress.wrong_room_breached is True
+
+
+def test_post_l_ammo_pickup_order_inside_108_is_not_wrong_room():
+    """Staying in the checkpoint room never pays wrong_room (no item-order gate)."""
+    g = RoomGraph(DOORS)
+    planner = _yawn_planner("ammo_108")
+    assert planner.current_objective()["checkpoint_id"] == "ammo_108"
+    progress = ProgressTracker()
+    progress.seed_spawn_room("108")
+
+    _, bd = compute_reward(
+        make_state("108", step=1),
+        make_state("108", step=2, inventory=["handgun_bullets"]),
+        planner,
+        progress=progress,
+        graph=g,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["wrong_room"] == 0.0
+    assert progress.wrong_room_breached is False

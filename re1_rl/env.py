@@ -793,17 +793,30 @@ class RE1Env(gym.Env):
     ) -> tuple[bool, bool, str | None]:
         """Return Gym termination flags, preserving the Wesker terminal mark."""
         kenneth_gate_failure = self._progress.kenneth_gate_breached
+        wrong_room_failure = self._progress.wrong_room_breached
         checkpoint_success = (
             self._stage.get("mode") == "yawn_rails"
             and self._progress.checkpoint_success
         )
-        terminated = bool(state.get("dead")) or kenneth_gate_failure or checkpoint_success
-        truncated = False if kenneth_gate_failure else self._episode_truncated()
-        reason = (
-            "main_hall_before_kenneth"
-            if kenneth_gate_failure
-            else ("checkpoint_success" if checkpoint_success else None)
+        terminated = (
+            bool(state.get("dead"))
+            or kenneth_gate_failure
+            or wrong_room_failure
+            or checkpoint_success
         )
+        truncated = (
+            False
+            if (kenneth_gate_failure or wrong_room_failure)
+            else self._episode_truncated()
+        )
+        if kenneth_gate_failure:
+            reason = "main_hall_before_kenneth"
+        elif wrong_room_failure:
+            reason = "wrong_room"
+        elif checkpoint_success:
+            reason = "checkpoint_success"
+        else:
+            reason = None
         return terminated, truncated, reason
 
     def _update_loadout_segment(

@@ -40,6 +40,8 @@ class ProgressTracker:
     # Terminal black mark: set before building the terminal observation.
     # Positive reward/extension guards also prevent same-step leakage.
     kenneth_gate_breached: bool = False
+    # Rails off-path: wrong_room penalty ends the episode (like Kenneth gate).
+    wrong_room_breached: bool = False
     # Spawn room (usually dining 105): visited at reset; no +new_room payout —
     # fresh start matches archive/PB sidecars that already carry spawn credit.
     spawn_room_id: str | None = None
@@ -222,6 +224,14 @@ class ProgressTracker:
         if room_id in self.penalized_offroute_rooms:
             return False
         self.penalized_offroute_rooms.add(room_id)
+        return True
+
+    def breach_wrong_room(self) -> bool:
+        """Mark post-L Passage room detour as terminal; true only on first breach."""
+        if self.wrong_room_breached:
+            return False
+        self.wrong_room_breached = True
+        self.softlock_cap_frames = 0
         return True
 
     def claim_cutscene_bonus(self, cutscene_key: str) -> bool:

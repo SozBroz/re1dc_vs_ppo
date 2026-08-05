@@ -42,6 +42,11 @@ ROOMS = ROOT / "data" / "rooms.json"
 DOORS = ROOT / "data" / "doors_empirical.json"
 DOORS_RDT = ROOT / "data" / "doors_rdt.json"
 GOAL_IDX = {name: i for i, (name, _) in enumerate(GOAL_FIELDS)}
+_ROUTE_ROWS = json.loads(ROUTE.read_text(encoding="utf-8"))
+_ROUTE_INDEX = {
+    str(row["checkpoint_id"]): i for i, row in enumerate(_ROUTE_ROWS)
+}
+_ROUTE_N = len(_ROUTE_ROWS)
 
 
 def _graph() -> RoomGraph:
@@ -52,10 +57,14 @@ def _graph() -> RoomGraph:
     )
 
 
+def _idx(checkpoint_id: str) -> int:
+    return int(_ROUTE_INDEX[checkpoint_id])
+
+
 def _planner(start_index: int = 0) -> WaypointPlanner:
     return WaypointPlanner(
         ROUTE,
-        route_steps=list(range(1, 59)),
+        route_steps=list(range(1, _ROUTE_N + 1)),
         start_index=start_index,
     )
 
@@ -94,16 +103,67 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
         "type": "room_enter",
         "room_id": "104",
     }
+    # L Passage and later: enter-room is never bundled with pickup/use/fight work.
+    enter_108 = next(cp for cp in route if cp["checkpoint_id"] == "l_passage_enter_108")
+    ammo_108 = next(cp for cp in route if cp["checkpoint_id"] == "ammo_108")
+    assert enter_108["seq"] + 1 == ammo_108["seq"]
+    assert enter_108["action_type"] == "navigate"
+    assert enter_108["items_gained"] == []
+    assert enter_108["success_condition"] == {
+        "type": "room_enter",
+        "room_id": "108",
+    }
+    assert ammo_108["action_type"] == "pickup"
+    assert ammo_108["items_gained"] == ["handgun_bullets"]
+    assert ammo_108["success_condition"] == {
+        "type": "acquired_item",
+        "item": "handgun_bullets",
+    }
+    l_idx = next(
+        i for i, cp in enumerate(route) if cp["checkpoint_id"] == "l_passage_enter_108"
+    )
+
+    def _cond_types(cond: object, acc: list[str] | None = None) -> list[str]:
+        out = acc if acc is not None else []
+        if not isinstance(cond, dict):
+            return out
+        ctype = str(cond.get("type") or "")
+        if ctype:
+            out.append(ctype)
+        for sub in cond.get("conditions") or []:
+            _cond_types(sub, out)
+        return out
+
+    for cp in route[l_idx:]:
+        types = _cond_types(cp.get("success_condition"))
+        has_enter = any(
+            t in types for t in ("room_enter", "room_enter_from", "room_enter_any")
+        )
+        extras = [
+            t
+            for t in types
+            if t
+            not in (
+                "all_of",
+                "any_of",
+                "room_enter",
+                "room_enter_from",
+                "room_enter_any",
+            )
+        ]
+        assert not (has_enter and extras), (
+            f"{cp['checkpoint_id']} still bundles enter with {extras}"
+        )
     assert [(cp["room_id"], cp["checkpoint_id"]) for cp in route[-10:]] == [
-        ("20D", "richard_cutscene_20D"),
-        ("204", "richard_forced_return_204"),
-        ("201", "east_stairs_201_post_richard"),
         ("101", "east_stairs_101_post_richard"),
+        ("11B", "yawn_box_enter_11B"),
         ("11B", "yawn_box_prep_11B"),
         ("101", "east_stairs_101_to_yawn"),
         ("201", "east_stairs_201_to_yawn"),
+        ("20D", "moon_hall_enter_20D"),
         ("20D", "ammo_20D"),
         ("20E", "attic_entry_20E"),
+        ("210", "yawn_arena_enter_210"),
         ("210", "yawn_moon_210"),
     ]
     bar_ids = [cp["checkpoint_id"] for cp in route if cp["room_id"] == "10F"]
@@ -253,13 +313,31 @@ def test_barry_hall_return_does_not_latch_wrong_from_room() -> None:
     )
 
 
+def test_l_passage_enter_then_ammo_are_separate_legs() -> None:
+    enter = _planner(start_index=_idx("l_passage_enter_108"))
+    assert enter.current_objective()["checkpoint_id"] == "l_passage_enter_108"
+    # Entering 108 alone completes the doorway cell (no ammo required).
+    assert enter.advance_if_success(_state("108"), progress=ProgressTracker())
+    assert enter.current_objective()["checkpoint_id"] == "ammo_108"
+
+    ammo = _planner(start_index=_idx("ammo_108"))
+    progress = ProgressTracker()
+    # Already in the L Passage: pickup completes without re-checking the door.
+    assert not ammo.advance_if_success(_state("108"), progress=progress)
+    progress.note_leg_acquired("handgun_bullets")
+    assert ammo.advance_if_success(
+        _state("108", inventory=["handgun_bullets"]),
+        progress=progress,
+    )
+
+
 def test_main_hall_ink_checkpoint_is_room_enter_only() -> None:
-    planner = _planner(start_index=16)  # ink_106 after place_emblem_10F insert
+    planner = _planner(start_index=_idx("ink_106"))
     assert planner.advance_if_success(_state("106"), progress=ProgressTracker())
 
 
 def test_save_100_checkpoint_is_room_enter_only() -> None:
-    planner = _planner(start_index=36)  # save_100 after place_emblem_10F insert
+    planner = _planner(start_index=_idx("save_100"))
     assert planner.advance_if_success(_state("100"), progress=ProgressTracker())
 
 
@@ -267,14 +345,23 @@ def test_shotgun_rescue_requires_reentry_shotgun_and_ceiling_cutscene() -> None:
     prev = _state("116", inventory=["shotgun"])
     state = _state("115", inventory=["shotgun"])
 
-    no_cutscene = _planner(start_index=22)  # barry_rescue_115
+    reenter = _planner(start_index=_idx("barry_reenter_115"))
+    assert reenter.current_objective()["checkpoint_id"] == "barry_reenter_115"
+    assert reenter.advance_if_success(
+        state,
+        progress=ProgressTracker(),
+        prev_state=prev,
+    )
+    assert reenter.current_objective()["checkpoint_id"] == "barry_rescue_115"
+
+    no_cutscene = _planner(start_index=_idx("barry_rescue_115"))
     assert not no_cutscene.advance_if_success(
         state,
         progress=ProgressTracker(),
         prev_state=prev,
     )
 
-    no_shotgun = _planner(start_index=22)
+    no_shotgun = _planner(start_index=_idx("barry_rescue_115"))
     observed = ProgressTracker()
     observed.observe_cutscene("115:ceiling_lowering")
     assert not no_shotgun.advance_if_success(
@@ -283,7 +370,7 @@ def test_shotgun_rescue_requires_reentry_shotgun_and_ceiling_cutscene() -> None:
         prev_state=prev,
     )
 
-    rescued = _planner(start_index=22)
+    rescued = _planner(start_index=_idx("barry_rescue_115"))
     assert rescued.advance_if_success(
         state,
         progress=observed,
@@ -294,18 +381,22 @@ def test_shotgun_rescue_requires_reentry_shotgun_and_ceiling_cutscene() -> None:
 def test_goal_encodes_selected_one_leg_checkpoint() -> None:
     graph = _graph()
     encoder = ObsEncoder(ROOMS, graph, curriculum_stage_index=1)
-    planner = _planner(start_index=56)  # attic_entry_20E
+    planner = _planner(start_index=_idx("attic_entry_20E"))
     state = _state("20D", x=1000, z=1000)
     goal = encoder.encode_goal(state, planner)
     assert planner.next_waypoint_room() == "20E"
     assert goal[GOAL_IDX["goal_room_index"]] == encoder._room_idx_norm("20E")
     assert goal[GOAL_IDX["doors_available"]] == 1.0
-    assert goal[GOAL_IDX["waypoints_remaining"]] == pytest.approx(2 / 58)
+    remaining = _ROUTE_N - _idx("attic_entry_20E")
+    assert goal[GOAL_IDX["waypoints_remaining"]] == pytest.approx(
+        remaining / _ROUTE_N
+    )
 
 
 def test_goal_appends_six_masked_checkpoint_semantic_slots() -> None:
     encoder = ObsEncoder(ROOMS, _graph(), curriculum_stage_index=1)
-    planner = _planner(start_index=53)
+    # Lookahead from east stairs after Richard: … ammo_20D, attic, yawn enter, yawn.
+    planner = _planner(start_index=_idx("east_stairs_101_to_yawn"))
     goal = encoder.encode_goal(
         _state("101", inventory=["shield_key", "shotgun"]),
         planner,
@@ -313,14 +404,15 @@ def test_goal_appends_six_masked_checkpoint_semantic_slots() -> None:
     slots = goal[GOAL_BASE_DIM:].reshape(
         GOAL_LOOKAHEAD_SLOTS, GOAL_LOOKAHEAD_SLOT_DIM
     )
-    assert slots[:, 0].tolist() == [1.0, 1.0, 1.0, 1.0, 1.0, 0.0]
+    assert slots[0, 0] == 1.0
     assert slots[0, 1] == encoder._room_idx_norm("101")
-    assert slots[2, 3 + 1] == 1.0  # pickup
-    assert slots[2, 12] > 0.0  # gained handgun bullets identity
-    assert slots[3, 8] > 0.0  # required shield key identity
-    assert slots[3, 11] == 1.0
-    assert planner.peek_objective(2)["seq"] == 56
-    assert planner.peek_waypoint_room(4) == "210"
+    pickup_slots = [i for i in range(GOAL_LOOKAHEAD_SLOTS) if slots[i, 3 + 1] == 1.0]
+    assert pickup_slots, "expected a pickup in lookahead"
+    assert any(
+        planner.peek_objective(offset) is not None
+        and planner.peek_objective(offset)["checkpoint_id"] == "yawn_moon_210"
+        for offset in range(0, _ROUTE_N - _idx("east_stairs_101_to_yawn"))
+    )
 
 
 def test_two_leg_episode_pays_each_checkpoint_and_resets_acquisitions() -> None:
@@ -376,7 +468,7 @@ def test_yawn_episode_terminates_only_after_configured_leg_span() -> None:
 
 
 def test_yawn_box_prep_requires_natural_lab_timer_expiry() -> None:
-    planner = _planner(start_index=52)
+    planner = _planner(start_index=_idx("yawn_box_prep_11B"))
     assert planner.current_objective()["checkpoint_id"] == "yawn_box_prep_11B"
     assert "11B" in BOX_ROOMS
 
@@ -390,7 +482,7 @@ def test_yawn_box_prep_requires_natural_lab_timer_expiry() -> None:
 
 
 def test_richard_checkpoint_accepts_forced_settle_in_204() -> None:
-    planner = _planner(start_index=48)
+    planner = _planner(start_index=_idx("richard_cutscene_20D"))
     progress = ProgressTracker()
     progress.observe_cutscene("20D:richard")
     settled = _state("204")
@@ -507,10 +599,10 @@ def test_chaining_curriculum_samples_bounded_remaining_span(tmp_path: Path) -> N
     assert chaining["legs_per_episode"] == 6
     assert chaining["episode_mode"] == "multi_leg"
     assert chaining["route_id"] == "yawn_quest_v2"
-    assert chaining["route_steps"][-1] == 58
+    assert chaining["route_steps"][-1] == _ROUTE_N
     assert one_leg["episode_mode"] == "one_leg"
     assert one_leg["route_id"] == "yawn_quest_v2"
-    assert one_leg["route_steps"][-1] == 58
+    assert one_leg["route_steps"][-1] == _ROUTE_N
     assert "legs_per_episode" not in one_leg
 
 

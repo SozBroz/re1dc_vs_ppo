@@ -295,7 +295,12 @@ def ammo_waste_penalty(
     ) * float(rounds)
 
 
+# Pre-L Passage: sparse detour fine (does not end the episode).
 WRONG_ROOM_PENALTY = -3.0
+# At/after l_passage_enter_108: room detour is terminal. In-room pickup order
+# is never gated — only graph hops toward the active checkpoint room.
+WRONG_ROOM_TERMINAL_PENALTY = -4.0
+WRONG_ROOM_TERMINAL_FROM_CHECKPOINT_ID = "l_passage_enter_108"
 RETREAT_PENALTY = -0.6
 SUCCESS_ROOM_BONUS = CHECKPOINT_REWARD
 PBRS_GRAPH_WEIGHT = 0.02
@@ -336,6 +341,30 @@ RAILS_SCALED_CLAWBACK_TERMS: frozenset[str] = frozenset({
 
 # Kept as a public capability flag; each curriculum still opts in via rails_mode.
 ENABLE_CHECKPOINT_PATH = True
+
+
+def _wrong_room_terminal_active(planner: Any) -> bool:
+    """True when the active rails checkpoint is at/after L Passage enter."""
+    route = getattr(planner, "route", None) or []
+    gate_seq: int | None = None
+    for step in route:
+        if not isinstance(step, dict):
+            continue
+        if str(step.get("checkpoint_id") or "") == WRONG_ROOM_TERMINAL_FROM_CHECKPOINT_ID:
+            try:
+                gate_seq = int(step.get("seq", 0))
+            except (TypeError, ValueError):
+                gate_seq = None
+            break
+    if gate_seq is None:
+        return False
+    cur = planner.current_route_seq()
+    if cur is None:
+        return False
+    try:
+        return int(cur) >= int(gate_seq)
+    except (TypeError, ValueError):
+        return False
 
 
 def _key_item_return_blocked(
@@ -575,7 +604,13 @@ def compute_reward(
                     claimed = progress.claim_offroute_penalty(room) \
                         if progress is not None else True
                     if claimed:
-                        bd["wrong_room"] = WRONG_ROOM_PENALTY
+                        if _wrong_room_terminal_active(planner):
+                            bd["wrong_room"] = WRONG_ROOM_TERMINAL_PENALTY
+                            if progress is not None:
+                                progress.breach_wrong_room()
+                        else:
+                            # Finished early-route cells keep the old sparse fine.
+                            bd["wrong_room"] = WRONG_ROOM_PENALTY
 
     if room_changed and is_new_room:
         bd["new_room"] += NEW_ROOM_BONUS
@@ -797,7 +832,9 @@ def compute_reward(
     elif state.get("attack_macro_failure"):
         bd["attack_macro_failure"] = ATTACK_MACRO_FAILURE_PENALTY
 
-    if progress is not None and progress.kenneth_gate_breached:
+    if progress is not None and (
+        progress.kenneth_gate_breached or progress.wrong_room_breached
+    ):
         for term, value in bd.items():
             if value > 0.0:
                 bd[term] = 0.0
