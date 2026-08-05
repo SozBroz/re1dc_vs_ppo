@@ -70,5 +70,7 @@ def encode_named_state(state: dict[str, Any] | None) -> np.ndarray:
     if knocked is None:
         knocked = bool(int(state.get("dining_statue_flag", 0) or 0) & 0x10)
     v[off + 6] = 1.0 if knocked else 0.0
-    v[off + 7] = 1.0 if state.get("poisoned") else 0.0
+    from re1_rl.memory_map import player_poisoned_from_state
+
+    v[off + 7] = 1.0 if player_poisoned_from_state(state) else 0.0
     return v

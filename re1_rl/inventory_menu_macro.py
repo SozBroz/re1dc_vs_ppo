@@ -757,8 +757,10 @@ def execute_use_macro(
 
     item_before, qty_before = _read_slot_qty(client, int(slot))
     hp_before = _read_hp(client)
+    from re1_rl.memory_map import player_poisoned_from_raw
+
     poison_raw = client.read_ram([("player_poison", PLAYER_POISON, "u8")])
-    poisoned = bool(int(poison_raw.get("player_poison", 0)))
+    poisoned = player_poisoned_from_raw(poison_raw.get("player_poison", 0))
     story = story_site is not None
     if not story:
         if not use_would_help(

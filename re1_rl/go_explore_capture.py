@@ -705,10 +705,9 @@ def compute_quality(
         if name in _HEALING_NAMES:
             healing += q
     slots = ever_held_item_count(state, ever_held=ever_held, env=env)
-    poisoned = bool(state.get("poisoned")) or bool(
-        int(state.get("player_poison", 0) or 0)
-    )
-    poison_ok = 0 if poisoned else 1
+    from re1_rl.memory_map import player_poisoned_from_state
+
+    poison_ok = 0 if player_poisoned_from_state(state) else 1
     return (hp, ammo, healing, slots, poison_ok, -int(ribbons))
 
 

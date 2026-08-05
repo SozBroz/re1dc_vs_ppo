@@ -73,7 +73,7 @@ PROPRIO_FIELDS: list[tuple[str, str]] = [
     ("anim_hist3_state", "player anim byte t / 255"),
     ("anim_hist3_aux", "player action aux t / 255"),
     ("anim_hist3_recovery", "recovery timer t / 32"),
-    ("poisoned", "1 = poisoned (u8@0x800C51A1; verify on live Yawn bite)"),
+    ("poisoned", "1 = poisoned (DISABLED: always 0 until PLAYER_POISON verified)"),
     ("player_world_vx", "Jill allocentric x delta / VEL_NORM, clip [-1,1]"),
     ("player_world_vz", "Jill allocentric z delta / VEL_NORM, clip [-1,1]"),
 ]
@@ -235,7 +235,9 @@ class ObsEncoder:
                 v[base] = float(anim) / 255.0
                 v[base + 1] = float(aux) / 255.0
                 v[base + 2] = float(rec) / ANIM_RECOVERY_NORM
-        v[27] = 1.0 if state.get("poisoned") else 0.0
+        from re1_rl.memory_map import player_poisoned_from_state
+
+        v[27] = 1.0 if player_poisoned_from_state(state) else 0.0
         v[28] = clip_vel(float(state.get("player_world_vx", 0)))
         v[29] = clip_vel(float(state.get("player_world_vz", 0)))
         return v

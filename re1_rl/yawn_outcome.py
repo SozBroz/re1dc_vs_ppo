@@ -139,12 +139,10 @@ def _primary_yawn(
 
 
 def yawn_poison_active(state: dict[str, Any] | None) -> bool:
-    """True when player poison RAM / state flag is set."""
-    if not state:
-        return False
-    if "poisoned" in state:
-        return bool(state.get("poisoned"))
-    return bool(int(state.get("player_poison", 0) or 0))
+    """True when player poison RAM / state flag is set (disabled while untrusted)."""
+    from re1_rl.memory_map import player_poisoned_from_state
+
+    return player_poisoned_from_state(state)
 
 
 def yawn_contact_edge(

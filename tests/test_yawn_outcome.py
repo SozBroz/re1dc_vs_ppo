@@ -48,8 +48,9 @@ def test_yawn_room_constant() -> None:
 
 
 def test_yawn_poison_active() -> None:
-    assert yawn_poison_active({"poisoned": True})
-    assert yawn_poison_active({"player_poison": 1})
+    # Candidate poison RAM disabled — always inactive until verified.
+    assert not yawn_poison_active({"poisoned": True})
+    assert not yawn_poison_active({"player_poison": 1})
     assert not yawn_poison_active({"poisoned": False, "player_poison": 0})
 
 
@@ -139,8 +140,9 @@ def test_poisoned_outcome() -> None:
     out = detect_yawn_outcome(
         state, prev, progress, enemies=enemies, prev_enemies=enemies
     )
-    assert out.poisoned
-    assert out.outcome == YawnOutcome.POISONED
+    # Poison outcome gated on TRUST_PLAYER_POISON_RAM (currently False).
+    assert not out.poisoned
+    assert out.outcome != YawnOutcome.POISONED
 
 
 def test_killed_when_raw_hp_hits_zero() -> None:

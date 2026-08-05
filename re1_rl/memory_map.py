@@ -99,9 +99,27 @@ PLAYER_ANIM_STATE = 0x800C51AA  # u8; 0=idle, 0x12/0x13=knife swing/recovery
 PLAYER_ACTION_AUX = 0x800C51A9  # u8; 0=idle, 0x04=knife active
 PLAYER_RECOVERY_TIMER = 0x800C51B0  # u8; counts down 13→0 during recovery
 
-# Poison flag [CANDIDATE — save struct Pl_poison_down is 0xB bytes before Pl_life
-# at 0x21A; PLAYER_HP maps to Pl_life. Verify with Yawn / blue-herb hunt.]
-PLAYER_POISON = 0x800C51A1  # u8; nonzero = poisoned
+# Poison flag [DISABLED — candidate u8 flickers on Fine/full-HP cells; not
+# verified on a live Yawn bite / blue-herb cure. Keep TRUST false until then.]
+PLAYER_POISON = 0x800C51A1  # u8; nonzero = poisoned (when trusted)
+TRUST_PLAYER_POISON_RAM = False
+
+
+def player_poisoned_from_raw(raw: int | float | None) -> bool:
+    """Poison bit for obs / quality / USE. Always False while RAM is untrusted."""
+    if not TRUST_PLAYER_POISON_RAM:
+        return False
+    return bool(int(raw or 0))
+
+
+def player_poisoned_from_state(state: dict[str, object] | None) -> bool:
+    if not TRUST_PLAYER_POISON_RAM:
+        return False
+    if not state:
+        return False
+    if "poisoned" in state:
+        return bool(state.get("poisoned"))
+    return bool(int(state.get("player_poison", 0) or 0))
 
 # Stage/room/camera block [CONFIRMED via autonomous boot run 2026-07-02].
 # Source: RE1-Autosplitter (deserteagle417) EnglishGOG addresses, mapped

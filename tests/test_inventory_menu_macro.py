@@ -298,5 +298,5 @@ def test_proprio_anim_history_and_poison() -> None:
     assert v.shape == (PROPRIO_DIM,)
     assert v[15] == round(0x12 / 255.0, 4) or abs(v[15] - 0x12 / 255.0) < 1e-5
     assert v[24] == round(0x14 / 255.0, 4) or abs(v[24] - 0x14 / 255.0) < 1e-5
-    assert v[27] == 1.0
+    assert v[27] == 0.0  # poison obs forced off while RAM untrusted
     assert np.all(np.isfinite(v))

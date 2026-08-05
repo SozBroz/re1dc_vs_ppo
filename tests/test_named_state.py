@@ -28,10 +28,10 @@ def test_encode_named_state_defaults_when_absent() -> None:
     assert np.all(v == 0.0)
     v2 = encode_named_state({})
     assert np.all(v2 == 0.0)
-    # Partial state: only poisoned present.
+    # Poison channel forced off while RAM is untrusted.
     v3 = encode_named_state({"poisoned": True})
-    assert v3[-1] == 1.0
-    assert v3[:-1].sum() == 0.0
+    assert v3[-1] == 0.0
+    assert np.all(v3 == 0.0)
 
 
 def test_encode_named_state_verified_bits() -> None:
@@ -60,7 +60,7 @@ def test_encode_named_state_verified_bits() -> None:
     assert abs(v[off + 4] - 0.5) < 1e-5
     assert abs(v[off + 5] - (128 / 255.0)) < 1e-5
     assert v[off + 6] == 0.0  # dining_statue_knocked
-    assert v[off + 7] == 1.0  # poisoned
+    assert v[off + 7] == 0.0  # poisoned disabled
     # No extra channel for interaction_prompt (8 trailing scalars).
     assert v.shape[0] == off + 8
     assert v.shape[0] == NAMED_STATE_DIM

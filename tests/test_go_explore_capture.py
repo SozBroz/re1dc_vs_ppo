@@ -79,10 +79,10 @@ def test_compute_quality_tuple() -> None:
     assert q[1] == 15 + 30  # beretta loaded + handgun bullets
     assert q[2] == 1  # green herb
     assert q[3] == 4  # ever_held-style distinct items (inventory fallback)
-    assert q[4] == 1  # not poisoned
+    assert q[4] == 1  # not poisoned (poison RAM disabled → always healthy)
     assert q[5] == 0  # no ink ribbons
     q_poison = compute_quality(_good_state(poisoned=True))
-    assert q_poison[4] == 0
+    assert q_poison[4] == 1  # ignored until TRUST_PLAYER_POISON_RAM
 
 
 def test_compute_quality_slots_uses_ever_held_not_inventory() -> None:
