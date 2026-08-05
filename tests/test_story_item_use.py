@@ -281,16 +281,37 @@ def test_story_use_success_consumed_item() -> None:
 
 
 def test_story_use_success_scene_change() -> None:
-    site = {"item": "emblem", "consumes": False}
+    """Non-emblem sites may still resolve via scene change without inventory leave."""
+    site = {"item": "gold_emblem", "consumes": False, "id": "gold_emblem@105_fireplace"}
     ok = story_use_succeeded(
         before={"scene_flag": 0x80, "msg_flag": 0, "in_control": True},
         after={"scene_flag": 0x90, "msg_flag": 0, "in_control": False},
         site=site,
         slot=1,
-        inventory_before=[(0, 0), (0x1F, 1)],
-        inventory_after=[(0, 0), (0x1F, 1)],
+        inventory_before=[(0, 0), (GOLD_EMBLEM_ID, 0)],
+        inventory_after=[(0, 0), (GOLD_EMBLEM_ID, 0)],
     )
     assert ok
+
+
+def test_wooden_emblem_scene_alone_does_not_resolve() -> None:
+    site = {"item": "emblem", "consumes": True, "id": "emblem@10F_wall"}
+    assert not story_use_succeeded(
+        before={"scene_flag": 0x80, "msg_flag": 0, "in_control": True},
+        after={"scene_flag": 0x90, "msg_flag": 0, "in_control": False},
+        site=site,
+        slot=1,
+        inventory_before=[(0, 0), (EMBLEM_ID, 0)],
+        inventory_after=[(0, 0), (EMBLEM_ID, 0)],
+    )
+    assert story_use_succeeded(
+        before={"scene_flag": 0x80, "msg_flag": 0, "in_control": True},
+        after={"scene_flag": 0x90, "msg_flag": 0, "in_control": False},
+        site=site,
+        slot=1,
+        inventory_before=[(0, 0), (EMBLEM_ID, 0)],
+        inventory_after=[(0, 0), (0, 0)],
+    )
 
 
 def test_story_use_macro_ignores_menu_msg_only() -> None:
@@ -522,9 +543,9 @@ def test_annotate_emblem_alcove_pays_story_use() -> None:
     after = dict(prev)
     after["scene_flag"] = 0x91
     after["in_control"] = False
-    # Swap: both held before; wooden placed / scene resolves; gold stays.
+    # Swap: both held before; wooden must leave inventory; gold stays.
     inv_before = _inv((EMBLEM_ID, 0), (GOLD_EMBLEM_ID, 0))
-    inv_after = _inv((EMBLEM_ID, 0), (GOLD_EMBLEM_ID, 0))
+    inv_after = _inv((0, 0), (GOLD_EMBLEM_ID, 0))
     out = annotate_story_use_success(
         after,
         prev_state=prev,

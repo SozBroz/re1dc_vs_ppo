@@ -281,6 +281,13 @@ def story_use_succeeded(
     )
 
 
+def _site_requires_inventory_leave(site: dict[str, Any]) -> bool:
+    """Wooden bar emblem USE must remove the item; scene flicker alone is not enough."""
+    item = canonical_item(str(site.get("item", "")))
+    site_id = str(site.get("id", ""))
+    return item == "emblem" or site_id.startswith("emblem@10F_")
+
+
 def story_use_macro_resolved(
     *,
     before: dict[str, Any],
@@ -292,14 +299,17 @@ def story_use_macro_resolved(
     allow_menu_msg_only: bool = False,
 ) -> bool:
     """Story USE resolved — ignores pause-menu msg bit unless allow_menu_msg_only."""
-    item_id = _NAME_TO_ITEM_ID.get(str(site["item"]), 0)
+    item_name = canonical_item(str(site["item"]))
+    item_id = _NAME_TO_ITEM_ID.get(item_name, 0)
     qty_before = int(inventory_before[slot][1]) if slot < len(inventory_before) else 0
     qty_after = int(inventory_after[slot][1]) if slot < len(inventory_after) else 0
     id_after = _slot_item_id(inventory_after, slot)
-    consumed = bool(site.get("consumes")) and (
-        qty_after < qty_before or id_after == 0 or id_after != item_id
-    )
-    if consumed:
+    held_before = _inventory_holds_named_key(inventory_before, item_name)
+    held_after = _inventory_holds_named_key(inventory_after, item_name)
+    left_inventory = held_before and not held_after
+    slot_consumed = qty_after < qty_before or id_after == 0 or id_after != item_id
+    consumed = bool(site.get("consumes")) and (slot_consumed or left_inventory)
+    if consumed or left_inventory:
         return True
 
     if site.get("mash_pages"):
@@ -310,6 +320,10 @@ def story_use_macro_resolved(
                 inventory_before, str(reward_name)
             ):
                 return True
+
+    # Wooden emblem place: never credit on scene/msg alone while still holding it.
+    if _site_requires_inventory_leave(site):
+        return False
 
     in_menu = bool(after.get("in_item_menu", False))
     scene_before = int(before.get("scene_flag", 0))

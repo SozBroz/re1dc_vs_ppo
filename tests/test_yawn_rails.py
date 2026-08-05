@@ -111,16 +111,20 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
         "bar_enter_10F",
         "music_notes_10F",
         "piano_music_notes_10F",
-        "place_emblem_10F",
         "gold_emblem_10F",
+        "place_emblem_10F",
     ]
     place = next(cp for cp in route if cp["checkpoint_id"] == "place_emblem_10F")
     assert place["action_type"] == "use_item"
     assert "emblem" in place["required_items"]
+    assert "gold_emblem" in place["required_items"]
     place_cond = json.dumps(place["success_condition"])
     assert "emblem@10F_alcove" in place_cond
     assert "emblem@10F_wall" in place_cond
     assert '"lacks_item"' in place_cond
+    gold = next(cp for cp in route if cp["checkpoint_id"] == "gold_emblem_10F")
+    assert gold["seq"] < place["seq"]
+    assert "gold_emblem" in gold["items_gained"]
     assert any(cp["checkpoint_id"] == "place_gold_emblem_105" for cp in route)
     for checkpoint in route:
         condition_text = json.dumps(checkpoint["success_condition"])

@@ -18,8 +18,8 @@
       "x": 9750,
       "z": 8600,
       "radius": 1500,
-      "consumes": false,
-      "notes": "Secret alcove after piano — USE wooden emblem (same stand as gold_emblem pickup 9750/8600). Swap keeps gold; putting gold back alone is gold_emblem_return −2 (not this site)."
+      "consumes": true,
+      "notes": "After taking gold: USE wooden emblem into bookshelf (9750/8600). Wooden must leave inventory; gold stays. Putting gold back alone is gold_emblem_return (not this site)."
     },
     {
       "id": "emblem@10F_wall",
@@ -28,8 +28,8 @@
       "x": 8850,
       "z": 19300,
       "radius": 1500,
-      "consumes": false,
-      "notes": "Bar wooden-emblem USE at alternate RDT tile (QuickSave0 2026-08-05 stand 8780/18780; RDT ~8850/19300). Required for mask legality away from the post-piano alcove."
+      "consumes": true,
+      "notes": "Bar wooden-emblem USE at alternate RDT tile (QuickSave0 2026-08-05 stand 8780/18780; RDT ~8850/19300). consumes=true — scene-flag alone must not credit this site."
     },
     {
       "id": "gold_emblem@105_fireplace",

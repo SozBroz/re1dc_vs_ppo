@@ -196,12 +196,37 @@
   },
   {
     "seq": 12,
+    "checkpoint_id": "gold_emblem_10F",
+    "room_id": "10F",
+    "objective": "Take the gold emblem from the piano bookshelf (wooden emblem may still be held)",
+    "action_type": "pickup",
+    "required_items": [],
+    "items_gained": [
+      "gold_emblem"
+    ],
+    "success_condition": {
+      "type": "all_of",
+      "conditions": [
+        {
+          "type": "room_enter",
+          "room_id": "10F"
+        },
+        {
+          "type": "acquired_item",
+          "item": "gold_emblem"
+        }
+      ]
+    }
+  },
+  {
+    "seq": 13,
     "checkpoint_id": "place_emblem_10F",
     "room_id": "10F",
-    "objective": "USE the wooden emblem on the bar bookshelf (must leave inventory)",
+    "objective": "USE the wooden emblem into the bookshelf slot after taking gold",
     "action_type": "use_item",
     "required_items": [
-      "emblem"
+      "emblem",
+      "gold_emblem"
     ],
     "items_gained": [],
     "consume_before_gain": [
@@ -230,30 +255,6 @@
         {
           "type": "lacks_item",
           "item": "emblem"
-        }
-      ]
-    }
-  },
-  {
-    "seq": 13,
-    "checkpoint_id": "gold_emblem_10F",
-    "room_id": "10F",
-    "objective": "Hold the gold emblem after the wooden emblem swap",
-    "action_type": "pickup",
-    "required_items": [],
-    "items_gained": [
-      "gold_emblem"
-    ],
-    "success_condition": {
-      "type": "all_of",
-      "conditions": [
-        {
-          "type": "room_enter",
-          "room_id": "10F"
-        },
-        {
-          "type": "acquired_item",
-          "item": "gold_emblem"
         }
       ]
     }
