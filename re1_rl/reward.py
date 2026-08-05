@@ -728,22 +728,11 @@ def compute_reward(
 
     if rails_mode:
         state["typewriter_save_complete"] = bool(typewriter_save_complete)
-        # Early Barry lockpick: snap forward past barry_hall_return / skipped 203.
-        advanced = False
-        if "lockpick" in {canonical_item(str(x)) for x in new_items}:
-            advanced = bool(planner.snap_forward_on_lockpick())
-        if not advanced:
-            advanced = bool(
-                planner.advance_if_success(
-                    state, progress=progress, prev_state=prev_state
-                )
+        advanced = bool(
+            planner.advance_if_success(
+                state, progress=progress, prev_state=prev_state
             )
-        elif progress is not None and prev_state is not None:
-            # Keep transition bookkeeping consistent when snap skips advance_if_success.
-            progress.note_leg_room_transition(
-                str(prev_state.get("room_id", "")),
-                str(state.get("room_id", "")),
-            )
+        )
         if advanced:
             if progress is not None:
                 progress.on_waypoint_advanced()

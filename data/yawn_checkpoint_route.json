@@ -53,11 +53,11 @@
     "seq": 6,
     "checkpoint_id": "barry_hall_return_106",
     "room_id": "106",
-    "objective": "Return from 2F to Main Hall and receive Barry's lockpick",
-    "action_type": "pickup",
+    "objective": "Return from Main Hall 2F (203) back to Main Hall 1F (106)",
+    "action_type": "navigate",
     "required_items": [],
-    "items_gained": ["lockpick"],
-    "success_condition": {"type": "all_of", "conditions": [{"type": "room_enter_from", "room_id": "106", "from_room_ids": ["203"]}, {"type": "acquired_item", "item": "lockpick"}]}
+    "items_gained": [],
+    "success_condition": {"type": "room_enter_from", "room_id": "106", "from_room_ids": ["203"]}
   },
   {
     "seq": 7,

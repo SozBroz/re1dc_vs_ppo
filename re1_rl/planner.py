@@ -174,23 +174,7 @@ class WaypointPlanner:
             }
             if want in gains:
                 return i
-            if str(step.get("checkpoint_id", "")) == "barry_hall_return_106" and want == "lockpick":
-                return i
         return None
-
-    def snap_forward_on_lockpick(self) -> bool:
-        """Forward-only jump past the lockpick checkpoint when lockpick is acquired.
-
-        Skips upstairs/return gates if Barry already handed the lockpick. Never
-        moves the planner backward if that checkpoint is already cleared.
-        """
-        target = self.index_of_item_gain_checkpoint("lockpick")
-        if target is None:
-            return False
-        if self._index > target:
-            return False
-        self._index = int(target) + 1
-        return True
 
     def advance_if_success(
         self,

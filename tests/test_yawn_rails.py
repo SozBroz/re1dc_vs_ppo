@@ -151,57 +151,35 @@ def test_checkpoint_key_item_already_held_pays_terminal_reward() -> None:
     assert reward > RAILS_CHECKPOINT_REWARD - 0.01
 
 
-def test_lockpick_is_required_on_return_to_106_not_first_entry() -> None:
+def test_barry_hall_return_is_203_to_106_path_only() -> None:
+    """cp05: first main-hall entry is free; return from 203 completes without lockpick."""
     first_entry = _planner(start_index=3)
     assert first_entry.advance_if_success(_state("106"), progress=ProgressTracker())
 
     return_entry = _planner(start_index=5)
-    prev = _state("203")
-    state = _state("106", inventory=["lockpick"])
-    # Key item already in inventory satisfies acquired_item (no leg_acquired needed).
     assert return_entry.advance_if_success(
-        state,
-        progress=ProgressTracker(),
-        prev_state=prev,
-    )
-
-    acquired = ProgressTracker()
-    acquired.note_leg_acquired("lockpick")
-    wrong_return = _planner(start_index=5)
-    assert not wrong_return.advance_if_success(
-        state,
-        progress=acquired,
-        prev_state=_state("201"),
-    )
-
-
-def test_lockpick_already_held_passes_without_leg_acquire() -> None:
-    planner = _planner(start_index=5)
-    assert planner.advance_if_success(
-        _state("106", inventory=["lockpick"]),
+        _state("106"),
         progress=ProgressTracker(),
         prev_state=_state("203"),
     )
 
-
-def test_lockpick_snap_skips_203_and_finishes_barry_return() -> None:
-    """Getting lockpick early snaps forward past barry_hall_return (cp05)."""
-    planner = _planner(start_index=3)  # main_hall_106 — before 203
-    assert planner.index_of_item_gain_checkpoint("lockpick") == 5
-    assert planner.snap_forward_on_lockpick()
-    assert planner.waypoint_index == 6  # dining_return_105
-    # Forward-only: already past lockpick checkpoint → no snap.
-    assert not planner.snap_forward_on_lockpick()
-    assert planner.waypoint_index == 6
-
-
-def test_lockpick_acquire_pays_checkpoint_via_snap() -> None:
-    planner = _planner(start_index=3)
-    progress = ProgressTracker()
-    progress.seed_spawn_room("106")
-    reward, bd = compute_reward(
+    wrong_return = _planner(start_index=5)
+    assert not wrong_return.advance_if_success(
         _state("106"),
-        _state("106", inventory=["lockpick"], new_items=["lockpick"]),
+        progress=ProgressTracker(),
+        prev_state=_state("201"),
+    )
+
+
+def test_barry_hall_return_pays_checkpoint_on_stairs_down() -> None:
+    planner = _planner(start_index=5)
+    progress = ProgressTracker()
+    progress.seed_spawn_room("203")
+    # Kenneth already paid so 203→106 is not the illegal pre-Kenneth hall gate.
+    progress.observed_cutscenes.add("104:0:s0")
+    reward, bd = compute_reward(
+        _state("203"),
+        _state("106"),
         planner,
         progress=progress,
         graph=_graph(),
@@ -214,38 +192,21 @@ def test_lockpick_acquire_pays_checkpoint_via_snap() -> None:
     assert reward > RAILS_CHECKPOINT_REWARD - 0.01
 
 
-def test_lockpick_key_items_rewarded_passes_without_inventory() -> None:
-    progress = ProgressTracker()
-    progress.key_items_rewarded.add("lockpick")
+def test_barry_hall_return_latches_203_entry_same_leg() -> None:
     planner = _planner(start_index=5)
+    progress = ProgressTracker()
+
     assert planner.advance_if_success(
         _state("106"),
         progress=progress,
         prev_state=_state("203"),
     )
-
-
-def test_lockpick_checkpoint_latches_203_entry_until_delayed_pickup() -> None:
-    planner = _planner(start_index=5)
-    progress = ProgressTracker()
-
-    assert not planner.advance_if_success(
-        _state("106"),
-        progress=progress,
-        prev_state=_state("203"),
-    )
-    progress.note_leg_acquired("lockpick")
-    assert planner.advance_if_success(
-        _state("106", inventory=["lockpick"]),
-        progress=progress,
-        prev_state=_state("106"),
-    )
-
+    # After advance, transitions clear so a later same-room step does not re-fire.
     progress.on_waypoint_advanced()
     assert not progress.leg_room_transitions
 
 
-def test_lockpick_checkpoint_does_not_latch_wrong_return_room() -> None:
+def test_barry_hall_return_does_not_latch_wrong_from_room() -> None:
     planner = _planner(start_index=5)
     progress = ProgressTracker()
 
@@ -254,9 +215,8 @@ def test_lockpick_checkpoint_does_not_latch_wrong_return_room() -> None:
         progress=progress,
         prev_state=_state("201"),
     )
-    progress.note_leg_acquired("lockpick")
     assert not planner.advance_if_success(
-        _state("106", inventory=["lockpick"]),
+        _state("106"),
         progress=progress,
         prev_state=_state("106"),
     )
