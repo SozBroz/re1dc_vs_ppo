@@ -46,6 +46,7 @@ STORY_USE_MILESTONES: frozenset[str] = frozenset(
     {
         "music_notes@10F_piano",
         "emblem@10F_alcove",
+        "emblem@10F_wall",
         "gold_emblem@105_fireplace",
     }
 )
