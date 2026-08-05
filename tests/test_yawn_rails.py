@@ -453,9 +453,9 @@ def test_reset_mix_prefers_latest_cell_then_fresh_then_older(tmp_path: Path) -> 
         else:
             counts["older"] += 1
     total = sum(counts.values())
-    assert counts["latest"] / total == pytest.approx(0.40, abs=0.05)
-    assert counts["fresh"] / total == pytest.approx(0.30, abs=0.05)
-    assert counts["older"] / total == pytest.approx(0.30, abs=0.05)
+    assert counts["latest"] / total == pytest.approx(0.50, abs=0.05)
+    assert counts["fresh"] / total == pytest.approx(0.25, abs=0.05)
+    assert counts["older"] / total == pytest.approx(0.25, abs=0.05)
 
 
 def test_reset_latest_only_env_pins_newest_cell(

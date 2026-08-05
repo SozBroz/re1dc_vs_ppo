@@ -315,9 +315,10 @@ def validate_manifest_cells(
 
 
 # Non-PLR reset mix: frontier cell / fresh Jill / older cells.
-RESET_LATEST_CELL_WEIGHT = 0.40
-RESET_FRESH_START_WEIGHT = 0.30
-RESET_OTHER_CELLS_WEIGHT = 0.30
+# 50% latest checkpoint; remaining 50% splits fresh + older.
+RESET_LATEST_CELL_WEIGHT = 0.50
+RESET_FRESH_START_WEIGHT = 0.25
+RESET_OTHER_CELLS_WEIGHT = 0.25
 _RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
 
 
@@ -333,7 +334,7 @@ def _choose_reset_candidate(
     rng: random.Random,
     latest_only: bool = False,
 ) -> dict[str, Any]:
-    """40% latest cell, 30% fresh start, 30% older cells (fallback if empty)."""
+    """50% latest cell, 25% fresh start, 25% older cells (fallback if empty)."""
     fresh = {"checkpoint_index": -1, "source": "route_initial"}
     if not cells:
         return fresh
@@ -362,7 +363,7 @@ def sample_one_leg_options(
 ) -> dict[str, Any]:
     """Choose a curated start and bounded checkpoint span.
 
-    Non-PLR mix: 40% latest cell, 30% ``route_initial``, 30% older cells.
+    Non-PLR mix: 50% latest cell, 25% ``route_initial``, 25% older cells.
     ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell (memlog pin).
     """
     cells = iter_loadable_cells(project_root, stage)
