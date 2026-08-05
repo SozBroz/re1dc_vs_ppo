@@ -705,21 +705,27 @@ def test_fireplace_gold_emblem_site_still_works() -> None:
     fireplace = next(s for s in sites if s["id"] == "gold_emblem@105_fireplace")
     assert fireplace["room"] == "105"
     assert fireplace["item"] == "gold_emblem"
+    assert float(fireplace["radius"]) >= 2500
+    stand_x, stand_z = 3746, 8191
 
     inv = _inv((GOLD_EMBLEM_ID, 0))
+    assert any_legal_story_use_slot(
+        inv, room="105", x=stand_x, z=stand_z, rewarded_site_ids=set()
+    )
+    # RDT trigger pose still inside the generous radius.
     assert any_legal_story_use_slot(
         inv, room="105", x=2900, z=8100, rewarded_site_ids=set()
     )
     # Alcove put-back must not fire in the dining room.
     assert not gold_emblem_return_detected(
-        prev_state={"room_id": "105", "x": 2900, "z": 8100},
+        prev_state={"room_id": "105", "x": stand_x, "z": stand_z},
         inventory_before=inv,
         inventory_after=_inv((0, 0)),
     )
     prev = {
         "room_id": "105",
-        "x": 2900,
-        "z": 8100,
+        "x": stand_x,
+        "z": stand_z,
         "scene_flag": 0x80,
         "msg_flag": 0,
         "in_control": True,

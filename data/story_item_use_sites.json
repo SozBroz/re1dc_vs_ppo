@@ -35,11 +35,11 @@
       "id": "gold_emblem@105_fireplace",
       "item": "gold_emblem",
       "room": "105",
-      "x": 2900,
-      "z": 8100,
-      "radius": 1500,
+      "x": 3746,
+      "z": 8191,
+      "radius": 2800,
       "consumes": true,
-      "notes": "Dining fireplace — clock reveals shield key (QuickSave4 stand 3746/8186; RDT 2900/8100). consumes=true — gold must leave inventory; scene flicker alone must not credit."
+      "notes": "Dining fireplace — USE gold emblem (QuickSave0 2026-08-05 stand 3746/8191; RDT ~2900/8100). Generous radius so approach pose still legal. consumes=true — gold must leave inventory."
     },
     {
       "id": "blue_jewel@10D_tiger_eye",
