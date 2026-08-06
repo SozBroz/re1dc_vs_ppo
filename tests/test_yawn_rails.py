@@ -254,7 +254,7 @@ def test_barry_hall_return_is_203_to_106_path_only() -> None:
     first_entry = _planner(start_index=3)
     hall = ProgressTracker()
     hall.observe_cutscene("106:1:s0")
-    _settle(hall, "106")
+    _settle(hall, "106", steps=45)
     assert first_entry.advance_if_success(_state("106"), progress=hall)
 
     return_entry = _planner(start_index=5)
@@ -343,19 +343,35 @@ def test_kenneth_requires_cutscene_and_in_control_settle() -> None:
 
     ok = ProgressTracker()
     ok.observe_cutscene("104:0:s0")
-    _settle(ok, "104")
+    _settle(ok, "104", steps=45)
     assert planner.advance_if_success(_state("104"), progress=ok)
+
+
+def test_pre_cutscene_room_dwell_does_not_satisfy_post_cutscene_settle() -> None:
+    """Barry/Kenneth success must settle AFTER the cinema, not from walk-up dwell."""
+    planner = _planner(start_index=_idx("barry_return_105"))
+    progress = ProgressTracker()
+    progress.note_leg_room_transition("104", "105")
+    _settle(progress, "105", steps=90)  # walk-up before Barry return beat
+    progress.observe_cutscene("105:2:s1")
+    assert not planner.advance_if_success(
+        _state("105"), progress=progress, prev_state=_state("104")
+    )
+    _settle(progress, "105", steps=60)
+    assert planner.advance_if_success(
+        _state("105"), progress=progress, prev_state=_state("104")
+    )
 
 
 def test_main_hall_rejects_room_spoof_without_106_cutscene() -> None:
     planner = _planner(start_index=_idx("main_hall_106"))
     spoof = ProgressTracker()
-    _settle(spoof, "106")
+    _settle(spoof, "106", steps=45)
     assert not planner.advance_if_success(_state("106"), progress=spoof)
 
     ok = ProgressTracker()
     ok.observe_cutscene("106:1:s0")
-    _settle(ok, "106")
+    _settle(ok, "106", steps=45)
     assert planner.advance_if_success(_state("106"), progress=ok)
 
 
@@ -481,7 +497,7 @@ def test_two_leg_episode_pays_each_checkpoint_and_resets_acquisitions() -> None:
     assert planner.waypoint_index == 1
 
     progress.observe_cutscene("104:kenneth")
-    _settle(progress, "104")
+    _settle(progress, "104", steps=45)
     _, second = compute_reward(
         _state("105", inventory=["emblem"]),
         _state("104", inventory=["emblem"]),
@@ -798,6 +814,8 @@ def test_checkpoint_success_proposes_without_local_install_when_sync_on(
         },
         _planner=planner,
         bridge=bridge,
+        _macro_active=False,
+        _read_state=lambda track_items=False: _state("105", inventory=["emblem"]),
     )
     monkeypatch.setattr(
         "re1_rl.yawn_rails.dump_episode_sidecar",
@@ -810,6 +828,7 @@ def test_checkpoint_success_proposes_without_local_install_when_sync_on(
         _state("105", inventory=["emblem"]),
         {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
     )
+    assert env._macro_active is False  # restored after capture
 
     curated = tmp_path / "states/yawn_rails/cells/cp00/cell.State"
     assert proposal is not None
@@ -886,6 +905,155 @@ def test_local_cas_installs_better_and_rejects_worse(
     assert (yr / "cells" / "cp00" / CELL_STATE_NAME).read_bytes() == b"BETTER"
     man = json.loads((yr / "manifest.json").read_text(encoding="utf-8"))
     assert man["cells"][0]["quality"][:2] == [96, 60]
+
+
+def test_story_progress_allows_overwrite_blocks_cutscene_regression() -> None:
+    from re1_rl.yawn_rails_sync import story_progress_allows_overwrite
+
+    old = {
+        "progress": {"observed_cutscenes": ["104:0:s0", "105:2:s1"]},
+        "captured_room_id": "105",
+        "capture_step": 400,
+        "episode_history": {"room_entries": [["105", 100]]},
+    }
+    thin = {
+        "progress": {"observed_cutscenes": ["104:0:s0"]},
+        "captured_room_id": "105",
+        "capture_step": 120,
+        "episode_history": {"room_entries": [["105", 100]]},
+    }
+    settled = {
+        "progress": {
+            "observed_cutscenes": ["104:0:s0", "105:2:s1", "105:2:s0"]
+        },
+        "captured_room_id": "105",
+        "capture_step": 500,
+        "episode_history": {"room_entries": [["105", 100]]},
+    }
+    assert not story_progress_allows_overwrite(thin, old, room_id="105")
+    assert story_progress_allows_overwrite(settled, old, room_id="105")
+
+
+def test_local_cas_rejects_story_regress_despite_better_hp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
+    from re1_rl.yawn_rails_sync import (
+        CELL_SIDECAR_NAME,
+        CELL_STATE_NAME,
+        try_install_yawn_cell,
+        yawn_rails_root,
+    )
+
+    yr = yawn_rails_root(tmp_path)
+    good = yr / "cells" / "cp02"
+    good.mkdir(parents=True)
+    (good / CELL_STATE_NAME).write_bytes(b"STORY")
+    (good / CELL_SIDECAR_NAME).write_text(
+        json.dumps(
+            {
+                "progress": {"observed_cutscenes": ["104:0:s0", "105:2:s1"]},
+                "captured_room_id": "105",
+                "capture_step": 400,
+                "episode_history": {"room_entries": [["104", 10], ["105", 200]]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (yr / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "archive_version": 1,
+                "cells": [
+                    {
+                        "checkpoint_index": 2,
+                        "checkpoint_id": "barry_return_105",
+                        "quality": [80, 40, 0, 4, 1, 0],
+                        "state_path": "states/yawn_rails/cells/cp02/cell.State",
+                        "sidecar_path": (
+                            "states/yawn_rails/cells/cp02/cell.sidecar.json"
+                        ),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    healthier = yr / ".staging" / "healthier_thin"
+    healthier.mkdir(parents=True)
+    (healthier / CELL_STATE_NAME).write_bytes(b"THIN")
+    (healthier / CELL_SIDECAR_NAME).write_text(
+        json.dumps(
+            {
+                "progress": {"observed_cutscenes": ["104:0:s0"]},
+                "captured_room_id": "105",
+                "capture_step": 210,
+                "episode_history": {"room_entries": [["105", 200]]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert not try_install_yawn_cell(
+        tmp_path,
+        checkpoint_index=2,
+        staged_dir=healthier,
+        quality=[96, 60, 0, 4, 1, 0],
+        row={"checkpoint_id": "barry_return_105", "room_id": "105"},
+    )
+    assert (good / CELL_STATE_NAME).read_bytes() == b"STORY"
+
+
+def test_barry_return_capture_requires_105_2_s1(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
+    from re1_rl.progress import ProgressTracker
+
+    bridge = MagicMock()
+    bridge.save_savestate.side_effect = (
+        lambda path: Path(path).write_bytes(b"state")
+    )
+    planner = _planner(start_index=_idx("barry_return_105") + 1)
+    progress = ProgressTracker()
+    progress.observed_cutscenes.add("104:0:s0")  # Kenneth only — missing return beat
+    env = SimpleNamespace(
+        project_root=tmp_path,
+        _stage={
+            "mode": "yawn_rails",
+            "cells_manifest": "states/yawn_rails/manifest.json",
+            "route_id": "test",
+        },
+        _planner=planner,
+        bridge=bridge,
+        _macro_active=False,
+        _progress=progress,
+        _step_count=300,
+        _read_state=lambda track_items=False: _state("105"),
+    )
+    assert (
+        capture_successor_cell(
+            env, _state("105"), {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
+        )
+        is None
+    )
+    bridge.save_savestate.assert_not_called()
+
+    progress.observed_cutscenes.add("105:2:s1")
+    monkeypatch.setattr(
+        "re1_rl.yawn_rails.dump_episode_sidecar",
+        lambda *_args, **_kwargs: {
+            "schema_version": 1,
+            "progress": {"observed_cutscenes": sorted(progress.observed_cutscenes)},
+            "episode_history": {"room_entries": [["105", 100]]},
+        },
+    )
+    proposal = capture_successor_cell(
+        env, _state("105"), {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
+    )
+    assert proposal is not None
+    assert proposal["checkpoint_id"] == "barry_return_105"
 
 
 def test_11b_almanac_has_chemical_but_not_square_crank() -> None:

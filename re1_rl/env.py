@@ -398,6 +398,9 @@ class RE1Env(gym.Env):
         self._async_cutscene_skip = bool(async_cutscene_skip)
         self._bg_skip_stop = threading.Event()
         self._bg_skip_thread: threading.Thread | None = None
+        # Serializes emu advancement in the bg skip worker vs yawn capture
+        # savestate (macro flag alone only gates between skip chunks).
+        self._bg_skip_emu_lock = threading.Lock()
         # Knife macro owns the joypad for its whole schedule; the bg skip
         # worker must not start a fast_forward (which mashes cross and stomps
         # joypad) while this is set.
@@ -1551,11 +1554,16 @@ class RE1Env(gym.Env):
             # Chunk like play_human cutscene_skip_chunk so mid-skip room crossings
             # can restart the script segment (door = new_room, not new_cutscene).
             chunk = int(getattr(self._ram_skip, "skip_chunk", 600) or 600)
-            burned, died = self._ram_skip.skip_uncontrolled(
-                max_frames=chunk,
-                prev_hp=self._prev_hp,
-                episode_start_hp=getattr(self, "_episode_start_hp", 0),
-            )
+            with self._bg_skip_emu_lock:
+                # Capture/macros set _macro_active then take this lock; re-check
+                # so we never start a chunk after freeze was requested.
+                if self._macro_active or self._bg_skip_stop.is_set():
+                    continue
+                burned, died = self._ram_skip.skip_uncontrolled(
+                    max_frames=chunk,
+                    prev_hp=self._prev_hp,
+                    episode_start_hp=getattr(self, "_episode_start_hp", 0),
+                )
             self._last_skip_frames = int(getattr(self, "_last_skip_frames", 0)) + int(
                 burned
             )

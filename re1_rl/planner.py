@@ -339,6 +339,17 @@ class WaypointPlanner:
                 return False
             min_steps = int(cond.get("min_steps", 1))
             return progress.in_control_steps_in_room(target_room) >= min_steps
+        if cond_type == "in_control_steps_since_cutscene":
+            if progress is None:
+                return False
+            prefix = str(cond.get("prefix", ""))
+            min_steps = int(cond.get("min_steps", 1))
+            target_room = str(cond.get("room_id", wp_room) or wp_room)
+            if target_room and str(state.get("room_id", "")) != target_room:
+                return False
+            return bool(prefix) and (
+                progress.in_control_steps_since_cutscene(prefix) >= min_steps
+            )
         return False
 
     @property

@@ -30,6 +30,8 @@ class ProgressTracker:
     cutscene_blocked_after_pickup_room: str | None = None
     _success_room_rewarded: bool = False
     _in_control_steps: dict[str, int] = field(default_factory=dict)
+    # In-control steps after each newly observed cutscene key (post-cinema settle).
+    _in_control_since_cutscene: dict[str, int] = field(default_factory=dict)
 
     # Idle contempt: emulated frames since last exploration progress (reward.compute_reward).
     _stagnation_frames: int = 0
@@ -110,13 +112,32 @@ class ProgressTracker:
         if in_control:
             room_id = str(room_id)
             self._in_control_steps[room_id] = self._in_control_steps.get(room_id, 0) + 1
+            # Post-cutscene settle clocks (see in_control_steps_since_cutscene).
+            for key in list(self._in_control_since_cutscene.keys()):
+                self._in_control_since_cutscene[key] = (
+                    int(self._in_control_since_cutscene[key]) + 1
+                )
 
     def in_control_steps_in_room(self, room_id: str) -> int:
         return int(self._in_control_steps.get(str(room_id), 0))
 
+    def in_control_steps_since_cutscene(self, prefix: str) -> int:
+        """Max in-control steps since any observed cutscene matching ``prefix``."""
+        prefix = str(prefix or "")
+        if not prefix:
+            return 0
+        best = 0
+        found = False
+        for key, steps in self._in_control_since_cutscene.items():
+            if str(key).startswith(prefix):
+                found = True
+                best = max(best, int(steps))
+        return best if found else 0
+
     def on_waypoint_advanced(self) -> None:
         """Reset per-room step counters so repeated hall objectives work."""
         self._in_control_steps.clear()
+        self._in_control_since_cutscene.clear()
         self.leg_room_transitions.clear()
 
     def note_leg_room_transition(self, from_room: str, to_room: str) -> None:
@@ -248,6 +269,8 @@ class ProgressTracker:
         if not key or key in self.observed_cutscenes:
             return False
         self.observed_cutscenes.add(key)
+        # Start post-cutscene settle clock at 0 (pre-cinema room dwell must not count).
+        self._in_control_since_cutscene[key] = 0
         return True
 
     def note_leg_acquired(self, item_name: str) -> None:

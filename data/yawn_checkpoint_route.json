@@ -43,9 +43,10 @@
           "prefix": "104:"
         },
         {
-          "type": "in_control_steps_in_room",
+          "type": "in_control_steps_since_cutscene",
+          "prefix": "104:",
           "room_id": "104",
-          "min_steps": 30
+          "min_steps": 45
         }
       ]
     }
@@ -69,9 +70,14 @@
           ]
         },
         {
-          "type": "in_control_steps_in_room",
+          "type": "observed_cutscene",
+          "prefix": "105:2:s1"
+        },
+        {
+          "type": "in_control_steps_since_cutscene",
+          "prefix": "105:2:s1",
           "room_id": "105",
-          "min_steps": 30
+          "min_steps": 60
         }
       ]
     }
@@ -96,9 +102,10 @@
           "prefix": "106:"
         },
         {
-          "type": "in_control_steps_in_room",
+          "type": "in_control_steps_since_cutscene",
+          "prefix": "106:",
           "room_id": "106",
-          "min_steps": 30
+          "min_steps": 45
         }
       ]
     }
@@ -123,9 +130,10 @@
           "prefix": "203:"
         },
         {
-          "type": "in_control_steps_in_room",
+          "type": "in_control_steps_since_cutscene",
+          "prefix": "203:",
           "room_id": "203",
-          "min_steps": 30
+          "min_steps": 45
         }
       ]
     }

@@ -6,6 +6,7 @@ import json
 import os
 import random
 import shutil
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -483,6 +484,10 @@ def capture_successor_cell(
     cid = str(completed_cp.get("checkpoint_id", "") or "")
     if cid == "kenneth_104" and not any(str(k).startswith("104:") for k in ledgers):
         return None
+    if cid == "barry_return_105" and not any(
+        str(k).startswith("105:2:s1") for k in ledgers
+    ):
+        return None
     if cid == "main_hall_106" and not any(str(k).startswith("106:") for k in ledgers):
         return None
     if cid == "upper_hall_203" and not any(str(k).startswith("203:") for k in ledgers):
@@ -506,25 +511,98 @@ def capture_successor_cell(
 
     root = Path(env.project_root)
     yr = yawn_rails_root(root)
-    staging = yr / ".staging" / f"{cell_dir_name(completed)}_{os.getpid()}"
+    # Unique per capture — never share staging across concurrent envs/pids.
+    staging = (
+        yr
+        / ".staging"
+        / f"{cell_dir_name(completed)}_{os.getpid()}_{uuid.uuid4().hex[:8]}"
+    )
     if staging.exists():
         shutil.rmtree(staging, ignore_errors=True)
     staging.mkdir(parents=True, exist_ok=True)
     state_path = staging / CELL_STATE_NAME
     sidecar_path = staging / CELL_SIDECAR_NAME
+    # Freeze async cutscene-skip so bg fast_forward cannot advance the emu
+    # between the success RAM snapshot and savestate.save (sidecar/State skew).
+    # _macro_active blocks new chunks; _bg_skip_emu_lock waits out an in-flight
+    # chunk already inside skip_uncontrolled.
+    prev_macro = bool(getattr(env, "_macro_active", False))
+    env._macro_active = True
+    emu_lock = getattr(env, "_bg_skip_emu_lock", None)
     try:
-        env.bridge.save_savestate(str(state_path))
+        live_room = room_id
+        live_state = state
+        read_state = getattr(env, "_read_state", None)
+
+        def _locked_section():
+            nonlocal live_room, live_state
+            if callable(read_state):
+                try:
+                    live = read_state(track_items=False)
+                    live_room = str(live.get("room_id", "") or "")
+                    live_state = live
+                except (OSError, RuntimeError, ValueError, TypeError, AttributeError):
+                    live_room = room_id
+            if expected_room and live_room.upper() != expected_room.upper():
+                print(
+                    f"[yawn_capture] reject pre-save room drift "
+                    f"live={live_room!r} expected={expected_room!r} cp={cid}",
+                    flush=True,
+                )
+                return False
+            if not live_state.get("in_control", True) or live_state.get("dead"):
+                print(
+                    f"[yawn_capture] reject pre-save not settled "
+                    f"in_control={live_state.get('in_control')} "
+                    f"dead={live_state.get('dead')} cp={cid}",
+                    flush=True,
+                )
+                return False
+            env.bridge.save_savestate(str(state_path))
+            if callable(read_state):
+                try:
+                    live_after = read_state(track_items=False)
+                    after_room = str(live_after.get("room_id", "") or "")
+                    live_state = live_after
+                except (OSError, RuntimeError, ValueError, TypeError, AttributeError) as exc:
+                    print(
+                        f"[yawn_capture] reject post-save read failure "
+                        f"cp={cid} err={exc!r}",
+                        flush=True,
+                    )
+                    return False
+                if expected_room and after_room.upper() != expected_room.upper():
+                    print(
+                        f"[yawn_capture] reject post-save room drift "
+                        f"after={after_room!r} expected={expected_room!r} cp={cid}",
+                        flush=True,
+                    )
+                    return False
+                live_room = after_room
+            return True
+
+        if emu_lock is not None:
+            with emu_lock:
+                if not _locked_section():
+                    return None
+        else:
+            if not _locked_section():
+                return None
         sidecar = dump_episode_sidecar(
             env,
-            captured_room_id=str(state.get("room_id", "")),
+            captured_room_id=live_room,
             captured_at_iso=utc_now_iso(),
         )
+        try:
+            sidecar["capture_step"] = int(getattr(env, "_step_count", 0) or 0)
+        except (TypeError, ValueError):
+            sidecar["capture_step"] = 0
         sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
 
         checkpoint_id = str(completed_cp.get("checkpoint_id", "") or cid)
         route_id = str(stage.get("route_id") or "yawn_quest_v2")
         quality = compute_quality(
-            state,
+            live_state,
             ever_held=getattr(getattr(env, "_items", None), "ever_held", None),
             env=env,
         )
@@ -532,7 +610,7 @@ def capture_successor_cell(
             route_id=route_id,
             checkpoint_index=completed,
             checkpoint_id=checkpoint_id,
-            room_id=room_id,
+            room_id=live_room,
             quality=quality,
             state_path=state_path,
             sidecar_path=sidecar_path,
@@ -543,7 +621,7 @@ def capture_successor_cell(
             "route_id": route_id,
             "checkpoint_index": completed,
             "checkpoint_id": checkpoint_id,
-            "room_id": room_id,
+            "room_id": live_room,
             "quality": list(quality),
             "bundle_sha256": str(proposal.get("bundle_sha256") or ""),
             "bytes": int(proposal.get("bytes") or 0),
@@ -571,7 +649,7 @@ def capture_successor_cell(
         row = {
             "checkpoint_index": completed,
             "checkpoint_id": checkpoint_id,
-            "room_id": room_id,
+            "room_id": live_room,
             "route_id": route_id,
             "quality": list(quality),
             "bundle_sha256": proposal.get("bundle_sha256", ""),
@@ -585,6 +663,13 @@ def capture_successor_cell(
             row=row,
             holder="yawn_capture_local",
         )
+        if installed:
+            print(
+                f"[yawn_capture] installed cp{completed:02d} {checkpoint_id} "
+                f"room={live_room} quality={list(quality)}",
+                flush=True,
+            )
         return proposal if installed else None
     finally:
+        env._macro_active = prev_macro
         shutil.rmtree(staging, ignore_errors=True)

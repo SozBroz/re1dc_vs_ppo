@@ -213,6 +213,86 @@ def _existing_cell_quality(root: Path, checkpoint_index: int) -> tuple[int, ...]
     return None
 
 
+def _sidecar_story_keys(sidecar: dict[str, Any]) -> set[str]:
+    """Cutscene ledger keys recorded in a cell sidecar (observed ∪ rewarded)."""
+    prog = sidecar.get("progress") or {}
+    keys: set[str] = set()
+    for field in ("observed_cutscenes", "rewarded_cutscenes"):
+        raw = prog.get(field) or []
+        if isinstance(raw, (list, tuple, set, frozenset)):
+            keys.update(str(x) for x in raw)
+    return keys
+
+
+def _room_dwell_frames(sidecar: dict[str, Any], room_id: str) -> int:
+    """Approx dwell frames in ``room_id`` from room_entries enter steps.
+
+    ``room_entries`` store ``(room_id, enter_step)``. Dwell for a visit is
+    ``next_enter - enter``; the final open visit uses ``capture_step`` when
+    present (else 0 — unknown).
+    """
+    room = str(room_id or "")
+    if not room:
+        return 0
+    hist = (sidecar.get("episode_history") or {}).get("room_entries") or []
+    entries: list[tuple[str, int]] = []
+    for entry in hist:
+        if not isinstance(entry, (list, tuple)) or len(entry) < 2:
+            continue
+        try:
+            entries.append((str(entry[0]), int(entry[1] or 0)))
+        except (TypeError, ValueError):
+            continue
+    try:
+        capture_step = int(sidecar.get("capture_step") or 0)
+    except (TypeError, ValueError):
+        capture_step = 0
+    total = 0
+    for i, (rid, step) in enumerate(entries):
+        if rid != room:
+            continue
+        if i + 1 < len(entries):
+            end = entries[i + 1][1]
+        elif capture_step > step:
+            end = capture_step
+        else:
+            continue
+        if end > step:
+            total += end - step
+    return total
+
+
+def story_progress_allows_overwrite(
+    new_side: dict[str, Any],
+    old_side: dict[str, Any],
+    *,
+    room_id: str = "",
+) -> bool:
+    """True if new sidecar does not regress story vs an existing curated cell.
+
+    Blocks high-HP door-threshold captures from clobbering a more progressed
+    story cell: new must retain every old cutscene key, and must not have
+    strictly thinner dwell in the capture room when both have dwell data.
+    """
+    old_keys = _sidecar_story_keys(old_side)
+    new_keys = _sidecar_story_keys(new_side)
+    missing = old_keys - new_keys
+    if missing:
+        return False
+    room = str(
+        room_id
+        or new_side.get("captured_room_id")
+        or old_side.get("captured_room_id")
+        or ""
+    )
+    if room:
+        new_dwell = _room_dwell_frames(new_side, room)
+        old_dwell = _room_dwell_frames(old_side, room)
+        if old_dwell > 0 and new_dwell < old_dwell:
+            return False
+    return True
+
+
 def try_install_yawn_cell(
     project_root: Path | str,
     *,
@@ -239,6 +319,10 @@ def try_install_yawn_cell(
     side_src = Path(staged_dir) / CELL_SIDECAR_NAME
     if not state_src.is_file() or not side_src.is_file():
         return False
+    try:
+        new_side = json.loads(side_src.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return False
 
     with yawn_cells_locked(root, holder=holder):
         dest = cell_slot_dir(root, idx)
@@ -248,6 +332,33 @@ def try_install_yawn_cell(
                 return False
             if not quality_replace_significant(new_q, old_q):
                 return False
+            # High-HP door-threshold / story-regress captures must not clobber
+            # a more progressed cell (cutscene ledger + room dwell).
+            old_side_p = dest / CELL_SIDECAR_NAME
+            if old_side_p.is_file():
+                try:
+                    old_side = json.loads(old_side_p.read_text(encoding="utf-8-sig"))
+                except (OSError, json.JSONDecodeError):
+                    old_side = {}
+                room = str(
+                    row.get("room_id")
+                    or new_side.get("captured_room_id")
+                    or old_side.get("captured_room_id")
+                    or ""
+                )
+                if not story_progress_allows_overwrite(
+                    new_side, old_side, room_id=room
+                ):
+                    print(
+                        f"[yawn_capture] reject story-regress overwrite "
+                        f"cp{idx:02d} room={room} "
+                        f"old_keys={len(_sidecar_story_keys(old_side))} "
+                        f"new_keys={len(_sidecar_story_keys(new_side))} "
+                        f"old_dwell={_room_dwell_frames(old_side, room)} "
+                        f"new_dwell={_room_dwell_frames(new_side, room)}",
+                        flush=True,
+                    )
+                    return False
 
         incoming = dest.parent / f".incoming_{cell_dir_name(idx)}"
         if incoming.exists():
@@ -588,6 +699,7 @@ class YawnRailsCellStore:
             return None
 
         existing = self.cells.get(idx)
+        capacity_upgrade = False
         if existing is not None:
             old_q = _as_quality(existing.get("quality"))
             capacity_upgrade = (
@@ -619,6 +731,38 @@ class YawnRailsCellStore:
         if not ok:
             self.rejected += 1
             return None
+
+        # Story-regress gate (same as local try_install) before curated write.
+        if existing is not None and not capacity_upgrade:
+            try:
+                with zipfile.ZipFile(io.BytesIO(bundle_bytes)) as zf:
+                    new_side = json.loads(zf.read(CELL_SIDECAR_NAME).decode("utf-8"))
+            except (OSError, zipfile.BadZipFile, json.JSONDecodeError, KeyError, UnicodeDecodeError):
+                self.rejected += 1
+                return None
+            old_side: dict[str, Any] = {}
+            old_side_p = cell_slot_dir(self.root, idx) / CELL_SIDECAR_NAME
+            if old_side_p.is_file():
+                try:
+                    old_side = json.loads(old_side_p.read_text(encoding="utf-8-sig"))
+                except (OSError, json.JSONDecodeError):
+                    old_side = {}
+            room = str(
+                prop.get("room_id")
+                or new_side.get("captured_room_id")
+                or old_side.get("captured_room_id")
+                or ""
+            )
+            if old_side and not story_progress_allows_overwrite(
+                new_side, old_side, room_id=room
+            ):
+                print(
+                    f"[yawn_ingest] reject story-regress overwrite "
+                    f"cp{idx:02d} room={room}",
+                    flush=True,
+                )
+                self.rejected += 1
+                return None
 
         bundle_sha = _sha256_bytes(bundle_bytes)
         self._write_bundle_unlocked(idx, bundle_bytes, prop, bundle_sha)
