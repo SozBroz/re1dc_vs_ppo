@@ -572,7 +572,20 @@ class YawnRailsCellStore:
         self.archive_version = int(raw.get("archive_version", 0) or 0)
         self.route_id = str(raw.get("route_id") or "") or None
         cells: dict[int, dict[str, Any]] = {}
-        for key, row in (raw.get("cells") or {}).items():
+        raw_cells = raw.get("cells") or {}
+        # Canonical store uses dict keyed by index; wipe/seed scripts may leave
+        # a curriculum-style list (same shape as manifest.json).
+        if isinstance(raw_cells, list):
+            pairs: list[tuple[Any, Any]] = [
+                (row.get("checkpoint_index", i), row)
+                for i, row in enumerate(raw_cells)
+                if isinstance(row, dict)
+            ]
+        elif isinstance(raw_cells, dict):
+            pairs = list(raw_cells.items())
+        else:
+            pairs = []
+        for key, row in pairs:
             if not isinstance(row, dict):
                 continue
             try:
