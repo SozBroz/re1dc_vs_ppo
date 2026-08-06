@@ -126,14 +126,9 @@
           "room_id": "203"
         },
         {
-          "type": "observed_cutscene",
-          "prefix": "203:"
-        },
-        {
-          "type": "in_control_steps_since_cutscene",
-          "prefix": "203:",
+          "type": "in_control_steps_in_room",
           "room_id": "203",
-          "min_steps": 45
+          "min_steps": 30
         }
       ]
     }

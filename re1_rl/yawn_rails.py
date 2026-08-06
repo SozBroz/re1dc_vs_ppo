@@ -490,8 +490,7 @@ def capture_successor_cell(
         return None
     if cid == "main_hall_106" and not any(str(k).startswith("106:") for k in ledgers):
         return None
-    if cid == "upper_hall_203" and not any(str(k).startswith("203:") for k in ledgers):
-        return None
+    # First climb to 203 has no cinema at this story beat — do not require 203:.
     next_checkpoint = planner.step_by_seq(completed + 2)
     capacity = successor_capacity(state, next_checkpoint)
     if not capacity["inventory_feasible"]:

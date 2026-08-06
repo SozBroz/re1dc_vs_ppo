@@ -363,6 +363,16 @@ def test_pre_cutscene_room_dwell_does_not_satisfy_post_cutscene_settle() -> None
     )
 
 
+def test_upper_hall_203_is_room_enter_settle_without_cutscene() -> None:
+    """First climb to 203 has no cinema; cutscene gate would softlock cp04 forever."""
+    planner = _planner(start_index=_idx("upper_hall_203"))
+    bare = ProgressTracker()
+    assert not planner.advance_if_success(_state("203"), progress=bare)
+    ok = ProgressTracker()
+    _settle(ok, "203", steps=30)
+    assert planner.advance_if_success(_state("203"), progress=ok)
+
+
 def test_main_hall_rejects_room_spoof_without_106_cutscene() -> None:
     planner = _planner(start_index=_idx("main_hall_106"))
     spoof = ProgressTracker()
