@@ -732,9 +732,10 @@ def test_sampling_filters_legacy_and_infeasible_mandatory_pickup_rows(
     assert chosen["reset_source"] == "route_initial"
 
 
-def test_checkpoint_success_captures_successor_cell(
+def test_checkpoint_success_proposes_without_local_install_when_sync_on(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "1")
     bridge = MagicMock()
     bridge.save_savestate.side_effect = (
         lambda path: Path(path).write_bytes(b"state")
@@ -762,17 +763,81 @@ def test_checkpoint_success_captures_successor_cell(
         {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
     )
 
-    captured = tmp_path / "states/yawn_rails/cells/cp00/cell.State"
+    curated = tmp_path / "states/yawn_rails/cells/cp00/cell.State"
     assert proposal is not None
     assert proposal["checkpoint_index"] == 0
-    bridge.save_savestate.assert_called_once_with(str(captured))
-    manifest = json.loads(
-        (tmp_path / "states/yawn_rails/manifest.json").read_text(encoding="utf-8")
-    )
-    assert manifest["cells"][0]["checkpoint_index"] == 0
-    assert manifest["cells"][0]["checkpoint_id"] == "emblem_105"
-    assert manifest["cells"][0]["inventory_feasible"] is True
     assert proposal["next_checkpoint_id"] == "kenneth_104"
+    assert not curated.is_file()  # learner + poll install curated slots
+    assert bridge.save_savestate.called
+    # Staging cleaned up after propose.
+    staging_root = tmp_path / "states/yawn_rails/.staging"
+    if staging_root.is_dir():
+        assert list(staging_root.iterdir()) == []
+
+
+def test_local_cas_installs_better_and_rejects_worse(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
+    from re1_rl.yawn_rails_sync import (
+        CELL_SIDECAR_NAME,
+        CELL_STATE_NAME,
+        try_install_yawn_cell,
+        yawn_rails_root,
+    )
+
+    yr = yawn_rails_root(tmp_path)
+    # Seed a strong curated cell.
+    good = yr / "cells" / "cp00"
+    good.mkdir(parents=True)
+    (good / CELL_STATE_NAME).write_bytes(b"GOOD")
+    (good / CELL_SIDECAR_NAME).write_text("{}", encoding="utf-8")
+    (yr / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "archive_version": 1,
+                "cells": [
+                    {
+                        "checkpoint_index": 0,
+                        "checkpoint_id": "emblem_105",
+                        "quality": [96, 45, 0, 4, 1, 0],
+                        "state_path": "states/yawn_rails/cells/cp00/cell.State",
+                        "sidecar_path": "states/yawn_rails/cells/cp00/cell.sidecar.json",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    worse = yr / ".staging" / "worse"
+    worse.mkdir(parents=True)
+    (worse / CELL_STATE_NAME).write_bytes(b"BAD")
+    (worse / CELL_SIDECAR_NAME).write_text("{}", encoding="utf-8")
+    assert not try_install_yawn_cell(
+        tmp_path,
+        checkpoint_index=0,
+        staged_dir=worse,
+        quality=[51, 45, 0, 4, 1, 0],
+        row={"checkpoint_id": "emblem_105", "quality": [51, 45, 0, 4, 1, 0]},
+    )
+    assert (good / CELL_STATE_NAME).read_bytes() == b"GOOD"
+
+    better = yr / ".staging" / "better"
+    better.mkdir(parents=True)
+    (better / CELL_STATE_NAME).write_bytes(b"BETTER")
+    (better / CELL_SIDECAR_NAME).write_text("{}", encoding="utf-8")
+    assert try_install_yawn_cell(
+        tmp_path,
+        checkpoint_index=0,
+        staged_dir=better,
+        quality=[96, 60, 0, 4, 1, 0],
+        row={"checkpoint_id": "emblem_105", "quality": [96, 60, 0, 4, 1, 0]},
+    )
+    assert (yr / "cells" / "cp00" / CELL_STATE_NAME).read_bytes() == b"BETTER"
+    man = json.loads((yr / "manifest.json").read_text(encoding="utf-8"))
+    assert man["cells"][0]["quality"][:2] == [96, 60]
 
 
 def test_11b_almanac_has_chemical_but_not_square_crank() -> None:

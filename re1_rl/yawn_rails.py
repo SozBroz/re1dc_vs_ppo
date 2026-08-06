@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import random
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -447,21 +448,16 @@ def capture_successor_cell(
 ) -> dict[str, Any] | None:
     """Capture a clean successor start and return a fleet sync proposal.
 
-    Always writes the local ``states/yawn_rails/cells/cpNN`` bundle + sampling
-    manifest row. The returned proposal is attached to episode infos so the
-    learner can admit/replace the canonical fleet copy.
-
-    When ``RE1_YAWN_RAILS_SYNC=0``, capture is frozen (no local overwrite, no
-    fleet proposal) so curated cells cannot desync from the manifest again.
+    Always saves into a staging directory first (never blind-overwrites curated
+    ``cpNN``). When ``RE1_YAWN_RAILS_SYNC=1`` (fleet default), only the proposal
+    is returned — the learner quality-gate admits, then workers install via
+    verified poll. When sync is off, local compare-and-swap installs only if the
+    new quality beats the existing curated cell.
     """
     if float(breakdown.get("checkpoint_success", 0.0)) <= 0.0:
         return None
     stage = getattr(env, "_stage", {})
     if stage.get("mode") != "yawn_rails":
-        return None
-    from re1_rl.yawn_rails_sync import yawn_rails_sync_enabled
-
-    if not yawn_rails_sync_enabled():
         return None
     if not state.get("in_control", True) or state.get("dead"):
         return None
@@ -474,101 +470,102 @@ def capture_successor_cell(
     if not capacity["inventory_feasible"]:
         return None
 
-    root = Path(env.project_root)
-    cell_dir = root / "states" / "yawn_rails" / "cells" / f"cp{completed:02d}"
-    cell_dir.mkdir(parents=True, exist_ok=True)
-    state_path = cell_dir / "cell.State"
-    sidecar_path = cell_dir / "cell.sidecar.json"
-    env.bridge.save_savestate(str(state_path))
-    sidecar = dump_episode_sidecar(
-        env,
-        captured_room_id=str(state.get("room_id", "")),
-        captured_at_iso=utc_now_iso(),
-    )
-    sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
-
-    checkpoint_id = str(
-        (planner.step_by_seq(completed + 1) or {}).get("checkpoint_id", "")
-    )
-    room_id = str(state.get("room_id", ""))
-    route_id = str(stage.get("route_id") or "yawn_quest_v2")
-
     from re1_rl.go_explore_capture import compute_quality
-    from re1_rl.yawn_rails_sync import build_capture_proposal
-
-    quality = compute_quality(
-        state,
-        ever_held=getattr(getattr(env, "_items", None), "ever_held", None),
-        env=env,
-    )
-    proposal = build_capture_proposal(
-        route_id=route_id,
-        checkpoint_index=completed,
-        checkpoint_id=checkpoint_id,
-        room_id=room_id,
-        quality=quality,
-        state_path=state_path,
-        sidecar_path=sidecar_path,
-        worker_id=os.environ.get("MACHINE_NAME"),
-        capacity=capacity,
+    from re1_rl.yawn_rails_sync import (
+        CELL_META_NAME,
+        CELL_SIDECAR_NAME,
+        CELL_STATE_NAME,
+        build_capture_proposal,
+        cell_dir_name,
+        try_install_yawn_cell,
+        yawn_rails_root,
+        yawn_rails_sync_enabled,
     )
 
-    # Bind this State to its proposal sha so poll cannot treat a stale learner
-    # meta.json as a cache hit after a rejected local overwrite.
-    meta_path = cell_dir / "meta.json"
-    meta_path.write_text(
-        json.dumps(
-            {
-                "route_id": route_id,
-                "checkpoint_index": completed,
-                "checkpoint_id": checkpoint_id,
-                "room_id": room_id,
-                "quality": list(quality),
-                "bundle_sha256": str(proposal.get("bundle_sha256") or ""),
-                "bytes": int(proposal.get("bytes") or 0),
-                **{
-                    k: capacity[k]
-                    for k in (
-                        "inventory_free_slots",
-                        "next_checkpoint_id",
-                        "next_slots_needed",
-                        "inventory_feasible",
-                        "captured_in_box_room",
-                    )
-                    if k in capacity
-                },
-            },
-            indent=2,
-            sort_keys=True,
+    root = Path(env.project_root)
+    yr = yawn_rails_root(root)
+    staging = yr / ".staging" / f"{cell_dir_name(completed)}_{os.getpid()}"
+    if staging.exists():
+        shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir(parents=True, exist_ok=True)
+    state_path = staging / CELL_STATE_NAME
+    sidecar_path = staging / CELL_SIDECAR_NAME
+    try:
+        env.bridge.save_savestate(str(state_path))
+        sidecar = dump_episode_sidecar(
+            env,
+            captured_room_id=str(state.get("room_id", "")),
+            captured_at_iso=utc_now_iso(),
         )
-        + "\n",
-        encoding="utf-8",
-    )
+        sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
 
-    # Local sampling manifest (learner poll overwrites only after verified fetch).
-    manifest_path = root / stage["cells_manifest"]
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest = load_manifest(root, stage)
-    rel_state = state_path.relative_to(root).as_posix()
-    rel_sidecar = sidecar_path.relative_to(root).as_posix()
-    row = {
-        "checkpoint_index": completed,
-        "checkpoint_id": checkpoint_id,
-        "room_id": room_id,
-        "state_path": rel_state,
-        "sidecar_path": rel_sidecar,
-        "quality": list(quality),
-        "bundle_sha256": proposal.get("bundle_sha256", ""),
-        **capacity,
-    }
-    cells = [
-        old for old in manifest["cells"]
-        if int(old.get("checkpoint_index", -999)) != completed
-    ]
-    cells.append(row)
-    manifest["route_id"] = route_id
-    manifest["cells"] = sorted(cells, key=lambda x: int(x["checkpoint_index"]))
-    tmp = manifest_path.with_suffix(f".{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    os.replace(tmp, manifest_path)
-    return proposal
+        checkpoint_id = str(
+            (planner.step_by_seq(completed + 1) or {}).get("checkpoint_id", "")
+        )
+        room_id = str(state.get("room_id", ""))
+        route_id = str(stage.get("route_id") or "yawn_quest_v2")
+        quality = compute_quality(
+            state,
+            ever_held=getattr(getattr(env, "_items", None), "ever_held", None),
+            env=env,
+        )
+        proposal = build_capture_proposal(
+            route_id=route_id,
+            checkpoint_index=completed,
+            checkpoint_id=checkpoint_id,
+            room_id=room_id,
+            quality=quality,
+            state_path=state_path,
+            sidecar_path=sidecar_path,
+            worker_id=os.environ.get("MACHINE_NAME"),
+            capacity=capacity,
+        )
+        meta = {
+            "route_id": route_id,
+            "checkpoint_index": completed,
+            "checkpoint_id": checkpoint_id,
+            "room_id": room_id,
+            "quality": list(quality),
+            "bundle_sha256": str(proposal.get("bundle_sha256") or ""),
+            "bytes": int(proposal.get("bytes") or 0),
+            **{
+                k: capacity[k]
+                for k in (
+                    "inventory_free_slots",
+                    "next_checkpoint_id",
+                    "next_slots_needed",
+                    "inventory_feasible",
+                    "captured_in_box_room",
+                )
+                if k in capacity
+            },
+        }
+        (staging / CELL_META_NAME).write_text(
+            json.dumps(meta, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+        if yawn_rails_sync_enabled():
+            # Learner admits; workers install via verified poll only.
+            return proposal
+
+        row = {
+            "checkpoint_index": completed,
+            "checkpoint_id": checkpoint_id,
+            "room_id": room_id,
+            "route_id": route_id,
+            "quality": list(quality),
+            "bundle_sha256": proposal.get("bundle_sha256", ""),
+            **capacity,
+        }
+        installed = try_install_yawn_cell(
+            root,
+            checkpoint_index=completed,
+            staged_dir=staging,
+            quality=quality,
+            row=row,
+            holder="yawn_capture_local",
+        )
+        return proposal if installed else None
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)

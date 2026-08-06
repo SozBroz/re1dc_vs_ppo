@@ -15,9 +15,11 @@ import os
 import shutil
 import tempfile
 import threading
+import time
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from re1_rl.go_explore_archive import quality_beats
 from re1_rl.go_explore_merge import (
@@ -32,12 +34,131 @@ STORE_FILENAME = "store.json"
 MANIFEST_FILENAME = "manifest.json"
 _ROOT_ENV = "RE1_YAWN_RAILS_ROOT"
 _SYNC_ENV = "RE1_YAWN_RAILS_SYNC"
+_LOCK_NAME = "cells.sync.lock"
+_STALE_LOCK_S = 180.0
 
 
 def yawn_rails_sync_enabled() -> bool:
-    """Cross-machine yawn mirror + local capture; ``RE1_YAWN_RAILS_SYNC=0`` freezes."""
+    """Learner-authoritative cross-machine yawn sync (default on).
+
+    ``RE1_YAWN_RAILS_SYNC=0`` disables learner merge + worker poll; local capture
+    then uses compare-and-swap only on that machine.
+    """
     raw = os.environ.get(_SYNC_ENV, "1").strip().lower()
     return raw not in {"0", "false", "no", "off"}
+
+
+def _lock_path(root: Path) -> Path:
+    return Path(root) / _LOCK_NAME
+
+
+def _clear_stale_yawn_lock(root: Path, *, stale_s: float = _STALE_LOCK_S) -> bool:
+    lp = _lock_path(root)
+    if not lp.is_file():
+        return False
+    try:
+        age = time.time() - lp.stat().st_mtime
+    except OSError:
+        return False
+    if age < float(stale_s):
+        return False
+    try:
+        lp.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def acquire_yawn_cells_lock(
+    root: Path | str,
+    *,
+    holder: str = "yawn_rails",
+    stale_s: float = _STALE_LOCK_S,
+) -> bool:
+    """Exclusive lockfile under the yawn rails root. False if another holder is live."""
+    path = Path(root)
+    path.mkdir(parents=True, exist_ok=True)
+    _clear_stale_yawn_lock(path, stale_s=stale_s)
+    lp = _lock_path(path)
+    if lp.is_file():
+        return False
+    payload = {
+        "holder": str(holder),
+        "created_unix": time.time(),
+        "pid": os.getpid(),
+    }
+    tmp = path / f".{_LOCK_NAME}.{os.getpid()}.tmp"
+    try:
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        fd = os.open(str(lp), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(tmp.read_text(encoding="utf-8"))
+        finally:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        return True
+    except FileExistsError:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        return False
+    except OSError:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        return False
+
+
+def release_yawn_cells_lock(root: Path | str) -> None:
+    try:
+        _lock_path(Path(root)).unlink()
+    except OSError:
+        pass
+
+
+def wait_for_yawn_cells_unlock(
+    root: Path | str,
+    *,
+    timeout_s: float = 90.0,
+    poll_s: float = 0.25,
+    stale_s: float = _STALE_LOCK_S,
+) -> bool:
+    path = Path(root)
+    deadline = time.monotonic() + max(0.0, float(timeout_s))
+    while True:
+        _clear_stale_yawn_lock(path, stale_s=stale_s)
+        if not _lock_path(path).is_file():
+            return True
+        if time.monotonic() >= deadline:
+            _clear_stale_yawn_lock(path, stale_s=stale_s)
+            return not _lock_path(path).is_file()
+        time.sleep(max(0.05, float(poll_s)))
+
+
+@contextmanager
+def yawn_cells_locked(
+    root: Path | str,
+    *,
+    holder: str = "yawn_rails",
+    timeout_s: float = 90.0,
+) -> Iterator[None]:
+    path = Path(root)
+    if not wait_for_yawn_cells_unlock(path, timeout_s=timeout_s):
+        raise TimeoutError(f"yawn cells lock timeout: {path}")
+    if not acquire_yawn_cells_lock(path, holder=holder):
+        if not wait_for_yawn_cells_unlock(path, timeout_s=min(5.0, timeout_s)):
+            raise TimeoutError(f"yawn cells lock busy: {path}")
+        if not acquire_yawn_cells_lock(path, holder=holder):
+            raise TimeoutError(f"yawn cells lock acquire failed: {path}")
+    try:
+        yield
+    finally:
+        release_yawn_cells_lock(path)
 
 
 def yawn_rails_root(project_root: Path | str | None = None) -> Path:
@@ -59,6 +180,132 @@ def cell_dir_name(checkpoint_index: int) -> str:
 
 def cell_slot_dir(root: Path | str, checkpoint_index: int) -> Path:
     return Path(root) / "cells" / cell_dir_name(checkpoint_index)
+
+
+def _existing_cell_quality(root: Path, checkpoint_index: int) -> tuple[int, ...] | None:
+    """Best-effort quality for an installed cell (manifest row, else meta)."""
+    man_p = Path(root) / MANIFEST_FILENAME
+    if man_p.is_file():
+        try:
+            man = json.loads(man_p.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            man = {}
+        for row in man.get("cells") or []:
+            if not isinstance(row, dict):
+                continue
+            try:
+                if int(row["checkpoint_index"]) != int(checkpoint_index):
+                    continue
+            except (KeyError, TypeError, ValueError):
+                continue
+            q = _as_quality(row.get("quality"))
+            if q is not None:
+                return q
+    meta_p = cell_slot_dir(root, checkpoint_index) / CELL_META_NAME
+    if meta_p.is_file():
+        try:
+            meta = json.loads(meta_p.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            meta = {}
+        q = _as_quality(meta.get("quality"))
+        if q is not None:
+            return q
+    return None
+
+
+def try_install_yawn_cell(
+    project_root: Path | str,
+    *,
+    checkpoint_index: int,
+    staged_dir: Path,
+    quality: list[int] | tuple[int, ...],
+    row: dict[str, Any],
+    holder: str = "yawn_capture",
+) -> bool:
+    """Compare-and-swap install from ``staged_dir`` into curated ``cpNN``.
+
+    Under the store file lock: reject unless new quality beats the existing cell
+    (same ``quality_beats`` + ``quality_replace_significant`` rules as learner
+    ingest). Returns True when the curated slot was updated.
+    """
+    from re1_rl.go_explore_capture import quality_replace_significant
+
+    root = yawn_rails_root(project_root)
+    idx = int(checkpoint_index)
+    new_q = _as_quality(quality)
+    if new_q is None:
+        return False
+    state_src = Path(staged_dir) / CELL_STATE_NAME
+    side_src = Path(staged_dir) / CELL_SIDECAR_NAME
+    if not state_src.is_file() or not side_src.is_file():
+        return False
+
+    with yawn_cells_locked(root, holder=holder):
+        dest = cell_slot_dir(root, idx)
+        old_q = _existing_cell_quality(root, idx)
+        if old_q is not None:
+            if not quality_beats(new_q, old_q):
+                return False
+            if not quality_replace_significant(new_q, old_q):
+                return False
+
+        incoming = dest.parent / f".incoming_{cell_dir_name(idx)}"
+        if incoming.exists():
+            shutil.rmtree(incoming, ignore_errors=True)
+        incoming.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copy2(state_src, incoming / CELL_STATE_NAME)
+            shutil.copy2(side_src, incoming / CELL_SIDECAR_NAME)
+            meta_src = Path(staged_dir) / CELL_META_NAME
+            if meta_src.is_file():
+                shutil.copy2(meta_src, incoming / CELL_META_NAME)
+            else:
+                (incoming / CELL_META_NAME).write_text(
+                    json.dumps(dict(row), indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if dest.exists():
+                shutil.rmtree(dest, ignore_errors=True)
+            os.replace(str(incoming), str(dest))
+        except OSError:
+            shutil.rmtree(incoming, ignore_errors=True)
+            return False
+
+        man_p = root / MANIFEST_FILENAME
+        if man_p.is_file():
+            try:
+                man = json.loads(man_p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                man = {"schema_version": 1, "cells": []}
+        else:
+            man = {"schema_version": 1, "cells": []}
+        cells = [
+            old
+            for old in (man.get("cells") or [])
+            if isinstance(old, dict)
+            and int(old.get("checkpoint_index", -999)) != idx
+        ]
+        install_row = dict(row)
+        install_row["checkpoint_index"] = idx
+        install_row["quality"] = list(new_q)
+        install_row.setdefault(
+            "state_path",
+            f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}",
+        )
+        install_row.setdefault(
+            "sidecar_path",
+            f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}",
+        )
+        cells.append(install_row)
+        man["cells"] = sorted(cells, key=lambda x: int(x["checkpoint_index"]))
+        if install_row.get("route_id"):
+            man["route_id"] = install_row["route_id"]
+        man["archive_version"] = int(man.get("archive_version", 0) or 0) + 1
+        tmp = man_p.with_suffix(f".{os.getpid()}.tmp")
+        tmp.write_text(json.dumps(man, indent=2) + "\n", encoding="utf-8")
+        os.replace(tmp, man_p)
+        return True
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -306,14 +553,15 @@ class YawnRailsCellStore:
         if not proposals:
             return accepted
         with self._lock:
-            self._load()
-            for prop in proposals:
-                cid = self._ingest_one_unlocked(prop)
-                if cid is not None:
-                    accepted.append(cid)
-            if accepted:
-                self.archive_version += 1
-                self._persist_unlocked()
+            with yawn_cells_locked(self.root, holder="yawn_learner_ingest"):
+                self._load()
+                for prop in proposals:
+                    cid = self._ingest_one_unlocked(prop)
+                    if cid is not None:
+                        accepted.append(cid)
+                if accepted:
+                    self.archive_version += 1
+                    self._persist_unlocked()
         return accepted
 
     def _ingest_one_unlocked(self, prop: dict[str, Any]) -> str | None:

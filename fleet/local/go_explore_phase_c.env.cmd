@@ -4,9 +4,9 @@ call "%~dp0obs_raw.env.cmd"
 call "%~dp0reset_mix_l_passage.env.cmd"
 set RE1_GO_EXPLORE_CAPTURE=1
 set RE1_GO_EXPLORE_ARCHIVE=data\go_explore\archive.json
-REM Cross-machine cell sync OFF (2026-08-05): local cells only; no learner mirror.
+REM Yawn rails: learner-authoritative sync (CAS + verified poll). Go-Explore mirror stays off.
 set RE1_GO_EXPLORE_SYNC=0
-set RE1_YAWN_RAILS_SYNC=0
+set RE1_YAWN_RAILS_SYNC=1
 set RE1_YAWN_RAILS_ROOT=states\yawn_rails
 set RE1_YAWN_RAILS_MANIFEST_POLL_S=60
 set RE1_GO_EXPLORE_MANIFEST_POLL_S=60

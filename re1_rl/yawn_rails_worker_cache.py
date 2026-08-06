@@ -17,6 +17,7 @@ from re1_rl.yawn_rails_sync import (
     MANIFEST_FILENAME,
     cell_dir_name,
     cell_slot_dir,
+    yawn_cells_locked,
     yawn_rails_root,
     yawn_rails_sync_enabled,
 )
@@ -145,9 +146,10 @@ def ensure_yawn_bundle_cached(
                 json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if dest.exists():
-            shutil.rmtree(dest, ignore_errors=True)
-        os.replace(str(incoming), str(dest))
+        with yawn_cells_locked(root, holder="yawn_poll_install"):
+            if dest.exists():
+                shutil.rmtree(dest, ignore_errors=True)
+            os.replace(str(incoming), str(dest))
     except Exception:
         shutil.rmtree(incoming, ignore_errors=True)
         return None
