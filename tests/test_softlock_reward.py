@@ -56,9 +56,9 @@ def _step(
 
 
 def test_softlock_budget_is_independent_static():
-    assert CONTEMPT_BUDGET_SCALED == pytest.approx(1.0 / 15.0)  # |death|/5
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-(1.0 / 15.0))
-    assert DEATH_PENALTY_SCALED == pytest.approx(1.0 / 3.0)
+    assert CONTEMPT_BUDGET_SCALED == pytest.approx(4.0 / 15.0)  # |death|/5
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-(4.0 / 15.0))
+    assert DEATH_PENALTY_SCALED == pytest.approx(4.0 / 3.0)
     assert CONTEMPT_BUDGET_SCALED < SURVIVAL_BUDGET_SCALED
 
 

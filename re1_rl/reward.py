@@ -79,17 +79,17 @@ CHECKPOINT_MAX_STEPS_EXTENSION = SOFTLOCK_EXTENSION_FRAMES // 8  # 5400 steps / 
 CONTEMPT_GRACE_FRAMES = 3 * 60 * 60
 
 JILL_FINE_HP = 96  # Jill Fine / practical max (RAM ceiling PLAYER_HP_MAX=140)
-# Survival budget 1.0; same chip/death ratio as before (2/3 dense Fine→1, 1/3 death).
+# Survival budget 4.0 (4× prior); same chip/death ratio (2/3 dense Fine→1, 1/3 death).
 # Literals below are precomputed; not derived from CHECKPOINT_REWARD.
-SURVIVAL_BUDGET_SCALED = 1.0
-NEAR_DEATH_DAMAGE_SCALED = 0.6666666666666666  # 2/3
-DEATH_PENALTY_SCALED = 0.3333333333333333  # 1/3
-DEATH_PENALTY = -0.3333333333333333
+SURVIVAL_BUDGET_SCALED = 4.0
+NEAR_DEATH_DAMAGE_SCALED = 2.6666666666666665  # 8/3
+DEATH_PENALTY_SCALED = 1.3333333333333333  # 4/3
+DEATH_PENALTY = -1.3333333333333333
 # Sole Kenneth gate: illegal pre-Kenneth transition into Main Hall room 106.
 MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.05
 # Idle contempt budget: death/5 → static literal under new death.
-CONTEMPT_BUDGET_SCALED = 0.06666666666666667  # |DEATH|/5
-SOFTLOCK_TIMEOUT_PENALTY = -0.06666666666666667
+CONTEMPT_BUDGET_SCALED = 0.26666666666666666  # |DEATH|/5
+SOFTLOCK_TIMEOUT_PENALTY = -0.26666666666666666
 
 ENEMY_DAMAGE_REWARD = 0.007
 ENEMY_KILL_REWARD = 0.24
@@ -235,9 +235,9 @@ def gamma_for_emulated_half_life(
 RAILS_CREDIT_HALF_LIFE_S = 25.0
 RL_GAMMA = gamma_for_emulated_half_life(RAILS_CREDIT_HALF_LIFE_S)
 
-# Per-HP damage / heal: (2/3) / (JILL_FINE_HP - 1) = (2/3)/95. Exact inverse heal.
-HP_LOSS_SCALE = 0.007017543859649122
-HP_GAIN_SCALE = 0.007017543859649122
+# Per-HP damage / heal: (8/3) / (JILL_FINE_HP - 1) = (8/3)/95. Exact inverse heal.
+HP_LOSS_SCALE = 0.02807017543859649
+HP_GAIN_SCALE = 0.02807017543859649
 # Legacy export; heal is linear now (kept so old imports do not break).
 HEAL_LOG_CURVE_EXPONENT = 1.0
 

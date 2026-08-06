@@ -187,8 +187,8 @@ stubs; live tax writes `bd["ammo_waste"]` via the clip helpers.
 
 All live reward/punishment magnitudes in `reward.py` are **independent static
 floats** — not derived from `CHECKPOINT_REWARD` (legacy label only). Survival
-budget **1.0**: Fine→1 chip **−2/3**, death **−1/3**. Per-HP scale
-`HP_LOSS_SCALE` = **(2/3)/95** ≈ **0.007017543859649122** (Jill Fine
+budget **4.0**: Fine→1 chip **−8/3**, death **−4/3**. Per-HP scale
+`HP_LOSS_SCALE` = **(8/3)/95** ≈ **0.02807017543859649** (Jill Fine
 `JILL_FINE_HP=96`, not RAM ceiling 140). Living step cost **−0.00024**.
 
 - Taking damage: linear per-HP penalty (`HP_LOSS_SCALE`).
@@ -218,7 +218,7 @@ budget **1.0**: Fine→1 chip **−2/3**, death **−1/3**. Per-HP scale
   budget and every progress extension** (new room / document examine / key
   pickup / key use / first weapon / gallery, via `SOFTLOCK_EXTENSION_FRAMES`)
   are **6 min** emulated — one clock. Contempt budget is the independent
-  static **|death|/5 ≈ 0.06666666666666667** (`CONTEMPT_BUDGET_SCALED`).
+  static **|death|/5 ≈ 0.26666666666666666** (`CONTEMPT_BUDGET_SCALED`).
   Dense in scalar reward under main γ (**~0.996314**, ~25s pure-discount
   half-life) — no separate softlock MC channel.
 
