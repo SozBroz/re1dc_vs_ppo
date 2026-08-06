@@ -75,6 +75,51 @@ def drain_action_logits(
     return report
 
 
+def boost_action_logits(
+    model: Any,
+    *,
+    actions: Sequence[str] = ("attack",),
+    factor: float = 2.0,
+) -> dict[str, Any]:
+    """Add a modest prior to action bias rows: ``bias += log(factor)``.
+
+    Default ``factor=2`` (≈ +0.69) roughly doubles relative odds vs peers —
+    enough to prefer an under-used action without the multi-hour unlearn of a
+    ``log(100)`` transplant-scale shove. Does not touch weight rows.
+    """
+    if factor <= 0:
+        raise ValueError(f"factor must be > 0, got {factor}")
+
+    action_net = model.policy.action_net
+    bias = action_net.bias
+    if bias is None:
+        raise RuntimeError("policy.action_net missing bias")
+
+    name_to_idx = {name: i for i, name in enumerate(ACTION_NAMES)}
+    missing = [a for a in actions if a not in name_to_idx]
+    if missing:
+        raise KeyError(f"unknown actions: {missing}")
+
+    delta = float(np.log(float(factor)))
+    report: dict[str, Any] = {
+        "factor": float(factor),
+        "delta": delta,
+        "actions": {},
+    }
+    with torch.no_grad():
+        for name in actions:
+            i = name_to_idx[name]
+            before_b = float(bias[i].detach().cpu())
+            bias[i].add_(delta)
+            after_b = float(bias[i].detach().cpu())
+            report["actions"][name] = {
+                "index": i,
+                "bias_before": before_b,
+                "bias_after": after_b,
+            }
+    return report
+
+
 def format_drain_report(report: dict[str, Any]) -> Iterable[str]:
     yield (
         f"drain factor={report['factor']} delta={report['delta']:.3f} "
@@ -85,4 +130,12 @@ def format_drain_report(report: dict[str, Any]) -> Iterable[str]:
         yield (
             f"  {name}[{row['index']}]: bias {row['bias_before']:.3f}->{row['bias_after']:.3f} "
             f"||w|| {row['weight_norm_before']:.3f}->{row['weight_norm_after']:.3f}"
+        )
+
+
+def format_boost_report(report: dict[str, Any]) -> Iterable[str]:
+    yield f"boost factor={report['factor']} delta={report['delta']:.3f}"
+    for name, row in report.get("actions", {}).items():
+        yield (
+            f"  {name}[{row['index']}]: bias {row['bias_before']:.3f}->{row['bias_after']:.3f}"
         )

@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from re1_rl.action_head_surgery import drain_action_logits
+from re1_rl.action_head_surgery import boost_action_logits, drain_action_logits
 from re1_rl.env import ACTION_NAMES
 
 
@@ -40,3 +40,20 @@ def test_drain_equip_aligns_below_movement_mean() -> None:
     assert abs(after - (2.0 - torch.log(torch.tensor(100.0)).item())) < 1e-5
     wn = float(model.policy.action_net.weight[eq].norm())
     assert abs(wn - (8.0**0.5) * 0.25) < 1e-5
+
+
+def test_boost_neutral_attack_adds_log_factor() -> None:
+    model = _Model()
+    atk = ACTION_NAMES.index("attack")
+    up = ACTION_NAMES.index("attack_up")
+    with torch.no_grad():
+        model.policy.action_net.bias.fill_(0.0)
+        model.policy.action_net.bias[atk] = 1.0
+        model.policy.action_net.bias[up] = 1.0
+
+    report = boost_action_logits(model, actions=("attack",), factor=2.0)
+    after = float(model.policy.action_net.bias[atk])
+    assert after == report["actions"]["attack"]["bias_after"]
+    assert abs(after - (1.0 + torch.log(torch.tensor(2.0)).item())) < 1e-5
+    # Only neutral attack moves; up/down untouched.
+    assert float(model.policy.action_net.bias[up]) == 1.0
