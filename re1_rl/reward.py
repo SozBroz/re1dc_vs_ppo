@@ -591,9 +591,20 @@ def compute_reward(
 
         target = planner.next_waypoint_room()
         if room_changed and target is not None:
-            if prev_room == str(target) and room != str(target) \
-                    and planner.next_waypoint_room() == str(target):
-                bd["retreat"] = RETREAT_PENALTY
+            left_target = (
+                prev_room == str(target)
+                and room != str(target)
+                and planner.next_waypoint_room() == str(target)
+            )
+            if left_target:
+                # Pre-L: soft retreat. Post-L: leaving the checkpoint room is
+                # terminal wrong_room (-4 + episode end), same as hop detours.
+                if _wrong_room_terminal_active(planner):
+                    bd["wrong_room"] = WRONG_ROOM_TERMINAL_PENALTY
+                    if progress is not None:
+                        progress.breach_wrong_room()
+                else:
+                    bd["retreat"] = RETREAT_PENALTY
             elif room != str(target):
                 prev_hops = graph.hop_distance(prev_room, str(target))
                 now_hops = graph.hop_distance(room, str(target))
@@ -818,7 +829,12 @@ def compute_reward(
         if rounds > 0:
             from re1_rl.ammo_accounting import fireable_ammo_before_miss
 
-            wid = int(state.get("equipped_weapon_id", 0) or 0)
+            # Deferred projectile miss may resolve after a weapon swap.
+            wid = int(
+                state.get("pending_miss_weapon_id")
+                or state.get("equipped_weapon_id", 0)
+                or 0
+            )
             ammo_before = fireable_ammo_before_miss(
                 state, wid, rounds_spent=rounds,
             )

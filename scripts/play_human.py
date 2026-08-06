@@ -61,7 +61,7 @@ from re1_rl.cutscene_reward import (
     format_cutscene_gate_panel,
     qualify_cutscene_reward,
 )
-from re1_rl.enemy_combat import apply_combat_step_fields
+from re1_rl.enemy_combat import apply_combat_step_fields, tick_pending_combat_credit
 from re1_rl.ram_skip import RamSkipper, SKIP_POLL_RAM_FIELDS, in_control_from_ram, item_inventory_screen_from_ram, needs_skip_from_ram
 from re1_rl.sticky_input import human_buttons_to_step, human_step_gate
 from re1_rl.reward import (
@@ -1840,11 +1840,27 @@ def human_advance(
 
     env._step_count += 1
     state = env._read_state()
+    credit_pending = (
+        int((env._prev_state or {}).get("pending_combat_frames") or 0) > 0
+        and not (knife or attack)
+    )
     state = apply_combat_step_fields(
         env._prev_state,
         state,
         knife=knife,
         attack=attack,
+        credit_damage=credit_pending,
+    )
+    step_frames = int(getattr(env, "frame_skip", 8) or 8)
+    state = tick_pending_combat_credit(
+        env._prev_state,
+        state,
+        knife=knife,
+        attack=attack,
+        step_emulated_frames=step_frames,
+        ammo_spent=int(state.get("ammo_spent") or 0),
+        weapon_id=int(state.get("equipped_weapon_id") or 0),
+        attack_outcome=str(state.get("attack_outcome") or ""),
     )
     if sticky.get("up"):
         env._forward_collision_stall = update_forward_collision_stall(

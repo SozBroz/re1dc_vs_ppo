@@ -196,6 +196,7 @@ def apply_combat_step_fields(
     *,
     knife: bool = False,
     attack: bool = False,
+    credit_damage: bool = False,
 ) -> dict[str, Any]:
     """Attach ``enemy_damage`` / ``enemy_kills`` (and miss flags) like ``env.step``.
 
@@ -204,6 +205,10 @@ def apply_combat_step_fields(
 
     HP flicker / despawn during interact / door / cutscene (no knife or attack
     this step) must not pay either — live dining door interact minted +0.06.
+
+    ``credit_damage`` pays HP deltas while a pending shot window is open (dog
+    lag / grenade flight). It must not set miss flags. Arm via
+    ``tick_pending_combat_credit`` after a fire that has not yet resolved.
     """
     out = dict(state)
     prev_room = str(prev_state.get("room_id", "") or "")
@@ -214,7 +219,7 @@ def apply_combat_step_fields(
         out["combat_events"] = []
         return out
 
-    if not knife and not attack:
+    if not knife and not attack and not credit_damage:
         out["enemy_damage"] = 0
         out["enemy_kills"] = 0
         out["combat_events"] = []
@@ -254,4 +259,112 @@ def apply_combat_step_fields(
     if enemy_damage == 0 and enemy_kills == 0:
         out["knife_swing_missed"] = knife
         out["attack_missed"] = attack
+    return out
+
+
+# Emulated-frame windows (60fps). Training turbo must not change these.
+HITSCAN_PENDING_FRAMES = 30  # 0.5s — beretta/shotgun/knife settle lag
+PROJECTILE_PENDING_FRAMES = 120  # 2.0s — grenade / bazooka flight
+
+
+def pending_combat_window_frames(weapon_id: int) -> int:
+    """How long to wait for HP to post after a fire."""
+    from re1_rl.attack_macro import BAZOOKA_WEAPON_IDS
+
+    if int(weapon_id) in BAZOOKA_WEAPON_IDS:
+        return PROJECTILE_PENDING_FRAMES
+    return HITSCAN_PENDING_FRAMES
+
+
+def _clear_pending_fields(out: dict[str, Any]) -> None:
+    out["pending_combat_frames"] = 0
+    out["pending_combat_ammo"] = 0
+    out["pending_combat_weapon_id"] = 0
+    out["pending_combat_knife"] = False
+    out["combat_damage_credit"] = False
+
+
+def tick_pending_combat_credit(
+    prev_state: dict[str, Any],
+    state: dict[str, Any],
+    *,
+    knife: bool = False,
+    attack: bool = False,
+    step_emulated_frames: int = 8,
+    ammo_spent: int = 0,
+    weapon_id: int = 0,
+    attack_outcome: str = "",
+) -> dict[str, Any]:
+    """Arm / tick / expire delayed combat credit after ``apply_combat_step_fields``.
+
+    While ``pending_combat_frames`` remain, the next step may pass
+    ``credit_damage=True``. Miss / ammo taxes are deferred until the window
+    expires with no HP drop (grenade flight, dog HP lag).
+    """
+    out = state
+    prev_room = str(prev_state.get("room_id", "") or "")
+    curr_room = str(out.get("room_id", "") or "")
+    room_changed = bool(prev_room and curr_room and prev_room != curr_room)
+
+    pending_left = int(prev_state.get("pending_combat_frames") or 0)
+    pending_ammo = int(prev_state.get("pending_combat_ammo") or 0)
+    pending_wid = int(prev_state.get("pending_combat_weapon_id") or 0)
+    pending_knife = bool(prev_state.get("pending_combat_knife"))
+
+    hit = int(out.get("enemy_damage") or 0) > 0 or int(out.get("enemy_kills") or 0) > 0
+    if room_changed:
+        _clear_pending_fields(out)
+        return out
+
+    if hit:
+        out["credited_from_pending"] = bool(
+            pending_left > 0 and not knife and not attack
+        )
+        _clear_pending_fields(out)
+        return out
+
+    outcome = str(attack_outcome or "")
+    failed_macro = outcome in ("dry_fire", "illegal_attack") or bool(
+        out.get("attack_macro_failure")
+    )
+
+    if knife or attack:
+        if failed_macro:
+            # Keep immediate miss flags from apply_combat_step_fields.
+            _clear_pending_fields(out)
+            return out
+        # Defer miss: strip same-step miss flags and wait for HP to post.
+        out.pop("attack_missed", None)
+        out.pop("knife_swing_missed", None)
+        wid = int(weapon_id or out.get("equipped_weapon_id") or 0)
+        out["pending_combat_frames"] = pending_combat_window_frames(wid)
+        out["pending_combat_ammo"] = int(ammo_spent)
+        out["pending_combat_weapon_id"] = wid
+        out["pending_combat_knife"] = bool(knife)
+        out["combat_damage_credit"] = True
+        return out
+
+    if pending_left <= 0:
+        _clear_pending_fields(out)
+        return out
+
+    tick = max(1, int(step_emulated_frames))
+    left = max(0, pending_left - tick)
+    if left > 0:
+        out["pending_combat_frames"] = left
+        out["pending_combat_ammo"] = pending_ammo
+        out["pending_combat_weapon_id"] = pending_wid
+        out["pending_combat_knife"] = pending_knife
+        out["combat_damage_credit"] = True
+        return out
+
+    # Window expired with no hit — apply deferred miss once.
+    _clear_pending_fields(out)
+    out["pending_combat_expired"] = True
+    if pending_knife:
+        out["knife_swing_missed"] = True
+    elif pending_ammo > 0:
+        out["attack_missed"] = True
+        out["ammo_spent"] = pending_ammo
+        out["pending_miss_weapon_id"] = pending_wid
     return out

@@ -8,11 +8,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.enemy_combat import (
+    HITSCAN_PENDING_FRAMES,
+    PROJECTILE_PENDING_FRAMES,
     alive_enemy_count,
     apply_combat_step_fields,
     combat_enemy_count,
     enemy_combat_delta,
     enemy_hp_by_slot,
+    pending_combat_window_frames,
+    tick_pending_combat_credit,
 )
 
 
@@ -148,6 +152,96 @@ def test_interact_hp_flicker_does_not_pay_damage() -> None:
     out_hit = apply_combat_step_fields(prev, cur, attack=True)
     assert out_hit["enemy_damage"] == 12
     assert out_hit["enemy_kills"] == 0
+
+
+def test_post_attack_credit_pays_delayed_hp_drop() -> None:
+    """Dog HP posting one step after the attack macro still pays."""
+    prev = {
+        "room_id": "108",
+        "pending_combat_frames": HITSCAN_PENDING_FRAMES,
+        "enemies": [
+            {"slot": 0, "hp": 32, "type_id": 15},
+            {"slot": 1, "hp": 119, "type_id": 15},
+        ],
+    }
+    cur = {
+        "room_id": "108",
+        "enemies": [
+            {"slot": 0, "hp": 32, "type_id": 15},
+            {"slot": 1, "hp": 92, "type_id": 15},
+        ],
+    }
+    out = apply_combat_step_fields(prev, cur, credit_damage=True)
+    assert out["enemy_damage"] == 27
+    assert out["enemy_kills"] == 0
+    assert "attack_missed" not in out
+    assert "knife_swing_missed" not in out
+    ticked = tick_pending_combat_credit(
+        prev, out, step_emulated_frames=8, attack_outcome="ok"
+    )
+    assert ticked.get("credited_from_pending") is True
+    assert int(ticked.get("pending_combat_frames") or 0) == 0
+    # Without the pending window, same HP drop must still be denied (interact farm).
+    denied = apply_combat_step_fields(prev, cur)
+    assert denied["enemy_damage"] == 0
+    assert denied["combat_events"] == []
+
+
+def test_pending_fire_defers_miss_then_expires() -> None:
+    prev = {"room_id": "108", "enemies": [{"slot": 0, "hp": 100, "type_id": 15}]}
+    cur = {"room_id": "108", "enemies": [{"slot": 0, "hp": 100, "type_id": 15}]}
+    fired = apply_combat_step_fields(prev, cur, attack=True)
+    assert fired.get("attack_missed") is True
+    armed = tick_pending_combat_credit(
+        prev,
+        fired,
+        attack=True,
+        ammo_spent=1,
+        weapon_id=2,
+        attack_outcome="no_damage",
+        step_emulated_frames=8,
+    )
+    assert "attack_missed" not in armed
+    assert int(armed["pending_combat_frames"]) == HITSCAN_PENDING_FRAMES
+
+    # Tick almost to expiry with no HP drop.
+    mid_prev = dict(armed)
+    mid = {"room_id": "108", "enemies": [{"slot": 0, "hp": 100, "type_id": 15}]}
+    mid = apply_combat_step_fields(mid_prev, mid, credit_damage=True)
+    mid = tick_pending_combat_credit(
+        mid_prev, mid, step_emulated_frames=HITSCAN_PENDING_FRAMES - 1
+    )
+    assert int(mid["pending_combat_frames"]) == 1
+
+    end_prev = dict(mid)
+    end = {"room_id": "108", "enemies": [{"slot": 0, "hp": 100, "type_id": 15}]}
+    end = apply_combat_step_fields(end_prev, end, credit_damage=True)
+    end = tick_pending_combat_credit(end_prev, end, step_emulated_frames=8)
+    assert end.get("attack_missed") is True
+    assert int(end.get("ammo_spent") or 0) == 1
+    assert int(end.get("pending_miss_weapon_id") or 0) == 2
+    assert int(end.get("pending_combat_frames") or 0) == 0
+
+
+def test_bazooka_pending_window_is_two_seconds() -> None:
+    assert pending_combat_window_frames(0x07) == PROJECTILE_PENDING_FRAMES
+    assert pending_combat_window_frames(2) == HITSCAN_PENDING_FRAMES
+
+
+def test_room_change_clears_pending_without_miss() -> None:
+    prev = {
+        "room_id": "108",
+        "pending_combat_frames": 80,
+        "pending_combat_ammo": 1,
+        "pending_combat_weapon_id": 7,
+        "enemies": [{"slot": 0, "hp": 100}],
+    }
+    cur = {"room_id": "107", "enemies": []}
+    out = apply_combat_step_fields(prev, cur, credit_damage=True)
+    out = tick_pending_combat_credit(prev, out, step_emulated_frames=8)
+    assert int(out.get("pending_combat_frames") or 0) == 0
+    assert not out.get("attack_missed")
+    assert int(out.get("enemy_damage") or 0) == 0
 
 
 def test_wasp_room_408_denies_combat_pay() -> None:

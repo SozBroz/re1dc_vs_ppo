@@ -14,7 +14,11 @@ import numpy as np
 from gymnasium import spaces
 
 from re1_rl.bizhawk_bridge import BizHawkClient
-from re1_rl.enemy_combat import apply_combat_step_fields, combat_enemy_count
+from re1_rl.enemy_combat import (
+    apply_combat_step_fields,
+    combat_enemy_count,
+    tick_pending_combat_credit,
+)
 from re1_rl.game_session import (
     episode_death_signal_from_ram,
     episode_failure_reason,
@@ -712,6 +716,8 @@ class RE1Env(gym.Env):
             "macro_outcome": (attack_report or {}).get("outcome"),
             "enemy_damage": int(state.get("enemy_damage", 0) or 0),
             "enemy_kills": int(state.get("enemy_kills", 0) or 0),
+            "pending_combat_frames": int(state.get("pending_combat_frames") or 0),
+            "credited_from_pending": bool(state.get("credited_from_pending")),
             "combat_reward_terms": {
                 key: float(breakdown.get(key, 0.0))
                 for key in (
@@ -3067,30 +3073,56 @@ class RE1Env(gym.Env):
                 or 0
             )
             knife_weapon = wid == KNIFE_ID
+        # Timed pending credit: dog/Beretta lag + grenade/bazooka flight.
+        # Bare interact/door flicker still unpaid (no pending window).
+        credit_pending = (
+            int((self._prev_state or {}).get("pending_combat_frames") or 0) > 0
+            and not combat_attack
+        )
         state = apply_combat_step_fields(
             self._prev_state,
             state,
             knife=knife_weapon,
             attack=combat_attack,
+            credit_damage=credit_pending,
         )
         from re1_rl.grab_escape import grab_bite_transition
 
         grab_detected = grab_bite_transition(self._prev_state, state)
         if grab_detected:
             self._grab_escape_pending = True
-        enemy_damage = int(state.get("enemy_damage", 0))
-        enemy_kills = int(state.get("enemy_kills", 0))
         state["step_emulated_frames"] = step_emulated_frames
         state["reference_step_frames"] = self.frame_skip
         state["cutscene_key"] = self._qualify_cutscene_reward(
             skipped, self._prev_state, state
         )
+        ammo_spent = 0
+        outcome = ""
         if attack_report is not None:
-            state["ammo_spent"] = int(attack_report.get("ammo_spent", 0))
+            ammo_spent = int(attack_report.get("ammo_spent", 0))
+            state["ammo_spent"] = ammo_spent
             state["attack_weapon"] = attack_report.get("weapon")
             outcome = str(attack_report.get("outcome", "") or "")
             state["attack_macro_failure"] = outcome not in ("", "ok", "dry_fire")
             state["attack_dry_fire"] = outcome == "dry_fire"
+        wid_for_pending = int(
+            (attack_report or {}).get("weapon_id")
+            or state.get("equipped_weapon_id")
+            or (self._prev_state or {}).get("equipped_weapon_id")
+            or 0
+        )
+        state = tick_pending_combat_credit(
+            self._prev_state,
+            state,
+            knife=knife_weapon,
+            attack=combat_attack,
+            step_emulated_frames=step_emulated_frames,
+            ammo_spent=ammo_spent,
+            weapon_id=wid_for_pending,
+            attack_outcome=outcome,
+        )
+        enemy_damage = int(state.get("enemy_damage", 0))
+        enemy_kills = int(state.get("enemy_kills", 0))
         if combat_attack:
             self._fill_last_attack_obs(
                 self._prev_state,

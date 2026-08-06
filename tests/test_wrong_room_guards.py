@@ -13,6 +13,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
+    RETREAT_PENALTY,
     WRONG_ROOM_PENALTY,
     WRONG_ROOM_TERMINAL_PENALTY,
     compute_reward,
@@ -188,5 +189,50 @@ def test_post_l_ammo_pickup_order_inside_108_is_not_wrong_room():
         rails_mode=True,
         return_breakdown=True,
     )
+    assert bd["wrong_room"] == 0.0
+    assert progress.wrong_room_breached is False
+
+
+def test_post_l_leave_checkpoint_target_is_terminal_wrong_room():
+    """After L enter: leaving 108 while waypoint stays 108 is -4 + episode end."""
+    g = RoomGraph(DOORS)
+    planner = _yawn_planner("l_passage_enter_108")
+    assert planner.next_waypoint_room() == "108"
+    progress = ProgressTracker()
+    progress.seed_spawn_room("108")
+
+    _, bd = compute_reward(
+        make_state("108", step=1),
+        make_state("107", step=2),
+        planner,
+        progress=progress,
+        graph=g,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["wrong_room"] == WRONG_ROOM_TERMINAL_PENALTY
+    assert bd.get("retreat", 0.0) == 0.0
+    assert progress.wrong_room_breached is True
+
+
+def test_pre_l_leave_checkpoint_target_keeps_soft_retreat():
+    """Before L Passage: leaving the target room is still soft retreat=-0.6."""
+    g = RoomGraph(DOORS)
+    planner = WaypointPlanner(ROUTE, waypoints=["104"])
+    assert planner.next_waypoint_room() == "104"
+    progress = ProgressTracker()
+    progress.seed_spawn_room("104")
+    progress.observe_cutscene("104:0:s0")
+
+    _, bd = compute_reward(
+        make_state("104", step=1),
+        make_state("105", step=2),
+        planner,
+        progress=progress,
+        graph=g,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["retreat"] == RETREAT_PENALTY
     assert bd["wrong_room"] == 0.0
     assert progress.wrong_room_breached is False
