@@ -118,6 +118,8 @@ def _release_rollout_arrays(rollouts: list[WorkerRollout]) -> None:
         r.combat_targets = None
         r.world_event_targets = None
         r.world_event_masks = None
+        # Drop capture bundles (bundle_b64) and other episode metadata.
+        r.episode_infos.clear()
 
 
 

@@ -13,6 +13,7 @@ from sb3_contrib import MaskablePPO
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.distributed.learner_train import (
+    _release_rollout_arrays,
     fill_rollout_buffer,
     group_rollouts_by_policy_version,
     merge_rollouts,
@@ -75,6 +76,16 @@ def test_train_on_rollouts_advances_timesteps() -> None:
     steps = train_on_rollouts(model, [_fake_rollout()])
     assert steps == 16
     assert model.num_timesteps == before + 16
+
+
+def test_release_rollout_arrays_clears_episode_infos() -> None:
+    r = _fake_rollout(n_steps=2, n_envs=1)
+    r.episode_infos = [
+        {"yawn_rails_capture": [{"bundle_b64": "abc" * 100}]},
+    ]
+    _release_rollout_arrays([r])
+    assert r.episode_infos == []
+    assert r.obs == {}
 
 
 def test_merge_rollouts_rejects_mixed_policy_versions() -> None:

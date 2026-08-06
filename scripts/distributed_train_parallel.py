@@ -104,8 +104,27 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=DEFAULT_SYNC_INTERVAL_S,
         help=(
-            "seconds between remote network epochs: upload buffered experience "
-            "then pull weights (default 360). Also learner train cadence."
+            "max seconds to buffer before a worker flush / learner timed train "
+            "(default 360). Workers may flush earlier via --worker-buffer-steps."
+        ),
+    )
+    ap.add_argument(
+        "--max-pending-steps",
+        type=int,
+        default=100_000,
+        help=(
+            "learner cohort cap: admit at most this many env-steps per epoch "
+            "(default 100000). 0 = unlimited. When full, reject with "
+            "capacity_full and train the admitted cohort early."
+        ),
+    )
+    ap.add_argument(
+        "--worker-buffer-steps",
+        type=int,
+        default=32_000,
+        help=(
+            "worker early-flush threshold in env-steps (default 32000). "
+            "0 = timer-only flush at --sync-interval-s."
         ),
     )
     ap.add_argument(
@@ -414,6 +433,7 @@ def _run_local_worker(
                 is_local=True,
                 weight_store=weight_store,
                 sync_interval_s=sync_interval,
+                buffer_flush_steps=int(getattr(args, "worker_buffer_steps", 0) or 0),
                 project_root=PROJECT_ROOT,
                 headless=bool(args.headless),
                 screenshot_mmf=args.screenshot_mmf,
@@ -495,6 +515,7 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
                 rollout_sink=client,
                 is_local=False,
                 sync_interval_s=sync_interval,
+                buffer_flush_steps=int(getattr(args, "worker_buffer_steps", 0) or 0),
                 project_root=PROJECT_ROOT,
                 headless=bool(args.headless),
                 screenshot_mmf=args.screenshot_mmf,
@@ -527,9 +548,13 @@ def _run_learner(args: argparse.Namespace) -> int:
     sync_interval = float(args.sync_interval_s)
     if args.weight_sync_poll_s is not None:
         sync_interval = float(args.weight_sync_poll_s)
+    max_pending_steps = max(int(getattr(args, "max_pending_steps", 0) or 0), 0)
+    worker_buffer_steps = max(int(getattr(args, "worker_buffer_steps", 0) or 0), 0)
     log(
         args.machine_name,
         f"learner starting: sync_interval_s={sync_interval:.0f} "
+        f"max_pending_steps={max_pending_steps or 'unlimited'} "
+        f"worker_buffer_steps={worker_buffer_steps or 'off'} "
         f"batch_threshold={args.batch_threshold} max_staleness={args.max_staleness} "
         f"relevance_gate={args.relevance_gate} "
         f"relevance_max_age={args.relevance_max_age} "
@@ -573,6 +598,7 @@ def _run_learner(args: argparse.Namespace) -> int:
         relevance_max_age=args.relevance_max_age,
         expected_curriculum_id=normalize_curriculum_id(args.curriculum),
         expected_obs_schema_version=int(OBS_SCHEMA_VERSION),
+        max_pending_steps=max_pending_steps,
     )
     local_rollout_sink = LearnerRolloutSink(learner_state)
 
@@ -650,6 +676,14 @@ def _run_learner(args: argparse.Namespace) -> int:
     for cb in callbacks:
         cb.init_callback(model)
 
+    def _rss_gb() -> float | None:
+        try:
+            import psutil
+
+            return float(psutil.Process().memory_info().rss) / (1024.0 ** 3)
+        except Exception:
+            return None
+
     pending: list = []
     pending_steps = 0
     epoch_t0 = time.monotonic()
@@ -677,19 +711,29 @@ def _run_learner(args: argparse.Namespace) -> int:
 
             elapsed = time.monotonic() - epoch_t0
             status = learner_state.epoch_status()
+            cohort_full = bool(
+                max_pending_steps > 0
+                and (
+                    learner_state.cohort_full()
+                    or pending_steps >= max_pending_steps
+                )
+            )
 
-            # Before sync_interval: keep collecting.
-            if elapsed < sync_interval:
+            # Before sync_interval: keep collecting unless the cohort is full.
+            if elapsed < sync_interval and not cohort_full:
                 continue
 
-            # After sync_interval: wait for all currently-expected live workers,
-            # but do not block forever if pking disappears (liveness + grace).
-            if not waiting_for_fleet:
+            # After sync_interval (or cohort full): wait for live workers unless
+            # capacity already filled — then train the admitted cohort early.
+            if not cohort_full and not waiting_for_fleet:
                 waiting_for_fleet = True
                 # Refresh expected set once the collect window ends so late
                 # joiners (pking) that registered during the window are included.
                 if status["n_expected"] == 0 and learner_state.live_workers():
                     epoch_id, expected = learner_state.begin_epoch()
+                    # Re-seed admission for any rollouts already in pending.
+                    with learner_state.lock:
+                        learner_state.epoch_admitted_steps = int(pending_steps)
                     status = learner_state.epoch_status()
                     log(
                         args.machine_name,
@@ -701,7 +745,7 @@ def _run_learner(args: argparse.Namespace) -> int:
                     f"expected={status['expected']} missing={status['missing']}",
                 )
 
-            if status["n_expected"] == 0:
+            if status["n_expected"] == 0 and not cohort_full:
                 # No live workers yet — do not train; keep waiting for register.
                 continue
 
@@ -718,10 +762,18 @@ def _run_learner(args: argparse.Namespace) -> int:
 
             fleet_ready = bool(status["ready"])
             grace_expired = elapsed >= sync_interval + epoch_grace
-            if not fleet_ready and not grace_expired:
+            if not cohort_full and not fleet_ready and not grace_expired:
                 continue
 
-            if not fleet_ready and grace_expired:
+            if cohort_full:
+                log(
+                    args.machine_name,
+                    f"epoch {status['epoch_id']} cohort full "
+                    f"(pending_steps={pending_steps} "
+                    f"admitted={learner_state.admitted_steps()} "
+                    f"cap={max_pending_steps}); training early",
+                )
+            elif not fleet_ready and grace_expired:
                 log(
                     args.machine_name,
                     f"epoch {status['epoch_id']} grace expired; training without "
@@ -729,10 +781,13 @@ def _run_learner(args: argparse.Namespace) -> int:
                 )
 
             merged_envs = sum(r.n_envs for r in pending)
+            rss_before = _rss_gb()
             log(
                 args.machine_name,
                 f"epoch train prep: {len(pending)} rollouts "
-                f"pending_steps={pending_steps} merged_envs={merged_envs}",
+                f"pending_steps={pending_steps} merged_envs={merged_envs} "
+                f"queue_depth={rollout_queue.qsize()} "
+                f"rss_gb={rss_before if rss_before is not None else 'n/a'}",
             )
 
             batch_infos: list[dict[str, Any]] = []
@@ -771,11 +826,13 @@ def _run_learner(args: argparse.Namespace) -> int:
                 train_wall_s = time.monotonic() - train_t0
                 version = weight_store.publish(export_policy_state_dict(model))
                 learner_state.set_current_version(version)
+                rss_after = _rss_gb()
                 log(
                     args.machine_name,
                     f"epoch train {trained} steps from {len(pending)} rollouts "
                     f"merged_envs={merged_envs} contributors={status_contributors} -> "
-                    f"policy_version={version} total={model.num_timesteps}",
+                    f"policy_version={version} total={model.num_timesteps} "
+                    f"rss_gb={rss_after if rss_after is not None else 'n/a'}",
                 )
                 pitch = learner_state.pitch_summary()
                 log(
@@ -789,7 +846,9 @@ def _run_learner(args: argparse.Namespace) -> int:
                     f"stale_queued_steps={pitch['steps_stale_queued']} "
                     f"relevance_kept_steps={pitch['steps_relevance_kept']} "
                     f"packets_rej={pitch['rollouts_rejected']} "
-                    f"packets_stale_q={pitch['rollouts_stale_queued']}",
+                    f"packets_stale_q={pitch['rollouts_stale_queued']} "
+                    f"capacity_rej={learner_state.rollouts_rejected_capacity} "
+                    f"capacity_steps={learner_state.steps_rejected_capacity}",
                 )
                 contributors = list(
                     fleet_metrics.get("contributors") or status_contributors
@@ -863,6 +922,10 @@ def _run_learner(args: argparse.Namespace) -> int:
                     machine_name=args.machine_name,
                 )
                 pending_steps = sum(r.num_timesteps() for r in pending)
+                # Carry-forward was already admitted under the prior epoch; seed
+                # the new epoch counter so capacity accounting stays accurate.
+                with learner_state.lock:
+                    learner_state.epoch_admitted_steps = int(pending_steps)
                 log(
                     args.machine_name,
                     f"epoch {epoch_id} started; expected={expected or '(none yet)'} "

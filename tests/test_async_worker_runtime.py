@@ -99,7 +99,7 @@ def test_flush_local_epoch_syncs_weights_at_barrier() -> None:
     store.publish({"w": torch.ones(1)})  # version 2
     pol = _Pol()
     q: queue.Queue = queue.Queue()
-    retained = _flush_local_epoch(
+    retained, capacity_full = _flush_local_epoch(
         [],
         rollout_sink=q,
         machine_name="workhorse2",
@@ -108,6 +108,7 @@ def test_flush_local_epoch_syncs_weights_at_barrier() -> None:
         weight_store=store,
     )
     assert retained == []
+    assert capacity_full is False
     assert pol.loads == [2]
     assert pol.policy_version == 2
 
@@ -310,15 +311,37 @@ def test_pack_and_deliver_retains_failed_chunks() -> None:
     def deliver(packed: WorkerRollout) -> bool:
         return packed.n_envs == 1
 
-    n_posts, retained = _pack_and_deliver_rollouts(
+    n_posts, retained, capacity_full = _pack_and_deliver_rollouts(
         buffered,
         worker_id="w",
         pack_max_envs=2,
         deliver=deliver,
     )
     assert n_posts == 1
+    assert capacity_full is False
     assert len(retained) == 2
     assert {r.worker_id for r in retained} == {"w:actor_0", "w:actor_1"}
+
+
+def test_pack_and_deliver_drops_on_capacity_full() -> None:
+    buffered = [
+        _mini_rollout("w:actor_0"),
+        _mini_rollout("w:actor_1"),
+        _mini_rollout("w:actor_2"),
+    ]
+
+    def deliver(_packed: WorkerRollout) -> str:
+        return "capacity_full"
+
+    n_posts, retained, capacity_full = _pack_and_deliver_rollouts(
+        buffered,
+        worker_id="w",
+        pack_max_envs=16,
+        deliver=deliver,
+    )
+    assert n_posts == 0
+    assert capacity_full is True
+    assert retained == []
 
 
 def test_safe_upload_retries_then_retains(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -338,8 +361,8 @@ def test_safe_upload_retries_then_retains(monkeypatch: pytest.MonkeyPatch) -> No
             raise urllib.error.URLError(TimeoutError("timed out"))
 
     client = _FlakyClient()
-    ok = awr._safe_upload(client, "pking", _mini_rollout("w"), retries=3)
-    assert ok is False
+    result = awr._safe_upload(client, "pking", _mini_rollout("w"), retries=3)
+    assert result == "error"
     assert client.calls == 3
     assert sleeps == [2.0, 5.0]
 
@@ -362,8 +385,8 @@ def test_safe_upload_succeeds_on_retry(monkeypatch: pytest.MonkeyPatch) -> None:
             return True
 
     client = _RecoveringClient()
-    ok = awr._safe_upload(client, "pking", _mini_rollout("w"), retries=3)
-    assert ok is True
+    result = awr._safe_upload(client, "pking", _mini_rollout("w"), retries=3)
+    assert result == "ok"
     assert client.calls == 2
 
 
@@ -371,9 +394,11 @@ def test_flush_local_epoch_retains_when_sink_rejects() -> None:
     class _RejectFirstSink:
         def __init__(self) -> None:
             self.accepted: list[WorkerRollout] = []
+            self.last_reject_reason = "rejected"
 
         def put(self, rollout: WorkerRollout) -> bool:
             if not self.accepted:
+                self.last_reject_reason = "rejected"
                 return False
             self.accepted.append(rollout)
             return True
@@ -383,14 +408,39 @@ def test_flush_local_epoch_retains_when_sink_rejects() -> None:
         _mini_rollout("workhorse2:actor_0"),
         _mini_rollout("workhorse2:actor_1"),
     ]
-    retained = _flush_local_epoch(
+    retained, capacity_full = _flush_local_epoch(
         buffered,
         rollout_sink=sink,
         machine_name="workhorse2",
         worker_id="workhorse2",
     )
+    assert capacity_full is False
     assert len(retained) == 2
     assert len(sink.accepted) == 0
+
+
+def test_flush_local_epoch_drops_on_capacity_full() -> None:
+    class _CapacitySink:
+        def __init__(self) -> None:
+            self.last_reject_reason = "capacity_full"
+
+        def put(self, rollout: WorkerRollout) -> bool:
+            self.last_reject_reason = "capacity_full"
+            return False
+
+    sink = _CapacitySink()
+    buffered = [
+        _mini_rollout("workhorse2:actor_0"),
+        _mini_rollout("workhorse2:actor_1"),
+    ]
+    retained, capacity_full = _flush_local_epoch(
+        buffered,
+        rollout_sink=sink,
+        machine_name="workhorse2",
+        worker_id="workhorse2",
+    )
+    assert capacity_full is True
+    assert retained == []
 
 
 def test_distributed_epoch_hyperparams_gentler_than_monolithic() -> None:

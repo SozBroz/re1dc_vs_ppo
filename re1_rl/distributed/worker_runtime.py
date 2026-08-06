@@ -302,7 +302,7 @@ def run_synced_worker_loop(
                 epoch_infos = [
                     info for r in buffered for info in (r.episode_infos or [])
                 ]
-                buffered = _flush_remote_epoch(
+                buffered, _capacity_full = _flush_remote_epoch(
                     buffered,
                     client=client,
                     policy=policy,
@@ -333,7 +333,7 @@ def run_synced_worker_loop(
             buffered.append(rollout)
 
         if buffered:
-            buffered = _flush_remote_epoch(
+            buffered, _ = _flush_remote_epoch(
                 buffered,
                 client=client,
                 policy=policy,

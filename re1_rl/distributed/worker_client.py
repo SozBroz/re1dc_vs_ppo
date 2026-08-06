@@ -19,6 +19,7 @@ class WorkerClient:
         self.base = f"http://{host}:{port}"
         self.machine_name = machine_name
         self.timeout = timeout
+        self.last_reject_reason = ""
 
     def _request(
         self,
@@ -118,12 +119,28 @@ class WorkerClient:
             content_type="application/octet-stream",
         )
         if code == 200:
+            self.last_reject_reason = ""
             return True
         if code == 409:
-            log(
-                self.machine_name,
-                f"rollout rejected by learner ({resp[:120]!r}); keeping buffered for retry",
-            )
+            reason = "rejected"
+            try:
+                payload = json.loads(resp.decode("utf-8"))
+                reason = str(payload.get("reason") or reason)
+            except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
+                pass
+            self.last_reject_reason = reason
+            if reason == "capacity_full":
+                log(
+                    self.machine_name,
+                    "rollout rejected (capacity_full); drop packet and wait for "
+                    "newer policy (backpressure)",
+                )
+            else:
+                log(
+                    self.machine_name,
+                    f"rollout rejected by learner ({reason}); "
+                    "keeping buffered for retry",
+                )
             return False
         raise RuntimeError(f"POST /rollout failed with HTTP {code}: {resp[:200]!r}")
 

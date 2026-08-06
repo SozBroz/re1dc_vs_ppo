@@ -130,3 +130,112 @@ def test_multiple_posts_same_worker_accepted() -> None:
     assert state.accept_rollout(_partial(16))[0]
     assert state.accept_rollout(_partial(4))[0]
     assert q.qsize() == 3
+
+
+def test_capacity_full_rejects_after_cohort_fills() -> None:
+    store = WeightStore()
+    q: queue.Queue = queue.Queue()
+    state = LearnerState(
+        store,
+        q,
+        machine_name="t",
+        max_staleness=2,
+        worker_liveness_s=60,
+        max_pending_steps=10,
+    )
+    state.set_current_version(1)
+    state.begin_epoch()
+
+    first = WorkerRollout(
+        worker_id="pking",
+        policy_version=1,
+        n_envs=2,
+        n_steps=4,
+        obs={"x": np.zeros((4, 2), dtype=np.float32)},
+        actions=np.zeros((4, 2), dtype=np.int64),
+        rewards=np.zeros((4, 2), dtype=np.float32),
+        dones=np.zeros((4, 2), dtype=np.bool_),
+        values=np.zeros((4, 2), dtype=np.float32),
+        log_probs=np.zeros((4, 2), dtype=np.float32),
+        last_values=np.zeros((2,), dtype=np.float32),
+        action_masks=np.ones((4, 2, 8), dtype=np.bool_),
+    )
+    ok, reason = state.accept_rollout(first)
+    assert ok and reason == "ok"
+    assert state.admitted_steps() == 8
+    assert state.cohort_full() is False
+
+    second = WorkerRollout(
+        worker_id="workhorse1",
+        policy_version=1,
+        n_envs=1,
+        n_steps=4,
+        obs={"x": np.zeros((4, 1), dtype=np.float32)},
+        actions=np.zeros((4, 1), dtype=np.int64),
+        rewards=np.zeros((4, 1), dtype=np.float32),
+        dones=np.zeros((4, 1), dtype=np.bool_),
+        values=np.zeros((4, 1), dtype=np.float32),
+        log_probs=np.zeros((4, 1), dtype=np.float32),
+        last_values=np.zeros((1,), dtype=np.float32),
+        action_masks=np.ones((4, 1, 8), dtype=np.bool_),
+    )
+    # 8 + 4 > 10 → capacity_full
+    ok, reason = state.accept_rollout(second)
+    assert not ok
+    assert reason == "capacity_full"
+    assert state.rollouts_rejected_capacity == 1
+    assert q.qsize() == 1
+
+
+def test_capacity_allows_first_oversized_rollout() -> None:
+    store = WeightStore()
+    q: queue.Queue = queue.Queue()
+    state = LearnerState(
+        store,
+        q,
+        machine_name="t",
+        max_staleness=2,
+        worker_liveness_s=60,
+        max_pending_steps=4,
+    )
+    state.set_current_version(1)
+    state.begin_epoch()
+    big = WorkerRollout(
+        worker_id="pking",
+        policy_version=1,
+        n_envs=2,
+        n_steps=4,
+        obs={"x": np.zeros((4, 2), dtype=np.float32)},
+        actions=np.zeros((4, 2), dtype=np.int64),
+        rewards=np.zeros((4, 2), dtype=np.float32),
+        dones=np.zeros((4, 2), dtype=np.bool_),
+        values=np.zeros((4, 2), dtype=np.float32),
+        log_probs=np.zeros((4, 2), dtype=np.float32),
+        last_values=np.zeros((2,), dtype=np.float32),
+        action_masks=np.ones((4, 2, 8), dtype=np.bool_),
+    )
+    ok, reason = state.accept_rollout(big)
+    assert ok and reason == "ok"
+    assert state.admitted_steps() == 8
+    assert state.cohort_full() is True
+    assert state.accept_rollout(_rollout("workhorse1")) == (False, "capacity_full")
+
+
+def test_begin_epoch_resets_admitted_steps() -> None:
+    store = WeightStore()
+    q: queue.Queue = queue.Queue()
+    state = LearnerState(
+        store,
+        q,
+        machine_name="t",
+        max_staleness=2,
+        worker_liveness_s=60,
+        max_pending_steps=100,
+    )
+    state.set_current_version(1)
+    state.begin_epoch()
+    assert state.accept_rollout(_rollout("pking"))[0]
+    assert state.admitted_steps() == 4
+    state.begin_epoch()
+    assert state.admitted_steps() == 0
+    assert state.cohort_full() is False

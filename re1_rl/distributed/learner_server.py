@@ -72,12 +72,16 @@ class LearnerState:
         yawn_rails_store: YawnRailsCellStore | None = None,
         expected_curriculum_id: str = "",
         expected_obs_schema_version: int | None = None,
+        max_pending_steps: int = 0,
     ) -> None:
         self.weight_store = weight_store
         self.rollout_queue = rollout_queue
         self.machine_name = machine_name
         self.max_staleness = max_staleness
         self.worker_liveness_s = float(worker_liveness_s)
+        # 0 = unlimited. Otherwise admit at most this many env-steps per epoch
+        # (first rollout always accepted even if alone it exceeds the cap).
+        self.max_pending_steps = max(int(max_pending_steps), 0)
         # Soft-accept stale (version behind max_staleness) up to relevance_max_age;
         # train_on_rollouts applies the π_new/π_old ownership gate.
         self.relevance_gate = bool(relevance_gate)
@@ -110,6 +114,9 @@ class LearnerState:
         self.steps_relevance_dropped = 0
         self.rollouts_rejected_identity = 0
         self.steps_rejected_identity = 0
+        self.rollouts_rejected_capacity = 0
+        self.steps_rejected_capacity = 0
+        self.epoch_admitted_steps = 0
         self.epoch_id = 0
         self.epoch_contributors: set[str] = set()
         self.epoch_expected: set[str] = set()
@@ -239,9 +246,22 @@ class LearnerState:
         with self.lock:
             self.epoch_id += 1
             self.epoch_contributors.clear()
+            self.epoch_admitted_steps = 0
             live = self._prune_and_list_live_unlocked()
             self.epoch_expected = set(live.keys())
             return self.epoch_id, sorted(self.epoch_expected)
+
+    def cohort_full(self) -> bool:
+        """True when this epoch has admitted at least ``max_pending_steps``."""
+        with self.lock:
+            return (
+                self.max_pending_steps > 0
+                and self.epoch_admitted_steps >= self.max_pending_steps
+            )
+
+    def admitted_steps(self) -> int:
+        with self.lock:
+            return int(self.epoch_admitted_steps)
 
     def ingest_go_explore_from_rollout(self, rollout: WorkerRollout) -> list[str]:
         """Merge capture proposals from accepted rollout episode infos."""
@@ -304,6 +324,19 @@ class LearnerState:
                 self.steps_rejected_identity += steps
             return False, identity_reason
         with self.lock:
+            # Capacity gate: stop admitting once the epoch cohort is full.
+            # Always allow the first rollout of an empty epoch so a single
+            # oversized packet can still train (better than stalling forever).
+            if (
+                self.max_pending_steps > 0
+                and self.epoch_admitted_steps > 0
+                and self.epoch_admitted_steps + steps > self.max_pending_steps
+            ):
+                self.rollouts_rejected += 1
+                self.rollouts_rejected_capacity += 1
+                self.steps_rejected_ingest += steps
+                self.steps_rejected_capacity += steps
+                return False, "capacity_full"
             min_ok = self.current_policy_version - self.max_staleness
             if rollout.policy_version < min_ok:
                 if self.relevance_gate:
@@ -313,6 +346,7 @@ class LearnerState:
                         self.rollouts_stale_queued += 1
                         self.steps_accepted += steps
                         self.steps_stale_queued += steps
+                        self.epoch_admitted_steps += steps
                         self.epoch_contributors.add(wid)
                         self.rollout_queue.put(rollout)
                         reason = "stale_queued_for_relevance_gate"
@@ -327,6 +361,7 @@ class LearnerState:
             else:
                 self.rollouts_accepted += 1
                 self.steps_accepted += steps
+                self.epoch_admitted_steps += steps
                 self.epoch_contributors.add(wid)
                 reason = "ok"
         if reason == "ok":
@@ -397,9 +432,11 @@ class LearnerRolloutSink:
 
     def __init__(self, state: LearnerState) -> None:
         self._state = state
+        self.last_reject_reason = ""
 
     def put(self, rollout: WorkerRollout) -> bool:
         ok, reason = self._state.accept_rollout(rollout)
+        self.last_reject_reason = "" if ok else str(reason)
         if not ok:
             log(
                 self._state.machine_name,
@@ -500,6 +537,14 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "rollouts_rejected": self.state.rollouts_rejected,
                     "rollouts_rejected_duplicate": self.state.rollouts_rejected_duplicate,
                     "rollouts_stale_queued": self.state.rollouts_stale_queued,
+                    "rollouts_rejected_capacity": self.state.rollouts_rejected_capacity,
+                    "steps_rejected_capacity": self.state.steps_rejected_capacity,
+                    "max_pending_steps": self.state.max_pending_steps,
+                    "epoch_admitted_steps": self.state.epoch_admitted_steps,
+                    "cohort_full": (
+                        self.state.max_pending_steps > 0
+                        and self.state.epoch_admitted_steps >= self.state.max_pending_steps
+                    ),
                     "relevance_gate": self.state.relevance_gate,
                     "relevance_max_age": self.state.relevance_max_age,
                     "relevance_kept": self.state.relevance_kept,
