@@ -295,13 +295,13 @@ def ammo_waste_penalty(
     ) * float(rounds)
 
 
-# Pre-L Passage: sparse detour fine (does not end the episode).
-WRONG_ROOM_PENALTY = -3.0
-# At/after l_passage_enter_108: room detour is terminal. In-room pickup order
-# is never gated — only graph hops toward the active checkpoint room.
+# Legacy aliases (all rails off-path / leave-target is now terminal -4).
+WRONG_ROOM_PENALTY = -4.0
+# Room detour / leave-target: -4, zeros same-step positives, ends episode.
+# In-room pickup order is never gated — only graph hops toward the checkpoint.
 WRONG_ROOM_TERMINAL_PENALTY = -4.0
 WRONG_ROOM_TERMINAL_FROM_CHECKPOINT_ID = "l_passage_enter_108"
-RETREAT_PENALTY = -0.6
+RETREAT_PENALTY = -4.0
 SUCCESS_ROOM_BONUS = CHECKPOINT_REWARD
 PBRS_GRAPH_WEIGHT = 0.02
 PBRS_DOOR_WEIGHT = 0.05
@@ -596,32 +596,27 @@ def compute_reward(
                 and room != str(target)
                 and planner.next_waypoint_room() == str(target)
             )
+            off_rails = False
             if left_target:
-                # Pre-L: soft retreat. Post-L: leaving the checkpoint room is
-                # terminal wrong_room (-4 + episode end), same as hop detours.
-                if _wrong_room_terminal_active(planner):
-                    bd["wrong_room"] = WRONG_ROOM_TERMINAL_PENALTY
-                    if progress is not None:
-                        progress.breach_wrong_room()
-                else:
-                    bd["retreat"] = RETREAT_PENALTY
+                off_rails = True
             elif room != str(target):
                 prev_hops = graph.hop_distance(prev_room, str(target))
                 now_hops = graph.hop_distance(room, str(target))
                 off_rails = now_hops is None or (
                     prev_hops is not None and now_hops >= prev_hops
                 )
-                if off_rails and graph.knows_room(str(target)):
-                    claimed = progress.claim_offroute_penalty(room) \
-                        if progress is not None else True
-                    if claimed:
-                        if _wrong_room_terminal_active(planner):
-                            bd["wrong_room"] = WRONG_ROOM_TERMINAL_PENALTY
-                            if progress is not None:
-                                progress.breach_wrong_room()
-                        else:
-                            # Finished early-route cells keep the old sparse fine.
-                            bd["wrong_room"] = WRONG_ROOM_PENALTY
+                if off_rails and not graph.knows_room(str(target)):
+                    off_rails = False
+            if off_rails:
+                claimed = True
+                if progress is not None and not left_target:
+                    claimed = progress.claim_offroute_penalty(room)
+                if claimed:
+                    # All rails wrong-way: -4 and end the episode (no soft
+                    # retreat / sparse -3). Leave-target always claims.
+                    bd["wrong_room"] = WRONG_ROOM_TERMINAL_PENALTY
+                    if progress is not None:
+                        progress.breach_wrong_room()
 
     if room_changed and is_new_room:
         bd["new_room"] += NEW_ROOM_BONUS

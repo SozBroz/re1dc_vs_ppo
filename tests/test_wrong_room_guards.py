@@ -1,4 +1,4 @@
-"""Checkpoint-path wrong_room guards (pre-L sparse vs post-L terminal)."""
+"""Checkpoint-path wrong_room guards (all rails off-path = terminal -4)."""
 
 from __future__ import annotations
 
@@ -13,8 +13,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
-    RETREAT_PENALTY,
-    WRONG_ROOM_PENALTY,
     WRONG_ROOM_TERMINAL_PENALTY,
     compute_reward,
 )
@@ -92,8 +90,8 @@ def test_offroute_room_only_pays_exploration_bonus():
     assert bd["new_room"] > 0.0
 
 
-def test_rails_connected_detour_pre_l_keeps_sparse_fine():
-    """Finished early-route cells still use -3 and do not end the episode."""
+def test_rails_connected_detour_is_terminal_minus_four():
+    """Any rails hop that does not get closer pays -4 and ends the episode."""
     g = RoomGraph(DOORS)
     planner = WaypointPlanner(ROUTE, waypoints=["104"])
     progress = ProgressTracker()
@@ -110,10 +108,10 @@ def test_rails_connected_detour_pre_l_keeps_sparse_fine():
         return_breakdown=True,
     )
 
-    assert bd["wrong_room"] == WRONG_ROOM_PENALTY
-    assert bd["wrong_room"] == pytest.approx(-3.0)
-    assert bd["new_room"] > 0.0
-    assert progress.wrong_room_breached is False
+    assert bd["wrong_room"] == WRONG_ROOM_TERMINAL_PENALTY
+    assert bd["wrong_room"] == pytest.approx(-4.0)
+    assert bd["new_room"] == 0.0
+    assert progress.wrong_room_breached is True
 
 
 def test_rails_shortest_path_step_is_not_wrong_room():
@@ -215,8 +213,8 @@ def test_post_l_leave_checkpoint_target_is_terminal_wrong_room():
     assert progress.wrong_room_breached is True
 
 
-def test_pre_l_leave_checkpoint_target_keeps_soft_retreat():
-    """Before L Passage: leaving the target room is still soft retreat=-0.6."""
+def test_leave_checkpoint_target_is_always_terminal_wrong_room():
+    """Leaving the target room is always -4 + episode end (no soft retreat)."""
     g = RoomGraph(DOORS)
     planner = WaypointPlanner(ROUTE, waypoints=["104"])
     assert planner.next_waypoint_room() == "104"
@@ -233,6 +231,6 @@ def test_pre_l_leave_checkpoint_target_keeps_soft_retreat():
         rails_mode=True,
         return_breakdown=True,
     )
-    assert bd["retreat"] == RETREAT_PENALTY
-    assert bd["wrong_room"] == 0.0
-    assert progress.wrong_room_breached is False
+    assert bd["wrong_room"] == WRONG_ROOM_TERMINAL_PENALTY
+    assert bd.get("retreat", 0.0) == 0.0
+    assert progress.wrong_room_breached is True
