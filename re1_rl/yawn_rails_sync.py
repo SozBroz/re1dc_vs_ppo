@@ -31,6 +31,13 @@ DEFAULT_YAWN_RAILS_REL = "states/yawn_rails"
 STORE_FILENAME = "store.json"
 MANIFEST_FILENAME = "manifest.json"
 _ROOT_ENV = "RE1_YAWN_RAILS_ROOT"
+_SYNC_ENV = "RE1_YAWN_RAILS_SYNC"
+
+
+def yawn_rails_sync_enabled() -> bool:
+    """Cross-machine yawn mirror + local capture; ``RE1_YAWN_RAILS_SYNC=0`` freezes."""
+    raw = os.environ.get(_SYNC_ENV, "1").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
 
 
 def yawn_rails_root(project_root: Path | str | None = None) -> Path:

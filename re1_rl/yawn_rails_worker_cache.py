@@ -18,6 +18,7 @@ from re1_rl.yawn_rails_sync import (
     cell_dir_name,
     cell_slot_dir,
     yawn_rails_root,
+    yawn_rails_sync_enabled,
 )
 
 DEFAULT_MANIFEST_POLL_S = 60.0
@@ -297,6 +298,8 @@ def maybe_poll_yawn_rails_manifest(
     poll_s: float | None = None,
 ) -> float:
     """Poll learner yawn_rails manifest when interval elapsed."""
+    if not yawn_rails_sync_enabled():
+        return float(last_poll_mono)
     interval = (
         yawn_rails_manifest_poll_s() if poll_s is None else float(poll_s)
     )

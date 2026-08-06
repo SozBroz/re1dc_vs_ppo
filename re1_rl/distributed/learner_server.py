@@ -33,6 +33,9 @@ def base_worker_id(worker_id: str) -> str:
 
 def _go_explore_merge_from_env() -> GoExploreMerge | None:
     """Attach merge when ``RE1_GO_EXPLORE_ARCHIVE`` is set (canonical learner path)."""
+    sync = os.environ.get("RE1_GO_EXPLORE_SYNC", "1").strip().lower()
+    if sync in {"0", "false", "no", "off"}:
+        return None
     raw = os.environ.get("RE1_GO_EXPLORE_ARCHIVE", "").strip()
     if not raw:
         return None
@@ -41,8 +44,9 @@ def _go_explore_merge_from_env() -> GoExploreMerge | None:
 
 def _yawn_rails_store_from_env() -> YawnRailsCellStore | None:
     """Attach Yawn rails store unless explicitly disabled."""
-    raw = os.environ.get("RE1_YAWN_RAILS_SYNC", "1").strip().lower()
-    if raw in {"0", "false", "no", "off"}:
+    from re1_rl.yawn_rails_sync import yawn_rails_sync_enabled
+
+    if not yawn_rails_sync_enabled():
         return None
     root = os.environ.get("RE1_YAWN_RAILS_ROOT", "").strip()
     project = os.environ.get("RE1_PROJECT_ROOT", "").strip()

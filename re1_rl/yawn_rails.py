@@ -450,11 +450,18 @@ def capture_successor_cell(
     Always writes the local ``states/yawn_rails/cells/cpNN`` bundle + sampling
     manifest row. The returned proposal is attached to episode infos so the
     learner can admit/replace the canonical fleet copy.
+
+    When ``RE1_YAWN_RAILS_SYNC=0``, capture is frozen (no local overwrite, no
+    fleet proposal) so curated cells cannot desync from the manifest again.
     """
     if float(breakdown.get("checkpoint_success", 0.0)) <= 0.0:
         return None
     stage = getattr(env, "_stage", {})
     if stage.get("mode") != "yawn_rails":
+        return None
+    from re1_rl.yawn_rails_sync import yawn_rails_sync_enabled
+
+    if not yawn_rails_sync_enabled():
         return None
     if not state.get("in_control", True) or state.get("dead"):
         return None

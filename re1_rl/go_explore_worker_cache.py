@@ -29,6 +29,12 @@ class _ManifestClient(Protocol):
     def fetch_go_explore_bundle(self, record_id: str) -> bytes: ...
 
 
+def go_explore_sync_enabled() -> bool:
+    """Cross-machine Go-Explore mirror; ``RE1_GO_EXPLORE_SYNC=0`` disables poll."""
+    raw = os.environ.get("RE1_GO_EXPLORE_SYNC", "1").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
 def manifest_poll_s(default: float = DEFAULT_MANIFEST_POLL_S) -> float:
     raw = os.environ.get("RE1_GO_EXPLORE_MANIFEST_POLL_S", "").strip()
     if not raw:
@@ -179,6 +185,8 @@ def maybe_poll_manifest(
     """Poll learner manifest when interval elapsed. Returns updated monotonic timestamp."""
     import time
 
+    if not go_explore_sync_enabled():
+        return float(last_poll_mono)
     interval = manifest_poll_s() if poll_s is None else float(poll_s)
     now = time.monotonic()
     if now - float(last_poll_mono) < interval:
