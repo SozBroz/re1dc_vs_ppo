@@ -69,6 +69,12 @@ def _planner(start_index: int = 0) -> WaypointPlanner:
     )
 
 
+def _settle(progress: ProgressTracker, room: str, steps: int = 30) -> None:
+    """Accumulate in-control dwell required by cutscene/door settle gates."""
+    for _ in range(int(steps)):
+        progress.record_in_control_step(room, True)
+
+
 def _state(room: str, *, inventory=(), new_items=(), x=0, z=0) -> dict:
     return {
         "room_id": room,
@@ -203,11 +209,13 @@ def test_zero_coordinate_rdt_rows_are_not_walkable_edges() -> None:
 
 
 def test_rails_nav_crumbs_keep_full_exploration_magnitudes() -> None:
-    planner = _planner()
+    # On-path tea-room entry (kenneth leg) still pays full new_room under rails.
+    # Off-target leaves are terminal wrong_room now — do not use those for crumb checks.
+    planner = _planner(start_index=_idx("kenneth_104"))
     progress = ProgressTracker()
     progress.seed_spawn_room("105")
     _, bd = compute_reward(
-        _state("105"),
+        _state("105", inventory=["emblem"]),
         _state("104", inventory=["emblem"]),
         planner,
         progress=progress,
@@ -216,7 +224,8 @@ def test_rails_nav_crumbs_keep_full_exploration_magnitudes() -> None:
         return_breakdown=True,
     )
     assert bd["new_room"] == pytest.approx(4.0)
-    assert bd["checkpoint_success"] == 0.0
+    assert bd["wrong_room"] == 0.0
+    assert bd["checkpoint_success"] == 0.0  # needs cutscene + settle
 
 
 def test_checkpoint_key_item_already_held_pays_terminal_reward() -> None:
@@ -241,21 +250,28 @@ def test_checkpoint_key_item_already_held_pays_terminal_reward() -> None:
 
 
 def test_barry_hall_return_is_203_to_106_path_only() -> None:
-    """cp05: first main-hall entry is free; return from 203 completes without lockpick."""
+    """cp05: main-hall needs 106: settle; return from 203 needs control dwell."""
     first_entry = _planner(start_index=3)
-    assert first_entry.advance_if_success(_state("106"), progress=ProgressTracker())
+    hall = ProgressTracker()
+    hall.observe_cutscene("106:1:s0")
+    _settle(hall, "106")
+    assert first_entry.advance_if_success(_state("106"), progress=hall)
 
     return_entry = _planner(start_index=5)
+    ret = ProgressTracker()
+    _settle(ret, "106")
     assert return_entry.advance_if_success(
         _state("106"),
-        progress=ProgressTracker(),
+        progress=ret,
         prev_state=_state("203"),
     )
 
     wrong_return = _planner(start_index=5)
+    bad = ProgressTracker()
+    _settle(bad, "106")
     assert not wrong_return.advance_if_success(
         _state("106"),
-        progress=ProgressTracker(),
+        progress=bad,
         prev_state=_state("201"),
     )
 
@@ -266,6 +282,7 @@ def test_barry_hall_return_pays_checkpoint_on_stairs_down() -> None:
     progress.seed_spawn_room("203")
     # Kenneth already paid so 203→106 is not the illegal pre-Kenneth hall gate.
     progress.observed_cutscenes.add("104:0:s0")
+    _settle(progress, "106")
     reward, bd = compute_reward(
         _state("203"),
         _state("106"),
@@ -286,6 +303,7 @@ def test_barry_hall_return_pays_checkpoint_on_stairs_down() -> None:
 def test_barry_hall_return_latches_203_entry_same_leg() -> None:
     planner = _planner(start_index=5)
     progress = ProgressTracker()
+    _settle(progress, "106")
 
     assert planner.advance_if_success(
         _state("106"),
@@ -300,6 +318,7 @@ def test_barry_hall_return_latches_203_entry_same_leg() -> None:
 def test_barry_hall_return_does_not_latch_wrong_from_room() -> None:
     planner = _planner(start_index=5)
     progress = ProgressTracker()
+    _settle(progress, "106")
 
     assert not planner.advance_if_success(
         _state("106"),
@@ -311,6 +330,33 @@ def test_barry_hall_return_does_not_latch_wrong_from_room() -> None:
         progress=progress,
         prev_state=_state("106"),
     )
+
+
+def test_kenneth_requires_cutscene_and_in_control_settle() -> None:
+    planner = _planner(start_index=_idx("kenneth_104"))
+    bare = ProgressTracker()
+    assert not planner.advance_if_success(_state("104"), progress=bare)
+
+    mid = ProgressTracker()
+    mid.observe_cutscene("104:0:s0")
+    assert not planner.advance_if_success(_state("104"), progress=mid)
+
+    ok = ProgressTracker()
+    ok.observe_cutscene("104:0:s0")
+    _settle(ok, "104")
+    assert planner.advance_if_success(_state("104"), progress=ok)
+
+
+def test_main_hall_rejects_room_spoof_without_106_cutscene() -> None:
+    planner = _planner(start_index=_idx("main_hall_106"))
+    spoof = ProgressTracker()
+    _settle(spoof, "106")
+    assert not planner.advance_if_success(_state("106"), progress=spoof)
+
+    ok = ProgressTracker()
+    ok.observe_cutscene("106:1:s0")
+    _settle(ok, "106")
+    assert planner.advance_if_success(_state("106"), progress=ok)
 
 
 def test_l_passage_enter_then_ammo_are_separate_legs() -> None:
@@ -435,6 +481,7 @@ def test_two_leg_episode_pays_each_checkpoint_and_resets_acquisitions() -> None:
     assert planner.waypoint_index == 1
 
     progress.observe_cutscene("104:kenneth")
+    _settle(progress, "104")
     _, second = compute_reward(
         _state("105", inventory=["emblem"]),
         _state("104", inventory=["emblem"]),
@@ -757,9 +804,10 @@ def test_checkpoint_success_proposes_without_local_install_when_sync_on(
         lambda *_args, **_kwargs: {"schema_version": 1},
     )
 
+    # completed index 0 = emblem_105; room must match route capture room.
     proposal = capture_successor_cell(
         env,
-        _state("105"),
+        _state("105", inventory=["emblem"]),
         {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
     )
 

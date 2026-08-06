@@ -41,6 +41,11 @@
         {
           "type": "observed_cutscene",
           "prefix": "104:"
+        },
+        {
+          "type": "in_control_steps_in_room",
+          "room_id": "104",
+          "min_steps": 30
         }
       ]
     }
@@ -54,10 +59,20 @@
     "required_items": [],
     "items_gained": [],
     "success_condition": {
-      "type": "room_enter_from",
-      "room_id": "105",
-      "from_room_ids": [
-        "104"
+      "type": "all_of",
+      "conditions": [
+        {
+          "type": "room_enter_from",
+          "room_id": "105",
+          "from_room_ids": [
+            "104"
+          ]
+        },
+        {
+          "type": "in_control_steps_in_room",
+          "room_id": "105",
+          "min_steps": 30
+        }
       ]
     }
   },
@@ -70,8 +85,22 @@
     "required_items": [],
     "items_gained": [],
     "success_condition": {
-      "type": "room_enter",
-      "room_id": "106"
+      "type": "all_of",
+      "conditions": [
+        {
+          "type": "room_enter",
+          "room_id": "106"
+        },
+        {
+          "type": "observed_cutscene",
+          "prefix": "106:"
+        },
+        {
+          "type": "in_control_steps_in_room",
+          "room_id": "106",
+          "min_steps": 30
+        }
+      ]
     }
   },
   {
@@ -83,8 +112,22 @@
     "required_items": [],
     "items_gained": [],
     "success_condition": {
-      "type": "room_enter",
-      "room_id": "203"
+      "type": "all_of",
+      "conditions": [
+        {
+          "type": "room_enter",
+          "room_id": "203"
+        },
+        {
+          "type": "observed_cutscene",
+          "prefix": "203:"
+        },
+        {
+          "type": "in_control_steps_in_room",
+          "room_id": "203",
+          "min_steps": 30
+        }
+      ]
     }
   },
   {
@@ -96,10 +139,20 @@
     "required_items": [],
     "items_gained": [],
     "success_condition": {
-      "type": "room_enter_from",
-      "room_id": "106",
-      "from_room_ids": [
-        "203"
+      "type": "all_of",
+      "conditions": [
+        {
+          "type": "room_enter_from",
+          "room_id": "106",
+          "from_room_ids": [
+            "203"
+          ]
+        },
+        {
+          "type": "in_control_steps_in_room",
+          "room_id": "106",
+          "min_steps": 30
+        }
       ]
     }
   },

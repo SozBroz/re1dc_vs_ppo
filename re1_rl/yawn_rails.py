@@ -467,6 +467,26 @@ def capture_successor_cell(
     completed = int(planner.waypoint_index) - 1
     if completed < 0 or completed >= planner.total_waypoints - 1:
         return None
+    completed_cp = planner.step_by_seq(completed + 1) or {}
+    expected_room = str(completed_cp.get("room_id", "") or "")
+    room_id = str(state.get("room_id", "") or "")
+    # Refuse door-threshold / cutscene-spoof captures (Wesker→fake 106, Kenneth
+    # at 105→104 entry pose before tea-room settle, etc.).
+    if expected_room and room_id.upper() != expected_room.upper():
+        return None
+    progress = getattr(env, "_progress", None)
+    ledgers: set[str] = set()
+    if progress is not None:
+        ledgers = set(progress.observed_cutscenes or ()) | set(
+            progress.rewarded_cutscenes or ()
+        )
+    cid = str(completed_cp.get("checkpoint_id", "") or "")
+    if cid == "kenneth_104" and not any(str(k).startswith("104:") for k in ledgers):
+        return None
+    if cid == "main_hall_106" and not any(str(k).startswith("106:") for k in ledgers):
+        return None
+    if cid == "upper_hall_203" and not any(str(k).startswith("203:") for k in ledgers):
+        return None
     next_checkpoint = planner.step_by_seq(completed + 2)
     capacity = successor_capacity(state, next_checkpoint)
     if not capacity["inventory_feasible"]:
@@ -501,10 +521,7 @@ def capture_successor_cell(
         )
         sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
 
-        checkpoint_id = str(
-            (planner.step_by_seq(completed + 1) or {}).get("checkpoint_id", "")
-        )
-        room_id = str(state.get("room_id", ""))
+        checkpoint_id = str(completed_cp.get("checkpoint_id", "") or cid)
         route_id = str(stage.get("route_id") or "yawn_quest_v2")
         quality = compute_quality(
             state,
