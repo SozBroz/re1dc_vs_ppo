@@ -241,7 +241,9 @@ def load_manifest(project_root: Path, stage: dict[str, Any]) -> dict[str, Any]:
     path = project_root / stage["cells_manifest"]
     if not path.is_file():
         return {"schema_version": 1, "route_id": stage.get("route_id"), "cells": []}
-    data = json.loads(path.read_text(encoding="utf-8"))
+    # utf-8-sig: PowerShell Set-Content -Encoding UTF8 writes a BOM that
+    # plain utf-8 json.loads rejects (crashes workers on empty-manifest wipes).
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     if data.get("schema_version") != 1 or not isinstance(data.get("cells"), list):
         raise ValueError(f"invalid Yawn rails cells manifest: {path}")
     if data.get("route_id") != stage.get("route_id"):

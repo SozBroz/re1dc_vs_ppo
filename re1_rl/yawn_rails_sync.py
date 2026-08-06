@@ -187,7 +187,7 @@ def _existing_cell_quality(root: Path, checkpoint_index: int) -> tuple[int, ...]
     man_p = Path(root) / MANIFEST_FILENAME
     if man_p.is_file():
         try:
-            man = json.loads(man_p.read_text(encoding="utf-8"))
+            man = json.loads(man_p.read_text(encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError):
             man = {}
         for row in man.get("cells") or []:
@@ -275,7 +275,7 @@ def try_install_yawn_cell(
         man_p = root / MANIFEST_FILENAME
         if man_p.is_file():
             try:
-                man = json.loads(man_p.read_text(encoding="utf-8"))
+                man = json.loads(man_p.read_text(encoding="utf-8-sig"))
             except (OSError, json.JSONDecodeError):
                 man = {"schema_version": 1, "cells": []}
         else:
@@ -454,7 +454,7 @@ class YawnRailsCellStore:
             self._load_manifest_fallback()
             return
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw = json.loads(path.read_text(encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError):
             self._load_manifest_fallback()
             return
@@ -479,7 +479,7 @@ class YawnRailsCellStore:
             self.cells = {}
             return
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw = json.loads(path.read_text(encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError):
             self.archive_version = 0
             self.cells = {}

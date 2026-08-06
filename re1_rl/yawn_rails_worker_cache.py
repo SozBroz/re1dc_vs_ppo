@@ -50,7 +50,7 @@ def load_local_yawn_manifest(project_root: Path | str) -> dict[str, Any]:
     if not path.is_file():
         return {"schema_version": 1, "archive_version": 0, "route_id": None, "cells": []}
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError):
         return {"schema_version": 1, "archive_version": 0, "route_id": None, "cells": []}
     if not isinstance(raw, dict):
