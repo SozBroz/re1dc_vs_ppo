@@ -733,7 +733,7 @@ def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: P
 
 
 def test_reset_mix_prefers_latest_cell_then_older_eligible(tmp_path: Path) -> None:
-    # 3 eligible cells (18,19,20) → latest 50%; remaining 50% uniform over 18,19.
+    # 3 eligible cells (18,19,20) → latest 20%; remaining 80% uniform over 18,19.
     manifest = {
         "schema_version": 1,
         "route_id": "test",
@@ -756,10 +756,10 @@ def test_reset_mix_prefers_latest_cell_then_older_eligible(tmp_path: Path) -> No
         else:
             counts["older"] += 1
     total = sum(counts.values())
-    assert counts["latest"] / total == pytest.approx(0.50, abs=0.04)
-    assert counts["older"] / total == pytest.approx(0.50, abs=0.04)
-    assert per_start.get(19, 0) / total == pytest.approx(0.25, abs=0.04)
-    assert per_start.get(20, 0) / total == pytest.approx(0.25, abs=0.04)
+    assert counts["latest"] / total == pytest.approx(0.20, abs=0.04)
+    assert counts["older"] / total == pytest.approx(0.80, abs=0.04)
+    assert per_start.get(19, 0) / total == pytest.approx(0.40, abs=0.05)
+    assert per_start.get(20, 0) / total == pytest.approx(0.40, abs=0.05)
 
 
 def test_reset_latest_only_env_pins_newest_cell(

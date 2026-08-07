@@ -296,10 +296,10 @@ def validate_manifest_cells(
     return errors
 
 
-# Non-PLR reset mix: 50% frontier cell; remaining 50% is uniform over
+# Non-PLR reset mix: 20% frontier cell; remaining 80% uniform over
 # each older eligible cell (no route_initial — conditions before cp18 are frozen).
 RESET_MIN_CHECKPOINT_INDEX = 18
-RESET_LATEST_CELL_WEIGHT = 0.50
+RESET_LATEST_CELL_WEIGHT = 0.20
 _RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
 
 
@@ -324,7 +324,7 @@ def _choose_reset_candidate(
     rng: random.Random,
     latest_only: bool = False,
 ) -> dict[str, Any]:
-    """50% latest eligible cell; else uniform over each older eligible cell."""
+    """20% latest eligible cell; else uniform over each older eligible cell."""
     eligible = eligible_reset_cells(cells)
     if not eligible:
         raise ValueError(
@@ -349,7 +349,7 @@ def sample_one_leg_options(
 ) -> dict[str, Any]:
     """Choose a curated start and bounded checkpoint span.
 
-    Non-PLR mix: 50% latest eligible cell (cp18+); remaining 50% uniform over
+    Non-PLR mix: 20% latest eligible cell (cp18+); remaining 80% uniform over
     older eligible cells. ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
     """
     cells = eligible_reset_cells(iter_loadable_cells(project_root, stage))
