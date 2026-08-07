@@ -785,14 +785,14 @@
   {
     "seq": 41,
     "checkpoint_id": "east_stairs_101",
-    "room_id": "101",
+    "room_id": "10B",
     "objective": "Reach East Stairway 1F",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "101"
+      "room_id": "10B"
     }
   },
   {
@@ -825,21 +825,21 @@
   },
   {
     "checkpoint_id": "east_stairs_101_post_storeroom",
-    "room_id": "101",
+    "room_id": "10B",
     "objective": "Return to East Stairway 1F from the storeroom",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "101"
+      "room_id": "10B"
     },
     "seq": 44
   },
   {
     "seq": 45,
     "checkpoint_id": "east_stairs_201",
-    "room_id": "201",
+    "room_id": "207",
     "objective": "Climb East Stairway to 2F",
     "action_type": "navigate",
     "required_items": [
@@ -848,7 +848,7 @@
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "201"
+      "room_id": "207"
     }
   },
   {
@@ -989,27 +989,27 @@
   {
     "seq": 56,
     "checkpoint_id": "west_stairs_207",
-    "room_id": "207",
+    "room_id": "201",
     "objective": "Reach West Stairway 2F",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "207"
+      "room_id": "201"
     }
   },
   {
     "seq": 57,
     "checkpoint_id": "west_stairs_10B",
-    "room_id": "10B",
+    "room_id": "101",
     "objective": "Descend West Stairway",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "10B"
+      "room_id": "101"
     }
   },
   {
@@ -1027,14 +1027,14 @@
   },
   {
     "checkpoint_id": "west_stairs_return_10B",
-    "room_id": "10B",
+    "room_id": "101",
     "objective": "Return through West Stairway before the Central Corridor",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "10B"
+      "room_id": "101"
     },
     "seq": 59
   },
@@ -1407,7 +1407,7 @@
   {
     "seq": 83,
     "checkpoint_id": "east_stairs_201_post_richard",
-    "room_id": "201",
+    "room_id": "207",
     "objective": "Reach East Stairway 2F after Richard",
     "action_type": "navigate",
     "required_items": [
@@ -1416,13 +1416,13 @@
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "201"
+      "room_id": "207"
     }
   },
   {
     "seq": 84,
     "checkpoint_id": "east_stairs_101_post_richard",
-    "room_id": "101",
+    "room_id": "10B",
     "objective": "Descend East Stairway after Richard",
     "action_type": "navigate",
     "required_items": [
@@ -1431,7 +1431,7 @@
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "101"
+      "room_id": "10B"
     }
   },
   {
@@ -1467,7 +1467,7 @@
   {
     "seq": 87,
     "checkpoint_id": "east_stairs_101_to_yawn",
-    "room_id": "101",
+    "room_id": "10B",
     "objective": "Return to East Stairway 1F for Yawn",
     "action_type": "navigate",
     "required_items": [
@@ -1477,13 +1477,13 @@
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "101"
+      "room_id": "10B"
     }
   },
   {
     "seq": 88,
     "checkpoint_id": "east_stairs_201_to_yawn",
-    "room_id": "201",
+    "room_id": "207",
     "objective": "Climb East Stairway for Yawn",
     "action_type": "navigate",
     "required_items": [
@@ -1493,7 +1493,7 @@
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "201"
+      "room_id": "207"
     }
   },
   {

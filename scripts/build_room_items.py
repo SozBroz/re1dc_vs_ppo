@@ -29,7 +29,7 @@ ER_TO_ROOM: dict[str, str] = {
     "Back Passage": "10A",
     "Large Gallery": "117",
     "Roofed Passage": "11A",
-    "East Stairway 1F": "101",
+    "East Stairway 1F": "10B",
     "Mansion Storeroom": "11B",
     # ER "Store Room" (crest shed / square crank) shares debug 11B with Mansion
     # Storeroom (herbicide) in Jill play — both map here per operator catalog.
@@ -40,7 +40,7 @@ ER_TO_ROOM: dict[str, str] = {
     "Keeper's Room": "10E",
     "Vacant Room": "102",
     "Mansion Save Room": "100",
-    "West Stairway 1F": "10B",
+    "West Stairway 1F": "101",
     "Bar": "10F",
     "Piano Bar": "10F",
     "Dressing Room": "111",
@@ -54,12 +54,12 @@ ER_TO_ROOM: dict[str, str] = {
     "Wardrobe Closet": "11C",
     # Mansion 2F
     "Main Hall 2F": "203",
-    "East Stairway 2F": "201",
+    "East Stairway 2F": "207",
     "'C' Passage": "204",
     "Terrace Entry": "211",
     "Terrace": "212",
     "Dining Room 2F": "202",
-    "West Stairway 2F": "207",
+    "West Stairway 2F": "201",
     "Armor Room": "205",
     "Pillar Passage": "20D",
     "Attic Entry": "20E",

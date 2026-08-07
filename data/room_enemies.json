@@ -7,10 +7,9 @@
     "fetch_errors": [
       "https://www.evilresource.com/resident-evil/enemies/hornet: HTTP Error 404: Not Found"
     ],
-    "notes": "positions intentionally absent \u2014 come from RAM/RDT only",
+    "notes": "positions intentionally absent — come from RAM/RDT only",
     "scrape_ok": true,
-    "unmatched_count": 0,
-    "rdt_positions_merged": 15
+    "unmatched_count": 0
   },
   "100": {
     "room_name": "SAVE ROOM",
@@ -18,15 +17,7 @@
   },
   "101": {
     "room_name": "1F LEFT STAIRS",
-    "enemies": [
-      {
-        "enemy_type": "zombie",
-        "count": 1,
-        "spawn_trigger": "return_visit",
-        "notes": "zombie on east stairs landing",
-        "unverified": true
-      }
-    ]
+    "enemies": []
   },
   "102": {
     "room_name": "VACANT ROOM",
@@ -51,11 +42,8 @@
         "enemy_type": "zombie",
         "count": 1,
         "spawn_trigger": "cutscene",
-        "notes": "Kenneth Sullivan body; first zombie encounter | RDT @(4150,6300)",
-        "unverified": true,
-        "x": 4150,
-        "z": 6300,
-        "model_id": 17
+        "notes": "Kenneth Sullivan body; first zombie encounter",
+        "unverified": true
       }
     ]
   },
@@ -109,11 +97,8 @@
         "enemy_type": "zombie",
         "count": 1,
         "spawn_trigger": "always",
-        "notes": "zombie in L-shaped passage | RDT @(30000,30000)",
-        "unverified": true,
-        "x": 30000,
-        "z": 30000,
-        "model_id": 2
+        "notes": "zombie in L-shaped passage",
+        "unverified": true
       }
     ]
   },
@@ -136,17 +121,22 @@
         "enemy_type": "zombie",
         "count": 1,
         "spawn_trigger": "return_visit",
-        "notes": "zombie in back passage | RDT @(8272,2433)",
-        "unverified": true,
-        "x": 8272,
-        "z": 2433,
-        "model_id": 17
+        "notes": "zombie in back passage",
+        "unverified": true
       }
     ]
   },
   "10B": {
     "room_name": "1F RIGHT STAIRS",
-    "enemies": []
+    "enemies": [
+      {
+        "enemy_type": "zombie",
+        "count": 1,
+        "spawn_trigger": "return_visit",
+        "notes": "zombie on east stairs landing",
+        "unverified": true
+      }
+    ]
   },
   "10C": {
     "room_name": "GREEN HOUSE",
@@ -227,11 +217,8 @@
         "enemy_type": "zombie",
         "count": 2,
         "spawn_trigger": "always",
-        "notes": "zombies near wall shotgun rack | RDT @(9500,5800)",
-        "unverified": true,
-        "x": 9500,
-        "z": 5800,
-        "model_id": 17
+        "notes": "zombies near wall shotgun rack",
+        "unverified": true
       }
     ]
   },
@@ -242,11 +229,8 @@
         "enemy_type": "crow",
         "count": 2,
         "spawn_trigger": "always",
-        "notes": "crows; star crest puzzle room | RDT @(19557,10200)",
-        "unverified": true,
-        "x": 19557,
-        "z": 10200,
-        "model_id": 5
+        "notes": "crows; star crest puzzle room",
+        "unverified": true
       }
     ]
   },
@@ -255,7 +239,7 @@
     "enemies": []
   },
   "119": {
-    "room_name": "N/A",
+    "room_name": "COURTYARD STUDY",
     "enemies": []
   },
   "11A": {
@@ -265,11 +249,8 @@
         "enemy_type": "zombie",
         "count": 1,
         "spawn_trigger": "always",
-        "notes": "zombie in roofed outdoor passage | RDT @(6500,24860)",
-        "unverified": true,
-        "x": 6500,
-        "z": 24860,
-        "model_id": 2
+        "notes": "zombie in roofed outdoor passage",
+        "unverified": true
       }
     ]
   },
@@ -368,11 +349,8 @@
         "enemy_type": "snake_yawn",
         "count": 1,
         "spawn_trigger": "event",
-        "notes": "Yawn boss fight (first snake encounter) | RDT @(4500,24500)",
-        "unverified": true,
-        "x": 4500,
-        "z": 24500,
-        "model_id": 13
+        "notes": "Yawn boss fight (first snake encounter)",
+        "unverified": true
       }
     ]
   },
@@ -383,12 +361,6 @@
   "212": {
     "room_name": "TERRACE",
     "enemies": [
-      {
-        "enemy_type": "crow",
-        "count": 3,
-        "spawn_trigger": "always",
-        "notes": "Live QS0: three crows; active_byte 0x04 idle / 0x1C flying"
-      },
       {
         "enemy_type": "zombie",
         "count": 1,
@@ -419,11 +391,11 @@
     "enemies": []
   },
   "218": {
-    "room_name": "HIDDEN LIBRARY",
+    "room_name": "SMALL LIBRARY",
     "enemies": []
   },
   "219": {
-    "room_name": "SHED",
+    "room_name": "CLOSET",
     "enemies": []
   },
   "21A": {
@@ -445,26 +417,14 @@
         "enemy_type": "cerberus",
         "count": 2,
         "spawn_trigger": "event",
-        "notes": "dogs attack on first courtyard entry | RDT @(23945,20792)",
-        "unverified": true,
-        "x": 23945,
-        "z": 20792,
-        "model_id": 2
+        "notes": "dogs attack on first courtyard entry",
+        "unverified": true
       }
     ]
   },
   "301": {
     "room_name": "WATER GATE",
-    "enemies": [
-      {
-        "enemy_type": "adder",
-        "count": 6,
-        "spawn_trigger": "always",
-        "notes": "Hub-door classify 2026-07-23: 6 low-HP slots, kind@0x05=0x0B; infinite respawn — no combat pay",
-        "unverified": false,
-        "type_id": 11
-      }
-    ]
+    "enemies": []
   },
   "302": {
     "room_name": "FALLS",
@@ -481,11 +441,8 @@
         "enemy_type": "cerberus",
         "count": 2,
         "spawn_trigger": "always",
-        "notes": "cerberus at guardhouse entrance | RDT @(25657,11984)",
-        "unverified": true,
-        "x": 25657,
-        "z": 11984,
-        "model_id": 2
+        "notes": "cerberus at guardhouse entrance",
+        "unverified": true
       }
     ]
   },
@@ -512,11 +469,8 @@
         "enemy_type": "hunter",
         "count": 1,
         "spawn_trigger": "always",
-        "notes": "hunter in darkness passage (underground) | RDT @(7750,4760)",
-        "unverified": true,
-        "x": 7750,
-        "z": 4760,
-        "model_id": 6
+        "notes": "hunter in darkness passage (underground)",
+        "unverified": true
       }
     ]
   },
@@ -535,11 +489,8 @@
         "enemy_type": "black_tiger",
         "count": 1,
         "spawn_trigger": "event",
-        "notes": "Black Tiger boss in underground cavern | RDT @(4500,5700)",
-        "unverified": true,
-        "x": 4500,
-        "z": 5700,
-        "model_id": 4
+        "notes": "Black Tiger boss in underground cavern",
+        "unverified": true
       }
     ]
   },
@@ -591,24 +542,11 @@
     "room_name": "BAR",
     "enemies": [
       {
-        "enemy_type": "spider",
-        "count": 2,
-        "spawn_trigger": "always",
-        "notes": "Hub-door classify 2026-07-23: 2 Web Spinners @ (11600,12700), kind@0x05=0x14 (same byte as Black Tiger)",
-        "unverified": false,
-        "x": 11600,
-        "z": 12700,
-        "type_id": 20
-      },
-      {
         "enemy_type": "hunter",
         "count": 1,
         "spawn_trigger": "return_visit",
-        "notes": "hunter in recreation room on return visit | RDT @(14100,24900)",
-        "unverified": true,
-        "x": 14100,
-        "z": 24900,
-        "model_id": 3
+        "notes": "hunter in recreation room",
+        "unverified": true
       }
     ]
   },
@@ -645,11 +583,10 @@
     "enemies": [
       {
         "enemy_type": "wasp",
-        "count": 6,
+        "count": 1,
         "spawn_trigger": "always",
-        "notes": "Hub-door classify 2026-07-23: 6 wasp slots HP~36-50, kind@0x05=0x0A; infinite respawn — no combat pay",
-        "unverified": false,
-        "type_id": 10
+        "notes": "wasp nest blocks passage to 002 key",
+        "unverified": true
       }
     ]
   },
@@ -680,11 +617,8 @@
         "enemy_type": "plant42",
         "count": 1,
         "spawn_trigger": "event",
-        "notes": "Plant 42 boss | RDT @(10800,10800)",
-        "unverified": true,
-        "x": 10800,
-        "z": 10800,
-        "model_id": 8
+        "notes": "Plant 42 boss",
+        "unverified": true
       }
     ]
   },
@@ -694,16 +628,7 @@
   },
   "40E": {
     "room_name": "WATER TANK",
-    "enemies": [
-      {
-        "enemy_type": "shark",
-        "count": 3,
-        "spawn_trigger": "always",
-        "notes": "Hub-door classify 2026-07-23: 3 Neptune slots ~HP45-52, kind@0x05=0x0D; aim snap = instant death — no combat pay",
-        "unverified": false,
-        "type_id": 13
-      }
-    ]
+    "enemies": []
   },
   "40F": {
     "room_name": "SECURITY ROOM",
@@ -792,11 +717,8 @@
         "enemy_type": "chimera",
         "count": 1,
         "spawn_trigger": "always",
-        "notes": "chimera in power maze | RDT @(5676,7812)",
-        "unverified": true,
-        "x": 5676,
-        "z": 7812,
-        "model_id": 9
+        "notes": "chimera in power maze",
+        "unverified": true
       }
     ]
   },
@@ -819,11 +741,8 @@
         "enemy_type": "tyrant",
         "count": 1,
         "spawn_trigger": "event",
-        "notes": "Tyrant T-002 boss | RDT @(10700,7000)",
-        "unverified": true,
-        "x": 10700,
-        "z": 7000,
-        "model_id": 12
+        "notes": "Tyrant T-002 boss",
+        "unverified": true
       }
     ]
   },

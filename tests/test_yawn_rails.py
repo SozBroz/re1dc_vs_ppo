@@ -164,8 +164,8 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     assert [(cp["room_id"], cp["checkpoint_id"]) for cp in route[-10:]] == [
         ("11B", "yawn_box_enter_11B"),
         ("11B", "yawn_box_prep_11B"),
-        ("101", "east_stairs_101_to_yawn"),
-        ("201", "east_stairs_201_to_yawn"),
+        ("10B", "east_stairs_101_to_yawn"),
+        ("207", "east_stairs_201_to_yawn"),
         ("204", "c_passage_204_to_yawn"),
         ("20D", "moon_hall_enter_20D"),
         ("20D", "ammo_20D"),
@@ -422,6 +422,16 @@ def test_crest_gate_requires_story_use_not_unheld_crest_lacks() -> None:
     assert planner.advance_if_success(placed, progress=progress)
 
 
+def test_cp39_leg_east_stairs_101_room_enter() -> None:
+    """cp39 reset (index 39) -> leg 40 is east_stairs_101; entering 10B completes."""
+    planner = _planner(start_index=_idx("back_passage_post_crest_10A") + 1)
+    assert planner.current_objective()["checkpoint_id"] == "east_stairs_101"
+    progress = ProgressTracker()
+    assert not planner.advance_if_success(_state("10A"), progress=progress)
+    assert not planner.advance_if_success(_state("101"), progress=progress)
+    assert planner.advance_if_success(_state("10B"), progress=progress)
+
+
 def test_kenneth_requires_cutscene_and_in_control_settle() -> None:
     planner = _planner(start_index=_idx("kenneth_104"))
     bare = ProgressTracker()
@@ -597,14 +607,14 @@ def test_goal_appends_six_masked_checkpoint_semantic_slots() -> None:
     # Lookahead from east stairs after Richard: … ammo_20D, attic, yawn enter, yawn.
     planner = _planner(start_index=_idx("east_stairs_101_to_yawn"))
     goal = encoder.encode_goal(
-        _state("101", inventory=["shield_key", "shotgun"]),
+        _state("10B", inventory=["shield_key", "shotgun"]),
         planner,
     )
     slots = goal[GOAL_BASE_DIM:].reshape(
         GOAL_LOOKAHEAD_SLOTS, GOAL_LOOKAHEAD_SLOT_DIM
     )
     assert slots[0, 0] == 1.0
-    assert slots[0, 1] == encoder._room_idx_norm("101")
+    assert slots[0, 1] == encoder._room_idx_norm("10B")
     pickup_slots = [i for i in range(GOAL_LOOKAHEAD_SLOTS) if slots[i, 3 + 1] == 1.0]
     assert pickup_slots, "expected a pickup in lookahead"
     assert any(
