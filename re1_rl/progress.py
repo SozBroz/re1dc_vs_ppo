@@ -430,14 +430,20 @@ class ProgressTracker:
             self.gallery_pending_reward += GALLERY_STEP_REWARD
             return GALLERY_STEP_REWARD, 0.0
 
-        puzzle_complete = (
-            int(prev_raw) == GALLERY_COMPLETE_PREV_RAW
-            and int(raw) == 0
-            and prev_count == len(GALLERY_STEP_VALUES)
+        awaiting_final = (
+            self.gallery_step_index >= len(GALLERY_STEP_VALUES)
+            or int(prev_raw) == GALLERY_COMPLETE_PREV_RAW
         )
-        if puzzle_complete:
+        if awaiting_final and int(raw) == 0:
             self.gallery_puzzle_solved = True
             self.gallery_step_index = len(GALLERY_STEP_VALUES)
+            return 0.0, 0.0
+
+        if self.gallery_puzzle_solved:
+            return 0.0, 0.0
+
+        if awaiting_final:
+            # Final-switch / crest-reveal transients (e.g. 2→1) before RAM settles.
             return 0.0, 0.0
 
         wrong_reset = int(raw) == 0 and int(prev_raw) != 0

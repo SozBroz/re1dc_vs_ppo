@@ -614,8 +614,8 @@
       "state_path": "states/yawn_rails/cells/cp27/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp27/cell.sidecar.json",
       "inventory_free_slots": 4,
-      "next_checkpoint_id": "star_crest_117",
-      "next_slots_needed": 1,
+      "next_checkpoint_id": "gallery_portrait_1_117",
+      "next_slots_needed": 0,
       "inventory_feasible": true,
       "captured_in_box_room": false
     },

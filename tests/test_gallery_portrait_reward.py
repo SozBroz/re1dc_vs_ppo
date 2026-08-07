@@ -175,6 +175,47 @@ def test_wrong_first_confirmation_locks_rewards_and_points_to_exit() -> None:
     assert locked_bd["gallery"] == 0.0
 
 
+def test_final_switch_transient_ram_not_wrong_portrait() -> None:
+    progress = ProgressTracker()
+    progress.first_visit("117")
+    prev = _state()
+    for raw in GALLERY_STEP_VALUES:
+        state = _state(raw=raw)
+        _reward(progress, prev, state)
+        prev = state
+
+    transient = _state(raw=1)
+    _total, bd = _reward(progress, prev, transient)
+    assert bd["gallery_wrong"] == 0.0
+    assert not progress.gallery_wrong_breached
+    assert not progress.gallery_puzzle_solved
+
+    complete = _state(raw=0)
+    _total, bd = _reward(progress, transient, complete)
+    assert bd["gallery_wrong"] == 0.0
+    assert progress.gallery_puzzle_solved
+
+
+def test_post_puzzle_confirm_noise_not_wrong_portrait() -> None:
+    progress = ProgressTracker()
+    progress.first_visit("117")
+    prev = _state()
+    for raw in GALLERY_STEP_VALUES:
+        state = _state(raw=raw)
+        _reward(progress, prev, state)
+        prev = state
+
+    complete = _state(raw=0, confirm=2)
+    _reward(progress, prev, complete)
+    assert progress.gallery_puzzle_solved
+
+    crest_reveal = _state(raw=0, confirm=10)
+    settled = _state(raw=0, confirm=2)
+    _total, bd = _reward(progress, settled, crest_reveal)
+    assert bd["gallery_wrong"] == 0.0
+    assert not progress.gallery_wrong_breached
+
+
 def test_final_switch_clears_progress_without_wrong_portrait_terminal() -> None:
     progress = ProgressTracker()
     progress.first_visit("117")
