@@ -297,6 +297,60 @@ def ammo_waste_penalty(
     ) * float(rounds)
 
 
+def _nominal_weapon_damage_max(weapon_id: int) -> int:
+    from re1_rl.weapon_damage import WEAPON_NOMINAL_DAMAGE
+
+    pair = WEAPON_NOMINAL_DAMAGE.get(int(weapon_id) & 0xFF)
+    if not pair:
+        return 0
+    return int(pair[1])
+
+
+def combat_overkill_penalty(state: dict[str, Any]) -> float:
+    """Penalty for wasted nominal damage on kills (scales like miss tax)."""
+    events = state.get("combat_events")
+    if not events:
+        return 0.0
+    wid = int(
+        state.get("pending_miss_weapon_id")
+        or state.get("equipped_weapon_id")
+        or 0
+    )
+    if wid <= 0:
+        return 0.0
+    nominal = _nominal_weapon_damage_max(wid)
+    if nominal <= 0:
+        return 0.0
+    ammo_spent = int(state.get("ammo_spent", 0) or 0)
+    total = 0.0
+    if wid == 0x01:
+        per_miss = KNIFE_MISS_PENALTY
+        for ev in events:
+            if ev.get("reward_denied") or not ev.get("killed"):
+                continue
+            damage = int(ev.get("damage", 0))
+            wasted = max(0, nominal - damage)
+            if wasted <= 0:
+                continue
+            total += (wasted / float(nominal)) * per_miss
+        return total
+    from re1_rl.ammo_accounting import fireable_ammo_before_miss
+
+    ammo_before = fireable_ammo_before_miss(state, wid, rounds_spent=ammo_spent)
+    per_round = ammo_waste_per_missed_round(wid, ammo_before=ammo_before)
+    if per_round == 0.0:
+        return 0.0
+    for ev in events:
+        if ev.get("reward_denied") or not ev.get("killed"):
+            continue
+        damage = int(ev.get("damage", 0))
+        wasted = max(0, nominal - damage)
+        if wasted <= 0:
+            continue
+        total += (wasted / float(nominal)) * per_round
+    return total
+
+
 # Legacy aliases (all rails off-path / leave-target is now terminal -4).
 WRONG_ROOM_PENALTY = -4.0
 # Room detour / leave-target: -4, zeros same-step positives, ends episode.
@@ -573,6 +627,7 @@ def compute_reward(
         "enemy_kill": 0.0,
         "attack_miss": 0.0,
         "ammo_waste": 0.0,
+        "combat_overkill": 0.0,
         "attack_dry_fire": 0.0,
         "attack_macro_failure": 0.0,
     }
@@ -848,6 +903,10 @@ def compute_reward(
         bd["enemy_damage"] = enemy_damage_pay
     if enemy_kill_pay > 0.0:
         bd["enemy_kill"] = enemy_kill_pay
+
+    overkill = combat_overkill_penalty(state)
+    if overkill < 0.0:
+        bd["combat_overkill"] = overkill
 
     # Miss taxes: gun ammo waste on attack_missed; knife whiff on knife_swing_missed
     # (any knife-equipped macro height).

@@ -112,7 +112,7 @@ def test_sample_one_leg_uses_plr_when_enabled(
 ) -> None:
     monkeypatch.setenv("RE1_YAWN_PLR", "1")
     monkeypatch.setenv("RE1_YAWN_PLR_STATE", str(tmp_path / "plr.json"))
-    cell = tmp_path / "states/cp0"
+    cell = tmp_path / "states/cp18"
     cell.mkdir(parents=True)
     (cell / "cell.State").write_bytes(b"state" * 100)
     (cell / "cell.sidecar.json").write_text("{}", encoding="utf-8")
@@ -121,9 +121,9 @@ def test_sample_one_leg_uses_plr_when_enabled(
             "schema_version": 1,
             "route_id": "test",
             "cells": [{
-                "checkpoint_index": 0,
-                "state_path": "states/cp0/cell.State",
-                "sidecar_path": "states/cp0/cell.sidecar.json",
+                "checkpoint_index": 18,
+                "state_path": "states/cp18/cell.State",
+                "sidecar_path": "states/cp18/cell.sidecar.json",
             }],
         }),
         encoding="utf-8",

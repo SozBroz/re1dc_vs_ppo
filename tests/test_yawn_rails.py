@@ -720,50 +720,46 @@ def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: P
     manifest = {
         "schema_version": 1,
         "route_id": "test",
-        "cells": [_write_cell(tmp_path, 0)],
+        "cells": [_write_cell(tmp_path, 18)],
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     stage = {"route_id": "test", "cells_manifest": "manifest.json"}
     a = sample_one_leg_options(tmp_path, stage, rng=random.Random(7))
     b = sample_one_leg_options(tmp_path, stage, rng=random.Random(7))
     assert a == b
-    assert a["reset_source"] in {"route_initial", "route_cell"}
-    assert a["reset_source"] not in {"pb", "archive"}
+    assert a["reset_source"] == "route_cell"
+    assert a["reset_source"] not in {"pb", "archive", "route_initial"}
     assert a["leg_span"] == 1
 
 
-def test_reset_mix_prefers_latest_cell_then_fresh_then_older(tmp_path: Path) -> None:
-    # 3 cells → latest 50%; remaining 50% uniform over fresh + 2 older (= 1/6 each).
+def test_reset_mix_prefers_latest_cell_then_older_eligible(tmp_path: Path) -> None:
+    # 3 eligible cells (18,19,20) → latest 50%; remaining 50% uniform over 18,19.
     manifest = {
         "schema_version": 1,
         "route_id": "test",
-        "cells": [_write_cell(tmp_path, i) for i in range(3)],
+        "cells": [_write_cell(tmp_path, i) for i in range(18, 21)],
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     stage = {
         "route_id": "test",
         "cells_manifest": "manifest.json",
-        "route_steps": list(range(1, 10)),
+        "route_steps": list(range(1, 30)),
     }
-    counts = {"latest": 0, "fresh": 0, "older": 0}
+    counts = {"latest": 0, "older": 0}
     per_start: dict[int, int] = {}
     for seed in range(3000):
         opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
         start = int(opts["route_start_index"])
         per_start[start] = per_start.get(start, 0) + 1
-        if start == 0:
-            counts["fresh"] += 1
-        elif start == 3:  # latest cell index 2 → start 3
+        if start == 21:  # latest cell index 20 → start 21
             counts["latest"] += 1
         else:
             counts["older"] += 1
     total = sum(counts.values())
     assert counts["latest"] / total == pytest.approx(0.50, abs=0.04)
-    # fresh, cp00→start1, cp01→start2 each get 0.5/3
-    assert counts["fresh"] / total == pytest.approx(0.5 / 3, abs=0.04)
-    assert counts["older"] / total == pytest.approx(0.5 * 2 / 3, abs=0.04)
-    assert per_start.get(1, 0) / total == pytest.approx(0.5 / 3, abs=0.04)
-    assert per_start.get(2, 0) / total == pytest.approx(0.5 / 3, abs=0.04)
+    assert counts["older"] / total == pytest.approx(0.50, abs=0.04)
+    assert per_start.get(19, 0) / total == pytest.approx(0.25, abs=0.04)
+    assert per_start.get(20, 0) / total == pytest.approx(0.25, abs=0.04)
 
 
 def test_reset_latest_only_env_pins_newest_cell(
@@ -772,34 +768,40 @@ def test_reset_latest_only_env_pins_newest_cell(
     manifest = {
         "schema_version": 1,
         "route_id": "test",
-        "cells": [_write_cell(tmp_path, i) for i in range(3)],
+        "cells": [_write_cell(tmp_path, i) for i in range(18, 21)],
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     stage = {
         "route_id": "test",
         "cells_manifest": "manifest.json",
-        "route_steps": list(range(1, 10)),
+        "route_steps": list(range(1, 30)),
     }
     monkeypatch.setenv("RE1_YAWN_RESET_LATEST_ONLY", "1")
     for seed in range(50):
         opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
-        assert opts["route_start_index"] == 3
+        assert opts["route_start_index"] == 21
         assert opts["reset_source"] == "route_cell"
         assert str(opts["pb_bundle"]["state_path"]).replace("\\", "/").endswith(
-            "states/cp2/cell.State"
+            "states/cp20/cell.State"
         )
 
 
 def test_chaining_curriculum_samples_bounded_remaining_span(tmp_path: Path) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, 18)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     stage = {
         "route_id": "test",
-        "cells_manifest": "missing.json",
-        "route_steps": list(range(1, 5)),
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 30)),
         "legs_per_episode": 6,
     }
     opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(1))
-    assert opts["route_start_index"] == 0
-    assert opts["leg_span"] == 4
+    assert opts["route_start_index"] == 19
+    assert opts["leg_span"] == 6
     chaining = json.loads(
         (ROOT / "curriculum/yawn_rails_chaining.json").read_text(encoding="utf-8")
     )
@@ -919,14 +921,15 @@ def test_sampling_filters_legacy_and_infeasible_mandatory_pickup_rows(
             "captured_in_box_room": False,
         },
     )):
-        cell = tmp_path / f"states/cp{idx}"
+        cp_idx = 18 + idx
+        cell = tmp_path / f"states/cp{cp_idx}"
         cell.mkdir(parents=True)
         (cell / "cell.State").write_bytes(b"state")
         (cell / "cell.sidecar.json").write_text("{}", encoding="utf-8")
         cells.append({
-            "checkpoint_index": 0,
-            "state_path": f"states/cp{idx}/cell.State",
-            "sidecar_path": f"states/cp{idx}/cell.sidecar.json",
+            "checkpoint_index": cp_idx,
+            "state_path": f"states/cp{cp_idx}/cell.State",
+            "sidecar_path": f"states/cp{cp_idx}/cell.sidecar.json",
             **extra,
         })
     (tmp_path / "manifest.json").write_text(
@@ -939,7 +942,7 @@ def test_sampling_filters_legacy_and_infeasible_mandatory_pickup_rows(
         "cells_manifest": "manifest.json",
     }
     chosen = sample_one_leg_options(tmp_path, stage, rng=random.Random(0))
-    assert chosen["reset_source"] == "route_initial"
+    assert chosen["reset_source"] == "route_cell"
 
 
 def test_checkpoint_success_proposes_without_local_install_when_sync_on(

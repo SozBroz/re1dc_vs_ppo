@@ -297,7 +297,8 @@ def validate_manifest_cells(
 
 
 # Non-PLR reset mix: 50% frontier cell; remaining 50% is uniform over
-# ``route_initial`` plus each older cell (fresh counts as one peer).
+# each older eligible cell (no route_initial — conditions before cp18 are frozen).
+RESET_MIN_CHECKPOINT_INDEX = 18
 RESET_LATEST_CELL_WEIGHT = 0.50
 _RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
 
@@ -308,25 +309,36 @@ def reset_latest_only_from_env() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def eligible_reset_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Cells the random reset sampler may use (cp18+ only)."""
+    return [
+        row
+        for row in cells
+        if int(row.get("checkpoint_index", -1)) >= RESET_MIN_CHECKPOINT_INDEX
+    ]
+
+
 def _choose_reset_candidate(
     cells: list[dict[str, Any]],
     *,
     rng: random.Random,
     latest_only: bool = False,
 ) -> dict[str, Any]:
-    """50% latest; else uniform over fresh + each older cell."""
-    fresh = {"checkpoint_index": -1, "source": "route_initial"}
-    if not cells:
-        return fresh
-    latest = cells[-1]
+    """50% latest eligible cell; else uniform over each older eligible cell."""
+    eligible = eligible_reset_cells(cells)
+    if not eligible:
+        raise ValueError(
+            f"no loadable Yawn rails cells at checkpoint_index>={RESET_MIN_CHECKPOINT_INDEX}"
+        )
+    latest = eligible[-1]
     if latest_only:
         return latest
-    older = cells[:-1]
+    older = eligible[:-1]
     if rng.random() < float(RESET_LATEST_CELL_WEIGHT):
         return latest
-    # Remaining 50%: fresh and every older cell share equal probability.
-    pool: list[dict[str, Any]] = [fresh, *older]
-    return pool[rng.randrange(len(pool))]
+    if not older:
+        return latest
+    return older[rng.randrange(len(older))]
 
 
 def sample_one_leg_options(
@@ -337,18 +349,15 @@ def sample_one_leg_options(
 ) -> dict[str, Any]:
     """Choose a curated start and bounded checkpoint span.
 
-    Non-PLR mix: 50% latest cell; remaining 50% uniform over ``route_initial``
-    and each older cell. ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
+    Non-PLR mix: 50% latest eligible cell (cp18+); remaining 50% uniform over
+    older eligible cells. ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
     """
-    cells = iter_loadable_cells(project_root, stage)
-    candidates: list[dict[str, Any]] = [
-        {"checkpoint_index": -1, "source": "route_initial"},
-        *cells,
-    ]
+    cells = eligible_reset_cells(iter_loadable_cells(project_root, stage))
     latest_only = reset_latest_only_from_env()
     from re1_rl.yawn_rails_plr import plr_enabled_from_env, sample_plr_options
 
     if plr_enabled_from_env() and not latest_only:
+        candidates = list(cells)
         return sample_plr_options(project_root, stage, candidates, rng=rng)
     chosen = _choose_reset_candidate(cells, rng=rng, latest_only=latest_only)
     start_index = int(chosen["checkpoint_index"]) + 1

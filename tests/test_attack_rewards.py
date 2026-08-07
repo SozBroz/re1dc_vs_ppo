@@ -21,6 +21,7 @@ from re1_rl.reward import (
     STEP_PENALTY,
     ammo_waste_per_missed_round,
     ammo_waste_penalty,
+    combat_overkill_penalty,
     compute_reward,
 )
 from tests.test_scaffolding import make_planner, make_state
@@ -183,6 +184,79 @@ def test_breakdown_keys_present() -> None:
     )
     assert "attack_miss" in bd
     assert "ammo_waste" in bd
+    assert "combat_overkill" in bd
+
+
+def test_combat_overkill_beretta_one_hp_kill() -> None:
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    cur["equipped_weapon_id"] = 0x02
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 1,
+            "killed": True,
+            "reward_denied": False,
+            "is_crow": False,
+        }
+    ]
+    per_round = ammo_waste_per_missed_round(0x02)
+    expected = (3 / 4.0) * per_round
+    assert combat_overkill_penalty(cur) == pytest.approx(expected)
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["combat_overkill"] == pytest.approx(expected)
+    assert bd["enemy_kill"] == ENEMY_KILL_REWARD
+
+
+def test_combat_overkill_scales_with_low_ammo() -> None:
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    cur = make_state(
+        hp=96,
+        step=2,
+        inventory_slots=[("beretta", 1), ("handgun_bullets", 0)],
+    )
+    cur["equipped_weapon_id"] = 0x02
+    cur["ammo_spent"] = 1
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 1,
+            "killed": True,
+            "reward_denied": False,
+            "is_crow": False,
+        }
+    ]
+    from re1_rl.ammo_accounting import fireable_ammo_before_miss
+
+    per_round = ammo_waste_per_missed_round(
+        0x02,
+        ammo_before=fireable_ammo_before_miss(cur, 0x02, rounds_spent=1),
+    )
+    expected = (3 / 4.0) * per_round
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["combat_overkill"] == pytest.approx(expected)
+    assert abs(bd["combat_overkill"]) > abs((3 / 4.0) * ammo_waste_per_missed_round(0x02))
+
+
+def test_combat_overkill_no_penalty_on_efficient_kill() -> None:
+    cur = make_state(hp=96, step=2)
+    cur["equipped_weapon_id"] = 0x02
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 4,
+            "killed": True,
+            "reward_denied": False,
+            "is_crow": False,
+        }
+    ]
+    assert combat_overkill_penalty(cur) == 0.0
 
 
 def test_yawn_rails_keeps_combat_hit_positive_unscaled_against_miss_tax() -> None:
