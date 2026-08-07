@@ -471,17 +471,24 @@ def capture_successor_cell(
     completed_cp = planner.step_by_seq(completed + 1) or {}
     expected_room = str(completed_cp.get("room_id", "") or "")
     room_id = str(state.get("room_id", "") or "")
+    cid = str(completed_cp.get("checkpoint_id", "") or "")
     # Refuse door-threshold / cutscene-spoof captures (Wesker→fake 106, Kenneth
     # at 105→104 entry pose before tea-room settle, etc.).
+    from re1_rl.barry_rescue_checkpoint import barry_rescue_capture_room_ok
+
     if expected_room and room_id.upper() != expected_room.upper():
-        return None
+        if not barry_rescue_capture_room_ok(cid, room_id, expected_room):
+            return None
     progress = getattr(env, "_progress", None)
     ledgers: set[str] = set()
     if progress is not None:
         ledgers = set(progress.observed_cutscenes or ()) | set(
             progress.rewarded_cutscenes or ()
         )
-    cid = str(completed_cp.get("checkpoint_id", "") or "")
+    if cid == "barry_rescue_115" and not any(
+        str(k).startswith("115:") for k in ledgers
+    ):
+        return None
     if cid == "kenneth_104" and not any(str(k).startswith("104:") for k in ledgers):
         return None
     if cid == "barry_return_105" and not any(
@@ -543,12 +550,13 @@ def capture_successor_cell(
                 except (OSError, RuntimeError, ValueError, TypeError, AttributeError):
                     live_room = room_id
             if expected_room and live_room.upper() != expected_room.upper():
-                print(
-                    f"[yawn_capture] reject pre-save room drift "
-                    f"live={live_room!r} expected={expected_room!r} cp={cid}",
-                    flush=True,
-                )
-                return False
+                if not barry_rescue_capture_room_ok(cid, live_room, expected_room):
+                    print(
+                        f"[yawn_capture] reject pre-save room drift "
+                        f"live={live_room!r} expected={expected_room!r} cp={cid}",
+                        flush=True,
+                    )
+                    return False
             if not live_state.get("in_control", True) or live_state.get("dead"):
                 print(
                     f"[yawn_capture] reject pre-save not settled "
@@ -571,12 +579,15 @@ def capture_successor_cell(
                     )
                     return False
                 if expected_room and after_room.upper() != expected_room.upper():
-                    print(
-                        f"[yawn_capture] reject post-save room drift "
-                        f"after={after_room!r} expected={expected_room!r} cp={cid}",
-                        flush=True,
-                    )
-                    return False
+                    if not barry_rescue_capture_room_ok(
+                        cid, after_room, expected_room
+                    ):
+                        print(
+                            f"[yawn_capture] reject post-save room drift "
+                            f"after={after_room!r} expected={expected_room!r} cp={cid}",
+                            flush=True,
+                        )
+                        return False
                 live_room = after_room
             return True
 

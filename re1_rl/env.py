@@ -429,6 +429,7 @@ class RE1Env(gym.Env):
         self._post_skip_reward = 0.0
         self._post_skip_bd: dict[str, float] = {}
         self._cutscene_skip_entry_prev: dict[str, Any] | None = None
+        self._cutscene_skip_origin_prev: dict[str, Any] | None = None
         # Total uncontrolled frames for the current skip, including every
         # room-crossing segment. Unlike _last_skip_frames, this never resets at
         # a door and is the sole duration used for cutscene reward qualification.
@@ -1273,6 +1274,7 @@ class RE1Env(gym.Env):
         self._post_skip_reward = 0.0
         self._post_skip_bd = {}
         self._cutscene_skip_entry_prev = None
+        self._cutscene_skip_origin_prev = None
         self._skip_session_frames = 0
         self._pending_skip_room_crossings = []
         self._pending_episode_failure = None
@@ -1538,9 +1540,17 @@ class RE1Env(gym.Env):
                     self._cutscene_skip_entry_prev = dict(
                         self._read_state(track_items=False)
                     )
+                    self._cutscene_skip_origin_prev = dict(
+                        self._cutscene_skip_entry_prev
+                    )
                 except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
                     self._cutscene_skip_entry_prev = (
                         dict(self._prev_state) if self._prev_state else None
+                    )
+                    self._cutscene_skip_origin_prev = (
+                        dict(self._cutscene_skip_entry_prev)
+                        if self._cutscene_skip_entry_prev
+                        else None
                     )
                 try:
                     self._ram_skip.clear_skip_script_peaks()
@@ -1769,6 +1779,21 @@ class RE1Env(gym.Env):
         """Credit pickups / cutscenes that finished while async skip was running."""
         from re1_rl.story_item_use import annotate_story_use_success
 
+        skip_trap_entry: dict[str, Any] | None = None
+        pending_cross = getattr(self, "_pending_skip_room_crossings", None) or []
+        if pending_cross:
+            skip_trap_entry = dict(pending_cross[0][0])
+        else:
+            origin = getattr(self, "_cutscene_skip_origin_prev", None)
+            if origin is not None:
+                skip_trap_entry = dict(origin)
+            else:
+                snap = getattr(self, "_cutscene_skip_entry_prev", None)
+                if snap is not None:
+                    skip_trap_entry = dict(snap)
+                elif self._prev_state:
+                    skip_trap_entry = dict(self._prev_state)
+
         # Flush any door crossing (harness _credit_skip_room_crossing).
         try:
             self._credit_async_skip_room_crossing()
@@ -1800,8 +1825,19 @@ class RE1Env(gym.Env):
         if inv_before is not None:
             entry_prev = dict(entry_prev or {})
             entry_prev["inventory"] = list(inv_before)
+            if skip_trap_entry is not None:
+                skip_trap_entry["inventory"] = list(inv_before)
         if inv_after is not None:
             state["inventory"] = list(inv_after)
+        from re1_rl.barry_rescue_checkpoint import note_barry_rescue_skip_settle
+
+        note_barry_rescue_skip_settle(
+            self._planner,
+            self._progress,
+            skip_trap_entry or entry_prev,
+            state,
+            skip_frames=int(getattr(self, "_skip_session_frames", 0) or 0),
+        )
         # Reward qualification is duration-based with explicit exclusions (menu,
         # pickup, death, opening, pre-Kenneth hall, message-box text). Door
         # crossings keep their new_room credit and contribute to skip duration.
@@ -1833,6 +1869,7 @@ class RE1Env(gym.Env):
         self._prev_state = state
         self._queue_kenneth_gate_failure_if_needed()
         self._cutscene_skip_entry_prev = None
+        self._cutscene_skip_origin_prev = None
         self._pending_skip_room_crossings = []
         # Stash for monitor/harness before session counters reset. Do not let
         # gate panels fall back to step_emulated_frames (lies as "4 < 20").

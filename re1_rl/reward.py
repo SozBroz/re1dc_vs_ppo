@@ -591,32 +591,37 @@ def compute_reward(
 
         target = planner.next_waypoint_room()
         if room_changed and target is not None:
-            left_target = (
-                prev_room == str(target)
-                and room != str(target)
-                and planner.next_waypoint_room() == str(target)
-            )
-            off_rails = False
-            if left_target:
-                off_rails = True
-            elif room != str(target):
-                prev_hops = graph.hop_distance(prev_room, str(target))
-                now_hops = graph.hop_distance(room, str(target))
-                off_rails = now_hops is None or (
-                    prev_hops is not None and now_hops >= prev_hops
+            from re1_rl.barry_rescue_checkpoint import should_suppress_wrong_room
+
+            if should_suppress_wrong_room(planner, prev_room, room, state):
+                pass
+            else:
+                left_target = (
+                    prev_room == str(target)
+                    and room != str(target)
+                    and planner.next_waypoint_room() == str(target)
                 )
-                if off_rails and not graph.knows_room(str(target)):
-                    off_rails = False
-            if off_rails:
-                claimed = True
-                if progress is not None and not left_target:
-                    claimed = progress.claim_offroute_penalty(room)
-                if claimed:
-                    # All rails wrong-way: -4 and end the episode (no soft
-                    # retreat / sparse -3). Leave-target always claims.
-                    bd["wrong_room"] = WRONG_ROOM_TERMINAL_PENALTY
-                    if progress is not None:
-                        progress.breach_wrong_room()
+                off_rails = False
+                if left_target:
+                    off_rails = True
+                elif room != str(target):
+                    prev_hops = graph.hop_distance(prev_room, str(target))
+                    now_hops = graph.hop_distance(room, str(target))
+                    off_rails = now_hops is None or (
+                        prev_hops is not None and now_hops >= prev_hops
+                    )
+                    if off_rails and not graph.knows_room(str(target)):
+                        off_rails = False
+                if off_rails:
+                    claimed = True
+                    if progress is not None and not left_target:
+                        claimed = progress.claim_offroute_penalty(room)
+                    if claimed:
+                        # All rails wrong-way: -4 and end the episode (no soft
+                        # retreat / sparse -3). Leave-target always claims.
+                        bd["wrong_room"] = WRONG_ROOM_TERMINAL_PENALTY
+                        if progress is not None:
+                            progress.breach_wrong_room()
 
     if room_changed and is_new_room:
         bd["new_room"] += NEW_ROOM_BONUS

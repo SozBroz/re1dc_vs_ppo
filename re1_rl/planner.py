@@ -271,6 +271,12 @@ class WaypointPlanner:
                 str(key).startswith(prefix) for key in progress.observed_cutscenes
             )
 
+        if cond_type == "has_item":
+            # Inventory checks are room-agnostic (cp25 Barry rescue ends in 109).
+            return WaypointPlanner._check_in_room_condition(
+                cond, state, wp_room, progress
+            )
+
         if str(state.get("room_id", "")) != wp_room:
             return False
 
