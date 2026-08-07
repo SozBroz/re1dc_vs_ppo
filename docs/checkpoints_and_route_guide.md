@@ -18,8 +18,7 @@ the corrected atomic route in `data/yawn_checkpoint_route.json`.
 - Richard/serum is skipped. Room 100 is only a save/inventory-logistics
   checkpoint. Room 20D ammunition remains mandatory with no serum prerequisite.
 - Room 205 and its Sun Crest are not route objectives.
-- Room 11B contains the herbicide/chemical, not the Square Crank. The latter's
-  separate crest-shed debug room id remains unresolved.
+- **118** = Mansion Storeroom (debug STAIRS UNDER ROOM): chemical, Barry loot, item box (`10B→118`). **11B** = crest-shed Store Room off Roofed Passage (`11A→11B`): square crank only.
 - Curated cells live under `states/yawn_rails/`; PB and Go-Explore sidecars
   continue to be written for archival use but are not rails reset sources.
 
@@ -95,10 +94,10 @@ Canonical table (**116 rooms**, transcribed from `data/rooms.json`; Evil Resourc
 | **115** | stage_id=0, room=0x15 | TRAP ROOM | Mansion 1F | Trap Room | — |
 | **116** | stage_id=0, room=0x16 | LIVING ROOM | Mansion 1F | Living Room | — |
 | **117** | stage_id=0, room=0x17 | LARGE GALLERY | Mansion 1F | Large Gallery | — |
-| **118** | stage_id=0, room=0x18 | STAIRS UNDER ROOM | Mansion 1F | Isolated Passage | — |
-| **119** | stage_id=0, room=0x19 | N/A | Mansion 1F | — | unused slot in debug table; unused debug slot |
+| **118** | stage_id=0, room=0x18 | STAIRS UNDER ROOM | Mansion 1F | Mansion Storeroom | Chemical, Barry loot, item box + typewriter (`10B→118`) |
+| **119** | stage_id=0, room=0x19 | COURTYARD STUDY | Mansion 1F | Courtyard Study | helmet-key door off Back Passage (10A->119) |
 | **11A** | stage_id=0, room=0x1A | ROOFED PASSAGE | Mansion 1F | Roofed Passage | — |
-| **11B** | stage_id=0, room=0x1B | STORE ROOM | Mansion 1F | Mansion Storeroom | — |
+| **11B** | stage_id=0, room=0x1B | STORE ROOM | Mansion 1F | Store Room (crest shed) | Square crank; `11A→11B` — not mansion storeroom 118 |
 | **11C** | stage_id=0, room=0x1C | WARDROBE S | Mansion 1F | Wardrobe Closet | — |
 | **200** | stage_id=1, room=0x00 | N/A | Mansion 2F | — | unused slot in debug table; unused debug slot |
 | **201** | stage_id=1, room=0x01 | 2F LEFT STAIRS | Mansion 2F | East Stairway 2F | — |
@@ -241,7 +240,7 @@ Follow along on Evil Resource by area. Items and puzzles are under **Key items**
 | 7 | 106 | Main Hall | **Return to hall** after 2F explore |
 | 6 | 115 | Trap Room | **Shotgun** (Jill Sandwich) |
 | 7 | 107 | Gallery / Art Room | Crow puzzle → **star crest** |
-| 8 | 11B | Store Room | Chemicals + **green herb** |
+| 8 | 118 | Mansion Storeroom | Chemicals + **green herb** (item box) |
 | 9 | 10C | Greenhouse | Pump chemicals, kill plant → **armor key** |
 
 ### Mansion 1F — west & puzzles

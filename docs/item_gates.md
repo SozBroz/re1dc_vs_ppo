@@ -104,7 +104,7 @@ v[18] = min(room_items.key_items_remaining_in_room(room, held), 4) / 4.0
 | control_room_key | **402** | 402 bathroom | Route wp22 said 401 |
 | dorm_key_002 | **408** | Honeycomb / beehive table | Route wp23 said 406 |
 | red_book | **401** | Room 001 bed | Route wp23 said 406 |
-| square_crank | **unresolved (not 11B)** | Separate crest-shed Store Room; debug room id still unverified | Do not collapse into Mansion Storeroom 11B |
+| square_crank | `11B` | Crest-shed store room off Roofed Passage (`11A→11B`) | Use at Water Gate `301` |
 | shotgun | **115** + **116** | Trap room / living room rack | Same item; both marked `trap` |
 
 ## Route-critical gates (Jill any%)

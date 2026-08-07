@@ -1,0 +1,23 @@
+{
+  "bundle_sha256": "fa708e3c836c339f74a38f064b1863e6d28718d7bd747d03d9ad2e859e83583e",
+  "bytes": 1444302,
+  "captured_in_box_room": false,
+  "checkpoint_id": "east_stairs_101",
+  "checkpoint_index": 40,
+  "inventory_feasible": true,
+  "inventory_free_slots": 4,
+  "next_checkpoint_id": "storeroom_enter_118",
+  "next_slots_needed": 0,
+  "quality": [
+    48,
+    33,
+    0,
+    12,
+    1,
+    0
+  ],
+  "room_id": "10B",
+  "route_id": "yawn_quest_v2",
+  "sidecar_sha256": "0afa25c28a94e1a501df9219d5b1e734d59d966a0ce44e32b4c63d217fcf194a",
+  "state_sha256": "1fbf03e6e0f5faf3e7681bdb37338f98c760f4825680529a7602730ae9faebbb"
+}

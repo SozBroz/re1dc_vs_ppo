@@ -162,8 +162,8 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
             f"{cp['checkpoint_id']} still bundles enter with {extras}"
         )
     assert [(cp["room_id"], cp["checkpoint_id"]) for cp in route[-10:]] == [
-        ("11B", "yawn_box_enter_11B"),
-        ("11B", "yawn_box_prep_11B"),
+        ("118", "yawn_box_enter_118"),
+        ("118", "yawn_box_prep_118"),
         ("10B", "east_stairs_101_to_yawn"),
         ("207", "east_stairs_201_to_yawn"),
         ("204", "c_passage_204_to_yawn"),
@@ -211,7 +211,7 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     assert crest["seq"] + 1 == post_crest["seq"]
     assert post_crest["seq"] + 1 == east["seq"]
     assert post_crest["room_id"] == "10A"
-    chemical = next(cp for cp in route if cp["checkpoint_id"] == "chemical_11B")
+    chemical = next(cp for cp in route if cp["checkpoint_id"] == "chemical_118")
     stairs_101_post = next(
         cp for cp in route if cp["checkpoint_id"] == "east_stairs_101_post_storeroom"
     )
@@ -678,15 +678,15 @@ def test_yawn_episode_terminates_only_after_configured_leg_span() -> None:
 
 
 def test_yawn_box_prep_requires_natural_lab_timer_expiry() -> None:
-    planner = _planner(start_index=_idx("yawn_box_prep_11B"))
-    assert planner.current_objective()["checkpoint_id"] == "yawn_box_prep_11B"
-    assert "11B" in BOX_ROOMS
+    planner = _planner(start_index=_idx("yawn_box_prep_118"))
+    assert planner.current_objective()["checkpoint_id"] == "yawn_box_prep_118"
+    assert "118" in BOX_ROOMS
 
-    active = _state("11B")
+    active = _state("118")
     active["lab_timer"] = 1
     assert not planner.advance_if_success(active, progress=ProgressTracker())
 
-    expired = _state("11B")
+    expired = _state("118")
     expired["lab_timer"] = 0
     assert planner.advance_if_success(expired, progress=ProgressTracker())
 
@@ -859,7 +859,7 @@ def test_successor_capacity_uses_stack_headroom_and_consumption() -> None:
 
 def test_successor_capacity_always_allows_box_room() -> None:
     capacity = successor_capacity(
-        _state("11B") | {"inventory_slots": [("red_herb", 1)] * 8},
+        _state("118") | {"inventory_slots": [("red_herb", 1)] * 8},
         {"checkpoint_id": "two", "items_gained": ["moon_crest", "shotgun_shells"]},
     )
     assert capacity["captured_in_box_room"] is True
@@ -1291,8 +1291,15 @@ def test_barry_return_capture_requires_105_2_s1(
     assert proposal["checkpoint_id"] == "barry_return_105"
 
 
-def test_11b_almanac_has_chemical_but_not_square_crank() -> None:
+def test_118_almanac_has_chemical_but_not_square_crank() -> None:
     room_items = json.loads((ROOT / "data/room_items.json").read_text(encoding="utf-8"))
-    names = {row["name"] for row in room_items["11B"]["items"]}
+    names = {row["name"] for row in room_items["118"]["items"]}
     assert "chemical" in names
     assert "square_crank" not in names
+
+
+def test_11b_almanac_has_square_crank_not_mansion_storeroom_loot() -> None:
+    room_items = json.loads((ROOT / "data" / "room_items.json").read_text(encoding="utf-8"))
+    names = {row["name"] for row in room_items["11B"]["items"]}
+    assert "square_crank" in names
+    assert "chemical" not in names

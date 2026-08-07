@@ -122,7 +122,7 @@
   "118": {
     "name": "STAIRS UNDER ROOM",
     "stage": 1,
-    "notes": ""
+    "notes": "Mansion Storeroom (Evil Resource): chemical, Barry loot, item box + typewriter. East stairs 10B->118."
   },
   "119": {
     "name": "COURTYARD STUDY",
@@ -137,7 +137,7 @@
   "11B": {
     "name": "STORE ROOM",
     "stage": 1,
-    "notes": ""
+    "notes": "Crest-shed store room (Evil Resource Store Room): square crank on top shelf. Roofed Passage door 11A->11B. Not mansion storeroom 118."
   },
   "11C": {
     "name": "WARDROBE S",

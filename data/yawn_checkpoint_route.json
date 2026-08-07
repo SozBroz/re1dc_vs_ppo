@@ -797,21 +797,21 @@
   },
   {
     "seq": 42,
-    "checkpoint_id": "storeroom_enter_11B",
-    "room_id": "11B",
+    "checkpoint_id": "storeroom_enter_118",
+    "room_id": "118",
     "objective": "Enter the mansion storeroom",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "11B"
+      "room_id": "118"
     }
   },
   {
     "seq": 43,
-    "checkpoint_id": "chemical_11B",
-    "room_id": "11B",
+    "checkpoint_id": "chemical_118",
+    "room_id": "118",
     "objective": "Take the herbicide from the mansion storeroom",
     "action_type": "pickup",
     "required_items": [],
@@ -1436,21 +1436,21 @@
   },
   {
     "seq": 85,
-    "checkpoint_id": "yawn_box_enter_11B",
-    "room_id": "11B",
+    "checkpoint_id": "yawn_box_enter_118",
+    "room_id": "118",
     "objective": "Enter the storeroom for Yawn box prep",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "11B"
+      "room_id": "118"
     }
   },
   {
     "seq": 86,
-    "checkpoint_id": "yawn_box_prep_11B",
-    "room_id": "11B",
+    "checkpoint_id": "yawn_box_prep_118",
+    "room_id": "118",
     "objective": "Prepare inventory at the item box and wait for the lab timer to expire naturally",
     "action_type": "navigate",
     "required_items": [

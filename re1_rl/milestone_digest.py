@@ -23,7 +23,7 @@ YAWN_PATH_ROOMS: frozenset[str] = frozenset(
         "107",
         "10F",
         "117",
-        "11B",
+        "118",
         "10C",
         "10D",
         "102",

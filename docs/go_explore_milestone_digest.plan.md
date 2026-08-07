@@ -88,7 +88,7 @@ flowchart TB
 Rooms on first-Yawn chain (from [`route_jill_anypct.json`](D:\re1_rl\data\route_jill_anypct.json) + attic):
 
 ```text
-105, 104, 106, 107, 10F, 117, 11B, 10C, 10D, 102, 116, 202, 203, 205, 209, 20E, 210
+105, 104, 106, 107, 10F, 117, 118, 10C, 10D, 102, 116, 202, 203, 205, 209, 20E, 210
 ```
 
 Adjust as curriculum proves; **do not** archive underground/lab rooms until post-Yawn.

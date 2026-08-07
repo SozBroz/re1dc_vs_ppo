@@ -30,8 +30,8 @@ _DEFAULT_SPAWNS: dict[str, dict[str, int]] = {
     "100": {"x": 3500, "z": 2600, "facing": 3072, "cam_id": 0, "y": 0},
     # Dining room — 106->105 (doors_empirical.json).
     "105": {"x": 30700, "z": 7200, "facing": 1024, "cam_id": 0, "y": 0},
-    # Mansion store room — 11A->11B (doors_rdt.json).
-    "11B": {"x": 3500, "z": 6600, "facing": 0, "cam_id": 0, "y": 0},
+    # Mansion storeroom — 10B->118 (doors_rdt.json).
+    "118": {"x": 6000, "z": 8000, "facing": 1024, "cam_id": 0, "y": 0},
 }
 
 

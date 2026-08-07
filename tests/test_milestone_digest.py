@@ -32,7 +32,7 @@ def test_yawn_path_rooms_match_plan() -> None:
             "107",
             "10F",
             "117",
-            "11B",
+            "118",
             "10C",
             "10D",
             "102",

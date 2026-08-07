@@ -80,17 +80,17 @@ GATES: dict[tuple[str, str], dict] = {
         "requires": [],
         "notes": "Crow painting buttons in life-cycle order (large gallery)",
     },
-    ("11B", "shotgun_shells"): {
+    ("118", "shotgun_shells"): {
         "type": "event",
         "requires": [],
         "notes": "Barry drops after Plant 42 defeat (1x7 shells)",
     },
-    ("11B", "first_aid_spray_alt"): {
+    ("118", "first_aid_spray_alt"): {
         "type": "event",
         "requires": [],
         "notes": "Barry drops after Plant 42 defeat",
     },
-    ("11B", "acid_rounds"): {
+    ("118", "acid_rounds"): {
         "type": "event",
         "requires": [],
         "notes": "Barry drops after Plant 42 defeat (1x6)",

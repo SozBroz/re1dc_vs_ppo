@@ -84,11 +84,11 @@
     "door_edges": [],
     "notes": "Herbicide (wiki name; RAM id chemical). Pour into greenhouse pump to kill vines on crest",
     "pickup_rooms": [
-      "11B"
+      "118"
     ],
     "rooms": [
       "10C",
-      "11B"
+      "118"
     ],
     "use_rooms": [
       "10C"
@@ -527,9 +527,12 @@
   },
   "square_crank": {
     "door_edges": [],
-    "notes": "Separate crest-shed Store Room (debug id unresolved; explicitly not 11B); use at Water Gate (301)",
-    "pickup_rooms": [],
+    "notes": "Crest-shed store room 11B (11A door); use at Water Gate (301)",
+    "pickup_rooms": [
+      "11B"
+    ],
     "rooms": [
+      "11B",
       "301"
     ],
     "use_rooms": [

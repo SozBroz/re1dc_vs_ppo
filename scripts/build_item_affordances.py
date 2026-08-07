@@ -140,7 +140,7 @@ _MANUAL: dict[str, dict] = {
 
     "chemical": {
 
-        "pickup_rooms": ["11B"],
+        "pickup_rooms": ["118"],
 
         "use_rooms": ["10C"],
 
@@ -218,7 +218,7 @@ _MANUAL: dict[str, dict] = {
 
         "door_edges": [],
 
-        "notes": "Crest shed / store room shelf; use at Water Gate (301)",
+        "notes": "Crest-shed store room 11B (11A door); use at Water Gate (301)",
 
     },
 

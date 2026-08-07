@@ -49,8 +49,8 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp38` | 39 | `crest_gate_11A` | `11A` | use_item | Place a crest at the courtyard gate (any slot) |
 | `cp39` | 40 | `back_passage_post_crest_10A` | `10A` | navigate | Return through the Back Passage after opening the courtyard gate |
 | `cp40` | 41 | `east_stairs_101` | `10B` | navigate | Reach East Stairway 1F |
-| `cp41` | 42 | `storeroom_enter_11B` | `11B` | navigate | Enter the mansion storeroom |
-| `cp42` | 43 | `chemical_11B` | `11B` | pickup | Take the herbicide from the mansion storeroom |
+| `cp41` | 42 | `storeroom_enter_118` | `118` | navigate | Enter the mansion storeroom |
+| `cp42` | 43 | `chemical_118` | `118` | pickup | Take the herbicide from the mansion storeroom |
 | `cp43` | 44 | `east_stairs_101_post_storeroom` | `10B` | navigate | Return to East Stairway 1F from the storeroom |
 | `cp44` | 45 | `east_stairs_201` | `207` | navigate | Climb East Stairway to 2F |
 | `cp45` | 46 | `c_passage_204` | `204` | navigate | Reach the C Passage |
@@ -92,8 +92,8 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp81` | 82 | `richard_forced_return_204` | `204` | navigate | Continue from Richard's cutscene into the C Passage |
 | `cp82` | 83 | `east_stairs_201_post_richard` | `207` | navigate | Reach East Stairway 2F after Richard |
 | `cp83` | 84 | `east_stairs_101_post_richard` | `10B` | navigate | Descend East Stairway after Richard |
-| `cp84` | 85 | `yawn_box_enter_11B` | `11B` | navigate | Enter the storeroom for Yawn box prep |
-| `cp85` | 86 | `yawn_box_prep_11B` | `11B` | navigate | Prepare inventory at the item box and wait for the lab timer to expire naturally |
+| `cp84` | 85 | `yawn_box_enter_118` | `118` | navigate | Enter the storeroom for Yawn box prep |
+| `cp85` | 86 | `yawn_box_prep_118` | `118` | navigate | Prepare inventory at the item box and wait for the lab timer to expire naturally |
 | `cp86` | 87 | `east_stairs_101_to_yawn` | `10B` | navigate | Return to East Stairway 1F for Yawn |
 | `cp87` | 88 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
 | `cp88` | 89 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
@@ -601,25 +601,25 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `10B`
 
-### `cp41` — `storeroom_enter_11B` (seq 42)
+### `cp41` — `storeroom_enter_118` (seq 42)
 
-- **Room:** `11B`
+- **Room:** `118`
 - **Action:** `navigate`
 - **Objective:** Enter the mansion storeroom
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **11B**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **118**. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `11B`
+- Enter room `118`
 
-### `cp42` — `chemical_11B` (seq 43)
+### `cp42` — `chemical_118` (seq 43)
 
-- **Room:** `11B`
+- **Room:** `118`
 - **Action:** `pickup`
 - **Objective:** Take the herbicide from the mansion storeroom
 - **Required items:** _(none)_
 - **Items gained:** `chemical`
-- **How to achieve:** Be in / reach **11B**. Pick up `chemical`.
+- **How to achieve:** Be in / reach **118**. Pick up `chemical`.
 - **Success condition:**
 - Acquire item `chemical`
 
@@ -1080,25 +1080,25 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `10B`
 
-### `cp84` — `yawn_box_enter_11B` (seq 85)
+### `cp84` — `yawn_box_enter_118` (seq 85)
 
-- **Room:** `11B`
+- **Room:** `118`
 - **Action:** `navigate`
 - **Objective:** Enter the storeroom for Yawn box prep
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **11B**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **118**. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `11B`
+- Enter room `118`
 
-### `cp85` — `yawn_box_prep_11B` (seq 86)
+### `cp85` — `yawn_box_prep_118` (seq 86)
 
-- **Room:** `11B`
+- **Room:** `118`
 - **Action:** `navigate`
 - **Objective:** Prepare inventory at the item box and wait for the lab timer to expire naturally
 - **Required items:** `shield_key`, `shotgun`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **11B**. Hold: `shield_key`, `shotgun`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **118**. Hold: `shield_key`, `shotgun`. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
 - State flag `lab_timer` == `0`
 

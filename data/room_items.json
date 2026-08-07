@@ -60,7 +60,7 @@
       "er_room": "Store Room",
       "item": "square_crank",
       "count": 1,
-      "notes": "ROUTE CONFLICT wp37: route says 305 FOUNTAIN; Evil Resource crest shed Store Room (square crank top shelf) has no confident debug code. RDT 11B = Mansion Storeroom, not crest shed."
+      "notes": "ROUTE CONFLICT wp37: route says 305 FOUNTAIN; crest-shed Store Room confirmed debug 11B (11A door). Mansion storeroom is 118."
     }
   ],
   "100": {
@@ -443,35 +443,6 @@
   },
   "118": {
     "room_name": "STAIRS UNDER ROOM",
-    "items": []
-  },
-  "119": {
-    "room_name": "COURTYARD STUDY",
-    "items": [
-      {
-        "name": "doom_book_1",
-        "item_id": 64,
-        "count": 1,
-        "key_item": true,
-        "in_inventory_table": true,
-        "notes": "bookshelf next to door; switch on lamp first (contains eagle_medal)"
-      },
-      {
-        "name": "magnum_rounds",
-        "item_id": 14,
-        "count": 1,
-        "key_item": false,
-        "in_inventory_table": true,
-        "notes": "optional desk"
-      }
-    ]
-  },
-  "11A": {
-    "room_name": "ROOFED PASSAGE",
-    "items": []
-  },
-  "11B": {
-    "room_name": "STORE ROOM",
     "items": [
       {
         "name": "chemical",
@@ -504,6 +475,44 @@
         "key_item": false,
         "in_inventory_table": true,
         "notes": "Barry after Plant 42 (1x6)"
+      }
+    ]
+  },
+  "119": {
+    "room_name": "COURTYARD STUDY",
+    "items": [
+      {
+        "name": "doom_book_1",
+        "item_id": 64,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "bookshelf next to door; switch on lamp first (contains eagle_medal)"
+      },
+      {
+        "name": "magnum_rounds",
+        "item_id": 14,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "optional desk"
+      }
+    ]
+  },
+  "11A": {
+    "room_name": "ROOFED PASSAGE",
+    "items": []
+  },
+  "11B": {
+    "room_name": "STORE ROOM",
+    "items": [
+      {
+        "name": "square_crank",
+        "item_id": 29,
+        "count": 1,
+        "key_item": true,
+        "in_inventory_table": true,
+        "notes": "top shelf; crest-shed store room off Roofed Passage (11A->11B)"
       }
     ]
   },

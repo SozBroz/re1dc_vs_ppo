@@ -45,7 +45,7 @@ Each item lists: **why human**, **what to do**, **artifacts to produce**, **done
 | `star_crest` | `117` (catalog/ER) vs `107` (route/GameFAQs Art Room) | One source of truth |
 | `doom_book_2` | `305` vs `306` | ER/walkthrough |
 | Medals | Desk/coffin floor loot vs book contents at fountain | Model + USE sites |
-| `square_crank` | `11B` vs `305` | Pickup room |
+| `square_crank` | `11B` (crest shed) vs `305` (route waypoint) | Pickup room — use `11B` |
 | `mo_disc` first | `217` vs `213` | Primary for WorldCatalog |
 | `serum` | `100` only vs also `102` | Drop duplicate |
 

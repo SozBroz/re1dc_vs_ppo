@@ -30,9 +30,7 @@ ER_TO_ROOM: dict[str, str] = {
     "Large Gallery": "117",
     "Roofed Passage": "11A",
     "East Stairway 1F": "10B",
-    "Mansion Storeroom": "11B",
-    # ER "Store Room" (crest shed / square crank) shares debug 11B with Mansion
-    # Storeroom (herbicide) in Jill play — both map here per operator catalog.
+    "Mansion Storeroom": "118",
     "Store Room": "11B",
     "Central Corridor": "103",
     "Greenhouse": "10C",
@@ -48,9 +46,7 @@ ER_TO_ROOM: dict[str, str] = {
     "Tiger Statue Room": "10D",
     "Outside Boiler": "114",
     "Bathroom": "113",
-    "Isolated Passage": "118",
     "Courtyard Study": "119",
-    "Elevator Stairway": "118",
     "Wardrobe Closet": "11C",
     # Mansion 2F
     "Main Hall 2F": "203",
@@ -640,7 +636,7 @@ def main() -> None:
         {"er_room": "Courtyard Study", "item": "doom_book_1", "count": 1,
          "notes": "ROUTE CONFLICT wp36: route says 20B FRONT LESSON ROOM; Evil Resource places Doom Book 1 in Courtyard Study (1F, helmet key door off Back Passage). No confident debug code in rooms.json - left unmapped."},
         {"er_room": "Store Room", "item": "square_crank", "count": 1,
-         "notes": "ROUTE CONFLICT wp37: route says 305 FOUNTAIN; Evil Resource crest shed Store Room (square crank top shelf) has no confident debug code. RDT 11B = Mansion Storeroom, not crest shed."},
+         "notes": "ROUTE CONFLICT wp37: route says 305 FOUNTAIN; crest-shed Store Room confirmed debug 11B (11A door). Mansion storeroom is 118."},
     ])
 
     out = {

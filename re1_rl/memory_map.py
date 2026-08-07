@@ -129,7 +129,7 @@ def player_poisoned_from_state(state: dict[str, object] | None) -> bool:
 STAGE_ID = 0x800C8660  # byte; 0-indexed (stage 0 = Mansion 1, "1XX" rooms)
 ROOM_ID = 0x800C8661  # byte; room number within stage (6 = Main Hall 106)
 # Title / front-end menu stack (recon boot: stage=0 room=27 hp=0 before mansion).
-# Not the in-game STORE ROOM code 11B — that is stage 0 room 0x1B (27) only on menus.
+# Mansion Storeroom is debug code 118 (ROOM1180.RDT, item box + typewriter).
 MENU_ROOM_ID = 27
 # Front-end New Game / Load Game stack (recon boot frame ~1950, death continue hunt).
 MAIN_MENU_GAME_STATE = 0x80000000

@@ -27,7 +27,7 @@ from tests.test_yawn_rails import ROOMS, _graph, _planner, _state
 def test_horizon_aggregates_box_to_boss_route_semantics() -> None:
     encoder = ObsEncoder(ROOMS, _graph(), curriculum_stage_index=2)
     planner = _planner(start_index=47)
-    state = _state("11B", inventory=["shield_key", "shotgun"])
+    state = _state("118", inventory=["shield_key", "shotgun"])
     state["inventory_slots"] = [
         ("shield_key", 1),
         ("shotgun", 7),
@@ -55,7 +55,7 @@ def test_segment_snapshot_survives_arbitrary_rollout_cut() -> None:
         features,
         waypoint_index=48,
         horizon_checkpoints=5,
-        departure_room="11B",
+        departure_room="118",
         departure_inventory=[("shield_key", 1), ("", 0)],
     )
     # A rollout boundary does not reset ProgressTracker or emit a fake label.

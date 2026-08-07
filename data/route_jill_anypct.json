@@ -173,7 +173,7 @@
   },
   {
     "seq": 10,
-    "room_id": "11B",
+    "room_id": "118",
     "objective": "mansion storeroom under east stairs: herbicide (+ Barry loot after Plant 42)",
     "action_type": "pickup",
     "required_items": [],

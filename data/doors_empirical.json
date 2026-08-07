@@ -359,15 +359,15 @@
     "door_z": 0,
     "notes": "operator topology B1 2026-07-24; coords TBD"
   },
-  "21C->118": {
+  "21C->11B": {
     "from_room": "21C",
-    "to_room": "118",
+    "to_room": "11B",
     "door_x": 0,
     "door_z": 0,
     "notes": "operator topology B1 2026-07-24; coords TBD"
   },
-  "118->21C": {
-    "from_room": "118",
+  "11B->21C": {
+    "from_room": "11B",
     "to_room": "21C",
     "door_x": 0,
     "door_z": 0,
@@ -387,15 +387,15 @@
     "door_z": 0,
     "notes": "operator topology B1 2026-07-24; coords TBD"
   },
-  "21A->118": {
+  "21A->11B": {
     "from_room": "21A",
-    "to_room": "118",
+    "to_room": "11B",
     "door_x": 0,
     "door_z": 0,
     "notes": "operator topology B1 2026-07-24; coords TBD"
   },
-  "118->21A": {
-    "from_room": "118",
+  "11B->21A": {
+    "from_room": "11B",
     "to_room": "21A",
     "door_x": 0,
     "door_z": 0,

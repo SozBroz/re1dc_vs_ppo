@@ -29,7 +29,7 @@ ER_TO_ROOM: dict[str, str] = {
   "Large Gallery": "117",
   "Roofed Passage": "11A",
   "East Stairway 1F": "10B",
-  "Mansion Storeroom": "11B",
+  "Mansion Storeroom": "118",
   "Store Room": "11B",
   "Central Corridor": "103",
   "Greenhouse": "10C",
@@ -43,8 +43,6 @@ ER_TO_ROOM: dict[str, str] = {
   "Dressing Room": "111",
   "Wardrobe": "112",
   "Bathroom": "113",
-  "Isolated Passage": "118",
-  "Elevator Stairway": "118",
   "Wardrobe Closet": "11C",
   "Outside Boiler": "114",
   # Mansion 2F

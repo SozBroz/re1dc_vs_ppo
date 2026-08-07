@@ -45,7 +45,7 @@ BOX_SLOTS = 16
 INVENTORY_SLOTS = 8
 LOCKPICK_ITEM_ID = 0x31
 
-BOX_ROOMS = frozenset({"100", "118", "11B", "30E", "403", "502", "50E", "600", "618"})
+BOX_ROOMS = frozenset({"100", "118", "30E", "403", "502", "50E", "600", "618"})
 
 
 class _BridgeReadWrite(Protocol):

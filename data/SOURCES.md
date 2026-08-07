@@ -35,7 +35,7 @@ Generated 2026-07-01 for Jill Any% (PS1 Director's Cut / PC-classic parity).
 2. **Stage 4 (401–411)** — all guardhouse sub-rooms except `400 ENTER PASSAGE`: sequential assignment from table order; biorand references `405`/`406` but does not publish official names.
 3. **Stage 5 (501–515)** — lab interior: `501 HELIPORT PASSAGE` confirmed by search synthesis; `500` confirmed; `502–515` sequential from table order.
 4. **`311 ROTATING HOLE`** — inferred from RE1 Room List (t1204) courtyard B1 ordering; no hex in primary table.
-5. **`110`, `119`, `200`** — marked `N/A` in debug table (may be unused RDT slots).
+- **118** = Mansion Storeroom (debug **STAIRS UNDER ROOM**): chemical, Barry loot, item box. **11B** = crest-shed **STORE ROOM** off Roofed Passage (`11A→11B`): square crank. Operator-confirmed 2026-08-07.
 
 ### `route_jill_anypct.json`
 
