@@ -841,11 +841,13 @@ def _run_learner(args: argparse.Namespace) -> int:
                     f"pitch_pct={pitch['pitch_pct']:.1f}% "
                     f"pitched_steps={pitch['steps_pitched']} "
                     f"(ingest_reject={pitch['steps_rejected_ingest']} "
+                    f"stale_reject={pitch['steps_rejected_stale']} "
                     f"+ relevance_drop={pitch['steps_relevance_dropped']}) "
                     f"accepted_steps={pitch['steps_accepted']} "
                     f"stale_queued_steps={pitch['steps_stale_queued']} "
                     f"relevance_kept_steps={pitch['steps_relevance_kept']} "
                     f"packets_rej={pitch['rollouts_rejected']} "
+                    f"packets_stale_rej={pitch['rollouts_rejected_stale']} "
                     f"packets_stale_q={pitch['rollouts_stale_queued']} "
                     f"capacity_rej={learner_state.rollouts_rejected_capacity} "
                     f"capacity_steps={learner_state.steps_rejected_capacity}",
@@ -879,6 +881,7 @@ def _run_learner(args: argparse.Namespace) -> int:
                     ),
                     extra={
                         "logger_scalars": fleet_metrics.get("logger_scalars") or {},
+                        "pitch": pitch,
                     },
                 )
                 emit_fleet_epoch_metrics(metrics_jsonl, record)

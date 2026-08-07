@@ -15,6 +15,7 @@ from re1_rl.gallery_puzzle import (
     GALLERY_STEP_REWARD,
     GALLERY_STEP_VALUES,
     GALLERY_TARGETS,
+    GALLERY_WRONG_PORTRAIT_PENALTY,
     encode_gallery_hint,
 )
 from re1_rl.obs_encoder import GOAL_FIELDS
@@ -92,10 +93,12 @@ def test_wrong_switch_claws_back_every_pending_gallery_reward() -> None:
     reset = _state(raw=0)
     _total, bd = _reward(progress, third, reset)
     assert bd["gallery"] == pytest.approx(-3 * GALLERY_STEP_REWARD)
+    assert bd["gallery_wrong"] == pytest.approx(-GALLERY_WRONG_PORTRAIT_PENALTY)
     assert GALLERY_STEP_REWARD == pytest.approx(4.0)
     assert bd["gallery"] == pytest.approx(-12.0)
     assert progress.gallery_pending_reward == 0.0
     assert progress.gallery_step_index == 0
+    assert progress.gallery_wrong_breached
 
     _total, retry_bd = _reward(progress, reset, first)
     assert retry_bd["gallery"] == 0.0
@@ -139,8 +142,10 @@ def test_leaving_gallery_claws_back_partial_sequence() -> None:
     outside = _state(room="106", raw=GALLERY_STEP_VALUES[0])
     _total, bd = _reward(progress, first, outside)
     assert bd["gallery"] == pytest.approx(-GALLERY_STEP_REWARD)
+    assert bd["gallery_wrong"] == 0.0
     assert progress.gallery_pending_reward == 0.0
     assert progress.gallery_needs_reentry
+    assert not progress.gallery_wrong_breached
 
     reentered = _state()
     _reward(progress, outside, reentered)
@@ -154,7 +159,9 @@ def test_wrong_first_confirmation_locks_rewards_and_points_to_exit() -> None:
     wrong = _state(confirm=2)
     _total, bd = _reward(progress, before, wrong)
     assert bd["gallery"] == 0.0
+    assert bd["gallery_wrong"] == pytest.approx(-GALLERY_WRONG_PORTRAIT_PENALTY)
     assert progress.gallery_needs_reentry
+    assert progress.gallery_wrong_breached
 
     x, z = GALLERY_EXIT_TARGET
     hint = encode_gallery_hint(
@@ -190,7 +197,8 @@ def test_star_crest_finalizes_sequence_without_gallery_double_pay() -> None:
 
 
 def test_gallery_hint_uses_existing_four_goal_slots() -> None:
-    assert [name for name, _ in GOAL_FIELDS[-5:-1]] == [
+    names = [name for name, _ in GOAL_FIELDS if name.startswith("gallery_")]
+    assert names == [
         "gallery_bearing_sin",
         "gallery_bearing_cos",
         "gallery_distance",

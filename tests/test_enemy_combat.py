@@ -17,6 +17,9 @@ from re1_rl.enemy_combat import (
     enemy_combat_events,
     enemy_hp_by_slot,
     is_crow_combat_entity,
+    is_crow_enemy,
+    is_passive_crow_enemy,
+    paid_combat_enemy_count,
     pending_combat_window_frames,
     tick_pending_combat_credit,
 )
@@ -335,3 +338,95 @@ def test_crow_active_byte_marks_combat_event() -> None:
     assert len(events) == 1
     assert events[0]["is_crow"] is True
     assert events[0]["damage"] == 10
+
+
+def test_passive_crow_detection() -> None:
+    assert is_crow_enemy(
+        {"slot": 0, "hp": 20, "active_byte": 0x04, "combat_near": 1}
+    )
+    assert is_crow_enemy(
+        {"slot": 0, "hp": 20, "active_byte": 0x1C, "combat_near": 1}
+    )
+    assert is_passive_crow_enemy(
+        {"slot": 0, "hp": 20, "active_byte": 0x04, "combat_near": 1}
+    )
+    assert not is_passive_crow_enemy(
+        {"slot": 0, "hp": 20, "active_byte": 0x1C, "combat_near": 1}
+    )
+    assert is_crow_enemy(
+        {"slot": 0, "hp": 20, "type_name": "crow", "combat_near": 1}
+    )
+    assert not is_crow_enemy(
+        {"slot": 0, "hp": 20, "type_name": "zombie", "combat_near": 1}
+    )
+    assert is_crow_enemy(
+        {
+            "slot": 0,
+            "hp": 28,
+            "type_id": 0x0D,
+            "in_room": 1,
+            "combat_near": 1,
+        },
+        room_id="117",
+    )
+    assert not is_crow_enemy(
+        {
+            "slot": 0,
+            "hp": 45,
+            "type_id": 0x0D,
+            "in_room": 1,
+            "combat_near": 1,
+        },
+        room_id="40E",
+    )
+
+
+def test_paid_combat_enemy_count_skips_crows() -> None:
+    enemies = [
+        {
+            "slot": 0,
+            "hp": 20,
+            "active_byte": 0x04,
+            "combat_near": 1,
+            "knife_near": 1,
+        },
+        {
+            "slot": 1,
+            "hp": 20,
+            "active_byte": 0x1C,
+            "combat_near": 1,
+            "knife_near": 1,
+        },
+        {
+            "slot": 2,
+            "hp": 80,
+            "type_name": "zombie",
+            "combat_near": 1,
+            "knife_near": 1,
+        },
+    ]
+    assert combat_enemy_count(enemies) == 3
+    assert paid_combat_enemy_count(enemies) == 1
+    assert paid_combat_enemy_count(enemies, knife=True) == 1
+    gallery_crows = [
+        {
+            "slot": 0,
+            "hp": 28,
+            "type_id": 0x0D,
+            "active_byte": 0x00,
+            "in_room": 1,
+            "combat_near": 1,
+            "knife_near": 1,
+        },
+        {
+            "slot": 1,
+            "hp": 42,
+            "type_id": 0x0D,
+            "active_byte": 0x00,
+            "in_room": 1,
+            "combat_near": 1,
+            "knife_near": 1,
+        },
+    ]
+    assert paid_combat_enemy_count(gallery_crows, room_id="117") == 0
+    assert paid_combat_enemy_count(gallery_crows, knife=True, room_id="117") == 0

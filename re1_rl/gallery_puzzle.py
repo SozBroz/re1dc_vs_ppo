@@ -9,6 +9,8 @@ import numpy as np
 
 GALLERY_ROOM_ID = "117"
 GALLERY_STEP_REWARD = 4.0
+# Extra terminal penalty on wrong portrait (in addition to pending-step clawback).
+GALLERY_WRONG_PORTRAIT_PENALTY = 4.0
 # Failure claws back all pending step pay at 1:1 inverse (see ProgressTracker.gallery_step_reward).
 GALLERY_STEP_CLAWBACK_SCALE = 1.0
 

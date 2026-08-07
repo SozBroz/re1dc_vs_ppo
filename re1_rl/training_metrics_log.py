@@ -346,6 +346,12 @@ def log_update_line(record: dict[str, Any]) -> None:
         )
     elif "relevance_keep_rate" in record:
         parts.append(f"rel_keep={float(record['relevance_keep_rate']):.3f}")
+    pitch = record.get("pitch")
+    if isinstance(pitch, dict):
+        if pitch.get("steps_rejected_stale"):
+            parts.append(f"stale_rej={int(pitch['steps_rejected_stale'])}")
+        if pitch.get("steps_stale_queued"):
+            parts.append(f"stale_q={int(pitch['steps_stale_queued'])}")
     print(f"[train:metrics] {' '.join(parts)}", flush=True)
 
 

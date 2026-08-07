@@ -17,6 +17,7 @@ from re1_rl.bizhawk_bridge import BizHawkClient
 from re1_rl.enemy_combat import (
     apply_combat_step_fields,
     combat_enemy_count,
+    paid_combat_enemy_count,
     tick_pending_combat_credit,
 )
 from re1_rl.game_session import (
@@ -140,6 +141,10 @@ from re1_rl.options_menu_macro import dismiss_options_menu
 # Mask knife/attack when live RAM shows no living enemies (set 0 to debug combat).
 MASK_ATTACK_WITHOUT_ENEMIES = os.environ.get(
     "MASK_ATTACK_WITHOUT_ENEMIES", "1"
+).strip().lower() not in ("0", "false", "no", "off")
+# Mask knife/gun macros when only idle gallery crows are in the near band.
+MASK_ATTACK_PASSIVE_CROWS = os.environ.get(
+    "MASK_ATTACK_PASSIVE_CROWS", "1"
 ).strip().lower() not in ("0", "false", "no", "off")
 
 ACTION_NAMES = [
@@ -804,6 +809,7 @@ class RE1Env(gym.Env):
         """Return Gym termination flags, preserving the Wesker terminal mark."""
         kenneth_gate_failure = self._progress.kenneth_gate_breached
         wrong_room_failure = self._progress.wrong_room_breached
+        gallery_wrong_failure = self._progress.gallery_wrong_breached
         checkpoint_success = (
             self._stage.get("mode") == "yawn_rails"
             and self._progress.checkpoint_success
@@ -812,17 +818,20 @@ class RE1Env(gym.Env):
             bool(state.get("dead"))
             or kenneth_gate_failure
             or wrong_room_failure
+            or gallery_wrong_failure
             or checkpoint_success
         )
         truncated = (
             False
-            if (kenneth_gate_failure or wrong_room_failure)
+            if (kenneth_gate_failure or wrong_room_failure or gallery_wrong_failure)
             else self._episode_truncated()
         )
         if kenneth_gate_failure:
             reason = "main_hall_before_kenneth"
         elif wrong_room_failure:
             reason = "wrong_room"
+        elif gallery_wrong_failure:
+            reason = "gallery_wrong_portrait"
         elif checkpoint_success:
             reason = "checkpoint_success"
         else:
@@ -1807,7 +1816,7 @@ class RE1Env(gym.Env):
         entry_prev = getattr(self, "_cutscene_skip_entry_prev", None) or self._prev_state
         try:
             from re1_rl.item_box import read_inventory
-            from re1_rl.weapon_equip import policy_inventory
+            from re1_rl.weapon_equip import policy_inventory, policy_inventory_to_names
 
             inv_after = policy_inventory(read_inventory(self.bridge))
         except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
@@ -1824,11 +1833,11 @@ class RE1Env(gym.Env):
         # Authoritative policy inventory for pickup→cutscene disqualify.
         if inv_before is not None:
             entry_prev = dict(entry_prev or {})
-            entry_prev["inventory"] = list(inv_before)
+            entry_prev["inventory"] = policy_inventory_to_names(inv_before)
             if skip_trap_entry is not None:
-                skip_trap_entry["inventory"] = list(inv_before)
+                skip_trap_entry["inventory"] = policy_inventory_to_names(inv_before)
         if inv_after is not None:
-            state["inventory"] = list(inv_after)
+            state["inventory"] = policy_inventory_to_names(inv_after)
         from re1_rl.barry_rescue_checkpoint import note_barry_rescue_skip_settle
 
         note_barry_rescue_skip_settle(
@@ -2795,6 +2804,15 @@ class RE1Env(gym.Env):
             except (OSError, RuntimeError, AttributeError, TypeError, ValueError):
                 document_examine_open = False
         enemies = pose.get("enemies")
+        room_for_mask = str(pose.get("room_id", "") or "") or None
+        if MASK_ATTACK_PASSIVE_CROWS:
+            knife_near = paid_combat_enemy_count(
+                enemies, knife=True, room_id=room_for_mask
+            )
+            gun_near = paid_combat_enemy_count(enemies, room_id=room_for_mask)
+        else:
+            knife_near = combat_enemy_count(enemies, knife=True)
+            gun_near = combat_enemy_count(enemies)
         mask = build_action_mask(
             int(self.action_space.n),
             self._prev_action,
@@ -2818,8 +2836,8 @@ class RE1Env(gym.Env):
                 getattr(self, "_grab_escape_pending", False)
             ),
             alive_enemies_in_room=combat_enemy_count(enemies),
-            knife_enemies_near=combat_enemy_count(enemies, knife=True),
-            gun_enemies_near=combat_enemy_count(enemies),
+            knife_enemies_near=knife_near,
+            gun_enemies_near=gun_near,
             mask_combat_without_enemies=MASK_ATTACK_WITHOUT_ENEMIES,
             room_id=str(pose.get("room_id", "") or "") or None,
             player_x=pose.get("x"),

@@ -303,6 +303,20 @@ def test_poll_drops_cell_when_fetch_fails_after_dirty_overwrite(
     assert local["cells"] == []
 
 
+def test_http_ingest_endpoint(yawn_http, tmp_path: Path) -> None:
+    client: WorkerClient = yawn_http["client"]
+    store: YawnRailsCellStore = yawn_http["store"]
+    prop = _write_local_cell(tmp_path / "ingest", idx=4, quality=[88, 12, 1, 2, 1])
+    result = client.ingest_yawn_rails_proposals([prop])
+    assert result["accepted"] == ["cp04"]
+    assert int(result["archive_version"]) >= 1
+    assert 4 in store.cells
+    weak = _write_local_cell(tmp_path / "weak", idx=4, quality=[40, 1, 0, 1, 1])
+    result2 = client.ingest_yawn_rails_proposals([weak])
+    assert result2["accepted"] == []
+    assert store.cells[4]["quality"][0] == 88
+
+
 def test_slim_progress_keeps_yawn_rails_capture() -> None:
     prop = {
         "checkpoint_index": 0,

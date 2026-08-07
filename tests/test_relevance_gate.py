@@ -132,12 +132,15 @@ def test_accept_rollout_still_hard_rejects_ancient_and_when_gate_off() -> None:
     ok, reason = state.accept_rollout(_fake_rollout(version=5))
     assert ok is False
     assert reason == "stale_policy_version"
+    assert state.rollouts_rejected_stale == 1
+    assert state.steps_rejected_stale == _fake_rollout(version=5).num_timesteps()
 
     state.relevance_gate = True
     state.relevance_max_age = 2
     ok2, reason2 = state.accept_rollout(_fake_rollout(version=5))
     assert ok2 is False
     assert reason2 == "stale_policy_version"
+    assert state.rollouts_rejected_stale == 2
 
 
 def test_compute_new_log_probs_finite_with_masks() -> None:

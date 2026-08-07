@@ -19,6 +19,13 @@ NO_COMBAT_REWARD_ROOMS: frozenset[str] = frozenset({"408", "301", "40E"})
 
 # Crow gallery pests: active_byte from live QS0 / room_enemies notes.
 CROW_ACTIVE_BYTES: frozenset[int] = frozenset({0x04, 0x1C})
+CROW_IDLE_ACTIVE_BYTE = 0x04
+CROW_FLYING_ACTIVE_BYTE = 0x1C
+# Live cp27 / room 117: kind@0x05=0x0D with active_byte 0x00 (not 0x04/0x1C).
+GALLERY_CROW_RAM_TYPE_ID = 0x0D
+GALLERY_CROW_ROOMS: frozenset[str] = frozenset({"107", "117", "212"})
+# Exclusive crow combat rooms (no paid fauna spawns in almanac).
+CROW_ONLY_COMBAT_ROOMS: frozenset[str] = frozenset({"117"})
 
 
 def is_crow_combat_entity(meta: dict[str, Any]) -> bool:
@@ -28,6 +35,50 @@ def is_crow_combat_entity(meta: dict[str, Any]) -> bool:
         return True
     ab = meta.get("active_byte")
     return ab is not None and int(ab) in CROW_ACTIVE_BYTES
+
+
+def _crow_meta_from_enemy(ent: dict[str, Any]) -> dict[str, Any]:
+    meta: dict[str, Any] = {}
+    name = ent.get("type_name") or ent.get("enemy_type")
+    if name is not None:
+        meta["type_name"] = str(name)
+    if "active_byte" in ent:
+        meta["active_byte"] = int(ent["active_byte"])
+    return meta
+
+
+def is_crow_enemy(
+    ent: dict[str, Any],
+    *,
+    room_id: str | None = None,
+) -> bool:
+    """True for gallery crows (zero combat pay; attack macros should stay masked)."""
+    if int(ent.get("hp", 0)) <= 0:
+        return False
+    if is_crow_combat_entity(_crow_meta_from_enemy(ent)):
+        return True
+    rid = str(room_id or "").upper()
+    if rid not in GALLERY_CROW_ROOMS:
+        return False
+    tid = ent.get("type_id")
+    if tid is None or int(tid) != GALLERY_CROW_RAM_TYPE_ID:
+        return False
+    return bool(int(ent.get("in_room", ent.get("alive", 0))))
+
+
+def is_passive_crow_enemy(
+    ent: dict[str, Any],
+    *,
+    room_id: str | None = None,
+) -> bool:
+    """True for idle gallery crows (active_byte 0x04 or type-only crow tag)."""
+    if not is_crow_enemy(ent, room_id=room_id):
+        return False
+    meta = _crow_meta_from_enemy(ent)
+    ab = meta.get("active_byte")
+    if ab is None:
+        return True
+    return int(ab) in (0, CROW_IDLE_ACTIVE_BYTE)
 
 
 def combat_reward_denied(
@@ -79,6 +130,33 @@ def combat_enemy_count(
             if float(ent.get("dist", 1e18)) >= float(max_dist):
                 continue
             n += 1
+            continue
+        flag = "knife_near" if knife else "combat_near"
+        if int(ent.get(flag, 0)):
+            n += 1
+    return n
+
+
+def paid_combat_enemy_count(
+    enemies: list[dict[str, Any]] | None,
+    *,
+    knife: bool = False,
+    room_id: str | None = None,
+) -> int:
+    """Near-band enemies that justify attack macros.
+
+    Gallery crows are excluded (zero combat pay). Crow-only rooms (117) mask
+    attack even when RAM active_byte/type tags are missing.
+    """
+    rid = str(room_id or "").upper()
+    if rid in CROW_ONLY_COMBAT_ROOMS:
+        if combat_enemy_count(enemies, knife=knife) > 0:
+            return 0
+    n = 0
+    for ent in enemies or []:
+        if int(ent.get("hp", 0)) <= 0:
+            continue
+        if is_crow_enemy(ent, room_id=room_id):
             continue
         flag = "knife_near" if knife else "combat_near"
         if int(ent.get(flag, 0)):

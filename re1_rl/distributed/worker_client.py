@@ -180,6 +180,26 @@ class WorkerClient:
             raise RuntimeError(f"GET /yawn_rails/manifest failed with HTTP {code}")
         return json.loads(body.decode("utf-8"))
 
+    def ingest_yawn_rails_proposals(
+        self, proposals: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """POST capture proposals to learner (bypasses rollout / capacity_full)."""
+        payload = {"proposals": list(proposals)}
+        code, body = self._request(
+            "POST",
+            "/yawn_rails/ingest",
+            data=json.dumps(payload).encode("utf-8"),
+            content_type="application/json",
+        )
+        if code != 200:
+            raise RuntimeError(
+                f"POST /yawn_rails/ingest failed with HTTP {code}: {body[:200]!r}"
+            )
+        result = json.loads(body.decode("utf-8"))
+        if not isinstance(result, dict):
+            raise RuntimeError("POST /yawn_rails/ingest returned non-object JSON")
+        return result
+
     def fetch_yawn_rails_bundle(self, cell_id: str) -> bytes:
         cid = str(cell_id).strip()
         if not cid or "/" in cid or "\\" in cid or ".." in cid:

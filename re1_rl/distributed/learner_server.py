@@ -104,12 +104,14 @@ class LearnerState:
         self.rollouts_accepted = 0
         self.rollouts_rejected = 0
         self.rollouts_stale_queued = 0  # accepted for train-time relevance gate
+        self.rollouts_rejected_stale = 0
         self.relevance_kept = 0
         self.relevance_dropped = 0
         # Env-step accounting for pitch % (ingest + relevance gate).
         self.steps_accepted = 0
         self.steps_rejected_ingest = 0
         self.steps_stale_queued = 0
+        self.steps_rejected_stale = 0
         self.steps_relevance_kept = 0
         self.steps_relevance_dropped = 0
         self.rollouts_rejected_identity = 0
@@ -288,18 +290,20 @@ class LearnerState:
             )
         return accepted
 
-    def ingest_yawn_rails_from_rollout(self, rollout: WorkerRollout) -> list[str]:
-        """Merge Yawn rails checkpoint cells from accepted rollout episode infos."""
+    def ingest_yawn_rails_proposals(
+        self,
+        proposals: list[dict[str, Any]],
+        *,
+        source: str = "http",
+    ) -> list[str]:
+        """Admit/replace Yawn rails cells (quality-gated, no training queue)."""
         store = self.yawn_rails_store
-        if store is None:
-            return []
-        proposals = extract_yawn_rails_proposals(rollout.episode_infos)
-        if not proposals:
+        if store is None or not proposals:
             return []
         try:
             accepted = store.ingest_proposals(proposals)
         except Exception as exc:
-            log(self.machine_name, f"yawn_rails merge failed: {exc}")
+            log(self.machine_name, f"yawn_rails ingest failed ({source}): {exc}")
             return []
         with self.lock:
             if accepted:
@@ -308,9 +312,36 @@ class LearnerState:
         if accepted:
             log(
                 self.machine_name,
-                f"yawn_rails merged {len(accepted)} cell(s) from {rollout.worker_id}",
+                f"yawn_rails merged {len(accepted)} cell(s) via {source}",
             )
         return accepted
+
+    def ingest_yawn_rails_from_rollout(self, rollout: WorkerRollout) -> list[str]:
+        """Merge Yawn rails checkpoint cells from accepted rollout episode infos."""
+        proposals = extract_yawn_rails_proposals(rollout.episode_infos)
+        if not proposals:
+            return []
+        return self.ingest_yawn_rails_proposals(
+            proposals,
+            source=str(rollout.worker_id),
+        )
+
+    def _log_rollout_staleness(
+        self,
+        rollout: WorkerRollout,
+        *,
+        reason: str,
+    ) -> None:
+        lag = int(self.current_policy_version) - int(rollout.policy_version)
+        log(
+            self.machine_name,
+            f"rollout {reason} from {rollout.worker_id} "
+            f"v{rollout.policy_version} lag={lag} "
+            f"(current={self.current_policy_version}, "
+            f"max_staleness={self.max_staleness}, "
+            f"relevance_max_age={self.relevance_max_age}) "
+            f"+{rollout.num_timesteps()} steps",
+        )
 
     def accept_rollout(self, rollout: WorkerRollout) -> tuple[bool, str]:
         wid = base_worker_id(rollout.worker_id)
@@ -352,11 +383,21 @@ class LearnerState:
                         reason = "stale_queued_for_relevance_gate"
                     else:
                         self.rollouts_rejected += 1
+                        self.rollouts_rejected_stale += 1
                         self.steps_rejected_ingest += steps
+                        self.steps_rejected_stale += steps
+                        self._log_rollout_staleness(
+                            rollout, reason="stale_policy_version (hard reject)"
+                        )
                         return False, "stale_policy_version"
                 else:
                     self.rollouts_rejected += 1
+                    self.rollouts_rejected_stale += 1
                     self.steps_rejected_ingest += steps
+                    self.steps_rejected_stale += steps
+                    self._log_rollout_staleness(
+                        rollout, reason="stale_policy_version (hard reject)"
+                    )
                     return False, "stale_policy_version"
             else:
                 self.rollouts_accepted += 1
@@ -366,6 +407,10 @@ class LearnerState:
                 reason = "ok"
         if reason == "ok":
             self.rollout_queue.put(rollout)
+        elif reason == "stale_queued_for_relevance_gate":
+            self._log_rollout_staleness(
+                rollout, reason="stale_queued_for_relevance_gate (soft accept)"
+            )
         self.ingest_go_explore_from_rollout(rollout)
         self.ingest_yawn_rails_from_rollout(rollout)
         return True, reason
@@ -397,6 +442,7 @@ class LearnerState:
                 "steps_accepted": accepted,
                 "steps_rejected_ingest": ingest_rej,
                 "steps_stale_queued": int(self.steps_stale_queued),
+                "steps_rejected_stale": int(self.steps_rejected_stale),
                 "steps_relevance_kept": int(self.steps_relevance_kept),
                 "steps_relevance_dropped": gate_drop,
                 "steps_pitched": pitched,
@@ -404,6 +450,7 @@ class LearnerState:
                 "rollouts_accepted": int(self.rollouts_accepted),
                 "rollouts_rejected": int(self.rollouts_rejected),
                 "rollouts_stale_queued": int(self.rollouts_stale_queued),
+                "rollouts_rejected_stale": int(self.rollouts_rejected_stale),
                 "relevance_kept": int(self.relevance_kept),
                 "relevance_dropped": int(self.relevance_dropped),
             }
@@ -442,12 +489,6 @@ class LearnerRolloutSink:
                 self._state.machine_name,
                 f"local rollout not queued ({reason}) from {rollout.worker_id} "
                 f"(+{rollout.num_timesteps()})",
-            )
-        elif reason == "stale_queued_for_relevance_gate":
-            log(
-                self._state.machine_name,
-                f"local rollout soft-queued ({reason}) from {rollout.worker_id} "
-                f"v{rollout.policy_version} (+{rollout.num_timesteps()})",
             )
         return ok
 
@@ -537,6 +578,8 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "rollouts_rejected": self.state.rollouts_rejected,
                     "rollouts_rejected_duplicate": self.state.rollouts_rejected_duplicate,
                     "rollouts_stale_queued": self.state.rollouts_stale_queued,
+                    "rollouts_rejected_stale": self.state.rollouts_rejected_stale,
+                    "steps_rejected_stale": self.state.steps_rejected_stale,
                     "rollouts_rejected_capacity": self.state.rollouts_rejected_capacity,
                     "steps_rejected_capacity": self.state.steps_rejected_capacity,
                     "max_pending_steps": self.state.max_pending_steps,
@@ -678,6 +721,40 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                 self._send_json(200, {"accepted": True})
             else:
                 self._send_json(409, {"accepted": False, "reason": reason})
+            return
+
+        if path == "/yawn_rails/ingest":
+            store = self.state.yawn_rails_store
+            if store is None:
+                self._send_json(503, {"error": "yawn_rails store not configured"})
+                return
+            try:
+                payload = json.loads(self._read_body().decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                self._send_json(400, {"error": "invalid json"})
+                return
+            raw_props = payload.get("proposals")
+            if raw_props is None and isinstance(payload.get("proposal"), dict):
+                raw_props = [payload["proposal"]]
+            if not isinstance(raw_props, list) or not raw_props:
+                self._send_json(400, {"error": "proposals required"})
+                return
+            proposals = [p for p in raw_props if isinstance(p, dict)]
+            if not proposals:
+                self._send_json(400, {"error": "no valid proposals"})
+                return
+            accepted = self.state.ingest_yawn_rails_proposals(
+                proposals,
+                source="POST /yawn_rails/ingest",
+            )
+            self._send_json(
+                200,
+                {
+                    "accepted": accepted,
+                    "archive_version": int(store.archive_version),
+                    "cell_count": len(store.cells),
+                },
+            )
             return
 
         self._send_json(404, {"error": "not found"})

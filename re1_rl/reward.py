@@ -557,6 +557,7 @@ def compute_reward(
         "key_item": 0.0,
         "story_use": 0.0,
         "gallery": 0.0,
+        "gallery_wrong": 0.0,
         "dining_statue": 0.0,
         "gold_emblem_return": 0.0,
         "key_item_return": 0.0,
@@ -738,14 +739,12 @@ def compute_reward(
         if acquired_key_or_weapon:
             progress.note_pickup_cutscene_block(room_now)
 
-    prev_inventory = {
-        canonical_item(str(name)) for name in prev_state.get("inventory", [])
-    }
-    inventory = {
-        canonical_item(str(name)) for name in state.get("inventory", [])
-    }
+    from re1_rl.weapon_equip import inventory_entries_to_names
+
+    prev_inventory = set(inventory_entries_to_names(prev_state.get("inventory")))
+    inventory = set(inventory_entries_to_names(state.get("inventory")))
     if progress is not None:
-        bd["gallery"] = progress.gallery_step_reward(
+        gallery_pay, gallery_wrong = progress.gallery_step_reward(
             prev_room=prev_room,
             room=room,
             prev_raw=int(prev_state.get("gallery_progress", 0) or 0),
@@ -754,6 +753,8 @@ def compute_reward(
             confirm=int(state.get("gallery_confirm", 0) or 0),
             star_crest_held="star_crest" in inventory,
         )
+        bd["gallery"] = gallery_pay
+        bd["gallery_wrong"] = gallery_wrong
         from re1_rl.dining_statue_puzzle import dining_statue_knocked_from_state
 
         if bool(state.get("in_control")) and progress.claim_dining_statue_bonus(

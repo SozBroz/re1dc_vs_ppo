@@ -60,6 +60,7 @@ class ProgressTracker:
     gallery_pending_reward: float = 0.0
     gallery_completed: bool = False
     gallery_needs_reentry: bool = False
+    gallery_wrong_breached: bool = False
     dining_statue_rewarded: bool = False
     # Pickups made after the current rails checkpoint. For non-key/non-weapon
     # items, only this set satisfies ``acquired_item``. Key items and weapons
@@ -374,21 +375,27 @@ class ProgressTracker:
         prev_confirm: int,
         confirm: int,
         star_crest_held: bool,
-    ) -> float:
-        """Pay ordered Gallery steps; claw back partial rewards on reset/exit."""
+    ) -> tuple[float, float]:
+        """Pay ordered Gallery steps; claw back partial rewards on wrong portrait.
+
+        Returns ``(gallery_pay, gallery_wrong_penalty)``. Wrong portrait pays
+        clawback on pending steps plus ``-GALLERY_WRONG_PORTRAIT_PENALTY`` and
+        marks the episode terminal via ``breach_gallery_wrong()``.
+        """
         from re1_rl.gallery_puzzle import (
             GALLERY_ROOM_ID,
             GALLERY_STEP_CLAWBACK_SCALE,
             GALLERY_STEP_REWARD,
+            GALLERY_WRONG_PORTRAIT_PENALTY,
             completed_steps,
         )
 
         if self.gallery_completed:
-            return 0.0
+            return 0.0, 0.0
         if star_crest_held:
             self.gallery_completed = True
             self.gallery_pending_reward = 0.0
-            return 0.0
+            return 0.0, 0.0
 
         entered = str(prev_room) != GALLERY_ROOM_ID and str(room) == GALLERY_ROOM_ID
         left = str(prev_room) == GALLERY_ROOM_ID and str(room) != GALLERY_ROOM_ID
@@ -396,18 +403,18 @@ class ProgressTracker:
             self.gallery_needs_reentry = False
             self.gallery_step_index = completed_steps(raw)
             self.gallery_pending_reward = 0.0
-            return 0.0
+            return 0.0, 0.0
 
         if left:
             clawback = -self.gallery_pending_reward * GALLERY_STEP_CLAWBACK_SCALE
             self.gallery_needs_reentry = True
             self.gallery_step_index = 0
             self.gallery_pending_reward = 0.0
-            return clawback
+            return clawback, 0.0
         if str(room) != GALLERY_ROOM_ID:
-            return 0.0
+            return 0.0, 0.0
         if self.gallery_needs_reentry:
-            return 0.0
+            return 0.0, 0.0
 
         prev_count = completed_steps(prev_raw)
         count = completed_steps(raw)
@@ -417,7 +424,7 @@ class ProgressTracker:
         if int(raw) != int(prev_raw) and count == self.gallery_step_index + 1:
             self.gallery_step_index = count
             self.gallery_pending_reward += GALLERY_STEP_REWARD
-            return GALLERY_STEP_REWARD
+            return GALLERY_STEP_REWARD, 0.0
 
         wrong_reset = int(raw) == 0 and int(prev_raw) != 0
         wrong_first = (
@@ -434,8 +441,17 @@ class ProgressTracker:
             self.gallery_step_index = 0
             self.gallery_pending_reward = 0.0
             self.gallery_needs_reentry = True
-            return clawback
-        return 0.0
+            self.breach_gallery_wrong()
+            return clawback, -GALLERY_WRONG_PORTRAIT_PENALTY
+        return 0.0, 0.0
+
+    def breach_gallery_wrong(self) -> bool:
+        """Mark wrong gallery portrait as terminal; true only on first breach."""
+        if self.gallery_wrong_breached:
+            return False
+        self.gallery_wrong_breached = True
+        self.softlock_cap_frames = 0
+        return True
 
     def claim_dining_statue_bonus(
         self,

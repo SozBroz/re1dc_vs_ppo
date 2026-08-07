@@ -2084,10 +2084,14 @@ def cutscene_skip_chunk(
         env, entry_prev, state, inv_before, inv_after
     )
     if inv_before is not None:
+        from re1_rl.weapon_equip import policy_inventory_to_names
+
         entry_prev = dict(entry_prev or {})
-        entry_prev["inventory"] = list(inv_before)
+        entry_prev["inventory"] = policy_inventory_to_names(inv_before)
     if inv_after is not None:
-        state["inventory"] = list(inv_after)
+        from re1_rl.weapon_equip import policy_inventory_to_names
+
+        state["inventory"] = policy_inventory_to_names(inv_after)
     env._cutscene_skip_entry_prev = dict(entry_prev)
     blocked_room = env._progress.cutscene_blocked_after_pickup_room
     state["cutscene_key"] = qualify_cutscene_reward(

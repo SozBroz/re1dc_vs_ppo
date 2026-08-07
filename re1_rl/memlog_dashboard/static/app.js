@@ -141,6 +141,11 @@
     const ld = learner.data || {};
     const epoch = ld.epoch || {};
     const pitch = ld.pitch || {};
+    const yawn = status.yawn_cells || {};
+    const frontier = yawn.frontier || {};
+    const frontierText = frontier.checkpoint_id
+      ? `cp${String(frontier.checkpoint_index).padStart(2, "0")} ${frontier.checkpoint_id} room=${frontier.room_id || "?"} hp=${frontier.hp ?? "?"} ammo=${frontier.ammo ?? "?"}`
+      : "—";
     const rows = [
       ["memlog process", process.running ? "running" : (process.owned ? `exited (${process.exit_code})` : "not owned")],
       ["owned PID", process.pid ?? "—"], ["owned run", process.run_id ?? "—"],
@@ -152,7 +157,11 @@
       ["learner", learner.available ? learner.url : `unavailable: ${learner.error || "unknown"}`],
       ["queue / epoch", `${ld.queue_depth ?? "—"} / ${epoch.epoch ?? epoch.index ?? epoch.current ?? "—"}`],
       ["pitch", `${fmt(pitch.pitch_pct, 2)}% (${pitch.steps_pitched ?? "—"} steps)`],
+      ["stale rollouts", `rej=${pitch.rollouts_rejected_stale ?? ld.rollouts_rejected_stale ?? "—"} q=${pitch.rollouts_stale_queued ?? ld.rollouts_stale_queued ?? "—"}`],
+      ["stale steps", `rej=${pitch.steps_rejected_stale ?? ld.steps_rejected_stale ?? "—"} q=${pitch.steps_stale_queued ?? "—"}`],
       ["workers", ld.workers ? `${Object.keys(ld.workers).length}: ${Object.keys(ld.workers).join(", ")}` : "—"],
+      ["yawn cells", `${yawn.cell_count ?? "—"} @ v${yawn.archive_version ?? "—"}`],
+      ["yawn frontier", frontierText],
     ];
     $("infrastructure").innerHTML = rows.map(([key, value]) =>
       `<span class="key">${esc(key)}</span><span>${esc(value)}</span>`).join("");
@@ -272,6 +281,20 @@
   $("set-speed").addEventListener("click", () => post("/api/control/speed", {
     run_id: runId(), speed_pct: Number($("speed").value),
   }));
+  $("sync-cells").addEventListener("click", async () => {
+    try {
+      const result = await api("/api/yawn-sync/pull", {method: "POST", body: "{}"});
+      const data = result?.data || {};
+      const frontier = data.frontier;
+      const label = frontier?.checkpoint_id
+        ? `cp${String(frontier.checkpoint_index).padStart(2, "0")} ${frontier.checkpoint_id}`
+        : "cells";
+      toast(`Synced ${data.fetched ?? 0} bundle(s) · ${label}`);
+      await poll();
+    } catch (error) {
+      toast(error.message, true);
+    }
+  });
   $("action-sort").addEventListener("change", renderActions);
   poll();
   window.setInterval(poll, 1000);

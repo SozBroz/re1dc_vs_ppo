@@ -55,6 +55,31 @@ def policy_inventory(
     return [(int(iid), policy_item_qty(iid, qty)) for iid, qty in inventory]
 
 
+def inventory_entries_to_names(entries: Any) -> list[str]:
+    """Canonical item names from a state ``inventory`` field (names or id/qty tuples)."""
+    from re1_rl.item_todo import canonical_item
+
+    names: list[str] = []
+    for entry in entries or []:
+        if isinstance(entry, tuple) and entry:
+            iid = int(entry[0])
+            if not iid:
+                continue
+            raw = ITEM_IDS.get(iid, "")
+            if raw:
+                names.append(canonical_item(raw))
+        elif entry:
+            names.append(canonical_item(str(entry)))
+    return names
+
+
+def policy_inventory_to_names(
+    inventory: list[tuple[int, int]] | None,
+) -> list[str]:
+    """Map policy RAM inventory tuples to reward-state item names."""
+    return inventory_entries_to_names(inventory)
+
+
 def read_inventory_ids(bridge: Any) -> list[int]:
     """Item id per inventory slot (0 = empty)."""
     fields = [

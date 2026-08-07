@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 from urllib.request import urlopen
 
 from re1_rl.env import ACTION_NAMES
@@ -412,6 +413,73 @@ class DashboardService:
             return self.write_control(str(run_id or ""), {"speed_pct": speed})
         raise ValueError(f"unknown control operation: {operation}")
 
+    def yawn_local_status(self) -> dict[str, Any]:
+        from re1_rl.yawn_rails_worker_cache import load_local_yawn_manifest
+
+        manifest = load_local_yawn_manifest(self.config.root)
+        cells = sorted(
+            [
+                row
+                for row in (manifest.get("cells") or [])
+                if isinstance(row, dict) and "checkpoint_index" in row
+            ],
+            key=lambda row: int(row["checkpoint_index"]),
+        )
+        frontier = cells[-1] if cells else None
+        quality = list((frontier or {}).get("quality") or [])
+        return {
+            "archive_version": int(manifest.get("archive_version", 0) or 0),
+            "cell_count": len(cells),
+            "route_id": manifest.get("route_id"),
+            "frontier": (
+                {
+                    "checkpoint_index": int(frontier["checkpoint_index"]),
+                    "checkpoint_id": str(frontier.get("checkpoint_id") or ""),
+                    "room_id": str(frontier.get("room_id") or ""),
+                    "hp": quality[0] if quality else None,
+                    "ammo": quality[1] if len(quality) > 1 else None,
+                }
+                if frontier
+                else None
+            ),
+        }
+
+    def yawn_sync_pull(self, *, full: bool = False) -> dict[str, Any]:
+        """Pull learner Yawn cells into local states/yawn_rails (hot, no worker restart)."""
+        from re1_rl.distributed.worker_client import WorkerClient
+        from re1_rl.yawn_rails_worker_cache import (
+            load_local_yawn_manifest,
+            poll_yawn_rails_manifest,
+        )
+
+        parsed = urlparse(self.config.learner_url)
+        host = parsed.hostname or "127.0.0.1"
+        port = int(parsed.port or 8765)
+        client = WorkerClient(
+            host,
+            port,
+            machine_name="memlog_dashboard",
+            timeout=30.0,
+        )
+        if not client.health():
+            raise RuntimeError(f"learner unreachable: {self.config.learner_url}")
+        local_before = load_local_yawn_manifest(self.config.root)
+        since = 0 if full else int(local_before.get("archive_version", 0) or 0)
+        local_after = poll_yawn_rails_manifest(
+            client,
+            self.config.root,
+            since_version=since,
+        )
+        stats = dict(local_after.get("cache_stats") or {})
+        return {
+            "archive_version": int(local_after.get("archive_version", 0) or 0),
+            "cell_count": len(local_after.get("cells") or []),
+            "fetched": int(stats.get("fetched_last_poll", 0) or 0),
+            "pruned": int(stats.get("pruned_dirs_last_poll", 0) or 0),
+            "full": bool(full),
+            "frontier": self.yawn_local_status().get("frontier"),
+        }
+
     def learner_status(self) -> dict[str, Any]:
         url = self.config.learner_url.rstrip("/") + "/status"
         try:
@@ -453,6 +521,7 @@ class DashboardService:
             "control": control,
             "control_error": control_error,
             "learner": self.learner_status(),
+            "yawn_cells": self.yawn_local_status(),
         }
 
     def start(self, body: dict[str, Any]) -> dict[str, Any]:
@@ -547,6 +616,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 payload = self.service.start(body)
             elif self.path == "/api/lifecycle/stop":
                 payload = self.service.stop()
+            elif self.path == "/api/yawn-sync/pull":
+                payload = self.service.yawn_sync_pull(
+                    full=bool(body.get("full")),
+                )
             else:
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return

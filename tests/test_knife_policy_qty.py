@@ -9,7 +9,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.weapon_equip import (
     POLICY_KNIFE_QTY,
+    inventory_entries_to_names,
     policy_inventory,
+    policy_inventory_to_names,
     policy_item_qty,
     slot_legal_for_equip,
 )
@@ -36,3 +38,10 @@ def test_equip_gun_to_knife_when_ram_qty_zero() -> None:
     assert not slot_legal_for_equip(
         inv, 1, equipped_weapon_id=0x02, equipped_slot_0based=1
     )
+
+
+def test_policy_inventory_to_names_matches_string_inventory() -> None:
+    tuples = [(0x01, 99), (0x02, 15), (0x35, 1), (0x03, 1)]
+    names = policy_inventory_to_names(tuples)
+    assert names == ["knife", "beretta", "shield_key", "shotgun"]
+    assert inventory_entries_to_names(names) == names

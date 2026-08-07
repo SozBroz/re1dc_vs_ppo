@@ -132,3 +132,23 @@ def test_rails_gold_emblem_return_scales_with_pickup():
 
     bd = _reward(prev, ret, rails=True, progress=progress)
     assert bd["gold_emblem_return"] == GOLD_EMBLEM_RETURN_PENALTY * RAILS_NAV_POSITIVE_SCALE
+
+
+def test_post_skip_mixed_inventory_formats_no_false_key_item_return():
+    """Cutscene skip must not claw back keys when names vs id/qty tuples differ."""
+    progress = ProgressTracker()
+    progress.key_items_rewarded.update({"emblem", "gold_emblem", "shield_key"})
+    prev = make_state(
+        "117",
+        inventory=["knife", "beretta", "shield_key", "shotgun"],
+    )
+    # Bug shape: post-skip assigned raw policy tuples to state inventory.
+    after = make_state(
+        "117",
+        step=2,
+        inventory=[(0x01, 99), (0x02, 15), (0x35, 1), (0x03, 1)],
+    )
+
+    bd = _reward(prev, after, rails=True, progress=progress)
+    assert bd["key_item_return"] == 0.0
+    assert progress.key_items_rewarded == {"emblem", "gold_emblem", "shield_key"}

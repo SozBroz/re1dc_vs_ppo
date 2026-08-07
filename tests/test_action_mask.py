@@ -223,6 +223,21 @@ def test_knife_vs_gun_near_bands_mask() -> None:
     assert m_close[ATTACK_DOWN_ACTION]
 
 
+def test_mask_blocks_attack_when_only_crows_near() -> None:
+    idle = dict(player_anim=0x0D, player_aux=0x01, player_recovery=0)
+    m = action_mask(
+        N_ACTIONS,
+        None,
+        **idle,
+        equipped_weapon_id=0x01,
+        knife_enemies_near=0,
+        gun_enemies_near=0,
+        mask_combat_without_enemies=True,
+    )
+    assert not m[ATTACK_ACTION]
+    assert not m[ATTACK_DOWN_ACTION]
+
+
 def test_mask_blocks_equip_during_gun_stable_aim() -> None:
     from re1_rl.action_mask import EQUIP_ACTION, USE_ACTION
 
