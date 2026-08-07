@@ -158,6 +158,16 @@ def test_attack_execution_reuses_live_mask_legality() -> None:
     assert env._execution_action_legal(ATTACK_ACTION)
 
 
+def test_magic_deposit_execution_reuses_live_mask_legality() -> None:
+    env = RE1Env.__new__(RE1Env)
+    denied = [True] * N_ACTIONS
+    denied[DEPOSIT_ACTION_BASE] = False
+    env.action_masks = lambda: denied
+    assert not env._execution_action_legal(DEPOSIT_ACTION_BASE)
+    denied[DEPOSIT_ACTION_BASE] = True
+    assert env._execution_action_legal(DEPOSIT_ACTION_BASE)
+
+
 def test_knife_crouch_legal_with_knife_via_attack_down() -> None:
     m = action_mask(N_ACTIONS, None, equipped_weapon_id=0x01, knife_enemies_near=1)
     assert m[ATTACK_DOWN_ACTION]
