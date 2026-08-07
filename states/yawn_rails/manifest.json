@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "archive_version": 238,
+  "archive_version": 245,
   "route_id": "yawn_quest_v2",
   "cells": [
     {
@@ -167,10 +167,10 @@
         0,
         6,
         1,
-        -2
+        -1
       ],
-      "bundle_sha256": "685a2fc79795935508dd1fd7cfcfe8890ab46a77a9619b5de25fe2f43fc63f76",
-      "bytes": 1495750,
+      "bundle_sha256": "646ae4a5a546b5f7aee105a56b8dd270a8b06439fd11f337c119baefb6566090",
+      "bytes": 1497124,
       "state_path": "states/yawn_rails/cells/cp07/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp07/cell.sidecar.json",
       "inventory_free_slots": 3,
@@ -618,12 +618,144 @@
       "next_slots_needed": 1,
       "inventory_feasible": true,
       "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 28,
+      "checkpoint_id": "gallery_portrait_1_117",
+      "room_id": "117",
+      "quality": [
+        48,
+        63,
+        0,
+        11,
+        1,
+        0
+      ],
+      "bundle_sha256": "946e6a984288a322cbfe22a68648032627157225420267b30b5c53f62b4bb0c1",
+      "bytes": 1439750,
+      "state_path": "states/yawn_rails/cells/cp28/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp28/cell.sidecar.json",
+      "inventory_free_slots": 4,
+      "next_checkpoint_id": "gallery_portrait_2_117",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 29,
+      "checkpoint_id": "gallery_portrait_2_117",
+      "room_id": "117",
+      "quality": [
+        48,
+        63,
+        0,
+        11,
+        1,
+        0
+      ],
+      "bundle_sha256": "294f64f870c04f4e261c068ba0a692fa382f5c5a481b3c5198bf3edbfdd559d7",
+      "bytes": 1449325,
+      "state_path": "states/yawn_rails/cells/cp29/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp29/cell.sidecar.json",
+      "inventory_free_slots": 4,
+      "next_checkpoint_id": "gallery_portrait_3_117",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 30,
+      "checkpoint_id": "gallery_portrait_3_117",
+      "room_id": "117",
+      "quality": [
+        48,
+        63,
+        0,
+        11,
+        1,
+        0
+      ],
+      "bundle_sha256": "17fd2f61247ea3ff195e4127258029fcac40a19838be633f2653dc2f2f72bb38",
+      "bytes": 1441353,
+      "state_path": "states/yawn_rails/cells/cp30/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp30/cell.sidecar.json",
+      "inventory_free_slots": 4,
+      "next_checkpoint_id": "gallery_portrait_4_117",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 31,
+      "checkpoint_id": "gallery_portrait_4_117",
+      "room_id": "117",
+      "quality": [
+        48,
+        63,
+        0,
+        11,
+        1,
+        0
+      ],
+      "bundle_sha256": "212a9ca6a12153cd1621376be0dbc00f8c3fc44a24aa41e18d380598126d7d8b",
+      "bytes": 1441972,
+      "state_path": "states/yawn_rails/cells/cp31/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp31/cell.sidecar.json",
+      "inventory_free_slots": 4,
+      "next_checkpoint_id": "gallery_portrait_5_117",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 32,
+      "checkpoint_id": "gallery_portrait_5_117",
+      "room_id": "117",
+      "quality": [
+        48,
+        63,
+        0,
+        11,
+        1,
+        0
+      ],
+      "bundle_sha256": "062f49c4d102ab3c0e419e6f2662e2c225d25ebc827ffb742a475c52dd678574",
+      "bytes": 1430036,
+      "state_path": "states/yawn_rails/cells/cp32/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp32/cell.sidecar.json",
+      "inventory_free_slots": 4,
+      "next_checkpoint_id": "gallery_portrait_6_117",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 33,
+      "checkpoint_id": "gallery_portrait_6_117",
+      "room_id": "117",
+      "quality": [
+        48,
+        63,
+        0,
+        11,
+        1,
+        0
+      ],
+      "bundle_sha256": "84f23399c8fd2d3a654c0449c78b964acaeaf77d3c092b2144cbebaea1e454c9",
+      "bytes": 1438155,
+      "state_path": "states/yawn_rails/cells/cp33/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp33/cell.sidecar.json",
+      "inventory_free_slots": 4,
+      "next_checkpoint_id": "gallery_complete_117",
+      "next_slots_needed": 1,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
     }
   ],
   "cache_stats": {
-    "manifest_cells": 28,
+    "manifest_cells": 34,
     "fetched_last_poll": 0,
     "pruned_dirs_last_poll": 0,
-    "remote_cell_count": 28
+    "remote_cell_count": 34
   }
 }

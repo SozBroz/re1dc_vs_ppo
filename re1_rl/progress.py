@@ -59,6 +59,7 @@ class ProgressTracker:
     gallery_step_index: int = 0
     gallery_pending_reward: float = 0.0
     gallery_completed: bool = False
+    gallery_puzzle_solved: bool = False
     gallery_needs_reentry: bool = False
     gallery_wrong_breached: bool = False
     dining_statue_rewarded: bool = False
@@ -383,9 +384,11 @@ class ProgressTracker:
         marks the episode terminal via ``breach_gallery_wrong()``.
         """
         from re1_rl.gallery_puzzle import (
+            GALLERY_COMPLETE_PREV_RAW,
             GALLERY_ROOM_ID,
             GALLERY_STEP_CLAWBACK_SCALE,
             GALLERY_STEP_REWARD,
+            GALLERY_STEP_VALUES,
             GALLERY_WRONG_PORTRAIT_PENALTY,
             completed_steps,
         )
@@ -394,6 +397,7 @@ class ProgressTracker:
             return 0.0, 0.0
         if star_crest_held:
             self.gallery_completed = True
+            self.gallery_puzzle_solved = True
             self.gallery_pending_reward = 0.0
             return 0.0, 0.0
 
@@ -425,6 +429,16 @@ class ProgressTracker:
             self.gallery_step_index = count
             self.gallery_pending_reward += GALLERY_STEP_REWARD
             return GALLERY_STEP_REWARD, 0.0
+
+        puzzle_complete = (
+            int(prev_raw) == GALLERY_COMPLETE_PREV_RAW
+            and int(raw) == 0
+            and prev_count == len(GALLERY_STEP_VALUES)
+        )
+        if puzzle_complete:
+            self.gallery_puzzle_solved = True
+            self.gallery_step_index = len(GALLERY_STEP_VALUES)
+            return 0.0, 0.0
 
         wrong_reset = int(raw) == 0 and int(prev_raw) != 0
         wrong_first = (

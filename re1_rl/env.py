@@ -912,6 +912,7 @@ class RE1Env(gym.Env):
         )
         goal_state = dict(state)
         goal_state["gallery_needs_reentry"] = self._progress.gallery_needs_reentry
+        goal_state["gallery_puzzle_solved"] = self._progress.gallery_puzzle_solved
         box_obs = self._box_obs(state)
         inventory_obs = encode_inventory_slots(state.get("inventory_slots"))
         logistics_obs = self._encoder.encode_logistics(state, self._planner)

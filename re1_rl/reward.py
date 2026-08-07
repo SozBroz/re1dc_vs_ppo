@@ -804,6 +804,8 @@ def compute_reward(
 
     if rails_mode:
         state["typewriter_save_complete"] = bool(typewriter_save_complete)
+        if progress is not None:
+            state["gallery_puzzle_solved"] = bool(progress.gallery_puzzle_solved)
         advanced = bool(
             planner.advance_if_success(
                 state, progress=progress, prev_state=prev_state

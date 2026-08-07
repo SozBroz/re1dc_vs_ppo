@@ -422,10 +422,20 @@ def test_gallery_portrait_steps_are_separate_legs() -> None:
             progress=progress,
         )
 
+    assert planner.current_objective()["checkpoint_id"] == "gallery_complete_117"
+    assert not planner.advance_if_success(
+        _state("117", gallery_progress=GALLERY_STEP_VALUES[5]),
+        progress=progress,
+    )
+    assert planner.advance_if_success(
+        _state("117", gallery_progress=0, gallery_puzzle_solved=True),
+        progress=progress,
+    )
+
     assert planner.current_objective()["checkpoint_id"] == "star_crest_117"
     progress.note_leg_acquired("star_crest")
     assert planner.advance_if_success(
-        _state("117", gallery_progress=GALLERY_STEP_VALUES[5], inventory=["star_crest"]),
+        _state("117", gallery_progress=0, gallery_puzzle_solved=True, inventory=["star_crest"]),
         progress=progress,
     )
     assert planner.current_objective()["checkpoint_id"] == "back_passage_return_10A"

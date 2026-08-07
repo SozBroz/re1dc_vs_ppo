@@ -175,6 +175,24 @@ def test_wrong_first_confirmation_locks_rewards_and_points_to_exit() -> None:
     assert locked_bd["gallery"] == 0.0
 
 
+def test_final_switch_clears_progress_without_wrong_portrait_terminal() -> None:
+    progress = ProgressTracker()
+    progress.first_visit("117")
+    prev = _state()
+    for raw in GALLERY_STEP_VALUES:
+        state = _state(raw=raw)
+        _reward(progress, prev, state)
+        prev = state
+
+    complete = _state(raw=0)
+    _total, bd = _reward(progress, prev, complete)
+    assert bd["gallery"] == 0.0
+    assert bd["gallery_wrong"] == 0.0
+    assert progress.gallery_puzzle_solved
+    assert not progress.gallery_wrong_breached
+    assert progress.gallery_pending_reward == pytest.approx(6 * GALLERY_STEP_REWARD)
+
+
 def test_star_crest_finalizes_sequence_without_gallery_double_pay() -> None:
     progress = ProgressTracker()
     progress.first_visit("117")
@@ -205,6 +223,10 @@ def test_gallery_hint_uses_existing_four_goal_slots() -> None:
         "gallery_progress",
     ]
     assert np.array_equal(encode_gallery_hint(_state(room="106")), np.zeros(4))
+
+    solved = _state(raw=0) | {"gallery_puzzle_solved": True, "x": 1850.0, "z": 4100.0}
+    solved_hint = encode_gallery_hint(solved)
+    assert solved_hint[3] == pytest.approx(1.0)
 
     x, z = GALLERY_TARGETS[1]
     hint = encode_gallery_hint(

@@ -33,6 +33,9 @@ GALLERY_TARGETS = (
     (1850.0, 4100.0),
 )
 GALLERY_EXIT_TARGET = (3200.0, 11700.0)  # ROOM1170.RDT door to room 10A
+# Final "end of life" switch (slot 8); crest spawns here after puzzle completion.
+GALLERY_FINAL_SWITCH_TARGET = GALLERY_TARGETS[-1]
+GALLERY_COMPLETE_PREV_RAW = GALLERY_STEP_VALUES[-1]
 
 
 def completed_steps(raw_progress: int) -> int:
@@ -50,8 +53,17 @@ def encode_gallery_hint(state: dict[str, Any]) -> np.ndarray:
         return out
 
     needs_reentry = bool(state.get("gallery_needs_reentry", False))
+    puzzle_solved = bool(state.get("gallery_puzzle_solved", False))
     count = completed_steps(int(state.get("gallery_progress", 0) or 0))
-    tx, tz = GALLERY_EXIT_TARGET if needs_reentry else GALLERY_TARGETS[count]
+    if needs_reentry:
+        tx, tz = GALLERY_EXIT_TARGET
+        progress_frac = -1.0
+    elif puzzle_solved or count >= len(GALLERY_STEP_VALUES):
+        tx, tz = GALLERY_FINAL_SWITCH_TARGET
+        progress_frac = 1.0
+    else:
+        tx, tz = GALLERY_TARGETS[count]
+        progress_frac = count / len(GALLERY_STEP_VALUES)
     dx = tx - float(state.get("x", 0))
     dz = tz - float(state.get("z", 0))
     distance = min(math.hypot(dx, dz) / 4096.0, 2.0)
@@ -62,6 +74,6 @@ def encode_gallery_hint(state: dict[str, Any]) -> np.ndarray:
         math.sin(bearing),
         math.cos(bearing),
         distance,
-        -1.0 if needs_reentry else count / len(GALLERY_STEP_VALUES),
+        progress_frac,
     )
     return out

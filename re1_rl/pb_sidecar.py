@@ -73,6 +73,7 @@ def progress_to_sidecar(progress: ProgressTracker) -> dict[str, Any]:
         "gallery_step_index": int(progress.gallery_step_index),
         "gallery_pending_reward": float(progress.gallery_pending_reward),
         "gallery_completed": bool(progress.gallery_completed),
+        "gallery_puzzle_solved": bool(progress.gallery_puzzle_solved),
         "gallery_needs_reentry": bool(progress.gallery_needs_reentry),
         "dining_statue_rewarded": bool(progress.dining_statue_rewarded),
     }
@@ -100,6 +101,7 @@ def apply_progress_sidecar(progress: ProgressTracker, data: dict[str, Any]) -> N
     progress.gallery_step_index = int(data.get("gallery_step_index", 0))
     progress.gallery_pending_reward = float(data.get("gallery_pending_reward", 0.0))
     progress.gallery_completed = bool(data.get("gallery_completed", False))
+    progress.gallery_puzzle_solved = bool(data.get("gallery_puzzle_solved", False))
     progress.gallery_needs_reentry = bool(data.get("gallery_needs_reentry", False))
     progress.dining_statue_rewarded = bool(data.get("dining_statue_rewarded", False))
 
