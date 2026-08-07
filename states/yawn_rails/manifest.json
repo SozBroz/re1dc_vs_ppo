@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "archive_version": 237,
+  "archive_version": 238,
   "route_id": "yawn_quest_v2",
   "cells": [
     {
@@ -145,10 +145,10 @@
         0,
         6,
         1,
-        -2
+        -1
       ],
-      "bundle_sha256": "4891e0e743c32d5840f029e0b552f0321d4299264d37acd2a6af2b81b737697c",
-      "bytes": 1458382,
+      "bundle_sha256": "5b8aabc6af0d18d56bb722abb560c5c92877e9262d0c73e61cfb11e583a0d092",
+      "bytes": 1449156,
       "state_path": "states/yawn_rails/cells/cp06/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp06/cell.sidecar.json",
       "inventory_free_slots": 3,

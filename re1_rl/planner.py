@@ -356,6 +356,12 @@ class WaypointPlanner:
             return bool(prefix) and (
                 progress.in_control_steps_since_cutscene(prefix) >= min_steps
             )
+        if cond_type == "gallery_progress":
+            from re1_rl.gallery_puzzle import completed_steps
+
+            min_steps = int(cond.get("min_steps", 1))
+            raw = int(state.get("gallery_progress", 0) or 0)
+            return completed_steps(raw) >= min_steps
         return False
 
     @property
