@@ -48,11 +48,11 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp37` | 38 | `courtyard_enter_11A` | `11A` | navigate | Enter the courtyard crest gate |
 | `cp38` | 39 | `crest_gate_11A` | `11A` | use_item | Place a crest at the courtyard gate (any slot) |
 | `cp39` | 40 | `back_passage_post_crest_10A` | `10A` | navigate | Return through the Back Passage after opening the courtyard gate |
-| `cp40` | 41 | `east_stairs_101` | `101` | navigate | Reach East Stairway 1F |
+| `cp40` | 41 | `east_stairs_101` | `10B` | navigate | Reach East Stairway 1F |
 | `cp41` | 42 | `storeroom_enter_11B` | `11B` | navigate | Enter the mansion storeroom |
 | `cp42` | 43 | `chemical_11B` | `11B` | pickup | Take the herbicide from the mansion storeroom |
-| `cp43` | 44 | `east_stairs_101_post_storeroom` | `101` | navigate | Return to East Stairway 1F from the storeroom |
-| `cp44` | 45 | `east_stairs_201` | `201` | navigate | Climb East Stairway to 2F |
+| `cp43` | 44 | `east_stairs_101_post_storeroom` | `10B` | navigate | Return to East Stairway 1F from the storeroom |
+| `cp44` | 45 | `east_stairs_201` | `207` | navigate | Climb East Stairway to 2F |
 | `cp45` | 46 | `c_passage_204` | `204` | navigate | Reach the C Passage |
 | `cp46` | 47 | `upper_hall_enter_203` | `203` | navigate | Enter Upper Hall for Barry's acid rounds |
 | `cp47` | 48 | `acid_rounds_203` | `203` | pickup | Receive Barry's acid rounds |
@@ -63,10 +63,10 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp52` | 53 | `upper_hall_203_post_terrace` | `203` | navigate | Return through Upper Hall toward Dining 2F |
 | `cp53` | 54 | `dining_2f_enter_202` | `202` | navigate | Enter Dining Room 2F |
 | `cp54` | 55 | `statue_202` | `202` | navigate | Push the Dining 2F statue down |
-| `cp55` | 56 | `west_stairs_207` | `207` | navigate | Reach West Stairway 2F |
-| `cp56` | 57 | `west_stairs_10B` | `10B` | navigate | Descend West Stairway |
+| `cp55` | 56 | `west_stairs_207` | `201` | navigate | Reach West Stairway 2F |
+| `cp56` | 57 | `west_stairs_10B` | `101` | navigate | Descend West Stairway |
 | `cp57` | 58 | `save_100` | `100` | navigate | Reach the Mansion Save Room |
-| `cp58` | 59 | `west_stairs_return_10B` | `10B` | navigate | Return through West Stairway before the Central Corridor |
+| `cp58` | 59 | `west_stairs_return_10B` | `101` | navigate | Return through West Stairway before the Central Corridor |
 | `cp59` | 60 | `central_corridor_103` | `103` | navigate | Reach the Central Corridor |
 | `cp60` | 61 | `tiger_room_enter_10C` | `10C` | navigate | Enter the tiger skull room |
 | `cp61` | 62 | `armor_key_10C` | `10C` | use_item | Use the chemical and take the armor key |
@@ -90,12 +90,12 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp79` | 80 | `richard_room_enter_20D` | `20D` | navigate | Enter the east wing hallway for Richard |
 | `cp80` | 81 | `richard_cutscene_20D` | `20D` | navigate | Trigger Richard's Pillar Passage cutscene |
 | `cp81` | 82 | `richard_forced_return_204` | `204` | navigate | Continue from Richard's cutscene into the C Passage |
-| `cp82` | 83 | `east_stairs_201_post_richard` | `201` | navigate | Reach East Stairway 2F after Richard |
-| `cp83` | 84 | `east_stairs_101_post_richard` | `101` | navigate | Descend East Stairway after Richard |
+| `cp82` | 83 | `east_stairs_201_post_richard` | `207` | navigate | Reach East Stairway 2F after Richard |
+| `cp83` | 84 | `east_stairs_101_post_richard` | `10B` | navigate | Descend East Stairway after Richard |
 | `cp84` | 85 | `yawn_box_enter_11B` | `11B` | navigate | Enter the storeroom for Yawn box prep |
 | `cp85` | 86 | `yawn_box_prep_11B` | `11B` | navigate | Prepare inventory at the item box and wait for the lab timer to expire naturally |
-| `cp86` | 87 | `east_stairs_101_to_yawn` | `101` | navigate | Return to East Stairway 1F for Yawn |
-| `cp87` | 88 | `east_stairs_201_to_yawn` | `201` | navigate | Climb East Stairway for Yawn |
+| `cp86` | 87 | `east_stairs_101_to_yawn` | `10B` | navigate | Return to East Stairway 1F for Yawn |
+| `cp87` | 88 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
 | `cp88` | 89 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
 | `cp89` | 90 | `moon_hall_enter_20D` | `20D` | navigate | Enter the east wing hallway for attic ammo |
 | `cp90` | 91 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
@@ -592,14 +592,14 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp40` — `east_stairs_101` (seq 41)
 
-- **Room:** `101`
+- **Room:** `10B`
 - **Action:** `navigate`
 - **Objective:** Reach East Stairway 1F
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **101**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10B**. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `101`
+- Enter room `10B`
 
 ### `cp41` — `storeroom_enter_11B` (seq 42)
 
@@ -625,25 +625,25 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp43` — `east_stairs_101_post_storeroom` (seq 44)
 
-- **Room:** `101`
+- **Room:** `10B`
 - **Action:** `navigate`
 - **Objective:** Return to East Stairway 1F from the storeroom
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **101**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10B**. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `101`
+- Enter room `10B`
 
 ### `cp44` — `east_stairs_201` (seq 45)
 
-- **Room:** `201`
+- **Room:** `207`
 - **Action:** `navigate`
 - **Objective:** Climb East Stairway to 2F
 - **Required items:** `chemical`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **201**. Hold: `chemical`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **207**. Hold: `chemical`. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `201`
+- Enter room `207`
 
 ### `cp45` — `c_passage_204` (seq 46)
 
@@ -757,25 +757,25 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp55` — `west_stairs_207` (seq 56)
 
-- **Room:** `207`
+- **Room:** `201`
 - **Action:** `navigate`
 - **Objective:** Reach West Stairway 2F
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **207**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **201**. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `207`
+- Enter room `201`
 
 ### `cp56` — `west_stairs_10B` (seq 57)
 
-- **Room:** `10B`
+- **Room:** `101`
 - **Action:** `navigate`
 - **Objective:** Descend West Stairway
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10B**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **101**. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `10B`
+- Enter room `101`
 
 ### `cp57` — `save_100` (seq 58)
 
@@ -790,14 +790,14 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp58` — `west_stairs_return_10B` (seq 59)
 
-- **Room:** `10B`
+- **Room:** `101`
 - **Action:** `navigate`
 - **Objective:** Return through West Stairway before the Central Corridor
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10B**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **101**. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `10B`
+- Enter room `101`
 
 ### `cp59` — `central_corridor_103` (seq 60)
 
@@ -1060,25 +1060,25 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp82` — `east_stairs_201_post_richard` (seq 83)
 
-- **Room:** `201`
+- **Room:** `207`
 - **Action:** `navigate`
 - **Objective:** Reach East Stairway 2F after Richard
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **201**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **207**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `201`
+- Enter room `207`
 
 ### `cp83` — `east_stairs_101_post_richard` (seq 84)
 
-- **Room:** `101`
+- **Room:** `10B`
 - **Action:** `navigate`
 - **Objective:** Descend East Stairway after Richard
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **101**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10B**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `101`
+- Enter room `10B`
 
 ### `cp84` — `yawn_box_enter_11B` (seq 85)
 
@@ -1104,25 +1104,25 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp86` — `east_stairs_101_to_yawn` (seq 87)
 
-- **Room:** `101`
+- **Room:** `10B`
 - **Action:** `navigate`
 - **Objective:** Return to East Stairway 1F for Yawn
 - **Required items:** `shield_key`, `shotgun`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **101**. Hold: `shield_key`, `shotgun`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10B**. Hold: `shield_key`, `shotgun`. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `101`
+- Enter room `10B`
 
 ### `cp87` — `east_stairs_201_to_yawn` (seq 88)
 
-- **Room:** `201`
+- **Room:** `207`
 - **Action:** `navigate`
 - **Objective:** Climb East Stairway for Yawn
 - **Required items:** `shield_key`, `shotgun`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **201**. Hold: `shield_key`, `shotgun`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **207**. Hold: `shield_key`, `shotgun`. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
-- Enter room `201`
+- Enter room `207`
 
 ### `cp88` — `c_passage_204_to_yawn` (seq 89)
 
