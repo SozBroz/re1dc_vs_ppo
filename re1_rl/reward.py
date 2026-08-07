@@ -91,8 +91,8 @@ MAIN_HALL_BEFORE_KENNETH_PENALTY = -0.05
 CONTEMPT_BUDGET_SCALED = 0.26666666666666666  # |DEATH|/5
 SOFTLOCK_TIMEOUT_PENALTY = -0.26666666666666666
 
-ENEMY_DAMAGE_REWARD = 0.007
-ENEMY_KILL_REWARD = 0.24
+ENEMY_DAMAGE_REWARD = 0.014
+ENEMY_KILL_REWARD = 2.0
 # Conservative ammo-waste tax.  A full inverse pickup tax (1.0) made scarce
 # weapons too expensive to explore; 0.10 keeps successful damage comfortably
 # more valuable while giving confirmed misses a small, immediate signal.

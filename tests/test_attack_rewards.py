@@ -163,7 +163,7 @@ def test_hit_rewards_unchanged_no_miss_tax() -> None:
 
 
 def test_enemy_kill_reward_is_static() -> None:
-    assert ENEMY_KILL_REWARD == pytest.approx(0.24)
+    assert ENEMY_KILL_REWARD == pytest.approx(2.0)
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
