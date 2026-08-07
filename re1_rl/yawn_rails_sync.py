@@ -270,26 +270,17 @@ def story_progress_allows_overwrite(
 ) -> bool:
     """True if new sidecar does not regress story vs an existing curated cell.
 
-    Blocks high-HP door-threshold captures from clobbering a more progressed
-    story cell: new must retain every old cutscene key, and must not have
-    strictly thinner dwell in the capture room when both have dwell data.
+    Pay-forward installs compare survival quality (``quality_beats``) first.
+    This gate only blocks door-threshold / cutscene-spoof captures: the new
+    sidecar must retain every old observed/rewarded cutscene key. Room dwell
+    is intentionally **not** compared — shorter legs with better ammo/HP win.
     """
+    _ = room_id  # kept for call-site compatibility
     old_keys = _sidecar_story_keys(old_side)
     new_keys = _sidecar_story_keys(new_side)
     missing = old_keys - new_keys
     if missing:
         return False
-    room = str(
-        room_id
-        or new_side.get("captured_room_id")
-        or old_side.get("captured_room_id")
-        or ""
-    )
-    if room:
-        new_dwell = _room_dwell_frames(new_side, room)
-        old_dwell = _room_dwell_frames(old_side, room)
-        if old_dwell > 0 and new_dwell < old_dwell:
-            return False
     return True
 
 
@@ -304,9 +295,10 @@ def try_install_yawn_cell(
 ) -> bool:
     """Compare-and-swap install from ``staged_dir`` into curated ``cpNN``.
 
-    Under the store file lock: reject unless new quality beats the existing cell
-    (same ``quality_beats`` + ``quality_replace_significant`` rules as learner
-    ingest). Returns True when the curated slot was updated.
+    Pay-forward model: completing checkpoint *N* proposes cell cpNN; install
+    when new quality strictly beats the incumbent (``quality_beats`` +
+    ``quality_replace_significant``), and cutscene keys are not regressed.
+    Returns True when the curated slot was updated.
     """
     from re1_rl.go_explore_capture import quality_replace_significant
 
@@ -332,8 +324,7 @@ def try_install_yawn_cell(
                 return False
             if not quality_replace_significant(new_q, old_q):
                 return False
-            # High-HP door-threshold / story-regress captures must not clobber
-            # a more progressed cell (cutscene ledger + room dwell).
+            # Cutscene-spoof captures must not clobber a more progressed cell.
             old_side_p = dest / CELL_SIDECAR_NAME
             if old_side_p.is_file():
                 try:
@@ -350,12 +341,10 @@ def try_install_yawn_cell(
                     new_side, old_side, room_id=room
                 ):
                     print(
-                        f"[yawn_capture] reject story-regress overwrite "
+                        f"[yawn_capture] reject cutscene-regress overwrite "
                         f"cp{idx:02d} room={room} "
                         f"old_keys={len(_sidecar_story_keys(old_side))} "
-                        f"new_keys={len(_sidecar_story_keys(new_side))} "
-                        f"old_dwell={_room_dwell_frames(old_side, room)} "
-                        f"new_dwell={_room_dwell_frames(new_side, room)}",
+                        f"new_keys={len(_sidecar_story_keys(new_side))}",
                         flush=True,
                     )
                     return False
@@ -770,7 +759,7 @@ class YawnRailsCellStore:
                 new_side, old_side, room_id=room
             ):
                 print(
-                    f"[yawn_ingest] reject story-regress overwrite "
+                    f"[yawn_ingest] reject cutscene-regress overwrite "
                     f"cp{idx:02d} room={room}",
                     flush=True,
                 )

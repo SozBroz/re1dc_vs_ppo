@@ -942,6 +942,94 @@ def test_story_progress_allows_overwrite_blocks_cutscene_regression() -> None:
     }
     assert not story_progress_allows_overwrite(thin, old, room_id="105")
     assert story_progress_allows_overwrite(settled, old, room_id="105")
+    # Shorter dwell must not block pay-forward when cutscenes are preserved.
+    fast = {
+        "progress": {"observed_cutscenes": ["104:0:s0", "105:2:s1"]},
+        "captured_room_id": "105",
+        "capture_step": 50,
+        "episode_history": {"room_entries": [["105", 0]]},
+    }
+    assert story_progress_allows_overwrite(fast, old, room_id="105")
+
+
+def test_pay_forward_ammo_beats_despite_shorter_dwell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """cp14-style pay-forward: more ammo at equal HP replaces incumbent."""
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
+    from re1_rl.yawn_rails_sync import (
+        CELL_META_NAME,
+        CELL_SIDECAR_NAME,
+        CELL_STATE_NAME,
+        try_install_yawn_cell,
+        yawn_rails_root,
+    )
+
+    yr = yawn_rails_root(tmp_path)
+    slot = yr / "cells" / "cp15"
+    slot.mkdir(parents=True)
+    (slot / CELL_STATE_NAME).write_bytes(b"OLD15")
+    (slot / CELL_SIDECAR_NAME).write_text(
+        json.dumps(
+            {
+                "progress": {
+                    "observed_cutscenes": ["104:0:s0", "105:2:s1", "105:2:s0"]
+                },
+                "captured_room_id": "105",
+                "capture_step": 1721,
+                "episode_history": {"room_entries": [["105", 0], ["105", 1419]]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (yr / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "archive_version": 1,
+                "cells": [
+                    {
+                        "checkpoint_index": 15,
+                        "checkpoint_id": "shield_key_105",
+                        "quality": [96, 15, 1, 8, 1, 0],
+                        "state_path": "states/yawn_rails/cells/cp15/cell.State",
+                        "sidecar_path": (
+                            "states/yawn_rails/cells/cp15/cell.sidecar.json"
+                        ),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    staged = yr / ".staging" / "cp15_better_ammo"
+    staged.mkdir(parents=True)
+    (staged / CELL_STATE_NAME).write_bytes(b"NEW15")
+    (staged / CELL_SIDECAR_NAME).write_text(
+        json.dumps(
+            {
+                "progress": {
+                    "observed_cutscenes": ["104:0:s0", "105:2:s1", "105:2:s0"]
+                },
+                "captured_room_id": "105",
+                "capture_step": 80,
+                "episode_history": {"room_entries": [["105", 0]]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert try_install_yawn_cell(
+        tmp_path,
+        checkpoint_index=15,
+        staged_dir=staged,
+        quality=[96, 30, 1, 8, 1, 0],
+        row={"checkpoint_id": "shield_key_105", "room_id": "105"},
+    )
+    assert (slot / CELL_STATE_NAME).read_bytes() == b"NEW15"
+    man = json.loads((yr / "manifest.json").read_text(encoding="utf-8"))
+    cp15 = next(c for c in man["cells"] if c["checkpoint_index"] == 15)
+    assert cp15["quality"][:2] == [96, 30]
 
 
 def test_local_cas_rejects_story_regress_despite_better_hp(

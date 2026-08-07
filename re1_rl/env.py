@@ -1448,6 +1448,12 @@ class RE1Env(gym.Env):
                 apply_episode_sidecar(self, sidecar, reset_softlock=True)
                 state = self._read_state(track_items=True)
                 self._seed_episode_hp(state)
+                # Yawn pay-forward: each one-leg episode gets fresh dwell
+                # history; do not carry captured room_entries forward.
+                if str(pb_bundle.get("source") or "") == "yawn_rails":
+                    self._episode_history.reset(
+                        str(state.get("room_id", "") or ""), step=0
+                    )
                 rooms = sorted(self._progress.visited_rooms)
                 print(
                     f"[pb] reset applied sidecar visited={rooms} "
