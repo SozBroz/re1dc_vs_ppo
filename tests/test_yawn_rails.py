@@ -198,6 +198,10 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     assert '"lacks_item"' in place_gold_cond
     assert '"item": "gold_emblem"' in place_gold_cond
     crest = next(cp for cp in route if cp["checkpoint_id"] == "crest_gate_11A")
+    crest_cond = json.dumps(crest["success_condition"])
+    for item in ("star_crest", "sun_crest", "moon_crest", "wind_crest"):
+        assert f'"item": "{item}"' in crest_cond
+    assert '"any_of"' in crest_cond
     post_crest = next(
         cp for cp in route if cp["checkpoint_id"] == "back_passage_post_crest_10A"
     )

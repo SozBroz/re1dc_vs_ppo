@@ -702,15 +702,35 @@
     "seq": 39,
     "checkpoint_id": "crest_gate_11A",
     "room_id": "11A",
-    "objective": "Place the star crest at the courtyard gate",
+    "objective": "Place a crest at the courtyard gate (any slot)",
     "action_type": "use_item",
     "required_items": [
       "star_crest"
     ],
     "items_gained": [],
+    "consume_before_gain": [
+      "star_crest"
+    ],
     "success_condition": {
-      "type": "lacks_item",
-      "item": "star_crest"
+      "type": "any_of",
+      "conditions": [
+        {
+          "type": "lacks_item",
+          "item": "star_crest"
+        },
+        {
+          "type": "lacks_item",
+          "item": "sun_crest"
+        },
+        {
+          "type": "lacks_item",
+          "item": "moon_crest"
+        },
+        {
+          "type": "lacks_item",
+          "item": "wind_crest"
+        }
+      ]
     }
   },
   {

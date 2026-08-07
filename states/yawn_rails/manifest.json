@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "archive_version": 245,
+  "archive_version": 254,
   "route_id": "yawn_quest_v2",
   "cells": [
     {
@@ -614,8 +614,8 @@
       "state_path": "states/yawn_rails/cells/cp27/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp27/cell.sidecar.json",
       "inventory_free_slots": 4,
-      "next_checkpoint_id": "gallery_portrait_1_117",
-      "next_slots_needed": 0,
+      "next_checkpoint_id": "star_crest_117",
+      "next_slots_needed": 1,
       "inventory_feasible": true,
       "captured_in_box_room": false
     },
@@ -746,16 +746,126 @@
       "state_path": "states/yawn_rails/cells/cp33/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp33/cell.sidecar.json",
       "inventory_free_slots": 4,
-      "next_checkpoint_id": "gallery_complete_117",
+      "next_checkpoint_id": "star_crest_117",
       "next_slots_needed": 1,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 34,
+      "checkpoint_id": "gallery_complete_117",
+      "room_id": "117",
+      "quality": [
+        48,
+        63,
+        0,
+        12,
+        1,
+        0
+      ],
+      "bundle_sha256": "01a49fccf090cc7584ceaa62f62a0a5e0ecbae35a2a2036e4248b72196da92c5",
+      "bytes": 1442277,
+      "state_path": "states/yawn_rails/cells/cp34/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp34/cell.sidecar.json",
+      "inventory_free_slots": 3,
+      "next_checkpoint_id": "star_crest_117",
+      "next_slots_needed": 1,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 35,
+      "checkpoint_id": "star_crest_117",
+      "room_id": "117",
+      "quality": [
+        48,
+        63,
+        0,
+        12,
+        1,
+        0
+      ],
+      "bundle_sha256": "330109e6f63901fe97f591b0215d32bcd3cdc564d5fb8ac977f38593dc8b8a12",
+      "bytes": 1446278,
+      "state_path": "states/yawn_rails/cells/cp35/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp35/cell.sidecar.json",
+      "inventory_free_slots": 3,
+      "next_checkpoint_id": "back_passage_return_10A",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 36,
+      "checkpoint_id": "back_passage_return_10A",
+      "room_id": "10A",
+      "quality": [
+        48,
+        63,
+        0,
+        12,
+        1,
+        0
+      ],
+      "bundle_sha256": "db03d28bde5e7d2808194519531cbf86bd194c2dc9ff9af8650237632937bfd0",
+      "bytes": 1504667,
+      "state_path": "states/yawn_rails/cells/cp36/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp36/cell.sidecar.json",
+      "inventory_free_slots": 3,
+      "next_checkpoint_id": "courtyard_enter_11A",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 37,
+      "checkpoint_id": "courtyard_enter_11A",
+      "room_id": "11A",
+      "quality": [
+        48,
+        63,
+        0,
+        12,
+        1,
+        0
+      ],
+      "bundle_sha256": "468531d18347ea45b1d59002cc12142f95a61c7ee4b14dc99a417e69c463e701",
+      "bytes": 1509428,
+      "state_path": "states/yawn_rails/cells/cp37/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp37/cell.sidecar.json",
+      "inventory_free_slots": 3,
+      "next_checkpoint_id": "crest_gate_11A",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 38,
+      "checkpoint_id": "crest_gate_11A",
+      "room_id": "11A",
+      "quality": [
+        48,
+        59,
+        0,
+        12,
+        1,
+        0
+      ],
+      "bundle_sha256": "ce35c0c592ac5196a9f6972c34a1d5fbed045eeb6debbfeb90eeb6ec59cc4e17",
+      "bytes": 1561626,
+      "state_path": "states/yawn_rails/cells/cp38/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp38/cell.sidecar.json",
+      "inventory_free_slots": 3,
+      "next_checkpoint_id": "back_passage_post_crest_10A",
+      "next_slots_needed": 0,
       "inventory_feasible": true,
       "captured_in_box_room": false
     }
   ],
   "cache_stats": {
-    "manifest_cells": 34,
-    "fetched_last_poll": 0,
+    "manifest_cells": 39,
+    "fetched_last_poll": 39,
     "pruned_dirs_last_poll": 0,
-    "remote_cell_count": 34
+    "remote_cell_count": 39
   }
 }

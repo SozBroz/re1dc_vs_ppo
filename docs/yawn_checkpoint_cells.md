@@ -46,7 +46,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp35` | 36 | `star_crest_117` | `117` | pickup | Take the star crest after completing the gallery puzzle |
 | `cp36` | 37 | `back_passage_return_10A` | `10A` | navigate | Return to the Back Passage with the star crest |
 | `cp37` | 38 | `courtyard_enter_11A` | `11A` | navigate | Enter the courtyard crest gate |
-| `cp38` | 39 | `crest_gate_11A` | `11A` | use_item | Place the star crest at the courtyard gate |
+| `cp38` | 39 | `crest_gate_11A` | `11A` | use_item | Place a crest at the courtyard gate (any slot) |
 | `cp39` | 40 | `back_passage_post_crest_10A` | `10A` | navigate | Return through the Back Passage after opening the courtyard gate |
 | `cp40` | 41 | `east_stairs_101` | `101` | navigate | Reach East Stairway 1F |
 | `cp41` | 42 | `storeroom_enter_11B` | `11B` | navigate | Enter the mansion storeroom |
@@ -560,12 +560,16 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `11A`
 - **Action:** `use_item`
-- **Objective:** Place the star crest at the courtyard gate
+- **Objective:** Place a crest at the courtyard gate (any slot)
 - **Required items:** `star_crest`
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **11A**. Hold: `star_crest`. Perform the story USE (inventory USE at the site).
 - **Success condition:**
-- No longer holding `star_crest`
+- **any of:**
+  - No longer holding `star_crest`
+  - No longer holding `sun_crest`
+  - No longer holding `moon_crest`
+  - No longer holding `wind_crest`
 
 ### `cp39` — `back_passage_post_crest_10A` (seq 40)
 

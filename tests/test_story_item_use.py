@@ -72,6 +72,52 @@ def test_load_music_notes_piano_site() -> None:
     assert piano["h"] == 1700
 
 
+STAR_CREST_ID = 0x2D
+CREST_GATE_X = 7240
+CREST_GATE_Z = 26824
+
+
+def test_load_courtyard_crest_sites_not_draft() -> None:
+    load_story_use_sites.cache_clear()
+    sites = load_story_use_sites()
+    crest_ids = {
+        "star_crest@11A_crest_slot",
+        "sun_crest@11A_crest_slot",
+        "moon_crest@11A_crest_slot",
+        "wind_crest@11A_crest_slot",
+    }
+    crest_sites = [s for s in sites if s["id"] in crest_ids]
+    assert len(crest_sites) == 4
+    for site in crest_sites:
+        assert site["room"] == "11A"
+        assert not site.get("_draft")
+        assert site["x"] == 7000
+        assert site["z"] == 26500
+
+
+def test_story_use_legal_at_courtyard_crest_gate() -> None:
+    load_story_use_sites.cache_clear()
+    inv = _inv((STAR_CREST_ID, 0))
+    assert any_legal_story_use_slot(
+        inv,
+        room="11A",
+        x=CREST_GATE_X,
+        z=CREST_GATE_Z,
+        rewarded_site_ids=set(),
+    )
+    slots = legal_story_use_slots(
+        inv,
+        room="11A",
+        x=CREST_GATE_X,
+        z=CREST_GATE_Z,
+        rewarded_site_ids=set(),
+    )
+    assert slots == [0]
+    assert not any_legal_story_use_slot(
+        inv, room="11A", x=4500, z=4100, rewarded_site_ids=set()
+    )
+
+
 def test_load_chemical_greenhouse_pump_site() -> None:
     load_story_use_sites.cache_clear()
     sites = load_story_use_sites()

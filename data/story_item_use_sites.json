@@ -83,33 +83,49 @@
       "id": "sun_crest@11A_crest_slot",
       "item": "sun_crest",
       "room": "11A",
-      "_draft": true,
+      "x": 7000,
+      "z": 26500,
+      "w": 2500,
+      "h": 2500,
+      "pad": 500,
       "consumes": true,
-      "notes": "BEST-EFFORT: Roofed passage — place sun crest on courtyard door puzzle (route_jill_anypct seq 20; item_affordances pickup 205)"
+      "notes": "Courtyard crest gate — RDT triggers 7500/27700; empirical QuickSave0 stand 7240/26824. Puzzle accepts any crest in any slot."
     },
     {
       "id": "moon_crest@11A_crest_slot",
       "item": "moon_crest",
       "room": "11A",
-      "_draft": true,
+      "x": 7000,
+      "z": 26500,
+      "w": 2500,
+      "h": 2500,
+      "pad": 500,
       "consumes": true,
-      "notes": "BEST-EFFORT: Roofed passage — place moon crest on courtyard door puzzle (route_jill_anypct seq 20; item_affordances pickup 210)"
+      "notes": "Courtyard crest gate — shared stand zone with star/sun/wind (QuickSave0 7240/26824)."
     },
     {
       "id": "star_crest@11A_crest_slot",
       "item": "star_crest",
       "room": "11A",
-      "_draft": true,
+      "x": 7000,
+      "z": 26500,
+      "w": 2500,
+      "h": 2500,
+      "pad": 500,
       "consumes": true,
-      "notes": "BEST-EFFORT: Roofed passage — place star crest on courtyard door puzzle (route_jill_anypct seq 20; item_affordances pickup 117)"
+      "notes": "Courtyard crest gate — Jill yawn route first crest; QuickSave0 stand 7240/26824."
     },
     {
       "id": "wind_crest@11A_crest_slot",
       "item": "wind_crest",
       "room": "11A",
-      "_draft": true,
+      "x": 7000,
+      "z": 26500,
+      "w": 2500,
+      "h": 2500,
+      "pad": 500,
       "consumes": true,
-      "notes": "BEST-EFFORT: Roofed passage — place wind crest on courtyard door puzzle (route_jill_anypct seq 20; pickup 10D after blue_jewel)"
+      "notes": "Courtyard crest gate — shared stand zone (RDT triggers 7500/27700)."
     },
     {
       "id": "v_jolt@40E_water_tank",
