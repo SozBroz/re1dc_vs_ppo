@@ -10,7 +10,7 @@ import torch
 from torch import nn
 
 import re1_rl.loadout_learning as loadout_learning
-from re1_rl.action_mask import DEPOSIT_ACTION_BASE, WITHDRAW_ACTION_BASE
+from re1_rl.action_mask import DEPOSIT_ACTION_BASE, WITHDRAW_ACTION_BASE, action_mask
 from re1_rl.loadout_learning import (
     LOADOUT_FEATURE_DIM,
     LOADOUT_TRANSFER_BOUND,
@@ -143,8 +143,14 @@ def test_feasibility_guard_keeps_required_items_and_pickup_headroom() -> None:
         (0, 0),
     ]
     box = [(0x44, 1)] + [(0, 0)] * 15
-    mask = np.ones(45, dtype=np.bool_)
+    mask = action_mask(
+        45,
+        None,
+        inventory=inventory,
+        box=box,
+        in_box_room=True,
+    )
     apply_logistics_feasibility_mask(mask, inventory, box, _planner(start_index=47))
-    assert not mask[DEPOSIT_ACTION_BASE]  # cannot omit sole required shield key
-    assert not mask[DEPOSIT_ACTION_BASE + 1]  # cannot omit sole required shotgun
+    assert not mask[DEPOSIT_ACTION_BASE]  # deposits never policy-legal
+    assert not mask[DEPOSIT_ACTION_BASE + 1]
     assert not mask[WITHDRAW_ACTION_BASE]  # preserve two declared pickup slots

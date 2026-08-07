@@ -67,8 +67,6 @@ def apply_logistics_feasibility_mask(
 ) -> Any:
     """Mask only route-feasibility violations; never prescribe combat supplies."""
     from re1_rl.action_mask import (
-        DEPOSIT_ACTION_BASE,
-        N_DEPOSIT_ACTIONS,
         N_WITHDRAW_ACTIONS,
         WITHDRAW_ACTION_BASE,
     )
@@ -85,26 +83,6 @@ def apply_logistics_feasibility_mask(
             break
         if offset > 0 and is_box_room(str(room)):
             break
-    required_ids = {
-        _ITEM_NAME_TO_ID[name]
-        for row in rows
-        for item in row.get("required_items", [])
-        if (name := canonical_item(str(item))) in _ITEM_NAME_TO_ID
-    }
-    carried_counts: dict[int, int] = {}
-    for item_id, _qty in inventory:
-        if item_id:
-            carried_counts[int(item_id)] = carried_counts.get(int(item_id), 0) + 1
-    for slot in range(min(N_DEPOSIT_ACTIONS, len(inventory))):
-        action = DEPOSIT_ACTION_BASE + slot
-        item_id = int(inventory[slot][0])
-        if (
-            action < len(mask)
-            and item_id in required_ids
-            and carried_counts.get(item_id, 0) <= 1
-        ):
-            mask[action] = False
-
     pressure = peak = 0
     for row in rows:
         pressure -= len(row.get("consume_before_gain", []))

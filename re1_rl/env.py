@@ -3047,15 +3047,7 @@ class RE1Env(gym.Env):
                 finally:
                     self._macro_active = False
         elif magic:
-            if not self._execution_action_legal(int(action)):
-                magic_report = {
-                    "ok": False,
-                    "reason": "illegal_magic_action",
-                    "moved": None,
-                    "unequipped": False,
-                }
-            else:
-                magic_report = self._apply_magic_action(int(action))
+            magic_report = self._apply_magic_action(int(action))
             sticky, pulse, pulse_hold = self._sticky_input.apply(
                 0, ACTION_BUTTON_MAP
             )

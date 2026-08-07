@@ -6,7 +6,7 @@ Action layout (env.ACTION_NAMES):
   9     interact
   10    use                — open USE menu; then select_slot_N (2-step)
   11    equip              — open EQUIP menu; then select_slot_N (2-step)
-  12-19 deposit_slot_N
+  12-19 deposit_slot_N   — never legal via mask (withdraw-only box policy)
   20-35 withdraw_box_N
   36    combine            — open COMBINE menu; select_slot x2 (3-step)
   37-44 select_slot_N      — shared slot pick (use / equip / combine)
@@ -287,14 +287,14 @@ def action_mask(
             )
 
     if not in_submenu:
+        # Box policy: withdraw only in box rooms; deposits never legal via mask.
+        for i in range(N_DEPOSIT_ACTIONS):
+            idx = DEPOSIT_ACTION_BASE + i
+            if idx < n_actions:
+                mask[idx] = False
         if inventory is not None and box is not None:
-            from re1_rl.item_box import can_deposit, can_withdraw
+            from re1_rl.item_box import can_withdraw
 
-            for i in range(N_DEPOSIT_ACTIONS):
-                idx = DEPOSIT_ACTION_BASE + i
-                if idx < n_actions:
-                    ok, _ = can_deposit(inventory, box, i)
-                    mask[idx] = in_box_room and ok
             for i in range(N_WITHDRAW_ACTIONS):
                 idx = WITHDRAW_ACTION_BASE + i
                 if idx < n_actions:
@@ -302,7 +302,7 @@ def action_mask(
                     mask[idx] = in_box_room and ok
         elif not in_box_room:
             for idx in range(
-                DEPOSIT_ACTION_BASE, WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS
+                WITHDRAW_ACTION_BASE, WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS
             ):
                 if idx < n_actions:
                     mask[idx] = False
