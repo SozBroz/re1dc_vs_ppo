@@ -162,11 +162,11 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
             f"{cp['checkpoint_id']} still bundles enter with {extras}"
         )
     assert [(cp["room_id"], cp["checkpoint_id"]) for cp in route[-10:]] == [
-        ("101", "east_stairs_101_post_richard"),
         ("11B", "yawn_box_enter_11B"),
         ("11B", "yawn_box_prep_11B"),
         ("101", "east_stairs_101_to_yawn"),
         ("201", "east_stairs_201_to_yawn"),
+        ("204", "c_passage_204_to_yawn"),
         ("20D", "moon_hall_enter_20D"),
         ("20D", "ammo_20D"),
         ("20E", "attic_entry_20E"),
@@ -197,6 +197,64 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     assert "gold_emblem@105_fireplace" in place_gold_cond
     assert '"lacks_item"' in place_gold_cond
     assert '"item": "gold_emblem"' in place_gold_cond
+    crest = next(cp for cp in route if cp["checkpoint_id"] == "crest_gate_11A")
+    post_crest = next(
+        cp for cp in route if cp["checkpoint_id"] == "back_passage_post_crest_10A"
+    )
+    east = next(cp for cp in route if cp["checkpoint_id"] == "east_stairs_101")
+    assert crest["seq"] + 1 == post_crest["seq"]
+    assert post_crest["seq"] + 1 == east["seq"]
+    assert post_crest["room_id"] == "10A"
+    chemical = next(cp for cp in route if cp["checkpoint_id"] == "chemical_11B")
+    stairs_101_post = next(
+        cp for cp in route if cp["checkpoint_id"] == "east_stairs_101_post_storeroom"
+    )
+    stairs_201 = next(cp for cp in route if cp["checkpoint_id"] == "east_stairs_201")
+    assert chemical["seq"] + 1 == stairs_101_post["seq"]
+    assert stairs_101_post["seq"] + 1 == stairs_201["seq"]
+    bazooka = next(cp for cp in route if cp["checkpoint_id"] == "bazooka_212")
+    terrace_ret = next(cp for cp in route if cp["checkpoint_id"] == "terrace_return_211")
+    upper_ret = next(cp for cp in route if cp["checkpoint_id"] == "upper_hall_203_post_terrace")
+    dining_2f = next(cp for cp in route if cp["checkpoint_id"] == "dining_2f_enter_202")
+    assert bazooka["seq"] + 1 == terrace_ret["seq"]
+    assert terrace_ret["seq"] + 1 == upper_ret["seq"]
+    assert upper_ret["seq"] + 1 == dining_2f["seq"]
+    save_100 = next(cp for cp in route if cp["checkpoint_id"] == "save_100")
+    west_ret = next(cp for cp in route if cp["checkpoint_id"] == "west_stairs_return_10B")
+    corridor = next(cp for cp in route if cp["checkpoint_id"] == "central_corridor_103")
+    assert save_100["seq"] + 1 == west_ret["seq"]
+    assert west_ret["seq"] + 1 == corridor["seq"]
+    armor = next(cp for cp in route if cp["checkpoint_id"] == "armor_key_10C")
+    corridor_post = next(
+        cp for cp in route if cp["checkpoint_id"] == "central_corridor_post_armor_103"
+    )
+    plant = next(cp for cp in route if cp["checkpoint_id"] == "plant_42_enter_10E")
+    assert armor["seq"] + 1 == corridor_post["seq"]
+    assert corridor_post["seq"] + 1 == plant["seq"]
+    ammo_10e = next(cp for cp in route if cp["checkpoint_id"] == "ammo_10E")
+    corridor_10e = next(
+        cp for cp in route if cp["checkpoint_id"] == "central_corridor_post_10E_103"
+    )
+    tea_10e = next(cp for cp in route if cp["checkpoint_id"] == "tea_transit_104_post_10E")
+    dining_jewel = next(cp for cp in route if cp["checkpoint_id"] == "dining_enter_105_jewel")
+    assert ammo_10e["seq"] + 1 == corridor_10e["seq"]
+    assert corridor_10e["seq"] + 1 == tea_10e["seq"]
+    assert tea_10e["seq"] + 1 == dining_jewel["seq"]
+    blue_jewel = next(cp for cp in route if cp["checkpoint_id"] == "blue_jewel_105")
+    tea_jewel = next(cp for cp in route if cp["checkpoint_id"] == "tea_return_104_post_jewel")
+    corridor_jewel = next(
+        cp for cp in route if cp["checkpoint_id"] == "central_corridor_post_jewel_103"
+    )
+    forest = next(cp for cp in route if cp["checkpoint_id"] == "forest_enter_10D")
+    assert blue_jewel["seq"] + 1 == tea_jewel["seq"]
+    assert tea_jewel["seq"] + 1 == corridor_jewel["seq"]
+    assert corridor_jewel["seq"] + 1 == forest["seq"]
+    stairs_201_yawn = next(cp for cp in route if cp["checkpoint_id"] == "east_stairs_201_to_yawn")
+    cpass_yawn = next(cp for cp in route if cp["checkpoint_id"] == "c_passage_204_to_yawn")
+    moon = next(cp for cp in route if cp["checkpoint_id"] == "moon_hall_enter_20D")
+    assert stairs_201_yawn["seq"] + 1 == cpass_yawn["seq"]
+    assert cpass_yawn["seq"] + 1 == moon["seq"]
+    assert curriculum["route_steps"][-1] == len(route)
     for checkpoint in route:
         condition_text = json.dumps(checkpoint["success_condition"])
         for item in checkpoint["items_gained"]:
