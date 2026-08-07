@@ -503,6 +503,21 @@ def capture_successor_cell(
     if not capacity["inventory_feasible"]:
         return None
 
+    inv_names = {
+        canonical_item(str(x))
+        for x in (state.get("inventory") or [])
+        if str(x).strip()
+    }
+    for item in completed_cp.get("consume_before_gain") or []:
+        name = canonical_item(str(item))
+        if name and name in inv_names:
+            print(
+                f"[yawn_capture] reject consume_before_gain still held "
+                f"item={name!r} cp={cid}",
+                flush=True,
+            )
+            return None
+
     from re1_rl.go_explore_capture import compute_quality
     from re1_rl.yawn_rails_sync import (
         CELL_META_NAME,

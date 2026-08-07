@@ -75,6 +75,9 @@ def test_load_music_notes_piano_site() -> None:
 STAR_CREST_ID = 0x2D
 CREST_GATE_X = 7240
 CREST_GATE_Z = 26824
+CREST_SITE_X = 7500
+CREST_SITE_Z = 27700
+CREST_SITE_RADIUS = 1500
 
 
 def test_load_courtyard_crest_sites_not_draft() -> None:
@@ -91,8 +94,10 @@ def test_load_courtyard_crest_sites_not_draft() -> None:
     for site in crest_sites:
         assert site["room"] == "11A"
         assert not site.get("_draft")
-        assert site["x"] == 7000
-        assert site["z"] == 26500
+        assert site["x"] == CREST_SITE_X
+        assert site["z"] == CREST_SITE_Z
+        assert site.get("radius") == CREST_SITE_RADIUS
+        assert "w" not in site
 
 
 def test_story_use_legal_at_courtyard_crest_gate() -> None:
@@ -113,6 +118,21 @@ def test_story_use_legal_at_courtyard_crest_gate() -> None:
         rewarded_site_ids=set(),
     )
     assert slots == [0]
+    # Edge of generous disc (same radius as chemical / jewel sites).
+    assert any_legal_story_use_slot(
+        inv,
+        room="11A",
+        x=CREST_SITE_X + CREST_SITE_RADIUS - 100,
+        z=CREST_SITE_Z,
+        rewarded_site_ids=set(),
+    )
+    assert not any_legal_story_use_slot(
+        inv,
+        room="11A",
+        x=CREST_SITE_X + CREST_SITE_RADIUS + 100,
+        z=CREST_SITE_Z,
+        rewarded_site_ids=set(),
+    )
     assert not any_legal_story_use_slot(
         inv, room="11A", x=4500, z=4100, rewarded_site_ids=set()
     )

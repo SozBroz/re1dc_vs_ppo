@@ -715,20 +715,56 @@
       "type": "any_of",
       "conditions": [
         {
-          "type": "lacks_item",
-          "item": "star_crest"
+          "type": "all_of",
+          "conditions": [
+            {
+              "type": "story_use",
+              "site_id": "star_crest@11A_crest_slot"
+            },
+            {
+              "type": "lacks_item",
+              "item": "star_crest"
+            }
+          ]
         },
         {
-          "type": "lacks_item",
-          "item": "sun_crest"
+          "type": "all_of",
+          "conditions": [
+            {
+              "type": "story_use",
+              "site_id": "sun_crest@11A_crest_slot"
+            },
+            {
+              "type": "lacks_item",
+              "item": "sun_crest"
+            }
+          ]
         },
         {
-          "type": "lacks_item",
-          "item": "moon_crest"
+          "type": "all_of",
+          "conditions": [
+            {
+              "type": "story_use",
+              "site_id": "moon_crest@11A_crest_slot"
+            },
+            {
+              "type": "lacks_item",
+              "item": "moon_crest"
+            }
+          ]
         },
         {
-          "type": "lacks_item",
-          "item": "wind_crest"
+          "type": "all_of",
+          "conditions": [
+            {
+              "type": "story_use",
+              "site_id": "wind_crest@11A_crest_slot"
+            },
+            {
+              "type": "lacks_item",
+              "item": "wind_crest"
+            }
+          ]
         }
       ]
     }

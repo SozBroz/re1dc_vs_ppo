@@ -201,7 +201,9 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     crest_cond = json.dumps(crest["success_condition"])
     for item in ("star_crest", "sun_crest", "moon_crest", "wind_crest"):
         assert f'"item": "{item}"' in crest_cond
+        assert f"{item}@11A_crest_slot" in crest_cond
     assert '"any_of"' in crest_cond
+    assert crest_cond.count('"story_use"') == 4
     post_crest = next(
         cp for cp in route if cp["checkpoint_id"] == "back_passage_post_crest_10A"
     )
@@ -393,6 +395,31 @@ def test_barry_hall_return_does_not_latch_wrong_from_room() -> None:
         progress=progress,
         prev_state=_state("106"),
     )
+
+
+def test_crest_gate_requires_story_use_not_unheld_crest_lacks() -> None:
+    """Sun/moon/wind lacks_item alone must not complete crest_gate while star is held."""
+    planner = _planner(start_index=_idx("crest_gate_11A"))
+    progress = ProgressTracker()
+    progress.key_items_rewarded.add("star_crest")
+    holding = _state(
+        "11A",
+        inventory=[
+            "knife",
+            "beretta",
+            "shield_key",
+            "shotgun",
+            "star_crest",
+        ],
+    )
+    assert not planner.advance_if_success(holding, progress=progress)
+
+    placed = _state(
+        "11A",
+        inventory=["knife", "beretta", "shield_key", "shotgun"],
+    )
+    progress.rewarded_story_uses.add("star_crest@11A_crest_slot")
+    assert planner.advance_if_success(placed, progress=progress)
 
 
 def test_kenneth_requires_cutscene_and_in_control_settle() -> None:

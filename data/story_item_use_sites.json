@@ -83,49 +83,41 @@
       "id": "sun_crest@11A_crest_slot",
       "item": "sun_crest",
       "room": "11A",
-      "x": 7000,
-      "z": 26500,
-      "w": 2500,
-      "h": 2500,
-      "pad": 500,
+      "x": 7500,
+      "z": 27700,
+      "radius": 1500,
       "consumes": true,
-      "notes": "Courtyard crest gate — RDT triggers 7500/27700; empirical QuickSave0 stand 7240/26824. Puzzle accepts any crest in any slot."
+      "notes": "Courtyard crest gate — RDT trigger 7500/27700; radius 1500 matches chemical/jewel USE sites. QuickSave0 stand 7240/26824 inside."
     },
     {
       "id": "moon_crest@11A_crest_slot",
       "item": "moon_crest",
       "room": "11A",
-      "x": 7000,
-      "z": 26500,
-      "w": 2500,
-      "h": 2500,
-      "pad": 500,
+      "x": 7500,
+      "z": 27700,
+      "radius": 1500,
       "consumes": true,
-      "notes": "Courtyard crest gate — shared stand zone with star/sun/wind (QuickSave0 7240/26824)."
+      "notes": "Courtyard crest gate — shared stand disc with star/sun/wind (QuickSave0 7240/26824)."
     },
     {
       "id": "star_crest@11A_crest_slot",
       "item": "star_crest",
       "room": "11A",
-      "x": 7000,
-      "z": 26500,
-      "w": 2500,
-      "h": 2500,
-      "pad": 500,
+      "x": 7500,
+      "z": 27700,
+      "radius": 1500,
       "consumes": true,
-      "notes": "Courtyard crest gate — Jill yawn route first crest; QuickSave0 stand 7240/26824."
+      "notes": "Courtyard crest gate — Jill yawn route first crest; radius 1500 like other story USE sites."
     },
     {
       "id": "wind_crest@11A_crest_slot",
       "item": "wind_crest",
       "room": "11A",
-      "x": 7000,
-      "z": 26500,
-      "w": 2500,
-      "h": 2500,
-      "pad": 500,
+      "x": 7500,
+      "z": 27700,
+      "radius": 1500,
       "consumes": true,
-      "notes": "Courtyard crest gate — shared stand zone (RDT triggers 7500/27700)."
+      "notes": "Courtyard crest gate — shared stand disc (RDT triggers 7500/27700)."
     },
     {
       "id": "v_jolt@40E_water_tank",

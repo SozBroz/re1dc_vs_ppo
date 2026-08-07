@@ -566,10 +566,18 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **How to achieve:** Be in / reach **11A**. Hold: `star_crest`. Perform the story USE (inventory USE at the site).
 - **Success condition:**
 - **any of:**
-  - No longer holding `star_crest`
-  - No longer holding `sun_crest`
-  - No longer holding `moon_crest`
-  - No longer holding `wind_crest`
+  - **all of:**
+    - Story USE at `star_crest@11A_crest_slot`
+    - No longer holding `star_crest`
+  - **all of:**
+    - Story USE at `sun_crest@11A_crest_slot`
+    - No longer holding `sun_crest`
+  - **all of:**
+    - Story USE at `moon_crest@11A_crest_slot`
+    - No longer holding `moon_crest`
+  - **all of:**
+    - Story USE at `wind_crest@11A_crest_slot`
+    - No longer holding `wind_crest`
 
 ### `cp39` — `back_passage_post_crest_10A` (seq 40)
 
