@@ -97,7 +97,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "desk drawer with lockpick"
+        "notes": "desk drawer with lockpick",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked desk in vacant room"
+        }
       },
       {
         "name": "broken_shotgun",
@@ -143,7 +150,14 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "behind grandfather clock after gold emblem"
+        "notes": "behind grandfather clock after gold emblem",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "gold_emblem"
+          ],
+          "notes": "Grandfather clock slides after gold emblem placed on fireplace"
+        }
       }
     ]
   },
@@ -156,7 +170,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "Barry after first zombie"
+        "notes": "Barry after first zombie",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry gives lockpick after first zombie encounter in tea room"
+        }
       },
       {
         "name": "ink_ribbon",
@@ -180,7 +199,12 @@
         "count": 6,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "Barry gives if inventory space (2F return)"
+        "notes": "Barry gives if inventory space (2F return)",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry hands acid rounds on 2F hall return if inventory has space"
+        }
       }
     ]
   },
@@ -193,7 +217,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": false,
-        "notes": "on statue after pushing ladder"
+        "notes": "on statue after pushing ladder",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Push ladder behind statue and climb to bowl on statue head"
+        }
       },
       {
         "name": "ink_ribbon",
@@ -201,7 +230,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "behind movable drawers"
+        "notes": "behind movable drawers",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Push movable drawers aside in gallery side corridor"
+        }
       }
     ]
   },
@@ -257,7 +291,14 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "after chemical on plant; on crest"
+        "notes": "after chemical on plant; on crest",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "chemical"
+          ],
+          "notes": "Pour chemical into greenhouse pump to kill vines on crest"
+        }
       },
       {
         "name": "green_herb",
@@ -286,7 +327,14 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "blue jewel on tiger eye"
+        "notes": "blue jewel on tiger eye",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "blue_jewel"
+          ],
+          "notes": "Insert blue jewel in tiger eye; statue slides to reveal crest"
+        }
       },
       {
         "name": "colt_python",
@@ -294,7 +342,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "red jewel alcove behind tiger statue"
+        "notes": "red jewel alcove behind tiger statue",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "red_jewel"
+          ],
+          "notes": "Insert red jewel in tiger eye; alcove reveals Colt Python"
+        }
       }
     ]
   },
@@ -336,7 +391,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "behind movable bookcase"
+        "notes": "behind movable bookcase",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Push bookcase aside to reach shelf behind piano"
+        }
       },
       {
         "name": "gold_emblem",
@@ -344,7 +404,15 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "secret room after piano"
+        "notes": "secret room after piano",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "music_notes",
+            "emblem"
+          ],
+          "notes": "Play piano with music notes; swap wooden emblem for gold in secret alcove"
+        }
       }
     ]
   },
@@ -369,7 +437,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "locked desk"
+        "notes": "locked desk",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked desk in dressing room"
+        }
       }
     ]
   },
@@ -424,7 +499,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "wall rack; ceiling trap in adjacent 115"
+        "notes": "wall rack; ceiling trap in adjacent 115",
+        "gate": {
+          "type": "trap",
+          "requires": [],
+          "notes": "Same wall rack as trap room; taking triggers ceiling trap (Jill: Barry rescue)"
+        }
       }
     ]
   },
@@ -437,7 +517,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "crow painting puzzle"
+        "notes": "crow painting puzzle",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Crow painting buttons in life-cycle order (large gallery)"
+        }
       }
     ]
   },
@@ -458,7 +543,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "Barry after Plant 42 (1x7 rounds)"
+        "notes": "Barry after Plant 42 (1x7 rounds)",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry drops after Plant 42 defeat (1x7 shells)"
+        }
       },
       {
         "name": "first_aid_spray_alt",
@@ -466,7 +556,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "Barry after Plant 42"
+        "notes": "Barry after Plant 42",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry drops after Plant 42 defeat"
+        }
       },
       {
         "name": "acid_rounds",
@@ -474,7 +569,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "Barry after Plant 42 (1x6)"
+        "notes": "Barry after Plant 42 (1x6)",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry drops after Plant 42 defeat (1x6)"
+        }
       }
     ]
   },
@@ -487,7 +587,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "bookshelf next to door; switch on lamp first (contains eagle_medal)"
+        "notes": "bookshelf next to door; switch on lamp first (contains eagle_medal)",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Flip wall switch by door, then take Doom Book 1 from bookshelf"
+        }
       },
       {
         "name": "magnum_rounds",
@@ -537,7 +642,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "push statue off balcony"
+        "notes": "push statue off balcony",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Push statue off 2F dining room balcony gap"
+        }
       }
     ]
   },
@@ -550,7 +660,12 @@
         "count": 6,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "Barry after Forest scene if space"
+        "notes": "Barry after Forest scene if space",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry gives after Forest balcony scene if inventory has space"
+        }
       }
     ]
   },
@@ -567,7 +682,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "statue puzzle cabinet"
+        "notes": "statue puzzle cabinet",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Cover both floor grates with statues then press center button"
+        }
       }
     ]
   },
@@ -629,7 +749,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "secret cabinet puzzle"
+        "notes": "secret cabinet puzzle",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Study room colored-bottle cabinet puzzle (push aquarium, bookcase)"
+        }
       },
       {
         "name": "ink_ribbon",
@@ -658,7 +783,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": false,
-        "notes": "fireplace with lighter"
+        "notes": "fireplace with lighter",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lighter"
+          ],
+          "notes": "Burn logs in lesson room entry fireplace"
+        }
       },
       {
         "name": "green_herb",
@@ -691,7 +823,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": false,
-        "notes": "search Richard body after serum"
+        "notes": "search Richard body after serum",
+        "gate": {
+          "type": "event",
+          "requires": [
+            "serum"
+          ],
+          "notes": "Search Richard's body twice after giving him serum (pillar passage)"
+        }
       }
     ]
   },
@@ -724,7 +863,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "secret bookcase room"
+        "notes": "secret bookcase room",
+        "gate": {
+          "type": "puzzle",
+          "requires": [
+            "lighter"
+          ],
+          "notes": "Light candles, push left bookcase, enter secret cabinet room"
+        }
       }
     ]
   },
@@ -737,7 +883,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "after Yawn 1"
+        "notes": "after Yawn 1",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Appears after Yawn 1 fight or retreat in attic"
+        }
       },
       {
         "name": "shotgun_shells",
@@ -745,7 +896,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "barrel if avoiding Yawn"
+        "notes": "barrel if avoiding Yawn",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "On barrel during Yawn 1 attic visit (fight or sneak past)"
+        }
       }
     ]
   },
@@ -762,7 +918,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "Forest Speyer corpse event"
+        "notes": "Forest Speyer corpse event",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Forest Speyer corpse cutscene on 2F terrace balcony"
+        }
       }
     ]
   },
@@ -816,7 +977,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "deer head with lights off"
+        "notes": "deer head with lights off",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Shut trophy room lights, stepladder under deer head, climb for jewel"
+        }
       },
       {
         "name": "orders",
@@ -837,7 +1003,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": false,
-        "notes": "on desk"
+        "notes": "on desk",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked locker in large library"
+        }
       }
     ]
   },
@@ -850,7 +1023,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "first MO disc; Any% may use 213 security room instead"
+        "notes": "first MO disc; Any% may use 213 security room instead",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Library B: press wall button, push statue onto lit floor tile"
+        }
       }
     ]
   },
@@ -941,7 +1119,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "Barry ending item"
+        "notes": "Barry ending item",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry gives flare at falls for good ending path"
+        }
       }
     ]
   },
@@ -954,7 +1137,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "Brad drop bad ending"
+        "notes": "Brad drop bad ending",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Brad drops launcher on helipad bad ending only"
+        }
       }
     ]
   },
@@ -1050,7 +1238,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "on body after scene"
+        "notes": "on body after scene",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Sparkle pickup appears after Enrico death cutscene"
+        }
       },
       {
         "name": "clip",
@@ -1058,7 +1251,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": false,
-        "notes": "search body twice"
+        "notes": "search body twice",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Search Enrico's body twice after cutscene"
+        }
       }
     ]
   },
@@ -1071,7 +1269,14 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "alcove after boulder"
+        "notes": "alcove after boulder",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "hex_crank"
+          ],
+          "notes": "Alcove behind first boulder trap after using hex crank on wall"
+        }
       },
       {
         "name": "map_underground",
@@ -1079,7 +1284,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": false,
-        "notes": "wall after boulder"
+        "notes": "wall after boulder",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "hex_crank"
+          ],
+          "notes": "On wall in boulder alcove (same gate as second MO disc)"
+        }
       }
     ]
   },
@@ -1096,7 +1308,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "after boulder trap"
+        "notes": "after boulder trap",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Hunter drop after triggering second boulder trap"
+        }
       }
     ]
   },
@@ -1180,7 +1397,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "locked desk"
+        "notes": "locked desk",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked desk in room 001"
+        }
       }
     ]
   },
@@ -1193,7 +1417,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "drain bathtub"
+        "notes": "drain bathtub",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Pull bathtub drain chain in room 001 bathroom"
+        }
       }
     ]
   },
@@ -1227,7 +1456,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": false,
-        "notes": "pool table code 345 (Jill)"
+        "notes": "pool table code 345 (Jill)",
+        "gate": {
+          "type": "puzzle",
+          "requires": [],
+          "notes": "Jill reads pool-table code 345 in rec room (Chris: Barry gives pass)"
+        }
       }
     ]
   },
@@ -1244,7 +1478,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "in desk"
+        "notes": "in desk",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked locker in room 002"
+        }
       },
       {
         "name": "map_dormitory",
@@ -1328,7 +1569,14 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "locked desk"
+        "notes": "locked desk",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "lockpick"
+          ],
+          "notes": "Locked desk in room 003"
+        }
       }
     ]
   },
@@ -1354,7 +1602,12 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": true,
-        "notes": "fireplace after boss"
+        "notes": "fireplace after boss",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Fireplace after Plant 42 boss (Barry helps if no V-Jolt)"
+        }
       }
     ]
   },
@@ -1480,7 +1733,14 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": false,
-        "notes": "aka pass_number; decoded on MO disc reader, not a physical pickup"
+        "notes": "aka pass_number; decoded on MO disc reader, not a physical pickup",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "mo_disc"
+          ],
+          "notes": "Decoded at MO terminal, not a floor pickup"
+        }
       },
       {
         "name": "passcode_b",
@@ -1488,7 +1748,14 @@
         "count": 1,
         "key_item": true,
         "in_inventory_table": false,
-        "notes": "aka pass_number; decoded on MO disc reader, not a physical pickup"
+        "notes": "aka pass_number; decoded on MO disc reader, not a physical pickup",
+        "gate": {
+          "type": "item",
+          "requires": [
+            "mo_disc"
+          ],
+          "notes": "Decoded at MO terminal, not a floor pickup"
+        }
       },
       {
         "name": "clip",
@@ -1596,7 +1863,12 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "Barry drops before Tyrant"
+        "notes": "Barry drops before Tyrant",
+        "gate": {
+          "type": "event",
+          "requires": [],
+          "notes": "Barry drops rocket launcher before Tyrant fight (good ending)"
+        }
       }
     ]
   },

@@ -18,6 +18,7 @@ from typing import Any, Callable, Iterable
 from re1_rl.cutscene_ledger import CUTSCENE_MILESTONE_KEYS
 from re1_rl.episode_history import ACQUISITION_LOG_K, ROOM_DEQUE_K
 from re1_rl.key_items import KEY_ITEM_NAMES
+from re1_rl.world_state_encoder import NUM_PICKUPS
 from re1_rl.maps_files import MAPS_FILES_DIM
 from re1_rl.memory_map import ITEM_IDS
 from re1_rl.milestone_features import MILESTONE_FEATURE_NAMES
@@ -277,14 +278,14 @@ def _world_state_rows(value: Any) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     room_labels = [rid for rid, _ in _rooms()]
     n_keys = len(KEY_ITEM_NAMES)
-    key_start = 250 + len(room_labels)
+    key_start = 2 * NUM_PICKUPS + len(room_labels)
     for i, raw in enumerate(values):
-        if i < 125:
+        if i < NUM_PICKUPS:
             name, group, meaning = f"pickup_active[{i}]", "pickup active", "catalog pickup remains active"
-        elif i < 250:
-            name, group, meaning = f"pickup_gated[{i - 125}]", "pickup gated", "catalog pickup blocked by tracked requirements"
+        elif i < 2 * NUM_PICKUPS:
+            name, group, meaning = f"pickup_gated[{i - NUM_PICKUPS}]", "pickup gated", "catalog pickup blocked by tracked requirements"
         elif i < key_start:
-            ri = i - 250
+            ri = i - 2 * NUM_PICKUPS
             room = room_labels[ri] if ri < len(room_labels) else str(ri)
             name, group, meaning = f"room_remaining[{room}]", "room remaining", "remaining pickups / 4"
         elif i < key_start + n_keys:

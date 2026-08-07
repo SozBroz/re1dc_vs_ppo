@@ -26,13 +26,13 @@ def test_buffer_shapes_and_dtypes() -> None:
     assert cat.room_stage.shape == (NUM_ROOMS,)
     assert cat.link_requires_key.shape == (NUM_ROOMS, MAX_NEIGHBORS)
 
-    assert cat.num_pickups == 125
-    assert cat.pickup_room_idx.shape == (125,)
-    assert cat.pickup_item_id.shape == (125,)
-    assert cat.pickup_category.shape == (125,)
-    assert cat.pickup_key_flag.shape == (125,)
-    assert cat.pickup_gate_type.shape == (125,)
-    assert cat.pickup_requires_mask.shape == (125, len(KEY_ITEM_NAMES))
+    assert cat.num_pickups == 126
+    assert cat.pickup_room_idx.shape == (126,)
+    assert cat.pickup_item_id.shape == (126,)
+    assert cat.pickup_category.shape == (126,)
+    assert cat.pickup_key_flag.shape == (126,)
+    assert cat.pickup_gate_type.shape == (126,)
+    assert cat.pickup_requires_mask.shape == (126, len(KEY_ITEM_NAMES))
 
     k = len(KEY_ITEM_NAMES)
     assert cat.key_pickup_room.shape == (k,)
@@ -76,7 +76,7 @@ def test_room_105_neighbors_include_tea_or_main_hall() -> None:
 def test_pickup_active_mask_prunes_held_and_gated() -> None:
     cat = _catalog()
     all_active = cat.pickup_active_mask(set())
-    assert all_active.shape == (125,)
+    assert all_active.shape == (126,)
     assert all_active.sum() > 0
 
     held = {"emblem"}

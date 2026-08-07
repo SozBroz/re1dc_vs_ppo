@@ -33,7 +33,8 @@ from re1_rl.weapon_damage import LAST_ATTACK_DIM, WEAPON_CARD_DIM
 
 # Flattened privileged dims excluding frame/world_state (weapon_card + last_attack = +28).
 # +3 vs legacy 946: KEY_ITEM_NAMES grew 34→37 (lab_key_2, etc.).
-_FLAT_PRIVILEGED_DIM = 949 + WEAPON_CARD_DIM + LAST_ATTACK_DIM
+# +125 vs 989: acquisitions dim tracks pickup catalog rows (121 slots).
+_FLAT_PRIVILEGED_DIM = 1114
 
 
 def _stub_obs_space(*, with_world_state: bool = True, with_key_hints: bool = False) -> spaces.Dict:

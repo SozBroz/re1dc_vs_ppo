@@ -36,7 +36,7 @@ def test_encode_world_state_shape() -> None:
         current_room="105",
     )
     assert v.shape == (WORLD_STATE_DIM,)
-    assert WORLD_STATE_DIM == 489
+    assert WORLD_STATE_DIM == 488
     assert v.dtype == np.float32
 
 

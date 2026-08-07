@@ -15,7 +15,7 @@ from re1_rl.item_todo import RoomItems, canonical_item
 from re1_rl.key_items import KEY_ITEM_NAMES
 from re1_rl.world_catalog import NUM_ROOMS, WorldCatalog
 
-NUM_PICKUPS = 125
+NUM_PICKUPS = 126
 KEY_HINTS_PER_KEY = 3
 
 PICKUP_ACTIVE_SLICE = slice(0, NUM_PICKUPS)
