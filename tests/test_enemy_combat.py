@@ -14,7 +14,9 @@ from re1_rl.enemy_combat import (
     apply_combat_step_fields,
     combat_enemy_count,
     enemy_combat_delta,
+    enemy_combat_events,
     enemy_hp_by_slot,
+    is_crow_combat_entity,
     pending_combat_window_frames,
     tick_pending_combat_credit,
 )
@@ -319,3 +321,17 @@ def test_adder_type_name_denies_kill() -> None:
     assert out["enemy_kills"] == 0
     assert out["combat_events"][0]["reward_denied"] is True
     assert out["combat_events"][0]["killed"] is True
+
+
+def test_crow_active_byte_marks_combat_event() -> None:
+    assert is_crow_combat_entity({"active_byte": 0x04})
+    assert is_crow_combat_entity({"type_name": "crow"})
+    assert not is_crow_combat_entity({"active_byte": 0x0F, "type_name": "zombie"})
+    events = enemy_combat_events(
+        [{"slot": 0, "hp": 20, "active_byte": 0x1C}],
+        [{"slot": 0, "hp": 10, "active_byte": 0x1C}],
+        room_id="117",
+    )
+    assert len(events) == 1
+    assert events[0]["is_crow"] is True
+    assert events[0]["damage"] == 10

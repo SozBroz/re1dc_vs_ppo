@@ -17,6 +17,18 @@ NO_COMBAT_REWARD_TYPE_NAMES: frozenset[str] = frozenset(
 # 408 honeycomb wasps; 301 water-gate adder swarm; 40E water-tank Neptunes.
 NO_COMBAT_REWARD_ROOMS: frozenset[str] = frozenset({"408", "301", "40E"})
 
+# Crow gallery pests: active_byte from live QS0 / room_enemies notes.
+CROW_ACTIVE_BYTES: frozenset[int] = frozenset({0x04, 0x1C})
+
+
+def is_crow_combat_entity(meta: dict[str, Any]) -> bool:
+    """True when RAM meta identifies a crow (gallery pests)."""
+    name = str(meta.get("type_name") or meta.get("enemy_type") or "").lower()
+    if name == "crow":
+        return True
+    ab = meta.get("active_byte")
+    return ab is not None and int(ab) in CROW_ACTIVE_BYTES
+
 
 def combat_reward_denied(
     *,
@@ -119,6 +131,8 @@ def _type_meta_by_slot(
         name = ent.get("type_name") or ent.get("enemy_type")
         if name is not None:
             meta["type_name"] = str(name)
+        if "active_byte" in ent:
+            meta["active_byte"] = int(ent["active_byte"])
         if meta:
             out[slot] = meta
     return out
@@ -148,6 +162,7 @@ def enemy_combat_events(
             type_id=meta.get("type_id"),
             type_name=meta.get("type_name"),
         )
+        is_crow = is_crow_combat_entity(meta)
         if after <= 0:
             events.append({
                 "slot": slot,
@@ -156,6 +171,7 @@ def enemy_combat_events(
                 "damage": before,
                 "killed": True,
                 "reward_denied": denied,
+                "is_crow": is_crow,
                 **({"type_id": meta["type_id"]} if "type_id" in meta else {}),
             })
         elif after < before:
@@ -166,6 +182,7 @@ def enemy_combat_events(
                 "damage": before - after,
                 "killed": False,
                 "reward_denied": denied,
+                "is_crow": is_crow,
                 **({"type_id": meta["type_id"]} if "type_id" in meta else {}),
             })
     return events

@@ -8,7 +8,9 @@ from typing import Any
 import numpy as np
 
 GALLERY_ROOM_ID = "117"
-GALLERY_STEP_REWARD = 0.5
+GALLERY_STEP_REWARD = 4.0
+# Failure claws back all pending step pay at 1:1 inverse (see ProgressTracker.gallery_step_reward).
+GALLERY_STEP_CLAWBACK_SCALE = 1.0
 
 # RDT slots: newborn, infant, boy, young man, middle-aged man, old man.
 GALLERY_STEP_SLOTS = (3, 5, 6, 4, 2, 7)

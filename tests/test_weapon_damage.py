@@ -20,10 +20,13 @@ from re1_rl.weapon_damage import (
     N_LAST_ATTACK_MACROS,
     WEAPON_CARD_DIM,
     ammo_qty_norm,
+    damage_weighted_ammo_score,
     empty_last_attack,
     encode_weapon_card,
     equipped_clip_from_inventory_slots,
+    item_name_to_weapon_id,
     last_attack_macro_from_action,
+    nominal_max_damage,
     pack_last_attack,
     room_bonus_flags,
 )
@@ -40,6 +43,15 @@ def test_ammo_qty_norm_shared_scale() -> None:
     assert ammo_qty_norm(15) == pytest.approx(15 / 255.0)
     assert ammo_qty_norm(255) == 1.0
     assert ammo_qty_norm(999) == 1.0
+
+
+def test_damage_weighted_ammo_score() -> None:
+    assert item_name_to_weapon_id("handgun_bullets") == 0x02
+    assert nominal_max_damage(0x02) == 4
+    assert nominal_max_damage(0x03) == 25
+    assert damage_weighted_ammo_score([("handgun_bullets", 20)]) == 20
+    assert damage_weighted_ammo_score([("shotgun_shells", 7)]) == 43
+    assert damage_weighted_ammo_score([("beretta", 15), ("handgun_bullets", 30)]) == 45
 
 
 def test_inventory_and_box_use_ammo_norm() -> None:

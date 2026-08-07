@@ -84,12 +84,16 @@ def test_wrong_switch_claws_back_every_pending_gallery_reward() -> None:
     progress.first_visit("117")
     first = _state(raw=GALLERY_STEP_VALUES[0])
     second = _state(raw=GALLERY_STEP_VALUES[1])
+    third = _state(raw=GALLERY_STEP_VALUES[2])
     _reward(progress, _state(), first)
     _reward(progress, first, second)
+    _reward(progress, second, third)
 
     reset = _state(raw=0)
-    _total, bd = _reward(progress, second, reset)
-    assert bd["gallery"] == pytest.approx(-2 * GALLERY_STEP_REWARD)
+    _total, bd = _reward(progress, third, reset)
+    assert bd["gallery"] == pytest.approx(-3 * GALLERY_STEP_REWARD)
+    assert GALLERY_STEP_REWARD == pytest.approx(4.0)
+    assert bd["gallery"] == pytest.approx(-12.0)
     assert progress.gallery_pending_reward == 0.0
     assert progress.gallery_step_index == 0
 
@@ -103,6 +107,27 @@ def test_wrong_switch_claws_back_every_pending_gallery_reward() -> None:
     _reward(progress, outside, reentered)
     _total, retry_bd = _reward(progress, reentered, first)
     assert retry_bd["gallery"] == pytest.approx(GALLERY_STEP_REWARD)
+
+
+def test_gallery_clawback_full_magnitude_on_rails() -> None:
+    progress = ProgressTracker()
+    progress.first_visit("117")
+    first = _state(raw=GALLERY_STEP_VALUES[0])
+    second = _state(raw=GALLERY_STEP_VALUES[1])
+    _reward(progress, _state(), first)
+    _reward(progress, first, second)
+
+    reset = _state(raw=0)
+    _total, bd = compute_reward(
+        second,
+        reset,
+        make_planner(),
+        progress=progress,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["gallery"] == pytest.approx(-2 * GALLERY_STEP_REWARD)
+    assert bd["gallery"] == pytest.approx(-8.0)
 
 
 def test_leaving_gallery_claws_back_partial_sequence() -> None:

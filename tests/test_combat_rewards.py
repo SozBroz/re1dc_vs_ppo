@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
+    CROW_COMBAT_REWARD_SCALE,
     ENEMY_DAMAGE_REWARD,
     ENEMY_KILL_REWARD,
     REFERENCE_STEP_FRAMES,
@@ -92,3 +93,24 @@ def test_knife_hit_rewards_stack_on_scaled_step_contempt() -> None:
     assert bd["attack_miss"] == 0.0
     assert bd["ammo_waste"] == 0.0
     assert reward == sum(bd.values())
+
+
+def test_crow_combat_pays_nothing() -> None:
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 20,
+            "killed": True,
+            "is_crow": True,
+            "reward_denied": False,
+        }
+    ]
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert CROW_COMBAT_REWARD_SCALE == 0.0
+    assert bd["enemy_damage"] == 0.0
+    assert bd["enemy_kill"] == 0.0

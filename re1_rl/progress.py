@@ -378,6 +378,7 @@ class ProgressTracker:
         """Pay ordered Gallery steps; claw back partial rewards on reset/exit."""
         from re1_rl.gallery_puzzle import (
             GALLERY_ROOM_ID,
+            GALLERY_STEP_CLAWBACK_SCALE,
             GALLERY_STEP_REWARD,
             completed_steps,
         )
@@ -398,7 +399,7 @@ class ProgressTracker:
             return 0.0
 
         if left:
-            clawback = -self.gallery_pending_reward
+            clawback = -self.gallery_pending_reward * GALLERY_STEP_CLAWBACK_SCALE
             self.gallery_needs_reentry = True
             self.gallery_step_index = 0
             self.gallery_pending_reward = 0.0
@@ -429,7 +430,7 @@ class ProgressTracker:
             int(raw) != int(prev_raw) and count != self.gallery_step_index
         )
         if wrong_reset or wrong_first or unexpected_transition:
-            clawback = -self.gallery_pending_reward
+            clawback = -self.gallery_pending_reward * GALLERY_STEP_CLAWBACK_SCALE
             self.gallery_step_index = 0
             self.gallery_pending_reward = 0.0
             self.gallery_needs_reentry = True

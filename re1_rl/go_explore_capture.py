@@ -70,30 +70,6 @@ CELL_SIDECAR_NAME = "cell.sidecar.json"
 CELL_META_NAME = "meta.json"
 INCOMING_NAME = ".incoming"
 
-# Ammo names counted into the quality ammo component.
-_AMMO_NAMES: frozenset[str] = frozenset(
-    {
-        "handgun_bullets",
-        "shotgun_shells",
-        "magnum_rounds",
-        "dumdum_rounds",
-        "flamethrower_fuel",
-        "explosive_rounds",
-        "acid_rounds",
-        "flame_rounds",
-        "rocket",
-        "beretta",  # loaded rounds live in qty
-        "shotgun",
-        "colt_python",
-        "colt_python_dumdum",
-        "flamethrower",
-        "bazooka_acid",
-        "bazooka_explosive",
-        "bazooka_flame",
-        "rocket_launcher",
-    }
-)
-
 # Healing / cure stacks (qty summed).
 _HEALING_NAMES: frozenset[str] = frozenset(
     {
@@ -652,6 +628,52 @@ def _inventory_slots(state: dict[str, Any]) -> list[tuple[str, int]]:
     return out
 
 
+def _box_inventory_slots(state: dict[str, Any], *, env: Any = None) -> list[tuple[str, int]]:
+    """Item-box stacks as ``(canonical_name, qty)`` from sidecar or live env cache."""
+    from re1_rl.memory_map import ITEM_IDS
+
+    raw = state.get("box_cache")
+    if raw is None and env is not None:
+        raw = getattr(env, "_box_cache", None)
+    if not raw:
+        return []
+    out: list[tuple[str, int]] = []
+    for entry in raw:
+        if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+            raw_id, qty = entry[0], int(entry[1])
+            if isinstance(raw_id, str):
+                name = canonical_item(raw_id)
+                if name and qty > 0:
+                    out.append((name, qty))
+                continue
+            iid = int(raw_id) & 0xFF
+            if iid <= 0 or qty <= 0:
+                continue
+            name = ITEM_IDS.get(iid)
+            if name:
+                out.append((canonical_item(name), qty))
+        elif isinstance(entry, dict):
+            raw_name = entry.get("name") or entry.get("item")
+            if raw_name:
+                name = canonical_item(str(raw_name))
+                qty = int(entry.get("qty", 1) or 0)
+                if name and qty > 0:
+                    out.append((name, qty))
+            else:
+                iid = int(entry.get("item_id", entry.get("id", 0)) or 0) & 0xFF
+                qty = int(entry.get("qty", 1) or 0)
+                if iid > 0 and qty > 0:
+                    name = ITEM_IDS.get(iid)
+                    if name:
+                        out.append((canonical_item(name), qty))
+    return out
+
+
+def _firepower_inventory(state: dict[str, Any], *, env: Any = None) -> list[tuple[str, int]]:
+    """On-person inventory plus item-box stacks (for ammo quality only)."""
+    return _inventory_slots(state) + _box_inventory_slots(state, env=env)
+
+
 def ever_held_item_count(
     state: dict[str, Any] | None,
     *,
@@ -683,14 +705,18 @@ def compute_quality(
 ) -> Quality:
     """Lexicographic quality: ``(hp, ammo, healing, slots, poison, -ink_ribbons)``.
 
-    ``ammo`` / ``healing`` / ``ink_ribbons`` come from the current on-person
-    inventory. ``slots`` is the count of distinct items in ``ever_held``
-    (sidecar semantics), not occupied inventory slots. ``poison`` is ``1`` when
-    healthy, ``0`` when poisoned. Holding ink ribbons is penalized (same spirit
-    as typewriter PB champions) so cells that spend them beat ribbon hoards.
+    ``ammo`` is damage-weighted firepower from on-person inventory **and the item
+    box** (weapon loaded qty + reserve piles), using nominal max damage from
+    ``weapon_damage`` almanac, scaled to handgun-round equivalents. ``healing`` /
+    ``ink_ribbons`` come from on-person inventory only. ``slots`` is the count of
+    distinct items in ``ever_held`` (sidecar semantics), not occupied inventory
+    slots. ``poison`` is ``1`` when healthy, ``0`` when poisoned. Holding ink
+    ribbons is penalized.
     """
+    from re1_rl.weapon_damage import damage_weighted_ammo_score
+
     hp = int(state.get("hp", 0) or 0)
-    ammo = 0
+    ammo = damage_weighted_ammo_score(_firepower_inventory(state, env=env))
     healing = 0
     ribbons = 0
     for name, qty in _inventory_slots(state):
@@ -700,8 +726,6 @@ def compute_quality(
         if name == "ink_ribbon":
             ribbons += q
             continue
-        if name in _AMMO_NAMES:
-            ammo += q
         if name in _HEALING_NAMES:
             healing += q
     slots = ever_held_item_count(state, ever_held=ever_held, env=env)

@@ -7,7 +7,7 @@ policy can relate clip ↔ spend ↔ inventory on one axis. Do not reintroduce `
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Iterable
 
 import numpy as np
 
@@ -141,6 +141,94 @@ def weapon_round_type(weapon_id: int) -> int:
 
 def nominal_damage_range(weapon_id: int) -> tuple[int, int]:
     return WEAPON_NOMINAL_DAMAGE.get(int(weapon_id) & 0xFF, (0, 0))
+
+
+def nominal_max_damage(weapon_id: int) -> int:
+    """Upper bound of nominal per-round damage for a weapon id."""
+    return int(nominal_damage_range(weapon_id)[1])
+
+
+# Quality ammo scoring: lazy-built name → weapon id maps.
+_AMMO_NAME_TO_WEAPON: dict[str, int] | None = None
+_WEAPON_NAME_TO_WEAPON: dict[str, int] | None = None
+
+
+def _ammo_item_maps() -> tuple[dict[str, int], dict[str, int]]:
+    global _AMMO_NAME_TO_WEAPON, _WEAPON_NAME_TO_WEAPON
+    if _AMMO_NAME_TO_WEAPON is not None and _WEAPON_NAME_TO_WEAPON is not None:
+        return _AMMO_NAME_TO_WEAPON, _WEAPON_NAME_TO_WEAPON
+
+    from re1_rl.ammo_accounting import WEAPON_AMMO_ITEM
+    from re1_rl.item_todo import canonical_item
+    from re1_rl.memory_map import ITEM_IDS, WEAPON_ITEM_IDS
+
+    ammo_by_name: dict[str, int] = {}
+    weapon_by_name: dict[str, int] = {}
+    for wid, ammo_id in WEAPON_AMMO_ITEM.items():
+        if ammo_id is None:
+            continue
+        name = ITEM_IDS.get(int(ammo_id))
+        if name:
+            ammo_by_name[canonical_item(name)] = int(wid)
+    for wid in WEAPON_ITEM_IDS:
+        name = ITEM_IDS.get(int(wid))
+        if name:
+            weapon_by_name[canonical_item(name)] = int(wid)
+    ammo_by_name.setdefault("rocket", 0x0A)
+    _AMMO_NAME_TO_WEAPON = ammo_by_name
+    _WEAPON_NAME_TO_WEAPON = weapon_by_name
+    return ammo_by_name, weapon_by_name
+
+
+def item_name_to_weapon_id(name: str) -> int | None:
+    """Resolve a weapon or reserve-ammo item name to a weapon id, else None."""
+    from re1_rl.item_todo import canonical_item
+
+    ammo_by_name, weapon_by_name = _ammo_item_maps()
+    key = canonical_item(str(name))
+    if key in weapon_by_name:
+        return weapon_by_name[key]
+    if key in ammo_by_name:
+        return ammo_by_name[key]
+    return None
+
+
+def damage_weighted_ammo_score(
+    inventory_slots: Iterable[tuple[Any, int] | list[Any] | dict[str, Any]] | None,
+    *,
+    ref_weapon_id: int = 0x02,
+) -> int:
+    """Sum fireable rounds weighted by nominal max damage (``weapon_damage`` almanac).
+
+    Each stack contributes ``qty * max_dmg``; the total is scaled to beretta
+    handgun-round equivalents via ``// ref_max_dmg`` so pure-HG inventories keep
+    familiar magnitudes (20 bullets → 20, 7 shells → 43).
+    """
+    from re1_rl.item_todo import canonical_item
+
+    _, ref_max = nominal_damage_range(ref_weapon_id)
+    ref_max = max(1, int(ref_max))
+    total_dmg = 0
+    for entry in inventory_slots or []:
+        if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+            raw_name, qty = entry[0], int(entry[1])
+            name = canonical_item(str(raw_name))
+        elif isinstance(entry, dict):
+            name = canonical_item(str(entry.get("name") or entry.get("item") or ""))
+            qty = int(entry.get("qty", 1) or 0)
+        else:
+            continue
+        q = max(0, int(qty))
+        if not name or q <= 0:
+            continue
+        wid = item_name_to_weapon_id(name)
+        if wid is None:
+            continue
+        max_dmg = nominal_max_damage(wid)
+        if max_dmg <= 0:
+            continue
+        total_dmg += q * max_dmg
+    return int(total_dmg // ref_max)
 
 
 def room_bonus_flags(room_id: str | None, weapon_id: int) -> dict[str, float]:

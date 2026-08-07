@@ -93,6 +93,8 @@ SOFTLOCK_TIMEOUT_PENALTY = -0.26666666666666666
 
 ENEMY_DAMAGE_REWARD = 0.014
 ENEMY_KILL_REWARD = 2.0
+# Gallery crows: pest combat pays nothing (#7/#8).
+CROW_COMBAT_REWARD_SCALE = 0.0
 # Conservative ammo-waste tax.  A full inverse pickup tax (1.0) made scarce
 # weapons too expensive to explore; 0.10 keeps successful damage comfortably
 # more valuable while giving confirmed misses a small, immediate signal.
@@ -332,8 +334,9 @@ RAILS_UNSCALED_COMBAT_TERMS: frozenset[str] = frozenset({
     "enemy_damage",
     "enemy_kill",
 })
-# Rails clawbacks mirror nav pickup crumbs (exploration keeps full ±4.0).
+# Rails clawbacks mirror nav pickup crumbs (+4 room/key/story/gallery → −4 returns).
 RAILS_SCALED_CLAWBACK_TERMS: frozenset[str] = frozenset({
+    "gallery",
     "shotgun_return",
     "gold_emblem_return",
     "key_item_return",
@@ -490,6 +493,30 @@ def potential(
         phi_d = -min(dist / DIST_NORM, 1.0)
 
     return PBRS_GRAPH_WEIGHT * phi_g, PBRS_DOOR_WEIGHT * phi_d
+
+
+def enemy_combat_rewards(state: dict[str, Any]) -> tuple[float, float]:
+    """Return ``(damage_pay, kill_pay)`` honoring per-event crow scaling."""
+    events = state.get("combat_events")
+    if events:
+        damage_pay = 0.0
+        kill_pay = 0.0
+        for ev in events:
+            if ev.get("reward_denied"):
+                continue
+            scale = (
+                CROW_COMBAT_REWARD_SCALE if ev.get("is_crow") else 1.0
+            )
+            damage_pay += ENEMY_DAMAGE_REWARD * int(ev.get("damage", 0)) * scale
+            if ev.get("killed"):
+                kill_pay += ENEMY_KILL_REWARD * scale
+        return damage_pay, kill_pay
+    enemy_damage = int(state.get("enemy_damage", 0) or 0)
+    enemy_kills = int(state.get("enemy_kills", 0) or 0)
+    return (
+        ENEMY_DAMAGE_REWARD * enemy_damage,
+        ENEMY_KILL_REWARD * enemy_kills,
+    )
 
 
 def compute_reward(
@@ -813,12 +840,11 @@ def compute_reward(
     elif new_kenneth_gate_breach:
         bd["main_hall_before_kenneth"] = MAIN_HALL_BEFORE_KENNETH_PENALTY
 
-    enemy_damage = int(state.get("enemy_damage", 0) or 0)
-    if enemy_damage > 0:
-        bd["enemy_damage"] = ENEMY_DAMAGE_REWARD * enemy_damage
-    enemy_kills = int(state.get("enemy_kills", 0) or 0)
-    if enemy_kills > 0:
-        bd["enemy_kill"] = ENEMY_KILL_REWARD * enemy_kills
+    enemy_damage_pay, enemy_kill_pay = enemy_combat_rewards(state)
+    if enemy_damage_pay > 0.0:
+        bd["enemy_damage"] = enemy_damage_pay
+    if enemy_kill_pay > 0.0:
+        bd["enemy_kill"] = enemy_kill_pay
 
     # Miss taxes: gun ammo waste on attack_missed; knife whiff on knife_swing_missed
     # (any knife-equipped macro height).

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "archive_version": 218,
+  "archive_version": 226,
   "route_id": "yawn_quest_v2",
   "cells": [
     {
@@ -9,7 +9,7 @@
       "room_id": "105",
       "quality": [
         96,
-        15,
+        45,
         1,
         4,
         1,
@@ -31,7 +31,7 @@
       "room_id": "104",
       "quality": [
         96,
-        15,
+        45,
         1,
         4,
         1,
@@ -53,14 +53,14 @@
       "room_id": "105",
       "quality": [
         96,
-        15,
-        1,
-        4,
+        69,
+        0,
+        5,
         1,
         0
       ],
-      "bundle_sha256": "bc29b6f8dbd5706a82b2968f7ec2e445ffb6e9873e3415fb52fe17652fe4e28b",
-      "bytes": 1582929,
+      "bundle_sha256": "d51ceff23dc7b22e22d1e835a9e40df5454845d2d7dc990e3c58de48709ea228",
+      "bytes": 1578443,
       "state_path": "states/yawn_rails/cells/cp02/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp02/cell.sidecar.json",
       "inventory_free_slots": 4,
@@ -75,14 +75,14 @@
       "room_id": "106",
       "quality": [
         96,
-        15,
-        1,
-        4,
+        69,
+        0,
+        5,
         1,
         0
       ],
-      "bundle_sha256": "88fde2325b1cf7a677539b43d4dbab41f344c1eaf825dfeb73bcc05a6c056928",
-      "bytes": 1490875,
+      "bundle_sha256": "54194c1bff62edc4a05d08662e5412900094b87e05f3c2b3356c161398fa5b22",
+      "bytes": 1493433,
       "state_path": "states/yawn_rails/cells/cp03/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp03/cell.sidecar.json",
       "inventory_free_slots": 4,
@@ -97,7 +97,7 @@
       "room_id": "203",
       "quality": [
         96,
-        15,
+        45,
         1,
         5,
         1,
@@ -119,7 +119,7 @@
       "room_id": "106",
       "quality": [
         96,
-        15,
+        45,
         1,
         5,
         1,
@@ -141,7 +141,7 @@
       "room_id": "105",
       "quality": [
         96,
-        15,
+        45,
         1,
         5,
         1,
@@ -163,7 +163,7 @@
       "room_id": "104",
       "quality": [
         96,
-        15,
+        45,
         1,
         5,
         1,
@@ -185,7 +185,7 @@
       "room_id": "10F",
       "quality": [
         96,
-        45,
+        75,
         1,
         6,
         1,
@@ -207,7 +207,7 @@
       "room_id": "10F",
       "quality": [
         96,
-        45,
+        75,
         1,
         7,
         1,
@@ -229,7 +229,7 @@
       "room_id": "10F",
       "quality": [
         96,
-        45,
+        75,
         1,
         7,
         1,
@@ -251,7 +251,7 @@
       "room_id": "10F",
       "quality": [
         96,
-        45,
+        75,
         1,
         8,
         1,
@@ -273,7 +273,7 @@
       "room_id": "10F",
       "quality": [
         96,
-        45,
+        75,
         1,
         8,
         1,
@@ -295,7 +295,7 @@
       "room_id": "104",
       "quality": [
         96,
-        45,
+        75,
         1,
         8,
         1,
@@ -317,7 +317,7 @@
       "room_id": "105",
       "quality": [
         96,
-        45,
+        75,
         1,
         8,
         1,
@@ -339,7 +339,7 @@
       "room_id": "105",
       "quality": [
         96,
-        45,
+        75,
         1,
         9,
         1,
@@ -361,7 +361,7 @@
       "room_id": "106",
       "quality": [
         96,
-        45,
+        75,
         1,
         9,
         1,
@@ -383,7 +383,7 @@
       "room_id": "107",
       "quality": [
         96,
-        45,
+        75,
         1,
         9,
         1,
@@ -405,14 +405,14 @@
       "room_id": "108",
       "quality": [
         96,
-        39,
-        0,
+        75,
+        1,
         9,
         1,
-        -3
+        0
       ],
-      "bundle_sha256": "a18013b43cd75671177b4664d37af13843529a1b6ffe2ae767a3fd3003312cd8",
-      "bytes": 1489032,
+      "bundle_sha256": "35d326752f87eb932aa874eacf74961c83ff415323e1c0216071d110cc1309ce",
+      "bytes": 1504174,
       "state_path": "states/yawn_rails/cells/cp18/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp18/cell.sidecar.json",
       "inventory_free_slots": 3,
@@ -427,17 +427,17 @@
       "room_id": "108",
       "quality": [
         16,
-        15,
+        48,
         0,
         9,
         1,
-        0
+        -3
       ],
-      "bundle_sha256": "6e62b0335a37e5b243a632da3f727041f88175d8d50178e2976297804ab52841",
-      "bytes": 1556609,
+      "bundle_sha256": "114cc703845934a2909530a7d272cbeb8981f0c5b43b0584f4f2135d4758a1bf",
+      "bytes": 1588081,
       "state_path": "states/yawn_rails/cells/cp19/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp19/cell.sidecar.json",
-      "inventory_free_slots": 4,
+      "inventory_free_slots": 3,
       "next_checkpoint_id": "winding_109",
       "next_slots_needed": 0,
       "inventory_feasible": true,
@@ -449,17 +449,17 @@
       "room_id": "109",
       "quality": [
         16,
-        15,
+        48,
         0,
         9,
         1,
-        0
+        -3
       ],
-      "bundle_sha256": "0363f3b301a614f2132a6f6d2a2376d4688b1d2e8576e49c154c37ec72287e2d",
-      "bytes": 1451352,
+      "bundle_sha256": "6fa221e45af2bd2d6abf3f82b53c7f84291d6c183c3410a52cb8e33f23bfb163",
+      "bytes": 1417356,
       "state_path": "states/yawn_rails/cells/cp20/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp20/cell.sidecar.json",
-      "inventory_free_slots": 5,
+      "inventory_free_slots": 3,
       "next_checkpoint_id": "trap_entry_115",
       "next_slots_needed": 0,
       "inventory_feasible": true,
@@ -471,7 +471,7 @@
       "room_id": "115",
       "quality": [
         48,
-        15,
+        45,
         0,
         10,
         1,
@@ -493,7 +493,7 @@
       "room_id": "116",
       "quality": [
         48,
-        15,
+        45,
         0,
         10,
         1,
@@ -515,7 +515,7 @@
       "room_id": "116",
       "quality": [
         48,
-        22,
+        88,
         0,
         11,
         1,
@@ -537,7 +537,7 @@
       "room_id": "115",
       "quality": [
         48,
-        22,
+        88,
         0,
         11,
         1,
@@ -557,35 +557,73 @@
       "checkpoint_index": 25,
       "checkpoint_id": "barry_rescue_115",
       "room_id": "109",
-      "route_id": "yawn_quest_v2",
       "quality": [
         48,
-        22,
+        88,
         0,
         11,
         1,
         0
       ],
-      "bundle_sha256": "8357d2c642b1cfaec367faeb26ac0a32c5b82b0181c677ed141559d3761e2bc8",
+      "bundle_sha256": "ff22ff5b5dce8de0eb30c5e805f9738668b0794740308e2230b08e276cfa1c01",
+      "bytes": 1492289,
+      "state_path": "states/yawn_rails/cells/cp25/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp25/cell.sidecar.json",
       "inventory_free_slots": 4,
       "next_checkpoint_id": "back_passage_10A",
       "next_slots_needed": 0,
       "inventory_feasible": true,
-      "captured_in_box_room": false,
-      "logistics_horizon": "next_box_or_boss",
-      "route_required_items": [
-        "shotgun"
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 26,
+      "checkpoint_id": "back_passage_10A",
+      "room_id": "10A",
+      "quality": [
+        48,
+        88,
+        0,
+        11,
+        1,
+        0
       ],
-      "declared_gain_count": 0,
-      "next_is_boss": false,
-      "state_path": "states/yawn_rails/cells/cp25/cell.State",
-      "sidecar_path": "states/yawn_rails/cells/cp25/cell.sidecar.json"
+      "bundle_sha256": "c291d22b5bcc1bb0797c642681846eef13ec97a5f220da414da7a2eb473dd426",
+      "bytes": 1444134,
+      "state_path": "states/yawn_rails/cells/cp26/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp26/cell.sidecar.json",
+      "inventory_free_slots": 4,
+      "next_checkpoint_id": "crow_gallery_enter_117",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 27,
+      "checkpoint_id": "crow_gallery_enter_117",
+      "room_id": "117",
+      "quality": [
+        48,
+        45,
+        0,
+        11,
+        1,
+        0
+      ],
+      "bundle_sha256": "81a14a515370e83bede3b994f041f8831fbe7e81b0e0640c5bea74c947ef284e",
+      "bytes": 1437669,
+      "state_path": "states/yawn_rails/cells/cp27/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp27/cell.sidecar.json",
+      "inventory_free_slots": 4,
+      "next_checkpoint_id": "star_crest_117",
+      "next_slots_needed": 1,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
     }
   ],
   "cache_stats": {
-    "manifest_cells": 25,
+    "manifest_cells": 28,
     "fetched_last_poll": 0,
     "pruned_dirs_last_poll": 0,
-    "remote_cell_count": 25
+    "remote_cell_count": 28
   }
 }
