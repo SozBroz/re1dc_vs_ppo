@@ -349,8 +349,10 @@ def sample_one_leg_options(
 ) -> dict[str, Any]:
     """Choose a curated start and bounded checkpoint span.
 
-    Non-PLR mix: 20% latest eligible cell (cp18+); remaining 80% uniform over
-    older eligible cells. ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
+    Default (payforward ripple): 20% latest; 80% equal across fighting CPs
+    (ammo cliffs), eating each fight's share into its ripple tip after a
+    push-forward. ``RE1_YAWN_PAYFORWARD_RIPPLE=0`` restores legacy uniform
+    older-cell mix. ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
     """
     cells = eligible_reset_cells(iter_loadable_cells(project_root, stage))
     latest_only = reset_latest_only_from_env()
@@ -359,6 +361,12 @@ def sample_one_leg_options(
     if plr_enabled_from_env() and not latest_only:
         candidates = list(cells)
         return sample_plr_options(project_root, stage, candidates, rng=rng)
+    if not latest_only:
+        from re1_rl.yawn_rails_payforward import sample_payforward_options
+
+        pf = sample_payforward_options(project_root, stage, cells, rng=rng)
+        if pf is not None:
+            return pf
     chosen = _choose_reset_candidate(cells, rng=rng, latest_only=latest_only)
     start_index = int(chosen["checkpoint_index"]) + 1
     route_steps = list(stage.get("route_steps", []))

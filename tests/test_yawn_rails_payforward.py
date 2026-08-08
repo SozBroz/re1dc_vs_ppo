@@ -1,0 +1,182 @@
+"""Fight-cliff discovery and ripple grind for pay-forward resets."""
+
+from __future__ import annotations
+
+import random
+from collections import Counter
+from pathlib import Path
+
+from re1_rl.go_explore_archive import quality_beats
+from re1_rl.yawn_rails_payforward import (
+    STATUS_BLOCKED,
+    STATUS_GRIND,
+    STATUS_RIPPLING,
+    PayforwardRippleStore,
+    discover_fights,
+    hop_blocked,
+    project_end_quality,
+    sample_payforward_options,
+)
+
+
+def _row(idx: int, ammo: int, hp: int = 80, **extra: object) -> dict:
+    q = [hp, ammo, 1, 10, 1, 0, 0]
+    row = {
+        "checkpoint_index": idx,
+        "checkpoint_id": f"cp{idx:02d}_id",
+        "next_checkpoint_id": f"cp{idx + 1:02d}_id",
+        "quality": q,
+        "state_path": f"states/yawn_rails/cells/cp{idx:02d}/cell.State",
+        "sidecar_path": f"states/yawn_rails/cells/cp{idx:02d}/cell.sidecar.json",
+    }
+    row.update(extra)
+    return row
+
+
+def test_discover_fights_ammo_cliffs_and_stretches() -> None:
+    cells = [
+        _row(18, 75),
+        _row(19, 56),
+        _row(20, 56),
+        _row(34, 103),
+        _row(35, 66),
+        _row(36, 66),
+        _row(37, 66),
+        _row(38, 59),
+    ]
+    fights = discover_fights(cells)
+    assert [f.fight_index for f in fights] == [18, 34, 37]
+    assert fights[0].stretch_end == 34
+    assert fights[1].stretch_end == 37
+    assert fights[2].stretch_end == 39  # max_idx+1
+
+
+def test_discover_ignores_ammo_gains() -> None:
+    cells = [_row(22, 56), _row(23, 103)]
+    assert discover_fights(cells) == []
+
+
+def test_project_end_quality_shotgun_and_clip() -> None:
+    start = (96, 56, 1, 10, 1, 0, 0)
+    shotgun = project_end_quality(start, {"items_gained": ["shotgun"]})
+    assert shotgun[0] == 96
+    assert shotgun[1] == 56 + 43
+    assert shotgun[3] == 11  # slots +1
+    clip = project_end_quality(start, {"items_gained": ["handgun_bullets"]})
+    assert clip[1] == 56 + 15
+
+
+def test_hop_blocked_uses_projection_not_raw_ammo() -> None:
+    # Equal HP: raw tip ammo loses, but shotgun gain can win.
+    tip = (80, 60, 1, 10, 1, 0, 0)
+    succ = (80, 100, 1, 11, 1, 0, 0)
+    assert hop_blocked(tip, succ, {"items_gained": []})
+    assert not hop_blocked(tip, succ, {"items_gained": ["shotgun"]})
+    # Healthier tip beats richer ammo successor even without pickup.
+    assert not hop_blocked((96, 56, 1, 10, 1, 0, 0), (80, 103, 2, 11, 1, 0, 0), None)
+
+
+def test_ripple_store_on_install_and_block(tmp_path: Path) -> None:
+    # Single fight 18→19. Ammo stays flat after the fight (no new cliffs);
+    # beatability uses HP so equal-ammo tips can still quality_beats successors.
+    cells = [_row(18, 70)] + [_row(i, 40, hp=80) for i in range(19, 26)]
+
+    store = PayforwardRippleStore(tmp_path / "payforward_ripple.json")
+    route = [
+        {"checkpoint_id": "cp19_id", "items_gained": []},
+        {"checkpoint_id": "cp20_id", "items_gained": []},
+        {"checkpoint_id": "cp21_id", "items_gained": []},
+        {"checkpoint_id": "cp22_id", "items_gained": []},
+        {"checkpoint_id": "cp23_id", "items_gained": ["shotgun"]},
+    ]
+    store.reconcile(cells, route=route)
+    assert list(store.fights) == [18]
+    assert store.fights[18].status == STATUS_GRIND
+    assert store.fights[18].stretch_end == 26
+
+    def _advance(idx: int, *, hp: int = 96) -> None:
+        cells[idx - 18] = _row(idx, 40, hp=hp)
+        store.on_install(idx, cells, route=route)
+
+    _advance(19)
+    assert store.fights[18].status == STATUS_RIPPLING
+    assert store.fights[18].ripple_tip == 19
+    assert store.fights[18].sample_index() == 19
+
+    _advance(20)
+    _advance(21)
+    assert store.fights[18].ripple_tip == 21
+    assert list(store.fights) == [18]
+
+    # Weak tip vs rich equal-HP plateau (ammo flat after 23 → still one fight).
+    cells[4] = _row(22, 40, hp=40)
+    for j, ci in enumerate(range(18, 26)):
+        if ci >= 23:
+            cells[j] = _row(ci, 200, hp=40)
+    store.on_install(22, cells, route=route)
+    assert store.fights[18].status == STATUS_BLOCKED
+    assert store.fights[18].blocked_at == 22
+    assert store.fights[18].sample_index() == 18  # budget back on fight
+
+
+def test_sample_payforward_equal_fight_budgets(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("RE1_YAWN_PAYFORWARD_RIPPLE", "1")
+    monkeypatch.setenv(
+        "RE1_YAWN_PAYFORWARD_STATE", str(tmp_path / "payforward_ripple.json")
+    )
+    cells_dir = tmp_path / "states" / "yawn_rails" / "cells"
+    cells = []
+    # Two fights: 18→19 and 22→23
+    specs = [
+        (18, 70),
+        (19, 40),
+        (20, 40),
+        (21, 40),
+        (22, 60),
+        (23, 30),
+    ]
+    for idx, ammo in specs:
+        d = cells_dir / f"cp{idx:02d}"
+        d.mkdir(parents=True)
+        (d / "cell.State").write_bytes(b"x" * 100)
+        (d / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+        cells.append(_row(idx, ammo))
+    stage = {
+        "route_id": "yawn_quest_v2",
+        "route_path": "data/yawn_checkpoint_route.json",
+        "route_steps": list(range(1, 40)),
+        "legs_per_episode": 1,
+        "cells_manifest": "states/yawn_rails/manifest.json",
+    }
+    # Point project_root so state path resolves under tmp via env override only.
+    # sample_payforward_options uses cells list directly for choice.
+    counts: Counter[int] = Counter()
+    rng = random.Random(0)
+    for _ in range(4000):
+        opts = sample_payforward_options(tmp_path, stage, cells, rng=rng)
+        assert opts is not None
+        assert opts["leg_span"] == 1
+        # route_start_index = cell+1
+        counts[int(opts["route_start_index"]) - 1] += 1
+    # Latest (23) ~20%; fights 18 and 22 split ~40% each while grinding.
+    assert counts[23] / 4000 > 0.12
+    assert counts[18] / 4000 > 0.25
+    assert counts[22] / 4000 > 0.25
+
+
+def test_new_fight_appears_on_reconcile(tmp_path: Path) -> None:
+    store = PayforwardRippleStore(tmp_path / "pf.json")
+    cells = [_row(18, 50), _row(19, 50), _row(20, 50)]
+    store.reconcile(cells)
+    assert store.fights == {}
+    cells[1] = _row(19, 30)  # 18>19 fight appears
+    store.reconcile(cells)
+    assert list(store.fights) == [18]
+    cells.append(_row(21, 10))  # 20>21 new fight
+    cells[2] = _row(20, 40)
+    store.reconcile(cells)
+    assert sorted(store.fights) == [18, 20]
+
+
+def test_quality_beats_sanity() -> None:
+    assert quality_beats((96, 56, 1, 10, 1, 0, 0), (80, 103, 2, 11, 1, 0, 0))

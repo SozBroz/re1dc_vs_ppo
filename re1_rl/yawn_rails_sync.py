@@ -405,6 +405,21 @@ def try_install_yawn_cell(
         tmp = man_p.with_suffix(f".{os.getpid()}.tmp")
         tmp.write_text(json.dumps(man, indent=2) + "\n", encoding="utf-8")
         os.replace(tmp, man_p)
+        try:
+            from re1_rl.yawn_rails_payforward import notify_payforward_install
+
+            notify_payforward_install(
+                Path(project_root),
+                installed_index=idx,
+                cells=[
+                    r
+                    for r in (man.get("cells") or [])
+                    if isinstance(r, dict)
+                    and int(r.get("checkpoint_index", -1)) >= 18
+                ],
+            )
+        except (OSError, ValueError, TypeError, KeyError):
+            pass
         return True
 
 
@@ -675,6 +690,33 @@ class YawnRailsCellStore:
                 if accepted:
                     self.archive_version += 1
                     self._persist_unlocked()
+        if accepted:
+            try:
+                from re1_rl.yawn_rails_payforward import notify_payforward_install
+
+                # self.root is states/yawn_rails → project root is parents[1].
+                project = (
+                    self.root.parent.parent
+                    if self.root.name == "yawn_rails"
+                    else Path(self.root)
+                )
+                cells = []
+                for idx, row in self.cells.items():
+                    if int(idx) < 18:
+                        continue
+                    entry = dict(row)
+                    entry["checkpoint_index"] = int(idx)
+                    cells.append(entry)
+                for cid in accepted:
+                    try:
+                        idx = int(str(cid).replace("cp", ""))
+                    except ValueError:
+                        continue
+                    notify_payforward_install(
+                        project, installed_index=idx, cells=cells
+                    )
+            except (OSError, ValueError, TypeError, KeyError, AttributeError):
+                pass
         return accepted
 
     def _ingest_one_unlocked(self, prop: dict[str, Any]) -> str | None:
