@@ -244,6 +244,7 @@ class PayforwardRippleStore:
             self.fights[int(fr.fight_index)] = fr
 
     def save(self) -> None:
+        """Best-effort atomic write. Never raise — multi-actor Windows races are OK."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "schema_version": _SCHEMA,
@@ -253,10 +254,36 @@ class PayforwardRippleStore:
                 str(k): v.to_dict() for k, v in sorted(self.fights.items())
             },
         }
+        text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
         tmp = self.path.with_suffix(f".{os.getpid()}.tmp")
-        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        os.replace(tmp, self.path)
-        self.updated_unix = float(payload["updated_unix"])
+        try:
+            tmp.write_text(text, encoding="utf-8")
+        except OSError:
+            return
+        for attempt in range(8):
+            try:
+                os.replace(tmp, self.path)
+                self.updated_unix = float(payload["updated_unix"])
+                return
+            except OSError:
+                time.sleep(0.01 * (attempt + 1))
+        try:
+            if tmp.is_file():
+                tmp.unlink()
+        except OSError:
+            pass
+
+    def refresh_from_disk(self) -> None:
+        """Reload JSON if another process advanced tips (install path)."""
+        if not self.path.is_file():
+            return
+        try:
+            mtime = float(self.path.stat().st_mtime)
+        except OSError:
+            return
+        if mtime <= float(self.updated_unix) + 1e-6:
+            return
+        self.load()
 
     def _merge_discovered(
         self,
@@ -414,7 +441,10 @@ class PayforwardRippleStore:
         by_idx = {int(r["checkpoint_index"]): r for r in eligible}
         idxs = sorted(by_idx)
         latest = idxs[-1]
-        self.reconcile(eligible, route=route, persist=True)
+        # Never persist on the sample path — dozens of actors would race
+        # os.replace on Windows and crash the fleet (PermissionError).
+        self.refresh_from_disk()
+        self.reconcile(eligible, route=route, persist=False)
         if not self.fights:
             return None
         if rng.random() < float(latest_weight):
@@ -500,38 +530,41 @@ def sample_payforward_options(
         return None
     if not cells:
         return None
-    route_path = stage.get("route_path")
-    route: list[dict[str, Any]] = []
-    if route_path:
-        rp = Path(project_root) / str(route_path)
-        if rp.is_file():
-            try:
-                raw = json.loads(rp.read_text(encoding="utf-8"))
-                if isinstance(raw, list):
-                    route = raw
-            except (OSError, json.JSONDecodeError):
-                route = []
-    if not route:
-        route = _load_route(project_root)
-    store = get_payforward_store(project_root)
-    pick = store.choose_cell_index(cells, rng, route=route)
-    if pick is None:
+    try:
+        route_path = stage.get("route_path")
+        route: list[dict[str, Any]] = []
+        if route_path:
+            rp = Path(project_root) / str(route_path)
+            if rp.is_file():
+                try:
+                    raw = json.loads(rp.read_text(encoding="utf-8"))
+                    if isinstance(raw, list):
+                        route = raw
+                except (OSError, json.JSONDecodeError):
+                    route = []
+        if not route:
+            route = _load_route(project_root)
+        store = get_payforward_store(project_root)
+        pick = store.choose_cell_index(cells, rng, route=route)
+        if pick is None:
+            return None
+        by_idx = {int(r["checkpoint_index"]): r for r in cells}
+        chosen = by_idx.get(int(pick))
+        if chosen is None:
+            return None
+        start_index = int(chosen["checkpoint_index"]) + 1
+        route_steps = list(stage.get("route_steps", []))
+        remaining = max(1, len(route_steps) - start_index)
+        return {
+            "route_start_index": start_index,
+            "leg_span": min(1, remaining),
+            "reset_source": "route_cell",
+            "pb_bundle": {
+                "state_path": str(chosen["state_path"]),
+                "sidecar_path": str(chosen["sidecar_path"]),
+                "source": "yawn_rails",
+            },
+            "payforward_fight_ripple": True,
+        }
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
         return None
-    by_idx = {int(r["checkpoint_index"]): r for r in cells}
-    chosen = by_idx.get(int(pick))
-    if chosen is None:
-        return None
-    start_index = int(chosen["checkpoint_index"]) + 1
-    route_steps = list(stage.get("route_steps", []))
-    remaining = max(1, len(route_steps) - start_index)
-    return {
-        "route_start_index": start_index,
-        "leg_span": min(1, remaining),
-        "reset_source": "route_cell",
-        "pb_bundle": {
-            "state_path": str(chosen["state_path"]),
-            "sidecar_path": str(chosen["sidecar_path"]),
-            "source": "yawn_rails",
-        },
-        "payforward_fight_ripple": True,
-    }

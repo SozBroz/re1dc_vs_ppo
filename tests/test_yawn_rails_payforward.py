@@ -180,3 +180,29 @@ def test_new_fight_appears_on_reconcile(tmp_path: Path) -> None:
 
 def test_quality_beats_sanity() -> None:
     assert quality_beats((96, 56, 1, 10, 1, 0, 0), (80, 103, 2, 11, 1, 0, 0))
+
+
+def test_choose_cell_does_not_persist(tmp_path: Path) -> None:
+    cells = [_row(18, 70), _row(19, 40), _row(20, 40)]
+    path = tmp_path / "payforward_ripple.json"
+    store = PayforwardRippleStore(path)
+    pick = store.choose_cell_index(cells, random.Random(0))
+    assert pick in {18, 19, 20}
+    assert not path.is_file()  # sample path must not write
+
+
+def test_save_swallows_replace_errors(tmp_path: Path, monkeypatch) -> None:
+    import os
+
+    from re1_rl.yawn_rails_payforward import FightRuntime
+
+    path = tmp_path / "payforward_ripple.json"
+    store = PayforwardRippleStore(path)
+    store.fights[18] = FightRuntime(18, 20, STATUS_GRIND)
+
+    def _boom(*_a, **_k):
+        raise PermissionError("simulated")
+
+    monkeypatch.setattr(os, "replace", _boom)
+    store.save()  # must not raise
+    assert not path.is_file()
