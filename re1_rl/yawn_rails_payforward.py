@@ -26,10 +26,12 @@ _LATEST_WEIGHT = 0.20
 _FIGHT_BUDGET = 0.80
 
 # Optimistic HG-eq ammo bonuses for route items_gained (pickup legs).
+# Shotgun: wall rack is ~7 shells; 7*25//4=43 under-shoots observed cp22→23
+# gains (~+47), so use a cushion — false "blocked" stops the whole ripple.
 _PICKUP_AMMO_BONUS: dict[str, int] = {
-    "shotgun": 43,  # ~7 shells * 25 // 4
+    "shotgun": 50,
     "handgun_bullets": 15,
-    "shotgun_shells": 43,
+    "shotgun_shells": 50,
     "acid_rounds": 15,
     "explosive_rounds": 15,
     "flame_rounds": 15,
@@ -104,19 +106,25 @@ def discover_fights(cells: list[dict[str, Any]]) -> list[FightStretch]:
     return out
 
 
+def _pickup_names(route_step: dict[str, Any] | None) -> list[str]:
+    if not route_step:
+        return []
+    from re1_rl.item_todo import canonical_item
+
+    return [
+        canonical_item(str(x))
+        for x in (route_step.get("items_gained") or [])
+        if str(x).strip()
+    ]
+
+
 def project_end_quality(
     start_q: Quality | list[int] | tuple[int, ...],
     route_step: dict[str, Any] | None,
 ) -> Quality:
     """Optimistic quality after completing ``route_step`` (no HP loss)."""
     hp, ammo, healing, slots, poison, neg_ribbons, neg_box = normalize_quality(start_q)
-    if not route_step:
-        return (hp, ammo, healing, slots, poison, neg_ribbons, neg_box)
-    gained = [str(x) for x in (route_step.get("items_gained") or []) if str(x).strip()]
-    for raw in gained:
-        from re1_rl.item_todo import canonical_item
-
-        name = canonical_item(raw)
+    for name in _pickup_names(route_step):
         ammo += int(_PICKUP_AMMO_BONUS.get(name, 0))
         if name in _HEALING_NAMES:
             healing += 1
@@ -134,14 +142,48 @@ def project_end_quality(
     )
 
 
+def strip_pickup_bonuses(
+    end_q: Quality | list[int] | tuple[int, ...],
+    route_step: dict[str, Any] | None,
+) -> Quality:
+    """Reverse optimistic pickup bonuses (incumbent already includes the gain)."""
+    hp, ammo, healing, slots, poison, neg_ribbons, neg_box = normalize_quality(end_q)
+    for name in _pickup_names(route_step):
+        ammo = max(0, ammo - int(_PICKUP_AMMO_BONUS.get(name, 0)))
+        if name in _HEALING_NAMES:
+            healing = max(0, healing - 1)
+        if name:
+            slots = max(0, slots - 1)
+    return (
+        int(hp),
+        int(ammo),
+        int(healing),
+        int(slots),
+        int(poison),
+        int(neg_ribbons),
+        int(neg_box),
+    )
+
+
 def hop_blocked(
     tip_q: Quality | list[int] | tuple[int, ...],
     succ_q: Quality | list[int] | tuple[int, ...],
     route_step: dict[str, Any] | None,
 ) -> bool:
-    """True if even optimistic end quality cannot beat the successor incumbent."""
+    """True only if tip cannot beat succ even with optimistic pickup accounting.
+
+    Two checks (either clears the hop):
+    1. tip + projected gains beats incumbent end quality
+    2. tip beats incumbent with those gains stripped (pre-pickup vs pre-pickup)
+    """
     projected = project_end_quality(tip_q, route_step)
-    return not quality_beats(projected, succ_q)
+    if quality_beats(projected, succ_q):
+        return False
+    if _pickup_names(route_step):
+        succ_base = strip_pickup_bonuses(succ_q, route_step)
+        if quality_beats(normalize_quality(tip_q), succ_base):
+            return False
+    return True
 
 
 def default_payforward_state_path(project_root: Path | str) -> Path:
@@ -338,6 +380,22 @@ class PayforwardRippleStore:
         if route is None:
             return
         for fr in self.fights.values():
+            # Re-open a sticky block when tip/succ qualities improve enough.
+            if fr.status == STATUS_BLOCKED and fr.blocked_at is not None:
+                tip = int(fr.blocked_at)
+                succ = tip + 1
+                if tip in by_idx and succ in by_idx:
+                    nid = _next_checkpoint_id_for_cell(by_idx[tip], by_idx.get(succ))
+                    step = _route_step_by_checkpoint_id(route, nid)
+                    if not hop_blocked(
+                        _cell_quality(by_idx[tip]),
+                        _cell_quality(by_idx[succ]),
+                        step,
+                    ):
+                        fr.status = STATUS_RIPPLING
+                        fr.ripple_tip = tip
+                        fr.blocked_at = None
+                continue
             if fr.status != STATUS_RIPPLING or fr.ripple_tip is None:
                 continue
             tip = int(fr.ripple_tip)

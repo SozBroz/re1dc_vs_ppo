@@ -60,7 +60,7 @@ def test_project_end_quality_shotgun_and_clip() -> None:
     start = (96, 56, 1, 10, 1, 0, 0)
     shotgun = project_end_quality(start, {"items_gained": ["shotgun"]})
     assert shotgun[0] == 96
-    assert shotgun[1] == 56 + 43
+    assert shotgun[1] == 56 + 50
     assert shotgun[3] == 11  # slots +1
     clip = project_end_quality(start, {"items_gained": ["handgun_bullets"]})
     assert clip[1] == 56 + 15
@@ -74,6 +74,46 @@ def test_hop_blocked_uses_projection_not_raw_ammo() -> None:
     assert not hop_blocked(tip, succ, {"items_gained": ["shotgun"]})
     # Healthier tip beats richer ammo successor even without pickup.
     assert not hop_blocked((96, 56, 1, 10, 1, 0, 0), (80, 103, 2, 11, 1, 0, 0), None)
+
+
+def test_hop_blocked_shotgun_leg_does_not_false_stop_at_cp22() -> None:
+    """Incumbent cp23 already includes shotgun ammo; tip with more HG must proceed.
+
+    Old +43 projection: 56+43=99 < 103 → false block. Strip/cushion fixes it.
+    """
+    tip = (80, 56, 1, 10, 1, 0, 0)
+    succ = (80, 103, 2, 11, 1, 0, 73)
+    step = {"items_gained": ["shotgun"]}
+    assert not hop_blocked(tip, succ, step)
+    # Richer tip (11 more HG-eq) clearly clears.
+    assert not hop_blocked((80, 67, 1, 10, 1, 0, 0), succ, step)
+
+
+def test_blocked_hop_reopens_when_tip_quality_improves(tmp_path: Path) -> None:
+    cells = [_row(18, 70)] + [_row(i, 40, hp=40) for i in range(19, 24)]
+    cells[5] = _row(23, 200, hp=40)  # index 23-18=5
+    # flatten: cells[0]=18 ... cells[5]=23
+    store = PayforwardRippleStore(tmp_path / "pf_reopen.json")
+    route = [
+        {"checkpoint_id": "cp19_id", "items_gained": []},
+        {"checkpoint_id": "cp20_id", "items_gained": []},
+        {"checkpoint_id": "cp21_id", "items_gained": []},
+        {"checkpoint_id": "cp22_id", "items_gained": []},
+        {"checkpoint_id": "cp23_id", "items_gained": ["shotgun"]},
+    ]
+    store.reconcile(cells, route=route)
+    # Force tip at 22 blocked against rich 23.
+    store.fights[18].status = STATUS_BLOCKED
+    store.fights[18].blocked_at = 22
+    store.fights[18].ripple_tip = None
+    store.reconcile(cells, route=route)
+    assert store.fights[18].status == STATUS_BLOCKED
+
+    # Improve tip HP so projected/stripped check clears → reopen rippling.
+    cells[4] = _row(22, 40, hp=96)
+    store.reconcile(cells, route=route)
+    assert store.fights[18].status == STATUS_RIPPLING
+    assert store.fights[18].ripple_tip == 22
 
 
 def test_ripple_store_on_install_and_block(tmp_path: Path) -> None:
