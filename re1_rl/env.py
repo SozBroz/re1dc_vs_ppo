@@ -247,6 +247,10 @@ _DEATH_FAILURE_REASONS = frozenset(
     }
 )
 
+# OPTIONS / legacy CONFIG traps: dismiss and keep the episode alive (never
+# hard-reset — dismiss_options_menu is the recovery path).
+_OPTIONS_MENU_REASONS = frozenset({"options_menu", "pause_or_options_menu"})
+
 
 def _prune_square_pillarbox(square: np.ndarray) -> np.ndarray:
     """Deprecated; pillarbox is cropped before resize now."""
@@ -2202,6 +2206,61 @@ class RE1Env(gym.Env):
             )
         return (not still), report
 
+    def _recover_options_menu(
+        self, action: int
+    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]] | None:
+        """Dismiss OPTIONS/CONFIG; never end the episode for that trap.
+
+        Returns a soft non-terminal step if still trapped after retries, else
+        ``None`` so the caller can continue the normal step path.
+        """
+        report: dict[str, Any] = {}
+        recovered = False
+        for _attempt in range(2):
+            recovered, report = self._try_dismiss_options_menu()
+            if recovered:
+                break
+        menu_reason = self._probe_outside_gameplay()
+        if menu_reason not in _OPTIONS_MENU_REASONS:
+            return None
+        port = getattr(self.bridge, "port", "?")
+        print(
+            f"[options_dismiss_persist] port={port} action={action} "
+            f"recovered={recovered} report={report}",
+            flush=True,
+        )
+        return self._options_menu_soft_continue(action, report=report)
+
+    def _options_menu_soft_continue(
+        self,
+        action: int,
+        *,
+        report: dict[str, Any],
+    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
+        """Stay in-episode after a failed OPTIONS dismiss (0 reward, not done)."""
+        del action
+        self._skipping_flag = False
+        self._sticky_input.reset()
+        self._step_count += 1
+        try:
+            frame_obs = self._capture_step_obs()
+            state = self._read_state(track_items=False)
+        except (OSError, RuntimeError, ValueError):
+            state = dict(self._prev_state)
+            frame_obs = self.bridge.build_frame_stack()
+            if frame_obs.shape != FRAME_SHAPE:
+                frame_obs = np.zeros(FRAME_SHAPE, dtype=np.uint8)
+        obs = self._build_obs(frame_obs, state)
+        info: dict[str, Any] = {
+            "room_id": state.get("room_id"),
+            "episode_failure": None,
+            "options_dismiss_persist": True,
+            "options_dismiss_report": report,
+            "visited_rooms": sorted(self._progress.visited_rooms),
+            "n_rooms_visited": len(self._progress.visited_rooms),
+        }
+        return obs, 0.0, False, False, info
+
     def _inventory_macro_owns_item_menu(self, action: int) -> bool:
         """True while equip/use/combine/box UI (or any bridge macro) owns the ITEM screen."""
         if bool(getattr(self, "_macro_active", False)):
@@ -3385,11 +3444,11 @@ class RE1Env(gym.Env):
             if self._dismiss_non_box_pause_menu_if_safe():
                 self._skipping_flag = False
         menu_reason = self._probe_outside_gameplay()
-        if menu_reason in {"options_menu", "pause_or_options_menu"}:
-            recovered, _options_report = self._try_dismiss_options_menu()
-            if recovered:
-                menu_reason = self._probe_outside_gameplay()
-            # If still trapped (or another failure), fall through to terminate.
+        if menu_reason in _OPTIONS_MENU_REASONS:
+            options_step = self._recover_options_menu(action)
+            if options_step is not None:
+                return options_step
+            menu_reason = self._probe_outside_gameplay()
         # Item-box UI: only gs mid-byte 0x90 (probe_box_ui_open). Pickup Yes/No
         # and START/ITEM also sit in the pause tree in box rooms (118).
         if bool(getattr(self, "_box_ui_open", False)):
@@ -3431,12 +3490,23 @@ class RE1Env(gym.Env):
                     if self._dismiss_non_box_pause_menu_if_safe():
                         self._skipping_flag = False
                         menu_reason = self._probe_outside_gameplay()
+        if menu_reason in _OPTIONS_MENU_REASONS:
+            options_step = self._recover_options_menu(action)
+            if options_step is not None:
+                return options_step
+            menu_reason = self._probe_outside_gameplay()
         if menu_reason in _DEATH_FAILURE_REASONS:
             death = self._death_step(
                 action, died_during_skip=False, died_during_step=True
             )
             if death is not None:
                 return death
+            menu_reason = None
+        if menu_reason in _OPTIONS_MENU_REASONS:
+            # Belt-and-suspenders: OPTIONS must never hard-reset the episode.
+            options_step = self._recover_options_menu(action)
+            if options_step is not None:
+                return options_step
             menu_reason = None
         if menu_reason:
             return self._outside_gameplay_step(action, reason=menu_reason)
@@ -3702,10 +3772,13 @@ class RE1Env(gym.Env):
                 action_id=int(action),
             )
         menu_reason = self._probe_outside_gameplay()
-        if menu_reason in {"options_menu", "pause_or_options_menu"}:
-            recovered, options_dismiss_report = self._try_dismiss_options_menu()
-            if recovered:
-                menu_reason = self._probe_outside_gameplay()
+        if menu_reason in _OPTIONS_MENU_REASONS:
+            options_step = self._recover_options_menu(action)
+            if options_step is not None:
+                return options_step
+            menu_reason = self._probe_outside_gameplay()
+        if menu_reason in _OPTIONS_MENU_REASONS:
+            menu_reason = None
         if menu_reason:
             return self._outside_gameplay_step(action, reason=menu_reason)
         # The first illegal pre-Kenneth 106 entry marks the terminal observation
