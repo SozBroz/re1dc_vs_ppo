@@ -5,9 +5,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+import re1_rl.item_box as item_box_mod  # noqa: E402
 from re1_rl.item_box import (  # noqa: E402
     BOX_SLOTS,
     INVENTORY_SLOTS,
@@ -20,6 +23,12 @@ from re1_rl.item_box import (  # noqa: E402
     plan_deposit,
     plan_withdraw,
 )
+
+
+@pytest.fixture
+def magic_box_writes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit-test apply_* planners; live training keeps magic writes off."""
+    monkeypatch.setattr(item_box_mod, "MAGIC_BOX_RAM_WRITES_ENABLED", True)
 from re1_rl.memory_map import (  # noqa: E402
     EQUIPPED_WEAPON_ID,
     EQUIPPED_SLOT_INDEX_1BASED,
@@ -77,7 +86,7 @@ class FakeBridge:
                 blk[off + 1] = qty
 
 
-def test_deposit_happy_path():
+def test_deposit_happy_path(magic_box_writes):
     inv = [(0x02, 15), (0x01, 1)] + [(0, 0)] * 6
     box = _empty_box()
     ok, reason = can_deposit(inv, box, 0)
@@ -100,7 +109,18 @@ def test_deposit_happy_path():
     assert len(bridge.writes) == 1
 
 
-def test_deposit_lockpick_refused():
+def test_apply_refuses_when_magic_writes_disabled():
+    inv = [(0x02, 15)] + [(0, 0)] * 7
+    box = [(0x0C, 5)] + [(0, 0)] * (BOX_SLOTS - 1)
+    bridge = FakeBridge(inventory=inv, box=box)
+    dep = apply_deposit(bridge, 0, equipped_weapon_id=0)
+    wdraw = apply_withdraw(bridge, 0)
+    assert dep["ok"] is False and dep["reason"] == "magic_box_ram_writes_disabled"
+    assert wdraw["ok"] is False and wdraw["reason"] == "magic_box_ram_writes_disabled"
+    assert bridge.writes == []
+
+
+def test_deposit_lockpick_refused(magic_box_writes):
     inv = [(LOCKPICK_ITEM_ID, 1)] + [(0, 0)] * 7
     box = _empty_box()
     ok, reason = can_deposit(inv, box, 0)
@@ -163,7 +183,7 @@ def test_deposit_never_overwrites_occupied_box_slots():
     assert new_inv[0] == (0, 0) and new_inv[1] == (0, 0) and new_inv[2] == (0, 0)
 
 
-def test_apply_deposit_full_same_id_stack_uses_empty_not_merge():
+def test_apply_deposit_full_same_id_stack_uses_empty_not_merge(magic_box_writes):
     inv = [(0x0B, 50)] + [(0, 0)] * 7
     box = [(0x0B, 50)] + [(0, 0)] * (BOX_SLOTS - 1)
     bridge = FakeBridge(inventory=inv, box=box)
@@ -194,7 +214,7 @@ def test_withdraw_to_full_inventory_allowed_when_merge_fits():
     assert ok and reason == ""
 
 
-def test_withdraw_happy_path():
+def test_withdraw_happy_path(magic_box_writes):
     inv = [(0x01, 1)] + [(0, 0)] * 7
     box = [(0x0C, 5)] + [(0, 0)] * (BOX_SLOTS - 1)
     ok, reason = can_withdraw(inv, box, 0)
@@ -251,7 +271,7 @@ def test_plan_functions_leave_gaps_no_compaction():
     assert new_box2[0] == (0, 0)
 
 
-def test_apply_deposit_unequips_equipped_weapon():
+def test_apply_deposit_unequips_equipped_weapon(magic_box_writes):
     inv = [(0x02, 15)] + [(0, 0)] * 7
     box = _empty_box()
     bridge = FakeBridge(inventory=inv, box=box)
@@ -268,7 +288,7 @@ def test_apply_deposit_unequips_equipped_weapon():
     assert unequip == {(EQUIPPED_WEAPON_ID, 0), (EQUIPPED_SLOT_INDEX_1BASED, 0)}
 
 
-def test_apply_deposit_does_not_unequip_other_item():
+def test_apply_deposit_does_not_unequip_other_item(magic_box_writes):
     inv = [(0x41, 1)] + [(0, 0)] * 7
     box = _empty_box()
     bridge = FakeBridge(inventory=inv, box=box)

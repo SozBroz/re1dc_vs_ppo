@@ -2298,20 +2298,19 @@ class RE1Env(gym.Env):
     def _handle_box_ui_action(
         self, action: int
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]] | None:
-        """Open-box PPO: withdraw/deposit/close.
+        """Open-box PPO: withdraw/close via authentic UI (no inv/box RAM writes).
 
-        Policy picks source slot; ``apply_*`` places into the right dest while
-        the box UI is open. Close is Triangle UI (no RAM write). Closed-box
-        magic transfers stay disabled.
+        Policy picks the source box slot; the game places into inventory.
+        Deposit stays policy-gated off. Close is Triangle.
         """
-        from re1_rl.attack_macro import read_equipped_weapon
         from re1_rl.herb_combine import combine_slot_from_action
-        from re1_rl.item_box import (
-            BOX_DEPOSIT_POLICY_ENABLED,
-            apply_deposit,
-            apply_withdraw,
+        from re1_rl.item_box import BOX_DEPOSIT_POLICY_ENABLED
+        from re1_rl.item_box_ui_macro import (
+            close_box_ui,
+            execute_box_deposit_ui,
+            execute_box_withdraw_ui,
+            probe_box_ui_open,
         )
-        from re1_rl.item_box_ui_macro import close_box_ui, probe_box_ui_open
 
         if not self._box_ui_open:
             return None
@@ -2377,30 +2376,32 @@ class RE1Env(gym.Env):
                     magic_report={"ok": False, "reason": "box_withdraw_slot_expected"},
                 )
             box_slot = a - WITHDRAW_ACTION_BASE
+            self._sticky_input.reset()
+            self._macro_active = True
             try:
-                report = apply_withdraw(self.bridge, box_slot)
+                died, frames, report = execute_box_withdraw_ui(
+                    self.bridge,
+                    box_slot,
+                    prev_hp=prev_hp,
+                    episode_start_hp=episode_start_hp,
+                )
             except (OSError, RuntimeError, ValueError) as exc:
+                died, frames = False, 0
                 report = {"ok": False, "reason": f"error:{exc}", "moved": None}
+            finally:
+                self._macro_active = False
+                self._sticky_input.reset()
             if report.get("ok") and report.get("moved") is not None:
                 report = {**report, "box_transfer": "withdraw"}
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_cache = None
-            sticky, pulse, pulse_hold = self._sticky_input.apply(0, ACTION_BUTTON_MAP)
-            _, died = self.bridge.step(
-                n=self.frame_skip,
-                sticky=sticky,
-                pulse=pulse,
-                pulse_hold=pulse_hold,
-                ring_stride=0,
-                capture_final=True,
-            )
             try:
                 self._box_ui_open = probe_box_ui_open(self.bridge)
             except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
                 self._box_ui_open = True
             return self._submenu_step(
                 a,
-                step_emulated_frames=self.frame_skip,
+                step_emulated_frames=max(int(frames), self.frame_skip),
                 magic_report=report,
                 died=bool(died),
             )
@@ -2420,32 +2421,31 @@ class RE1Env(gym.Env):
                     step_emulated_frames=self.frame_skip,
                     magic_report={"ok": False, "reason": "box_deposit_slot_expected"},
                 )
+            # Deposit uses UI macros only (never apply_deposit RAM writes).
+            self._sticky_input.reset()
+            self._macro_active = True
             try:
-                report = apply_deposit(
+                died, frames, report = execute_box_deposit_ui(
                     self.bridge,
                     int(slot),
-                    equipped_weapon_id=read_equipped_weapon(self.bridge),
+                    prev_hp=prev_hp,
+                    episode_start_hp=episode_start_hp,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
+                died, frames = False, 0
                 report = {"ok": False, "reason": f"error:{exc}", "moved": None}
+            finally:
+                self._macro_active = False
+                self._sticky_input.reset()
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_cache = None
-            sticky, pulse, pulse_hold = self._sticky_input.apply(0, ACTION_BUTTON_MAP)
-            _, died = self.bridge.step(
-                n=self.frame_skip,
-                sticky=sticky,
-                pulse=pulse,
-                pulse_hold=pulse_hold,
-                ring_stride=0,
-                capture_final=True,
-            )
             try:
                 self._box_ui_open = probe_box_ui_open(self.bridge)
             except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
                 self._box_ui_open = True
             return self._submenu_step(
                 a,
-                step_emulated_frames=self.frame_skip,
+                step_emulated_frames=max(int(frames), self.frame_skip),
                 magic_report=report,
                 died=bool(died),
             )

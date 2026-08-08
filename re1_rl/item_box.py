@@ -19,11 +19,10 @@ that change which art a slot should show, call
 ``sync_inventory_icons_after_knife_ammo_swap`` (or apply a GPURAM patch from
 ``inventory_icons``) while the ITEM UI is open.
 
-**Live policy (2026-08-07):** ``MAGIC_BOX_RAM_WRITES_ENABLED`` is False — the
-env must not call ``apply_*`` while the box UI is *closed* (that path scuffed
-post-cp41 states). While the box UI is open, the env may still call ``apply_*``
-for destination placement after the policy picks a source slot; close uses the
-Triangle UI macro.
+**Live policy (2026-08-07):** ``MAGIC_BOX_RAM_WRITES_ENABLED`` is False.
+``apply_deposit`` / ``apply_withdraw`` refuse ``write_ram`` while False.
+Training transfers go through ``item_box_ui_macro`` (Cross/Triangle) only —
+open-box RAM placement also scuffed box/inventory state.
 """
 
 from __future__ import annotations
@@ -52,8 +51,9 @@ INVENTORY_SLOTS = 8
 LOCKPICK_ITEM_ID = 0x31
 
 # Env must leave these False — magic writes scuffed post-cp41 states.
+# When False, ``apply_deposit`` / ``apply_withdraw`` are no-ops (no write_ram).
 MAGIC_BOX_RAM_WRITES_ENABLED = False
-# Policy: withdraw + close only until deposit is re-enabled.
+# Policy: withdraw + close only until deposit UI is re-enabled.
 BOX_DEPOSIT_POLICY_ENABLED = False
 
 BOX_ROOMS = frozenset({"100", "118", "30E", "403", "502", "50E", "600", "618"})
@@ -213,7 +213,17 @@ def apply_deposit(
     *,
     equipped_weapon_id: int,
 ) -> dict[str, Any]:
-    """Validate, plan, write inventory + box; unequip if depositing equipped weapon."""
+    """Validate, plan, write inventory + box; unequip if depositing equipped weapon.
+
+    No-op when ``MAGIC_BOX_RAM_WRITES_ENABLED`` is False (live training).
+    """
+    if not MAGIC_BOX_RAM_WRITES_ENABLED:
+        return {
+            "ok": False,
+            "reason": "magic_box_ram_writes_disabled",
+            "moved": None,
+            "unequipped": False,
+        }
     inventory = read_inventory(bridge)
     box = read_box(bridge)
     ok, reason = can_deposit(inventory, box, inv_slot)
@@ -248,7 +258,17 @@ def apply_deposit(
 
 
 def apply_withdraw(bridge: _BridgeReadWrite, box_slot: int) -> dict[str, Any]:
-    """Validate, plan, write inventory + box."""
+    """Validate, plan, write inventory + box.
+
+    No-op when ``MAGIC_BOX_RAM_WRITES_ENABLED`` is False (live training).
+    """
+    if not MAGIC_BOX_RAM_WRITES_ENABLED:
+        return {
+            "ok": False,
+            "reason": "magic_box_ram_writes_disabled",
+            "moved": None,
+            "unequipped": False,
+        }
     inventory = read_inventory(bridge)
     box = read_box(bridge)
     ok, reason = can_withdraw(inventory, box, box_slot)
