@@ -2828,8 +2828,8 @@ class RE1Env(gym.Env):
                     magic_report["menu_dismiss"] = dismiss_report
                     magic_report["menu_recovered"] = bool(recovered)
                 elif magic_report.get("reason") == "equip_ok":
-                    # Block reopening EQUIP for the next policy step.
-                    self._equip_switch_cooldown = 1
+                    # Block reopening EQUIP for the next few policy steps.
+                    self._equip_switch_cooldown = 5
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, self.frame_skip
                 magic_report = {"ok": False, "reason": f"error:{exc}"}

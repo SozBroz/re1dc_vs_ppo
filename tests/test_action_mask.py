@@ -301,6 +301,9 @@ def test_mask_blocks_equip_during_switch_cooldown() -> None:
     )
     assert action_mask(N_ACTIONS, None, **kwargs)[EQUIP_ACTION]
     assert not action_mask(
+        N_ACTIONS, None, equip_switch_cooldown=5, **kwargs
+    )[EQUIP_ACTION]
+    assert not action_mask(
         N_ACTIONS, None, equip_switch_cooldown=1, **kwargs
     )[EQUIP_ACTION]
 
