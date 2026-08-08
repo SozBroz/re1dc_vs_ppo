@@ -448,7 +448,7 @@ def quality_replace_significant(
     # Fewer on-person ink ribbons (higher -ribbons) is a real logistics win.
     if n[5] > o[5]:
         return True
-    # More damage-weighted ammo on-person (withdrawn from box) wins last.
+    # Less damage-weighted ammo left in the item box (higher -box_ammo) wins last.
     if n[6] > o[6]:
         return True
     return False
@@ -706,24 +706,25 @@ def compute_quality(
     ever_held: Iterable[str] | None = None,
     env: Any = None,
 ) -> Quality:
-    """Lexicographic quality: ``(hp, ammo, healing, slots, poison, -ink_ribbons, inv_ammo)``.
+    """Lexicographic quality: ``(hp, ammo, healing, slots, poison, -ink_ribbons, -box_ammo)``.
 
     ``ammo`` is damage-weighted firepower from on-person inventory **and the item
     box** (weapon loaded qty + reserve piles), using nominal max damage from
     ``weapon_damage`` almanac, scaled to handgun-round equivalents. ``healing`` /
-    ``ink_ribbons`` / ``inv_ammo`` come from on-person inventory only. ``slots``
-    is the count of distinct items in ``ever_held`` (sidecar semantics), not
-    occupied inventory slots. ``poison`` is ``1`` when healthy, ``0`` when
-    poisoned. Holding ink ribbons is penalized. ``inv_ammo`` is the same
-    damage-weighted score restricted to on-person slots — lowest-priority
-    tiebreaker so equal total firepower prefers ammo withdrawn into inventory.
+    ``ink_ribbons`` come from on-person inventory only. ``slots`` is the count of
+    distinct items in ``ever_held`` (sidecar semantics), not occupied inventory
+    slots. ``poison`` is ``1`` when healthy, ``0`` when poisoned. Holding ink
+    ribbons is penalized. ``-box_ammo`` is the negated damage-weighted ammo still
+    sitting in the item box — lowest-priority tiebreaker so equal total firepower
+    prefers ammo withdrawn (empty box → ``0`` beats ``-30``).
     """
     from re1_rl.weapon_damage import damage_weighted_ammo_score
 
     hp = int(state.get("hp", 0) or 0)
     inv_slots = _inventory_slots(state)
-    ammo = damage_weighted_ammo_score(_firepower_inventory(state, env=env))
-    inv_ammo = damage_weighted_ammo_score(inv_slots)
+    box_slots = _box_inventory_slots(state, env=env)
+    ammo = damage_weighted_ammo_score(inv_slots + box_slots)
+    box_ammo = damage_weighted_ammo_score(box_slots)
     healing = 0
     ribbons = 0
     for name, qty in inv_slots:
@@ -739,7 +740,7 @@ def compute_quality(
     from re1_rl.memory_map import player_poisoned_from_state
 
     poison_ok = 0 if player_poisoned_from_state(state) else 1
-    return (hp, ammo, healing, slots, poison_ok, -int(ribbons), inv_ammo)
+    return (hp, ammo, healing, slots, poison_ok, -int(ribbons), -int(box_ammo))
 
 
 def integrity_gate_ok(

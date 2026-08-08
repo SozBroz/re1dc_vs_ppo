@@ -396,6 +396,7 @@ class RE1Env(gym.Env):
         self._box_ui_open = False
         self._box_phase = BOX_PHASE_CHOOSE
         self._box_inv_cursor = 0
+        self._box_list_cursor = 0
         self._use_phase = 0
         self._inventory_before_use: list[tuple[int, int]] | None = None
         self._equip_phase = 0
@@ -1411,6 +1412,7 @@ class RE1Env(gym.Env):
         self._box_ui_open = False
         self._box_phase = BOX_PHASE_CHOOSE
         self._box_inv_cursor = 0
+        self._box_list_cursor = 0
         self._last_attack_obs = empty_last_attack()
         self._last_skip_frames = 0
         self._last_settled_skip_frames = 0
@@ -2223,13 +2225,16 @@ class RE1Env(gym.Env):
             if not self._box_ui_open:
                 self._box_ui_open = True
                 self._box_phase = BOX_PHASE_CHOOSE
-                # After open animation the cursor homes on inventory slot 0.
+                # After open animation the cursor homes on inventory slot 0;
+                # box list resumes at slot 0 on first Cross-in.
                 self._box_inv_cursor = 0
+                self._box_list_cursor = 0
             return
         if self._box_ui_open and not open_now:
             self._box_ui_open = False
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_inv_cursor = 0
+            self._box_list_cursor = 0
 
     def _probe_item_inventory_menu(self) -> bool:
         from re1_rl.ram_skip import item_inventory_screen_from_ram
@@ -2325,6 +2330,7 @@ class RE1Env(gym.Env):
         episode_start_hp = int(getattr(self, "_episode_start_hp", 0) or 0)
         phase = int(getattr(self, "_box_phase", BOX_PHASE_CHOOSE))
         inv_cursor = int(getattr(self, "_box_inv_cursor", 0) or 0)
+        box_cursor = int(getattr(self, "_box_list_cursor", 0) or 0)
 
         if a == BOX_CLOSE_ACTION:
             self._sticky_input.reset()
@@ -2342,6 +2348,7 @@ class RE1Env(gym.Env):
             self._box_ui_open = False
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_inv_cursor = 0
+            self._box_list_cursor = 0
             self._box_cache = None
             return self._submenu_step(
                 a,
@@ -2394,6 +2401,7 @@ class RE1Env(gym.Env):
                     prev_hp=prev_hp,
                     episode_start_hp=episode_start_hp,
                     inv_cursor=inv_cursor,
+                    box_cursor=box_cursor,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, 0
@@ -2405,6 +2413,8 @@ class RE1Env(gym.Env):
                 report = {**report, "box_transfer": "withdraw"}
             if report.get("inv_cursor") is not None:
                 self._box_inv_cursor = int(report["inv_cursor"])
+            if report.get("box_cursor") is not None:
+                self._box_list_cursor = int(report["box_cursor"])
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_cache = None
             try:
@@ -3209,6 +3219,7 @@ class RE1Env(gym.Env):
                     self._box_ui_open = True
                     self._box_phase = BOX_PHASE_CHOOSE
                     self._box_inv_cursor = 0
+                    self._box_list_cursor = 0
                     self._skipping_flag = False
                 else:
                     recovered, _item_report = self._try_dismiss_orphan_item_menu()

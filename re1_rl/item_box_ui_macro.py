@@ -4,9 +4,12 @@ RE1 DC box flow (imperator scaffolding 2026-08-07):
   - Interact opens the box; after the animation the cursor is on inventory
     slot 0 (top-left).
   - Withdraw: move to an **empty** inventory slot → Cross (cursor enters the
-    box list on slot 0) → Up/Down to the source box slot → Cross. The game
-    places the item in the chosen empty slot and leaves the cursor on it.
-  - Next withdraw: from that cursor, move to the next empty inv slot → …
+    box list; resume position is the last box slot selected this session,
+    slot 0 after a fresh open) → Up/Down to the source box slot → Cross.
+    The game places the item in the chosen empty slot and leaves the cursor
+    on it.
+  - Next withdraw: from that inv cursor, move to the next empty inv slot → …
+    (box-list cursor must be tracked; assuming slot 0 breaks 1-then-0 order).
   - Close: from the inventory cursor, Down to the EXIT button → Cross.
     Triangle remains a fallback dismiss.
 
@@ -166,6 +169,28 @@ def _confirm_cross(
     )
     frames += f
     return died, frames
+
+
+def _navigate_box_list(
+    client: Any,
+    from_slot: int,
+    to_slot: int,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int]:
+    """Up/Down within the box item list (not the inventory grid)."""
+    delta = int(to_slot) - int(from_slot)
+    if delta == 0:
+        return False, 0
+    direction = "down" if delta > 0 else "up"
+    return _move(
+        client,
+        direction,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+        taps=abs(delta),
+    )
 
 
 def _navigate_inventory(
@@ -336,12 +361,15 @@ def execute_box_withdraw_ui(
     prev_hp: int,
     episode_start_hp: int,
     inv_cursor: int = 0,
+    box_cursor: int = 0,
 ) -> tuple[bool, int, dict[str, Any]]:
     """Withdraw ``box_slot`` via empty-inv-slot → box list → Cross.
 
     ``inv_cursor`` is the inventory slot the red cursor is on at entry
-    (0 after open). On success, ``report['inv_cursor']`` is the destination
-    slot (where the withdrawn item now sits).
+    (0 after open). ``box_cursor`` is where the box list resumes when Cross
+    enters it (last selected box slot this session; 0 after fresh open).
+    On success, ``report['inv_cursor']`` is the destination inventory slot
+    and ``report['box_cursor']`` is the box slot just taken.
     """
     report: dict[str, Any] = {
         "ok": False,
@@ -349,6 +377,7 @@ def execute_box_withdraw_ui(
         "box_slot": int(box_slot),
         "moved": None,
         "inv_cursor": int(inv_cursor),
+        "box_cursor": int(box_cursor),
     }
     frames = 0
     if not probe_box_ui_open(client):
@@ -401,7 +430,7 @@ def execute_box_withdraw_ui(
         report["frames"] = frames
         return True, frames, report
 
-    # Cross on empty slot → cursor enters box list at slot 0.
+    # Cross on empty slot → box list resumes at ``box_cursor`` (not always 0).
     died, f = _confirm_cross(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
@@ -411,19 +440,19 @@ def execute_box_withdraw_ui(
         report["frames"] = frames
         return True, frames, report
 
-    if slot > 0:
-        died, f = _move(
-            client,
-            "down",
-            prev_hp=prev_hp,
-            episode_start_hp=episode_start_hp,
-            taps=slot,
-        )
-        frames += f
-        if died:
-            report["died"] = True
-            report["frames"] = frames
-            return True, frames, report
+    list_from = max(0, min(BOX_SLOTS - 1, int(box_cursor)))
+    died, f = _navigate_box_list(
+        client,
+        list_from,
+        slot,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+    )
+    frames += f
+    if died:
+        report["died"] = True
+        report["frames"] = frames
+        return True, frames, report
 
     died, f = _confirm_cross(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
@@ -482,6 +511,8 @@ def execute_box_withdraw_ui(
     report["moved"] = (item_id, moved_qty)
     # Cursor rests on the withdrawn stack in inventory.
     report["inv_cursor"] = int(dest)
+    # Next Cross-into-box resumes on this list index.
+    report["box_cursor"] = int(slot)
     return False, frames, report
 
 

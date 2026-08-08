@@ -81,7 +81,7 @@ def test_compute_quality_tuple() -> None:
     assert q[3] == 4  # ever_held-style distinct items (inventory fallback)
     assert q[4] == 1  # not poisoned (poison RAM disabled → always healthy)
     assert q[5] == 0  # no ink ribbons
-    assert q[6] == 15 + 30  # on-person ammo weight (same as total when box empty)
+    assert q[6] == 0  # -box_ammo; empty box
     q_poison = compute_quality(_good_state(poisoned=True))
     assert q_poison[4] == 1  # ignored until TRUST_PLAYER_POISON_RAM
 
@@ -113,12 +113,12 @@ def test_compute_quality_ammo_includes_box_cache() -> None:
     q_box = compute_quality(with_box)
     assert q_person[1] == 10
     assert q_box[1] == 10 + 15 + 20
-    assert q_person[6] == 10
-    assert q_box[6] == 10  # inv_ammo ignores box
+    assert q_person[6] == 0  # empty box
+    assert q_box[6] == -(15 + 20)  # -box_ammo
 
 
-def test_compute_quality_prefers_on_person_ammo_at_lowest_priority() -> None:
-    """Equal total firepower: more ammo withdrawn into inventory wins last."""
+def test_compute_quality_prefers_empty_box_at_lowest_priority() -> None:
+    """Equal total firepower: less ammo left in the box wins last (-0 > -25)."""
     from re1_rl.go_explore_archive import quality_beats
 
     boxed = _good_state(
@@ -132,8 +132,8 @@ def test_compute_quality_prefers_on_person_ammo_at_lowest_priority() -> None:
     q_boxed = compute_quality(boxed, ever_held={"handgun_bullets"})
     q_drawn = compute_quality(withdrawn, ever_held={"handgun_bullets"})
     assert q_boxed[1] == q_drawn[1] == 30
-    assert q_boxed[6] == 5
-    assert q_drawn[6] == 30
+    assert q_boxed[6] == -25
+    assert q_drawn[6] == 0
     assert quality_beats(q_drawn, q_boxed)
     assert not quality_beats(q_boxed, q_drawn)
     assert quality_replace_significant(q_drawn, q_boxed)

@@ -38,9 +38,9 @@ def test_quality_beats_lexicographic() -> None:
     assert quality_beats((9, 0, 0, 0, 0), (8, 99, 99, 99, 99))
     assert not quality_beats((8, 12, 2, 3, 0), (8, 12, 2, 3, 0))
     assert quality_beats((8, 13, 0, 0, 0), (8, 12, 9, 9, 9))
-    # Lowest priority: on-person ammo weight (withdraw bias).
-    assert quality_beats((8, 30, 0, 0, 1, 0, 30), (8, 30, 0, 0, 1, 0, 5))
-    assert not quality_beats((8, 30, 0, 0, 1, 0, 5), (8, 30, 0, 0, 1, 0, 30))
+    # Lowest priority: less ammo left in the box (higher -box_ammo) wins.
+    assert quality_beats((8, 30, 0, 0, 1, 0, 0), (8, 30, 0, 0, 1, 0, -30))
+    assert not quality_beats((8, 30, 0, 0, 1, 0, -30), (8, 30, 0, 0, 1, 0, 0))
 
 
 def test_upsert_and_frontier_yawn_filter(tmp_path: Path) -> None:

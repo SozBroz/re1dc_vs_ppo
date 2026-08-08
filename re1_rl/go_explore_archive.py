@@ -11,7 +11,7 @@ JSON schema (v2)::
         "room_id": "105",
         "tile_bin": [3, 1],
         "milestone_digest": "gallery:idle",
-        "quality": [hp, ammo_dmg_weighted, healing, ever_held_count, poison, -ink_ribbons, inv_ammo],
+        "quality": [hp, ammo_dmg_weighted, healing, ever_held_count, poison, -ink_ribbons, -box_ammo],
         "visit_count": 2,
         "bundle_path": null,
         "meta": {}
@@ -51,7 +51,7 @@ _MAX_CELLS_PER_ROOM_ENV = "RE1_GO_MAX_CELLS_PER_ROOM"
 _DEFAULT_MAX_CELLS_PER_ROOM = 40
 
 # (hp, ammo_dmg_weighted, healing, ever_held_count, poison_ok,
-#  -ink_ribbons_in_inventory, on_person_ammo_dmg_weighted)
+#  -ink_ribbons_in_inventory, -box_ammo_dmg_weighted)
 Quality = tuple[int, int, int, int, int, int, int]
 QUALITY_LEN = 7
 
