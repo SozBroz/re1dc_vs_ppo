@@ -11,7 +11,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.gallery_puzzle import (
+    GALLERY_COMPLETE_PREV_RAW,
     GALLERY_EXIT_TARGET,
+    GALLERY_FINAL_SWITCH_TARGET,
     GALLERY_STEP_REWARD,
     GALLERY_STEP_VALUES,
     GALLERY_TARGETS,
@@ -24,17 +26,35 @@ from re1_rl.reward import compute_reward
 from tests.test_scaffolding import make_planner, make_state
 
 
-def _state(*, room: str = "117", raw: int = 0, confirm: int = 0, inventory=()):
+def _state(
+    *,
+    room: str = "117",
+    raw: int = 0,
+    confirm: int = 0,
+    inventory=(),
+    x: float = 2900.0,
+    z: float = 10000.0,
+):
     return make_state(
         room=room,
-        x=2900,
-        z=10000,
+        x=x,
+        z=z,
         facing=0,
         gallery_progress=raw,
         gallery_confirm=confirm,
         inventory=list(inventory),
         new_items=[],
     )
+
+
+def _at_final(*, raw: int = 0, confirm: int = 0, inventory=()):
+    fx, fz = GALLERY_FINAL_SWITCH_TARGET
+    return _state(raw=raw, confirm=confirm, inventory=inventory, x=fx, z=fz)
+
+
+def _at_old_man(*, raw: int = GALLERY_COMPLETE_PREV_RAW, confirm: int = 2):
+    ox, oz = GALLERY_TARGETS[5]
+    return _state(raw=raw, confirm=confirm, x=ox, z=oz)
 
 
 def _reward(progress: ProgressTracker, prev: dict, state: dict):
@@ -133,7 +153,7 @@ def test_gallery_clawback_full_magnitude_on_rails() -> None:
     assert bd["gallery"] == pytest.approx(-8.0)
 
 
-def test_leaving_gallery_claws_back_partial_sequence() -> None:
+def test_leaving_gallery_mid_sequence_ends_episode() -> None:
     progress = ProgressTracker()
     progress.first_visit("117")
     first = _state(raw=GALLERY_STEP_VALUES[0])
@@ -142,14 +162,10 @@ def test_leaving_gallery_claws_back_partial_sequence() -> None:
     outside = _state(room="106", raw=GALLERY_STEP_VALUES[0])
     _total, bd = _reward(progress, first, outside)
     assert bd["gallery"] == pytest.approx(-GALLERY_STEP_REWARD)
-    assert bd["gallery_wrong"] == 0.0
+    assert bd["gallery_wrong"] == pytest.approx(-GALLERY_WRONG_PORTRAIT_PENALTY)
     assert progress.gallery_pending_reward == 0.0
     assert progress.gallery_needs_reentry
-    assert not progress.gallery_wrong_breached
-
-    reentered = _state()
-    _reward(progress, outside, reentered)
-    assert not progress.gallery_needs_reentry
+    assert progress.gallery_wrong_breached
 
 
 def test_wrong_first_confirmation_locks_rewards_and_points_to_exit() -> None:
@@ -184,13 +200,16 @@ def test_final_switch_transient_ram_not_wrong_portrait() -> None:
         _reward(progress, prev, state)
         prev = state
 
-    transient = _state(raw=1)
-    _total, bd = _reward(progress, prev, transient)
+    # Walk to the final switch before settle noise / clear.
+    at_final = _at_final(raw=GALLERY_COMPLETE_PREV_RAW)
+    _reward(progress, prev, at_final)
+    transient = _at_final(raw=1)
+    _total, bd = _reward(progress, at_final, transient)
     assert bd["gallery_wrong"] == 0.0
     assert not progress.gallery_wrong_breached
     assert not progress.gallery_puzzle_solved
 
-    complete = _state(raw=0)
+    complete = _at_final(raw=0)
     _total, bd = _reward(progress, transient, complete)
     assert bd["gallery_wrong"] == 0.0
     assert progress.gallery_puzzle_solved
@@ -205,12 +224,12 @@ def test_post_puzzle_confirm_noise_not_wrong_portrait() -> None:
         _reward(progress, prev, state)
         prev = state
 
-    complete = _state(raw=0, confirm=2)
+    complete = _at_final(raw=0, confirm=2)
     _reward(progress, prev, complete)
     assert progress.gallery_puzzle_solved
 
-    crest_reveal = _state(raw=0, confirm=10)
-    settled = _state(raw=0, confirm=2)
+    crest_reveal = _at_final(raw=0, confirm=10)
+    settled = _at_final(raw=0, confirm=2)
     _total, bd = _reward(progress, settled, crest_reveal)
     assert bd["gallery_wrong"] == 0.0
     assert not progress.gallery_wrong_breached
@@ -225,13 +244,50 @@ def test_final_switch_clears_progress_without_wrong_portrait_terminal() -> None:
         _reward(progress, prev, state)
         prev = state
 
-    complete = _state(raw=0)
+    complete = _at_final(raw=0)
     _total, bd = _reward(progress, prev, complete)
     assert bd["gallery"] == 0.0
     assert bd["gallery_wrong"] == 0.0
     assert progress.gallery_puzzle_solved
     assert not progress.gallery_wrong_breached
     assert progress.gallery_pending_reward == pytest.approx(6 * GALLERY_STEP_REWARD)
+
+
+def test_reclick_old_man_after_six_ends_episode() -> None:
+    """Progress→0 away from the final switch is a ruined sequence, not solve."""
+    progress = ProgressTracker()
+    progress.first_visit("117")
+    prev = _state()
+    for raw in GALLERY_STEP_VALUES:
+        state = _state(raw=raw)
+        _reward(progress, prev, state)
+        prev = state
+
+    ruined = _at_old_man(raw=0, confirm=4)
+    _total, bd = _reward(progress, prev, ruined)
+    assert bd["gallery"] == pytest.approx(-6 * GALLERY_STEP_REWARD)
+    assert bd["gallery_wrong"] == pytest.approx(-GALLERY_WRONG_PORTRAIT_PENALTY)
+    assert progress.gallery_wrong_breached
+    assert not progress.gallery_puzzle_solved
+
+
+def test_confirm_edge_on_old_man_while_awaiting_final_ends_episode() -> None:
+    progress = ProgressTracker()
+    progress.first_visit("117")
+    prev = _state(confirm=2)
+    for raw in GALLERY_STEP_VALUES:
+        state = _state(raw=raw, confirm=2)
+        _reward(progress, prev, state)
+        prev = state
+
+    at_old = _at_old_man(raw=GALLERY_COMPLETE_PREV_RAW, confirm=2)
+    _reward(progress, prev, at_old)
+    assert not progress.gallery_wrong_breached
+    reclick = _at_old_man(raw=GALLERY_COMPLETE_PREV_RAW, confirm=6)
+    _total, bd = _reward(progress, at_old, reclick)
+    assert bd["gallery_wrong"] == pytest.approx(-GALLERY_WRONG_PORTRAIT_PENALTY)
+    assert progress.gallery_wrong_breached
+    assert not progress.gallery_puzzle_solved
 
 
 def test_star_crest_finalizes_sequence_without_gallery_double_pay() -> None:

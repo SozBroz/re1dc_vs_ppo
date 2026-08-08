@@ -814,6 +814,8 @@ def compute_reward(
             prev_confirm=int(prev_state.get("gallery_confirm", 0) or 0),
             confirm=int(state.get("gallery_confirm", 0) or 0),
             star_crest_held="star_crest" in inventory,
+            x=float(state.get("x", 0) or 0),
+            z=float(state.get("z", 0) or 0),
         )
         bd["gallery"] = gallery_pay
         bd["gallery_wrong"] = gallery_wrong

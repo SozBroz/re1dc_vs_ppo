@@ -36,11 +36,19 @@ GALLERY_EXIT_TARGET = (3200.0, 11700.0)  # ROOM1170.RDT door to room 10A
 # Final "end of life" switch (slot 8); crest spawns here after puzzle completion.
 GALLERY_FINAL_SWITCH_TARGET = GALLERY_TARGETS[-1]
 GALLERY_COMPLETE_PREV_RAW = GALLERY_STEP_VALUES[-1]
+# Far enough for the slot-8 AOT, short enough to exclude portrait 6 (old man).
+GALLERY_FINAL_SWITCH_RADIUS = 2500.0
 
 
 def completed_steps(raw_progress: int) -> int:
     """Decode the game's one-hot progress byte to 0..6 completed portraits."""
     return int(GALLERY_VALUE_TO_COUNT.get(int(raw_progress), 0))
+
+
+def near_gallery_final_switch(x: float, z: float) -> bool:
+    """True when Jill is at the end-of-life switch (7th press), not a portrait."""
+    tx, tz = GALLERY_FINAL_SWITCH_TARGET
+    return math.hypot(float(x) - tx, float(z) - tz) <= GALLERY_FINAL_SWITCH_RADIUS
 
 
 def encode_gallery_hint(state: dict[str, Any]) -> np.ndarray:

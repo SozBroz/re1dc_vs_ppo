@@ -376,12 +376,19 @@ class ProgressTracker:
         prev_confirm: int,
         confirm: int,
         star_crest_held: bool,
+        x: float = 0.0,
+        z: float = 0.0,
     ) -> tuple[float, float]:
-        """Pay ordered Gallery steps; claw back partial rewards on wrong portrait.
+        """Pay ordered Gallery steps; claw back + terminate on any deviation.
 
-        Returns ``(gallery_pay, gallery_wrong_penalty)``. Wrong portrait pays
-        clawback on pending steps plus ``-GALLERY_WRONG_PORTRAIT_PENALTY`` and
-        marks the episode terminal via ``breach_gallery_wrong()``.
+        Exact sequence is the six portraits then the end-of-life switch (7).
+        Wrong / out-of-order / re-click / leave-before-solve all claw back
+        pending step pay, apply ``-GALLERY_WRONG_PORTRAIT_PENALTY``, and mark
+        the episode terminal via ``breach_gallery_wrong()``.
+
+        Progress clearing to 0 after portrait 6 only counts as solved when Jill
+        is at the final switch — a re-clicked portrait clears the same RAM byte
+        and must not be treated as success.
         """
         from re1_rl.gallery_puzzle import (
             GALLERY_COMPLETE_PREV_RAW,
@@ -391,7 +398,16 @@ class ProgressTracker:
             GALLERY_STEP_VALUES,
             GALLERY_WRONG_PORTRAIT_PENALTY,
             completed_steps,
+            near_gallery_final_switch,
         )
+
+        def _fail() -> tuple[float, float]:
+            clawback = -self.gallery_pending_reward * GALLERY_STEP_CLAWBACK_SCALE
+            self.gallery_step_index = 0
+            self.gallery_pending_reward = 0.0
+            self.gallery_needs_reentry = True
+            self.breach_gallery_wrong()
+            return clawback, -GALLERY_WRONG_PORTRAIT_PENALTY
 
         if self.gallery_completed:
             return 0.0, 0.0
@@ -410,14 +426,28 @@ class ProgressTracker:
             return 0.0, 0.0
 
         if left:
+            started = (
+                self.gallery_step_index > 0
+                or self.gallery_pending_reward > 0.0
+                or int(prev_raw) != 0
+            )
             clawback = -self.gallery_pending_reward * GALLERY_STEP_CLAWBACK_SCALE
             self.gallery_needs_reentry = True
             self.gallery_step_index = 0
             self.gallery_pending_reward = 0.0
+            if (
+                started
+                and not self.gallery_puzzle_solved
+                and not self.gallery_completed
+                and self.breach_gallery_wrong()
+            ):
+                return clawback, -GALLERY_WRONG_PORTRAIT_PENALTY
             return clawback, 0.0
         if str(room) != GALLERY_ROOM_ID:
             return 0.0, 0.0
         if self.gallery_needs_reentry:
+            return 0.0, 0.0
+        if self.gallery_puzzle_solved:
             return 0.0, 0.0
 
         prev_count = completed_steps(prev_raw)
@@ -434,16 +464,29 @@ class ProgressTracker:
             self.gallery_step_index >= len(GALLERY_STEP_VALUES)
             or int(prev_raw) == GALLERY_COMPLETE_PREV_RAW
         )
-        if awaiting_final and int(raw) == 0:
-            self.gallery_puzzle_solved = True
-            self.gallery_step_index = len(GALLERY_STEP_VALUES)
-            return 0.0, 0.0
-
-        if self.gallery_puzzle_solved:
-            return 0.0, 0.0
+        near_final = near_gallery_final_switch(x, z)
 
         if awaiting_final:
-            # Final-switch / crest-reveal transients (e.g. 2→1) before RAM settles.
+            # True completion: progress clears at the end-of-life switch only.
+            if int(raw) == 0 and int(prev_raw) != 0:
+                if near_final:
+                    self.gallery_puzzle_solved = True
+                    self.gallery_step_index = len(GALLERY_STEP_VALUES)
+                    return 0.0, 0.0
+                return _fail()
+            # Re-confirming a portrait (same last value, confirm edge) ruins it.
+            if (
+                int(raw) == int(prev_raw) == GALLERY_COMPLETE_PREV_RAW
+                and int(confirm) != int(prev_confirm)
+                and int(confirm) != 0
+                and not near_final
+            ):
+                return _fail()
+            # Settle noise (e.g. 2→1→0) only tolerated at the final switch.
+            if near_final:
+                return 0.0, 0.0
+            if int(raw) != int(prev_raw):
+                return _fail()
             return 0.0, 0.0
 
         wrong_reset = int(raw) == 0 and int(prev_raw) != 0
@@ -457,12 +500,7 @@ class ProgressTracker:
             int(raw) != int(prev_raw) and count != self.gallery_step_index
         )
         if wrong_reset or wrong_first or unexpected_transition:
-            clawback = -self.gallery_pending_reward * GALLERY_STEP_CLAWBACK_SCALE
-            self.gallery_step_index = 0
-            self.gallery_pending_reward = 0.0
-            self.gallery_needs_reentry = True
-            self.breach_gallery_wrong()
-            return clawback, -GALLERY_WRONG_PORTRAIT_PENALTY
+            return _fail()
         return 0.0, 0.0
 
     def breach_gallery_wrong(self) -> bool:
