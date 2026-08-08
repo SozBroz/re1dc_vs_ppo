@@ -3143,6 +3143,16 @@ class RE1Env(gym.Env):
         else:
             knife_near = combat_enemy_count(enemies, knife=True)
             gun_near = combat_enemy_count(enemies)
+        # Refresh before masking so pickup Yes/No in room 118 cannot keep a
+        # stale box-UI session (would hide noop→Cross).
+        if bridge is not None and (
+            bool(getattr(self, "_box_ui_open", False))
+            or self._current_room_is_box_room()
+        ):
+            try:
+                self._sync_box_ui_session_from_ram()
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                pass
         box_ui_open = bool(getattr(self, "_box_ui_open", False))
         # Box UI clears in_control; still refresh box contents for the mask.
         if box_ui_open and bridge is not None and box is None:
@@ -3275,23 +3285,40 @@ class RE1Env(gym.Env):
             if recovered:
                 menu_reason = self._probe_outside_gameplay()
             # If still trapped (or another failure), fall through to terminate.
-        # Item-box UI (same RAM signature as START/ITEM): leave open in box rooms.
-        # Elsewhere, orphan START/ITEM pause still gets dismissed (policy has no Start).
+        # Item-box UI: only gs mid-byte 0x90 (probe_box_ui_open). Pickup Yes/No
+        # and START/ITEM also sit in the pause tree in box rooms (118) — treating
+        # those as the box stole noop→Cross confirms and left agents stuck.
         if bool(getattr(self, "_box_ui_open", False)):
             self._sync_box_ui_session_from_ram()
         elif not self._inventory_macro_owns_item_menu(int(action)):
             if self._probe_item_inventory_menu():
+                from re1_rl.item_box_ui_macro import probe_box_ui_open
+
+                real_box = False
                 if self._current_room_is_box_room():
+                    try:
+                        real_box = bool(probe_box_ui_open(self.bridge))
+                    except (
+                        OSError,
+                        RuntimeError,
+                        ValueError,
+                        AttributeError,
+                        TypeError,
+                    ):
+                        real_box = False
+                if real_box:
                     self._box_ui_open = True
                     self._box_phase = BOX_PHASE_CHOOSE
                     self._box_inv_cursor = 0
                     self._box_list_cursor = 0
                     self._skipping_flag = False
-                else:
+                elif not self._current_room_is_box_room():
                     recovered, _item_report = self._try_dismiss_orphan_item_menu()
                     if recovered:
                         self._skipping_flag = False
                         menu_reason = self._probe_outside_gameplay()
+                # else: box-room pause modal (e.g. chemical Yes/No) — leave open;
+                # in_control false + pause_menu_modal maps noop → Cross.
         if menu_reason in _DEATH_FAILURE_REASONS:
             death = self._death_step(
                 action, died_during_skip=False, died_during_step=True

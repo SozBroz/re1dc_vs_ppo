@@ -58,6 +58,32 @@ def test_noop_taps_cross_on_pause_menu_yes_no() -> None:
     assert button_map_for_action(9, pause_menu_modal=True)[9] == {"cross": True}
 
 
+def test_pause_modal_not_treated_as_box_ui_mask() -> None:
+    """Chemical Yes/No in room 118 must keep noop legal (not box withdraw/close)."""
+    from re1_rl.action_mask import (
+        BOX_CLOSE_ACTION,
+        BOX_PHASE_CHOOSE,
+        BOX_WITHDRAW_ACTION,
+        action_mask,
+    )
+    from re1_rl.env import ACTION_NAMES
+
+    m = action_mask(
+        len(ACTION_NAMES),
+        None,
+        in_control=False,
+        box_ui_open=False,
+        in_box_room=True,
+        room_id="118",
+        box_phase=BOX_PHASE_CHOOSE,
+        inventory=[(0x01, 0)] + [(0, 0)] * 7,
+        box=[(0x0B, 15)] + [(0, 0)] * 15,
+    )
+    assert m[0]
+    assert not m[BOX_WITHDRAW_ACTION]
+    assert not m[BOX_CLOSE_ACTION]
+
+
 def test_attacks_are_adjacent() -> None:
     assert (ATTACK_UP_ACTION, ATTACK_ACTION, ATTACK_DOWN_ACTION) == (6, 7, 8)
 
