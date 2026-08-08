@@ -298,15 +298,36 @@ def close_item_screen(
     prev_hp: int,
     episode_start_hp: int,
 ) -> tuple[bool, int]:
-    """Close ITEM screen opened from gameplay; retry until in-mansion control."""
+    """Close ITEM/status via Triangle (cancel).
+
+    RE1 DC manual: Start opens the status screen; Triangle cancels on it.
+    Closing with Start *toggles* and often reopens the menu — then orphan
+    dismiss Triangle-closes it (looks like open → flash → close).
+    """
     from re1_rl.game_session import outside_gameplay_reason
 
     frames = 0
-    for attempt in range(5):
+    for _attempt in range(int(CLOSE_TRIANGLE_MAX_ATTEMPTS)):
+        if not _item_menu_confirmed(client):
+            ram = client.read_ram(
+                [
+                    ("game_mode", GAME_MODE, "u8"),
+                    ("game_state", GAME_STATE, "u32"),
+                    ("player_hp", PLAYER_HP, "u16"),
+                ]
+            )
+            if int(ram.get("game_mode", 0)) & IN_CONTROL_MASK:
+                if (
+                    outside_gameplay_reason(ram, episode_start_hp=episode_start_hp)
+                    is None
+                ):
+                    return False, frames
+            return False, frames
+
         died, f = _tap(
             client,
-            {"start": True},
-            frames=CLOSE_START_FRAMES,
+            {"triangle": True},
+            frames=CLOSE_TRIANGLE_FRAMES,
             prev_hp=prev_hp,
             episode_start_hp=episode_start_hp,
         )
@@ -315,7 +336,7 @@ def close_item_screen(
             return True, frames
         died, f = _wait(
             client,
-            frames=CLOSE_ITEM_SETTLE_FRAMES,
+            frames=CLOSE_TRIANGLE_SETTLE_FRAMES,
             prev_hp=prev_hp,
             episode_start_hp=episode_start_hp,
         )
@@ -323,37 +344,20 @@ def close_item_screen(
         if died:
             return True, frames
 
-        ram = client.read_ram(
-            [
-                ("game_mode", GAME_MODE, "u8"),
-                ("game_state", GAME_STATE, "u32"),
-                ("player_hp", PLAYER_HP, "u16"),
-            ]
-        )
-        if int(ram.get("game_mode", 0)) & IN_CONTROL_MASK:
-            if outside_gameplay_reason(ram, episode_start_hp=episode_start_hp) is None:
-                return False, frames
-
-        if attempt < 4:
-            died, f = _tap(
-                client,
-                {"cross": True},
-                frames=8,
-                prev_hp=prev_hp,
-                episode_start_hp=episode_start_hp,
+        if not _item_menu_confirmed(client):
+            ram = client.read_ram(
+                [
+                    ("game_mode", GAME_MODE, "u8"),
+                    ("game_state", GAME_STATE, "u32"),
+                    ("player_hp", PLAYER_HP, "u16"),
+                ]
             )
-            frames += f
-            if died:
-                return True, frames
-            died, f = _wait(
-                client,
-                frames=12,
-                prev_hp=prev_hp,
-                episode_start_hp=episode_start_hp,
-            )
-            frames += f
-            if died:
-                return True, frames
+            if int(ram.get("game_mode", 0)) & IN_CONTROL_MASK:
+                if (
+                    outside_gameplay_reason(ram, episode_start_hp=episode_start_hp)
+                    is None
+                ):
+                    return False, frames
     return False, frames
 
 
@@ -411,7 +415,7 @@ def dismiss_orphan_item_menu(
     """
     from re1_rl.ram_skip import document_examine_ui_from_ram
 
-    report: dict[str, Any] = {"cleared": False, "path": "close_item_screen"}
+    report: dict[str, Any] = {"cleared": False, "path": "triangle_cancel"}
     if not _item_menu_confirmed(client):
         report["cleared"] = True
         report["skipped"] = True
@@ -436,23 +440,13 @@ def dismiss_orphan_item_menu(
         report["frames"] = int(frames)
         return still, frames, report
 
+    # Normal ITEM/STATUS: Triangle cancel only (never Start — Start reopens).
     died, frames = close_item_screen(
         client,
         prev_hp=prev_hp,
         episode_start_hp=episode_start_hp,
     )
     still = _item_menu_confirmed(client)
-    if still and not died:
-        died_tri, tri_frames = close_document_examine_ui(
-            client,
-            prev_hp=prev_hp,
-            episode_start_hp=episode_start_hp,
-        )
-        frames += tri_frames
-        died = bool(died or died_tri)
-        still = _item_menu_confirmed(client)
-        if not still:
-            report["path"] = "triangle_document"
     report["cleared"] = not still
     report["died"] = bool(died)
     report["frames"] = int(frames)

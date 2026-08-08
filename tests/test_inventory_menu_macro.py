@@ -10,8 +10,6 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.inventory_menu_macro import (
-    CLOSE_ITEM_SETTLE_FRAMES,
-    CLOSE_START_FRAMES,
     CLOSE_TRIANGLE_FRAMES,
     CLOSE_TRIANGLE_SETTLE_FRAMES,
     EQUIP_SUBMENU_CROSS_FRAMES,
@@ -44,8 +42,8 @@ class _RecordingClient:
         equipped_slot_1b: int = 0,
         inv_ids: list[int] | None = None,
         equip_target_slot: int | None = None,
-        start_closes_menu: bool = True,
-        triangle_closes_menu: bool = False,
+        start_opens_menu: bool = True,
+        triangle_closes_menu: bool = True,
         document_examine: bool = False,
     ) -> None:
         self.equipped_id = int(equipped_id)
@@ -53,14 +51,15 @@ class _RecordingClient:
         self.inv_ids = list(inv_ids or [0] * 8)
         self.equip_target_slot = equip_target_slot
         self.in_item_menu = False
-        self.start_closes_menu = bool(start_closes_menu)
+        self.start_opens_menu = bool(start_opens_menu)
         self.triangle_closes_menu = bool(triangle_closes_menu)
         self.document_examine = bool(document_examine)
         self.steps: list[tuple[dict[str, bool], int]] = []
 
     def step(self, buttons: dict[str, bool], n: int = 1):
         self.steps.append((dict(buttons), int(n)))
-        if buttons.get("start") and self.start_closes_menu:
+        # Start opens/toggles status; Triangle cancels (manual).
+        if buttons.get("start") and self.start_opens_menu:
             self.in_item_menu = not self.in_item_menu
         if buttons.get("triangle") and self.triangle_closes_menu:
             self.in_item_menu = False
@@ -131,14 +130,14 @@ def test_open_item_screen_already_open_closes_and_reopens() -> None:
     assert not died
     assert opened is True
     assert cursor == 0
-    # Start close + settle, then Start open + settle.
+    # Triangle cancel + settle, then Start open + settle.
     assert frames >= (
-        CLOSE_START_FRAMES
-        + CLOSE_ITEM_SETTLE_FRAMES
+        CLOSE_TRIANGLE_FRAMES
+        + CLOSE_TRIANGLE_SETTLE_FRAMES
         + OPEN_START_FRAMES
         + OPEN_SETTLE_FRAMES
     )
-    assert client.steps[0] == ({"start": True}, CLOSE_START_FRAMES)
+    assert client.steps[0] == ({"triangle": True}, CLOSE_TRIANGLE_FRAMES)
     assert any(b.get("start") for b, _ in client.steps[1:])
 
 
@@ -153,7 +152,7 @@ def test_execute_equip_macro_skips_already_equipped_knife() -> None:
     assert client.steps == []
 
 
-def test_execute_equip_macro_closes_item_screen_with_start() -> None:
+def test_execute_equip_macro_closes_item_screen_with_triangle() -> None:
     client = _RecordingClient(
         equipped_id=0, inv_ids=[0x01, 0x02], equip_target_slot=1,
     )
@@ -163,12 +162,15 @@ def test_execute_equip_macro_closes_item_screen_with_start() -> None:
     assert not died
     assert report["ok"] is True
     assert client.steps[0] == ({"start": True}, OPEN_START_FRAMES)
-    assert client.steps[-2] == ({"start": True}, CLOSE_START_FRAMES)
-    assert client.steps[-1] == ({}, CLOSE_ITEM_SETTLE_FRAMES)
+    assert client.steps[-2] == ({"triangle": True}, CLOSE_TRIANGLE_FRAMES)
+    assert client.steps[-1] == ({}, CLOSE_TRIANGLE_SETTLE_FRAMES)
     cross_steps = [s for s in client.steps if s[0].get("cross")]
     assert len(cross_steps) == 2
     assert cross_steps[0] == ({"cross": True}, EQUIP_SUBMENU_CROSS_FRAMES)
     assert cross_steps[1] == ({"cross": True}, EQUIP_SUBMENU_CROSS_FRAMES)
+    # Close must not use Start (that reopens the status screen).
+    close_steps = client.steps[-2:]
+    assert not any(b.get("start") for b, _ in close_steps)
     expected_min = (
         OPEN_START_FRAMES
         + OPEN_SETTLE_FRAMES
@@ -176,13 +178,13 @@ def test_execute_equip_macro_closes_item_screen_with_start() -> None:
         + EQUIP_SUBMENU_SETTLE_FRAMES
         + EQUIP_SUBMENU_CROSS_FRAMES
         + EQUIP_SUBMENU_SETTLE_FRAMES
-        + CLOSE_START_FRAMES
-        + CLOSE_ITEM_SETTLE_FRAMES
+        + CLOSE_TRIANGLE_FRAMES
+        + CLOSE_TRIANGLE_SETTLE_FRAMES
     )
     assert frames >= expected_min
 
 
-def test_dismiss_orphan_item_menu_closes_with_start() -> None:
+def test_dismiss_orphan_item_menu_closes_with_triangle() -> None:
     client = _RecordingClient()
     client.in_item_menu = True
     still, frames, report = dismiss_orphan_item_menu(
@@ -191,8 +193,10 @@ def test_dismiss_orphan_item_menu_closes_with_start() -> None:
     assert not still
     assert report["cleared"] is True
     assert report.get("skipped") is not True
-    assert frames >= CLOSE_START_FRAMES + CLOSE_ITEM_SETTLE_FRAMES
-    assert client.steps[0] == ({"start": True}, CLOSE_START_FRAMES)
+    assert report["path"] == "triangle_cancel"
+    assert frames >= CLOSE_TRIANGLE_FRAMES + CLOSE_TRIANGLE_SETTLE_FRAMES
+    assert client.steps[0] == ({"triangle": True}, CLOSE_TRIANGLE_FRAMES)
+    assert not any(b.get("start") for b, _ in client.steps)
     assert not client.in_item_menu
 
 
@@ -209,7 +213,7 @@ def test_dismiss_orphan_item_menu_skips_when_already_clear() -> None:
 
 
 def test_close_document_examine_ui_triangle() -> None:
-    client = _RecordingClient(start_closes_menu=False, triangle_closes_menu=True)
+    client = _RecordingClient(start_opens_menu=False, triangle_closes_menu=True)
     client.in_item_menu = True
     died, frames = close_document_examine_ui(
         client, prev_hp=96, episode_start_hp=96
@@ -223,7 +227,7 @@ def test_close_document_examine_ui_triangle() -> None:
 def test_dismiss_orphan_document_examine_triangle_direct() -> None:
     """QS1 botany book gs=0x40808100: Triangle immediately (no Start waste)."""
     client = _RecordingClient(
-        start_closes_menu=False,
+        start_opens_menu=False,
         triangle_closes_menu=True,
         document_examine=True,
     )
@@ -240,18 +244,17 @@ def test_dismiss_orphan_document_examine_triangle_direct() -> None:
     assert not client.in_item_menu
 
 
-def test_dismiss_orphan_falls_back_to_triangle_for_document() -> None:
-    """Unknown pause-tree leftover: Start fails, Triangle clears it."""
-    client = _RecordingClient(start_closes_menu=False, triangle_closes_menu=True)
+def test_close_item_screen_never_presses_start() -> None:
+    """Regression: Start-to-close reopens status; cancel must be Triangle."""
+    from re1_rl.inventory_menu_macro import close_item_screen
+
+    client = _RecordingClient()
     client.in_item_menu = True
-    still, frames, report = dismiss_orphan_item_menu(
-        client, prev_hp=96, episode_start_hp=96
-    )
-    assert not still
-    assert report["cleared"] is True
-    assert report["path"] == "triangle_document"
-    assert any(b.get("triangle") for b, _ in client.steps)
-    assert frames > CLOSE_START_FRAMES + CLOSE_ITEM_SETTLE_FRAMES
+    died, frames = close_item_screen(client, prev_hp=96, episode_start_hp=96)
+    assert not died
+    assert frames >= CLOSE_TRIANGLE_FRAMES + CLOSE_TRIANGLE_SETTLE_FRAMES
+    assert client.steps[0] == ({"triangle": True}, CLOSE_TRIANGLE_FRAMES)
+    assert not any(b.get("start") for b, _ in client.steps)
     assert not client.in_item_menu
 
 
