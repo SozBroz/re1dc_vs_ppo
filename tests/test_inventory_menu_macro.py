@@ -16,7 +16,9 @@ from re1_rl.inventory_menu_macro import (
     CLOSE_TRIANGLE_SETTLE_FRAMES,
     EQUIP_SUBMENU_CROSS_FRAMES,
     EQUIP_SUBMENU_SETTLE_FRAMES,
+    OPEN_CONFIRM_MAX_EXTRA,
     OPEN_SETTLE_FRAMES,
+    OPEN_START_ATTEMPTS,
     OPEN_START_FRAMES,
     close_document_examine_ui,
     dismiss_orphan_item_menu,
@@ -280,7 +282,7 @@ def test_inventory_macro_owns_item_menu_gating() -> None:
 
 
 def test_execute_equip_releases_if_start_does_not_open_menu() -> None:
-    """Hitstun ate Start: one attempt, confirm fail, no further menu inputs."""
+    """Hitstun ate Start: toggle-recovery attempts, then fail without slot nav."""
 
     class _DeafStartClient(_RecordingClient):
         def step(self, buttons: dict[str, bool], n: int = 1):
@@ -297,11 +299,11 @@ def test_execute_equip_releases_if_start_does_not_open_menu() -> None:
     assert not died
     assert report["ok"] is False
     assert report["reason"] == "item_menu_open_failed"
-    assert frames == OPEN_START_FRAMES + OPEN_SETTLE_FRAMES
-    assert client.steps == [
-        ({"start": True}, OPEN_START_FRAMES),
-        ({}, OPEN_SETTLE_FRAMES),
-    ]
+    # Two Start attempts + settle + confirm poll each; never Cross into slots.
+    per_attempt = OPEN_START_FRAMES + OPEN_SETTLE_FRAMES + OPEN_CONFIRM_MAX_EXTRA
+    assert frames == per_attempt * OPEN_START_ATTEMPTS
+    start_taps = [s for s in client.steps if s[0].get("start")]
+    assert len(start_taps) == OPEN_START_ATTEMPTS
     assert not any(b.get("cross") for b, _ in client.steps)
 
 

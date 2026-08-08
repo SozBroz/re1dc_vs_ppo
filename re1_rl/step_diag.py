@@ -323,6 +323,8 @@ class StepDiagLogger:
                         "equipped_before",
                         "equipped_after",
                         "frames",
+                        "game_mode",
+                        "game_state",
                     )
                     if k in report
                 }

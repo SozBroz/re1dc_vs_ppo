@@ -48,6 +48,11 @@ from re1_rl.weapon_equip import (
 INVENTORY_GRID_COLS = 2
 OPEN_START_FRAMES = 12
 OPEN_SETTLE_FRAMES = 40
+# After Start+settle, poll — ITEM gs sometimes lands late; also used between
+# toggle-recovery attempts when an undetected open menu made Start *close* it.
+OPEN_CONFIRM_POLL_FRAMES = 2
+OPEN_CONFIRM_MAX_EXTRA = 24
+OPEN_START_ATTEMPTS = 2
 MOVE_TAP_FRAMES = 8
 MOVE_SETTLE_FRAMES = 10
 SUBMENU_TAP_FRAMES = 15
@@ -179,23 +184,66 @@ def _wait(
     )
 
 
+def _read_menu_ram(client: Any) -> dict[str, int]:
+    ram = client.read_ram(
+        [
+            ("game_mode", GAME_MODE, "u8"),
+            ("game_state", GAME_STATE, "u32"),
+        ]
+    )
+    return {
+        "game_mode": int(ram.get("game_mode", 0)),
+        "game_state": int(ram.get("game_state", 0)),
+    }
+
+
+def _poll_item_menu_open(
+    client: Any,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+    max_extra: int = OPEN_CONFIRM_MAX_EXTRA,
+) -> tuple[bool, int, bool]:
+    """Poll for ITEM pause tree. Returns ``(died, frames, opened)``."""
+    frames = 0
+    if _item_menu_confirmed(client):
+        return False, frames, True
+    polls = max(0, int(max_extra) // int(OPEN_CONFIRM_POLL_FRAMES))
+    for _ in range(polls):
+        died, f = _wait(
+            client,
+            frames=OPEN_CONFIRM_POLL_FRAMES,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += f
+        if died:
+            return True, frames, False
+        if _item_menu_confirmed(client):
+            return False, frames, True
+    return False, frames, False
+
+
 def open_item_screen(
     client: Any,
     *,
     prev_hp: int,
     episode_start_hp: int,
 ) -> tuple[bool, int, int, bool]:
-    """One Start tap to open ITEM; proceed only if RAM confirms the menu.
+    """Start-tap to open ITEM; proceed only if RAM confirms the menu.
 
     Returns ``(died, frames, cursor_slot, opened)``. Cursor is always ``0`` on a
     successful open — live DC opens home on inventory slot 0 (not the equipped
-    weapon). Seeding from the equipped slot caused Up to land on EXIT and Cross
-    to dismiss the menu, so shotgun→knife equips never stuck.
+    weapon).
 
     If ITEM is already open (orphan pause), close and reopen so the cursor is
-    known. When closed, does **not** spam Start — if hitstun ate the press,
-    callers must release without further menu inputs.
+    known. After Start, poll for late gs, and if still closed try a second Start
+    (toggle recovery: an undetected open menu makes the first Start *close* it,
+    which used to abort as ``item_menu_open_failed`` before any slot navigation —
+    looked like “stuck on knife, never moved to the gun”).
     """
+    from re1_rl.ram_skip import options_menu_from_ram
+
     frames = 0
     if _item_menu_confirmed(client):
         died, f = close_item_screen(
@@ -207,19 +255,41 @@ def open_item_screen(
         if _item_menu_confirmed(client):
             # Still stuck in pause — do not tap Start again.
             return False, frames, 0, False
-    for buttons, n in (({"start": True}, OPEN_START_FRAMES), ({}, OPEN_SETTLE_FRAMES)):
-        died, f = _tap(
-            client,
-            buttons,
-            frames=n,
-            prev_hp=prev_hp,
-            episode_start_hp=episode_start_hp,
+
+    for attempt in range(int(OPEN_START_ATTEMPTS)):
+        for buttons, n in (
+            ({"start": True}, OPEN_START_FRAMES),
+            ({}, OPEN_SETTLE_FRAMES),
+        ):
+            died, f = _tap(
+                client,
+                buttons,
+                frames=n,
+                prev_hp=prev_hp,
+                episode_start_hp=episode_start_hp,
+            )
+            frames += f
+            if died:
+                return True, frames, 0, False
+        died, f, opened = _poll_item_menu_open(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
         )
         frames += f
         if died:
             return True, frames, 0, False
-    opened = _item_menu_confirmed(client)
-    return False, frames, 0, opened
+        if opened:
+            return False, frames, 0, True
+
+        menu_ram = _read_menu_ram(client)
+        if options_menu_from_ram(menu_ram):
+            from re1_rl.options_menu_macro import dismiss_options_menu
+
+            _still, f, _rep = dismiss_options_menu(
+                client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+            )
+            frames += f
+
+    return False, frames, 0, False
 
 
 def close_item_screen(
@@ -717,6 +787,7 @@ def execute_equip_macro(
     if died:
         return True, frames, {"ok": False, "reason": "died", "slot": slot}
     if not opened:
+        menu_ram = _read_menu_ram(client)
         return (
             False,
             frames,
@@ -726,6 +797,8 @@ def execute_equip_macro(
                 "slot": int(slot),
                 "item_id": target_id,
                 "frames": frames,
+                "game_mode": menu_ram["game_mode"],
+                "game_state": menu_ram["game_state"],
             },
         )
 
