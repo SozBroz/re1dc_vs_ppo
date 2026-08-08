@@ -47,6 +47,8 @@ from re1_rl.memory_map import (
 )
 
 BOX_SLOTS = 16
+# Contiguous RAM through INVENTORY_BASE (see memory_map ITEM_BOX_BASE note).
+BOX_SLOTS_LIVE = 48
 INVENTORY_SLOTS = 8
 LOCKPICK_ITEM_ID = 0x31
 
@@ -107,10 +109,47 @@ def read_box(bridge: _BridgeReadWrite) -> list[tuple[int, int]]:
     return _decode_block(raw)[:BOX_SLOTS]
 
 
+def read_box_live(bridge: _BridgeReadWrite) -> list[tuple[int, int]]:
+    """Full 48-slot box array (UI scroll can park items past index 15)."""
+    raw = bridge.read_block(ITEM_BOX_BASE, BOX_SLOTS_LIVE * 2)
+    return _decode_block(raw)[:BOX_SLOTS_LIVE]
+
+
 def read_inventory(bridge: _BridgeReadWrite) -> list[tuple[int, int]]:
     """8 ``(item_id, qty)`` tuples from ``read_block(INVENTORY_BASE, 16)``."""
     raw = bridge.read_block(INVENTORY_BASE, INVENTORY_SLOTS * 2)
     return _decode_block(raw)[:INVENTORY_SLOTS]
+
+
+def box_pollution_reason(
+    box: list[tuple[int, int]] | None,
+) -> str | None:
+    """Reject key items anywhere in the box, or any item past the modeled 16.
+
+    Sparse UI scroll has parked knife/keys near the inventory boundary (e.g.
+    shield_key @ slot 46). Those slots are invisible to BOX_SLOTS=16 reads and
+    quality ``-box_ammo``, so polluted cells look clean while story keys vanish.
+    """
+    from re1_rl.item_todo import canonical_item
+    from re1_rl.key_items import KEY_ITEM_NAMES
+    from re1_rl.memory_map import ITEM_IDS
+
+    if not box:
+        return None
+    key_names = frozenset(KEY_ITEM_NAMES)
+    for i, entry in enumerate(box):
+        if not entry:
+            continue
+        item_id = int(entry[0])
+        if item_id == 0:
+            continue
+        name = canonical_item(ITEM_IDS.get(item_id, "") or "")
+        if name and name in key_names:
+            return f"key_item_in_box:{name}@{i}"
+        if i >= BOX_SLOTS:
+            label = name or f"0x{item_id:02x}"
+            return f"deep_box_item:{label}@{i}"
+    return None
 
 
 def can_deposit(

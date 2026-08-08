@@ -600,6 +600,21 @@ def capture_successor_cell(
         else:
             if not _locked_section():
                 return None
+        from re1_rl.item_box import box_pollution_reason, read_box_live
+
+        try:
+            live_box = read_box_live(env.bridge)
+            setattr(env, "_box_cache", live_box)
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            live_box = getattr(env, "_box_cache", None)
+        pollution = box_pollution_reason(live_box)
+        if pollution:
+            print(
+                f"[yawn_capture] reject box pollution {pollution} cp={cid}",
+                flush=True,
+            )
+            return None
+
         sidecar = dump_episode_sidecar(
             env,
             captured_room_id=live_room,

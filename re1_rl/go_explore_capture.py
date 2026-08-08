@@ -723,6 +723,7 @@ def compute_quality(
     hp = int(state.get("hp", 0) or 0)
     inv_slots = _inventory_slots(state)
     box_slots = _box_inventory_slots(state, env=env)
+    # Full live box (incl. deep scroll slots) — first-16-empty is not "box empty".
     ammo = damage_weighted_ammo_score(inv_slots + box_slots)
     box_ammo = damage_weighted_ammo_score(box_slots)
     healing = 0
@@ -748,6 +749,8 @@ def integrity_gate_ok(
     progress: ProgressTracker,
 ) -> tuple[bool, str]:
     """Admit only stable, controllable, non-terminal states."""
+    from re1_rl.item_box import box_pollution_reason
+
     if not bool(state.get("in_control")):
         return False, "not_in_control"
     if bool(state.get("dead")):
@@ -764,6 +767,18 @@ def integrity_gate_ok(
         return False, "room_transition"
     if state.get("stable_room") is False:
         return False, "unstable_room"
+    raw_box = state.get("box_cache")
+    if isinstance(raw_box, list) and raw_box:
+        pairs: list[tuple[int, int]] = []
+        for entry in raw_box:
+            if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+                try:
+                    pairs.append((int(entry[0]), int(entry[1])))
+                except (TypeError, ValueError):
+                    continue
+        pollution = box_pollution_reason(pairs)
+        if pollution:
+            return False, pollution
     return True, "ok"
 
 
@@ -897,6 +912,26 @@ def maybe_capture_cell(
     """
     if not go_explore_capture_enabled():
         return None
+
+    # Ensure live 48-slot box is visible to the pollution gate / quality.
+    env_state = dict(env_state)
+    if env_state.get("box_cache") is None and env is not None:
+        cache = getattr(env, "_box_cache", None)
+        if cache is None:
+            try:
+                from re1_rl.item_box import read_box_live
+
+                cache = read_box_live(env.bridge)
+            except (
+                OSError,
+                RuntimeError,
+                ValueError,
+                AttributeError,
+                TypeError,
+            ):
+                cache = None
+        if cache is not None:
+            env_state["box_cache"] = cache
 
     ok, reason = integrity_gate_ok(env_state, progress)
     if not ok:

@@ -397,6 +397,7 @@ class RE1Env(gym.Env):
         self._box_phase = BOX_PHASE_CHOOSE
         self._box_inv_cursor = 0
         self._box_list_cursor = 0
+        self._episode_failure_override: str | None = None
         self._use_phase = 0
         self._inventory_before_use: list[tuple[int, int]] | None = None
         self._equip_phase = 0
@@ -626,16 +627,28 @@ class RE1Env(gym.Env):
 
     def _box_obs(self, state: dict[str, Any]) -> np.ndarray:
         """Encode item-box contents; refresh the RAM cache in box rooms."""
-        from re1_rl.item_box import is_box_room, read_box
+        from re1_rl.item_box import is_box_room, read_box_live
 
         room = str(state.get("room_id", ""))
         in_box_room = is_box_room(room)
         if in_box_room or self._box_cache is None:
             try:
-                self._box_cache = read_box(self.bridge)
+                # Full 48-slot live array — UI scroll parks past index 15.
+                self._box_cache = read_box_live(self.bridge)
             except (OSError, RuntimeError, ValueError):
                 pass
         return encode_box(self._box_cache, in_box_room=in_box_room)
+
+    def _box_pollution_failure(self) -> str | None:
+        """Terminal if a key (or any deep-slot item) is parked in the live box."""
+        from re1_rl.item_box import box_pollution_reason, read_box_live
+
+        try:
+            live = read_box_live(self.bridge)
+            self._box_cache = live
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            live = getattr(self, "_box_cache", None)
+        return box_pollution_reason(live)
 
     def _weapon_card_obs(self, state: dict[str, Any]) -> np.ndarray:
         from re1_rl.ammo_accounting import (
@@ -821,6 +834,7 @@ class RE1Env(gym.Env):
         kenneth_gate_failure = self._progress.kenneth_gate_breached
         wrong_room_failure = self._progress.wrong_room_breached
         gallery_wrong_failure = self._progress.gallery_wrong_breached
+        box_pollution = getattr(self, "_episode_failure_override", None)
         checkpoint_success = (
             self._stage.get("mode") == "yawn_rails"
             and self._progress.checkpoint_success
@@ -830,11 +844,17 @@ class RE1Env(gym.Env):
             or kenneth_gate_failure
             or wrong_room_failure
             or gallery_wrong_failure
+            or bool(box_pollution)
             or checkpoint_success
         )
         truncated = (
             False
-            if (kenneth_gate_failure or wrong_room_failure or gallery_wrong_failure)
+            if (
+                kenneth_gate_failure
+                or wrong_room_failure
+                or gallery_wrong_failure
+                or box_pollution
+            )
             else self._episode_truncated()
         )
         if kenneth_gate_failure:
@@ -843,6 +863,8 @@ class RE1Env(gym.Env):
             reason = "wrong_room"
         elif gallery_wrong_failure:
             reason = "gallery_wrong_portrait"
+        elif box_pollution:
+            reason = str(box_pollution)
         elif checkpoint_success:
             reason = "checkpoint_success"
         else:
@@ -1413,6 +1435,7 @@ class RE1Env(gym.Env):
         self._box_phase = BOX_PHASE_CHOOSE
         self._box_inv_cursor = 0
         self._box_list_cursor = 0
+        self._episode_failure_override = None
         self._last_attack_obs = empty_last_attack()
         self._last_skip_frames = 0
         self._last_settled_skip_frames = 0
@@ -2350,6 +2373,15 @@ class RE1Env(gym.Env):
             self._box_inv_cursor = 0
             self._box_list_cursor = 0
             self._box_cache = None
+            pollution = self._box_pollution_failure()
+            if pollution:
+                report = {
+                    **report,
+                    "ok": False,
+                    "reason": pollution,
+                    "box_pollution": pollution,
+                }
+                self._episode_failure_override = pollution
             return self._submenu_step(
                 a,
                 step_emulated_frames=max(frames, self.frame_skip),
@@ -2421,6 +2453,15 @@ class RE1Env(gym.Env):
                 self._box_ui_open = probe_box_ui_open(self.bridge)
             except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
                 self._box_ui_open = True
+            pollution = self._box_pollution_failure()
+            if pollution:
+                report = {
+                    **report,
+                    "ok": False,
+                    "reason": pollution,
+                    "box_pollution": pollution,
+                }
+                self._episode_failure_override = pollution
             return self._submenu_step(
                 a,
                 step_emulated_frames=max(int(frames), self.frame_skip),
