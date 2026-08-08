@@ -1,7 +1,9 @@
 """ITEM-screen inventory macros (equip / use / combine).
 
-START opens the ITEM screen from gameplay (hunt 2026-07-07). Cursor homes on
-slot 0 each open. Submenu (cross opens) examples:
+START opens the ITEM screen from gameplay (hunt 2026-07-07). Fresh opens often
+home on slot 0, but rapid re-entry / already-open menus can leave the cursor on
+the equipped weapon — seed navigation from the equipped slot when known.
+Submenu (cross opens) examples:
 
   Weapons: EQUIP → CHECK → COMBN
   Spray / ammo: USE → CHECK → COMBN
@@ -37,7 +39,11 @@ from re1_rl.memory_map import (
     player_died,
 )
 from re1_rl.item_use import use_would_help
-from re1_rl.weapon_equip import read_inventory_ids, weapon_already_equipped
+from re1_rl.weapon_equip import (
+    read_equipped_slot_0based,
+    read_inventory_ids,
+    weapon_already_equipped,
+)
 
 INVENTORY_GRID_COLS = 2
 OPEN_START_FRAMES = 12
@@ -173,6 +179,17 @@ def _wait(
     )
 
 
+def _item_grid_cursor_slot(client: Any) -> int:
+    """Best-effort ITEM grid cursor; prefer equipped slot when known."""
+    try:
+        slot = read_equipped_slot_0based(client)
+    except (OSError, RuntimeError, AttributeError, TypeError, ValueError, KeyError):
+        slot = None
+    if slot is None:
+        return 0
+    return max(0, min(INVENTORY_SLOTS - 1, int(slot)))
+
+
 def open_item_screen(
     client: Any,
     *,
@@ -182,12 +199,14 @@ def open_item_screen(
     """One Start tap to open ITEM; proceed only if RAM confirms the menu.
 
     Returns ``(died, frames, cursor_slot, opened)``.
-    Does **not** spam Start — if hitstun ate the press, callers must release
-    without further menu inputs (and without a close Start that would open it).
+    If ITEM is already open (orphan pause), do **not** tap Start again — return
+    ``opened=True`` with a seeded cursor so equip/use/combine can continue.
+    When closed, does **not** spam Start — if hitstun ate the press, callers must
+    release without further menu inputs.
     """
     frames = 0
     if _item_menu_confirmed(client):
-        return False, frames, 0, True
+        return False, frames, _item_grid_cursor_slot(client), True
     for buttons, n in (({"start": True}, OPEN_START_FRAMES), ({}, OPEN_SETTLE_FRAMES)):
         died, f = _tap(
             client,
@@ -200,7 +219,8 @@ def open_item_screen(
         if died:
             return True, frames, 0, False
     opened = _item_menu_confirmed(client)
-    return False, frames, 0, opened
+    cursor = _item_grid_cursor_slot(client) if opened else 0
+    return False, frames, cursor, opened
 
 
 def close_item_screen(
@@ -666,7 +686,17 @@ def execute_equip_macro(
     """Equip the weapon in ``slot`` via ITEM -> EQUIP -> close (gameplay ITEM screen)."""
     target_id = read_inventory_ids(client)[int(slot)] if 0 <= slot < INVENTORY_SLOTS else 0
     before = _read_equipped_id(client)
-    if weapon_already_equipped(before, target_id):
+    before_slot = None
+    try:
+        before_slot = read_equipped_slot_0based(client)
+    except (OSError, RuntimeError, AttributeError, TypeError, ValueError, KeyError):
+        before_slot = None
+    if weapon_already_equipped(
+        before,
+        target_id,
+        equipped_slot_0based=before_slot,
+        slot=int(slot),
+    ):
         return (
             False,
             0,

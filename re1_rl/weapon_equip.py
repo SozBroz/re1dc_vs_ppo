@@ -125,8 +125,18 @@ def read_equipped_slot_0based(bridge: Any) -> int | None:
 def weapon_already_equipped(
     equipped_weapon_id: int | None,
     item_id: int,
+    *,
+    equipped_slot_0based: int | None = None,
+    slot: int | None = None,
 ) -> bool:
-    """True when ``item_id`` is already the held weapon (EQUIP would toggle off)."""
+    """True when ``item_id``/``slot`` is already the held weapon (EQUIP toggles off)."""
+    if (
+        equipped_slot_0based is not None
+        and slot is not None
+        and int(equipped_slot_0based) == int(slot)
+        and int(item_id) in EQUIPPABLE_WEAPON_IDS
+    ):
+        return True
     return (
         equipped_weapon_id is not None
         and int(equipped_weapon_id) != 0
@@ -147,13 +157,17 @@ def slot_legal_for_equip(
     (e.g. handgun_bullets 0x0B) and get COMBINE-loaded afterward. Knife RAM
     qty 0 is still a real item.
     """
-    del equipped_slot_0based
     if slot < 0 or slot >= len(inventory):
         return False
     item_id, _qty = inventory[slot]
     if int(item_id) not in EQUIPPABLE_WEAPON_IDS:
         return False
-    return not weapon_already_equipped(equipped_weapon_id, int(item_id))
+    return not weapon_already_equipped(
+        equipped_weapon_id,
+        int(item_id),
+        equipped_slot_0based=equipped_slot_0based,
+        slot=int(slot),
+    )
 
 
 def any_legal_equip_slot(

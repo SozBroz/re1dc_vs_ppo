@@ -303,6 +303,30 @@ class StepDiagLogger:
 
         big = _big_reward_events(info.get("reward_breakdown"))
 
+        equipped = None
+        magic = None
+        if isinstance(info, dict):
+            state = info.get("state")
+            if isinstance(state, dict) and state.get("equipped_weapon_id") is not None:
+                equipped = int(state["equipped_weapon_id"])
+            elif info.get("hp") is not None and "equipped_weapon_id" in info:
+                equipped = int(info["equipped_weapon_id"])
+            report = info.get("magic_report")
+            if isinstance(report, dict) and report:
+                magic = {
+                    k: report[k]
+                    for k in (
+                        "ok",
+                        "reason",
+                        "slot",
+                        "item_id",
+                        "equipped_before",
+                        "equipped_after",
+                        "frames",
+                    )
+                    if k in report
+                }
+
         row: dict[str, Any] = {
             "ep": self.ep_idx,
             "step": self._step_i,
@@ -315,6 +339,10 @@ class StepDiagLogger:
             "attack_legal": attack_legal,
             "use_slots_legal": use_slots,
         }
+        if equipped is not None:
+            row["equipped_weapon_id"] = equipped
+        if magic:
+            row["magic"] = magic
         if big:
             row["big_rewards"] = big
         knife_fail = _knife_fail_row(info)

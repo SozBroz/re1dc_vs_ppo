@@ -21,12 +21,13 @@ from re1_rl.inventory_menu_macro import (
     close_document_examine_ui,
     dismiss_orphan_item_menu,
     execute_equip_macro,
+    open_item_screen,
     slot_nav_moves,
 )
 from re1_rl.action_mask import COMBINE_ACTION, EQUIP_ACTION, USE_ACTION
 from re1_rl.obs_encoder import PROPRIO_DIM, ObsEncoder
 from re1_rl.room_graph import RoomGraph
-from re1_rl.weapon_equip import weapon_already_equipped
+from re1_rl.weapon_equip import slot_legal_for_equip, weapon_already_equipped
 from tests.test_scaffolding import make_state
 
 ROOMS = Path(__file__).resolve().parents[1] / "data" / "rooms.json"
@@ -105,6 +106,31 @@ def test_weapon_already_equipped() -> None:
     assert weapon_already_equipped(0x01, 0x01)
     assert not weapon_already_equipped(0x01, 0x02)
     assert not weapon_already_equipped(0, 0x01)
+    assert weapon_already_equipped(
+        0, 0x01, equipped_slot_0based=0, slot=0
+    )
+    inv = [(0x01, 0), (0x02, 15), (0, 0), (0x03, 7)] + [(0, 0)] * 4
+    assert not slot_legal_for_equip(
+        inv, 0, equipped_weapon_id=0x01, equipped_slot_0based=0
+    )
+    assert not slot_legal_for_equip(
+        inv, 0, equipped_weapon_id=0, equipped_slot_0based=0
+    )
+
+
+def test_open_item_screen_already_open_continues_without_start() -> None:
+    client = _RecordingClient(
+        equipped_id=0x03, equipped_slot_1b=4, inv_ids=[0x01, 0x02, 0, 0x03]
+    )
+    client.in_item_menu = True
+    died, frames, cursor, opened = open_item_screen(
+        client, prev_hp=96, episode_start_hp=96
+    )
+    assert not died
+    assert opened is True
+    assert frames == 0
+    assert cursor == 3
+    assert client.steps == []
 
 
 def test_execute_equip_macro_skips_already_equipped_knife() -> None:
