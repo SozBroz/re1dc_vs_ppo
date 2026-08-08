@@ -84,6 +84,41 @@ def test_pause_modal_not_treated_as_box_ui_mask() -> None:
     assert not m[BOX_CLOSE_ACTION]
 
 
+def test_pickup_modal_predicate_excludes_box_ui() -> None:
+    """Auto-accept gate: pause modal Yes/No only, never box or document UI."""
+    from re1_rl.item_box_ui_macro import box_ui_open_from_ram
+    from re1_rl.memory_map import DOCUMENT_EXAMINE_GAME_STATE, PAUSE_MENU_GAME_MODE
+    from re1_rl.ram_skip import (
+        document_examine_ui_from_ram,
+        pause_menu_modal_from_ram,
+    )
+
+    chemical = {
+        "game_mode": PAUSE_MENU_GAME_MODE,
+        "game_state": 0x40808800,
+        "msg_flag": 0x80,
+    }
+    box = {
+        "game_mode": PAUSE_MENU_GAME_MODE,
+        "game_state": 0x40809000,
+        "msg_flag": 0x00,
+    }
+    document = {
+        "game_mode": PAUSE_MENU_GAME_MODE,
+        "game_state": DOCUMENT_EXAMINE_GAME_STATE,
+        "msg_flag": 0x80,
+    }
+    assert pause_menu_modal_from_ram(chemical)
+    assert not box_ui_open_from_ram(chemical)
+    assert not document_examine_ui_from_ram(chemical)
+    assert not pause_menu_modal_from_ram(box)
+    assert box_ui_open_from_ram(box)
+    # Document can share msg_flag with pickups — must not auto-Cross.
+    assert pause_menu_modal_from_ram(document)
+    assert document_examine_ui_from_ram(document)
+    assert not box_ui_open_from_ram(document)
+
+
 def test_attacks_are_adjacent() -> None:
     assert (ATTACK_UP_ACTION, ATTACK_ACTION, ATTACK_DOWN_ACTION) == (6, 7, 8)
 

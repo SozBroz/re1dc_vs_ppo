@@ -1411,11 +1411,11 @@ class RE1Env(gym.Env):
         if self._ram_skip.use_engine_patches:
             self._ram_skip.install_engine_patches()
         self._skip_uncontrolled()
-        # Orphan START/ITEM or document examine left open by savestate
-        # (e.g. QuickSave1 botany book: mode=0x40 / gs=0x40808100; Triangle).
-        if self._probe_item_inventory_menu():
-            self._try_dismiss_orphan_item_menu()
-            self._skip_uncontrolled()
+        # Pickup Yes/No on the savestate (chemical QS0): accept, then close the
+        # leftover ITEM grid. Orphan Triangle first would cancel/strand Yes/No.
+        self._auto_accept_pause_pickup_modal()
+        self._dismiss_non_box_pause_menu_if_safe()
+        self._skip_uncontrolled()
         if self._stage.get("knife_equipped_start"):
             try:
                 equip_knife_from_pause_menu(self.bridge)
@@ -2266,6 +2266,82 @@ class RE1Env(gym.Env):
             return item_inventory_screen_from_ram(self._skip_poll_ram())
         except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
             return False
+
+    def _auto_accept_pause_pickup_modal(self) -> bool:
+        """Accept inventory Yes/No ("Will you take …?") with Cross.
+
+        Env-owned so pickups do not depend on PPO sampling noop. Excludes the
+        real item-box UI (``gs`` mid-byte ``0x90``). Returns True if Cross was
+        sent.
+        """
+        from re1_rl.item_box_ui_macro import probe_box_ui_open
+        from re1_rl.ram_skip import (
+            document_examine_ui_from_ram,
+            pause_menu_modal_from_ram,
+        )
+        from re1_rl.sticky_input import empty_sticky
+
+        try:
+            ram = self._skip_poll_ram()
+            if not pause_menu_modal_from_ram(ram):
+                return False
+            # Books/files (gs=0x40808100): Triangle closes; Cross flips pages.
+            if document_examine_ui_from_ram(ram):
+                return False
+            if probe_box_ui_open(self.bridge):
+                return False
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            return False
+
+        self._sticky_input.reset()
+        hold_n = max(int(self.frame_skip), 8)
+        try:
+            self.bridge.step(
+                sticky=empty_sticky(),
+                pulse_hold={"cross": True},
+                n=hold_n,
+                abort_on_zero_hp=False,
+                ring_stride=0,
+                capture_final=False,
+            )
+            # Brief settle so msg_flag / inventory update before orphan dismiss.
+            self.bridge.step(
+                buttons={},
+                n=24,
+                abort_on_zero_hp=False,
+                ring_stride=0,
+                capture_final=False,
+            )
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            return False
+        finally:
+            self._sticky_input.reset()
+        return True
+
+    def _dismiss_non_box_pause_menu_if_safe(self) -> bool:
+        """Triangle-close leftover ITEM/document pause; never touch box or Yes/No."""
+        from re1_rl.item_box_ui_macro import probe_box_ui_open
+        from re1_rl.ram_skip import (
+            document_examine_ui_from_ram,
+            pause_menu_modal_from_ram,
+        )
+
+        if not self._probe_item_inventory_menu():
+            return False
+        try:
+            if probe_box_ui_open(self.bridge):
+                return False
+            ram = self._skip_poll_ram()
+            # Pickup Yes/No: Triangle cancels. Document examine may share
+            # msg_flag — still Triangle-dismiss (books are not Yes/No).
+            if pause_menu_modal_from_ram(ram) and not document_examine_ui_from_ram(
+                ram
+            ):
+                return False
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            return False
+        recovered, _report = self._try_dismiss_orphan_item_menu()
+        return bool(recovered)
 
     def _try_dismiss_orphan_item_menu(self) -> tuple[bool, dict[str, Any]]:
         """Close orphan START/ITEM pause. Returns (recovered, report)."""
@@ -3279,6 +3355,11 @@ class RE1Env(gym.Env):
         pending = self._flush_pending_episode_failure(action)
         if pending is not None:
             return pending
+        # Auto-accept pickup Yes/No, then close leftover ITEM (not real box UI).
+        if self._auto_accept_pause_pickup_modal():
+            action = 0
+            if self._dismiss_non_box_pause_menu_if_safe():
+                self._skipping_flag = False
         menu_reason = self._probe_outside_gameplay()
         if menu_reason in {"options_menu", "pause_or_options_menu"}:
             recovered, _options_report = self._try_dismiss_options_menu()
@@ -3286,39 +3367,46 @@ class RE1Env(gym.Env):
                 menu_reason = self._probe_outside_gameplay()
             # If still trapped (or another failure), fall through to terminate.
         # Item-box UI: only gs mid-byte 0x90 (probe_box_ui_open). Pickup Yes/No
-        # and START/ITEM also sit in the pause tree in box rooms (118) — treating
-        # those as the box stole noop→Cross confirms and left agents stuck.
+        # and START/ITEM also sit in the pause tree in box rooms (118).
         if bool(getattr(self, "_box_ui_open", False)):
             self._sync_box_ui_session_from_ram()
         elif not self._inventory_macro_owns_item_menu(int(action)):
             if self._probe_item_inventory_menu():
                 from re1_rl.item_box_ui_macro import probe_box_ui_open
+                from re1_rl.ram_skip import pause_menu_modal_from_ram
 
                 real_box = False
-                if self._current_room_is_box_room():
-                    try:
-                        real_box = bool(probe_box_ui_open(self.bridge))
-                    except (
-                        OSError,
-                        RuntimeError,
-                        ValueError,
-                        AttributeError,
-                        TypeError,
-                    ):
-                        real_box = False
-                if real_box:
+                pickup_modal = False
+                try:
+                    real_box = bool(probe_box_ui_open(self.bridge))
+                except (
+                    OSError,
+                    RuntimeError,
+                    ValueError,
+                    AttributeError,
+                    TypeError,
+                ):
+                    real_box = False
+                try:
+                    pickup_modal = pause_menu_modal_from_ram(self._skip_poll_ram())
+                except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                    pickup_modal = False
+                if real_box and self._current_room_is_box_room():
                     self._box_ui_open = True
                     self._box_phase = BOX_PHASE_CHOOSE
                     self._box_inv_cursor = 0
                     self._box_list_cursor = 0
                     self._skipping_flag = False
+                elif pickup_modal:
+                    self._auto_accept_pause_pickup_modal()
+                    # Close leftover ITEM after Yes; safe even in room 118.
+                    if self._dismiss_non_box_pause_menu_if_safe():
+                        self._skipping_flag = False
                 elif not self._current_room_is_box_room():
-                    recovered, _item_report = self._try_dismiss_orphan_item_menu()
-                    if recovered:
+                    # Keep box-room protection for open animation / non-modal ITEM.
+                    if self._dismiss_non_box_pause_menu_if_safe():
                         self._skipping_flag = False
                         menu_reason = self._probe_outside_gameplay()
-                # else: box-room pause modal (e.g. chemical Yes/No) — leave open;
-                # in_control false + pause_menu_modal maps noop → Cross.
         if menu_reason in _DEATH_FAILURE_REASONS:
             death = self._death_step(
                 action, died_during_skip=False, died_during_step=True
