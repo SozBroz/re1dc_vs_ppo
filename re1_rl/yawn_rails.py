@@ -435,6 +435,53 @@ def validate_route(
     return errors
 
 
+def _settle_state_for_capture(env: Any, state: dict[str, Any]) -> dict[str, Any] | None:
+    """Wait out cutscenes so successor cells are saved under player control.
+
+    Checkpoint success often fires on the same frame a cinema starts (gallery
+    crest reveal, door loads, etc.). Episodes also terminate on that reward, so
+    capture cannot defer to a later PPO step — settle in-place first.
+    """
+    if state.get("dead"):
+        return None
+    if state.get("in_control", True):
+        return state
+    skip = getattr(env, "_skip_uncontrolled", None)
+    read_state = getattr(env, "_read_state", None)
+    if not callable(skip) or not callable(read_state):
+        print(
+            "[yawn_capture] reject not in_control (no settle helper)",
+            flush=True,
+        )
+        return None
+    print(
+        "[yawn_capture] settle cutscene before capture "
+        f"room={state.get('room_id')!r}",
+        flush=True,
+    )
+    try:
+        _skipped, died = skip()
+    except (OSError, RuntimeError, ValueError, TypeError, AttributeError) as exc:
+        print(f"[yawn_capture] reject settle failed err={exc!r}", flush=True)
+        return None
+    if died:
+        print("[yawn_capture] reject died during settle", flush=True)
+        return None
+    try:
+        settled = dict(read_state(track_items=False))
+    except (OSError, RuntimeError, ValueError, TypeError, AttributeError) as exc:
+        print(f"[yawn_capture] reject settle re-read failed err={exc!r}", flush=True)
+        return None
+    if settled.get("dead") or not settled.get("in_control", True):
+        print(
+            "[yawn_capture] reject still unsettled after skip "
+            f"in_control={settled.get('in_control')} dead={settled.get('dead')}",
+            flush=True,
+        )
+        return None
+    return settled
+
+
 def capture_successor_cell(
     env: Any,
     state: dict[str, Any],
@@ -453,7 +500,8 @@ def capture_successor_cell(
     stage = getattr(env, "_stage", {})
     if stage.get("mode") != "yawn_rails":
         return None
-    if not state.get("in_control", True) or state.get("dead"):
+    state = _settle_state_for_capture(env, state)
+    if state is None:
         return None
     planner = env._planner
     completed = int(planner.waypoint_index) - 1

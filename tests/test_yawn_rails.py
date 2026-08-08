@@ -1238,6 +1238,65 @@ def test_local_cas_rejects_story_regress_despite_better_hp(
     assert (good / CELL_STATE_NAME).read_bytes() == b"STORY"
 
 
+def test_capture_settles_cutscene_before_savestate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """gallery_complete (and similar) succeeds mid-cinema; do not drop the cell."""
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "1")
+    bridge = MagicMock()
+    bridge.save_savestate.side_effect = (
+        lambda path: Path(path).write_bytes(b"state")
+    )
+    # After advancing gallery_portrait_6 → gallery_complete is active; success
+    # on gallery_complete leaves waypoint on the next leg (completed = that idx).
+    planner = _planner(start_index=_idx("gallery_complete_117") + 1)
+    # First read is post-settle; later reads are pre/post savestate probes.
+    reads = [
+        _state("117", in_control=True),
+        _state("117", in_control=True),
+        _state("117", in_control=True),
+    ]
+
+    def _read_state(track_items=False):
+        if reads:
+            return reads.pop(0)
+        return _state("117", in_control=True)
+
+    skip_calls = {"n": 0}
+
+    def _skip():
+        skip_calls["n"] += 1
+        return 120, False
+
+    env = SimpleNamespace(
+        project_root=tmp_path,
+        _stage={
+            "mode": "yawn_rails",
+            "cells_manifest": "states/yawn_rails/manifest.json",
+            "route_id": "test",
+        },
+        _planner=planner,
+        bridge=bridge,
+        _macro_active=False,
+        _step_count=900,
+        _skip_uncontrolled=_skip,
+        _read_state=_read_state,
+    )
+    monkeypatch.setattr(
+        "re1_rl.yawn_rails.dump_episode_sidecar",
+        lambda *_args, **_kwargs: {"schema_version": 1},
+    )
+    proposal = capture_successor_cell(
+        env,
+        _state("117", in_control=False),
+        {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
+    )
+    assert skip_calls["n"] == 1
+    assert proposal is not None
+    assert proposal["checkpoint_id"] == "gallery_complete_117"
+    assert bridge.save_savestate.called
+
+
 def test_barry_return_capture_requires_105_2_s1(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
