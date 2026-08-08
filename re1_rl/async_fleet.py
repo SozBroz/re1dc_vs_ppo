@@ -812,7 +812,8 @@ def _actor_process(
             if mod_drop_state is not None:
                 # Chosen before action; fixed until episode done.
                 req["mod_drop_mask"] = mod_drop_state.masks[0].copy()
-            if memlog_telemetry is not None:
+            _diag_env = getattr(getattr(env, "unwrapped", env), "_step_diag", None)
+            if memlog_telemetry is not None or _diag_env is not None:
                 req["want_policy_diagnostics"] = True
             conn.send(req)
             msg = conn.recv()
@@ -831,11 +832,13 @@ def _actor_process(
             masks_before = masks_now
             if _wait_for_control():
                 break
-            # Top-right memlog (RE1_STEP_DIAG_PORT): stash critic V for this step.
+            # Top-right memlog (RE1_STEP_DIAG_PORT): stash critic V + probs.
             try:
                 _diag = getattr(getattr(env, "unwrapped", env), "_step_diag", None)
                 if _diag is not None:
                     _diag.note_value(value)
+                    if msg.get("masked_probs") is not None:
+                        _diag.note_masked_probs(msg.get("masked_probs"))
             except (AttributeError, TypeError, ValueError):
                 pass
             obs, rew, done, trunc, info = env.step(action)

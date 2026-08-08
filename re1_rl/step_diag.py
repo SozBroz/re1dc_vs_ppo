@@ -19,10 +19,12 @@ from typing import Any
 
 from re1_rl.action_mask import (
     ATTACK_ACTION,
+    EQUIP_ACTION,
     N_SELECT_SLOT,
     SELECT_SLOT_BASE,
 )
 from re1_rl.knife_macro import read_knife_hooks
+from re1_rl.memory_map import ITEM_IDS
 
 # Fixed default — no timestamps, same path every run.
 DEFAULT_LOG_PATH = Path("data/logs/pking_top_right_memlog.jsonl")
@@ -136,6 +138,96 @@ def _mask_use_slot_names(mask: Any, inventory_slots: Any) -> list[str]:
     return names
 
 
+def _inventory_weapon_slots(inventory_slots: Any) -> list[dict[str, Any]]:
+    """Compact weapon layout: slot index, item id, name."""
+    from re1_rl.weapon_equip import EQUIPPABLE_WEAPON_IDS
+
+    out: list[dict[str, Any]] = []
+    for i, slot in enumerate(inventory_slots or []):
+        iid = None
+        name = None
+        if isinstance(slot, (list, tuple)) and slot:
+            # Prefer id if present as int; else resolve name→skip id.
+            if isinstance(slot[0], int) or (
+                isinstance(slot[0], str) and str(slot[0]).isdigit()
+            ):
+                iid = int(slot[0])
+            else:
+                name = str(slot[0]) if slot[0] else None
+        elif isinstance(slot, str) and slot:
+            name = slot
+        if iid is not None:
+            if iid not in EQUIPPABLE_WEAPON_IDS:
+                continue
+            name = ITEM_IDS.get(iid, name or f"id_{iid}")
+        elif name:
+            # Name-only inventory from state — keep known weapons by name.
+            low = name.lower()
+            if low not in {
+                "knife",
+                "beretta",
+                "shotgun",
+                "colt_python",
+                "colt_python_dumdum",
+                "flamethrower",
+                "bazooka_acid",
+                "bazooka_explosive",
+                "bazooka_flame",
+                "rocket_launcher",
+            }:
+                continue
+        else:
+            continue
+        row: dict[str, Any] = {"s": int(i), "n": str(name)}
+        if iid is not None:
+            row["id"] = int(iid)
+        out.append(row)
+    return out
+
+
+def _legal_equip_select_slots(mask: Any, inventory_slots: Any) -> list[dict[str, Any]]:
+    """Legal equip-phase select targets with slot index + name."""
+    if mask is None:
+        return []
+    out: list[dict[str, Any]] = []
+    n = len(mask)
+    for i in range(N_SELECT_SLOT):
+        idx = SELECT_SLOT_BASE + i
+        if idx < n and bool(mask[idx]):
+            name = _slot_name(inventory_slots, i) or f"slot_{i}"
+            out.append({"s": int(i), "n": str(name)})
+    return out
+
+
+def _equip_policy_probs(masked_probs: Any, mask: Any) -> dict[str, Any] | None:
+    """Post-mask probabilities for EQUIP open + legal select_slot picks."""
+    if masked_probs is None:
+        return None
+    try:
+        probs = list(masked_probs)
+    except TypeError:
+        return None
+    if len(probs) <= EQUIP_ACTION:
+        return None
+    out: dict[str, Any] = {
+        "p_equip": round(float(probs[EQUIP_ACTION]), 5),
+    }
+    if mask is not None and EQUIP_ACTION < len(mask):
+        out["open_legal"] = bool(mask[EQUIP_ACTION])
+    slots: dict[str, float] = {}
+    n = len(probs)
+    for i in range(N_SELECT_SLOT):
+        idx = SELECT_SLOT_BASE + i
+        if idx >= n:
+            break
+        if mask is not None and (idx >= len(mask) or not bool(mask[idx])):
+            continue
+        slots[str(i)] = round(float(probs[idx]), 5)
+    if slots:
+        out["p_select"] = slots
+    return out
+
+
 # Log individual reward channels at/above this absolute magnitude (with source).
 BIG_REWARD_ABS = 0.1
 
@@ -242,6 +334,7 @@ class StepDiagLogger:
         self.ep_idx = 0
         self._step_i = 0
         self._pending_value: float | None = None
+        self._pending_masked_probs: Any | None = None
         _ensure_run_start(
             self.path,
             port=port,
@@ -256,11 +349,16 @@ class StepDiagLogger:
         """Stash critic V for the upcoming env.step (set by actor before step)."""
         self._pending_value = float(value)
 
+    def note_masked_probs(self, masked_probs: Any) -> None:
+        """Stash post-mask action probs for the upcoming env.step."""
+        self._pending_masked_probs = masked_probs
+
     def reset_episode(self) -> None:
         self.ep_return = 0.0
         self._step_i = 0
         self.ep_idx += 1
         self._pending_value = None
+        self._pending_masked_probs = None
 
     def log_step(
         self,
@@ -275,6 +373,7 @@ class StepDiagLogger:
         action: int | None = None,
         action_name: str | None = None,
         value: float | None = None,
+        equip_cd_pre: int | None = None,
     ) -> None:
         self._step_i += 1
         step_r = float(reward)
@@ -289,6 +388,8 @@ class StepDiagLogger:
         if value is None:
             value = self._pending_value
         self._pending_value = None
+        masked_probs = self._pending_masked_probs
+        self._pending_masked_probs = None
 
         # Human-readable action name only (never the PPO discrete slot index).
         aname = action_name or info.get("action_name")
@@ -359,6 +460,50 @@ class StepDiagLogger:
             row["logistics_sample"] = info["logistics_sample"]
         if terminated or truncated:
             row["ep_return_total"] = round(self.ep_return, 5)
+
+        equip_phase = int(info.get("equip_phase") or 0)
+        cd_post = int(info.get("equip_switch_cooldown") or 0)
+        cd_pre = int(equip_cd_pre) if equip_cd_pre is not None else cd_post
+        eq_slot = info.get("equipped_slot_0based")
+        if eq_slot is None and isinstance(info.get("state"), dict):
+            eq_slot = info["state"].get("equipped_slot_0based")
+        magic_reason = str((magic or {}).get("reason") or "")
+        aname_s = str(aname or "")
+        equip_interesting = (
+            cd_pre > 0
+            or cd_post > 0
+            or equip_phase > 0
+            or aname_s == "equip"
+            or aname_s.startswith("select_slot")
+            or magic_reason.startswith("equip")
+            or magic_reason
+            in ("already_equipped", "item_menu_open_failed", "equip_abort")
+        )
+        policy_snip = _equip_policy_probs(masked_probs, mask)
+        if policy_snip and float(policy_snip.get("p_equip") or 0) >= 0.05:
+            equip_interesting = True
+        if equip_interesting:
+            equip_row: dict[str, Any] = {
+                "cd_pre": cd_pre,
+                "cd_post": cd_post,
+                "phase": equip_phase,
+                "open_legal": (
+                    bool(mask[EQUIP_ACTION])
+                    if mask is not None and len(mask) > EQUIP_ACTION
+                    else None
+                ),
+                "eq_id": equipped,
+                "eq_slot": None if eq_slot is None else int(eq_slot),
+                "weapons": _inventory_weapon_slots(inventory_slots),
+            }
+            if equip_phase == 1 or aname_s.startswith("select_slot"):
+                equip_row["legal_select"] = _legal_equip_select_slots(
+                    mask, inventory_slots
+                )
+            if policy_snip:
+                equip_row["policy"] = policy_snip
+            row["equip"] = equip_row
+
         _append_line(self.path, row)
 
 

@@ -3054,6 +3054,10 @@ class RE1Env(gym.Env):
             "magic_report": magic_report,
             "use_phase": int(self._use_phase),
             "equip_phase": int(self._equip_phase),
+            "equip_switch_cooldown": int(
+                getattr(self, "_equip_switch_cooldown", 0)
+            ),
+            "equipped_slot_0based": state.get("equipped_slot_0based"),
             "combine_phase": int(self._combine_phase),
             "combine_slot_a": self._combine_slot_a,
             "inventory": state["inventory_slots"],
@@ -3310,6 +3314,7 @@ class RE1Env(gym.Env):
         action = int(action)
         # Capture the same mask the agent sees for this decision (pre-step state).
         pre_masks = None
+        equip_cd_pre = int(getattr(self, "_equip_switch_cooldown", 0))
         diag = getattr(self, "_step_diag", None)
         if diag is not None:
             try:
@@ -3342,6 +3347,7 @@ class RE1Env(gym.Env):
                     info=info if isinstance(info, dict) else None,
                     action=action,
                     action_name=aname,
+                    equip_cd_pre=equip_cd_pre,
                 )
             return result
         finally:
@@ -3799,6 +3805,12 @@ class RE1Env(gym.Env):
             "grab_detected": grab_detected,
             "grab_escape": grab_escape,
             "magic_report": magic_report,
+            "use_phase": int(getattr(self, "_use_phase", 0)),
+            "equip_phase": int(getattr(self, "_equip_phase", 0)),
+            "equip_switch_cooldown": int(
+                getattr(self, "_equip_switch_cooldown", 0)
+            ),
+            "equipped_slot_0based": state.get("equipped_slot_0based"),
             "frames_skipped": skipped,
             "died_during_skip": died_during_skip,
             "died_during_step": died_during_step,
