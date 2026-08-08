@@ -238,6 +238,41 @@ def test_mask_blocks_attack_when_only_crows_near() -> None:
     assert not m[ATTACK_DOWN_ACTION]
 
 
+def test_typewriter_or_box_rooms_ban_attacks() -> None:
+    """Typewriter/box rooms: attacks always illegal (even with near enemies)."""
+    from re1_rl.item_box import TYPEWRITER_OR_BOX_ROOMS
+
+    idle = dict(player_anim=0x0D, player_aux=0x01, player_recovery=0)
+    # TW-only (106), box-only (502), both (100).
+    for room in ("106", "502", "100", "30e"):
+        assert room.upper() in TYPEWRITER_OR_BOX_ROOMS
+        m = action_mask(
+            N_ACTIONS,
+            None,
+            **idle,
+            equipped_weapon_id=0x01,
+            knife_enemies_near=1,
+            gun_enemies_near=1,
+            mask_combat_without_enemies=True,
+            room_id=room,
+        )
+        assert not m[ATTACK_ACTION], room
+        assert not m[ATTACK_UP_ACTION], room
+        assert not m[ATTACK_DOWN_ACTION], room
+    # Ordinary room with enemies still allows attack.
+    m_hall = action_mask(
+        N_ACTIONS,
+        None,
+        **idle,
+        equipped_weapon_id=0x01,
+        knife_enemies_near=1,
+        gun_enemies_near=1,
+        mask_combat_without_enemies=True,
+        room_id="105",
+    )
+    assert m_hall[ATTACK_ACTION]
+
+
 def test_mask_blocks_equip_during_gun_stable_aim() -> None:
     from re1_rl.action_mask import EQUIP_ACTION, USE_ACTION
 

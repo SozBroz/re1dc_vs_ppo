@@ -81,6 +81,18 @@ BOX_DEPOSIT_ROOMS = frozenset({"100"})
 BOX_ROOMS = frozenset({"100", "118", "30E", "403", "502", "50E", "600", "618"})
 
 
+def _typewriter_or_box_rooms() -> frozenset[str]:
+    """Union of RDT typewriter rooms and known item-box rooms."""
+    from re1_rl.typewriter_save import TYPEWRITER_ROOMS
+
+    return frozenset(str(r).strip().upper() for r in (BOX_ROOMS | TYPEWRITER_ROOMS))
+
+
+# Rooms with a typewriter and/or item box. Attack macros are always illegal here
+# (do not use empty room_enemies / "safe room" maps — those are untrusted).
+TYPEWRITER_OR_BOX_ROOMS: frozenset[str] = _typewriter_or_box_rooms()
+
+
 class _BridgeReadWrite(Protocol):
     def read_block(self, address: int, count: int) -> list[int]: ...
 
@@ -371,6 +383,13 @@ def apply_withdraw(bridge: _BridgeReadWrite, box_slot: int) -> dict[str, Any]:
 def is_box_room(room_id: str) -> bool:
     """True when ``room_id`` is a known item-box room."""
     return str(room_id).strip().upper() in BOX_ROOMS
+
+
+def is_typewriter_or_box_room(room_id: str | None) -> bool:
+    """True when ``room_id`` has a typewriter and/or item box."""
+    if room_id is None:
+        return False
+    return str(room_id).strip().upper() in TYPEWRITER_OR_BOX_ROOMS
 
 
 def sync_inventory_icons_after_knife_ammo_swap(bridge: _BridgeGpu) -> int:

@@ -339,6 +339,31 @@ def test_is_box_room():
     assert not is_box_room("105")
 
 
+def test_typewriter_or_box_rooms():
+    from re1_rl.item_box import TYPEWRITER_OR_BOX_ROOMS, is_typewriter_or_box_room
+
+    # Explicit audit list: RDT typewriters ∪ BOX_ROOMS (not empty-enemy maps).
+    expected = {
+        "100",
+        "106",
+        "118",
+        "307",
+        "30E",
+        "403",
+        "502",
+        "50E",
+        "600",
+        "606",
+        "618",
+    }
+    assert TYPEWRITER_OR_BOX_ROOMS == expected
+    assert is_typewriter_or_box_room("106")
+    assert is_typewriter_or_box_room("502")
+    assert is_typewriter_or_box_room("30e")
+    assert not is_typewriter_or_box_room("105")
+    assert not is_typewriter_or_box_room(None)
+
+
 def test_box_withdraw_success_pays_one() -> None:
     import pytest
 

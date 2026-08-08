@@ -18,6 +18,7 @@ from __future__ import annotations
 import numpy as np
 
 from re1_rl.ammo_accounting import can_fire_from_equipped_slot
+from re1_rl.item_box import is_typewriter_or_box_room
 from re1_rl.item_use import any_legal_use_slot, slot_legal_for_use
 from re1_rl.story_item_use import (
     any_legal_story_use_slot,
@@ -355,21 +356,31 @@ def action_mask(
         else (int(alive_enemies_in_room) if alive_enemies_in_room is not None else None)
     )
 
+    # Typewriter / box rooms: attack macros always illegal (safe-room policy).
+    attacks_banned = is_typewriter_or_box_room(room_id)
+
     if not in_submenu:
-        height_legal = _height_attack_legal(
-            anim_ready=anim_ready,
-            equipped_weapon_id=equipped_weapon_id,
-            equipped_slot_0based=equipped_slot_0based,
-            inventory=inventory,
-            mask_combat_without_enemies=mask_combat_without_enemies,
-            knife_enemies=knife_enemies,
-            gun_enemies=gun_enemies,
-            alive_enemies_in_room=alive_enemies_in_room,
-        )
+        if attacks_banned:
+            height_legal = False
+        else:
+            height_legal = _height_attack_legal(
+                anim_ready=anim_ready,
+                equipped_weapon_id=equipped_weapon_id,
+                equipped_slot_0based=equipped_slot_0based,
+                inventory=inventory,
+                mask_combat_without_enemies=mask_combat_without_enemies,
+                knife_enemies=knife_enemies,
+                gun_enemies=gun_enemies,
+                alive_enemies_in_room=alive_enemies_in_room,
+            )
         for idx in (ATTACK_UP_ACTION, ATTACK_ACTION, ATTACK_DOWN_ACTION):
             if idx < n_actions:
                 mask[idx] = height_legal
-        if ATTACK_DOWN_ACTION < n_actions and mask[ATTACK_DOWN_ACTION]:
+        if (
+            not attacks_banned
+            and ATTACK_DOWN_ACTION < n_actions
+            and mask[ATTACK_DOWN_ACTION]
+        ):
             down_ready = (
                 crouch_anim_ready
                 if equipped_weapon_id == KNIFE_ID
