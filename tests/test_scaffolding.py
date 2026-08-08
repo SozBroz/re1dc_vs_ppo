@@ -308,6 +308,19 @@ def test_damage_and_death_calibrated_to_waypoint():
     assert hp_heal_reward(80) == pytest.approx(HP_GAIN_SCALE * 80.0)
     assert hp_heal_reward(10) == pytest.approx(-HP_LOSS_SCALE * (-10.0))
 
+    # Bogus inventory/death HP slingshot above Jill max (96) must not pay heal.
+    bogus = make_state(hp=3277, step=31)
+    _, bd_bogus = compute_reward(
+        hurt, bogus, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd_bogus["hp"] == 0.0
+    # Chris-scale 140 is also rejected for Jill runs.
+    chris_scale = make_state(hp=140, step=32)
+    _, bd_chris = compute_reward(
+        hurt, chris_scale, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd_chris["hp"] == 0.0
+
 
 def test_distributed_n_steps_is_six_gamma_half_lives():
     from re1_rl.async_fleet import DISTRIBUTED_EPOCH_HYPERPARAMS, distributed_n_steps

@@ -51,7 +51,8 @@ STATUS_BLOCKED = "blocked"
 STATUS_DONE = "stretch_done"
 
 
-def payforward_ripple_enabled(default: bool = True) -> bool:
+def payforward_ripple_enabled(default: bool = False) -> bool:
+    """Opt-in fight-ripple mix. Default off — fleet uses 50/50 latest/any-cp18+."""
     raw = os.environ.get(_PAYFORWARD_ENV, "").strip().lower()
     if not raw:
         return bool(default)

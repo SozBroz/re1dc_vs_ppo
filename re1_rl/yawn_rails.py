@@ -296,10 +296,10 @@ def validate_manifest_cells(
     return errors
 
 
-# Non-PLR reset mix: 20% frontier cell; remaining 80% uniform over
-# each older eligible cell (no route_initial — conditions before cp18 are frozen).
+# Non-PLR reset mix: 50% frontier cell; remaining 50% uniform over any
+# eligible cp18+ cell (including latest). Conditions before cp18 are frozen.
 RESET_MIN_CHECKPOINT_INDEX = 18
-RESET_LATEST_CELL_WEIGHT = 0.20
+RESET_LATEST_CELL_WEIGHT = 0.50
 _RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
 
 
@@ -324,7 +324,7 @@ def _choose_reset_candidate(
     rng: random.Random,
     latest_only: bool = False,
 ) -> dict[str, Any]:
-    """20% latest eligible cell; else uniform over each older eligible cell."""
+    """50% latest eligible cell; else uniform over any eligible cp18+ cell."""
     eligible = eligible_reset_cells(cells)
     if not eligible:
         raise ValueError(
@@ -333,12 +333,9 @@ def _choose_reset_candidate(
     latest = eligible[-1]
     if latest_only:
         return latest
-    older = eligible[:-1]
     if rng.random() < float(RESET_LATEST_CELL_WEIGHT):
         return latest
-    if not older:
-        return latest
-    return older[rng.randrange(len(older))]
+    return eligible[rng.randrange(len(eligible))]
 
 
 def sample_one_leg_options(
@@ -349,10 +346,9 @@ def sample_one_leg_options(
 ) -> dict[str, Any]:
     """Choose a curated start and bounded checkpoint span.
 
-    Default (payforward ripple): 20% latest; 80% equal across fighting CPs
-    (ammo cliffs), eating each fight's share into its ripple tip after a
-    push-forward. ``RE1_YAWN_PAYFORWARD_RIPPLE=0`` restores legacy uniform
-    older-cell mix. ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
+    Default: 50% latest; 50% uniform over any loadable cp18+ cell.
+    ``RE1_YAWN_PAYFORWARD_RIPPLE=1`` enables fight-cliff ripple mix instead.
+    ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
     """
     cells = eligible_reset_cells(iter_loadable_cells(project_root, stage))
     latest_only = reset_latest_only_from_env()

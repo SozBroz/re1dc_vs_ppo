@@ -80,7 +80,7 @@ CHECKPOINT_MAX_STEPS_EXTENSION = SOFTLOCK_EXTENSION_FRAMES // 8  # 5400 steps / 
 # First 3 min of no-progress: no extra idle tax (living step cost only).
 CONTEMPT_GRACE_FRAMES = 3 * 60 * 60
 
-JILL_FINE_HP = 96  # Jill Fine / practical max (RAM ceiling PLAYER_HP_MAX=140)
+JILL_FINE_HP = 96  # Jill max HP (Chris uses PLAYER_HP_MAX=140)
 # Survival budget 4.0 (4× prior); same chip/death ratio (2/3 dense Fine→1, 1/3 death).
 # Literals below are precomputed; not derived from CHECKPOINT_REWARD.
 SURVIVAL_BUDGET_SCALED = 4.0
@@ -251,6 +251,11 @@ def hp_heal_reward(hp_delta: int) -> float:
     if hp_delta <= 0:
         return 0.0
     return HP_GAIN_SCALE * float(hp_delta)
+
+
+def _player_hp_in_reward_band(hp: int) -> bool:
+    """True for live Jill HP readings (1..96). 0 is death/init; >96 is garbage/Chris-scale."""
+    return 1 <= int(hp) <= int(JILL_FINE_HP)
 
 
 def ammo_waste_per_missed_round(
@@ -894,10 +899,15 @@ def compute_reward(
     prev_hp = int(prev_state.get("hp", 0))
     hp = int(state.get("hp", 0))
     hp_delta = hp - prev_hp
-    if hp_delta < 0:
+    # Ignore menu/cutscene init (prev_hp==0) and impossible slingshots above
+    # Jill max (96). Death chip still allows hp==0.
+    if hp_delta < 0 and _player_hp_in_reward_band(prev_hp) and hp <= JILL_FINE_HP:
         bd["hp"] = HP_LOSS_SCALE * hp_delta
-    elif hp_delta > 0 and prev_hp > 0:
-        # Ignore bogus HP jumps from menu/cutscene init (prev_hp==0).
+    elif (
+        hp_delta > 0
+        and _player_hp_in_reward_band(prev_hp)
+        and _player_hp_in_reward_band(hp)
+    ):
         bd["hp"] = hp_heal_reward(hp_delta)
 
     # Actual death owns the ordinary death channel. Otherwise the first Kenneth

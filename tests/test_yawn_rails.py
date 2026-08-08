@@ -732,8 +732,9 @@ def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: P
     assert a["leg_span"] == 1
 
 
-def test_reset_mix_prefers_latest_cell_then_older_eligible(tmp_path: Path) -> None:
-    # 3 eligible cells (18,19,20) → latest 20%; remaining 80% uniform over 18,19.
+def test_reset_mix_half_latest_half_any_eligible(tmp_path: Path) -> None:
+    # 3 eligible cells → P(latest)=0.5+0.5/3; each specific cell in the
+    # any-bucket gets 0.5/3 (including latest again).
     manifest = {
         "schema_version": 1,
         "route_id": "test",
@@ -745,21 +746,15 @@ def test_reset_mix_prefers_latest_cell_then_older_eligible(tmp_path: Path) -> No
         "cells_manifest": "manifest.json",
         "route_steps": list(range(1, 30)),
     }
-    counts = {"latest": 0, "older": 0}
     per_start: dict[int, int] = {}
-    for seed in range(3000):
+    for seed in range(4000):
         opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
         start = int(opts["route_start_index"])
         per_start[start] = per_start.get(start, 0) + 1
-        if start == 21:  # latest cell index 20 → start 21
-            counts["latest"] += 1
-        else:
-            counts["older"] += 1
-    total = sum(counts.values())
-    assert counts["latest"] / total == pytest.approx(0.20, abs=0.04)
-    assert counts["older"] / total == pytest.approx(0.80, abs=0.04)
-    assert per_start.get(19, 0) / total == pytest.approx(0.40, abs=0.05)
-    assert per_start.get(20, 0) / total == pytest.approx(0.40, abs=0.05)
+    total = sum(per_start.values())
+    assert per_start.get(21, 0) / total == pytest.approx(0.5 + 0.5 / 3.0, abs=0.04)
+    assert per_start.get(19, 0) / total == pytest.approx(0.5 / 3.0, abs=0.04)
+    assert per_start.get(20, 0) / total == pytest.approx(0.5 / 3.0, abs=0.04)
 
 
 def test_reset_latest_only_env_pins_newest_cell(

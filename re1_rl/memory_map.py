@@ -14,7 +14,7 @@ PS1_MAINRAM_BASE = 0x80000000
 # SAME address in Standard/Original mode, so the save block likely matches.
 # Advanced/Arranged mode uses a different block (~0x800B8BC6) — avoid Arranged.
 GAME_SERIAL = "SLUS-00551"
-PLAYER_HP = 0x800C51AC  # u16; max 0x8C (140) Jill/Chris [CONFIRMED, both serials]
+PLAYER_HP = 0x800C51AC  # u16; Jill max 96 Fine, Chris max 0x8C (140) [CONFIRMED]
 
 # Game-mode / in-control byte [CONFIRMED via movement probes 2026-07-02].
 # High byte of the gameState dword at 0x800C3000 (linear map of the
