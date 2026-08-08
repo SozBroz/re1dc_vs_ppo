@@ -139,3 +139,28 @@ def test_attack_up_slot_is_macro_not_pulse() -> None:
     sticky, pulse, _ = s.apply(_idx("attack_up"), ACTION_BUTTON_MAP)
     assert not pulse
     assert sticky.get("square") is False
+
+
+def test_noop_pause_modal_delivers_cross_pulse_hold() -> None:
+    """Pickup Yes/No: button_map remaps noop→Cross; sticky must not drop it."""
+    from re1_rl.env import button_map_for_action
+
+    s = StickyInputState()
+    s.apply(_idx("forward"), ACTION_BUTTON_MAP)
+    bmap = button_map_for_action(0, pause_menu_modal=True)
+    sticky, pulse, pulse_hold = s.apply(0, bmap)
+    assert sticky == {
+        "up": False,
+        "down": False,
+        "left": False,
+        "right": False,
+        "square": False,
+    }
+    assert pulse is None
+    assert pulse_hold == {"cross": True}
+
+    # Plain noop still clears sticky and sends nothing.
+    sticky2, pulse2, ph2 = s.apply(0, ACTION_BUTTON_MAP)
+    assert sticky2["up"] is False
+    assert pulse2 is None
+    assert ph2 is None

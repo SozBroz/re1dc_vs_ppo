@@ -37,6 +37,13 @@ class StickyInputState:
         pulse_hold: dict[str, bool] | None = None
         if action == 0:
             self.reset()
+            # Env remaps noop → Cross on pause Yes/No (pickup confirms). Honor
+            # any face buttons in button_map[0]; plain noop stays empty.
+            btn = button_map.get(0, {}) or {}
+            face = {k: True for k in FACE_KEYS if btn.get(k)}
+            if face:
+                pulse_hold = face
+            return self.as_dict(), pulse, pulse_hold
         elif action == KNIFE_ACTION:
             # Movement cleared; env runs knife_macro with explicit frame schedule.
             self.reset()
