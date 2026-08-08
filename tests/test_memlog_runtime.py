@@ -82,7 +82,8 @@ def test_pking_launchers_reserve_and_preserve_memlog_port() -> None:
     assert "--worker-id pking-memlog" in memlog
     assert "--actor-ranks 4" in memlog
     assert "--tile-windows" in memlog
-    assert "RE1_YAWN_RESET_LATEST_ONLY=1" in memlog
+    assert "go_explore_phase_c.env.cmd" in memlog
+    assert "RE1_YAWN_RESET_LATEST_ONLY=1" not in memlog
 
     for name in (
         "start_worker_detached_pking.cmd",
