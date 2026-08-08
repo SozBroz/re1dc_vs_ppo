@@ -423,9 +423,17 @@ class StepDiagLogger:
                         "item_id",
                         "equipped_before",
                         "equipped_after",
+                        "equipped_slot_before",
+                        "equipped_slot_after",
                         "frames",
                         "game_mode",
                         "game_state",
+                        "in_control_after",
+                        "stages",
+                        "anomaly",
+                        "zero_nav",
+                        "menu_dismiss",
+                        "menu_recovered",
                     )
                     if k in report
                 }

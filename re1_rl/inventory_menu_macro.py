@@ -745,6 +745,38 @@ def _read_slot_qty(client: Any, slot: int) -> tuple[int, int]:
     return packed & 0xFF, packed >> 8
 
 
+def _equip_ram_snapshot(client: Any) -> dict[str, Any]:
+    """Equipped-id + both slot mirrors + menu/control bits for thrash forensics."""
+    from re1_rl.memory_map import EQUIPPED_SLOT_INDEX, EQUIPPED_SLOT_INDEX_1BASED
+
+    try:
+        ram = client.read_ram(
+            [
+                ("equipped_weapon_id", EQUIPPED_WEAPON_ID, "u8"),
+                ("equipped_slot_1based", EQUIPPED_SLOT_INDEX_1BASED, "u8"),
+                ("equipped_slot_0based", EQUIPPED_SLOT_INDEX, "u8"),
+                ("game_mode", GAME_MODE, "u8"),
+                ("game_state", GAME_STATE, "u32"),
+            ]
+        )
+    except (OSError, RuntimeError, AttributeError, TypeError, ValueError, KeyError):
+        return {}
+    slot_1b = int(ram.get("equipped_slot_1based", 0))
+    slot_0_mirror = int(ram.get("equipped_slot_0based", 0))
+    snap: dict[str, Any] = {
+        "eq": int(ram.get("equipped_weapon_id", 0)),
+        "slot_1b": slot_1b,
+        "slot_0": slot_1b - 1 if slot_1b > 0 else None,
+        "slot_0_mirror": slot_0_mirror,
+        "gm": int(ram.get("game_mode", 0)),
+        "gs": int(ram.get("game_state", 0)),
+        "menu": bool(_item_menu_confirmed(client)),
+    }
+    if snap["slot_0"] is not None and snap["slot_0"] != slot_0_mirror:
+        snap["mirror_disagree"] = True
+    return snap
+
+
 def execute_equip_macro(
     client: Any,
     slot: int,
@@ -754,12 +786,23 @@ def execute_equip_macro(
 ) -> tuple[bool, int, dict[str, Any]]:
     """Equip the weapon in ``slot`` via ITEM -> EQUIP -> close (gameplay ITEM screen)."""
     target_id = read_inventory_ids(client)[int(slot)] if 0 <= slot < INVENTORY_SLOTS else 0
-    before = _read_equipped_id(client)
-    before_slot = None
-    try:
-        before_slot = read_equipped_slot_0based(client)
-    except (OSError, RuntimeError, AttributeError, TypeError, ValueError, KeyError):
-        before_slot = None
+    before_snap = _equip_ram_snapshot(client)
+    before = int(before_snap.get("eq", 0)) if before_snap else _read_equipped_id(client)
+    before_slot = before_snap.get("slot_0") if before_snap else None
+    if before_slot is None:
+        try:
+            before_slot = read_equipped_slot_0based(client)
+        except (OSError, RuntimeError, AttributeError, TypeError, ValueError, KeyError):
+            before_slot = None
+    stages: list[dict[str, Any]] = [
+        {
+            "t": "pre",
+            "f": 0,
+            "target_slot": int(slot),
+            "target_id": int(target_id),
+            **before_snap,
+        }
+    ]
     if weapon_already_equipped(
         before,
         target_id,
@@ -776,7 +819,11 @@ def execute_equip_macro(
                 "item_id": target_id,
                 "equipped_before": before,
                 "equipped_after": before,
+                "equipped_slot_before": before_slot,
+                "equipped_slot_after": before_slot,
                 "frames": 0,
+                "stages": stages,
+                "anomaly": "redundant_equip_short_circuit",
             },
         )
     frames = 0
@@ -784,8 +831,23 @@ def execute_equip_macro(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
     frames += f
+    open_snap = _equip_ram_snapshot(client)
+    stages.append(
+        {
+            "t": "opened" if opened else "open_failed",
+            "f": frames,
+            "cursor_home": 0,
+            "opened": bool(opened),
+            **open_snap,
+        }
+    )
     if died:
-        return True, frames, {"ok": False, "reason": "died", "slot": slot}
+        return True, frames, {
+            "ok": False,
+            "reason": "died",
+            "slot": slot,
+            "stages": stages,
+        }
     if not opened:
         menu_ram = _read_menu_ram(client)
         return (
@@ -796,53 +858,97 @@ def execute_equip_macro(
                 "reason": "item_menu_open_failed",
                 "slot": int(slot),
                 "item_id": target_id,
+                "equipped_before": before,
+                "equipped_slot_before": before_slot,
                 "frames": frames,
                 "game_mode": menu_ram["game_mode"],
                 "game_state": menu_ram["game_state"],
+                "stages": stages,
             },
         )
+
+    anomaly: str | None = None
+    # Belt-and-suspenders: target already held should have short-circuited above.
+    if int(target_id) == int(before) and int(target_id) != 0:
+        anomaly = "redundant_equip_opened"
 
     died, f, cursor = _navigate_slot(
         client, cursor, int(slot), prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
     frames += f
+    nav_snap = _equip_ram_snapshot(client)
+    stages.append(
+        {
+            "t": "navigated",
+            "f": frames,
+            "cursor": int(cursor),
+            "target_slot": int(slot),
+            **nav_snap,
+        }
+    )
     if died:
-        return True, frames, {"ok": False, "reason": "died", "slot": slot}
+        return True, frames, {
+            "ok": False,
+            "reason": "died",
+            "slot": slot,
+            "stages": stages,
+        }
 
     died, f = _equip_weapon_submenu(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
     frames += f
+    conf_snap = _equip_ram_snapshot(client)
+    stages.append({"t": "confirmed", "f": frames, **conf_snap})
     if died:
-        return True, frames, {"ok": False, "reason": "died", "slot": slot}
+        return True, frames, {
+            "ok": False,
+            "reason": "died",
+            "slot": slot,
+            "stages": stages,
+        }
 
     died, f = close_item_screen(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
     frames += f
-    after = _read_equipped_id(client)
-    ram = client.read_ram([("game_mode", GAME_MODE, "u8")])
-    in_control = bool(int(ram.get("game_mode", 0)) & IN_CONTROL_MASK)
+    after_snap = _equip_ram_snapshot(client)
+    after = int(after_snap.get("eq", 0)) if after_snap else _read_equipped_id(client)
+    after_slot = after_snap.get("slot_0")
+    stages.append({"t": "closed", "f": frames, **after_snap})
+    in_control = bool(int(after_snap.get("gm", 0)) & IN_CONTROL_MASK) if after_snap else False
+    if after_snap.get("menu"):
+        anomaly = anomaly or "equip_menu_left_open"
+    if after != target_id:
+        anomaly = anomaly or "equip_target_mismatch"
+    if after_snap.get("mirror_disagree") or before_snap.get("mirror_disagree"):
+        anomaly = anomaly or "equip_mirror_disagree"
+    # Knife-on-knife lookalike: targeted knife while RAM already knife (should be impossible).
+    if int(target_id) == 1 and int(before) == 1:
+        anomaly = "knife_on_knife_dispatched"
     ok = (
         not died
         and target_id != 0
         and after == target_id
         and in_control
     )
-    return (
-        died,
-        frames,
-        {
-            "ok": ok,
-            "reason": "equip_ok" if ok else "equip_failed",
-            "slot": int(slot),
-            "item_id": target_id,
-            "equipped_before": before,
-            "equipped_after": after,
-            "in_control_after": in_control,
-            "frames": frames,
-        },
-    )
+    report: dict[str, Any] = {
+        "ok": ok,
+        "reason": "equip_ok" if ok else "equip_failed",
+        "slot": int(slot),
+        "item_id": target_id,
+        "equipped_before": before,
+        "equipped_after": after,
+        "equipped_slot_before": before_slot,
+        "equipped_slot_after": after_slot,
+        "in_control_after": in_control,
+        "frames": frames,
+        "stages": stages,
+        "zero_nav": int(slot) == 0,
+    }
+    if anomaly:
+        report["anomaly"] = anomaly
+    return (died, frames, report)
 
 
 def execute_use_macro(

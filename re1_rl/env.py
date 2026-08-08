@@ -2828,8 +2828,14 @@ class RE1Env(gym.Env):
                     magic_report["menu_dismiss"] = dismiss_report
                     magic_report["menu_recovered"] = bool(recovered)
                 elif magic_report.get("reason") == "equip_ok":
-                    # Block reopening EQUIP for the next few policy steps.
-                    self._equip_switch_cooldown = 5
+                    # Block reopening EQUIP — short cooldowns are invisible next
+                    # to ~300f ITEM macros; keep this long enough to watch.
+                    raw_cd = os.environ.get("RE1_EQUIP_SWITCH_COOLDOWN_STEPS", "64")
+                    try:
+                        cd_steps = max(0, int(raw_cd))
+                    except ValueError:
+                        cd_steps = 64
+                    self._equip_switch_cooldown = cd_steps
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, self.frame_skip
                 magic_report = {"ok": False, "reason": f"error:{exc}"}
