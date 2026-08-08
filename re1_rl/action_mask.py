@@ -183,9 +183,15 @@ def _mask_box_ui_session(
     box_phase: int,
     inventory: list[tuple[int, int]] | None,
     box: list[tuple[int, int]] | None,
+    room_id: str | None = None,
 ) -> np.ndarray:
     """Legal actions while the item-box UI is open (in_control is false)."""
-    from re1_rl.item_box import BOX_DEPOSIT_POLICY_ENABLED, can_deposit, can_withdraw
+    from re1_rl.item_box import (
+        BOX_DEPOSIT_POLICY_ENABLED,
+        BOX_DEPOSIT_ROOMS,
+        can_deposit,
+        can_withdraw,
+    )
     from re1_rl.item_box_ui_macro import first_empty_inventory_slot
 
     mask[:] = False
@@ -194,6 +200,10 @@ def _mask_box_ui_session(
     has_empty_inv = (
         inventory is not None and first_empty_inventory_slot(inventory) is not None
     )
+    deposit_room_ok = (
+        room_id is None or str(room_id) in BOX_DEPOSIT_ROOMS
+    )
+    deposit_enabled = bool(BOX_DEPOSIT_POLICY_ENABLED) and deposit_room_ok
 
     if phase == BOX_PHASE_WITHDRAW_SLOT:
         if inventory is not None and box is not None and has_empty_inv:
@@ -208,7 +218,7 @@ def _mask_box_ui_session(
         return mask
 
     if phase == BOX_PHASE_DEPOSIT_SLOT:
-        if BOX_DEPOSIT_POLICY_ENABLED and inventory is not None and box is not None:
+        if deposit_enabled and inventory is not None and box is not None:
             for i in range(N_SELECT_SLOT):
                 idx = SELECT_SLOT_BASE + i
                 if idx < n_actions:
@@ -230,11 +240,7 @@ def _mask_box_ui_session(
         mask[BOX_WITHDRAW_ACTION] = any_withdraw
     if BOX_DEPOSIT_ACTION < n_actions:
         any_deposit = False
-        if (
-            BOX_DEPOSIT_POLICY_ENABLED
-            and inventory is not None
-            and box is not None
-        ):
+        if deposit_enabled and inventory is not None and box is not None:
             for i in range(min(N_SELECT_SLOT, len(inventory))):
                 ok, _ = can_deposit(inventory, box, i)
                 if ok:
@@ -302,6 +308,7 @@ def action_mask(
             box_phase=box_phase,
             inventory=inventory,
             box=box,
+            room_id=room_id,
         )
     if not in_control:
         mask[:] = False

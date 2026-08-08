@@ -2398,11 +2398,22 @@ class RE1Env(gym.Env):
                     magic_report={"ok": True, "reason": "box_withdraw_open"},
                 )
             if a == BOX_DEPOSIT_ACTION:
+                from re1_rl.item_box import BOX_DEPOSIT_ROOMS
+
                 if not BOX_DEPOSIT_POLICY_ENABLED:
                     return self._submenu_step(
                         a,
                         step_emulated_frames=self.frame_skip,
                         magic_report={"ok": False, "reason": "deposit_disabled"},
+                    )
+                room_now = str(
+                    (getattr(self, "_prev_state", {}) or {}).get("room_id", "") or ""
+                )
+                if room_now and room_now not in BOX_DEPOSIT_ROOMS:
+                    return self._submenu_step(
+                        a,
+                        step_emulated_frames=self.frame_skip,
+                        magic_report={"ok": False, "reason": "deposit_room_blocked"},
                     )
                 self._box_phase = BOX_PHASE_DEPOSIT_SLOT
                 return self._submenu_step(
@@ -2494,6 +2505,7 @@ class RE1Env(gym.Env):
                     prev_hp=prev_hp,
                     episode_start_hp=episode_start_hp,
                     inv_cursor=inv_cursor,
+                    box_cursor=box_cursor,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, 0
@@ -2501,14 +2513,27 @@ class RE1Env(gym.Env):
             finally:
                 self._macro_active = False
                 self._sticky_input.reset()
+            if report.get("ok") and report.get("moved") is not None:
+                report = {**report, "box_transfer": "deposit"}
             if report.get("inv_cursor") is not None:
                 self._box_inv_cursor = int(report["inv_cursor"])
+            if report.get("box_cursor") is not None:
+                self._box_list_cursor = int(report["box_cursor"])
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_cache = None
             try:
                 self._box_ui_open = probe_box_ui_open(self.bridge)
             except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
                 self._box_ui_open = True
+            pollution = self._box_pollution_failure()
+            if pollution:
+                report = {
+                    **report,
+                    "ok": False,
+                    "reason": pollution,
+                    "box_pollution": pollution,
+                }
+                self._episode_failure_override = pollution
             return self._submenu_step(
                 a,
                 step_emulated_frames=max(int(frames), self.frame_skip),

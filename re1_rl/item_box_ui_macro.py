@@ -1,6 +1,6 @@
 """Authentic item-box UI macros (no magic RAM writes).
 
-RE1 DC box flow (imperator scaffolding 2026-08-07):
+RE1 DC box flow (imperator scaffolding 2026-08-07 / deposit hunt 2026-08-08):
   - Interact opens the box; after the animation the cursor is on inventory
     slot 0 (top-left).
   - Withdraw: move to an **empty** inventory slot → Cross (cursor enters the
@@ -8,12 +8,15 @@ RE1 DC box flow (imperator scaffolding 2026-08-07):
     slot 0 after a fresh open) → Up/Down to the source box slot → Cross.
     The game places the item in the chosen empty slot and leaves the cursor
     on it.
-  - Next withdraw: from that inv cursor, move to the next empty inv slot → …
-    (box-list cursor must be tracked; assuming slot 0 breaks 1-then-0 order).
-  - Close: from the inventory cursor, Down to the EXIT button → Cross.
-    Triangle remains a fallback dismiss.
+  - Deposit: move to an **occupied** inventory slot → Cross (enters box list
+    at ``box_cursor``) → Up/Down to the first empty box slot → Cross.
+    Cross on an occupied box slot **exchanges** (avoid). Deposit onto
+    ``-Nothing-`` is reliable after at least one successful transfer in the
+    session (typical: withdraw ammo first); cold empty-box deposit is flaky.
+  - Close: while the cursor is on the inventory grid, Triangle dismisses
+    cleanly. EXIT (Down → Cross) is the fallback if Triangle misses.
 
-Deposit stays available for later; policy currently off.
+Policy: deposit stays off until room-100 allowlist enablement.
 """
 
 from __future__ import annotations
@@ -29,7 +32,15 @@ from re1_rl.item_box import (
     read_box,
     read_inventory,
 )
-from re1_rl.memory_map import GAME_MODE, GAME_STATE, PLAYER_HP, player_died
+from re1_rl.memory_map import (
+    GAME_MODE,
+    GAME_STATE,
+    ITEM_BOX_UI_GAME_STATE,
+    ITEM_BOX_UI_GAME_STATE_MASK,
+    PAUSE_MENU_GAME_MODE,
+    PLAYER_HP,
+    player_died,
+)
 
 OPEN_PANE_TAP_FRAMES = 8
 OPEN_PANE_SETTLE_FRAMES = 16
@@ -88,10 +99,16 @@ def _wait(
 
 
 def box_ui_open_from_ram(ram: dict[str, int | float]) -> bool:
-    """Item-box screen shares the START/ITEM pause-tree RAM signature."""
-    from re1_rl.ram_skip import item_inventory_screen_from_ram
+    """True only on the item-box UI (``gs`` mid-byte 0x90), not START/ITEM.
 
-    return item_inventory_screen_from_ram(ram)
+    Pickup Yes/No and the ITEM grid also sit in the pause tree; treating those
+    as the box made BOX_CLOSE Triangle-spam over the chemical confirm dialog.
+    """
+    return (
+        int(ram.get("game_mode", 0)) == PAUSE_MENU_GAME_MODE
+        and (int(ram.get("game_state", 0)) & ITEM_BOX_UI_GAME_STATE_MASK)
+        == ITEM_BOX_UI_GAME_STATE
+    )
 
 
 def probe_box_ui_open(client: Any) -> bool:
@@ -254,63 +271,19 @@ def close_box_ui(
     episode_start_hp: int,
     inv_cursor: int = 0,
 ) -> tuple[bool, int, dict[str, Any]]:
-    """Dismiss the item box via EXIT (Cross), with Triangle fallback."""
-    report: dict[str, Any] = {"ok": False, "path": "exit"}
+    """Dismiss the item box: Triangle on inventory first, EXIT as fallback.
+
+    After a withdraw the cursor rests on an inventory slot — Triangle closes
+    without EXIT navigation. ``inv_cursor`` is kept for the EXIT fallback path.
+    """
+    report: dict[str, Any] = {"ok": False, "path": "triangle"}
     frames = 0
     if not probe_box_ui_open(client):
         report["ok"] = True
         report["skipped"] = True
         return False, 0, report
 
-    cursor = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
-    # Bottom-right of the grid is the shortest path to EXIT (down from there).
-    target = 5 if cursor <= 5 else 7
-    try:
-        target = 5
-        died, f = _navigate_inventory(
-            client,
-            cursor,
-            target,
-            prev_hp=prev_hp,
-            episode_start_hp=episode_start_hp,
-        )
-        frames += f
-        if died:
-            report["died"] = True
-            report["frames"] = frames
-            return True, frames, report
-    except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
-        pass
-
-    for _ in range(EXIT_NAV_MAX_DOWNS):
-        if not probe_box_ui_open(client):
-            report["ok"] = True
-            report["frames"] = frames
-            return False, frames, report
-        died, f = _move(
-            client, "down", prev_hp=prev_hp, episode_start_hp=episode_start_hp
-        )
-        frames += f
-        if died:
-            report["died"] = True
-            report["frames"] = frames
-            return True, frames, report
-
-    died, f = _confirm_cross(
-        client, prev_hp=prev_hp, episode_start_hp=episode_start_hp, settle=CLOSE_SETTLE_FRAMES
-    )
-    frames += f
-    if died:
-        report["died"] = True
-        report["frames"] = frames
-        return True, frames, report
-    if not probe_box_ui_open(client):
-        report["ok"] = True
-        report["frames"] = frames
-        return False, frames, report
-
-    # Triangle fallback (works when EXIT nav missed).
-    report["path"] = "exit_then_triangle"
+    # Primary: Triangle while focused on the inventory grid.
     for _ in range(CLOSE_MAX_ATTEMPTS):
         died, f = _tap(
             client,
@@ -340,6 +313,55 @@ def close_box_ui(
             report["frames"] = frames
             return False, frames, report
 
+    # Fallback: navigate to EXIT and Cross (cursor may be on the box list).
+    report["path"] = "triangle_then_exit"
+    cursor = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
+    try:
+        died, f = _navigate_inventory(
+            client,
+            cursor,
+            5,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += f
+        if died:
+            report["died"] = True
+            report["frames"] = frames
+            return True, frames, report
+    except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+        pass
+
+    for _ in range(EXIT_NAV_MAX_DOWNS):
+        if not probe_box_ui_open(client):
+            report["ok"] = True
+            report["frames"] = frames
+            return False, frames, report
+        died, f = _move(
+            client, "down", prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames += f
+        if died:
+            report["died"] = True
+            report["frames"] = frames
+            return True, frames, report
+
+    died, f = _confirm_cross(
+        client,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+        settle=CLOSE_SETTLE_FRAMES,
+    )
+    frames += f
+    if died:
+        report["died"] = True
+        report["frames"] = frames
+        return True, frames, report
+    if not probe_box_ui_open(client):
+        report["ok"] = True
+        report["frames"] = frames
+        return False, frames, report
+
     from re1_rl.inventory_menu_macro import close_item_screen
 
     died, f = close_item_screen(
@@ -347,7 +369,7 @@ def close_box_ui(
     )
     frames += f
     still = probe_box_ui_open(client)
-    report["path"] = "exit_triangle_start"
+    report["path"] = "triangle_exit_start"
     report["ok"] = not still and not died
     report["died"] = bool(died)
     report["frames"] = frames
@@ -523,14 +545,21 @@ def execute_box_deposit_ui(
     prev_hp: int,
     episode_start_hp: int,
     inv_cursor: int = 0,
+    box_cursor: int = 0,
 ) -> tuple[bool, int, dict[str, Any]]:
-    """Deposit ``inv_slot`` via UI (occupied inv → Cross → box NOTHING → Cross)."""
+    """Deposit ``inv_slot`` via occupied inv → Cross → empty box → Cross.
+
+    ``box_cursor`` is where the box list resumes on Cross (same session
+    tracking as withdraw). Destination is the first empty modeled box slot
+    (never exchange onto an occupied entry).
+    """
     report: dict[str, Any] = {
         "ok": False,
         "action": "deposit",
         "inv_slot": int(inv_slot),
         "moved": None,
         "inv_cursor": int(inv_cursor),
+        "box_cursor": int(box_cursor),
     }
     frames = 0
     if not probe_box_ui_open(client):
@@ -549,6 +578,14 @@ def execute_box_deposit_ui(
         report["reason"] = reason
         return False, 0, report
 
+    dest = next(
+        (i for i, (iid, _q) in enumerate(box_before) if int(iid) == 0),
+        None,
+    )
+    if dest is None:
+        report["reason"] = "box_full"
+        return False, 0, report
+
     item_id, qty_before = inv_before[slot]
     cursor = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
     died, f = _navigate_inventory(
@@ -564,6 +601,7 @@ def execute_box_deposit_ui(
         report["frames"] = frames
         return True, frames, report
 
+    # Cross on occupied inv → box list resumes at ``box_cursor``.
     died, f = _confirm_cross(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
@@ -573,13 +611,13 @@ def execute_box_deposit_ui(
         report["frames"] = frames
         return True, frames, report
 
-    # Box list: home to top, find first -Nothing- / empty (slot 0 often empty dest).
-    died, f = _move(
+    list_from = max(0, min(BOX_SLOTS - 1, int(box_cursor)))
+    died, f = _navigate_box_list(
         client,
-        "up",
+        list_from,
+        int(dest),
         prev_hp=prev_hp,
         episode_start_hp=episode_start_hp,
-        taps=16,
     )
     frames += f
     if died:
@@ -599,21 +637,38 @@ def execute_box_deposit_ui(
     inv_after = read_inventory(client)
     box_after = read_box(client)
     report["frames"] = frames
-    src_after = inv_after[slot] if slot < len(inv_after) else (0, 0)
-    moved = False
-    if src_after[0] == 0 and item_id != 0:
-        moved = True
-    elif src_after[0] == item_id and int(src_after[1]) < int(qty_before):
-        moved = True
-    if box_after == box_before:
-        moved = False
+    report["dest_slot"] = int(dest)
+
+    dest_got = (
+        dest < len(box_after)
+        and int(box_before[dest][0]) == 0
+        and int(box_after[dest][0]) == int(item_id)
+    )
+    before_units = sum(
+        1 if (int(q) <= 0 and int(iid) == int(item_id)) else int(q)
+        for iid, q in inv_before
+        if int(iid) == int(item_id)
+    )
+    after_units = sum(
+        1 if (int(q) <= 0 and int(iid) == int(item_id)) else int(q)
+        for iid, q in inv_after
+        if int(iid) == int(item_id)
+    )
+    moved = bool(dest_got) and after_units < before_units
 
     if not moved:
         report["reason"] = "transfer_no_effect"
+        report["inv_before"] = inv_before[:4]
+        report["inv_after"] = inv_after[:4]
+        report["box_before"] = box_before[:4]
+        report["box_after"] = box_after[:4]
         return False, frames, report
 
+    moved_qty = max(1, before_units - after_units)
     report["ok"] = True
     report["reason"] = ""
-    report["moved"] = (item_id, max(1, int(qty_before) - int(src_after[1])))
+    report["moved"] = (item_id, moved_qty)
+    # Inv may compact after deposit; keep source index as a hint.
     report["inv_cursor"] = int(slot)
+    report["box_cursor"] = int(dest)
     return False, frames, report

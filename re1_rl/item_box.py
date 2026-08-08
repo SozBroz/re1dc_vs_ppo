@@ -51,12 +51,32 @@ BOX_SLOTS = 16
 BOX_SLOTS_LIVE = 48
 INVENTORY_SLOTS = 8
 LOCKPICK_ITEM_ID = 0x31
+KNIFE_ITEM_ID = 0x01
+# Knife + healing items only (room-100 bank). Keys/ammo/weapons stay on person.
+DEPOSIT_ITEM_ALLOWLIST = frozenset(
+    {
+        KNIFE_ITEM_ID,
+        0x41,  # first_aid_spray_alt
+        0x43,  # red_herb
+        0x44,  # green_herb
+        0x45,  # blue_herb
+        0x46,  # mixed_herbs_gr
+        0x47,  # mixed_herbs_gg
+        0x48,  # mixed_herbs_gb
+        0x49,  # mixed_herbs_grb
+        0x4A,  # mixed_herbs_ggg
+        0x4B,  # mixed_herbs_ggb
+    }
+)
 
 # Env must leave these False — magic writes scuffed post-cp41 states.
 # When False, ``apply_deposit`` / ``apply_withdraw`` are no-ops (no write_ram).
 MAGIC_BOX_RAM_WRITES_ENABLED = False
 # Policy: withdraw + close only until deposit UI is re-enabled.
+# When flipped on: only ``BOX_DEPOSIT_ROOMS`` + ``DEPOSIT_ITEM_ALLOWLIST``.
 BOX_DEPOSIT_POLICY_ENABLED = False
+# First live deposit target is the mansion 1F box room (not storeroom 118).
+BOX_DEPOSIT_ROOMS = frozenset({"100"})
 
 BOX_ROOMS = frozenset({"100", "118", "30E", "403", "502", "50E", "600", "618"})
 
@@ -156,8 +176,14 @@ def can_deposit(
     inventory: list[tuple[int, int]],
     box: list[tuple[int, int]],
     inv_slot: int,
+    *,
+    enforce_allowlist: bool | None = None,
 ) -> tuple[bool, str]:
-    """Legal iff source occupied, not lockpick, and box has a free empty slot."""
+    """Legal iff source occupied, not lockpick, and box has a free empty slot.
+
+    When ``BOX_DEPOSIT_POLICY_ENABLED`` (or ``enforce_allowlist=True``), only
+    ``DEPOSIT_ITEM_ALLOWLIST`` ids may deposit (knife + heals).
+    """
     if inv_slot < 0 or inv_slot >= len(inventory):
         return False, "bad_slot"
     item_id, qty = inventory[inv_slot]
@@ -167,6 +193,13 @@ def can_deposit(
         return False, "lockpick"
     if effective_transfer_qty(item_id, qty) <= 0:
         return False, "empty_slot"
+    use_allowlist = (
+        BOX_DEPOSIT_POLICY_ENABLED
+        if enforce_allowlist is None
+        else bool(enforce_allowlist)
+    )
+    if use_allowlist and int(item_id) not in DEPOSIT_ITEM_ALLOWLIST:
+        return False, "not_allowlisted"
     if _first_empty_slot(box) is None:
         return False, "box_full"
     return True, ""

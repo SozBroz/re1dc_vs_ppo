@@ -5,6 +5,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.action_mask import (
@@ -198,6 +200,42 @@ def test_box_withdraw_only_while_box_ui_open() -> None:
     assert not choose[BOX_DEPOSIT_ACTION]  # deposit policy off
     assert choose[BOX_CLOSE_ACTION]
     assert not choose[WITHDRAW_ACTION_BASE]
+
+    # When policy is on, deposit only in BOX_DEPOSIT_ROOMS (100), allowlisted items.
+    import re1_rl.item_box as item_box_mod
+
+    monkey = pytest.MonkeyPatch()
+    try:
+        monkey.setattr(item_box_mod, "BOX_DEPOSIT_POLICY_ENABLED", True)
+        heal_inv = [(0x44, 1)] + [(0, 0)] * 7
+        room100 = action_mask(
+            N_ACTIONS,
+            None,
+            equipped_weapon_id=0x01,
+            inventory=heal_inv,
+            box=box,
+            in_box_room=True,
+            box_ui_open=True,
+            box_phase=BOX_PHASE_CHOOSE,
+            in_control=False,
+            room_id="100",
+        )
+        assert room100[BOX_DEPOSIT_ACTION]
+        room118 = action_mask(
+            N_ACTIONS,
+            None,
+            equipped_weapon_id=0x01,
+            inventory=heal_inv,
+            box=box,
+            in_box_room=True,
+            box_ui_open=True,
+            box_phase=BOX_PHASE_CHOOSE,
+            in_control=False,
+            room_id="118",
+        )
+        assert not room118[BOX_DEPOSIT_ACTION]
+    finally:
+        monkey.undo()
 
     picking = action_mask(
         N_ACTIONS,

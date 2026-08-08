@@ -132,6 +132,35 @@ def test_deposit_lockpick_refused(magic_box_writes):
     assert bridge.writes == []
 
 
+def test_deposit_allowlist_knife_and_heals_only() -> None:
+    inv = [(0x0B, 15), (0x01, 0), (0x44, 1)] + [(0, 0)] * 5
+    box = _empty_box()
+    ok_ammo, reason_ammo = can_deposit(inv, box, 0, enforce_allowlist=True)
+    assert not ok_ammo and reason_ammo == "not_allowlisted"
+    ok_knife, _ = can_deposit(inv, box, 1, enforce_allowlist=True)
+    ok_herb, _ = can_deposit(inv, box, 2, enforce_allowlist=True)
+    assert ok_knife and ok_herb
+    # Policy off: allowlist not enforced (planner/tests).
+    ok_ammo_open, _ = can_deposit(inv, box, 0, enforce_allowlist=False)
+    assert ok_ammo_open
+
+
+def test_box_ui_open_from_ram_requires_gs_90() -> None:
+    from re1_rl.item_box_ui_macro import box_ui_open_from_ram
+    from re1_rl.memory_map import PAUSE_MENU_GAME_MODE
+
+    assert box_ui_open_from_ram(
+        {"game_mode": PAUSE_MENU_GAME_MODE, "game_state": 0x40809000}
+    )
+    # START/ITEM grid — must not look like the box (Triangle spam on Yes/No).
+    assert not box_ui_open_from_ram(
+        {"game_mode": PAUSE_MENU_GAME_MODE, "game_state": 0x40808000}
+    )
+    assert not box_ui_open_from_ram(
+        {"game_mode": PAUSE_MENU_GAME_MODE, "game_state": 0x40808100}
+    )
+
+
 def test_deposit_from_empty_slot_refused():
     inv = _empty_inventory()
     box = _empty_box()

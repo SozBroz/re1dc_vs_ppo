@@ -45,6 +45,10 @@ IN_CONTROL_GAMESTATE_MASK = 0x90000000
 PAUSE_MENU_GAME_STATE = 0x40808000
 PAUSE_MENU_GAME_STATE_MASK = 0xFFFFFF00
 PAUSE_MENU_GAME_MODE = 0x40
+# Item-box UI (live QS0 / room 118): mode 0x40, gs mid-byte 0x90 → 0x40809000.
+# Distinct from START/ITEM grid 0x40808000 and pickup Yes/No (also pause-tree).
+ITEM_BOX_UI_GAME_STATE = 0x40809000
+ITEM_BOX_UI_GAME_STATE_MASK = 0xFFFFFF00
 # Document / file examine overlay (QS1 botany book, hunt 2026-07-20):
 # same mode 0x40 as ITEM but mid-byte 0x81 → exact gs 0x40808100. Distinct from
 # ITEM grid 0x40808000 and from STATUS mid-byte drift 0x40808104. Triangle
