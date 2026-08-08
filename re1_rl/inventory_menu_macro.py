@@ -1,9 +1,9 @@
 """ITEM-screen inventory macros (equip / use / combine).
 
-START opens the ITEM screen from gameplay (hunt 2026-07-07). Fresh opens often
-home on slot 0, but rapid re-entry / already-open menus can leave the cursor on
-the equipped weapon — seed navigation from the equipped slot when known.
-Submenu (cross opens) examples:
+START opens the ITEM screen from gameplay (hunt 2026-07-07). Fresh opens home
+on inventory slot 0 (live DC); do not seed from the equipped weapon or Up can
+land on EXIT. Orphan already-open menus are closed and reopened for a known
+cursor. Submenu (cross opens) examples:
 
   Weapons: EQUIP → CHECK → COMBN
   Spray / ammo: USE → CHECK → COMBN
@@ -179,17 +179,6 @@ def _wait(
     )
 
 
-def _item_grid_cursor_slot(client: Any) -> int:
-    """Best-effort ITEM grid cursor; prefer equipped slot when known."""
-    try:
-        slot = read_equipped_slot_0based(client)
-    except (OSError, RuntimeError, AttributeError, TypeError, ValueError, KeyError):
-        slot = None
-    if slot is None:
-        return 0
-    return max(0, min(INVENTORY_SLOTS - 1, int(slot)))
-
-
 def open_item_screen(
     client: Any,
     *,
@@ -198,15 +187,26 @@ def open_item_screen(
 ) -> tuple[bool, int, int, bool]:
     """One Start tap to open ITEM; proceed only if RAM confirms the menu.
 
-    Returns ``(died, frames, cursor_slot, opened)``.
-    If ITEM is already open (orphan pause), do **not** tap Start again — return
-    ``opened=True`` with a seeded cursor so equip/use/combine can continue.
-    When closed, does **not** spam Start — if hitstun ate the press, callers must
-    release without further menu inputs.
+    Returns ``(died, frames, cursor_slot, opened)``. Cursor is always ``0`` on a
+    successful open — live DC opens home on inventory slot 0 (not the equipped
+    weapon). Seeding from the equipped slot caused Up to land on EXIT and Cross
+    to dismiss the menu, so shotgun→knife equips never stuck.
+
+    If ITEM is already open (orphan pause), close and reopen so the cursor is
+    known. When closed, does **not** spam Start — if hitstun ate the press,
+    callers must release without further menu inputs.
     """
     frames = 0
     if _item_menu_confirmed(client):
-        return False, frames, _item_grid_cursor_slot(client), True
+        died, f = close_item_screen(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames += f
+        if died:
+            return True, frames, 0, False
+        if _item_menu_confirmed(client):
+            # Still stuck in pause — do not tap Start again.
+            return False, frames, 0, False
     for buttons, n in (({"start": True}, OPEN_START_FRAMES), ({}, OPEN_SETTLE_FRAMES)):
         died, f = _tap(
             client,
@@ -219,8 +219,7 @@ def open_item_screen(
         if died:
             return True, frames, 0, False
     opened = _item_menu_confirmed(client)
-    cursor = _item_grid_cursor_slot(client) if opened else 0
-    return False, frames, cursor, opened
+    return False, frames, 0, opened
 
 
 def close_item_screen(

@@ -118,7 +118,7 @@ def test_weapon_already_equipped() -> None:
     )
 
 
-def test_open_item_screen_already_open_continues_without_start() -> None:
+def test_open_item_screen_already_open_closes_and_reopens() -> None:
     client = _RecordingClient(
         equipped_id=0x03, equipped_slot_1b=4, inv_ids=[0x01, 0x02, 0, 0x03]
     )
@@ -128,9 +128,16 @@ def test_open_item_screen_already_open_continues_without_start() -> None:
     )
     assert not died
     assert opened is True
-    assert frames == 0
-    assert cursor == 3
-    assert client.steps == []
+    assert cursor == 0
+    # Start close + settle, then Start open + settle.
+    assert frames >= (
+        CLOSE_START_FRAMES
+        + CLOSE_ITEM_SETTLE_FRAMES
+        + OPEN_START_FRAMES
+        + OPEN_SETTLE_FRAMES
+    )
+    assert client.steps[0] == ({"start": True}, CLOSE_START_FRAMES)
+    assert any(b.get("start") for b, _ in client.steps[1:])
 
 
 def test_execute_equip_macro_skips_already_equipped_knife() -> None:
