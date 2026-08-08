@@ -287,3 +287,20 @@ def test_mask_allows_equip_from_standing_gun_idle() -> None:
     )
     assert m[EQUIP_ACTION]
 
+
+def test_mask_blocks_equip_during_switch_cooldown() -> None:
+    from re1_rl.action_mask import EQUIP_ACTION
+
+    inv = [(0x01, 1), (0x02, 15), (0x03, 5)]
+    kwargs = dict(
+        player_anim=0x0D,
+        player_aux=0x01,
+        player_recovery=0,
+        equipped_weapon_id=0x02,
+        inventory=inv,
+    )
+    assert action_mask(N_ACTIONS, None, **kwargs)[EQUIP_ACTION]
+    assert not action_mask(
+        N_ACTIONS, None, equip_switch_cooldown=1, **kwargs
+    )[EQUIP_ACTION]
+

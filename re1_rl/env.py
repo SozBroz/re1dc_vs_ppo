@@ -401,6 +401,7 @@ class RE1Env(gym.Env):
         self._use_phase = 0
         self._inventory_before_use: list[tuple[int, int]] | None = None
         self._equip_phase = 0
+        self._equip_switch_cooldown = 0
         self._combine_phase = 0
         self._combine_slot_a: int | None = None
         self._attack_telemetry = None
@@ -1429,6 +1430,7 @@ class RE1Env(gym.Env):
         self._use_phase = 0
         self._inventory_before_use = None
         self._equip_phase = 0
+        self._equip_switch_cooldown = 0
         self._combine_phase = 0
         self._combine_slot_a = None
         self._box_ui_open = False
@@ -2825,6 +2827,9 @@ class RE1Env(gym.Env):
                     magic_report = dict(magic_report)
                     magic_report["menu_dismiss"] = dismiss_report
                     magic_report["menu_recovered"] = bool(recovered)
+                elif magic_report.get("reason") == "equip_ok":
+                    # Block reopening EQUIP for the next policy step.
+                    self._equip_switch_cooldown = 1
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, self.frame_skip
                 magic_report = {"ok": False, "reason": f"error:{exc}"}
@@ -3273,6 +3278,9 @@ class RE1Env(gym.Env):
             player_z=pose.get("z"),
             rewarded_story_uses=rewarded_story_uses,
             document_examine_open=document_examine_open,
+            equip_switch_cooldown=int(
+                getattr(self, "_equip_switch_cooldown", 0)
+            ),
         )
         if (
             box_ui_open
@@ -3343,6 +3351,10 @@ class RE1Env(gym.Env):
         assert self._planner is not None
         # One-step TTL: clear prior last_attack before this step's observation.
         self._last_attack_obs = empty_last_attack()
+        # Consume equip holdout after the masked decision step has begun.
+        # action_masks() for this step already saw the pre-tick cooldown.
+        if int(getattr(self, "_equip_switch_cooldown", 0)) > 0:
+            self._equip_switch_cooldown -= 1
         self._start_bg_skip()
         if self._bg_death:
             self._bg_death = False

@@ -284,6 +284,7 @@ def action_mask(
     player_z: float | int | None = None,
     rewarded_story_uses: set[str] | frozenset[str] | None = None,
     document_examine_open: bool = False,
+    equip_switch_cooldown: int = 0,
 ) -> np.ndarray:
     """Return bool mask (True = legal) for MaskablePPO / ActionMasker."""
     del prev_action
@@ -434,6 +435,9 @@ def action_mask(
                     equipped_weapon_id=equipped_weapon_id,
                     equipped_slot_0based=equipped_slot_0based,
                 )
+                # One-step holdout after a successful equip swap (anti thrash).
+                if int(equip_switch_cooldown) > 0:
+                    mask[EQUIP_ACTION] = False
             if COMBINE_ACTION < n_actions:
                 from re1_rl.inventory_combine import any_valid_combine
 
