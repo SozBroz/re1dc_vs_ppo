@@ -166,6 +166,7 @@ def test_box_withdraw_only_while_box_ui_open() -> None:
         BOX_PHASE_CHOOSE,
         BOX_PHASE_WITHDRAW_SLOT,
         BOX_WITHDRAW_ACTION,
+        COMBINE_ACTION,
     )
 
     inv = [(0x01, 0)] + [(0, 0)] * 7
@@ -212,6 +213,45 @@ def test_box_withdraw_only_while_box_ui_open() -> None:
     assert picking[WITHDRAW_ACTION_BASE]
     assert picking[BOX_CLOSE_ACTION]
     assert not picking[BOX_WITHDRAW_ACTION]
+
+    # UI withdraw needs an empty inv slot even if a stack could merge.
+    full = [(0x01, 0), (0x02, 4), (0x35, 1), (0x03, 3)] + [(0x41, 1)] * 4
+    full_mask = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x02,
+        inventory=full,
+        box=box,
+        in_box_room=True,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_CHOOSE,
+        in_control=False,
+    )
+    assert not full_mask[BOX_WITHDRAW_ACTION]
+    assert full_mask[BOX_CLOSE_ACTION]
+
+    # After withdrawing two CLIP piles, combine must be legal outside the box UI.
+    merged_inv = [
+        (0x01, 0),
+        (0x02, 4),
+        (0x35, 1),
+        (0x03, 3),
+        (0x0B, 15),
+        (0x0B, 15),
+        (0, 0),
+        (0, 0),
+    ]
+    after = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x03,
+        inventory=merged_inv,
+        box=[(0, 0)] * 16,
+        in_box_room=True,
+        box_ui_open=False,
+        in_control=True,
+    )
+    assert after[COMBINE_ACTION]
 
 
 def test_knife_crouch_legal_with_knife_via_attack_down() -> None:

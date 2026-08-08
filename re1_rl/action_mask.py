@@ -186,12 +186,17 @@ def _mask_box_ui_session(
 ) -> np.ndarray:
     """Legal actions while the item-box UI is open (in_control is false)."""
     from re1_rl.item_box import BOX_DEPOSIT_POLICY_ENABLED, can_deposit, can_withdraw
+    from re1_rl.item_box_ui_macro import first_empty_inventory_slot
 
     mask[:] = False
     phase = int(box_phase)
+    # UI withdraw requires an empty inv slot (Cross on empty → box list).
+    has_empty_inv = (
+        inventory is not None and first_empty_inventory_slot(inventory) is not None
+    )
 
     if phase == BOX_PHASE_WITHDRAW_SLOT:
-        if inventory is not None and box is not None:
+        if inventory is not None and box is not None and has_empty_inv:
             for i in range(N_WITHDRAW_ACTIONS):
                 idx = WITHDRAW_ACTION_BASE + i
                 if idx < n_actions:
@@ -216,7 +221,7 @@ def _mask_box_ui_session(
     # BOX_PHASE_CHOOSE: withdraw / close (deposit wired but policy-gated).
     if BOX_WITHDRAW_ACTION < n_actions:
         any_withdraw = False
-        if inventory is not None and box is not None:
+        if inventory is not None and box is not None and has_empty_inv:
             for i in range(min(N_WITHDRAW_ACTIONS, len(box))):
                 ok, _ = can_withdraw(inventory, box, i)
                 if ok:

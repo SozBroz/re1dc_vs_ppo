@@ -82,7 +82,7 @@ def _row_as_dict(row: Any) -> dict[str, Any]:
         "record_id": getattr(row, "record_id", ""),
         "cell_key": getattr(row, "cell_key", ""),
         "room_id": getattr(row, "room_id", ""),
-        "quality": list(getattr(row, "quality", (0, 0, 0, 0, 0, 0))),
+        "quality": list(getattr(row, "quality", (0, 0, 0, 0, 0, 0, 0))),
         "visit_count": int(getattr(row, "visit_count", 0) or 0),
         "tile_bin": list(getattr(row, "tile_bin", (0, 0))),
         "meta": dict(getattr(row, "meta", {}) or {}),

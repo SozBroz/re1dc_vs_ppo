@@ -11,7 +11,7 @@ JSON schema (v2)::
         "room_id": "105",
         "tile_bin": [3, 1],
         "milestone_digest": "gallery:idle",
-        "quality": [hp, ammo_dmg_weighted, healing, ever_held_count, poison, -ink_ribbons],
+        "quality": [hp, ammo_dmg_weighted, healing, ever_held_count, poison, -ink_ribbons, inv_ammo],
         "visit_count": 2,
         "bundle_path": null,
         "meta": {}
@@ -50,17 +50,18 @@ _STALE_LOCK_S = 180.0
 _MAX_CELLS_PER_ROOM_ENV = "RE1_GO_MAX_CELLS_PER_ROOM"
 _DEFAULT_MAX_CELLS_PER_ROOM = 40
 
-# (hp, ammo_dmg_weighted, healing, ever_held_count, poison_ok, -ink_ribbons_in_inventory)
-Quality = tuple[int, int, int, int, int, int]
-QUALITY_LEN = 6
+# (hp, ammo_dmg_weighted, healing, ever_held_count, poison_ok,
+#  -ink_ribbons_in_inventory, on_person_ammo_dmg_weighted)
+Quality = tuple[int, int, int, int, int, int, int]
+QUALITY_LEN = 7
 
 
 def normalize_quality(
     raw: Quality | list[int] | tuple[int, ...] | None,
 ) -> Quality:
-    """Pad/truncate to the current quality arity (legacy 5-tuples get ``-ribbons=0``)."""
+    """Pad/truncate to the current quality arity (legacy shorter tuples pad with 0)."""
     if raw is None:
-        return (0, 0, 0, 0, 0, 0)
+        return (0, 0, 0, 0, 0, 0, 0)
     vals = [int(x) for x in list(raw)[:QUALITY_LEN]]
     while len(vals) < QUALITY_LEN:
         vals.append(0)
@@ -71,6 +72,7 @@ def normalize_quality(
         int(vals[3]),
         int(vals[4]),
         int(vals[5]),
+        int(vals[6]),
     )
 
 
@@ -229,7 +231,7 @@ class ArchiveCell:
     room_id: str
     tile_bin: tuple[int, int]
     milestone_digest: str
-    quality: Quality = (0, 0, 0, 0, 0, 0)
+    quality: Quality = (0, 0, 0, 0, 0, 0, 0)
     visit_count: int = 0
     bundle_path: str | None = None
     meta: dict[str, Any] = field(default_factory=dict)

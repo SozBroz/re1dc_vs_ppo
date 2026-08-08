@@ -412,7 +412,7 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _as_quality(raw: Any) -> tuple[int, int, int, int, int, int] | None:
+def _as_quality(raw: Any) -> tuple[int, int, int, int, int, int, int] | None:
     if not isinstance(raw, (list, tuple)) or len(raw) < 5:
         return None
     try:

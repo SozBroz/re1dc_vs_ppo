@@ -395,6 +395,7 @@ class RE1Env(gym.Env):
         self._box_departure_snapshot: list[float] | None = None
         self._box_ui_open = False
         self._box_phase = BOX_PHASE_CHOOSE
+        self._box_inv_cursor = 0
         self._use_phase = 0
         self._inventory_before_use: list[tuple[int, int]] | None = None
         self._equip_phase = 0
@@ -1409,6 +1410,7 @@ class RE1Env(gym.Env):
         self._combine_slot_a = None
         self._box_ui_open = False
         self._box_phase = BOX_PHASE_CHOOSE
+        self._box_inv_cursor = 0
         self._last_attack_obs = empty_last_attack()
         self._last_skip_frames = 0
         self._last_settled_skip_frames = 0
@@ -2221,10 +2223,13 @@ class RE1Env(gym.Env):
             if not self._box_ui_open:
                 self._box_ui_open = True
                 self._box_phase = BOX_PHASE_CHOOSE
+                # After open animation the cursor homes on inventory slot 0.
+                self._box_inv_cursor = 0
             return
         if self._box_ui_open and not open_now:
             self._box_ui_open = False
             self._box_phase = BOX_PHASE_CHOOSE
+            self._box_inv_cursor = 0
 
     def _probe_item_inventory_menu(self) -> bool:
         from re1_rl.ram_skip import item_inventory_screen_from_ram
@@ -2300,8 +2305,9 @@ class RE1Env(gym.Env):
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]] | None:
         """Open-box PPO: withdraw/close via authentic UI (no inv/box RAM writes).
 
-        Policy picks the source box slot; the game places into inventory.
-        Deposit stays policy-gated off. Close is Triangle.
+        Policy picks the source box slot; macro selects an empty inv slot then
+        the box entry (Cross/Cross). Deposit stays policy-gated off. Close uses
+        EXIT (Cross) with Triangle fallback.
         """
         from re1_rl.herb_combine import combine_slot_from_action
         from re1_rl.item_box import BOX_DEPOSIT_POLICY_ENABLED
@@ -2318,6 +2324,7 @@ class RE1Env(gym.Env):
         prev_hp = int(getattr(self, "_prev_hp", 0) or 0)
         episode_start_hp = int(getattr(self, "_episode_start_hp", 0) or 0)
         phase = int(getattr(self, "_box_phase", BOX_PHASE_CHOOSE))
+        inv_cursor = int(getattr(self, "_box_inv_cursor", 0) or 0)
 
         if a == BOX_CLOSE_ACTION:
             self._sticky_input.reset()
@@ -2327,12 +2334,14 @@ class RE1Env(gym.Env):
                     self.bridge,
                     prev_hp=prev_hp,
                     episode_start_hp=episode_start_hp,
+                    inv_cursor=inv_cursor,
                 )
             finally:
                 self._macro_active = False
                 self._sticky_input.reset()
             self._box_ui_open = False
             self._box_phase = BOX_PHASE_CHOOSE
+            self._box_inv_cursor = 0
             self._box_cache = None
             return self._submenu_step(
                 a,
@@ -2384,6 +2393,7 @@ class RE1Env(gym.Env):
                     box_slot,
                     prev_hp=prev_hp,
                     episode_start_hp=episode_start_hp,
+                    inv_cursor=inv_cursor,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, 0
@@ -2393,6 +2403,8 @@ class RE1Env(gym.Env):
                 self._sticky_input.reset()
             if report.get("ok") and report.get("moved") is not None:
                 report = {**report, "box_transfer": "withdraw"}
+            if report.get("inv_cursor") is not None:
+                self._box_inv_cursor = int(report["inv_cursor"])
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_cache = None
             try:
@@ -2430,6 +2442,7 @@ class RE1Env(gym.Env):
                     int(slot),
                     prev_hp=prev_hp,
                     episode_start_hp=episode_start_hp,
+                    inv_cursor=inv_cursor,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, 0
@@ -2437,6 +2450,8 @@ class RE1Env(gym.Env):
             finally:
                 self._macro_active = False
                 self._sticky_input.reset()
+            if report.get("inv_cursor") is not None:
+                self._box_inv_cursor = int(report["inv_cursor"])
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_cache = None
             try:
@@ -3193,6 +3208,7 @@ class RE1Env(gym.Env):
                 if self._current_room_is_box_room():
                     self._box_ui_open = True
                     self._box_phase = BOX_PHASE_CHOOSE
+                    self._box_inv_cursor = 0
                     self._skipping_flag = False
                 else:
                     recovered, _item_report = self._try_dismiss_orphan_item_menu()

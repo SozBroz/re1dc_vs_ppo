@@ -83,7 +83,7 @@ def test_admit_new_cell(tmp_path: Path) -> None:
     assert archive.is_file()
     cell = merge.archive.cells[prop["cell_key"]]
     assert cell.record_id == "rec_a"
-    assert cell.quality == (8, 12, 2, 3, 0, 0)
+    assert cell.quality == (8, 12, 2, 3, 0, 0, 0)
     assert (tmp_path / "cells" / "rec_a" / CELL_STATE_NAME).is_file()
 
 

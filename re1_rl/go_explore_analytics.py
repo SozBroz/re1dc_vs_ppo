@@ -24,7 +24,7 @@ class ManifestCellRow:
     tile_x: int
     tile_z: int
     milestone_digest: str
-    quality: tuple[int, int, int, int, int, int]
+    quality: tuple[int, int, int, int, int, int, int]
     bytes: int
 
     @property
@@ -59,7 +59,7 @@ class SemanticBucket:
         return sum(c.bytes for c in self.cells)
 
     @property
-    def quality_best(self) -> tuple[int, int, int, int, int, int] | None:
+    def quality_best(self) -> tuple[int, int, int, int, int, int, int] | None:
         if not self.cells:
             return None
         return max(c.quality for c in self.cells)
@@ -106,7 +106,7 @@ class ManifestAnalyticsReport:
         return self.bytes_total / self.cells_real
 
 
-def _as_quality(raw: Any) -> tuple[int, int, int, int, int, int]:
+def _as_quality(raw: Any) -> tuple[int, int, int, int, int, int, int]:
     from re1_rl.go_explore_archive import normalize_quality
 
     if not isinstance(raw, (list, tuple)) or len(raw) < 5:

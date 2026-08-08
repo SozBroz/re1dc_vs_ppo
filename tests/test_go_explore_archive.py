@@ -38,6 +38,9 @@ def test_quality_beats_lexicographic() -> None:
     assert quality_beats((9, 0, 0, 0, 0), (8, 99, 99, 99, 99))
     assert not quality_beats((8, 12, 2, 3, 0), (8, 12, 2, 3, 0))
     assert quality_beats((8, 13, 0, 0, 0), (8, 12, 9, 9, 9))
+    # Lowest priority: on-person ammo weight (withdraw bias).
+    assert quality_beats((8, 30, 0, 0, 1, 0, 30), (8, 30, 0, 0, 1, 0, 5))
+    assert not quality_beats((8, 30, 0, 0, 1, 0, 5), (8, 30, 0, 0, 1, 0, 30))
 
 
 def test_upsert_and_frontier_yawn_filter(tmp_path: Path) -> None:
@@ -157,7 +160,7 @@ def test_save_load_roundtrip(tmp_path: Path) -> None:
     assert isinstance(cell, ArchiveCell)
     assert cell.room_id == "10F"
     assert cell.milestone_digest == digest
-    assert cell.quality == (7, 4, 1, 2, 1, 0)
+    assert cell.quality == (7, 4, 1, 2, 1, 0, 0)
     assert cell.bundle_path == "cells/x/cell.State"
     assert cell.meta["worker"] == "test"
     assert cell.record_id
