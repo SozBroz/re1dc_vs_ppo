@@ -115,6 +115,12 @@ from re1_rl.action_mask import (
     ATTACK_ACTION,
     ATTACK_DOWN_ACTION,
     ATTACK_UP_ACTION,
+    BOX_CLOSE_ACTION,
+    BOX_DEPOSIT_ACTION,
+    BOX_PHASE_CHOOSE,
+    BOX_PHASE_DEPOSIT_SLOT,
+    BOX_PHASE_WITHDRAW_SLOT,
+    BOX_WITHDRAW_ACTION,
     COMBINE_ACTION,
     DEPOSIT_ACTION_BASE,
     DEPOSIT_ACTION_NAMES,
@@ -160,9 +166,9 @@ ACTION_NAMES = [
     "interact",
     "use",  # open USE menu -> select_slot_N (2-step; herbs, sprays)
     "equip",  # open EQUIP menu -> select_slot_N (2-step)
-    *DEPOSIT_ACTION_NAMES,    # 12-19 box deposits (box rooms only)
-    *WITHDRAW_ACTION_NAMES,   # 20-35 box withdrawals (box rooms only)
-    *MENU_ACTION_NAMES,       # 36 combine + 37-44 select_slot_N
+        *DEPOSIT_ACTION_NAMES,    # 12-19 deposit_slot_N (box UI reuses 0-2 as modes)
+        *WITHDRAW_ACTION_NAMES,   # 20-35 box withdrawals (box UI slot pick)
+        *MENU_ACTION_NAMES,       # 36 combine + 37-44 select_slot_N
 ]
 
 # Map discrete actions to friendly button names (translated to Nymashock core
@@ -387,6 +393,8 @@ class RE1Env(gym.Env):
         self._items = ItemTracker(todo=[])
         self._box_cache: list[tuple[int, int]] | None = None
         self._box_departure_snapshot: list[float] | None = None
+        self._box_ui_open = False
+        self._box_phase = BOX_PHASE_CHOOSE
         self._use_phase = 0
         self._inventory_before_use: list[tuple[int, int]] | None = None
         self._equip_phase = 0
@@ -1399,6 +1407,8 @@ class RE1Env(gym.Env):
         self._equip_phase = 0
         self._combine_phase = 0
         self._combine_slot_a = None
+        self._box_ui_open = False
+        self._box_phase = BOX_PHASE_CHOOSE
         self._last_attack_obs = empty_last_attack()
         self._last_skip_frames = 0
         self._last_settled_skip_frames = 0
@@ -2164,8 +2174,10 @@ class RE1Env(gym.Env):
         return (not still), report
 
     def _inventory_macro_owns_item_menu(self, action: int) -> bool:
-        """True while equip/use/combine (or any bridge macro) owns the ITEM screen."""
+        """True while equip/use/combine/box UI (or any bridge macro) owns the ITEM screen."""
         if bool(getattr(self, "_macro_active", False)):
+            return True
+        if bool(getattr(self, "_box_ui_open", False)):
             return True
         if int(getattr(self, "_use_phase", 0)) > 0:
             return True
@@ -2174,7 +2186,45 @@ class RE1Env(gym.Env):
         if int(getattr(self, "_combine_phase", 0)) > 0:
             return True
         a = int(action)
-        return a in (USE_ACTION, EQUIP_ACTION, COMBINE_ACTION)
+        return a in (
+            USE_ACTION,
+            EQUIP_ACTION,
+            COMBINE_ACTION,
+            BOX_WITHDRAW_ACTION,
+            BOX_DEPOSIT_ACTION,
+            BOX_CLOSE_ACTION,
+        ) or (
+            WITHDRAW_ACTION_BASE <= a < WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS
+        )
+
+    def _current_room_is_box_room(self) -> bool:
+        from re1_rl.item_box import is_box_room
+
+        room = str((getattr(self, "_prev_state", {}) or {}).get("room_id", "") or "")
+        if not room:
+            try:
+                state = self._read_state()
+                room = str(state.get("room_id", "") or "")
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                return False
+        return is_box_room(room)
+
+    def _sync_box_ui_session_from_ram(self) -> None:
+        """Enter/leave the box-UI policy session from live pause-tree RAM."""
+        from re1_rl.item_box_ui_macro import probe_box_ui_open
+
+        try:
+            open_now = probe_box_ui_open(self.bridge)
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            open_now = False
+        if open_now and self._current_room_is_box_room():
+            if not self._box_ui_open:
+                self._box_ui_open = True
+                self._box_phase = BOX_PHASE_CHOOSE
+            return
+        if self._box_ui_open and not open_now:
+            self._box_ui_open = False
+            self._box_phase = BOX_PHASE_CHOOSE
 
     def _probe_item_inventory_menu(self) -> bool:
         from re1_rl.ram_skip import item_inventory_screen_from_ram
@@ -2224,9 +2274,183 @@ class RE1Env(gym.Env):
 
     @staticmethod
     def _is_magic_action(action: int) -> bool:
+        """Legacy magic box RAM path — kept but always inactive in the env."""
+        from re1_rl.item_box import MAGIC_BOX_RAM_WRITES_ENABLED
+
+        if not MAGIC_BOX_RAM_WRITES_ENABLED:
+            return False
         return DEPOSIT_ACTION_BASE <= action < (
             WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS
         )
+
+    def _is_box_ui_action(self, action: int) -> bool:
+        if not bool(getattr(self, "_box_ui_open", False)):
+            return False
+        a = int(action)
+        if a in (BOX_WITHDRAW_ACTION, BOX_DEPOSIT_ACTION, BOX_CLOSE_ACTION):
+            return True
+        if WITHDRAW_ACTION_BASE <= a < WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS:
+            return True
+        if SELECT_SLOT_BASE <= a < SELECT_SLOT_BASE + N_SELECT_SLOT:
+            return int(getattr(self, "_box_phase", 0)) == BOX_PHASE_DEPOSIT_SLOT
+        return False
+
+    def _handle_box_ui_action(
+        self, action: int
+    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]] | None:
+        """Open-box PPO: withdraw/deposit/close.
+
+        Policy picks source slot; ``apply_*`` places into the right dest while
+        the box UI is open. Close is Triangle UI (no RAM write). Closed-box
+        magic transfers stay disabled.
+        """
+        from re1_rl.attack_macro import read_equipped_weapon
+        from re1_rl.herb_combine import combine_slot_from_action
+        from re1_rl.item_box import (
+            BOX_DEPOSIT_POLICY_ENABLED,
+            apply_deposit,
+            apply_withdraw,
+        )
+        from re1_rl.item_box_ui_macro import close_box_ui, probe_box_ui_open
+
+        if not self._box_ui_open:
+            return None
+        a = int(action)
+        prev_hp = int(getattr(self, "_prev_hp", 0) or 0)
+        episode_start_hp = int(getattr(self, "_episode_start_hp", 0) or 0)
+        phase = int(getattr(self, "_box_phase", BOX_PHASE_CHOOSE))
+
+        if a == BOX_CLOSE_ACTION:
+            self._sticky_input.reset()
+            self._macro_active = True
+            try:
+                died, frames, report = close_box_ui(
+                    self.bridge,
+                    prev_hp=prev_hp,
+                    episode_start_hp=episode_start_hp,
+                )
+            finally:
+                self._macro_active = False
+                self._sticky_input.reset()
+            self._box_ui_open = False
+            self._box_phase = BOX_PHASE_CHOOSE
+            self._box_cache = None
+            return self._submenu_step(
+                a,
+                step_emulated_frames=max(frames, self.frame_skip),
+                magic_report=report,
+                died=bool(died),
+            )
+
+        if phase == BOX_PHASE_CHOOSE:
+            if a == BOX_WITHDRAW_ACTION:
+                self._box_phase = BOX_PHASE_WITHDRAW_SLOT
+                return self._submenu_step(
+                    a,
+                    step_emulated_frames=self.frame_skip,
+                    magic_report={"ok": True, "reason": "box_withdraw_open"},
+                )
+            if a == BOX_DEPOSIT_ACTION:
+                if not BOX_DEPOSIT_POLICY_ENABLED:
+                    return self._submenu_step(
+                        a,
+                        step_emulated_frames=self.frame_skip,
+                        magic_report={"ok": False, "reason": "deposit_disabled"},
+                    )
+                self._box_phase = BOX_PHASE_DEPOSIT_SLOT
+                return self._submenu_step(
+                    a,
+                    step_emulated_frames=self.frame_skip,
+                    magic_report={"ok": True, "reason": "box_deposit_open"},
+                )
+            return self._submenu_step(
+                a,
+                step_emulated_frames=self.frame_skip,
+                magic_report={"ok": False, "reason": "box_phase_choose_expected"},
+            )
+
+        if phase == BOX_PHASE_WITHDRAW_SLOT:
+            if not (WITHDRAW_ACTION_BASE <= a < WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS):
+                return self._submenu_step(
+                    a,
+                    step_emulated_frames=self.frame_skip,
+                    magic_report={"ok": False, "reason": "box_withdraw_slot_expected"},
+                )
+            box_slot = a - WITHDRAW_ACTION_BASE
+            try:
+                report = apply_withdraw(self.bridge, box_slot)
+            except (OSError, RuntimeError, ValueError) as exc:
+                report = {"ok": False, "reason": f"error:{exc}", "moved": None}
+            if report.get("ok") and report.get("moved") is not None:
+                report = {**report, "box_transfer": "withdraw"}
+            self._box_phase = BOX_PHASE_CHOOSE
+            self._box_cache = None
+            sticky, pulse, pulse_hold = self._sticky_input.apply(0, ACTION_BUTTON_MAP)
+            _, died = self.bridge.step(
+                n=self.frame_skip,
+                sticky=sticky,
+                pulse=pulse,
+                pulse_hold=pulse_hold,
+                ring_stride=0,
+                capture_final=True,
+            )
+            try:
+                self._box_ui_open = probe_box_ui_open(self.bridge)
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                self._box_ui_open = True
+            return self._submenu_step(
+                a,
+                step_emulated_frames=self.frame_skip,
+                magic_report=report,
+                died=bool(died),
+            )
+
+        if phase == BOX_PHASE_DEPOSIT_SLOT:
+            if not BOX_DEPOSIT_POLICY_ENABLED:
+                self._box_phase = BOX_PHASE_CHOOSE
+                return self._submenu_step(
+                    a,
+                    step_emulated_frames=self.frame_skip,
+                    magic_report={"ok": False, "reason": "deposit_disabled"},
+                )
+            slot = combine_slot_from_action(a, select_slot_base=SELECT_SLOT_BASE)
+            if slot is None:
+                return self._submenu_step(
+                    a,
+                    step_emulated_frames=self.frame_skip,
+                    magic_report={"ok": False, "reason": "box_deposit_slot_expected"},
+                )
+            try:
+                report = apply_deposit(
+                    self.bridge,
+                    int(slot),
+                    equipped_weapon_id=read_equipped_weapon(self.bridge),
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                report = {"ok": False, "reason": f"error:{exc}", "moved": None}
+            self._box_phase = BOX_PHASE_CHOOSE
+            self._box_cache = None
+            sticky, pulse, pulse_hold = self._sticky_input.apply(0, ACTION_BUTTON_MAP)
+            _, died = self.bridge.step(
+                n=self.frame_skip,
+                sticky=sticky,
+                pulse=pulse,
+                pulse_hold=pulse_hold,
+                ring_stride=0,
+                capture_final=True,
+            )
+            try:
+                self._box_ui_open = probe_box_ui_open(self.bridge)
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                self._box_ui_open = True
+            return self._submenu_step(
+                a,
+                step_emulated_frames=self.frame_skip,
+                magic_report=report,
+                died=bool(died),
+            )
+
+        return None
 
     def _handle_use_action(
         self, action: int
@@ -2582,6 +2806,13 @@ class RE1Env(gym.Env):
         state = dict(state)
         state["step_emulated_frames"] = int(step_emulated_frames)
         state["reference_step_frames"] = self.frame_skip
+        report_pre = magic_report or {}
+        if (
+            report_pre.get("ok")
+            and report_pre.get("box_transfer") == "withdraw"
+            and report_pre.get("moved") is not None
+        ):
+            state["box_withdraw_success"] = True
         inv_before = getattr(self, "_inventory_before_use", None)
         if inv_before is not None:
             from re1_rl.item_box import read_inventory
@@ -2673,10 +2904,16 @@ class RE1Env(gym.Env):
         return obs, reward, terminated, truncated, info
 
     def _apply_magic_action(self, action: int) -> dict[str, Any]:
-        """Box-transfer actions: RAM writes, no button inputs."""
+        """Legacy closed-box RAM transfers — kept unused (see MAGIC_BOX_RAM_WRITES)."""
         from re1_rl.attack_macro import read_equipped_weapon
-        from re1_rl.item_box import apply_deposit, apply_withdraw
+        from re1_rl.item_box import (
+            MAGIC_BOX_RAM_WRITES_ENABLED,
+            apply_deposit,
+            apply_withdraw,
+        )
 
+        if not MAGIC_BOX_RAM_WRITES_ENABLED:
+            return {"ok": False, "reason": "magic_box_ram_writes_disabled"}
         try:
             if DEPOSIT_ACTION_BASE <= action < DEPOSIT_ACTION_BASE + N_DEPOSIT_ACTIONS:
                 result = apply_deposit(
@@ -2815,6 +3052,17 @@ class RE1Env(gym.Env):
         else:
             knife_near = combat_enemy_count(enemies, knife=True)
             gun_near = combat_enemy_count(enemies)
+        box_ui_open = bool(getattr(self, "_box_ui_open", False))
+        # Box UI clears in_control; still refresh box contents for the mask.
+        if box_ui_open and bridge is not None and box is None:
+            try:
+                from re1_rl.item_box import read_box, read_inventory
+                from re1_rl.weapon_equip import policy_inventory
+
+                inventory = policy_inventory(read_inventory(bridge))
+                box = read_box(bridge)
+            except (OSError, RuntimeError, AttributeError, TypeError, ValueError):
+                pass
         mask = build_action_mask(
             int(self.action_space.n),
             self._prev_action,
@@ -2826,6 +3074,8 @@ class RE1Env(gym.Env):
             inventory=inventory,
             box=box,
             in_box_room=in_box_room,
+            box_ui_open=box_ui_open,
+            box_phase=int(getattr(self, "_box_phase", BOX_PHASE_CHOOSE)),
             equip_phase=int(getattr(self, "_equip_phase", 0)),
             use_phase=int(getattr(self, "_use_phase", 0)),
             combine_phase=int(getattr(self, "_combine_phase", 0)),
@@ -2848,7 +3098,9 @@ class RE1Env(gym.Env):
             document_examine_open=document_examine_open,
         )
         if (
-            in_box_room
+            box_ui_open
+            and int(getattr(self, "_box_phase", BOX_PHASE_CHOOSE))
+            == BOX_PHASE_WITHDRAW_SLOT
             and inventory is not None
             and box is not None
             and getattr(self, "_stage", {}).get("mode") == "yawn_rails"
@@ -2932,14 +3184,21 @@ class RE1Env(gym.Env):
             if recovered:
                 menu_reason = self._probe_outside_gameplay()
             # If still trapped (or another failure), fall through to terminate.
-        # Orphan START/ITEM pause (policy has no Start): close on a fresh step
-        # only — never while equip/use/combine or another bridge macro owns it.
-        if not self._inventory_macro_owns_item_menu(int(action)):
+        # Item-box UI (same RAM signature as START/ITEM): leave open in box rooms.
+        # Elsewhere, orphan START/ITEM pause still gets dismissed (policy has no Start).
+        if bool(getattr(self, "_box_ui_open", False)):
+            self._sync_box_ui_session_from_ram()
+        elif not self._inventory_macro_owns_item_menu(int(action)):
             if self._probe_item_inventory_menu():
-                recovered, _item_report = self._try_dismiss_orphan_item_menu()
-                if recovered:
+                if self._current_room_is_box_room():
+                    self._box_ui_open = True
+                    self._box_phase = BOX_PHASE_CHOOSE
                     self._skipping_flag = False
-                    menu_reason = self._probe_outside_gameplay()
+                else:
+                    recovered, _item_report = self._try_dismiss_orphan_item_menu()
+                    if recovered:
+                        self._skipping_flag = False
+                        menu_reason = self._probe_outside_gameplay()
         if menu_reason in _DEATH_FAILURE_REASONS:
             death = self._death_step(
                 action, died_during_skip=False, died_during_step=True
@@ -2977,6 +3236,13 @@ class RE1Env(gym.Env):
             combine_step = self._handle_combine_action(int(action))
             if combine_step is not None:
                 return combine_step
+
+        if bool(getattr(self, "_box_ui_open", False)) or self._is_box_ui_action(
+            int(action)
+        ):
+            box_step = self._handle_box_ui_action(int(action))
+            if box_step is not None:
+                return box_step
 
         attack = int(action) == ATTACK_ACTION
         attack_up = int(action) == ATTACK_UP_ACTION

@@ -18,6 +18,12 @@ ITEM-screen grid icons are separate (BizHawk ``GPURAM``). After magic swaps
 that change which art a slot should show, call
 ``sync_inventory_icons_after_knife_ammo_swap`` (or apply a GPURAM patch from
 ``inventory_icons``) while the ITEM UI is open.
+
+**Live policy (2026-08-07):** ``MAGIC_BOX_RAM_WRITES_ENABLED`` is False — the
+env must not call ``apply_*`` while the box UI is *closed* (that path scuffed
+post-cp41 states). While the box UI is open, the env may still call ``apply_*``
+for destination placement after the policy picks a source slot; close uses the
+Triangle UI macro.
 """
 
 from __future__ import annotations
@@ -44,6 +50,11 @@ from re1_rl.memory_map import (
 BOX_SLOTS = 16
 INVENTORY_SLOTS = 8
 LOCKPICK_ITEM_ID = 0x31
+
+# Env must leave these False — magic writes scuffed post-cp41 states.
+MAGIC_BOX_RAM_WRITES_ENABLED = False
+# Policy: withdraw + close only until deposit is re-enabled.
+BOX_DEPOSIT_POLICY_ENABLED = False
 
 BOX_ROOMS = frozenset({"100", "118", "30E", "403", "502", "50E", "600", "618"})
 

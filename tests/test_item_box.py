@@ -290,6 +290,29 @@ def test_is_box_room():
     assert not is_box_room("105")
 
 
+def test_box_withdraw_success_pays_one() -> None:
+    import pytest
+
+    from re1_rl.progress import ProgressTracker
+    from re1_rl.reward import BOX_WITHDRAW_BONUS, compute_reward
+    from tests.test_scaffolding import make_planner, make_state
+
+    planner = make_planner()
+    prev = make_state(hp=96, step=1, room_id="118")
+    cur = make_state(hp=96, step=2, room_id="118")
+    cur["box_withdraw_success"] = True
+    _total, bd = compute_reward(
+        prev,
+        cur,
+        planner,
+        progress=ProgressTracker(),
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["box_withdraw"] == pytest.approx(BOX_WITHDRAW_BONUS)
+    assert BOX_WITHDRAW_BONUS == pytest.approx(1.0)
+
+
 if __name__ == "__main__":
     import pytest
 

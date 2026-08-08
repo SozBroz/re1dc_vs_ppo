@@ -143,14 +143,19 @@ def test_feasibility_guard_keeps_required_items_and_pickup_headroom() -> None:
         (0, 0),
     ]
     box = [(0x44, 1)] + [(0, 0)] * 15
+    from re1_rl.action_mask import BOX_PHASE_WITHDRAW_SLOT
+
     mask = action_mask(
         45,
         None,
         inventory=inventory,
         box=box,
         in_box_room=True,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_WITHDRAW_SLOT,
+        in_control=False,
     )
     apply_logistics_feasibility_mask(mask, inventory, box, _planner(start_index=47))
-    assert not mask[DEPOSIT_ACTION_BASE]  # deposits never policy-legal
+    assert not mask[DEPOSIT_ACTION_BASE]  # withdraw-mode opener not legal in slot phase
     assert not mask[DEPOSIT_ACTION_BASE + 1]
     assert not mask[WITHDRAW_ACTION_BASE]  # preserve two declared pickup slots

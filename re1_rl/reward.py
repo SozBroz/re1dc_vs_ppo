@@ -44,6 +44,8 @@ WAYPOINT_ROOM_BONUS = 4.0
 ITEM_PICKUP_BONUS = 0.15
 # Ammunition stacks (handgun bullets, shells, launcher packs, …).
 AMMO_PICKUP_BONUS = 2.0
+# Successful open-box UI withdraw (imperator 2026-08-07): +1 per transfer.
+BOX_WITHDRAW_BONUS = 1.0
 # Completed typewriter save (ink-ribbon consume + save cinema + stable control).
 TYPEWRITER_SAVE_BONUS = 0.3
 # Keys / emblems / crests (room_items.json key_item=true).
@@ -378,6 +380,7 @@ RAILS_NAV_POSITIVE_TERMS: frozenset[str] = frozenset({
     "new_weapon",
     "ammo_pickup",
     "gallery",
+    "box_withdraw",
 })
 # PBRS, junk pickups, typewriter, etc.
 RAILS_MINOR_POSITIVE_SCALE = 0.05
@@ -608,6 +611,7 @@ def compute_reward(
         "wrong_room": 0.0,
         "item": 0.0,
         "ammo_pickup": 0.0,
+        "box_withdraw": 0.0,
         "key_item": 0.0,
         "story_use": 0.0,
         "gallery": 0.0,
@@ -764,6 +768,9 @@ def compute_reward(
                 name, prev_state=prev_state, state=state
             ):
                 bd["item"] += ITEM_PICKUP_BONUS
+
+    if state.get("box_withdraw_success"):
+        bd["box_withdraw"] = BOX_WITHDRAW_BONUS
 
     # Observation and payout are separate ledgers. A cutscene can pay only when
     # this exact transition also earned a new-room entry reward.

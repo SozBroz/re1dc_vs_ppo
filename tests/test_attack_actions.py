@@ -159,7 +159,15 @@ def test_attack_execution_reuses_live_mask_legality() -> None:
     assert env._execution_action_legal(ATTACK_ACTION)
 
 
-def test_box_withdraw_only_in_box_room() -> None:
+def test_box_withdraw_only_while_box_ui_open() -> None:
+    from re1_rl.action_mask import (
+        BOX_CLOSE_ACTION,
+        BOX_DEPOSIT_ACTION,
+        BOX_PHASE_CHOOSE,
+        BOX_PHASE_WITHDRAW_SLOT,
+        BOX_WITHDRAW_ACTION,
+    )
+
     inv = [(0x01, 0)] + [(0, 0)] * 7
     box = [(0x0B, 15)] + [(0, 0)] * 15
     outside = action_mask(
@@ -168,21 +176,42 @@ def test_box_withdraw_only_in_box_room() -> None:
         equipped_weapon_id=0x01,
         inventory=inv,
         box=box,
-        in_box_room=False,
+        in_box_room=True,
+        box_ui_open=False,
     )
     assert not outside[DEPOSIT_ACTION_BASE:DEPOSIT_ACTION_BASE + N_DEPOSIT_ACTIONS].any()
     assert not outside[WITHDRAW_ACTION_BASE:WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS].any()
 
-    inside = action_mask(
+    choose = action_mask(
         N_ACTIONS,
         None,
         equipped_weapon_id=0x01,
         inventory=inv,
         box=box,
         in_box_room=True,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_CHOOSE,
+        in_control=False,
     )
-    assert not inside[DEPOSIT_ACTION_BASE:DEPOSIT_ACTION_BASE + N_DEPOSIT_ACTIONS].any()
-    assert inside[WITHDRAW_ACTION_BASE]
+    assert choose[BOX_WITHDRAW_ACTION]
+    assert not choose[BOX_DEPOSIT_ACTION]  # deposit policy off
+    assert choose[BOX_CLOSE_ACTION]
+    assert not choose[WITHDRAW_ACTION_BASE]
+
+    picking = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x01,
+        inventory=inv,
+        box=box,
+        in_box_room=True,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_WITHDRAW_SLOT,
+        in_control=False,
+    )
+    assert picking[WITHDRAW_ACTION_BASE]
+    assert picking[BOX_CLOSE_ACTION]
+    assert not picking[BOX_WITHDRAW_ACTION]
 
 
 def test_knife_crouch_legal_with_knife_via_attack_down() -> None:

@@ -1,15 +1,16 @@
 """Legal action masks for RE1 discrete control.
 
-Action layout (env.ACTION_NAMES):
+Action layout (env.ACTION_NAMES) — fixed size/names; do not reshape PPO:
   0-5   movement (curved run via sticky: run_forward + turn_*)
   6-8   attack_up / attack / attack_down
   9     interact
   10    use                — open USE menu; then select_slot_N (2-step)
   11    equip              — open EQUIP menu; then select_slot_N (2-step)
-  12-19 deposit_slot_N   — never legal via mask (withdraw-only box policy)
-  20-35 withdraw_box_N
+  12-19 deposit_slot_N     — while box UI open: 0=withdraw mode, 1=deposit mode,
+                             2=close; 3-7 unused (deposit item pick uses select_slot)
+  20-35 withdraw_box_N     — pick box source slot (box UI withdraw phase)
   36    combine            — open COMBINE menu; select_slot x2 (3-step)
-  37-44 select_slot_N      — shared slot pick (use / equip / combine)
+  37-44 select_slot_N      — shared slot pick (use / equip / combine / box deposit)
 """
 
 from __future__ import annotations
@@ -56,6 +57,16 @@ N_WITHDRAW_ACTIONS = 16
 COMBINE_ACTION = WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS  # 36
 SELECT_SLOT_BASE = COMBINE_ACTION + 1  # 37
 N_SELECT_SLOT = 8
+
+# Box-UI mode verbs reuse never-trained deposit_slot indices (names unchanged).
+BOX_WITHDRAW_ACTION = DEPOSIT_ACTION_BASE + 0  # deposit_slot_0
+BOX_DEPOSIT_ACTION = DEPOSIT_ACTION_BASE + 1  # deposit_slot_1
+BOX_CLOSE_ACTION = DEPOSIT_ACTION_BASE + 2  # deposit_slot_2
+
+# box_phase: 0 = choose withdraw/deposit/close; 1 = pick box slot; 2 = pick inv slot
+BOX_PHASE_CHOOSE = 0
+BOX_PHASE_WITHDRAW_SLOT = 1
+BOX_PHASE_DEPOSIT_SLOT = 2
 
 KNIFE_ID = 0x01
 
@@ -165,6 +176,71 @@ def _submenu_active(
     return int(use_phase) == 1 or int(equip_phase) == 1 or int(combine_phase) in (1, 2)
 
 
+def _mask_box_ui_session(
+    mask: np.ndarray,
+    n_actions: int,
+    *,
+    box_phase: int,
+    inventory: list[tuple[int, int]] | None,
+    box: list[tuple[int, int]] | None,
+) -> np.ndarray:
+    """Legal actions while the item-box UI is open (in_control is false)."""
+    from re1_rl.item_box import BOX_DEPOSIT_POLICY_ENABLED, can_deposit, can_withdraw
+
+    mask[:] = False
+    phase = int(box_phase)
+
+    if phase == BOX_PHASE_WITHDRAW_SLOT:
+        if inventory is not None and box is not None:
+            for i in range(N_WITHDRAW_ACTIONS):
+                idx = WITHDRAW_ACTION_BASE + i
+                if idx < n_actions:
+                    ok, _ = can_withdraw(inventory, box, i)
+                    mask[idx] = bool(ok)
+        # Allow backing out to close without completing a withdraw.
+        if BOX_CLOSE_ACTION < n_actions:
+            mask[BOX_CLOSE_ACTION] = True
+        return mask
+
+    if phase == BOX_PHASE_DEPOSIT_SLOT:
+        if BOX_DEPOSIT_POLICY_ENABLED and inventory is not None and box is not None:
+            for i in range(N_SELECT_SLOT):
+                idx = SELECT_SLOT_BASE + i
+                if idx < n_actions:
+                    ok, _ = can_deposit(inventory, box, i)
+                    mask[idx] = bool(ok)
+        if BOX_CLOSE_ACTION < n_actions:
+            mask[BOX_CLOSE_ACTION] = True
+        return mask
+
+    # BOX_PHASE_CHOOSE: withdraw / close (deposit wired but policy-gated).
+    if BOX_WITHDRAW_ACTION < n_actions:
+        any_withdraw = False
+        if inventory is not None and box is not None:
+            for i in range(min(N_WITHDRAW_ACTIONS, len(box))):
+                ok, _ = can_withdraw(inventory, box, i)
+                if ok:
+                    any_withdraw = True
+                    break
+        mask[BOX_WITHDRAW_ACTION] = any_withdraw
+    if BOX_DEPOSIT_ACTION < n_actions:
+        any_deposit = False
+        if (
+            BOX_DEPOSIT_POLICY_ENABLED
+            and inventory is not None
+            and box is not None
+        ):
+            for i in range(min(N_SELECT_SLOT, len(inventory))):
+                ok, _ = can_deposit(inventory, box, i)
+                if ok:
+                    any_deposit = True
+                    break
+        mask[BOX_DEPOSIT_ACTION] = any_deposit
+    if BOX_CLOSE_ACTION < n_actions:
+        mask[BOX_CLOSE_ACTION] = True
+    return mask
+
+
 def action_mask(
     n_actions: int,
     prev_action: int | None,
@@ -177,6 +253,8 @@ def action_mask(
     inventory: list[tuple[int, int]] | None = None,
     box: list[tuple[int, int]] | None = None,
     in_box_room: bool = False,
+    box_ui_open: bool = False,
+    box_phase: int = 0,
     use_phase: int = 0,
     equip_phase: int = 0,
     combine_phase: int = 0,
@@ -211,6 +289,15 @@ def action_mask(
         if n_actions > 0:
             mask[0] = True
         return mask
+    # Item-box UI clears in_control; expose withdraw/deposit/close instead of noop.
+    if box_ui_open:
+        return _mask_box_ui_session(
+            mask,
+            n_actions,
+            box_phase=box_phase,
+            inventory=inventory,
+            box=box,
+        )
     if not in_control:
         mask[:] = False
         if n_actions > 0:
@@ -287,25 +374,17 @@ def action_mask(
             )
 
     if not in_submenu:
-        # Box policy: withdraw only in box rooms; deposits never legal via mask.
+        # Box transfers only while the box UI is open (handled above).
         for i in range(N_DEPOSIT_ACTIONS):
             idx = DEPOSIT_ACTION_BASE + i
             if idx < n_actions:
                 mask[idx] = False
-        if inventory is not None and box is not None:
-            from re1_rl.item_box import can_withdraw
-
-            for i in range(N_WITHDRAW_ACTIONS):
-                idx = WITHDRAW_ACTION_BASE + i
-                if idx < n_actions:
-                    ok, _ = can_withdraw(inventory, box, i)
-                    mask[idx] = in_box_room and ok
-        elif not in_box_room:
-            for idx in range(
-                WITHDRAW_ACTION_BASE, WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS
-            ):
-                if idx < n_actions:
-                    mask[idx] = False
+        for idx in range(
+            WITHDRAW_ACTION_BASE, WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS
+        ):
+            if idx < n_actions:
+                mask[idx] = False
+        _ = in_box_room  # retained for call-site compat; UI session gates box acts
 
     if USE_ACTION < n_actions:
         mask[USE_ACTION] = False
