@@ -187,7 +187,9 @@ def _existing_cell_quality(root: Path, checkpoint_index: int) -> tuple[int, ...]
     man_p = Path(root) / MANIFEST_FILENAME
     if man_p.is_file():
         try:
-            man = json.loads(man_p.read_text(encoding="utf-8-sig"))
+            from re1_rl.win_fs_retry import read_text_retry
+
+            man = json.loads(read_text_retry(man_p, encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError):
             man = {}
         for row in man.get("cells") or []:
@@ -375,7 +377,9 @@ def try_install_yawn_cell(
         man_p = root / MANIFEST_FILENAME
         if man_p.is_file():
             try:
-                man = json.loads(man_p.read_text(encoding="utf-8-sig"))
+                from re1_rl.win_fs_retry import read_text_retry
+
+                man = json.loads(read_text_retry(man_p, encoding="utf-8-sig"))
             except (OSError, json.JSONDecodeError):
                 man = {"schema_version": 1, "cells": []}
         else:
@@ -404,7 +408,9 @@ def try_install_yawn_cell(
         man["archive_version"] = int(man.get("archive_version", 0) or 0) + 1
         tmp = man_p.with_suffix(f".{os.getpid()}.tmp")
         tmp.write_text(json.dumps(man, indent=2) + "\n", encoding="utf-8")
-        os.replace(tmp, man_p)
+        from re1_rl.win_fs_retry import replace_retry
+
+        replace_retry(tmp, man_p)
         try:
             from re1_rl.yawn_rails_payforward import notify_payforward_install
 
@@ -607,7 +613,9 @@ class YawnRailsCellStore:
             self.cells = {}
             return
         try:
-            raw = json.loads(path.read_text(encoding="utf-8-sig"))
+            from re1_rl.win_fs_retry import read_text_retry
+
+            raw = json.loads(read_text_retry(path, encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError):
             self.archive_version = 0
             self.cells = {}
@@ -673,7 +681,9 @@ class YawnRailsCellStore:
         }
         tmp = self.manifest_path.with_suffix(f".{os.getpid()}.tmp")
         tmp.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-        os.replace(tmp, self.manifest_path)
+        from re1_rl.win_fs_retry import replace_retry
+
+        replace_retry(tmp, self.manifest_path)
 
     def ingest_proposals(self, proposals: list[dict[str, Any]]) -> list[str]:
         """Admit/replace cells. Returns accepted ``cpNN`` ids."""

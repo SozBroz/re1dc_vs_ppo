@@ -222,7 +222,10 @@ def load_manifest(project_root: Path, stage: dict[str, Any]) -> dict[str, Any]:
         return {"schema_version": 1, "route_id": stage.get("route_id"), "cells": []}
     # utf-8-sig: PowerShell Set-Content -Encoding UTF8 writes a BOM that
     # plain utf-8 json.loads rejects (crashes workers on empty-manifest wipes).
-    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    # Windows multi-actor races on manifest replace → PermissionError; retry.
+    from re1_rl.win_fs_retry import read_text_retry
+
+    data = json.loads(read_text_retry(path, encoding="utf-8-sig"))
     if data.get("schema_version") != 1 or not isinstance(data.get("cells"), list):
         raise ValueError(f"invalid Yawn rails cells manifest: {path}")
     if data.get("route_id") != stage.get("route_id"):
