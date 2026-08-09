@@ -65,6 +65,12 @@ CLOSE_ITEM_SETTLE_FRAMES = 30
 CLOSE_TRIANGLE_FRAMES = 15
 CLOSE_TRIANGLE_SETTLE_FRAMES = 20
 CLOSE_TRIANGLE_MAX_ATTEMPTS = 12
+# Post-COMBINE reload often leaves the ITEM grid up where Triangle alone does
+# not exit (fleet: item_menu_dismiss_fail frames=420). Prefer Triangle, then
+# one Start toggle, then Triangle again — never Start-only looping.
+CLOSE_TRIANGLE_PRIMARY_ATTEMPTS = 4
+CLOSE_START_FALLBACK_ATTEMPTS = 1
+CLOSE_TRIANGLE_AFTER_START_ATTEMPTS = 4
 # Story key-item USE: poll slowly after submenu USE; do not close ITEM immediately.
 STORY_USE_POLL_FRAMES = 4
 STORY_USE_MENU_STALL_FRAMES = 120
@@ -292,42 +298,82 @@ def open_item_screen(
     return False, frames, 0, False
 
 
+def _item_menu_cleared_ok(
+    client: Any,
+    *,
+    episode_start_hp: int,
+) -> bool:
+    """True when ITEM/STATUS pause is gone (and gameplay if in-control bit set)."""
+    from re1_rl.game_session import outside_gameplay_reason
+
+    if _item_menu_confirmed(client):
+        return False
+    ram = client.read_ram(
+        [
+            ("game_mode", GAME_MODE, "u8"),
+            ("game_state", GAME_STATE, "u32"),
+            ("player_hp", PLAYER_HP, "u16"),
+        ]
+    )
+    if int(ram.get("game_mode", 0)) & IN_CONTROL_MASK:
+        return outside_gameplay_reason(ram, episode_start_hp=episode_start_hp) is None
+    return True
+
+
 def close_item_screen(
     client: Any,
     *,
     prev_hp: int,
     episode_start_hp: int,
 ) -> tuple[bool, int]:
-    """Close ITEM/status via Triangle (cancel).
+    """Close ITEM/status: Triangle cancel, then guarded Start fallback.
 
-    RE1 DC manual: Start opens the status screen; Triangle cancels on it.
-    Closing with Start *toggles* and often reopens the menu — then orphan
-    dismiss Triangle-closes it (looks like open → flash → close).
+    RE1 DC manual: Start opens/toggles the status screen; Triangle cancels.
+    Triangle-only close (post-equip) avoids Start reopen flash, but after
+    ammo COMBINE/reload Triangle often never clears the pause tree — agents
+    stay cursor-on-ammo until softlock. Fall back to one Start toggle, then
+    Triangle again if Start left/reopened the menu.
     """
-    from re1_rl.game_session import outside_gameplay_reason
-
     frames = 0
-    for _attempt in range(int(CLOSE_TRIANGLE_MAX_ATTEMPTS)):
-        if not _item_menu_confirmed(client):
-            ram = client.read_ram(
-                [
-                    ("game_mode", GAME_MODE, "u8"),
-                    ("game_state", GAME_STATE, "u32"),
-                    ("player_hp", PLAYER_HP, "u16"),
-                ]
-            )
-            if int(ram.get("game_mode", 0)) & IN_CONTROL_MASK:
-                if (
-                    outside_gameplay_reason(ram, episode_start_hp=episode_start_hp)
-                    is None
-                ):
-                    return False, frames
-            return False, frames
 
+    def _triangle_pass(attempts: int) -> tuple[bool, bool]:
+        """Returns ``(died, cleared)``."""
+        nonlocal frames
+        for _ in range(int(attempts)):
+            if _item_menu_cleared_ok(client, episode_start_hp=episode_start_hp):
+                return False, True
+            died, f = _tap(
+                client,
+                {"triangle": True},
+                frames=CLOSE_TRIANGLE_FRAMES,
+                prev_hp=prev_hp,
+                episode_start_hp=episode_start_hp,
+            )
+            frames += f
+            if died:
+                return True, False
+            died, f = _wait(
+                client,
+                frames=CLOSE_TRIANGLE_SETTLE_FRAMES,
+                prev_hp=prev_hp,
+                episode_start_hp=episode_start_hp,
+            )
+            frames += f
+            if died:
+                return True, False
+            if _item_menu_cleared_ok(client, episode_start_hp=episode_start_hp):
+                return False, True
+        return False, _item_menu_cleared_ok(client, episode_start_hp=episode_start_hp)
+
+    died, cleared = _triangle_pass(CLOSE_TRIANGLE_PRIMARY_ATTEMPTS)
+    if died or cleared:
+        return died, frames
+
+    for _ in range(int(CLOSE_START_FALLBACK_ATTEMPTS)):
         died, f = _tap(
             client,
-            {"triangle": True},
-            frames=CLOSE_TRIANGLE_FRAMES,
+            {"start": True},
+            frames=CLOSE_START_FRAMES,
             prev_hp=prev_hp,
             episode_start_hp=episode_start_hp,
         )
@@ -336,29 +382,18 @@ def close_item_screen(
             return True, frames
         died, f = _wait(
             client,
-            frames=CLOSE_TRIANGLE_SETTLE_FRAMES,
+            frames=CLOSE_ITEM_SETTLE_FRAMES,
             prev_hp=prev_hp,
             episode_start_hp=episode_start_hp,
         )
         frames += f
         if died:
             return True, frames
+        if _item_menu_cleared_ok(client, episode_start_hp=episode_start_hp):
+            return False, frames
 
-        if not _item_menu_confirmed(client):
-            ram = client.read_ram(
-                [
-                    ("game_mode", GAME_MODE, "u8"),
-                    ("game_state", GAME_STATE, "u32"),
-                    ("player_hp", PLAYER_HP, "u16"),
-                ]
-            )
-            if int(ram.get("game_mode", 0)) & IN_CONTROL_MASK:
-                if (
-                    outside_gameplay_reason(ram, episode_start_hp=episode_start_hp)
-                    is None
-                ):
-                    return False, frames
-    return False, frames
+    died, cleared = _triangle_pass(CLOSE_TRIANGLE_AFTER_START_ATTEMPTS)
+    return died, frames
 
 
 def close_document_examine_ui(
@@ -440,7 +475,7 @@ def dismiss_orphan_item_menu(
         report["frames"] = int(frames)
         return still, frames, report
 
-    # Normal ITEM/STATUS: Triangle cancel only (never Start — Start reopens).
+    # Normal ITEM/STATUS: Triangle first, Start fallback inside close_item_screen.
     died, frames = close_item_screen(
         client,
         prev_hp=prev_hp,
@@ -450,6 +485,8 @@ def dismiss_orphan_item_menu(
     report["cleared"] = not still
     report["died"] = bool(died)
     report["frames"] = int(frames)
+    if not still:
+        report["path"] = "triangle_or_start_cancel"
     return still, frames, report
 
 
@@ -1180,21 +1217,33 @@ def execute_combine_macro(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
     frames += f
+    dismiss_report: dict[str, Any] | None = None
+    if not died and _item_menu_confirmed(client):
+        still_open, f, dismiss_report = dismiss_orphan_item_menu(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames += f
+        if still_open and not dismiss_report.get("died"):
+            # Last resort already inside dismiss; keep report for telemetry.
+            pass
+        died = bool(died or dismiss_report.get("died"))
     inv_after = read_inventory(client)
     ram = client.read_ram([("game_mode", GAME_MODE, "u8")])
     in_control = bool(int(ram.get("game_mode", 0)) & IN_CONTROL_MASK)
+    menu_open = _item_menu_confirmed(client)
     # Qty-only reloads (empty beretta + bullets) keep the same item ids.
     changed = inv_before != inv_after
-    ok = not died and in_control and changed
-    return (
-        died,
-        frames,
-        {
-            "ok": ok,
-            "reason": "combine_ok" if ok else "combine_failed",
-            "slot_a": int(slot_a),
-            "slot_b": int(slot_b),
-            "in_control_after": in_control,
-            "frames": frames,
-        },
-    )
+    ok = not died and in_control and changed and not menu_open
+    report: dict[str, Any] = {
+        "ok": ok,
+        "reason": "combine_ok" if ok else "combine_failed",
+        "slot_a": int(slot_a),
+        "slot_b": int(slot_b),
+        "in_control_after": in_control,
+        "menu_open_after": menu_open,
+        "inventory_changed": changed,
+        "frames": frames,
+    }
+    if dismiss_report is not None:
+        report["menu_dismiss"] = dismiss_report
+    return died, frames, report

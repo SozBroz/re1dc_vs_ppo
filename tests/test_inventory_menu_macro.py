@@ -193,7 +193,7 @@ def test_dismiss_orphan_item_menu_closes_with_triangle() -> None:
     assert not still
     assert report["cleared"] is True
     assert report.get("skipped") is not True
-    assert report["path"] == "triangle_cancel"
+    assert report["path"] in {"triangle_cancel", "triangle_or_start_cancel"}
     assert frames >= CLOSE_TRIANGLE_FRAMES + CLOSE_TRIANGLE_SETTLE_FRAMES
     assert client.steps[0] == ({"triangle": True}, CLOSE_TRIANGLE_FRAMES)
     assert not any(b.get("start") for b, _ in client.steps)
@@ -244,8 +244,8 @@ def test_dismiss_orphan_document_examine_triangle_direct() -> None:
     assert not client.in_item_menu
 
 
-def test_close_item_screen_never_presses_start() -> None:
-    """Regression: Start-to-close reopens status; cancel must be Triangle."""
+def test_close_item_screen_prefers_triangle() -> None:
+    """Happy path: Triangle cancel closes without Start (no reopen flash)."""
     from re1_rl.inventory_menu_macro import close_item_screen
 
     client = _RecordingClient()
@@ -256,6 +256,28 @@ def test_close_item_screen_never_presses_start() -> None:
     assert client.steps[0] == ({"triangle": True}, CLOSE_TRIANGLE_FRAMES)
     assert not any(b.get("start") for b, _ in client.steps)
     assert not client.in_item_menu
+
+
+def test_close_item_screen_start_fallback_when_triangle_fails() -> None:
+    """Post-reload: Triangle may not clear ITEM; one Start toggle must."""
+    from re1_rl.inventory_menu_macro import (
+        CLOSE_START_FRAMES,
+        CLOSE_TRIANGLE_PRIMARY_ATTEMPTS,
+        close_item_screen,
+    )
+
+    client = _RecordingClient(triangle_closes_menu=False, start_opens_menu=True)
+    client.in_item_menu = True
+    died, frames = close_item_screen(client, prev_hp=96, episode_start_hp=96)
+    assert not died
+    assert not client.in_item_menu
+    triangle_steps = [b for b, _ in client.steps if b.get("triangle")]
+    start_steps = [b for b, _ in client.steps if b.get("start")]
+    assert len(triangle_steps) >= CLOSE_TRIANGLE_PRIMARY_ATTEMPTS
+    assert len(start_steps) == 1
+    assert start_steps[0] == {"start": True}
+    assert any(n == CLOSE_START_FRAMES for b, n in client.steps if b.get("start"))
+    assert frames > CLOSE_TRIANGLE_FRAMES + CLOSE_TRIANGLE_SETTLE_FRAMES
 
 
 def test_inventory_macro_owns_item_menu_gating() -> None:
