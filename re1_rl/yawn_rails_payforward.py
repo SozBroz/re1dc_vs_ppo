@@ -23,6 +23,7 @@ _SCHEMA = 1
 _PAYFORWARD_ENV = "RE1_YAWN_PAYFORWARD_RIPPLE"
 _STATE_ENV = "RE1_YAWN_PAYFORWARD_STATE"
 _FORCE_FIGHTS_ENV = "RE1_YAWN_PAYFORWARD_FORCE_FIGHTS"
+_IGNORE_FIGHTS_ENV = "RE1_YAWN_PAYFORWARD_IGNORE_FIGHTS"
 _LATEST_WEIGHT = 0.20
 _FIGHT_BUDGET = 0.80
 
@@ -62,9 +63,8 @@ def payforward_ripple_enabled(default: bool = False) -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
-def force_fight_indices_from_env() -> set[int]:
-    """``RE1_YAWN_PAYFORWARD_FORCE_FIGHTS=45,52`` — always treat as fights."""
-    raw = os.environ.get(_FORCE_FIGHTS_ENV, "").strip()
+def _index_set_from_env(env_name: str) -> set[int]:
+    raw = os.environ.get(env_name, "").strip()
     if not raw:
         return set()
     out: set[int] = set()
@@ -77,6 +77,16 @@ def force_fight_indices_from_env() -> set[int]:
         except ValueError:
             continue
     return out
+
+
+def force_fight_indices_from_env() -> set[int]:
+    """``RE1_YAWN_PAYFORWARD_FORCE_FIGHTS=45`` — always treat as fights."""
+    return _index_set_from_env(_FORCE_FIGHTS_ENV)
+
+
+def ignore_fight_indices_from_env() -> set[int]:
+    """``RE1_YAWN_PAYFORWARD_IGNORE_FIGHTS=52`` — drop ammo-cliff fights."""
+    return _index_set_from_env(_IGNORE_FIGHTS_ENV)
 
 
 def _ammo(q: Quality | list[int] | tuple[int, ...] | None) -> int:
@@ -100,11 +110,13 @@ def discover_fights(
     cells: list[dict[str, Any]],
     *,
     force: set[int] | None = None,
+    ignore: set[int] | None = None,
 ) -> list[FightStretch]:
     """Ammo cliffs among curated cells (any index set; caller filters cp18+).
 
-    ``force`` (or ``RE1_YAWN_PAYFORWARD_FORCE_FIGHTS``) adds fight edges even
-    without an ammo cliff, when the next curated index is adjacent.
+    ``force`` / ``RE1_YAWN_PAYFORWARD_FORCE_FIGHTS`` adds fight edges without a
+    cliff. ``ignore`` / ``RE1_YAWN_PAYFORWARD_IGNORE_FIGHTS`` drops cliffs so a
+    prior fight can ripple through (e.g. force 45 + ignore 52 → 45..54).
     """
     by_idx: dict[int, dict[str, Any]] = {}
     for row in cells:
@@ -117,11 +129,14 @@ def discover_fights(
         return []
     idxs = sorted(by_idx)
     forced = force if force is not None else force_fight_indices_from_env()
+    ignored = ignore if ignore is not None else ignore_fight_indices_from_env()
     fights: list[int] = []
     for i, idx in enumerate(idxs):
         nxt = idxs[i + 1] if i + 1 < len(idxs) else None
         if nxt is None or nxt != idx + 1:
             # Only adjacent curated indices form a fight edge.
+            continue
+        if idx in ignored and idx not in forced:
             continue
         cliff = _ammo(by_idx[idx].get("quality")) > _ammo(
             by_idx[nxt].get("quality")

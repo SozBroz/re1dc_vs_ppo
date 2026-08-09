@@ -57,12 +57,31 @@ def test_discover_ignores_ammo_gains() -> None:
     assert discover_fights(cells) == []
 
 
-def test_discover_force_fight_without_ammo_cliff() -> None:
+def test_discover_force_fight_without_ammo_cliff(monkeypatch) -> None:
+    monkeypatch.delenv("RE1_YAWN_PAYFORWARD_FORCE_FIGHTS", raising=False)
+    monkeypatch.delenv("RE1_YAWN_PAYFORWARD_IGNORE_FIGHTS", raising=False)
     cells = [_row(44, 50), _row(45, 50), _row(46, 50), _row(47, 40)]
     assert [f.fight_index for f in discover_fights(cells)] == [46]
     forced = discover_fights(cells, force={45})
     assert [f.fight_index for f in forced] == [45, 46]
     assert forced[0].stretch_end == 46
+
+
+def test_discover_ignore_fight_extends_prior_stretch(monkeypatch) -> None:
+    monkeypatch.delenv("RE1_YAWN_PAYFORWARD_FORCE_FIGHTS", raising=False)
+    monkeypatch.delenv("RE1_YAWN_PAYFORWARD_IGNORE_FIGHTS", raising=False)
+    cells = [
+        _row(45, 53),
+        _row(46, 0),
+        _row(51, 180),
+        _row(52, 180),
+        _row(53, 120),
+    ]
+    # Natural cliffs: 45 and 52. Ignoring 52 lets 45 ripple to end.
+    assert [f.fight_index for f in discover_fights(cells)] == [45, 52]
+    ignored = discover_fights(cells, force={45}, ignore={52})
+    assert [f.fight_index for f in ignored] == [45]
+    assert ignored[0].stretch_end == 54
 
 
 def test_done_stretch_reopens_on_fight_successor_improve(tmp_path: Path) -> None:

@@ -14,6 +14,7 @@ REM Pay-forward: 20% latest + 80% equal fight budgets; ripple improved loadouts
 REM through each stretch until the next fighting CP (or a blocked hop).
 set RE1_YAWN_PAYFORWARD_RIPPLE=1
 set RE1_YAWN_PAYFORWARD_FORCE_FIGHTS=45
+set RE1_YAWN_PAYFORWARD_IGNORE_FIGHTS=52
 set RE1_GO_EXPLORE_MANIFEST_POLL_S=60
 REM Learner HTTP for lazy bundle fetch in worker subprocesses (archive resets).
 if not defined RE1_LEARNER_HOST set RE1_LEARNER_HOST=%FLEET_LEARNER_HOST%
