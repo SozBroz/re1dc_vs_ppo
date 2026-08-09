@@ -247,6 +247,10 @@ class BizHawkClient:
         """
         self._request({"cmd": "buttons", "buttons": buttons})
 
+    def clear_latched_input(self) -> None:
+        """Clear Lua sticky latch and release the pad (episode reset boundary)."""
+        self._request({"cmd": "clear_input"})
+
     def read_joypad(self, debug: bool = False) -> dict[str, bool] | tuple[dict[str, bool], dict[str, Any]]:
         """Host physical controller state via EmuHawk (joypad.getimmediate)."""
         req: dict[str, Any] = {"cmd": "read_joypad"}

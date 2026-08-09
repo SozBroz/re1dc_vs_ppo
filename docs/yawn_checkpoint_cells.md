@@ -42,8 +42,8 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp31` | 32 | `gallery_portrait_4_117` | `117` | navigate | Interact with gallery portrait 4 (young man) |
 | `cp32` | 33 | `gallery_portrait_5_117` | `117` | navigate | Interact with gallery portrait 5 (middle-aged man) |
 | `cp33` | 34 | `gallery_portrait_6_117` | `117` | navigate | Interact with gallery portrait 6 (old man) |
-| `cp34` | 35 | `gallery_complete_117` | `117` | navigate | Complete the gallery puzzle (final switch — crest revealed) |
-| `cp35` | 36 | `star_crest_117` | `117` | pickup | Take the star crest after completing the gallery puzzle |
+| `cp34` | 35 | `gallery_complete_117` | `117` | pickup | Complete the gallery puzzle and take the star crest |
+| `cp35` | 36 | `star_crest_117` | `117` | pickup | Confirm star crest held (auto-pass if already held from cp34) |
 | `cp36` | 37 | `back_passage_return_10A` | `10A` | navigate | Return to the Back Passage with the star crest |
 | `cp37` | 38 | `courtyard_enter_11A` | `11A` | navigate | Enter the courtyard crest gate |
 | `cp38` | 39 | `crest_gate_11A` | `11A` | use_item | Place a crest at the courtyard gate (any slot) |
@@ -515,24 +515,26 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 ### `cp34` — `gallery_complete_117` (seq 35)
 
 - **Room:** `117`
-- **Action:** `navigate`
-- **Objective:** Complete the gallery puzzle (final switch — crest revealed)
+- **Action:** `pickup`
+- **Objective:** Complete the gallery puzzle and take the star crest
 - **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **117**. Navigate until the success enter/settle conditions fire.
+- **Items gained:** `star_crest`
+- **How to achieve:** Be in / reach **117**. Finish the portrait sequence / final switch, then pick up `star_crest`.
 - **Success condition:**
-- State flag `gallery_puzzle_solved` == `True`
+- Acquire item `star_crest`
+- **Note:** Reveal + pickup are one leg. Agents already take the crest immediately after the final switch; requiring pickup (not merely `gallery_puzzle_solved`) makes the captured cell inventory-correct for the courtyard legs.
 
 ### `cp35` — `star_crest_117` (seq 36)
 
 - **Room:** `117`
 - **Action:** `pickup`
-- **Objective:** Take the star crest after completing the gallery puzzle
+- **Objective:** Confirm star crest held after gallery complete (auto-pass if already held)
 - **Required items:** _(none)_
 - **Items gained:** `star_crest`
-- **How to achieve:** Be in / reach **117**. Pick up `star_crest`.
+- **How to achieve:** Be in / reach **117**. Pick up `star_crest` (or already hold it from a good cp34).
 - **Success condition:**
 - Acquire item `star_crest`
+- **Note:** Kept to avoid renumbering cp36+ fleet cells. From a crest-holding cp34 this leg is effectively free.
 
 ### `cp36` — `back_passage_return_10A` (seq 37)
 

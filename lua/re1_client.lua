@@ -449,6 +449,15 @@ local function handle_command(cmd)
         apply_buttons(cmd.buttons)
         return { ok = true }
 
+    elseif op == "clear_input" then
+        -- Episode boundary: drop latched sticky + any pending joypad.set so a
+        -- fresh reset cannot advance one frame on the previous PPO hold.
+        for k, _ in pairs(STICKY) do
+            STICKY[k] = false
+        end
+        apply_buttons({})
+        return { ok = true }
+
     elseif op == "read_joypad" then
         local out, raw = read_host_joypad(cmd.debug == true)
         -- dkjson encodes empty Lua tables as JSON arrays; keep a dummy key.

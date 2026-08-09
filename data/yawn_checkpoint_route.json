@@ -645,21 +645,22 @@
     "seq": 35,
     "checkpoint_id": "gallery_complete_117",
     "room_id": "117",
-    "objective": "Complete the gallery puzzle (final switch \u2014 crest revealed)",
-    "action_type": "navigate",
+    "objective": "Complete the gallery puzzle and take the star crest",
+    "action_type": "pickup",
     "required_items": [],
-    "items_gained": [],
+    "items_gained": [
+      "star_crest"
+    ],
     "success_condition": {
-      "type": "state_flag",
-      "field": "gallery_puzzle_solved",
-      "value": true
+      "type": "acquired_item",
+      "item": "star_crest"
     }
   },
   {
     "seq": 36,
     "checkpoint_id": "star_crest_117",
     "room_id": "117",
-    "objective": "Take the star crest after completing the gallery puzzle",
+    "objective": "Confirm star crest held after gallery complete (auto-pass if already held)",
     "action_type": "pickup",
     "required_items": [],
     "items_gained": [

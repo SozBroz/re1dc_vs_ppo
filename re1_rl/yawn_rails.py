@@ -301,12 +301,30 @@ def validate_manifest_cells(
 RESET_MIN_CHECKPOINT_INDEX = 18
 RESET_LATEST_CELL_WEIGHT = 0.50
 _RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
+_RESET_PIN_INDEX_ENV = "RE1_YAWN_RESET_PIN_INDEX"
 
 
 def reset_latest_only_from_env() -> bool:
     """``RE1_YAWN_RESET_LATEST_ONLY=1`` — always start from the newest loadable cell."""
     raw = os.environ.get(_RESET_LATEST_ONLY_ENV, "").strip().lower()
     return raw in {"1", "true", "yes", "on"}
+
+
+def reset_pin_index_from_env() -> int | None:
+    """``RE1_YAWN_RESET_PIN_INDEX=N`` — force every reset onto curated cell ``cpNN``.
+
+    Loads ``cpN`` so the next success captures ``cp{N+1}`` (e.g. pin 33 → hunt cp34).
+    """
+    raw = os.environ.get(_RESET_PIN_INDEX_ENV, "").strip()
+    if not raw:
+        return None
+    try:
+        idx = int(raw, 10)
+    except ValueError:
+        return None
+    if idx < 0:
+        return None
+    return idx
 
 
 def eligible_reset_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -338,6 +356,32 @@ def _choose_reset_candidate(
     return eligible[rng.randrange(len(eligible))]
 
 
+def _options_from_cell(
+    chosen: dict[str, Any],
+    stage: dict[str, Any],
+    *,
+    reset_source: str = "route_cell",
+) -> dict[str, Any]:
+    start_index = int(chosen["checkpoint_index"]) + 1
+    route_steps = list(stage.get("route_steps", []))
+    remaining = max(1, len(route_steps) - start_index)
+    # Global legs_per_episode remains a hard cap for non-PLR mode; PLR widens
+    # per endpoint instead of jumping the whole curriculum to 6-leg episodes.
+    leg_span = min(max(1, int(stage.get("legs_per_episode", 1))), remaining)
+    opts: dict[str, Any] = {
+        "route_start_index": start_index,
+        "leg_span": leg_span,
+        "reset_source": reset_source if start_index else "route_initial",
+    }
+    if start_index:
+        opts["pb_bundle"] = {
+            "state_path": str(chosen["state_path"]),
+            "sidecar_path": str(chosen["sidecar_path"]),
+            "source": "yawn_rails",
+        }
+    return opts
+
+
 def sample_one_leg_options(
     project_root: Path,
     stage: dict[str, Any],
@@ -349,8 +393,29 @@ def sample_one_leg_options(
     Default: 50% latest; 50% uniform over any loadable cp18+ cell.
     ``RE1_YAWN_PAYFORWARD_RIPPLE=1`` enables fight-cliff ripple mix instead.
     ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
+    ``RE1_YAWN_RESET_PIN_INDEX=N`` forces curated cell ``cpNN`` (overrides mix).
     """
     cells = eligible_reset_cells(iter_loadable_cells(project_root, stage))
+    pin_index = reset_pin_index_from_env()
+    if pin_index is not None:
+        pinned = [
+            row
+            for row in cells
+            if int(row.get("checkpoint_index", -1)) == int(pin_index)
+        ]
+        if not pinned:
+            # Pin may target a curated cell below the cp18 reset floor.
+            pinned = [
+                row
+                for row in iter_loadable_cells(project_root, stage)
+                if int(row.get("checkpoint_index", -1)) == int(pin_index)
+            ]
+        if not pinned:
+            raise ValueError(
+                f"RE1_YAWN_RESET_PIN_INDEX={pin_index} but cp{int(pin_index):02d} "
+                "is not loadable"
+            )
+        return _options_from_cell(pinned[0], stage, reset_source="route_cell_pin")
     latest_only = reset_latest_only_from_env()
     from re1_rl.yawn_rails_plr import plr_enabled_from_env, sample_plr_options
 
@@ -364,24 +429,7 @@ def sample_one_leg_options(
         if pf is not None:
             return pf
     chosen = _choose_reset_candidate(cells, rng=rng, latest_only=latest_only)
-    start_index = int(chosen["checkpoint_index"]) + 1
-    route_steps = list(stage.get("route_steps", []))
-    remaining = max(1, len(route_steps) - start_index)
-    # Global legs_per_episode remains a hard cap for non-PLR mode; PLR widens
-    # per endpoint instead of jumping the whole curriculum to 6-leg episodes.
-    leg_span = min(max(1, int(stage.get("legs_per_episode", 1))), remaining)
-    opts: dict[str, Any] = {
-        "route_start_index": start_index,
-        "leg_span": leg_span,
-        "reset_source": "route_cell" if start_index else "route_initial",
-    }
-    if start_index:
-        opts["pb_bundle"] = {
-            "state_path": str(chosen["state_path"]),
-            "sidecar_path": str(chosen["sidecar_path"]),
-            "source": "yawn_rails",
-        }
-    return opts
+    return _options_from_cell(chosen, stage)
 
 
 def validate_route(

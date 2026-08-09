@@ -271,6 +271,26 @@ def test_reclick_old_man_after_six_ends_episode() -> None:
     assert not progress.gallery_puzzle_solved
 
 
+def test_final_switch_clear_uses_prev_pose_after_cinema_nudge() -> None:
+    """Clear often samples on the next step after pose leaves the AOT."""
+    progress = ProgressTracker()
+    progress.first_visit("117")
+    prev = _state()
+    for raw in GALLERY_STEP_VALUES:
+        state = _state(raw=raw)
+        _reward(progress, prev, state)
+        prev = state
+
+    at_final = _at_final(raw=GALLERY_COMPLETE_PREV_RAW)
+    _reward(progress, prev, at_final)
+    # Progress clears while Jill has already been nudged away (cinema / hold).
+    after_nudge = _state(raw=0, x=12000.0, z=12000.0)
+    _total, bd = _reward(progress, at_final, after_nudge)
+    assert bd["gallery_wrong"] == 0.0
+    assert not progress.gallery_wrong_breached
+    assert progress.gallery_puzzle_solved
+
+
 def test_confirm_edge_on_old_man_while_awaiting_final_ends_episode() -> None:
     progress = ProgressTracker()
     progress.first_visit("117")

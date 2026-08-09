@@ -821,6 +821,8 @@ def compute_reward(
             star_crest_held="star_crest" in inventory,
             x=float(state.get("x", 0) or 0),
             z=float(state.get("z", 0) or 0),
+            prev_x=float(prev_state.get("x", 0) or 0),
+            prev_z=float(prev_state.get("z", 0) or 0),
         )
         bd["gallery"] = gallery_pay
         bd["gallery_wrong"] = gallery_wrong

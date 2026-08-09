@@ -17,4 +17,8 @@ set RE1_PB_DANGER_ROOMS=1
 call "%~dp0go_explore_phase_c.env.cmd"
 if not exist data\go_explore mkdir data\go_explore
 
+REM Temporary hunt: all pking train envs start on cp33 (gallery portrait 6)
+REM so success captures cp34 (gallery complete + star crest). Clear when done.
+set RE1_YAWN_RESET_PIN_INDEX=33
+
 venv\Scripts\python.exe scripts\distributed_train_parallel.py --role worker --machine-name %MACHINE_NAME% --worker-id pking --learner-host %LEARNER_HOST% --learner-port %FLEET_LEARNER_PORT% --curriculum curriculum/yawn_rails_one_leg.json --n-envs %N_ENVS% --actor-ranks %ACTOR_RANKS% --base-port %BASE_PORT% --total-steps 0 --training-speed 6400 --skip-chunk 600 --sync-interval-s %SYNC_INTERVAL_S% --capture-checkpoints --headless --tile-windows --grid-cols 5 --grid-rows 4 --screenshot-mmf --inference-batch-max %N_ENVS%

@@ -77,6 +77,8 @@ def _mock_lua(port: int) -> None:
                 resp = {"ok": True, "addr": cmd["addr"], "bytes": list(range(cmd["count"]))}
             elif op == "buttons":
                 resp = {"ok": True}
+            elif op == "clear_input":
+                resp = {"ok": True}
             elif op == "frameadvance":
                 resp = {"ok": True, "frame": cmd.get("n", 1)}
             elif op == "set_patches":
@@ -107,6 +109,7 @@ def test_bridge_loopback() -> None:
     assert ram["game_timer"] == 12345
 
     client.send_buttons({"P1 Up": True})
+    client.clear_latched_input()
     assert client.frameadvance(8) == 8
 
     block = client.read_block(0x800C8724, 4)

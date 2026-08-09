@@ -1326,6 +1326,10 @@ class RE1Env(gym.Env):
         self._skip_session_frames = 0
         self._pending_skip_room_crossings = []
         self._pending_episode_failure = None
+        # Flush PPO/sticky carry before any post-load frames advance. Worker
+        # samples the next action only after this reset returns.
+        self._sticky_input.reset()
+        self._prev_action = None
         self._load_stage()
         assert self._planner is not None
         requested_leg_span = int(
@@ -1412,6 +1416,7 @@ class RE1Env(gym.Env):
         else:
             state_path = self.project_root / self._stage["init_savestate"]
         self.bridge.load_savestate(str(state_path))
+        self.bridge.clear_latched_input()
         self.bridge.frameadvance(1)
         if self._ram_skip.use_engine_patches:
             self._ram_skip.install_engine_patches()
@@ -1427,8 +1432,10 @@ class RE1Env(gym.Env):
                 self._skip_uncontrolled()
             except (OSError, RuntimeError, ValueError):
                 pass
+        # Settle macros may have pressed Cross/Triangle; release before obs.
         self._sticky_input.reset()
         self._prev_action = None
+        self.bridge.clear_latched_input()
         self._grab_escape_pending = False
         self._forward_collision_stall = False
         self._use_phase = 0
@@ -1489,10 +1496,14 @@ class RE1Env(gym.Env):
                 )
                 state_path = self.project_root / self._stage["init_savestate"]
                 self.bridge.load_savestate(str(state_path))
+                self._sticky_input.reset()
+                self._prev_action = None
+                self.bridge.clear_latched_input()
                 self.bridge.frameadvance(1)
                 if self._ram_skip.use_engine_patches:
                     self._ram_skip.install_engine_patches()
                 self._skip_uncontrolled()
+                self.bridge.clear_latched_input()
                 self._progress = ProgressTracker(leg_span=self._leg_span)
                 self._visited.reset()
                 self._box_cache = None

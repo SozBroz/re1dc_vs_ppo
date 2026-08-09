@@ -378,6 +378,8 @@ class ProgressTracker:
         star_crest_held: bool,
         x: float = 0.0,
         z: float = 0.0,
+        prev_x: float | None = None,
+        prev_z: float | None = None,
     ) -> tuple[float, float]:
         """Pay ordered Gallery steps; claw back + terminate on any deviation.
 
@@ -387,8 +389,10 @@ class ProgressTracker:
         the episode terminal via ``breach_gallery_wrong()``.
 
         Progress clearing to 0 after portrait 6 only counts as solved when Jill
-        is at the final switch — a re-clicked portrait clears the same RAM byte
-        and must not be treated as success.
+        is (or just was) at the final switch — a re-clicked portrait clears the
+        same RAM byte and must not be treated as success. Use prev pose as well
+        as current: the clear often lands on the next env step after a cinema
+        nudge that would otherwise false-fail ``near_final``.
         """
         from re1_rl.gallery_puzzle import (
             GALLERY_COMPLETE_PREV_RAW,
@@ -464,7 +468,11 @@ class ProgressTracker:
             self.gallery_step_index >= len(GALLERY_STEP_VALUES)
             or int(prev_raw) == GALLERY_COMPLETE_PREV_RAW
         )
-        near_final = near_gallery_final_switch(x, z)
+        px = float(x if prev_x is None else prev_x)
+        pz = float(z if prev_z is None else prev_z)
+        near_final = near_gallery_final_switch(x, z) or near_gallery_final_switch(
+            px, pz
+        )
 
         if awaiting_final:
             # True completion: progress clears at the end-of-life switch only.

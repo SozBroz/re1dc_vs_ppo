@@ -526,13 +526,19 @@ def test_gallery_portrait_steps_are_separate_legs() -> None:
         _state("117", gallery_progress=GALLERY_STEP_VALUES[5]),
         progress=progress,
     )
-    assert planner.advance_if_success(
+    # Reveal alone is not enough — cp34 requires taking the star crest.
+    assert not planner.advance_if_success(
         _state("117", gallery_progress=0, gallery_puzzle_solved=True),
+        progress=progress,
+    )
+    progress.note_leg_acquired("star_crest")
+    assert planner.advance_if_success(
+        _state("117", gallery_progress=0, gallery_puzzle_solved=True, inventory=["star_crest"]),
         progress=progress,
     )
 
     assert planner.current_objective()["checkpoint_id"] == "star_crest_117"
-    progress.note_leg_acquired("star_crest")
+    # Already held from cp34 — key-item acquired_item auto-passes.
     assert planner.advance_if_success(
         _state("117", gallery_progress=0, gallery_puzzle_solved=True, inventory=["star_crest"]),
         progress=progress,
@@ -778,6 +784,30 @@ def test_reset_latest_only_env_pins_newest_cell(
         assert opts["reset_source"] == "route_cell"
         assert str(opts["pb_bundle"]["state_path"]).replace("\\", "/").endswith(
             "states/cp20/cell.State"
+        )
+
+
+def test_reset_pin_index_env_forces_cell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in range(18, 34)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 40)),
+    }
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_INDEX", "33")
+    for seed in range(20):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        assert opts["route_start_index"] == 34
+        assert opts["reset_source"] == "route_cell_pin"
+        assert str(opts["pb_bundle"]["state_path"]).replace("\\", "/").endswith(
+            "states/cp33/cell.State"
         )
 
 
