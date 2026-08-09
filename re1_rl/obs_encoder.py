@@ -84,11 +84,11 @@ GOAL_FIELDS: list[tuple[str, str]] = [
     ("waypoints_remaining", "route steps left / total"),
     ("route_hop_distance", "BFS door-hops to goal room / 20"),
     ("in_target_room", "1 = already in the goal room"),
-    ("door_delta_x", "(door_x - player_x) / 4096, clip [-2,2]"),
-    ("door_delta_z", "(door_z - player_z) / 4096, clip [-2,2]"),
-    ("door_distance", "euclidean distance to exit door / 4096"),
-    ("door_bearing_sin", "sin(angle to door - facing); + = door to the left"),
-    ("door_bearing_cos", "cos(angle to door - facing); 1 = dead ahead"),
+    ("door_delta_x", "(target_x - player_x) / 4096; exit door or statue drop line"),
+    ("door_delta_z", "(target_z - player_z) / 4096; exit door or statue drop line"),
+    ("door_distance", "euclidean distance to exit door / statue drop / 4096"),
+    ("door_bearing_sin", "sin(angle to door/statue-drop - facing); + = left"),
+    ("door_bearing_cos", "cos(angle to door/statue-drop - facing); 1 = ahead"),
     ("obj_navigate", "objective one-hot: navigate"),
     ("obj_pickup", "objective one-hot: pick up item"),
     ("obj_use_item", "objective one-hot: use item"),
@@ -259,7 +259,10 @@ class ObsEncoder:
         room_items: RoomItems | None = None,
     ) -> np.ndarray:
         """Encode the live checkpoint objective and egocentric exit compass."""
-        from re1_rl.dining_statue_puzzle import encode_dining_statue_goal
+        from re1_rl.dining_statue_puzzle import (
+            encode_dining_statue_compass,
+            encode_dining_statue_goal,
+        )
         from re1_rl.gallery_puzzle import encode_gallery_hint
 
         v = np.zeros(GOAL_DIM, dtype=np.float32)
@@ -275,19 +278,27 @@ class ObsEncoder:
         v[3] = 1.0 if hops is None else min(float(hops) / 20.0, 1.0)
         v[4] = 1.0 if goal is not None and room == str(goal) else 0.0
 
-        door = self.graph.exit_toward(room, goal)
-        if door is not None:
-            dx = float(door.x) - float(state.get("x", 0))
-            dz = float(door.z) - float(state.get("z", 0))
-            distance = math.hypot(dx, dz)
-            facing = 2.0 * math.pi * float(state.get("facing", 0)) / FACING_FULL_CIRCLE
-            relative = math.atan2(dz, dx) - facing
-            v[5] = float(np.clip(dx / DIST_NORM, -2.0, 2.0))
-            v[6] = float(np.clip(dz / DIST_NORM, -2.0, 2.0))
-            v[7] = min(distance / DIST_NORM, 2.0)
-            v[8] = math.sin(relative)
-            v[9] = math.cos(relative)
+        statue_compass = encode_dining_statue_compass(state, planner)
+        if statue_compass is not None:
+            # On statue_202, reuse the door compass for the drop-line / final shove.
+            v[5:10] = statue_compass
             v[21] = 1.0
+        else:
+            door = self.graph.exit_toward(room, goal)
+            if door is not None:
+                dx = float(door.x) - float(state.get("x", 0))
+                dz = float(door.z) - float(state.get("z", 0))
+                distance = math.hypot(dx, dz)
+                facing = (
+                    2.0 * math.pi * float(state.get("facing", 0)) / FACING_FULL_CIRCLE
+                )
+                relative = math.atan2(dz, dx) - facing
+                v[5] = float(np.clip(dx / DIST_NORM, -2.0, 2.0))
+                v[6] = float(np.clip(dz / DIST_NORM, -2.0, 2.0))
+                v[7] = min(distance / DIST_NORM, 2.0)
+                v[8] = math.sin(relative)
+                v[9] = math.cos(relative)
+                v[21] = 1.0
 
         v[10:15] = planner.objective_one_hot()
         v[15] = min(max(self.curriculum_stage_index / 10.0, 0.0), 1.0)

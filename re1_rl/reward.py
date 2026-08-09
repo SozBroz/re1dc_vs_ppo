@@ -56,6 +56,9 @@ KEY_ITEM_RETURN_PENALTY = -KEY_ITEM_PICKUP_BONUS
 STORY_ITEM_USE_BONUS = 4.0
 # Dining 2F balcony statue knocked (blue jewel puzzle).
 DINING_STATUE_BONUS = 4.0
+# Dense statue→drop/final distance shaping (clipped ±0.5/step, ~+10 full shove).
+DINING_STATUE_PROGRESS_STEP = 0.5
+DINING_STATUE_PROGRESS_BUDGET = 10.0
 # 10F alcove: put gold_emblem back without leaving the wooden emblem (anti-hack).
 # Intended path is USE wooden emblem → +4 story use.
 GOLD_EMBLEM_RETURN_PENALTY = -4.0
@@ -109,6 +112,21 @@ AMMO_WASTE_MAX_PENALTY = 0.15
 # Flat legacy miss flag (unused); live knife tax uses KNIFE_MISS_PENALTY above.
 ATTACK_MISS_PENALTY = 0.0
 AMMO_WASTE_PENALTY = 0.0  # legacy stub; not read by compute_reward
+
+# Per-round ammo expenditure (hit or miss). Keeps kills +EV while making SG/RL
+# spray costly vs nav crumbs. Knife / flamethrower omitted (no discrete round).
+# Deferred misses re-post ``ammo_spent`` on expiry — skip spend there via
+# ``pending_combat_expired`` so fire-step already paid once.
+AMMO_SPEND_TAX_PER_ROUND: dict[int, float] = {
+    0x02: 0.03,  # beretta / handgun
+    0x03: 0.25,  # shotgun
+    0x04: 0.40,  # colt python dumdum
+    0x05: 0.40,  # colt python magnum
+    0x07: 0.40,  # grenade launcher / bazooka acid
+    0x08: 0.40,  # bazooka explosive
+    0x09: 0.40,  # bazooka flame
+    0x0A: 0.75,  # rocket launcher
+}
 
 # Miss / ammo-waste tax: per missed round =
 #   −AMMO_PICKUP_BONUS / clip_size
@@ -304,6 +322,32 @@ def ammo_waste_penalty(
     ) * float(rounds)
 
 
+def ammo_spend_per_round(weapon_id: int) -> float:
+    """Per-round expenditure tax for ``weapon_id`` (0 if knife / unknown)."""
+    return float(AMMO_SPEND_TAX_PER_ROUND.get(int(weapon_id) & 0xFF, 0.0))
+
+
+def ammo_spend_penalty(weapon_id: int, rounds_spent: int) -> float:
+    """Total ammo expenditure tax for ``rounds_spent`` (hit or miss)."""
+    rounds = int(rounds_spent)
+    if rounds <= 0:
+        return 0.0
+    per = ammo_spend_per_round(weapon_id)
+    if per <= 0.0:
+        return 0.0
+    return -per * float(rounds)
+
+
+def _combat_ammo_weapon_id(state: dict[str, Any]) -> int:
+    """Weapon id for ammo taxes (pending fire / deferred miss / equipped)."""
+    return int(
+        state.get("pending_combat_weapon_id")
+        or state.get("pending_miss_weapon_id")
+        or state.get("equipped_weapon_id")
+        or 0
+    )
+
+
 def _nominal_weapon_damage_max(weapon_id: int) -> int:
     from re1_rl.weapon_damage import WEAPON_NOMINAL_DAMAGE
 
@@ -382,6 +426,7 @@ RAILS_NAV_POSITIVE_TERMS: frozenset[str] = frozenset({
     "key_item",
     "story_use",
     "dining_statue",
+    "dining_statue_progress",
     "new_weapon",
     "ammo_pickup",
     "gallery",
@@ -622,6 +667,7 @@ def compute_reward(
         "gallery": 0.0,
         "gallery_wrong": 0.0,
         "dining_statue": 0.0,
+        "dining_statue_progress": 0.0,
         "gold_emblem_return": 0.0,
         "key_item_return": 0.0,
         "shotgun_return": 0.0,
@@ -635,6 +681,7 @@ def compute_reward(
         "enemy_damage": 0.0,
         "enemy_kill": 0.0,
         "attack_miss": 0.0,
+        "ammo_spend": 0.0,
         "ammo_waste": 0.0,
         "combat_overkill": 0.0,
         "attack_dry_fire": 0.0,
@@ -826,8 +873,14 @@ def compute_reward(
         )
         bd["gallery"] = gallery_pay
         bd["gallery_wrong"] = gallery_wrong
-        from re1_rl.dining_statue_puzzle import dining_statue_knocked_from_state
+        from re1_rl.dining_statue_puzzle import (
+            dining_statue_knocked_from_state,
+            dining_statue_progress_reward,
+        )
 
+        bd["dining_statue_progress"] = dining_statue_progress_reward(
+            prev_state, state, planner
+        )
         if bool(state.get("in_control")) and progress.claim_dining_statue_bonus(
             knocked=dining_statue_knocked_from_state(state),
             prev_knocked=dining_statue_knocked_from_state(prev_state),
@@ -929,21 +982,25 @@ def compute_reward(
     if overkill < 0.0:
         bd["combat_overkill"] = overkill
 
+    # Ammo expenditure: every spent round (hit or miss). Deferred miss expiry
+    # re-posts ammo_spent after the fire step already paid — skip that replay.
+    rounds_spent = int(state.get("ammo_spent", 0) or 0)
+    if rounds_spent > 0 and not state.get("pending_combat_expired"):
+        bd["ammo_spend"] = ammo_spend_penalty(
+            _combat_ammo_weapon_id(state), rounds_spent,
+        )
+
     # Miss taxes: gun ammo waste on attack_missed; knife whiff on knife_swing_missed
-    # (any knife-equipped macro height).
+    # (any knife-equipped macro height). Extra inefficiency on top of spend tax.
     if state.get("knife_swing_missed"):
         bd["attack_miss"] = KNIFE_MISS_PENALTY
     elif state.get("attack_missed"):
-        rounds = int(state.get("ammo_spent", 0) or 0)
+        rounds = rounds_spent
         if rounds > 0:
             from re1_rl.ammo_accounting import fireable_ammo_before_miss
 
             # Deferred projectile miss may resolve after a weapon swap.
-            wid = int(
-                state.get("pending_miss_weapon_id")
-                or state.get("equipped_weapon_id", 0)
-                or 0
-            )
+            wid = _combat_ammo_weapon_id(state)
             ammo_before = fireable_ammo_before_miss(
                 state, wid, rounds_spent=rounds,
             )
@@ -1002,6 +1059,7 @@ def compute_reward(
             or bd["story_use"] != 0.0
             or bd["gallery"] > 0.0
             or bd["dining_statue"] > 0.0
+            or bd["dining_statue_progress"] > 0.0
             or weapon_progress
         )
         # Pause idle clock during cutscenes / doors (not in_control).

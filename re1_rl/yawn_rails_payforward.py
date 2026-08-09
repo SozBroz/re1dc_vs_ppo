@@ -590,7 +590,7 @@ def notify_payforward_install(
     route: list[dict[str, Any]] | None = None,
 ) -> None:
     """Best-effort ripple advance after a curated cell install."""
-    if not payforward_ripple_enabled(default=True):
+    if not payforward_ripple_enabled(default=False):
         return
     try:
         store = get_payforward_store(project_root)
@@ -634,7 +634,7 @@ def sample_payforward_options(
     rng: random.Random,
 ) -> dict[str, Any] | None:
     """Build reset options under fight-ripple mix, or None to use legacy."""
-    if not payforward_ripple_enabled(default=True):
+    if not payforward_ripple_enabled(default=False):
         return None
     if not cells:
         return None

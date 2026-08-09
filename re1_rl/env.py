@@ -593,6 +593,8 @@ class RE1Env(gym.Env):
             "dining_statue_knocked": bool(
                 int(ram.get("dining_statue_flag", 0) or 0) & 0x10
             ),
+            "dining_statue_x": int(ram.get("dining_statue_x", 0) or 0),
+            "dining_statue_z": int(ram.get("dining_statue_z", 0) or 0),
             "player_anim": int(ram.get("player_anim", 0)),
             "player_aux": int(ram.get("player_aux", 0)),
             "player_recovery": int(ram.get("player_recovery", 0)),
@@ -761,6 +763,7 @@ class RE1Env(gym.Env):
                     "enemy_damage",
                     "enemy_kill",
                     "attack_miss",
+                    "ammo_spend",
                     "ammo_waste",
                     "combat_overkill",
                     "attack_dry_fire",

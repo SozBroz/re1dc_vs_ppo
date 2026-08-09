@@ -85,6 +85,9 @@ GALLERY_PROGRESS = 0x800C3008  # u8 [CONFIRMED live, QuickSave3, 2026-07-17]
 GALLERY_CONFIRM = 0x800C3009  # u8; changes on any portrait Yes confirmation
 # Dining 2F statue knocked (blue jewel balcony puzzle). QS1=0, post-push=0x10.
 DINING_STATUE_FLAG = 0x800C8702  # u8 [CONFIRMED live, QS1 monitor 2026-08-01]
+# Live balcony statue world XZ (QS9 continuous shove hunt 2026-08-09).
+DINING_STATUE_X = 0x800DB6E0  # s16
+DINING_STATUE_Z = 0x800DB6E8  # s16
 # Player entity block [CONFIRMED via live walk trace 2026-07-02, verify_pos.py]:
 # X/Z step ~64-162 units per frame while walking; facing full circle = 4096
 # (0x1000), turning ~192/quarter-second. Y is elevation (0 on ground floor).
@@ -455,6 +458,8 @@ DEFAULT_RAM_FIELDS: list[tuple[str, int, str]] = [
     ("gallery_progress", GALLERY_PROGRESS, "u8"),
     ("gallery_confirm", GALLERY_CONFIRM, "u8"),
     ("dining_statue_flag", DINING_STATUE_FLAG, "u8"),
+    ("dining_statue_x", DINING_STATUE_X, "s16"),
+    ("dining_statue_z", DINING_STATUE_Z, "s16"),
     ("player_x", PLAYER_X, "s16"),
     ("player_y", PLAYER_Y, "s16"),
     ("player_z", PLAYER_Z, "s16"),
