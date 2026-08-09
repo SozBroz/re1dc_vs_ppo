@@ -394,11 +394,13 @@ def sample_one_leg_options(
     """Choose a curated start and bounded checkpoint span.
 
     Default: 50% latest; 50% uniform over any loadable cp18+ cell.
-    ``RE1_YAWN_PAYFORWARD_RIPPLE=1`` enables fight-cliff ripple mix instead.
+    ``RE1_YAWN_PAYFORWARD_RIPPLE=1`` enables fight-progression mix instead:
+    40% frontier fight cell, 60% uniform over all loadable cells from cp00.
     ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
     ``RE1_YAWN_RESET_PIN_INDEX=N`` forces curated cell ``cpNN`` (overrides mix).
     """
-    cells = eligible_reset_cells(iter_loadable_cells(project_root, stage))
+    all_cells = list(iter_loadable_cells(project_root, stage))
+    cells = eligible_reset_cells(all_cells)
     pin_index = reset_pin_index_from_env()
     if pin_index is not None:
         pinned = [
@@ -428,7 +430,7 @@ def sample_one_leg_options(
     if not latest_only:
         from re1_rl.yawn_rails_payforward import sample_payforward_options
 
-        pf = sample_payforward_options(project_root, stage, cells, rng=rng)
+        pf = sample_payforward_options(project_root, stage, all_cells, rng=rng)
         if pf is not None:
             return pf
     chosen = _choose_reset_candidate(cells, rng=rng, latest_only=latest_only)
@@ -698,6 +700,14 @@ def capture_successor_cell(
         return None
     if cid == "main_hall_106" and not any(str(k).startswith("106:") for k in ledgers):
         return None
+    if cid == "crow_gallery_enter_117" and progress is not None:
+        leg_kills = int(progress.leg_kills_by_room.get("10A", 0))
+        if leg_kills < 2:
+            print(
+                f"[yawn_capture] reject leg_kills_10A={leg_kills} need=2 cp={cid}",
+                flush=True,
+            )
+            return None
     # First climb to 203 has no cinema at this story beat — do not require 203:.
     next_checkpoint = planner.step_by_seq(completed + 2)
     capacity = successor_capacity(state, next_checkpoint)

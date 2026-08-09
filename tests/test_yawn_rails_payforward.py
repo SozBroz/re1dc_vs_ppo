@@ -13,7 +13,12 @@ from re1_rl.yawn_rails_payforward import (
     STATUS_GRIND,
     STATUS_RIPPLING,
     PayforwardRippleStore,
+    choose_progression_reset_index,
     discover_fights,
+    fight_efficiency_met,
+    fight_target_for_index,
+    frontier_fight_index,
+    fight_leg_valid,
     hop_blocked,
     project_end_quality,
     sample_payforward_options,
@@ -206,28 +211,21 @@ def test_ripple_store_on_install_and_block(tmp_path: Path) -> None:
     assert store.fights[18].sample_index() == 18  # budget back on fight
 
 
-def test_sample_payforward_equal_fight_budgets(tmp_path: Path, monkeypatch) -> None:
+def test_sample_payforward_progression_mix(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("RE1_YAWN_PAYFORWARD_RIPPLE", "1")
-    monkeypatch.setenv(
-        "RE1_YAWN_PAYFORWARD_STATE", str(tmp_path / "payforward_ripple.json")
-    )
     cells_dir = tmp_path / "states" / "yawn_rails" / "cells"
     cells = []
-    # Two fights: 18→19 and 22→23
-    specs = [
-        (18, 70),
-        (19, 40),
-        (20, 40),
-        (21, 40),
-        (22, 60),
-        (23, 30),
-    ]
+    # cp18 successor inefficient (overspend); frontier stays cp18.
+    specs = [(0, 50), (5, 45), (18, 75), (19, 71), (20, 70)]
     for idx, ammo in specs:
         d = cells_dir / f"cp{idx:02d}"
         d.mkdir(parents=True)
         (d / "cell.State").write_bytes(b"x" * 100)
         (d / "cell.sidecar.json").write_text("{}", encoding="utf-8")
-        cells.append(_row(idx, ammo))
+        extra = {}
+        if idx == 18:
+            extra["checkpoint_id"] = "l_passage_enter_108"
+        cells.append(_row(idx, ammo, **extra))
     stage = {
         "route_id": "yawn_quest_v2",
         "route_path": "data/yawn_checkpoint_route.json",
@@ -235,20 +233,46 @@ def test_sample_payforward_equal_fight_budgets(tmp_path: Path, monkeypatch) -> N
         "legs_per_episode": 1,
         "cells_manifest": "states/yawn_rails/manifest.json",
     }
-    # Point project_root so state path resolves under tmp via env override only.
-    # sample_payforward_options uses cells list directly for choice.
+    by_idx = {int(r["checkpoint_index"]): r for r in cells}
+    assert frontier_fight_index(by_idx, project_root=tmp_path) == 18
     counts: Counter[int] = Counter()
     rng = random.Random(0)
-    for _ in range(4000):
+    for _ in range(6000):
         opts = sample_payforward_options(tmp_path, stage, cells, rng=rng)
         assert opts is not None
-        assert opts["leg_span"] == 1
-        # route_start_index = cell+1
+        assert opts["payforward_fight_progression"] is True
         counts[int(opts["route_start_index"]) - 1] += 1
-    # Latest (23) ~20%; fights 18 and 22 split ~40% each while grinding.
-    assert counts[23] / 4000 > 0.12
-    assert counts[18] / 4000 > 0.25
-    assert counts[22] / 4000 > 0.25
+    # 40% frontier cp18 + 60% uniform over 5 cells (no latest bias on cp20).
+    assert counts[18] / 6000 > 0.30
+    assert counts[0] / 6000 > 0.08
+    assert counts[20] / 6000 < 0.25
+
+
+def test_frontier_advances_when_fight_efficient(tmp_path: Path) -> None:
+    target = fight_target_for_index(18)
+    assert target is not None
+    tip = _row(18, 75, checkpoint_id="l_passage_enter_108")
+    good_succ = _row(19, 80)
+    bad_succ = _row(19, 71)
+    assert fight_efficiency_met(tip, good_succ, target, project_root=tmp_path)
+    assert not fight_efficiency_met(tip, bad_succ, target, project_root=tmp_path)
+    cells = [tip, good_succ, _row(26, 114, checkpoint_id="back_passage_10A")]
+    by_idx = {int(r["checkpoint_index"]): r for r in cells}
+    assert frontier_fight_index(by_idx, project_root=tmp_path) == 26
+
+
+def test_choose_progression_reset_index_bias(tmp_path: Path) -> None:
+    cells = [_row(0, 40), _row(18, 75, checkpoint_id="l_passage_enter_108"), _row(19, 71)]
+    counts: Counter[int] = Counter()
+    rng = random.Random(1)
+    for _ in range(5000):
+        pick = choose_progression_reset_index(
+            cells, rng, project_root=tmp_path, fight_bias=0.40
+        )
+        assert pick is not None
+        counts[int(pick)] += 1
+    assert counts[18] / 5000 > 0.25
+    assert counts[0] / 5000 > 0.10
 
 
 def test_new_fight_appears_on_reconcile(tmp_path: Path) -> None:
@@ -272,7 +296,7 @@ def test_quality_beats_sanity() -> None:
 def test_choose_cell_does_not_persist(tmp_path: Path) -> None:
     cells = [_row(18, 70), _row(19, 40), _row(20, 40)]
     path = tmp_path / "payforward_ripple.json"
-    store = PayforwardRippleStore(path)
+    store = PayforwardRippleStore(path, project_root=tmp_path)
     pick = store.choose_cell_index(cells, random.Random(0))
     assert pick in {18, 19, 20}
     assert not path.is_file()  # sample path must not write
@@ -293,3 +317,76 @@ def test_save_swallows_replace_errors(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(os, "replace", _boom)
     store.save()  # must not raise
     assert not path.is_file()
+
+
+def test_cp26_bogus_cliff_rejected_without_kills() -> None:
+    tip = _row(
+        26,
+        114,
+        checkpoint_id="back_passage_10A",
+    )
+    succ = _row(
+        27,
+        108,
+        checkpoint_id="crow_gallery_enter_117",
+    )
+    assert not fight_leg_valid(tip, succ)
+    assert [f.fight_index for f in discover_fights([tip, succ])] == []
+
+
+def test_cp26_valid_with_two_zombie_spend() -> None:
+    tip = _row(26, 114, checkpoint_id="back_passage_10A")
+    succ = _row(27, 100, checkpoint_id="crow_gallery_enter_117")
+    # Legacy sidecars without leg_kills_by_room: ammo floor only (2×7 beretta).
+    assert fight_leg_valid(tip, succ)
+    assert [f.fight_index for f in discover_fights([tip, succ])] == [26]
+
+
+def test_cp40_one_zombie_fight() -> None:
+    tip = _row(40, 60, checkpoint_id="east_stairs_101")
+    succ = _row(41, 53, checkpoint_id="storeroom_enter_118")
+    assert fight_leg_valid(tip, succ)
+    assert [f.fight_index for f in discover_fights([tip, succ])] == [40]
+    bogus = _row(41, 58, checkpoint_id="storeroom_enter_118")
+    assert not fight_leg_valid(tip, bogus)
+
+
+def test_cp26_requires_kills_when_sidecar_tracks_them(tmp_path: Path) -> None:
+    sidecar = tmp_path / "cp27.sidecar.json"
+    sidecar.write_text(
+        '{"schema_version":1,"progress":{"leg_kills_by_room":{"10A":1}}}',
+        encoding="utf-8",
+    )
+    tip = _row(26, 114, checkpoint_id="back_passage_10A")
+    succ = _row(27, 100, checkpoint_id="crow_gallery_enter_117")
+    succ["sidecar_path"] = "cp27.sidecar.json"
+    assert not fight_leg_valid(tip, succ, project_root=tmp_path)
+
+
+def test_cp26_valid_with_knife_kills_in_sidecar(tmp_path: Path) -> None:
+    sidecar = tmp_path / "cp27.sidecar.json"
+    sidecar.write_text(
+        '{"schema_version":1,"progress":{"leg_kills_by_room":{"10A":2}}}',
+        encoding="utf-8",
+    )
+    tip = _row(26, 114, checkpoint_id="back_passage_10A")
+    succ = _row(
+        27,
+        114,
+        checkpoint_id="crow_gallery_enter_117",
+    )
+    succ["sidecar_path"] = "cp27.sidecar.json"
+    assert fight_leg_valid(tip, succ, project_root=tmp_path)
+    assert [f.fight_index for f in discover_fights([tip, succ], project_root=tmp_path)] == []
+
+
+def test_navigate_only_10a_returns_never_fight() -> None:
+    for cid in (
+        "back_passage_return_10A",
+        "back_passage_post_crest_10A",
+        "east_stairs_101_post_storeroom",
+    ):
+        tip = _row(36, 100, checkpoint_id=cid)
+        succ = _row(37, 86, checkpoint_id="next_room")
+        assert not fight_leg_valid(tip, succ)
+        assert discover_fights([tip, succ]) == []

@@ -1,14 +1,18 @@
-"""Fight-cliff discovery and ripple grind for Yawn rails resets (cp18+).
+"""Fight-cliff discovery and progression-biased Yawn rails resets.
 
-Fighting CP: curated ``ammo(cpN) > ammo(cpN+1)``. Reset mix keeps 20% latest and
-splits the other 80% equally across fights. After a fight improves its successor,
-that fight's share is spent on the ripple tip until the stretch ends or a hop is
-blocked (projected end quality cannot beat the incumbent).
+When ``RE1_YAWN_PAYFORWARD_RIPPLE=1``, reset mix is **40%** the current frontier
+fight cell (first curated fight not yet ammo-efficient) and **60%** uniform over
+**all** loadable cells from ``cp00`` — no latest-cell bias.
+
+Fight efficiency uses curated beretta budgets (7 per zombie, 50% waste cap).
+The frontier advances cp18 → cp26 → … as each fight's successor meets its
+min-tolerated net ammo shift.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 import threading
@@ -24,7 +28,9 @@ _PAYFORWARD_ENV = "RE1_YAWN_PAYFORWARD_RIPPLE"
 _STATE_ENV = "RE1_YAWN_PAYFORWARD_STATE"
 _FORCE_FIGHTS_ENV = "RE1_YAWN_PAYFORWARD_FORCE_FIGHTS"
 _IGNORE_FIGHTS_ENV = "RE1_YAWN_PAYFORWARD_IGNORE_FIGHTS"
-_LATEST_WEIGHT = 0.20
+_FIGHT_BIAS_WEIGHT = 0.40
+_FIGHT_BIAS_ENV = "RE1_YAWN_FIGHT_BIAS_WEIGHT"
+_LATEST_WEIGHT = 0.20  # legacy ripple store only
 _FIGHT_BUDGET = 0.80
 
 # Optimistic HG-eq ammo bonuses for route items_gained (pickup legs).
@@ -56,11 +62,22 @@ STATUS_DONE = "stretch_done"
 
 
 def payforward_ripple_enabled(default: bool = False) -> bool:
-    """Opt-in fight-ripple mix. Default off — fleet uses 50/50 latest/any-cp18+."""
+    """Opt-in fight-progression reset mix (40/60 fight/uniform)."""
     raw = os.environ.get(_PAYFORWARD_ENV, "").strip().lower()
     if not raw:
         return bool(default)
     return raw in {"1", "true", "yes", "on"}
+
+
+def fight_bias_weight_from_env() -> float:
+    """``RE1_YAWN_FIGHT_BIAS_WEIGHT`` — fraction on frontier fight (default 0.40)."""
+    raw = os.environ.get(_FIGHT_BIAS_ENV, "").strip()
+    if not raw:
+        return float(_FIGHT_BIAS_WEIGHT)
+    try:
+        return max(0.0, min(1.0, float(raw)))
+    except ValueError:
+        return float(_FIGHT_BIAS_WEIGHT)
 
 
 def _index_set_from_env(env_name: str) -> set[int]:
@@ -101,6 +118,240 @@ def _cell_quality(row: dict[str, Any]) -> Quality:
 
 
 @dataclass(frozen=True)
+class FightLegRule:
+    """Optional validation for a payforward fight edge (tip checkpoint_id)."""
+
+    disallow: bool = False
+    min_ammo_drop: int = 0
+    min_kills_room: str | None = None
+    min_kills: int = 0
+
+
+# Curated legs where ammo cliffs alone are misleading (navigate-only returns,
+# or mandatory hallway clears). ``min_ammo_drop`` uses damage-weighted quality[1].
+ZOMBIE_BERETTA_SPEND = 7
+FIGHT_WASTE_FACTOR = 1.5  # 50% ammo waste tolerance above ideal
+
+
+def zombie_fight_spend(zombies: int) -> tuple[int, int]:
+    """Return ``(ideal_beretta, max_beretta)`` for ``zombies`` cleared on the leg."""
+    n = max(0, int(zombies))
+    ideal = ZOMBIE_BERETTA_SPEND * n
+    max_spend = int(math.ceil(ideal * FIGHT_WASTE_FACTOR))
+    return ideal, max_spend
+
+
+_TWO_ZOMBIE_MIN_DROP = zombie_fight_spend(2)[0]
+_ONE_ZOMBIE_MIN_DROP = zombie_fight_spend(1)[0]
+
+
+FIGHT_LEG_RULES: dict[str, FightLegRule] = {
+    # cp26: Back Passage — 2 zombies @ 7 beretta each before gallery.
+    "back_passage_10A": FightLegRule(
+        min_ammo_drop=_TWO_ZOMBIE_MIN_DROP,
+        min_kills_room="10A",
+        min_kills=2,
+    ),
+    # cp36/cp39: navigate-only 10A legs; bogus cliffs from poisoned lineage.
+    "back_passage_return_10A": FightLegRule(disallow=True),
+    "back_passage_post_crest_10A": FightLegRule(disallow=True),
+    # cp40: East stairs — 1 zombie on the way to the storeroom.
+    "east_stairs_101": FightLegRule(min_ammo_drop=_ONE_ZOMBIE_MIN_DROP),
+    # cp43: storeroom return — nav leg; small ammo cliff is miss waste, not a fight.
+    "east_stairs_101_post_storeroom": FightLegRule(disallow=True),
+    # cp44/cp45/cp53: 2-zombie shotgun rooms.
+    "east_stairs_201": FightLegRule(min_ammo_drop=_TWO_ZOMBIE_MIN_DROP),
+    "c_passage_204": FightLegRule(min_ammo_drop=_TWO_ZOMBIE_MIN_DROP),
+    "dining_2f_enter_202": FightLegRule(min_ammo_drop=_TWO_ZOMBIE_MIN_DROP),
+}
+
+
+@dataclass(frozen=True)
+class FightAmmoTarget:
+    """Curated ammo budget for a payforward fight edge (tip cpN → cpN+1)."""
+
+    fight_index: int
+    ideal_spend: int
+    max_spend: int
+    min_net_delta: int
+    successor_pickup: int = 0
+
+
+def _zombie_fight_target(fight_index: int, zombies: int) -> FightAmmoTarget:
+    ideal, max_spend = zombie_fight_spend(zombies)
+    return FightAmmoTarget(
+        fight_index=int(fight_index),
+        ideal_spend=int(ideal),
+        max_spend=int(max_spend),
+        min_net_delta=-int(max_spend),
+    )
+
+
+# Ordered fight curriculum; frontier advances when successor meets budget.
+FIGHT_PROGRESSION: tuple[FightAmmoTarget, ...] = (
+    FightAmmoTarget(18, 10, 15, 0, successor_pickup=15),
+    _zombie_fight_target(26, 2),
+    FightAmmoTarget(37, 5, 8, -8),
+    _zombie_fight_target(40, 1),
+    _zombie_fight_target(44, 2),
+    _zombie_fight_target(45, 2),
+    _zombie_fight_target(53, 2),
+)
+
+
+def fight_target_for_index(fight_index: int) -> FightAmmoTarget | None:
+    for target in FIGHT_PROGRESSION:
+        if int(target.fight_index) == int(fight_index):
+            return target
+    return None
+
+
+def fight_spend_beretta(
+    tip_row: dict[str, Any],
+    succ_row: dict[str, Any],
+    *,
+    successor_pickup: int = 0,
+) -> int:
+    """Manifest HG-eq spend crossing tip → successor (pickup on successor leg)."""
+    pickup = max(0, int(successor_pickup))
+    return pickup + _ammo(tip_row.get("quality")) - _ammo(succ_row.get("quality"))
+
+
+def fight_efficiency_met(
+    tip_row: dict[str, Any],
+    succ_row: dict[str, Any],
+    target: FightAmmoTarget,
+    *,
+    project_root: Path | None = None,
+) -> bool:
+    """True when successor quality reflects an acceptable fight on this leg."""
+    net = _ammo(succ_row.get("quality")) - _ammo(tip_row.get("quality"))
+    if net < int(target.min_net_delta):
+        return False
+    spend = fight_spend_beretta(
+        tip_row, succ_row, successor_pickup=int(target.successor_pickup)
+    )
+    if spend > int(target.max_spend):
+        return False
+    if spend < int(target.ideal_spend):
+        return False
+    tip_id = str(tip_row.get("checkpoint_id") or "")
+    rule = FIGHT_LEG_RULES.get(tip_id)
+    if rule is not None and rule.min_kills > 0 and rule.min_kills_room:
+        kills = _leg_kills_from_sidecar(
+            succ_row, str(rule.min_kills_room), project_root
+        )
+        if kills is not None and kills < int(rule.min_kills):
+            return False
+    return True
+
+
+def frontier_fight_index(
+    cells_by_idx: dict[int, dict[str, Any]],
+    *,
+    project_root: Path | None = None,
+) -> int | None:
+    """First fight in :data:`FIGHT_PROGRESSION` whose successor is not yet efficient."""
+    for target in FIGHT_PROGRESSION:
+        f = int(target.fight_index)
+        if f not in cells_by_idx:
+            continue
+        succ = f + 1
+        if succ not in cells_by_idx:
+            return f
+        if not fight_efficiency_met(
+            cells_by_idx[f],
+            cells_by_idx[succ],
+            target,
+            project_root=project_root,
+        ):
+            return f
+    return None
+
+
+def choose_progression_reset_index(
+    cells: list[dict[str, Any]],
+    rng: random.Random,
+    *,
+    project_root: Path | str | None = None,
+    fight_bias: float | None = None,
+) -> int | None:
+    """40% frontier fight cell; 60% uniform over all loadable cells (cp00+)."""
+    if not cells:
+        return None
+    by_idx = {int(r["checkpoint_index"]): r for r in cells}
+    idxs = sorted(by_idx)
+    root = Path(project_root) if project_root is not None else None
+    frontier = frontier_fight_index(by_idx, project_root=root)
+    bias = float(_FIGHT_BIAS_WEIGHT if fight_bias is None else fight_bias)
+    if frontier is not None and frontier in by_idx and rng.random() < bias:
+        return int(frontier)
+    return int(idxs[rng.randrange(len(idxs))])
+
+
+def _leg_kills_from_sidecar(
+    row: dict[str, Any],
+    room_id: str,
+    project_root: Path | None,
+) -> int | None:
+    """Paid kills in ``room_id`` recorded on the successor cell sidecar.
+
+    Returns ``None`` when the sidecar is missing or predates ``leg_kills_by_room``.
+    """
+    if project_root is None:
+        return None
+    rel = str(row.get("sidecar_path") or "").strip()
+    if not rel:
+        return None
+    path = Path(project_root) / rel
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    progress = data.get("progress")
+    if not isinstance(progress, dict):
+        return None
+    raw = progress.get("leg_kills_by_room")
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return int(raw.get(str(room_id).upper(), 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def fight_leg_valid(
+    tip_row: dict[str, Any],
+    succ_row: dict[str, Any],
+    *,
+    project_root: Path | None = None,
+) -> bool:
+    """True when a natural ammo cliff reflects a real fight on this leg."""
+    tip_id = str(tip_row.get("checkpoint_id") or "")
+    rule = FIGHT_LEG_RULES.get(tip_id)
+    if rule is not None and rule.disallow:
+        return False
+    drop = _ammo(tip_row.get("quality")) - _ammo(succ_row.get("quality"))
+    if rule is None:
+        return drop > 0
+    ammo_ok = drop >= int(rule.min_ammo_drop)
+    if rule.min_kills > 0 and rule.min_kills_room:
+        kills = _leg_kills_from_sidecar(succ_row, rule.min_kills_room, project_root)
+        if kills is not None:
+            return kills >= int(rule.min_kills)
+        if rule.min_ammo_drop > 0:
+            return ammo_ok
+        return False
+    if rule.min_ammo_drop > 0:
+        return ammo_ok
+    return True
+
+
+@dataclass(frozen=True)
 class FightStretch:
     fight_index: int
     stretch_end: int  # exclusive; next fight or max_index+1
@@ -111,12 +362,16 @@ def discover_fights(
     *,
     force: set[int] | None = None,
     ignore: set[int] | None = None,
+    project_root: Path | None = None,
 ) -> list[FightStretch]:
     """Ammo cliffs among curated cells (any index set; caller filters cp18+).
 
     ``force`` / ``RE1_YAWN_PAYFORWARD_FORCE_FIGHTS`` adds fight edges without a
     cliff. ``ignore`` / ``RE1_YAWN_PAYFORWARD_IGNORE_FIGHTS`` drops cliffs so a
     prior fight can ripple through (e.g. force 45 + ignore 52 → 45..54).
+
+    Curated legs in :data:`FIGHT_LEG_RULES` require plausible ammo spend and/or
+    sidecar kill evidence (e.g. cp26 Back Passage needs ~2 SG or 2 kills in 10A).
     """
     by_idx: dict[int, dict[str, Any]] = {}
     for row in cells:
@@ -138,10 +393,15 @@ def discover_fights(
             continue
         if idx in ignored and idx not in forced:
             continue
+        if idx in forced:
+            fights.append(idx)
+            continue
         cliff = _ammo(by_idx[idx].get("quality")) > _ammo(
             by_idx[nxt].get("quality")
         )
-        if cliff or idx in forced:
+        if cliff and fight_leg_valid(
+            by_idx[idx], by_idx[nxt], project_root=project_root
+        ):
             fights.append(idx)
     max_idx = idxs[-1]
     out: list[FightStretch] = []
@@ -304,8 +564,11 @@ class FightRuntime:
 class PayforwardRippleStore:
     """JSON-backed per-fight ripple state."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, project_root: Path | str | None = None) -> None:
         self.path = Path(path)
+        self.project_root = (
+            Path(project_root).resolve() if project_root is not None else None
+        )
         self._lock = threading.RLock()
         self.fights: dict[int, FightRuntime] = {}
         self.updated_unix: float = 0.0
@@ -378,7 +641,7 @@ class PayforwardRippleStore:
         cells: list[dict[str, Any]],
     ) -> tuple[list[FightStretch], dict[int, dict[str, Any]]]:
         """Rebind fight entries to current discovery (no blocked evaluation)."""
-        discovered = discover_fights(cells)
+        discovered = discover_fights(cells, project_root=self.project_root)
         by_idx: dict[int, dict[str, Any]] = {}
         for row in cells:
             try:
@@ -541,30 +804,15 @@ class PayforwardRippleStore:
         *,
         route: list[dict[str, Any]] | None = None,
         latest_weight: float = _LATEST_WEIGHT,
+        project_root: Path | str | None = None,
     ) -> int | None:
-        """Return checkpoint_index to load, or None → caller uses legacy mix."""
-        eligible = list(cells)
-        if not eligible:
-            return None
-        by_idx = {int(r["checkpoint_index"]): r for r in eligible}
-        idxs = sorted(by_idx)
-        latest = idxs[-1]
-        # Never persist on the sample path — dozens of actors would race
-        # os.replace on Windows and crash the fleet (PermissionError).
-        self.refresh_from_disk()
-        self.reconcile(eligible, route=route, persist=False)
-        if not self.fights:
-            return None
-        if rng.random() < float(latest_weight):
-            return int(latest)
-        fight_ids = sorted(self.fights)
-        fr = self.fights[int(rng.choice(fight_ids))]
-        pick = int(fr.sample_index())
-        if pick not in by_idx:
-            pick = int(fr.fight_index)
-        if pick not in by_idx:
-            return int(latest)
-        return pick
+        """Return checkpoint_index to load (progression mix; no latest bias)."""
+        del route, latest_weight  # ripple tips retired from reset sampling
+        return choose_progression_reset_index(
+            cells,
+            rng,
+            project_root=project_root or self.project_root,
+        )
 
 
 _STORE_LOCK = threading.Lock()
@@ -577,7 +825,7 @@ def get_payforward_store(project_root: Path | str) -> PayforwardRippleStore:
     with _STORE_LOCK:
         store = _STORE_CACHE.get(key)
         if store is None:
-            store = PayforwardRippleStore(path)
+            store = PayforwardRippleStore(path, project_root=project_root)
             _STORE_CACHE[key] = store
         return store
 
@@ -633,27 +881,13 @@ def sample_payforward_options(
     *,
     rng: random.Random,
 ) -> dict[str, Any] | None:
-    """Build reset options under fight-ripple mix, or None to use legacy."""
+    """Build reset options under fight-progression mix, or None to use legacy."""
     if not payforward_ripple_enabled(default=False):
         return None
     if not cells:
         return None
     try:
-        route_path = stage.get("route_path")
-        route: list[dict[str, Any]] = []
-        if route_path:
-            rp = Path(project_root) / str(route_path)
-            if rp.is_file():
-                try:
-                    raw = json.loads(rp.read_text(encoding="utf-8"))
-                    if isinstance(raw, list):
-                        route = raw
-                except (OSError, json.JSONDecodeError):
-                    route = []
-        if not route:
-            route = _load_route(project_root)
-        store = get_payforward_store(project_root)
-        pick = store.choose_cell_index(cells, rng, route=route)
+        pick = choose_progression_reset_index(cells, rng, project_root=project_root)
         if pick is None:
             return None
         by_idx = {int(r["checkpoint_index"]): r for r in cells}
@@ -672,7 +906,8 @@ def sample_payforward_options(
                 "sidecar_path": str(chosen["sidecar_path"]),
                 "source": "yawn_rails",
             },
-            "payforward_fight_ripple": True,
+            "payforward_fight_progression": True,
+            "payforward_frontier_fight": frontier_fight_index(by_idx, project_root=project_root),
         }
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
         return None
