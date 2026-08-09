@@ -10,6 +10,7 @@ in-process with no HTTP.
 from __future__ import annotations
 
 import multiprocessing as mp
+import os
 import queue
 import threading
 import time
@@ -556,7 +557,14 @@ def run_async_worker_loop(
                     "headless": headless,
                     "screenshot_mmf": screenshot_mmf,
                     "memlog_directory": (
-                        str(root / "data" / "memlog")
+                        str(
+                            root
+                            / "data"
+                            / (
+                                os.environ.get("RE1_MEMLOG_DIRECTORY", "memlog").strip()
+                                or "memlog"
+                            )
+                        )
                         if memlog_actor_rank is not None
                         and rank == int(memlog_actor_rank)
                         else None

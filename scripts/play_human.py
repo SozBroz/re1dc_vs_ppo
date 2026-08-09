@@ -1896,6 +1896,7 @@ def human_advance(
         progress=env._progress,
         graph=env.graph,
         success_room=stage.get("success_room"),
+        rails_mode=str(stage.get("mode", "")) == "yawn_rails",
         return_breakdown=True,
     )
 

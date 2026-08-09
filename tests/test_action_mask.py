@@ -259,6 +259,28 @@ def test_typewriter_or_box_rooms_ban_attacks() -> None:
         assert not m[ATTACK_ACTION], room
         assert not m[ATTACK_UP_ACTION], room
         assert not m[ATTACK_DOWN_ACTION], room
+
+
+def test_main_hall_f1_f2_ban_attacks() -> None:
+    """Main Hall 1F (106) and 2F upper hall (203): attacks always illegal."""
+    from re1_rl.action_mask import ALWAYS_ILLEGAL_ATTACK_ROOMS
+
+    idle = dict(player_anim=0x0D, player_aux=0x01, player_recovery=0)
+    assert ALWAYS_ILLEGAL_ATTACK_ROOMS == frozenset({"106", "203"})
+    for room in ("106", "203"):
+        m = action_mask(
+            N_ACTIONS,
+            None,
+            **idle,
+            equipped_weapon_id=0x01,
+            knife_enemies_near=1,
+            gun_enemies_near=1,
+            mask_combat_without_enemies=True,
+            room_id=room,
+        )
+        assert not m[ATTACK_ACTION], room
+        assert not m[ATTACK_UP_ACTION], room
+        assert not m[ATTACK_DOWN_ACTION], room
     # Ordinary room with enemies still allows attack.
     m_hall = action_mask(
         N_ACTIONS,

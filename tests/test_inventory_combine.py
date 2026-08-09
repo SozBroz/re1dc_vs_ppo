@@ -52,6 +52,31 @@ def test_beretta_reload_from_handgun_bullets() -> None:
     assert new_inv[1] == (0x0B, 15)
 
 
+def test_bazooka_reload_from_acid_rounds() -> None:
+    inv = _inv((0x07, 0), (0x11, 6))
+    planned = plan_combine(inv, 0, 1)
+    assert planned is not None
+    new_inv, dest, product = planned
+    assert dest == 0
+    assert product == 0x07
+    assert new_inv[0] == (0x07, 6)
+    assert new_inv[1] == (0, 0)
+
+
+def test_bazooka_partial_reload_from_acid_rounds() -> None:
+    inv = _inv((0x07, 5), (0x11, 6))
+    planned = plan_combine(inv, 0, 1)
+    assert planned is not None
+    new_inv, _, _ = planned
+    assert new_inv[0] == (0x07, 6)
+    assert new_inv[1] == (0x11, 5)
+
+
+def test_bazooka_full_clip_blocks_reload() -> None:
+    inv = _inv((0x07, 6), (0x11, 6))
+    assert plan_combine(inv, 0, 1) is None
+
+
 def test_shotgun_reload_from_shells() -> None:
     inv = _inv((0x03, 2), (0x0C, 10))
     planned = plan_combine(inv, 0, 1)

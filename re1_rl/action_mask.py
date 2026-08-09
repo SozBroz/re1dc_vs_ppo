@@ -59,6 +59,16 @@ COMBINE_ACTION = WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS  # 36
 SELECT_SLOT_BASE = COMBINE_ACTION + 1  # 37
 N_SELECT_SLOT = 8
 
+# Main Hall 1F (106) and 2F upper hall (203): attack macros always illegal.
+ALWAYS_ILLEGAL_ATTACK_ROOMS: frozenset[str] = frozenset({"106", "203"})
+
+
+def is_always_illegal_attack_room(room_id: str | None) -> bool:
+    if room_id is None:
+        return False
+    return str(room_id).strip().upper() in ALWAYS_ILLEGAL_ATTACK_ROOMS
+
+
 # Box-UI mode verbs reuse never-trained deposit_slot indices (names unchanged).
 BOX_WITHDRAW_ACTION = DEPOSIT_ACTION_BASE + 0  # deposit_slot_0
 BOX_DEPOSIT_ACTION = DEPOSIT_ACTION_BASE + 1  # deposit_slot_1
@@ -356,8 +366,11 @@ def action_mask(
         else (int(alive_enemies_in_room) if alive_enemies_in_room is not None else None)
     )
 
-    # Typewriter / box rooms: attack macros always illegal (safe-room policy).
-    attacks_banned = is_typewriter_or_box_room(room_id)
+    # Typewriter / box rooms and Main Hall F1/F2: attack macros always illegal.
+    attacks_banned = (
+        is_typewriter_or_box_room(room_id)
+        or is_always_illegal_attack_room(room_id)
+    )
 
     if not in_submenu:
         if attacks_banned:

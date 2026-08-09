@@ -21,7 +21,7 @@ WEAPON_AMMO_ITEM: dict[int, int | None] = {
     0x0A: 0x10,  # rocket launcher (explosive rounds)
 }
 
-# Rounds the weapon slot itself can hold after a COMBINE reload (PS1 DC).
+# Combat chamber / single-fire gating (bazooka family fires one round per shot).
 WEAPON_CLIP_CAPACITY: dict[int, int] = {
     0x02: 15,  # PS1 DC handgun magazine (live combine QuickSave0)
     0x03: 7,
@@ -33,6 +33,25 @@ WEAPON_CLIP_CAPACITY: dict[int, int] = {
     0x09: 1,
     0x0A: 1,
 }
+
+# Max rounds loaded into a weapon slot via inventory COMBINE (PS1 DC packs).
+WEAPON_COMBINE_CLIP_CAPACITY: dict[int, int] = {
+    0x02: 15,
+    0x03: 7,
+    0x04: 6,
+    0x05: 6,
+    0x06: 220,
+    0x07: 6,  # grenade launcher / bazooka acid pack
+    0x08: 6,
+    0x09: 6,
+    0x0A: 6,
+}
+
+
+def combine_clip_capacity(weapon_id: int) -> int:
+    """Rounds a weapon inventory slot can hold after COMBINE reload."""
+    wid = int(weapon_id) & 0xFF
+    return WEAPON_COMBINE_CLIP_CAPACITY.get(wid, WEAPON_CLIP_CAPACITY.get(wid, 1))
 
 
 def loaded_weapon_ammo(

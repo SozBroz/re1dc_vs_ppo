@@ -128,7 +128,7 @@ def test_distributed_ppo_hyperparams_match_async_fleet() -> None:
         n_epochs=4,
         learning_rate=3e-4,
         gamma=RL_GAMMA,
-        ent_coef=0.01,
+        ent_coef=0.005,
     )
     assert RL_GAMMA == gamma_for_emulated_half_life(RAILS_CREDIT_HALF_LIFE_S)
 
@@ -323,7 +323,7 @@ def test_load_async_learner_transplants_missing_obs_key(tmp_path: Path) -> None:
         n_epochs=1,
         learning_rate=3e-4,
         gamma=0.995,
-        ent_coef=0.01,
+        ent_coef=0.005,
         device="cpu",
         verbose=0,
     )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from re1_rl.ammo_accounting import WEAPON_AMMO_ITEM, WEAPON_CLIP_CAPACITY
+from re1_rl.ammo_accounting import combine_clip_capacity, WEAPON_AMMO_ITEM
 from re1_rl.herb_combine import combine_product, plan_combine as plan_herb_combine
 from re1_rl.inventory_stacking import is_stackable, stack_limit
 from re1_rl.memory_map import (
@@ -56,7 +56,7 @@ def _plan_weapon_reload(
             continue
         if int(aq) <= 0:
             continue
-        clip = WEAPON_CLIP_CAPACITY.get(int(wid), 1)
+        clip = combine_clip_capacity(int(wid))
         if int(wq) >= clip:
             continue
         moved = min(int(aq), clip - int(wq))
