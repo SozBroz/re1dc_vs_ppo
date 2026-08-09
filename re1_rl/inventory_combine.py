@@ -14,6 +14,10 @@ from re1_rl.memory_map import (
     WEAPON_ITEM_IDS,
 )
 
+# Grenade / rocket launchers: COMBINE only when the weapon slot is empty.
+# (PS1 DC will not top up a partially loaded bazooka from a rounds pack.)
+_EMPTY_ONLY_RELOAD_WEAPONS = frozenset({0x07, 0x08, 0x09, 0x0A})
+
 
 def _plan_ammo_merge(
     inventory: list[tuple[int, int]],
@@ -55,6 +59,8 @@ def _plan_weapon_reload(
         if expected is None or int(aid) != int(expected):
             continue
         if int(aq) <= 0:
+            continue
+        if int(wid) in _EMPTY_ONLY_RELOAD_WEAPONS and int(wq) > 0:
             continue
         clip = combine_clip_capacity(int(wid))
         if int(wq) >= clip:

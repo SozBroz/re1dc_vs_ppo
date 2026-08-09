@@ -63,13 +63,11 @@ def test_bazooka_reload_from_acid_rounds() -> None:
     assert new_inv[1] == (0, 0)
 
 
-def test_bazooka_partial_reload_from_acid_rounds() -> None:
+def test_bazooka_partial_reload_blocked_until_empty() -> None:
+    # Live game: acid rounds only combine onto an empty launcher.
     inv = _inv((0x07, 5), (0x11, 6))
-    planned = plan_combine(inv, 0, 1)
-    assert planned is not None
-    new_inv, _, _ = planned
-    assert new_inv[0] == (0x07, 6)
-    assert new_inv[1] == (0x11, 5)
+    assert plan_combine(inv, 0, 1) is None
+    assert plan_combine(inv, 1, 0) is None
 
 
 def test_bazooka_full_clip_blocks_reload() -> None:
