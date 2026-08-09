@@ -1281,6 +1281,8 @@ def test_capture_settles_cutscene_before_savestate(
         _step_count=900,
         _skip_uncontrolled=_skip,
         _read_state=_read_state,
+        _auto_accept_pause_pickup_modal=lambda: False,
+        _try_dismiss_orphan_item_menu=lambda: (True, {"cleared": True, "skipped": True}),
     )
     monkeypatch.setattr(
         "re1_rl.yawn_rails.dump_episode_sidecar",
@@ -1295,6 +1297,104 @@ def test_capture_settles_cutscene_before_savestate(
     assert proposal is not None
     assert proposal["checkpoint_id"] == "gallery_complete_117"
     assert bridge.save_savestate.called
+
+
+def test_capture_settles_item_menu_before_skip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Post-pickup ITEM pause is not turbo-skippable — dismiss then capture."""
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "1")
+    bridge = MagicMock()
+    bridge.save_savestate.side_effect = (
+        lambda path: Path(path).write_bytes(b"state")
+    )
+    planner = _planner(start_index=_idx("shotgun_116") + 1)
+    reads = [
+        _state("116", in_control=True, inventory=["shotgun", "beretta"]),
+        _state("116", in_control=True, inventory=["shotgun", "beretta"]),
+        _state("116", in_control=True, inventory=["shotgun", "beretta"]),
+    ]
+    calls = {"accept": 0, "dismiss": 0, "skip": 0}
+
+    def _read_state(track_items=False):
+        if reads:
+            return reads.pop(0)
+        return _state("116", in_control=True, inventory=["shotgun", "beretta"])
+
+    def _accept():
+        calls["accept"] += 1
+        return True
+
+    def _dismiss():
+        calls["dismiss"] += 1
+        return True, {"cleared": True, "path": "triangle_cancel", "frames": 40}
+
+    def _skip():
+        calls["skip"] += 1
+        return 0, False
+
+    # Seed an inferior curated cell so quality log shows WOULD_INSTALL / compare.
+    cell = tmp_path / "states/yawn_rails/cells/cp27"
+    cell.mkdir(parents=True)
+    (cell / "meta.json").write_text(
+        json.dumps(
+            {
+                "checkpoint_index": _idx("shotgun_116"),
+                "checkpoint_id": "shotgun_116",
+                "quality": [20, 10, 0, 5, 1, 0, 0],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "states/yawn_rails/manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "route_id": "test",
+                "cells": [
+                    {
+                        "checkpoint_index": _idx("shotgun_116"),
+                        "checkpoint_id": "shotgun_116",
+                        "quality": [20, 10, 0, 5, 1, 0, 0],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    env = SimpleNamespace(
+        project_root=tmp_path,
+        _stage={
+            "mode": "yawn_rails",
+            "cells_manifest": "states/yawn_rails/manifest.json",
+            "route_id": "test",
+        },
+        _planner=planner,
+        bridge=bridge,
+        _macro_active=False,
+        _step_count=500,
+        _auto_accept_pause_pickup_modal=_accept,
+        _try_dismiss_orphan_item_menu=_dismiss,
+        _skip_uncontrolled=_skip,
+        _read_state=_read_state,
+    )
+    monkeypatch.setattr(
+        "re1_rl.yawn_rails.dump_episode_sidecar",
+        lambda *_args, **_kwargs: {"schema_version": 1},
+    )
+    proposal = capture_successor_cell(
+        env,
+        _state("116", in_control=False, inventory=["shotgun", "beretta"], hp=96),
+        {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
+    )
+    assert calls == {"accept": 1, "dismiss": 1, "skip": 1}
+    assert proposal is not None
+    assert proposal["checkpoint_id"] == "shotgun_116"
+    out = capsys.readouterr().out
+    assert "[yawn_capture] quality" in out
+    assert "payforward=" in out
+    assert "shotgun_116" in out
 
 
 def test_barry_return_capture_requires_105_2_s1(

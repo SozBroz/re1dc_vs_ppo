@@ -436,50 +436,143 @@ def validate_route(
 
 
 def _settle_state_for_capture(env: Any, state: dict[str, Any]) -> dict[str, Any] | None:
-    """Wait out cutscenes so successor cells are saved under player control.
+    """Return an in-control state for successor capture, or None.
 
-    Checkpoint success often fires on the same frame a cinema starts (gallery
-    crest reveal, door loads, etc.). Episodes also terminate on that reward, so
-    capture cannot defer to a later PPO step — settle in-place first.
+    Checkpoint success often fires mid-cinema or with the post-pickup ITEM /
+    Yes-No pause still open. Episodes also terminate on that reward, so the
+    next PPO step never gets to auto-dismiss — settle in-place first.
     """
     if state.get("dead"):
         return None
     if state.get("in_control", True):
         return state
-    skip = getattr(env, "_skip_uncontrolled", None)
     read_state = getattr(env, "_read_state", None)
-    if not callable(skip) or not callable(read_state):
+    if not callable(read_state):
         print(
             "[yawn_capture] reject not in_control (no settle helper)",
             flush=True,
         )
         return None
     print(
-        "[yawn_capture] settle cutscene before capture "
+        "[yawn_capture] settle before capture "
         f"room={state.get('room_id')!r}",
         flush=True,
     )
-    try:
-        _skipped, died = skip()
-    except (OSError, RuntimeError, ValueError, TypeError, AttributeError) as exc:
-        print(f"[yawn_capture] reject settle failed err={exc!r}", flush=True)
-        return None
-    if died:
-        print("[yawn_capture] reject died during settle", flush=True)
-        return None
+
+    # 1) Accept "Will you take …?" — turbo-skip refuses pause menus.
+    accept = getattr(env, "_auto_accept_pause_pickup_modal", None)
+    if callable(accept):
+        try:
+            accepted = bool(accept())
+        except (OSError, RuntimeError, ValueError, TypeError, AttributeError) as exc:
+            print(f"[yawn_capture] settle accept err={exc!r}", flush=True)
+            accepted = False
+        if accepted:
+            print("[yawn_capture] settle accepted pickup Yes/No", flush=True)
+
+    # 2) Triangle-close leftover ITEM/STATUS (also refuses turbo-skip).
+    dismiss = getattr(env, "_try_dismiss_orphan_item_menu", None)
+    if callable(dismiss):
+        try:
+            recovered, report = dismiss()
+        except (OSError, RuntimeError, ValueError, TypeError, AttributeError) as exc:
+            print(f"[yawn_capture] settle dismiss err={exc!r}", flush=True)
+            recovered, report = False, {"error": repr(exc)}
+        print(
+            f"[yawn_capture] settle item_menu dismissed={bool(recovered)} "
+            f"report={report}",
+            flush=True,
+        )
+
+    # 3) Door / cinema turbo-skip once pause tree is clear.
+    skip = getattr(env, "_skip_uncontrolled", None)
+    if callable(skip):
+        try:
+            _skipped, died = skip()
+        except (OSError, RuntimeError, ValueError, TypeError, AttributeError) as exc:
+            print(f"[yawn_capture] reject settle skip failed err={exc!r}", flush=True)
+            return None
+        if died:
+            print("[yawn_capture] reject died during settle", flush=True)
+            return None
+
     try:
         settled = dict(read_state(track_items=False))
     except (OSError, RuntimeError, ValueError, TypeError, AttributeError) as exc:
         print(f"[yawn_capture] reject settle re-read failed err={exc!r}", flush=True)
         return None
+
+    # One more dismiss pass if skip left an ITEM overlay.
+    if (
+        not settled.get("dead")
+        and not settled.get("in_control", True)
+        and callable(dismiss)
+    ):
+        try:
+            recovered, report = dismiss()
+        except (OSError, RuntimeError, ValueError, TypeError, AttributeError):
+            recovered, report = False, {}
+        print(
+            f"[yawn_capture] settle item_menu retry dismissed={bool(recovered)} "
+            f"report={report}",
+            flush=True,
+        )
+        try:
+            settled = dict(read_state(track_items=False))
+        except (OSError, RuntimeError, ValueError, TypeError, AttributeError) as exc:
+            print(
+                f"[yawn_capture] reject settle re-read failed err={exc!r}",
+                flush=True,
+            )
+            return None
+
     if settled.get("dead") or not settled.get("in_control", True):
         print(
-            "[yawn_capture] reject still unsettled after skip "
+            "[yawn_capture] reject still unsettled after settle "
             f"in_control={settled.get('in_control')} dead={settled.get('dead')}",
             flush=True,
         )
         return None
     return settled
+
+
+def _log_capture_quality_vs_incumbent(
+    project_root: Path,
+    *,
+    checkpoint_index: int,
+    checkpoint_id: str,
+    quality: list[int] | tuple[int, ...],
+    note: str = "",
+) -> None:
+    """Print lexicographic quality vs curated cell (pay-forward gate preview)."""
+    from re1_rl.go_explore_archive import quality_beats
+    from re1_rl.go_explore_capture import quality_replace_significant
+    from re1_rl.yawn_rails_sync import _existing_cell_quality, yawn_rails_root
+
+    new_q = [int(x) for x in quality]
+    old_q = _existing_cell_quality(yawn_rails_root(project_root), checkpoint_index)
+    if old_q is None:
+        verdict = "NEW_SLOT"
+        beats = True
+        significant = True
+        old_list: list[int] | None = None
+    else:
+        old_list = [int(x) for x in old_q]
+        beats = bool(quality_beats(tuple(new_q), old_q))
+        significant = bool(quality_replace_significant(tuple(new_q), old_q))
+        if beats and significant:
+            verdict = "WOULD_INSTALL"
+        elif beats and not significant:
+            verdict = "BEATS_NOT_SIGNIFICANT"
+        else:
+            verdict = "LOSE_TO_INCUMBENT"
+    suffix = f" note={note}" if note else ""
+    print(
+        f"[yawn_capture] quality cp{int(checkpoint_index):02d} "
+        f"id={checkpoint_id} new={new_q} old={old_list} "
+        f"beats={beats} significant={significant} payforward={verdict}{suffix}",
+        flush=True,
+    )
 
 
 def capture_successor_cell(
@@ -500,17 +593,35 @@ def capture_successor_cell(
     stage = getattr(env, "_stage", {})
     if stage.get("mode") != "yawn_rails":
         return None
-    state = _settle_state_for_capture(env, state)
-    if state is None:
-        return None
     planner = env._planner
     completed = int(planner.waypoint_index) - 1
     if completed < 0 or completed >= planner.total_waypoints - 1:
         return None
     completed_cp = planner.step_by_seq(completed + 1) or {}
-    expected_room = str(completed_cp.get("room_id", "") or "")
-    room_id = str(state.get("room_id", "") or "")
     cid = str(completed_cp.get("checkpoint_id", "") or "")
+    expected_room = str(completed_cp.get("room_id", "") or "")
+    unsettled_state = state
+    state = _settle_state_for_capture(env, state)
+    if state is None:
+        try:
+            from re1_rl.go_explore_capture import compute_quality
+
+            q = compute_quality(
+                unsettled_state,
+                ever_held=getattr(getattr(env, "_items", None), "ever_held", None),
+                env=env,
+            )
+            _log_capture_quality_vs_incumbent(
+                Path(env.project_root),
+                checkpoint_index=completed,
+                checkpoint_id=cid or f"idx{completed}",
+                quality=q,
+                note="unsettled_reject",
+            )
+        except (OSError, RuntimeError, ValueError, TypeError, AttributeError):
+            pass
+        return None
+    room_id = str(state.get("room_id", "") or "")
     # Refuse door-threshold / cutscene-spoof captures (Wesker→fake 106, Kenneth
     # at 105→104 entry pose before tea-room settle, etc.).
     from re1_rl.barry_rescue_checkpoint import barry_rescue_capture_room_ok
@@ -540,6 +651,12 @@ def capture_successor_cell(
     next_checkpoint = planner.step_by_seq(completed + 2)
     capacity = successor_capacity(state, next_checkpoint)
     if not capacity["inventory_feasible"]:
+        print(
+            f"[yawn_capture] reject inventory_feasible=False cp={cid} "
+            f"free={capacity.get('inventory_free_slots')} "
+            f"need={capacity.get('next_slots_needed')}",
+            flush=True,
+        )
         return None
 
     inv_names = {
@@ -684,6 +801,13 @@ def capture_successor_cell(
             live_state,
             ever_held=getattr(getattr(env, "_items", None), "ever_held", None),
             env=env,
+        )
+        _log_capture_quality_vs_incumbent(
+            root,
+            checkpoint_index=completed,
+            checkpoint_id=checkpoint_id,
+            quality=quality,
+            note="propose",
         )
         proposal = build_capture_proposal(
             route_id=route_id,
