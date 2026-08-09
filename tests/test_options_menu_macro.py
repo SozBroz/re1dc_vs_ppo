@@ -108,13 +108,14 @@ def test_dismiss_start_pause_up_cross_to_gameplay() -> None:
     assert frames > 0
 
 
-def test_dismiss_stops_up_mashing_once_gameplay_returns() -> None:
-    """Up is tank-forward — do not keep normalizing after CONTINUE clears."""
+def test_dismiss_polls_clear_after_each_up() -> None:
+    """After every Up, re-read menu RAM and stop — no settle / no extra Ups."""
     from re1_rl.options_menu_macro import _dismiss_pause_menu
 
     client = MagicMock()
     phase = {"play": False}
     up_taps = {"n": 0}
+    steps_after_clear = {"n": 0}
 
     def read_ram(fields):
         names = [f[0] for f in fields]
@@ -137,9 +138,11 @@ def test_dismiss_stops_up_mashing_once_gameplay_returns() -> None:
 
     def step(buttons=None, n=1):
         buttons = buttons or {}
+        if phase["play"]:
+            steps_after_clear["n"] += 1
         if buttons.get("up"):
             up_taps["n"] += 1
-            # Clear after two Ups — remaining normalize must abort.
+            # Menu closes on the 2nd Up tap itself.
             if up_taps["n"] >= 2:
                 phase["play"] = True
         if buttons.get("cross"):
@@ -153,5 +156,6 @@ def test_dismiss_stops_up_mashing_once_gameplay_returns() -> None:
         client, prev_hp=96, episode_start_hp=96
     )
     assert cleared is True
-    # 6 normalize Ups were the old overshoot risk; must stop near clear.
-    assert up_taps["n"] <= 3
+    assert up_taps["n"] == 2
+    # Cleared mid-tap: must not burn settle frames or further Ups.
+    assert steps_after_clear["n"] == 0

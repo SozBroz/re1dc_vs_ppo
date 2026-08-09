@@ -216,6 +216,51 @@ def _open_pause_from_trap(
     return False, frames_used
 
 
+def _tap_poll_clear(
+    client: Any,
+    buttons: dict[str, bool],
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+    tap_frames: int = TAP_FRAMES,
+    settle_frames: int = SETTLE_FRAMES,
+) -> tuple[bool, bool, int]:
+    """Tap one button, then release immediately if the menu trap cleared.
+
+    Returns ``(cleared, died, frames_used)``. Settle frames are skipped when
+    gameplay is already back — Up/Down must not keep walking after CONTINUE.
+    """
+    frames_used = 0
+    died, n = _step(
+        client,
+        buttons,
+        frames=tap_frames,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+    )
+    frames_used += n
+    if died:
+        return False, True, frames_used
+    if _recovered_from_trap(
+        read_options_ram(client), episode_start_hp=episode_start_hp
+    ):
+        return True, False, frames_used
+    died, n = _step(
+        client,
+        {},
+        frames=settle_frames,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+    )
+    frames_used += n
+    if died:
+        return False, True, frames_used
+    cleared = _recovered_from_trap(
+        read_options_ram(client), episode_start_hp=episode_start_hp
+    )
+    return cleared, False, frames_used
+
+
 def _dismiss_pause_menu(
     client: Any,
     *,
@@ -224,9 +269,8 @@ def _dismiss_pause_menu(
 ) -> tuple[bool, int, int | None]:
     """Try pause-menu rows until gameplay returns.
 
-    Abort immediately when the trap clears — pause Up is tank-forward in
-    gameplay, so continuing normalize-Ups after CONTINUE looks like jagged
-    walk/stop cycles before PPO regains control.
+    After every Up/Down/Cross, re-read RAM and hand control back the instant
+    the trap is gone (Up is tank-forward in gameplay).
     """
     frames_used = 0
 
@@ -243,9 +287,7 @@ def _dismiss_pause_menu(
             return True, frames_used, None
 
         for _ in range(PAUSE_MENU_NORMALIZE_UPS):
-            if _cleared():
-                return True, frames_used, None
-            died, n = _tap_then_settle(
+            cleared, died, n = _tap_poll_clear(
                 client,
                 {"up": True},
                 prev_hp=prev_hp,
@@ -254,14 +296,11 @@ def _dismiss_pause_menu(
             frames_used += n
             if died:
                 return False, frames_used, None
-
-        if _cleared():
-            return True, frames_used, None
+            if cleared:
+                return True, frames_used, None
 
         for _ in range(int(row)):
-            if _cleared():
-                return True, frames_used, None
-            died, n = _tap_then_settle(
+            cleared, died, n = _tap_poll_clear(
                 client,
                 {"down": True},
                 prev_hp=prev_hp,
@@ -270,8 +309,10 @@ def _dismiss_pause_menu(
             frames_used += n
             if died:
                 return False, frames_used, None
+            if cleared:
+                return True, frames_used, None
 
-        died, n = _tap_then_settle(
+        cleared, died, n = _tap_poll_clear(
             client,
             {"cross": True},
             prev_hp=prev_hp,
@@ -282,9 +323,10 @@ def _dismiss_pause_menu(
         frames_used += n
         if died:
             return False, frames_used, None
+        if cleared:
+            return True, frames_used, row
 
-        # Short post-Cross poll — bail as soon as gameplay returns instead of
-        # burning a fixed 30f settle that delays PPO.
+        # Brief empty poll if Cross hasn't resolved yet.
         for _ in range(6):
             if _cleared():
                 return True, frames_used, row
