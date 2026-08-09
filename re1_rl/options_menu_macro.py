@@ -37,7 +37,9 @@ TAP_FRAMES = 8
 SETTLE_FRAMES = 20
 START_TAP_FRAMES = 12
 START_SETTLE_FRAMES = 24
-PAUSE_MENU_NORMALIZE_UPS = 20
+# Enough to home the pause cursor; Up is also tank-forward if we overshoot
+# into gameplay, so keep this small and abort the instant the trap clears.
+PAUSE_MENU_NORMALIZE_UPS = 6
 PAUSE_DISMISS_ROW_ORDER = (0, 5, 4, 1, 2, 3)
 MAX_ATTEMPTS = 5
 
@@ -220,10 +222,29 @@ def _dismiss_pause_menu(
     prev_hp: int,
     episode_start_hp: int,
 ) -> tuple[bool, int, int | None]:
-    """Try pause-menu rows until gameplay returns."""
+    """Try pause-menu rows until gameplay returns.
+
+    Abort immediately when the trap clears — pause Up is tank-forward in
+    gameplay, so continuing normalize-Ups after CONTINUE looks like jagged
+    walk/stop cycles before PPO regains control.
+    """
     frames_used = 0
+
+    def _cleared() -> bool:
+        return _recovered_from_trap(
+            read_options_ram(client), episode_start_hp=episode_start_hp
+        )
+
+    if _cleared():
+        return True, 0, None
+
     for row in PAUSE_DISMISS_ROW_ORDER:
+        if _cleared():
+            return True, frames_used, None
+
         for _ in range(PAUSE_MENU_NORMALIZE_UPS):
+            if _cleared():
+                return True, frames_used, None
             died, n = _tap_then_settle(
                 client,
                 {"up": True},
@@ -234,7 +255,12 @@ def _dismiss_pause_menu(
             if died:
                 return False, frames_used, None
 
+        if _cleared():
+            return True, frames_used, None
+
         for _ in range(int(row)):
+            if _cleared():
+                return True, frames_used, None
             died, n = _tap_then_settle(
                 client,
                 {"down": True},
@@ -257,16 +283,21 @@ def _dismiss_pause_menu(
         if died:
             return False, frames_used, None
 
-        died, n = _step(
-            client,
-            {},
-            frames=30,
-            prev_hp=prev_hp,
-            episode_start_hp=episode_start_hp,
-        )
-        frames_used += n
-        if died:
-            return False, frames_used, None
+        # Short post-Cross poll — bail as soon as gameplay returns instead of
+        # burning a fixed 30f settle that delays PPO.
+        for _ in range(6):
+            if _cleared():
+                return True, frames_used, row
+            died, n = _step(
+                client,
+                {},
+                frames=5,
+                prev_hp=prev_hp,
+                episode_start_hp=episode_start_hp,
+            )
+            frames_used += n
+            if died:
+                return False, frames_used, None
 
         ram = read_options_ram(client)
         if options_menu_from_ram(ram):
@@ -276,6 +307,8 @@ def _dismiss_pause_menu(
             frames_used += n
             if died:
                 return False, frames_used, None
+            if _cleared():
+                return True, frames_used, row
             continue
 
         if _recovered_from_trap(ram, episode_start_hp=episode_start_hp):
@@ -336,6 +369,12 @@ def dismiss_options_menu(
             return True, frames_used, report
 
         ram = read_options_ram(client)
+        if _recovered_from_trap(ram, episode_start_hp=episode_start_hp):
+            report["cleared"] = True
+            report["path"] = "implicit_clear"
+            report["ram_after"] = ram
+            return False, frames_used, report
+
         if pause_menu_tree_from_ram(ram) or still_trapped_in_menu(
             ram, episode_start_hp=episode_start_hp
         ):
@@ -355,7 +394,7 @@ def dismiss_options_menu(
         if _recovered_from_trap(ram, episode_start_hp=episode_start_hp):
             report["cleared"] = True
             report["path"] = "implicit_clear"
-            report["ram_after"] = read_options_ram(client)
+            report["ram_after"] = ram
             return False, frames_used, report
 
         died, n = _tap_then_settle(
@@ -369,6 +408,13 @@ def dismiss_options_menu(
             report["died"] = True
             report["ram_after"] = read_options_ram(client)
             return True, frames_used, report
+        if _recovered_from_trap(
+            read_options_ram(client), episode_start_hp=episode_start_hp
+        ):
+            report["cleared"] = True
+            report["path"] = "circle_clear"
+            report["ram_after"] = read_options_ram(client)
+            return False, frames_used, report
 
     ram = read_options_ram(client)
     report["ram_after"] = {

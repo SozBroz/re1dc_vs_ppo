@@ -106,3 +106,52 @@ def test_dismiss_start_pause_up_cross_to_gameplay() -> None:
     assert report["cleared"] is True
     assert "start" in report["sequence"] and "cross" in report["sequence"]
     assert frames > 0
+
+
+def test_dismiss_stops_up_mashing_once_gameplay_returns() -> None:
+    """Up is tank-forward — do not keep normalizing after CONTINUE clears."""
+    from re1_rl.options_menu_macro import _dismiss_pause_menu
+
+    client = MagicMock()
+    phase = {"play": False}
+    up_taps = {"n": 0}
+
+    def read_ram(fields):
+        names = [f[0] for f in fields]
+        if names == ["player_hp"]:
+            return {"player_hp": 96}
+        if phase["play"]:
+            gs, mode = 0x80800000, 0x80
+        else:
+            gs, mode = 0x40808000, 0x40
+        return {
+            "player_hp": 96,
+            "stage_id": 1,
+            "room_id": 17,
+            "character_id": 1,
+            "game_mode": mode,
+            "game_state": gs,
+            "msg_flag": 0,
+            "scene_flag": 0x80,
+        }
+
+    def step(buttons=None, n=1):
+        buttons = buttons or {}
+        if buttons.get("up"):
+            up_taps["n"] += 1
+            # Clear after two Ups — remaining normalize must abort.
+            if up_taps["n"] >= 2:
+                phase["play"] = True
+        if buttons.get("cross"):
+            phase["play"] = True
+        return None, False
+
+    client.read_ram.side_effect = read_ram
+    client.step.side_effect = step
+
+    cleared, _frames, _row = _dismiss_pause_menu(
+        client, prev_hp=96, episode_start_hp=96
+    )
+    assert cleared is True
+    # 6 normalize Ups were the old overshoot risk; must stop near clear.
+    assert up_taps["n"] <= 3
