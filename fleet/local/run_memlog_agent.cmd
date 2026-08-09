@@ -11,9 +11,8 @@ if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
 set RE1_STEP_DIAG_PORT=5759
 set RE1_MACHINE_NAME=%MACHINE_NAME%
 set RE1_STEP_DIAG_LOG=D:\re1_rl\data\logs\pking_top_right_memlog.jsonl
-REM Same pin as train workers while hunting cp34 (gallery complete + crest).
+REM Same reset mix as train workers (50/50 latest vs any cp18+; no pin).
 call "%~dp0go_explore_phase_c.env.cmd"
-set RE1_YAWN_RESET_PIN_INDEX=33
 if not exist data\go_explore mkdir data\go_explore
 
 if not exist data\logs mkdir data\logs
