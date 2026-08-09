@@ -261,6 +261,33 @@ def test_frontier_advances_when_fight_efficient(tmp_path: Path) -> None:
     assert frontier_fight_index(by_idx, project_root=tmp_path) == 26
 
 
+def test_sample_frontier_fight_options(tmp_path: Path) -> None:
+    cells_dir = tmp_path / "states" / "yawn_rails" / "cells"
+    cells = []
+    for idx, ammo in ((18, 75), (19, 71), (26, 114)):
+        d = cells_dir / f"cp{idx:02d}"
+        d.mkdir(parents=True)
+        (d / "cell.State").write_bytes(b"x" * 100)
+        (d / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+        extra = {}
+        if idx == 18:
+            extra["checkpoint_id"] = "l_passage_enter_108"
+        if idx == 26:
+            extra["checkpoint_id"] = "back_passage_10A"
+        cells.append(_row(idx, ammo, **extra))
+    stage = {
+        "route_steps": list(range(1, 60)),
+        "legs_per_episode": 1,
+    }
+    from re1_rl.yawn_rails_payforward import sample_frontier_fight_options
+
+    opts = sample_frontier_fight_options(tmp_path, stage, cells)
+    assert opts is not None
+    assert opts["reset_source"] == "route_cell_frontier_fight"
+    assert opts["payforward_frontier_fight"] == 18
+    assert opts["route_start_index"] == 19
+
+
 def test_choose_progression_reset_index_bias(tmp_path: Path) -> None:
     cells = [_row(0, 40), _row(18, 75, checkpoint_id="l_passage_enter_108"), _row(19, 71)]
     counts: Counter[int] = Counter()

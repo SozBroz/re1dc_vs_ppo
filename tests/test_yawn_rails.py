@@ -156,6 +156,7 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
                 "room_enter",
                 "room_enter_from",
                 "room_enter_any",
+                "leg_kills_in_room",
             )
         ]
         assert not (has_enter and extras), (
@@ -784,6 +785,30 @@ def test_reset_latest_only_env_pins_newest_cell(
         assert opts["reset_source"] == "route_cell"
         assert str(opts["pb_bundle"]["state_path"]).replace("\\", "/").endswith(
             "states/cp20/cell.State"
+        )
+
+
+def test_reset_frontier_fight_only_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in range(18, 21)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 30)),
+    }
+    monkeypatch.setenv("RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY", "1")
+    for seed in range(20):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        assert opts["route_start_index"] == 19
+        assert opts["reset_source"] == "route_cell_frontier_fight"
+        assert str(opts["pb_bundle"]["state_path"]).replace("\\", "/").endswith(
+            "states/cp18/cell.State"
         )
 
 

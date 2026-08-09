@@ -305,6 +305,7 @@ RESET_MIN_CHECKPOINT_INDEX = 18
 RESET_LATEST_CELL_WEIGHT = 0.50
 _RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
 _RESET_PIN_INDEX_ENV = "RE1_YAWN_RESET_PIN_INDEX"
+_RESET_FRONTIER_FIGHT_ENV = "RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY"
 
 
 def reset_latest_only_from_env() -> bool:
@@ -328,6 +329,12 @@ def reset_pin_index_from_env() -> int | None:
     if idx < 0:
         return None
     return idx
+
+
+def reset_frontier_fight_only_from_env() -> bool:
+    """``RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=1`` — memlog grind on fight frontier."""
+    raw = os.environ.get(_RESET_FRONTIER_FIGHT_ENV, "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 def eligible_reset_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -397,6 +404,7 @@ def sample_one_leg_options(
     ``RE1_YAWN_PAYFORWARD_RIPPLE=1`` enables fight-progression mix instead:
     40% frontier fight cell, 60% uniform over all loadable cells from cp00.
     ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
+    ``RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=1`` forces the fight-progression frontier.
     ``RE1_YAWN_RESET_PIN_INDEX=N`` forces curated cell ``cpNN`` (overrides mix).
     """
     all_cells = list(iter_loadable_cells(project_root, stage))
@@ -421,6 +429,12 @@ def sample_one_leg_options(
                 "is not loadable"
             )
         return _options_from_cell(pinned[0], stage, reset_source="route_cell_pin")
+    if reset_frontier_fight_only_from_env():
+        from re1_rl.yawn_rails_payforward import sample_frontier_fight_options
+
+        opts = sample_frontier_fight_options(project_root, stage, all_cells)
+        if opts is not None:
+            return opts
     latest_only = reset_latest_only_from_env()
     from re1_rl.yawn_rails_plr import plr_enabled_from_env, sample_plr_options
 

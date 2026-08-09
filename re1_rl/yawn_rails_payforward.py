@@ -269,6 +269,26 @@ def frontier_fight_index(
     return None
 
 
+def frontier_fight_cell(
+    cells: list[dict[str, Any]],
+    *,
+    project_root: Path | str | None = None,
+) -> dict[str, Any] | None:
+    """Loadable cell for the current fight-progression frontier (or last fight)."""
+    if not cells:
+        return None
+    by_idx = {int(r["checkpoint_index"]): r for r in cells}
+    root = Path(project_root) if project_root is not None else None
+    frontier = frontier_fight_index(by_idx, project_root=root)
+    if frontier is not None and frontier in by_idx:
+        return by_idx[frontier]
+    for target in reversed(FIGHT_PROGRESSION):
+        f = int(target.fight_index)
+        if f in by_idx:
+            return by_idx[f]
+    return None
+
+
 def choose_progression_reset_index(
     cells: list[dict[str, Any]],
     rng: random.Random,
@@ -911,3 +931,32 @@ def sample_payforward_options(
         }
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
         return None
+
+
+def sample_frontier_fight_options(
+    project_root: Path,
+    stage: dict[str, Any],
+    cells: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Always reset from the fight-progression frontier cell (memlog grind)."""
+    chosen = frontier_fight_cell(cells, project_root=project_root)
+    if chosen is None:
+        return None
+    start_index = int(chosen["checkpoint_index"]) + 1
+    route_steps = list(stage.get("route_steps", []))
+    remaining = max(1, len(route_steps) - start_index)
+    by_idx = {int(r["checkpoint_index"]): r for r in cells}
+    return {
+        "route_start_index": start_index,
+        "leg_span": min(1, remaining),
+        "reset_source": "route_cell_frontier_fight",
+        "pb_bundle": {
+            "state_path": str(chosen["state_path"]),
+            "sidecar_path": str(chosen["sidecar_path"]),
+            "source": "yawn_rails",
+        },
+        "payforward_frontier_fight": int(chosen["checkpoint_index"]),
+        "payforward_frontier_index": frontier_fight_index(
+            by_idx, project_root=project_root
+        ),
+    }
