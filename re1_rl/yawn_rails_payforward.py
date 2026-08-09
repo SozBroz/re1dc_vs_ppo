@@ -22,6 +22,7 @@ from re1_rl.go_explore_archive import Quality, normalize_quality, quality_beats
 _SCHEMA = 1
 _PAYFORWARD_ENV = "RE1_YAWN_PAYFORWARD_RIPPLE"
 _STATE_ENV = "RE1_YAWN_PAYFORWARD_STATE"
+_FORCE_FIGHTS_ENV = "RE1_YAWN_PAYFORWARD_FORCE_FIGHTS"
 _LATEST_WEIGHT = 0.20
 _FIGHT_BUDGET = 0.80
 
@@ -61,6 +62,23 @@ def payforward_ripple_enabled(default: bool = False) -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def force_fight_indices_from_env() -> set[int]:
+    """``RE1_YAWN_PAYFORWARD_FORCE_FIGHTS=45,52`` — always treat as fights."""
+    raw = os.environ.get(_FORCE_FIGHTS_ENV, "").strip()
+    if not raw:
+        return set()
+    out: set[int] = set()
+    for part in raw.replace(";", ",").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            out.add(int(part))
+        except ValueError:
+            continue
+    return out
+
+
 def _ammo(q: Quality | list[int] | tuple[int, ...] | None) -> int:
     if q is None:
         return 0
@@ -78,8 +96,16 @@ class FightStretch:
     stretch_end: int  # exclusive; next fight or max_index+1
 
 
-def discover_fights(cells: list[dict[str, Any]]) -> list[FightStretch]:
-    """Ammo cliffs among curated cells (any index set; caller filters cp18+)."""
+def discover_fights(
+    cells: list[dict[str, Any]],
+    *,
+    force: set[int] | None = None,
+) -> list[FightStretch]:
+    """Ammo cliffs among curated cells (any index set; caller filters cp18+).
+
+    ``force`` (or ``RE1_YAWN_PAYFORWARD_FORCE_FIGHTS``) adds fight edges even
+    without an ammo cliff, when the next curated index is adjacent.
+    """
     by_idx: dict[int, dict[str, Any]] = {}
     for row in cells:
         try:
@@ -90,13 +116,17 @@ def discover_fights(cells: list[dict[str, Any]]) -> list[FightStretch]:
     if not by_idx:
         return []
     idxs = sorted(by_idx)
+    forced = force if force is not None else force_fight_indices_from_env()
     fights: list[int] = []
     for i, idx in enumerate(idxs):
         nxt = idxs[i + 1] if i + 1 < len(idxs) else None
         if nxt is None or nxt != idx + 1:
             # Only adjacent curated indices form a fight edge.
             continue
-        if _ammo(by_idx[idx].get("quality")) > _ammo(by_idx[nxt].get("quality")):
+        cliff = _ammo(by_idx[idx].get("quality")) > _ammo(
+            by_idx[nxt].get("quality")
+        )
+        if cliff or idx in forced:
             fights.append(idx)
     max_idx = idxs[-1]
     out: list[FightStretch] = []
@@ -445,12 +475,16 @@ class PayforwardRippleStore:
             # a blocked hop. Advance, then evaluate the *new* tip.
             _, by_idx = self._merge_discovered(cells)
             for fr in self.fights.values():
-                if fr.status in (STATUS_BLOCKED, STATUS_DONE):
+                # Blocked stretches stay parked on the fight until hop clears.
+                # DONE re-opens when the fight successor improves again so a
+                # new better loadout can ripple through to the next fight.
+                if fr.status == STATUS_BLOCKED:
                     continue
                 expected = (
                     int(fr.fight_index) + 1
-                    if fr.status == STATUS_GRIND
-                    else int(fr.ripple_tip or -1) + 1
+                    if fr.status in (STATUS_GRIND, STATUS_DONE)
+                    or fr.ripple_tip is None
+                    else int(fr.ripple_tip) + 1
                 )
                 if idx != expected:
                     continue

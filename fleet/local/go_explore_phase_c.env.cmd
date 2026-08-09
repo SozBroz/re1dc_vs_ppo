@@ -10,6 +10,10 @@ set RE1_GO_EXPLORE_SYNC=0
 set RE1_YAWN_RAILS_SYNC=1
 set RE1_YAWN_RAILS_ROOT=states\yawn_rails
 set RE1_YAWN_RAILS_MANIFEST_POLL_S=60
+REM Pay-forward: 20% latest + 80% equal fight budgets; ripple improved loadouts
+REM through each stretch until the next fighting CP (or a blocked hop).
+set RE1_YAWN_PAYFORWARD_RIPPLE=1
+set RE1_YAWN_PAYFORWARD_FORCE_FIGHTS=45
 set RE1_GO_EXPLORE_MANIFEST_POLL_S=60
 REM Learner HTTP for lazy bundle fetch in worker subprocesses (archive resets).
 if not defined RE1_LEARNER_HOST set RE1_LEARNER_HOST=%FLEET_LEARNER_HOST%

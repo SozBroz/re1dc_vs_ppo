@@ -9,6 +9,7 @@ from pathlib import Path
 from re1_rl.go_explore_archive import quality_beats
 from re1_rl.yawn_rails_payforward import (
     STATUS_BLOCKED,
+    STATUS_DONE,
     STATUS_GRIND,
     STATUS_RIPPLING,
     PayforwardRippleStore,
@@ -54,6 +55,33 @@ def test_discover_fights_ammo_cliffs_and_stretches() -> None:
 def test_discover_ignores_ammo_gains() -> None:
     cells = [_row(22, 56), _row(23, 103)]
     assert discover_fights(cells) == []
+
+
+def test_discover_force_fight_without_ammo_cliff() -> None:
+    cells = [_row(44, 50), _row(45, 50), _row(46, 50), _row(47, 40)]
+    assert [f.fight_index for f in discover_fights(cells)] == [46]
+    forced = discover_fights(cells, force={45})
+    assert [f.fight_index for f in forced] == [45, 46]
+    assert forced[0].stretch_end == 46
+
+
+def test_done_stretch_reopens_on_fight_successor_improve(tmp_path: Path) -> None:
+    # Keep post-fight ammo flat so only cp18 is a fight edge.
+    cells = [_row(18, 70)] + [_row(i, 40, hp=80) for i in range(19, 24)]
+    store = PayforwardRippleStore(tmp_path / "pf_done_reopen.json")
+    route = [{"checkpoint_id": f"cp{i:02d}_id", "items_gained": []} for i in range(19, 24)]
+    store.reconcile(cells, route=route)
+    assert store.fights[18].stretch_end == 24
+    # Walk ripple to stretch_done at next-fight boundary (max+1).
+    for idx in range(19, 24):
+        cells[idx - 18] = _row(idx, 40, hp=96)
+        store.on_install(idx, cells, route=route)
+    assert store.fights[18].status == STATUS_DONE
+    # New improve of fight successor (HP only — keep ammo flat) re-opens ripple.
+    cells[1] = _row(19, 40, hp=99)
+    store.on_install(19, cells, route=route)
+    assert store.fights[18].status == STATUS_RIPPLING
+    assert store.fights[18].ripple_tip == 19
 
 
 def test_project_end_quality_shotgun_and_clip() -> None:
