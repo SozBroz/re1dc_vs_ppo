@@ -378,6 +378,30 @@ def test_cp40_one_zombie_fight() -> None:
     assert not fight_leg_valid(tip, bogus)
 
 
+def test_cp40_requires_kill_when_sidecar_tracks_them(tmp_path: Path) -> None:
+    sidecar = tmp_path / "cp41.sidecar.json"
+    sidecar.write_text(
+        '{"schema_version":1,"progress":{"leg_kills_by_room":{"10B":0}}}',
+        encoding="utf-8",
+    )
+    tip = _row(40, 60, checkpoint_id="east_stairs_101")
+    succ = _row(41, 53, checkpoint_id="storeroom_enter_118")
+    succ["sidecar_path"] = "cp41.sidecar.json"
+    assert not fight_leg_valid(tip, succ, project_root=tmp_path)
+
+
+def test_cp40_valid_with_kill_in_sidecar(tmp_path: Path) -> None:
+    sidecar = tmp_path / "cp41.sidecar.json"
+    sidecar.write_text(
+        '{"schema_version":1,"progress":{"leg_kills_by_room":{"10B":1}}}',
+        encoding="utf-8",
+    )
+    tip = _row(40, 60, checkpoint_id="east_stairs_101")
+    succ = _row(41, 53, checkpoint_id="storeroom_enter_118")
+    succ["sidecar_path"] = "cp41.sidecar.json"
+    assert fight_leg_valid(tip, succ, project_root=tmp_path)
+
+
 def test_cp26_requires_kills_when_sidecar_tracks_them(tmp_path: Path) -> None:
     sidecar = tmp_path / "cp27.sidecar.json"
     sidecar.write_text(
@@ -417,3 +441,51 @@ def test_navigate_only_10a_returns_never_fight() -> None:
         succ = _row(37, 86, checkpoint_id="next_room")
         assert not fight_leg_valid(tip, succ)
         assert discover_fights([tip, succ]) == []
+
+
+def test_cp37_requires_dog_kill_when_sidecar_tracks_them(tmp_path: Path) -> None:
+    sidecar = tmp_path / "cp38.sidecar.json"
+    sidecar.write_text(
+        '{"schema_version":1,"progress":{"leg_kills_by_room":{"11A":0}}}',
+        encoding="utf-8",
+    )
+    tip = _row(37, 71, checkpoint_id="courtyard_enter_11A")
+    succ = _row(38, 66, checkpoint_id="crest_gate_11A")
+    succ["sidecar_path"] = "cp38.sidecar.json"
+    assert not fight_leg_valid(tip, succ, project_root=tmp_path)
+
+
+def test_cp37_valid_with_dog_kill_in_sidecar(tmp_path: Path) -> None:
+    sidecar = tmp_path / "cp38.sidecar.json"
+    sidecar.write_text(
+        '{"schema_version":1,"progress":{"leg_kills_by_room":{"11A":1}}}',
+        encoding="utf-8",
+    )
+    tip = _row(37, 71, checkpoint_id="courtyard_enter_11A")
+    succ = _row(38, 66, checkpoint_id="crest_gate_11A")
+    succ["sidecar_path"] = "cp38.sidecar.json"
+    assert fight_leg_valid(tip, succ, project_root=tmp_path)
+
+
+def test_cp45_requires_kills_when_sidecar_tracks_them(tmp_path: Path) -> None:
+    sidecar = tmp_path / "cp46.sidecar.json"
+    sidecar.write_text(
+        '{"schema_version":1,"progress":{"leg_kills_by_room":{"204":1}}}',
+        encoding="utf-8",
+    )
+    tip = _row(45, 114, checkpoint_id="c_passage_204")
+    succ = _row(46, 100, checkpoint_id="upper_hall_enter_203")
+    succ["sidecar_path"] = "cp46.sidecar.json"
+    assert not fight_leg_valid(tip, succ, project_root=tmp_path)
+
+
+def test_cp45_valid_with_two_kills_in_sidecar(tmp_path: Path) -> None:
+    sidecar = tmp_path / "cp46.sidecar.json"
+    sidecar.write_text(
+        '{"schema_version":1,"progress":{"leg_kills_by_room":{"204":2}}}',
+        encoding="utf-8",
+    )
+    tip = _row(45, 114, checkpoint_id="c_passage_204")
+    succ = _row(46, 100, checkpoint_id="upper_hall_enter_203")
+    succ["sidecar_path"] = "cp46.sidecar.json"
+    assert fight_leg_valid(tip, succ, project_root=tmp_path)

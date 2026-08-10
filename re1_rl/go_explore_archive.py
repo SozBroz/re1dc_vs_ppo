@@ -11,7 +11,7 @@ JSON schema (v2)::
         "room_id": "105",
         "tile_bin": [3, 1],
         "milestone_digest": "gallery:idle",
-        "quality": [hp, ammo_dmg_weighted, healing, ever_held_count, poison, -ink_ribbons, -box_ammo],
+        "quality": [hp, ammo_dmg_weighted, healing_centi, ever_held_count, poison, -ink_ribbons, -box_ammo],
         "visit_count": 2,
         "bundle_path": null,
         "meta": {}

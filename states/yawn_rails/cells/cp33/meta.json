@@ -1,23 +1,24 @@
 {
-  "bundle_sha256": "84f23399c8fd2d3a654c0449c78b964acaeaf77d3c092b2144cbebaea1e454c9",
-  "bytes": 1438155,
+  "bundle_sha256": "0141c354926baa29ff6475a44b3fb5f61961008c2206e7f58f2a13482abd6465",
+  "bytes": 1453177,
   "captured_in_box_room": false,
   "checkpoint_id": "gallery_portrait_6_117",
   "checkpoint_index": 33,
   "inventory_feasible": true,
-  "inventory_free_slots": 4,
-  "next_checkpoint_id": "gallery_complete_117",
+  "inventory_free_slots": 2,
+  "next_checkpoint_id": "star_crest_117",
   "next_slots_needed": 1,
   "quality": [
-    48,
-    63,
-    0,
+    96,
+    104,
+    1,
     11,
     1,
-    0
+    0,
+    -30
   ],
   "room_id": "117",
   "route_id": "yawn_quest_v2",
-  "sidecar_sha256": "7d5c1369b2f0256ef239edf211af08ea09764623c5cfaa1de2655807a852fc49",
-  "state_sha256": "9b470eb6802e6d1a6a280ab370d8a8f58c3c66e39e5c5d3dac7f7e1cba865b9a"
+  "sidecar_sha256": "913642cad7e9d515f6bea7a330fcb1264d640018503d57f66e99f857a8de14d0",
+  "state_sha256": "f1bfe6075431083a9a8f41b658ac6dc40b44c25c72237d03662ad46ad4ec49ab"
 }

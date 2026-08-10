@@ -96,7 +96,7 @@ def test_pking_launchers_reserve_and_preserve_memlog_port() -> None:
     assert "--grid-cols 5" in memlog
     assert "--grid-monitor right" in memlog
     assert "memlog_danger_room.env.cmd" in memlog
-    assert "RE1_YAWN_RESET_PIN_RANGE=0-56" in (
+    assert "RE1_YAWN_RESET_PIN_RANGE=0-55" in (
         root / "fleet" / "local" / "memlog_danger_room.env.cmd"
     ).read_text(encoding="utf-8")
     assert "--eval-only" not in memlog

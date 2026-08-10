@@ -70,22 +70,29 @@ CELL_SIDECAR_NAME = "cell.sidecar.json"
 CELL_META_NAME = "meta.json"
 INCOMING_NAME = ".incoming"
 
-# Healing / cure stacks (qty summed).
-_HEALING_NAMES: frozenset[str] = frozenset(
-    {
-        "green_herb",
-        "first_aid_spray",
-        "first_aid_spray_alt",
-        "serum",
-        "mixed_herbs_gr",
-        "mixed_herbs_gg",
-        "mixed_herbs_gb",
-        "mixed_herbs_grb",
-        "mixed_herbs_ggg",
-        "mixed_herbs_ggb",
-        "blue_herb",  # poison cure counts as healing resource
-    }
-)
+# Healing quality weights in centi-units (quality[2] stays int).
+# Atoms: G=0.33, R=0.66, B=0.17. Mixes = atom sum + 0.02 per extra component
+# so merges beat carrying the herbs unmerged (G+G=0.68 > 0.66).
+_HEALING_WEIGHT_CENTI: dict[str, int] = {
+    "green_herb": 33,
+    "blue_herb": 17,  # poison cure counts as healing resource
+    "mixed_herbs_gg": 68,  # 33+33+2
+    "mixed_herbs_ggg": 103,  # 33*3+4
+    "mixed_herbs_gr": 101,  # 33+66+2
+    "mixed_herbs_gb": 52,  # 33+17+2
+    "mixed_herbs_ggb": 87,  # 33+33+17+4
+    "mixed_herbs_grb": 120,  # 33+66+17+4
+    "first_aid_spray": 100,
+    "first_aid_spray_alt": 100,
+}
+_HEALING_NAMES: frozenset[str] = frozenset(_HEALING_WEIGHT_CENTI)
+
+
+def healing_weight_centi(item_name: str) -> int:
+    """Centi-units of healing quality for one inventory stack of ``item_name``."""
+    from re1_rl.item_todo import canonical_item
+
+    return int(_HEALING_WEIGHT_CENTI.get(canonical_item(str(item_name)), 0))
 
 SaveStateCallback = Callable[[Path], None]
 
@@ -710,13 +717,14 @@ def compute_quality(
 
     ``ammo`` is damage-weighted firepower from on-person inventory **and the item
     box** (weapon loaded qty + reserve piles), using nominal max damage from
-    ``weapon_damage`` almanac, scaled to handgun-round equivalents. ``healing`` /
-    ``ink_ribbons`` come from on-person inventory only. ``slots`` is the count of
-    distinct items in ``ever_held`` (sidecar semantics), not occupied inventory
-    slots. ``poison`` is ``1`` when healthy, ``0`` when poisoned. Holding ink
-    ribbons is penalized. ``-box_ammo`` is the negated damage-weighted ammo still
-    sitting in the item box — lowest-priority tiebreaker so equal total firepower
-    prefers ammo withdrawn (empty box → ``0`` beats ``-30``).
+    ``weapon_damage`` almanac, scaled to handgun-round equivalents. ``healing`` is
+    on-person inventory only, in centi-units (green=33, G+G=68, …) so merged herbs
+    beat the same atoms unmerged. ``ink_ribbons`` are on-person only. ``slots`` is
+    the count of distinct items in ``ever_held`` (sidecar semantics), not occupied
+    inventory slots. ``poison`` is ``1`` when healthy, ``0`` when poisoned. Holding
+    ink ribbons is penalized. ``-box_ammo`` is the negated damage-weighted ammo
+    still sitting in the item box — lowest-priority tiebreaker so equal total
+    firepower prefers ammo withdrawn (empty box → ``0`` beats ``-30``).
     """
     from re1_rl.weapon_damage import damage_weighted_ammo_score
 
@@ -735,8 +743,9 @@ def compute_quality(
         if name == "ink_ribbon":
             ribbons += q
             continue
-        if name in _HEALING_NAMES:
-            healing += q
+        w = healing_weight_centi(name)
+        if w:
+            healing += w * q
     slots = ever_held_item_count(state, ever_held=ever_held, env=env)
     from re1_rl.memory_map import player_poisoned_from_state
 

@@ -308,7 +308,45 @@ _RESET_PIN_INDEX_ENV = "RE1_YAWN_RESET_PIN_INDEX"
 _RESET_PIN_RANGE_ENV = "RE1_YAWN_RESET_PIN_RANGE"
 _RESET_PIN_SET_ENV = "RE1_YAWN_RESET_PIN_SET"
 _RESET_PIN_SET_WEIGHT_ENV = "RE1_YAWN_RESET_PIN_SET_WEIGHT"
+_RESET_PIN_FILE_ENV = "RE1_YAWN_RESET_PIN_FILE"
+_DEFAULT_PIN_FILE = "data/yawn_reset_pin.env"
 _RESET_FRONTIER_FIGHT_ENV = "RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY"
+
+
+def _pin_file_path() -> Path | None:
+    """Optional hot-reload pin file (read every reset; no worker restart)."""
+    raw = os.environ.get(_RESET_PIN_FILE_ENV, _DEFAULT_PIN_FILE).strip()
+    if not raw:
+        return None
+    path = Path(raw)
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    return path if path.is_file() else None
+
+
+def _parse_pin_file(path: Path) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        out[key.strip()] = value.strip()
+    return out
+
+
+def _pin_env_raw(key: str) -> str | None:
+    """Pin knob: file override wins when key is present; else launcher env."""
+    pin_file = _pin_file_path()
+    if pin_file is not None:
+        overrides = _parse_pin_file(pin_file)
+        if key in overrides:
+            raw = overrides[key]
+            return raw if raw else None
+    raw = os.environ.get(key, "").strip()
+    return raw if raw else None
 
 
 def reset_latest_only_from_env() -> bool:
@@ -322,7 +360,7 @@ def reset_pin_index_from_env() -> int | None:
 
     Loads ``cpN`` so the next success captures ``cp{N+1}`` (e.g. pin 33 → hunt cp34).
     """
-    raw = os.environ.get(_RESET_PIN_INDEX_ENV, "").strip()
+    raw = _pin_env_raw(_RESET_PIN_INDEX_ENV)
     if not raw:
         return None
     try:
@@ -340,7 +378,7 @@ def reset_pin_range_from_env() -> tuple[int, int] | None:
     Inclusive lo/hi. Accepted forms: ``27-37``, ``27:37``, ``27,37``.
     Single-index pin (``RE1_YAWN_RESET_PIN_INDEX``) still wins when both are set.
     """
-    raw = os.environ.get(_RESET_PIN_RANGE_ENV, "").strip()
+    raw = _pin_env_raw(_RESET_PIN_RANGE_ENV)
     if not raw:
         return None
     for sep in ("-", ":", ",", ".."):
@@ -368,7 +406,7 @@ def reset_pin_set_from_env() -> tuple[frozenset[int], float] | None:
     sample uniformly from the listed indices; the remainder uses the normal mix.
     Single-index and range pins still override when set.
     """
-    raw = os.environ.get(_RESET_PIN_SET_ENV, "").strip()
+    raw = _pin_env_raw(_RESET_PIN_SET_ENV)
     if not raw:
         return None
     indices: set[int] = set()
@@ -384,7 +422,7 @@ def reset_pin_set_from_env() -> tuple[frozenset[int], float] | None:
             indices.add(idx)
     if not indices:
         return None
-    weight_raw = os.environ.get(_RESET_PIN_SET_WEIGHT_ENV, "0.5").strip()
+    weight_raw = _pin_env_raw(_RESET_PIN_SET_WEIGHT_ENV) or "0.5"
     try:
         weight = float(weight_raw)
     except ValueError:
@@ -495,6 +533,8 @@ def sample_one_leg_options(
     (overridden by a single pin index when both are set).
     ``RE1_YAWN_RESET_PIN_SET=37,40,44`` with optional
     ``RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5`` blends pin-set vs normal mix.
+    ``data/yawn_reset_pin.env`` (or ``RE1_YAWN_RESET_PIN_FILE``) overrides the
+    above on every reset without restarting the worker — edit the file live.
     """
     all_cells = list(iter_loadable_cells(project_root, stage))
     cells = eligible_reset_cells(all_cells)
@@ -823,14 +863,27 @@ def capture_successor_cell(
         return None
     if cid == "main_hall_106" and not any(str(k).startswith("106:") for k in ledgers):
         return None
-    if cid == "crow_gallery_enter_117" and progress is not None:
+    if cid in (
+        "crow_gallery_enter_117",
+        "crest_gate_11A",
+        "upper_hall_enter_203",
+        "storeroom_enter_118",
+    ) and progress is not None:
         # claim_checkpoint_success clears live kills before capture runs; use
         # the claim-time snapshot (falls back to live for unit tests).
+        leg_kill_gates = {
+            "crow_gallery_enter_117": ("10A", 2),
+            "crest_gate_11A": ("11A", 1),
+            "upper_hall_enter_203": ("204", 2),
+            "storeroom_enter_118": ("10B", 1),
+        }
+        room_key, need = leg_kill_gates[cid]
         kills_map = progress.leg_kills_for_capture()
-        leg_kills = int(kills_map.get("10A", 0))
-        if leg_kills < 2:
+        leg_kills = int(kills_map.get(room_key, 0))
+        if leg_kills < need:
             print(
-                f"[yawn_capture] reject leg_kills_10A={leg_kills} need=2 cp={cid}",
+                f"[yawn_capture] reject leg_kills_{room_key}={leg_kills} "
+                f"need={need} cp={cid}",
                 flush=True,
             )
             return None

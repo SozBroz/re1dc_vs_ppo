@@ -1,23 +1,24 @@
 {
-  "bundle_sha256": "fa708e3c836c339f74a38f064b1863e6d28718d7bd747d03d9ad2e859e83583e",
-  "bytes": 1444302,
-  "captured_in_box_room": false,
-  "checkpoint_id": "east_stairs_101",
+  "bundle_sha256": "6e2db37e328f5799c8ad615db99dcc0eb294086883b7a6c954384f59bea92352",
+  "bytes": 1456300,
+  "captured_in_box_room": true,
+  "checkpoint_id": "storeroom_enter_118",
   "checkpoint_index": 40,
   "inventory_feasible": true,
-  "inventory_free_slots": 4,
-  "next_checkpoint_id": "storeroom_enter_118",
+  "inventory_free_slots": 1,
+  "next_checkpoint_id": "chemical_118",
   "next_slots_needed": 0,
   "quality": [
-    48,
-    33,
-    0,
+    96,
+    83,
+    2,
     12,
     1,
-    0
+    0,
+    -30
   ],
-  "room_id": "10B",
+  "room_id": "118",
   "route_id": "yawn_quest_v2",
-  "sidecar_sha256": "0afa25c28a94e1a501df9219d5b1e734d59d966a0ce44e32b4c63d217fcf194a",
-  "state_sha256": "1fbf03e6e0f5faf3e7681bdb37338f98c760f4825680529a7602730ae9faebbb"
+  "sidecar_sha256": "8e670f1d2b00ea04279ca4ecf5c2a2d50f736f9b8592e67e2557e7f676047816",
+  "state_sha256": "81188acebaef5c3d258aac340e1c56a25d1d6ae189a68465add8c0f52cc926d4"
 }

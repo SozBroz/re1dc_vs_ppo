@@ -44,16 +44,6 @@ _PICKUP_AMMO_BONUS: dict[str, int] = {
     "explosive_rounds": 15,
     "flame_rounds": 15,
 }
-_HEALING_NAMES = frozenset(
-    {
-        "green_herb",
-        "red_herb",
-        "blue_herb",
-        "mixed_herb",
-        "first_aid_spray",
-        "first_aid_spray_alt",
-    }
-)
 
 STATUS_GRIND = "grind_fight"
 STATUS_RIPPLING = "rippling"
@@ -155,13 +145,27 @@ FIGHT_LEG_RULES: dict[str, FightLegRule] = {
     # cp36/cp39: navigate-only 10A legs; bogus cliffs from poisoned lineage.
     "back_passage_return_10A": FightLegRule(disallow=True),
     "back_passage_post_crest_10A": FightLegRule(disallow=True),
+    # cp37: courtyard — Cerberus dog before crest gate (~5 beretta ideal).
+    "courtyard_enter_11A": FightLegRule(
+        min_ammo_drop=5,
+        min_kills_room="11A",
+        min_kills=1,
+    ),
     # cp40: East stairs — 1 zombie on the way to the storeroom.
-    "east_stairs_101": FightLegRule(min_ammo_drop=_ONE_ZOMBIE_MIN_DROP),
+    "east_stairs_101": FightLegRule(
+        min_ammo_drop=_ONE_ZOMBIE_MIN_DROP,
+        min_kills_room="10B",
+        min_kills=1,
+    ),
     # cp43: storeroom return — nav leg; small ammo cliff is miss waste, not a fight.
     "east_stairs_101_post_storeroom": FightLegRule(disallow=True),
     # cp44/cp45/cp53: 2-zombie shotgun rooms.
     "east_stairs_201": FightLegRule(min_ammo_drop=_TWO_ZOMBIE_MIN_DROP),
-    "c_passage_204": FightLegRule(min_ammo_drop=_TWO_ZOMBIE_MIN_DROP),
+    "c_passage_204": FightLegRule(
+        min_ammo_drop=_TWO_ZOMBIE_MIN_DROP,
+        min_kills_room="204",
+        min_kills=2,
+    ),
     "dining_2f_enter_202": FightLegRule(min_ammo_drop=_TWO_ZOMBIE_MIN_DROP),
 }
 
@@ -448,11 +452,12 @@ def project_end_quality(
     route_step: dict[str, Any] | None,
 ) -> Quality:
     """Optimistic quality after completing ``route_step`` (no HP loss)."""
+    from re1_rl.go_explore_capture import healing_weight_centi
+
     hp, ammo, healing, slots, poison, neg_ribbons, neg_box = normalize_quality(start_q)
     for name in _pickup_names(route_step):
         ammo += int(_PICKUP_AMMO_BONUS.get(name, 0))
-        if name in _HEALING_NAMES:
-            healing += 1
+        healing += healing_weight_centi(name)
         # New distinct item → ever_held / slots bump (optimistic).
         if name:
             slots += 1
@@ -472,11 +477,12 @@ def strip_pickup_bonuses(
     route_step: dict[str, Any] | None,
 ) -> Quality:
     """Reverse optimistic pickup bonuses (incumbent already includes the gain)."""
+    from re1_rl.go_explore_capture import healing_weight_centi
+
     hp, ammo, healing, slots, poison, neg_ribbons, neg_box = normalize_quality(end_q)
     for name in _pickup_names(route_step):
         ammo = max(0, ammo - int(_PICKUP_AMMO_BONUS.get(name, 0)))
-        if name in _HEALING_NAMES:
-            healing = max(0, healing - 1)
+        healing = max(0, healing - healing_weight_centi(name))
         if name:
             slots = max(0, slots - 1)
     return (

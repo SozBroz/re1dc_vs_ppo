@@ -77,13 +77,33 @@ def test_compute_quality_tuple() -> None:
     q = compute_quality(_good_state())
     assert q[0] == 90  # hp
     assert q[1] == 15 + 30  # beretta + bullets, damage-weighted HG-equiv
-    assert q[2] == 1  # green herb
+    assert q[2] == 33  # green herb (centi-units)
     assert q[3] == 4  # ever_held-style distinct items (inventory fallback)
     assert q[4] == 1  # not poisoned (poison RAM disabled → always healthy)
     assert q[5] == 0  # no ink ribbons
     assert q[6] == 0  # -box_ammo; empty box
     q_poison = compute_quality(_good_state(poisoned=True))
     assert q_poison[4] == 1  # ignored until TRUST_PLAYER_POISON_RAM
+
+
+def test_compute_quality_merged_herbs_beat_unmerged() -> None:
+    from re1_rl.go_explore_archive import quality_beats
+
+    two_green = compute_quality(
+        _good_state(
+            inventory=["green_herb", "green_herb"],
+            inventory_slots=[("green_herb", 1), ("green_herb", 1)],
+        )
+    )
+    gg = compute_quality(
+        _good_state(
+            inventory=["mixed_herbs_gg"],
+            inventory_slots=[("mixed_herbs_gg", 1)],
+        )
+    )
+    assert two_green[2] == 66
+    assert gg[2] == 68
+    assert quality_beats(gg, two_green)
 
 
 def test_compute_quality_ammo_damage_weighted() -> None:

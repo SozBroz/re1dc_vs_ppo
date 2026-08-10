@@ -643,7 +643,7 @@
   },
   {
     "seq": 35,
-    "checkpoint_id": "gallery_complete_117",
+    "checkpoint_id": "star_crest_117",
     "room_id": "117",
     "objective": "Complete the gallery puzzle and take the star crest",
     "action_type": "pickup",
@@ -658,21 +658,6 @@
   },
   {
     "seq": 36,
-    "checkpoint_id": "star_crest_117",
-    "room_id": "117",
-    "objective": "Confirm star crest held after gallery complete (auto-pass if already held)",
-    "action_type": "pickup",
-    "required_items": [],
-    "items_gained": [
-      "star_crest"
-    ],
-    "success_condition": {
-      "type": "acquired_item",
-      "item": "star_crest"
-    }
-  },
-  {
-    "seq": 37,
     "checkpoint_id": "back_passage_return_10A",
     "room_id": "10A",
     "objective": "Return to the Back Passage with the star crest",
@@ -687,7 +672,7 @@
     }
   },
   {
-    "seq": 38,
+    "seq": 37,
     "checkpoint_id": "courtyard_enter_11A",
     "room_id": "11A",
     "objective": "Enter the courtyard crest gate",
@@ -700,7 +685,7 @@
     }
   },
   {
-    "seq": 39,
+    "seq": 38,
     "checkpoint_id": "crest_gate_11A",
     "room_id": "11A",
     "objective": "Place a crest at the courtyard gate (any slot)",
@@ -713,57 +698,67 @@
       "star_crest"
     ],
     "success_condition": {
-      "type": "any_of",
+      "type": "all_of",
       "conditions": [
         {
-          "type": "all_of",
-          "conditions": [
-            {
-              "type": "story_use",
-              "site_id": "star_crest@11A_crest_slot"
-            },
-            {
-              "type": "lacks_item",
-              "item": "star_crest"
-            }
-          ]
+          "type": "leg_kills_in_room",
+          "room_id": "11A",
+          "min_kills": 1
         },
         {
-          "type": "all_of",
+          "type": "any_of",
           "conditions": [
             {
-              "type": "story_use",
-              "site_id": "sun_crest@11A_crest_slot"
+              "type": "all_of",
+              "conditions": [
+                {
+                  "type": "story_use",
+                  "site_id": "star_crest@11A_crest_slot"
+                },
+                {
+                  "type": "lacks_item",
+                  "item": "star_crest"
+                }
+              ]
             },
             {
-              "type": "lacks_item",
-              "item": "sun_crest"
-            }
-          ]
-        },
-        {
-          "type": "all_of",
-          "conditions": [
-            {
-              "type": "story_use",
-              "site_id": "moon_crest@11A_crest_slot"
+              "type": "all_of",
+              "conditions": [
+                {
+                  "type": "story_use",
+                  "site_id": "sun_crest@11A_crest_slot"
+                },
+                {
+                  "type": "lacks_item",
+                  "item": "sun_crest"
+                }
+              ]
             },
             {
-              "type": "lacks_item",
-              "item": "moon_crest"
-            }
-          ]
-        },
-        {
-          "type": "all_of",
-          "conditions": [
-            {
-              "type": "story_use",
-              "site_id": "wind_crest@11A_crest_slot"
+              "type": "all_of",
+              "conditions": [
+                {
+                  "type": "story_use",
+                  "site_id": "moon_crest@11A_crest_slot"
+                },
+                {
+                  "type": "lacks_item",
+                  "item": "moon_crest"
+                }
+              ]
             },
             {
-              "type": "lacks_item",
-              "item": "wind_crest"
+              "type": "all_of",
+              "conditions": [
+                {
+                  "type": "story_use",
+                  "site_id": "wind_crest@11A_crest_slot"
+                },
+                {
+                  "type": "lacks_item",
+                  "item": "wind_crest"
+                }
+              ]
             }
           ]
         }
@@ -771,7 +766,7 @@
     }
   },
   {
-    "seq": 40,
+    "seq": 39,
     "checkpoint_id": "back_passage_post_crest_10A",
     "room_id": "10A",
     "objective": "Return through the Back Passage after opening the courtyard gate",
@@ -784,7 +779,7 @@
     }
   },
   {
-    "seq": 41,
+    "seq": 40,
     "checkpoint_id": "east_stairs_101",
     "room_id": "10B",
     "objective": "Reach East Stairway 1F",
@@ -797,7 +792,7 @@
     }
   },
   {
-    "seq": 42,
+    "seq": 41,
     "checkpoint_id": "storeroom_enter_118",
     "room_id": "118",
     "objective": "Enter the mansion storeroom",
@@ -810,7 +805,7 @@
     }
   },
   {
-    "seq": 43,
+    "seq": 42,
     "checkpoint_id": "chemical_118",
     "room_id": "118",
     "objective": "Take the herbicide from the mansion storeroom",
@@ -835,10 +830,10 @@
       "type": "room_enter",
       "room_id": "10B"
     },
-    "seq": 44
+    "seq": 43
   },
   {
-    "seq": 45,
+    "seq": 44,
     "checkpoint_id": "east_stairs_201",
     "room_id": "207",
     "objective": "Climb East Stairway to 2F",
@@ -853,7 +848,7 @@
     }
   },
   {
-    "seq": 46,
+    "seq": 45,
     "checkpoint_id": "c_passage_204",
     "room_id": "204",
     "objective": "Reach the C Passage",
@@ -866,7 +861,7 @@
     }
   },
   {
-    "seq": 47,
+    "seq": 46,
     "checkpoint_id": "upper_hall_enter_203",
     "room_id": "203",
     "objective": "Enter Upper Hall for Barry's acid rounds",
@@ -879,7 +874,7 @@
     }
   },
   {
-    "seq": 48,
+    "seq": 47,
     "checkpoint_id": "acid_rounds_203",
     "room_id": "203",
     "objective": "Receive Barry's acid rounds",
@@ -894,7 +889,7 @@
     }
   },
   {
-    "seq": 49,
+    "seq": 48,
     "checkpoint_id": "terrace_entry_211",
     "room_id": "211",
     "objective": "Reach the Terrace Entry",
@@ -907,7 +902,7 @@
     }
   },
   {
-    "seq": 50,
+    "seq": 49,
     "checkpoint_id": "terrace_enter_212",
     "room_id": "212",
     "objective": "Enter the terrace balcony",
@@ -920,7 +915,7 @@
     }
   },
   {
-    "seq": 51,
+    "seq": 50,
     "checkpoint_id": "bazooka_212",
     "room_id": "212",
     "objective": "Take the bazooka on the terrace",
@@ -945,7 +940,7 @@
       "type": "room_enter",
       "room_id": "211"
     },
-    "seq": 52
+    "seq": 51
   },
   {
     "checkpoint_id": "upper_hall_203_post_terrace",
@@ -958,10 +953,10 @@
       "type": "room_enter",
       "room_id": "203"
     },
-    "seq": 53
+    "seq": 52
   },
   {
-    "seq": 54,
+    "seq": 53,
     "checkpoint_id": "dining_2f_enter_202",
     "room_id": "202",
     "objective": "Enter Dining Room 2F",
@@ -974,7 +969,7 @@
     }
   },
   {
-    "seq": 55,
+    "seq": 54,
     "checkpoint_id": "statue_202",
     "room_id": "202",
     "objective": "Push the Dining 2F statue down",
@@ -988,7 +983,7 @@
     }
   },
   {
-    "seq": 56,
+    "seq": 55,
     "checkpoint_id": "west_stairs_207",
     "room_id": "201",
     "objective": "Reach West Stairway 2F",
@@ -1001,7 +996,7 @@
     }
   },
   {
-    "seq": 57,
+    "seq": 56,
     "checkpoint_id": "west_stairs_10B",
     "room_id": "101",
     "objective": "Descend West Stairway",
@@ -1014,7 +1009,7 @@
     }
   },
   {
-    "seq": 58,
+    "seq": 57,
     "checkpoint_id": "save_100",
     "room_id": "100",
     "objective": "Reach the Mansion Save Room",
@@ -1037,10 +1032,10 @@
       "type": "room_enter",
       "room_id": "101"
     },
-    "seq": 59
+    "seq": 58
   },
   {
-    "seq": 60,
+    "seq": 59,
     "checkpoint_id": "central_corridor_103",
     "room_id": "103",
     "objective": "Reach the Central Corridor",
@@ -1055,7 +1050,7 @@
     }
   },
   {
-    "seq": 61,
+    "seq": 60,
     "checkpoint_id": "tiger_room_enter_10C",
     "room_id": "10C",
     "objective": "Enter the tiger skull room",
@@ -1068,7 +1063,7 @@
     }
   },
   {
-    "seq": 62,
+    "seq": 61,
     "checkpoint_id": "armor_key_10C",
     "room_id": "10C",
     "objective": "Use the chemical and take the armor key",
@@ -1107,10 +1102,10 @@
       "type": "room_enter",
       "room_id": "103"
     },
-    "seq": 63
+    "seq": 62
   },
   {
-    "seq": 64,
+    "seq": 63,
     "checkpoint_id": "plant_42_enter_10E",
     "room_id": "10E",
     "objective": "Enter the Room 42 / plant corridor",
@@ -1123,7 +1118,7 @@
     }
   },
   {
-    "seq": 65,
+    "seq": 64,
     "checkpoint_id": "ammo_10E",
     "room_id": "10E",
     "objective": "Collect the Keeper's Room handgun bullets and shotgun shells",
@@ -1158,7 +1153,7 @@
       "type": "room_enter",
       "room_id": "103"
     },
-    "seq": 66
+    "seq": 65
   },
   {
     "checkpoint_id": "tea_transit_104_post_10E",
@@ -1171,10 +1166,10 @@
       "type": "room_enter",
       "room_id": "104"
     },
-    "seq": 67
+    "seq": 66
   },
   {
-    "seq": 68,
+    "seq": 67,
     "checkpoint_id": "dining_enter_105_jewel",
     "room_id": "105",
     "objective": "Return to Dining Room for the blue jewel",
@@ -1187,7 +1182,7 @@
     }
   },
   {
-    "seq": 69,
+    "seq": 68,
     "checkpoint_id": "blue_jewel_105",
     "room_id": "105",
     "objective": "Collect the blue jewel after the statue drop",
@@ -1212,7 +1207,7 @@
       "type": "room_enter",
       "room_id": "104"
     },
-    "seq": 70
+    "seq": 69
   },
   {
     "checkpoint_id": "central_corridor_post_jewel_103",
@@ -1225,10 +1220,10 @@
       "type": "room_enter",
       "room_id": "103"
     },
-    "seq": 71
+    "seq": 70
   },
   {
-    "seq": 72,
+    "seq": 71,
     "checkpoint_id": "forest_enter_10D",
     "room_id": "10D",
     "objective": "Enter the Forest / keep room",
@@ -1241,7 +1236,7 @@
     }
   },
   {
-    "seq": 73,
+    "seq": 72,
     "checkpoint_id": "wind_crest_10D",
     "room_id": "10D",
     "objective": "Use the blue jewel and take the wind crest",
@@ -1270,7 +1265,7 @@
     }
   },
   {
-    "seq": 74,
+    "seq": 73,
     "checkpoint_id": "central_corridor_return_103",
     "room_id": "103",
     "objective": "Return to the Central Corridor after taking the wind crest",
@@ -1285,7 +1280,7 @@
     }
   },
   {
-    "seq": 75,
+    "seq": 74,
     "checkpoint_id": "tea_return_104_post_wind",
     "room_id": "104",
     "objective": "Cross the Tea Room after taking the wind crest",
@@ -1300,7 +1295,7 @@
     }
   },
   {
-    "seq": 76,
+    "seq": 75,
     "checkpoint_id": "dining_return_105_post_wind",
     "room_id": "105",
     "objective": "Cross Dining after taking the wind crest",
@@ -1315,7 +1310,7 @@
     }
   },
   {
-    "seq": 77,
+    "seq": 76,
     "checkpoint_id": "main_hall_return_106_post_wind",
     "room_id": "106",
     "objective": "Reach Main Hall after taking the wind crest",
@@ -1330,7 +1325,7 @@
     }
   },
   {
-    "seq": 78,
+    "seq": 77,
     "checkpoint_id": "upper_hall_return_203",
     "room_id": "203",
     "objective": "Return to Main Hall 2F",
@@ -1345,7 +1340,7 @@
     }
   },
   {
-    "seq": 79,
+    "seq": 78,
     "checkpoint_id": "c_passage_return_204",
     "room_id": "204",
     "objective": "Return to the C Passage",
@@ -1360,7 +1355,7 @@
     }
   },
   {
-    "seq": 80,
+    "seq": 79,
     "checkpoint_id": "richard_room_enter_20D",
     "room_id": "20D",
     "objective": "Enter the east wing hallway for Richard",
@@ -1376,7 +1371,7 @@
     }
   },
   {
-    "seq": 81,
+    "seq": 80,
     "checkpoint_id": "richard_cutscene_20D",
     "room_id": "20D",
     "objective": "Trigger Richard's Pillar Passage cutscene",
@@ -1391,7 +1386,7 @@
     }
   },
   {
-    "seq": 82,
+    "seq": 81,
     "checkpoint_id": "richard_forced_return_204",
     "room_id": "204",
     "objective": "Continue from Richard's cutscene into the C Passage",
@@ -1406,7 +1401,7 @@
     }
   },
   {
-    "seq": 83,
+    "seq": 82,
     "checkpoint_id": "east_stairs_201_post_richard",
     "room_id": "207",
     "objective": "Reach East Stairway 2F after Richard",
@@ -1421,7 +1416,7 @@
     }
   },
   {
-    "seq": 84,
+    "seq": 83,
     "checkpoint_id": "east_stairs_101_post_richard",
     "room_id": "10B",
     "objective": "Descend East Stairway after Richard",
@@ -1436,7 +1431,7 @@
     }
   },
   {
-    "seq": 85,
+    "seq": 84,
     "checkpoint_id": "yawn_box_enter_118",
     "room_id": "118",
     "objective": "Enter the storeroom for Yawn box prep",
@@ -1449,7 +1444,7 @@
     }
   },
   {
-    "seq": 86,
+    "seq": 85,
     "checkpoint_id": "yawn_box_prep_118",
     "room_id": "118",
     "objective": "Prepare inventory at the item box and wait for the lab timer to expire naturally",
@@ -1466,7 +1461,7 @@
     }
   },
   {
-    "seq": 87,
+    "seq": 86,
     "checkpoint_id": "east_stairs_101_to_yawn",
     "room_id": "10B",
     "objective": "Return to East Stairway 1F for Yawn",
@@ -1482,7 +1477,7 @@
     }
   },
   {
-    "seq": 88,
+    "seq": 87,
     "checkpoint_id": "east_stairs_201_to_yawn",
     "room_id": "207",
     "objective": "Climb East Stairway for Yawn",
@@ -1508,10 +1503,10 @@
       "type": "room_enter",
       "room_id": "204"
     },
-    "seq": 89
+    "seq": 88
   },
   {
-    "seq": 90,
+    "seq": 89,
     "checkpoint_id": "moon_hall_enter_20D",
     "room_id": "20D",
     "objective": "Enter the east wing hallway for attic ammo",
@@ -1524,7 +1519,7 @@
     }
   },
   {
-    "seq": 91,
+    "seq": 90,
     "checkpoint_id": "ammo_20D",
     "room_id": "20D",
     "objective": "Collect the mandatory Pillar Passage handgun bullets",
@@ -1539,7 +1534,7 @@
     }
   },
   {
-    "seq": 92,
+    "seq": 91,
     "checkpoint_id": "attic_entry_20E",
     "room_id": "20E",
     "objective": "Reach the shield-key attic entrance",
@@ -1557,7 +1552,7 @@
     }
   },
   {
-    "seq": 93,
+    "seq": 92,
     "checkpoint_id": "yawn_arena_enter_210",
     "room_id": "210",
     "objective": "Enter the Yawn moon corridor",
@@ -1570,7 +1565,7 @@
     }
   },
   {
-    "seq": 94,
+    "seq": 93,
     "checkpoint_id": "yawn_moon_210",
     "room_id": "210",
     "objective": "Complete the Yawn encounter, collect the shells, and take the moon crest",

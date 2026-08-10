@@ -6,7 +6,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ## Summary table
 
-| cell | seq | checkpoint_id | room | action | objective |
+| Cell | Seq | Checkpoint ID | Room | Action | Objective |
 |------|-----|---------------|------|--------|-----------|
 | `cp00` | 1 | `emblem_105` | `105` | pickup | Pick up the wooden emblem |
 | `cp01` | 2 | `kenneth_104` | `104` | navigate | Reach the Tea Room and trigger Kenneth |
@@ -42,66 +42,65 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp31` | 32 | `gallery_portrait_4_117` | `117` | navigate | Interact with gallery portrait 4 (young man) |
 | `cp32` | 33 | `gallery_portrait_5_117` | `117` | navigate | Interact with gallery portrait 5 (middle-aged man) |
 | `cp33` | 34 | `gallery_portrait_6_117` | `117` | navigate | Interact with gallery portrait 6 (old man) |
-| `cp34` | 35 | `gallery_complete_117` | `117` | pickup | Complete the gallery puzzle and take the star crest |
-| `cp35` | 36 | `star_crest_117` | `117` | pickup | Confirm star crest held (auto-pass if already held from cp34) |
-| `cp36` | 37 | `back_passage_return_10A` | `10A` | navigate | Return to the Back Passage with the star crest |
-| `cp37` | 38 | `courtyard_enter_11A` | `11A` | navigate | Enter the courtyard crest gate |
-| `cp38` | 39 | `crest_gate_11A` | `11A` | use_item | Place a crest at the courtyard gate (any slot) |
-| `cp39` | 40 | `back_passage_post_crest_10A` | `10A` | navigate | Return through the Back Passage after opening the courtyard gate |
-| `cp40` | 41 | `east_stairs_101` | `10B` | navigate | Reach East Stairway 1F |
-| `cp41` | 42 | `storeroom_enter_118` | `118` | navigate | Enter the mansion storeroom |
-| `cp42` | 43 | `chemical_118` | `118` | pickup | Take the herbicide from the mansion storeroom |
-| `cp43` | 44 | `east_stairs_101_post_storeroom` | `10B` | navigate | Return to East Stairway 1F from the storeroom |
-| `cp44` | 45 | `east_stairs_201` | `207` | navigate | Climb East Stairway to 2F |
-| `cp45` | 46 | `c_passage_204` | `204` | navigate | Reach the C Passage |
-| `cp46` | 47 | `upper_hall_enter_203` | `203` | navigate | Enter Upper Hall for Barry's acid rounds |
-| `cp47` | 48 | `acid_rounds_203` | `203` | pickup | Receive Barry's acid rounds |
-| `cp48` | 49 | `terrace_entry_211` | `211` | navigate | Reach the Terrace Entry |
-| `cp49` | 50 | `terrace_enter_212` | `212` | navigate | Enter the terrace balcony |
-| `cp50` | 51 | `bazooka_212` | `212` | pickup | Take the bazooka on the terrace |
-| `cp51` | 52 | `terrace_return_211` | `211` | navigate | Return through Terrace Entry from the balcony |
-| `cp52` | 53 | `upper_hall_203_post_terrace` | `203` | navigate | Return through Upper Hall toward Dining 2F |
-| `cp53` | 54 | `dining_2f_enter_202` | `202` | navigate | Enter Dining Room 2F |
-| `cp54` | 55 | `statue_202` | `202` | navigate | Push the Dining 2F statue down |
-| `cp55` | 56 | `west_stairs_207` | `201` | navigate | Reach West Stairway 2F |
-| `cp56` | 57 | `west_stairs_10B` | `101` | navigate | Descend West Stairway |
-| `cp57` | 58 | `save_100` | `100` | navigate | Reach the Mansion Save Room |
-| `cp58` | 59 | `west_stairs_return_10B` | `101` | navigate | Return through West Stairway before the Central Corridor |
-| `cp59` | 60 | `central_corridor_103` | `103` | navigate | Reach the Central Corridor |
-| `cp60` | 61 | `tiger_room_enter_10C` | `10C` | navigate | Enter the tiger skull room |
-| `cp61` | 62 | `armor_key_10C` | `10C` | use_item | Use the chemical and take the armor key |
-| `cp62` | 63 | `central_corridor_post_armor_103` | `103` | navigate | Return through the Central Corridor before Plant 42 |
-| `cp63` | 64 | `plant_42_enter_10E` | `10E` | navigate | Enter the Room 42 / plant corridor |
-| `cp64` | 65 | `ammo_10E` | `10E` | pickup | Collect the Keeper's Room handgun bullets and shotgun shells |
-| `cp65` | 66 | `central_corridor_post_10E_103` | `103` | navigate | Return through the Central Corridor from Plant 42 |
-| `cp66` | 67 | `tea_transit_104_post_10E` | `104` | navigate | Cross the Tea Room toward Dining for the blue jewel |
-| `cp67` | 68 | `dining_enter_105_jewel` | `105` | navigate | Return to Dining Room for the blue jewel |
-| `cp68` | 69 | `blue_jewel_105` | `105` | pickup | Collect the blue jewel after the statue drop |
-| `cp69` | 70 | `tea_return_104_post_jewel` | `104` | navigate | Return through the Tea Room after the blue jewel |
-| `cp70` | 71 | `central_corridor_post_jewel_103` | `103` | navigate | Return through the Central Corridor toward the Forest |
-| `cp71` | 72 | `forest_enter_10D` | `10D` | navigate | Enter the Forest / keep room |
-| `cp72` | 73 | `wind_crest_10D` | `10D` | use_item | Use the blue jewel and take the wind crest |
-| `cp73` | 74 | `central_corridor_return_103` | `103` | navigate | Return to the Central Corridor after taking the wind crest |
-| `cp74` | 75 | `tea_return_104_post_wind` | `104` | navigate | Cross the Tea Room after taking the wind crest |
-| `cp75` | 76 | `dining_return_105_post_wind` | `105` | navigate | Cross Dining after taking the wind crest |
-| `cp76` | 77 | `main_hall_return_106_post_wind` | `106` | navigate | Reach Main Hall after taking the wind crest |
-| `cp77` | 78 | `upper_hall_return_203` | `203` | navigate | Return to Main Hall 2F |
-| `cp78` | 79 | `c_passage_return_204` | `204` | navigate | Return to the C Passage |
-| `cp79` | 80 | `richard_room_enter_20D` | `20D` | navigate | Enter the east wing hallway for Richard |
-| `cp80` | 81 | `richard_cutscene_20D` | `20D` | navigate | Trigger Richard's Pillar Passage cutscene |
-| `cp81` | 82 | `richard_forced_return_204` | `204` | navigate | Continue from Richard's cutscene into the C Passage |
-| `cp82` | 83 | `east_stairs_201_post_richard` | `207` | navigate | Reach East Stairway 2F after Richard |
-| `cp83` | 84 | `east_stairs_101_post_richard` | `10B` | navigate | Descend East Stairway after Richard |
-| `cp84` | 85 | `yawn_box_enter_118` | `118` | navigate | Enter the storeroom for Yawn box prep |
-| `cp85` | 86 | `yawn_box_prep_118` | `118` | navigate | Prepare inventory at the item box and wait for the lab timer to expire naturally |
-| `cp86` | 87 | `east_stairs_101_to_yawn` | `10B` | navigate | Return to East Stairway 1F for Yawn |
-| `cp87` | 88 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
-| `cp88` | 89 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
-| `cp89` | 90 | `moon_hall_enter_20D` | `20D` | navigate | Enter the east wing hallway for attic ammo |
-| `cp90` | 91 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
-| `cp91` | 92 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
-| `cp92` | 93 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
-| `cp93` | 94 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
+| `cp34` | 35 | `star_crest_117` | `117` | pickup | Complete the gallery puzzle and take the star crest |
+| `cp35` | 36 | `back_passage_return_10A` | `10A` | navigate | Return to the Back Passage with the star crest |
+| `cp36` | 37 | `courtyard_enter_11A` | `11A` | navigate | Enter the courtyard crest gate |
+| `cp37` | 38 | `crest_gate_11A` | `11A` | use_item | Place a crest at the courtyard gate (any slot) |
+| `cp38` | 39 | `back_passage_post_crest_10A` | `10A` | navigate | Return through the Back Passage after opening the courtyard gate |
+| `cp39` | 40 | `east_stairs_101` | `10B` | navigate | Reach East Stairway 1F |
+| `cp40` | 41 | `storeroom_enter_118` | `118` | navigate | Enter the mansion storeroom |
+| `cp41` | 42 | `chemical_118` | `118` | pickup | Take the herbicide from the mansion storeroom |
+| `cp42` | 43 | `east_stairs_101_post_storeroom` | `10B` | navigate | Return to East Stairway 1F from the storeroom |
+| `cp43` | 44 | `east_stairs_201` | `207` | navigate | Climb East Stairway to 2F |
+| `cp44` | 45 | `c_passage_204` | `204` | navigate | Reach the C Passage |
+| `cp45` | 46 | `upper_hall_enter_203` | `203` | navigate | Enter Upper Hall for Barry's acid rounds |
+| `cp46` | 47 | `acid_rounds_203` | `203` | pickup | Receive Barry's acid rounds |
+| `cp47` | 48 | `terrace_entry_211` | `211` | navigate | Reach the Terrace Entry |
+| `cp48` | 49 | `terrace_enter_212` | `212` | navigate | Enter the terrace balcony |
+| `cp49` | 50 | `bazooka_212` | `212` | pickup | Take the bazooka on the terrace |
+| `cp50` | 51 | `terrace_return_211` | `211` | navigate | Return through Terrace Entry from the balcony |
+| `cp51` | 52 | `upper_hall_203_post_terrace` | `203` | navigate | Return through Upper Hall toward Dining 2F |
+| `cp52` | 53 | `dining_2f_enter_202` | `202` | navigate | Enter Dining Room 2F |
+| `cp53` | 54 | `statue_202` | `202` | navigate | Push the Dining 2F statue down |
+| `cp54` | 55 | `west_stairs_207` | `201` | navigate | Reach West Stairway 2F |
+| `cp55` | 56 | `west_stairs_10B` | `101` | navigate | Descend West Stairway |
+| `cp56` | 57 | `save_100` | `100` | navigate | Reach the Mansion Save Room |
+| `cp57` | 58 | `west_stairs_return_10B` | `101` | navigate | Return through West Stairway before the Central Corridor |
+| `cp58` | 59 | `central_corridor_103` | `103` | navigate | Reach the Central Corridor |
+| `cp59` | 60 | `tiger_room_enter_10C` | `10C` | navigate | Enter the tiger skull room |
+| `cp60` | 61 | `armor_key_10C` | `10C` | use_item | Use the chemical and take the armor key |
+| `cp61` | 62 | `central_corridor_post_armor_103` | `103` | navigate | Return through the Central Corridor before Plant 42 |
+| `cp62` | 63 | `plant_42_enter_10E` | `10E` | navigate | Enter the Room 42 / plant corridor |
+| `cp63` | 64 | `ammo_10E` | `10E` | pickup | Collect the Keeper's Room handgun bullets and shotgun shells |
+| `cp64` | 65 | `central_corridor_post_10E_103` | `103` | navigate | Return through the Central Corridor from Plant 42 |
+| `cp65` | 66 | `tea_transit_104_post_10E` | `104` | navigate | Cross the Tea Room toward Dining for the blue jewel |
+| `cp66` | 67 | `dining_enter_105_jewel` | `105` | navigate | Return to Dining Room for the blue jewel |
+| `cp67` | 68 | `blue_jewel_105` | `105` | pickup | Collect the blue jewel after the statue drop |
+| `cp68` | 69 | `tea_return_104_post_jewel` | `104` | navigate | Return through the Tea Room after the blue jewel |
+| `cp69` | 70 | `central_corridor_post_jewel_103` | `103` | navigate | Return through the Central Corridor toward the Forest |
+| `cp70` | 71 | `forest_enter_10D` | `10D` | navigate | Enter the Forest / keep room |
+| `cp71` | 72 | `wind_crest_10D` | `10D` | use_item | Use the blue jewel and take the wind crest |
+| `cp72` | 73 | `central_corridor_return_103` | `103` | navigate | Return to the Central Corridor after taking the wind crest |
+| `cp73` | 74 | `tea_return_104_post_wind` | `104` | navigate | Cross the Tea Room after taking the wind crest |
+| `cp74` | 75 | `dining_return_105_post_wind` | `105` | navigate | Cross Dining after taking the wind crest |
+| `cp75` | 76 | `main_hall_return_106_post_wind` | `106` | navigate | Reach Main Hall after taking the wind crest |
+| `cp76` | 77 | `upper_hall_return_203` | `203` | navigate | Return to Main Hall 2F |
+| `cp77` | 78 | `c_passage_return_204` | `204` | navigate | Return to the C Passage |
+| `cp78` | 79 | `richard_room_enter_20D` | `20D` | navigate | Enter the east wing hallway for Richard |
+| `cp79` | 80 | `richard_cutscene_20D` | `20D` | navigate | Trigger Richard's Pillar Passage cutscene |
+| `cp80` | 81 | `richard_forced_return_204` | `204` | navigate | Continue from Richard's cutscene into the C Passage |
+| `cp81` | 82 | `east_stairs_201_post_richard` | `207` | navigate | Reach East Stairway 2F after Richard |
+| `cp82` | 83 | `east_stairs_101_post_richard` | `10B` | navigate | Descend East Stairway after Richard |
+| `cp83` | 84 | `yawn_box_enter_118` | `118` | navigate | Enter the storeroom for Yawn box prep |
+| `cp84` | 85 | `yawn_box_prep_118` | `118` | navigate | Prepare inventory at the item box and wait for the lab timer to expire naturally |
+| `cp85` | 86 | `east_stairs_101_to_yawn` | `10B` | navigate | Return to East Stairway 1F for Yawn |
+| `cp86` | 87 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
+| `cp87` | 88 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
+| `cp88` | 89 | `moon_hall_enter_20D` | `20D` | navigate | Enter the east wing hallway for attic ammo |
+| `cp89` | 90 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
+| `cp90` | 91 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
+| `cp91` | 92 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
+| `cp92` | 93 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
 
 ## Details
 
@@ -512,7 +511,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - `gallery_progress`: `{"min_steps": 6, "type": "gallery_progress"}`
 
-### `cp34` — `gallery_complete_117` (seq 35)
+### `cp34` — `star_crest_117` (seq 35)
 
 - **Room:** `117`
 - **Action:** `pickup`
@@ -522,21 +521,9 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **How to achieve:** Be in / reach **117**. Finish the portrait sequence / final switch, then pick up `star_crest`.
 - **Success condition:**
 - Acquire item `star_crest`
-- **Note:** Reveal + pickup are one leg. Agents already take the crest immediately after the final switch; requiring pickup (not merely `gallery_puzzle_solved`) makes the captured cell inventory-correct for the courtyard legs.
+- **Note:** Former duplicate `gallery_complete_117` cell removed; this is the crest pickup leg.
 
-### `cp35` — `star_crest_117` (seq 36)
-
-- **Room:** `117`
-- **Action:** `pickup`
-- **Objective:** Confirm star crest held after gallery complete (auto-pass if already held)
-- **Required items:** _(none)_
-- **Items gained:** `star_crest`
-- **How to achieve:** Be in / reach **117**. Pick up `star_crest` (or already hold it from a good cp34).
-- **Success condition:**
-- Acquire item `star_crest`
-- **Note:** Kept to avoid renumbering cp36+ fleet cells. From a crest-holding cp34 this leg is effectively free.
-
-### `cp36` — `back_passage_return_10A` (seq 37)
+### `cp35` — `back_passage_return_10A` (seq 36)
 
 - **Room:** `10A`
 - **Action:** `navigate`
@@ -547,7 +534,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `10A`
 
-### `cp37` — `courtyard_enter_11A` (seq 38)
+### `cp36` — `courtyard_enter_11A` (seq 37)
 
 - **Room:** `11A`
 - **Action:** `navigate`
@@ -558,7 +545,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `11A`
 
-### `cp38` — `crest_gate_11A` (seq 39)
+### `cp37` — `crest_gate_11A` (seq 38)
 
 - **Room:** `11A`
 - **Action:** `use_item`
@@ -581,7 +568,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
     - Story USE at `wind_crest@11A_crest_slot`
     - No longer holding `wind_crest`
 
-### `cp39` — `back_passage_post_crest_10A` (seq 40)
+### `cp38` — `back_passage_post_crest_10A` (seq 39)
 
 - **Room:** `10A`
 - **Action:** `navigate`
@@ -592,7 +579,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `10A`
 
-### `cp40` — `east_stairs_101` (seq 41)
+### `cp39` — `east_stairs_101` (seq 40)
 
 - **Room:** `10B`
 - **Action:** `navigate`
@@ -603,7 +590,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `10B`
 
-### `cp41` — `storeroom_enter_118` (seq 42)
+### `cp40` — `storeroom_enter_118` (seq 41)
 
 - **Room:** `118`
 - **Action:** `navigate`
@@ -614,7 +601,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `118`
 
-### `cp42` — `chemical_118` (seq 43)
+### `cp41` — `chemical_118` (seq 42)
 
 - **Room:** `118`
 - **Action:** `pickup`
@@ -625,7 +612,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Acquire item `chemical`
 
-### `cp43` — `east_stairs_101_post_storeroom` (seq 44)
+### `cp42` — `east_stairs_101_post_storeroom` (seq 43)
 
 - **Room:** `10B`
 - **Action:** `navigate`
@@ -636,7 +623,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `10B`
 
-### `cp44` — `east_stairs_201` (seq 45)
+### `cp43` — `east_stairs_201` (seq 44)
 
 - **Room:** `207`
 - **Action:** `navigate`
@@ -647,7 +634,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `207`
 
-### `cp45` — `c_passage_204` (seq 46)
+### `cp44` — `c_passage_204` (seq 45)
 
 - **Room:** `204`
 - **Action:** `navigate`
@@ -658,7 +645,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `204`
 
-### `cp46` — `upper_hall_enter_203` (seq 47)
+### `cp45` — `upper_hall_enter_203` (seq 46)
 
 - **Room:** `203`
 - **Action:** `navigate`
@@ -669,7 +656,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `203`
 
-### `cp47` — `acid_rounds_203` (seq 48)
+### `cp46` — `acid_rounds_203` (seq 47)
 
 - **Room:** `203`
 - **Action:** `pickup`
@@ -680,7 +667,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Acquire item `acid_rounds`
 
-### `cp48` — `terrace_entry_211` (seq 49)
+### `cp47` — `terrace_entry_211` (seq 48)
 
 - **Room:** `211`
 - **Action:** `navigate`
@@ -691,7 +678,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `211`
 
-### `cp49` — `terrace_enter_212` (seq 50)
+### `cp48` — `terrace_enter_212` (seq 49)
 
 - **Room:** `212`
 - **Action:** `navigate`
@@ -702,7 +689,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `212`
 
-### `cp50` — `bazooka_212` (seq 51)
+### `cp49` — `bazooka_212` (seq 50)
 
 - **Room:** `212`
 - **Action:** `pickup`
@@ -713,7 +700,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Acquire item `bazooka_acid`
 
-### `cp51` — `terrace_return_211` (seq 52)
+### `cp50` — `terrace_return_211` (seq 51)
 
 - **Room:** `211`
 - **Action:** `navigate`
@@ -724,7 +711,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `211`
 
-### `cp52` — `upper_hall_203_post_terrace` (seq 53)
+### `cp51` — `upper_hall_203_post_terrace` (seq 52)
 
 - **Room:** `203`
 - **Action:** `navigate`
@@ -735,7 +722,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `203`
 
-### `cp53` — `dining_2f_enter_202` (seq 54)
+### `cp52` — `dining_2f_enter_202` (seq 53)
 
 - **Room:** `202`
 - **Action:** `navigate`
@@ -746,7 +733,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `202`
 
-### `cp54` — `statue_202` (seq 55)
+### `cp53` — `statue_202` (seq 54)
 
 - **Room:** `202`
 - **Action:** `navigate`
@@ -757,7 +744,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - State flag `dining_statue_knocked` == `True`
 
-### `cp55` — `west_stairs_207` (seq 56)
+### `cp54` — `west_stairs_207` (seq 55)
 
 - **Room:** `201`
 - **Action:** `navigate`
@@ -768,7 +755,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `201`
 
-### `cp56` — `west_stairs_10B` (seq 57)
+### `cp55` — `west_stairs_10B` (seq 56)
 
 - **Room:** `101`
 - **Action:** `navigate`
@@ -779,7 +766,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `101`
 
-### `cp57` — `save_100` (seq 58)
+### `cp56` — `save_100` (seq 57)
 
 - **Room:** `100`
 - **Action:** `navigate`
@@ -790,7 +777,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `100`
 
-### `cp58` — `west_stairs_return_10B` (seq 59)
+### `cp57` — `west_stairs_return_10B` (seq 58)
 
 - **Room:** `101`
 - **Action:** `navigate`
@@ -801,7 +788,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `101`
 
-### `cp59` — `central_corridor_103` (seq 60)
+### `cp58` — `central_corridor_103` (seq 59)
 
 - **Room:** `103`
 - **Action:** `navigate`
@@ -812,7 +799,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `103`
 
-### `cp60` — `tiger_room_enter_10C` (seq 61)
+### `cp59` — `tiger_room_enter_10C` (seq 60)
 
 - **Room:** `10C`
 - **Action:** `navigate`
@@ -823,7 +810,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `10C`
 
-### `cp61` — `armor_key_10C` (seq 62)
+### `cp60` — `armor_key_10C` (seq 61)
 
 - **Room:** `10C`
 - **Action:** `use_item`
@@ -836,7 +823,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
   - Story USE at `chemical@10C_greenhouse_pump`
   - Acquire item `armor_key`
 
-### `cp62` — `central_corridor_post_armor_103` (seq 63)
+### `cp61` — `central_corridor_post_armor_103` (seq 62)
 
 - **Room:** `103`
 - **Action:** `navigate`
@@ -847,7 +834,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `103`
 
-### `cp63` — `plant_42_enter_10E` (seq 64)
+### `cp62` — `plant_42_enter_10E` (seq 63)
 
 - **Room:** `10E`
 - **Action:** `navigate`
@@ -858,7 +845,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `10E`
 
-### `cp64` — `ammo_10E` (seq 65)
+### `cp63` — `ammo_10E` (seq 64)
 
 - **Room:** `10E`
 - **Action:** `pickup`
@@ -871,7 +858,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
   - Acquire item `handgun_bullets`
   - Acquire item `shotgun_shells`
 
-### `cp65` — `central_corridor_post_10E_103` (seq 66)
+### `cp64` — `central_corridor_post_10E_103` (seq 65)
 
 - **Room:** `103`
 - **Action:** `navigate`
@@ -882,7 +869,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `103`
 
-### `cp66` — `tea_transit_104_post_10E` (seq 67)
+### `cp65` — `tea_transit_104_post_10E` (seq 66)
 
 - **Room:** `104`
 - **Action:** `navigate`
@@ -893,7 +880,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `104`
 
-### `cp67` — `dining_enter_105_jewel` (seq 68)
+### `cp66` — `dining_enter_105_jewel` (seq 67)
 
 - **Room:** `105`
 - **Action:** `navigate`
@@ -904,7 +891,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `105`
 
-### `cp68` — `blue_jewel_105` (seq 69)
+### `cp67` — `blue_jewel_105` (seq 68)
 
 - **Room:** `105`
 - **Action:** `pickup`
@@ -915,7 +902,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Acquire item `blue_jewel`
 
-### `cp69` — `tea_return_104_post_jewel` (seq 70)
+### `cp68` — `tea_return_104_post_jewel` (seq 69)
 
 - **Room:** `104`
 - **Action:** `navigate`
@@ -926,7 +913,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `104`
 
-### `cp70` — `central_corridor_post_jewel_103` (seq 71)
+### `cp69` — `central_corridor_post_jewel_103` (seq 70)
 
 - **Room:** `103`
 - **Action:** `navigate`
@@ -937,7 +924,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `103`
 
-### `cp71` — `forest_enter_10D` (seq 72)
+### `cp70` — `forest_enter_10D` (seq 71)
 
 - **Room:** `10D`
 - **Action:** `navigate`
@@ -948,7 +935,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `10D`
 
-### `cp72` — `wind_crest_10D` (seq 73)
+### `cp71` — `wind_crest_10D` (seq 72)
 
 - **Room:** `10D`
 - **Action:** `use_item`
@@ -961,7 +948,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
   - Story USE at `blue_jewel@10D_tiger_eye`
   - Acquire item `wind_crest`
 
-### `cp73` — `central_corridor_return_103` (seq 74)
+### `cp72` — `central_corridor_return_103` (seq 73)
 
 - **Room:** `103`
 - **Action:** `navigate`
@@ -972,7 +959,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `103`
 
-### `cp74` — `tea_return_104_post_wind` (seq 75)
+### `cp73` — `tea_return_104_post_wind` (seq 74)
 
 - **Room:** `104`
 - **Action:** `navigate`
@@ -983,7 +970,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `104`
 
-### `cp75` — `dining_return_105_post_wind` (seq 76)
+### `cp74` — `dining_return_105_post_wind` (seq 75)
 
 - **Room:** `105`
 - **Action:** `navigate`
@@ -994,7 +981,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `105`
 
-### `cp76` — `main_hall_return_106_post_wind` (seq 77)
+### `cp75` — `main_hall_return_106_post_wind` (seq 76)
 
 - **Room:** `106`
 - **Action:** `navigate`
@@ -1005,7 +992,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `106`
 
-### `cp77` — `upper_hall_return_203` (seq 78)
+### `cp76` — `upper_hall_return_203` (seq 77)
 
 - **Room:** `203`
 - **Action:** `navigate`
@@ -1016,7 +1003,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `203`
 
-### `cp78` — `c_passage_return_204` (seq 79)
+### `cp77` — `c_passage_return_204` (seq 78)
 
 - **Room:** `204`
 - **Action:** `navigate`
@@ -1027,7 +1014,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `204`
 
-### `cp79` — `richard_room_enter_20D` (seq 80)
+### `cp78` — `richard_room_enter_20D` (seq 79)
 
 - **Room:** `20D`
 - **Action:** `navigate`
@@ -1038,7 +1025,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - `room_enter_any`: `{"room_ids": ["20D", "204"], "type": "room_enter_any"}`
 
-### `cp80` — `richard_cutscene_20D` (seq 81)
+### `cp79` — `richard_cutscene_20D` (seq 80)
 
 - **Room:** `20D`
 - **Action:** `navigate`
@@ -1049,7 +1036,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Observe cutscene with prefix `20D:`
 
-### `cp81` — `richard_forced_return_204` (seq 82)
+### `cp80` — `richard_forced_return_204` (seq 81)
 
 - **Room:** `204`
 - **Action:** `navigate`
@@ -1060,7 +1047,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `204`
 
-### `cp82` — `east_stairs_201_post_richard` (seq 83)
+### `cp81` — `east_stairs_201_post_richard` (seq 82)
 
 - **Room:** `207`
 - **Action:** `navigate`
@@ -1071,7 +1058,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `207`
 
-### `cp83` — `east_stairs_101_post_richard` (seq 84)
+### `cp82` — `east_stairs_101_post_richard` (seq 83)
 
 - **Room:** `10B`
 - **Action:** `navigate`
@@ -1082,7 +1069,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `10B`
 
-### `cp84` — `yawn_box_enter_118` (seq 85)
+### `cp83` — `yawn_box_enter_118` (seq 84)
 
 - **Room:** `118`
 - **Action:** `navigate`
@@ -1093,7 +1080,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `118`
 
-### `cp85` — `yawn_box_prep_118` (seq 86)
+### `cp84` — `yawn_box_prep_118` (seq 85)
 
 - **Room:** `118`
 - **Action:** `navigate`
@@ -1104,7 +1091,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - State flag `lab_timer` == `0`
 
-### `cp86` — `east_stairs_101_to_yawn` (seq 87)
+### `cp85` — `east_stairs_101_to_yawn` (seq 86)
 
 - **Room:** `10B`
 - **Action:** `navigate`
@@ -1115,7 +1102,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `10B`
 
-### `cp87` — `east_stairs_201_to_yawn` (seq 88)
+### `cp86` — `east_stairs_201_to_yawn` (seq 87)
 
 - **Room:** `207`
 - **Action:** `navigate`
@@ -1126,7 +1113,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `207`
 
-### `cp88` — `c_passage_204_to_yawn` (seq 89)
+### `cp87` — `c_passage_204_to_yawn` (seq 88)
 
 - **Room:** `204`
 - **Action:** `navigate`
@@ -1137,7 +1124,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `204`
 
-### `cp89` — `moon_hall_enter_20D` (seq 90)
+### `cp88` — `moon_hall_enter_20D` (seq 89)
 
 - **Room:** `20D`
 - **Action:** `navigate`
@@ -1148,7 +1135,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `20D`
 
-### `cp90` — `ammo_20D` (seq 91)
+### `cp89` — `ammo_20D` (seq 90)
 
 - **Room:** `20D`
 - **Action:** `pickup`
@@ -1159,7 +1146,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Acquire item `handgun_bullets`
 
-### `cp91` — `attic_entry_20E` (seq 92)
+### `cp90` — `attic_entry_20E` (seq 91)
 
 - **Room:** `20E`
 - **Action:** `navigate`
@@ -1170,7 +1157,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `20E` from `20D`
 
-### `cp92` — `yawn_arena_enter_210` (seq 93)
+### `cp91` — `yawn_arena_enter_210` (seq 92)
 
 - **Room:** `210`
 - **Action:** `navigate`
@@ -1181,7 +1168,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `210`
 
-### `cp93` — `yawn_moon_210` (seq 94)
+### `cp92` — `yawn_moon_210` (seq 93)
 
 - **Room:** `210`
 - **Action:** `fight`

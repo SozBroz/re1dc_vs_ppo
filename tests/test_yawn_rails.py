@@ -420,6 +420,7 @@ def test_crest_gate_requires_story_use_not_unheld_crest_lacks() -> None:
         inventory=["knife", "beretta", "shield_key", "shotgun"],
     )
     progress.rewarded_story_uses.add("star_crest@11A_crest_slot")
+    progress.note_leg_kills("11A", 1)
     assert planner.advance_if_success(placed, progress=progress)
 
 
@@ -522,12 +523,12 @@ def test_gallery_portrait_steps_are_separate_legs() -> None:
             progress=progress,
         )
 
-    assert planner.current_objective()["checkpoint_id"] == "gallery_complete_117"
+    assert planner.current_objective()["checkpoint_id"] == "star_crest_117"
     assert not planner.advance_if_success(
         _state("117", gallery_progress=GALLERY_STEP_VALUES[5]),
         progress=progress,
     )
-    # Reveal alone is not enough — cp34 requires taking the star crest.
+    # Reveal alone is not enough — crest pickup requires taking the star crest.
     assert not planner.advance_if_success(
         _state("117", gallery_progress=0, gallery_puzzle_solved=True),
         progress=progress,
@@ -538,12 +539,6 @@ def test_gallery_portrait_steps_are_separate_legs() -> None:
         progress=progress,
     )
 
-    assert planner.current_objective()["checkpoint_id"] == "star_crest_117"
-    # Already held from cp34 — key-item acquired_item auto-passes.
-    assert planner.advance_if_success(
-        _state("117", gallery_progress=0, gallery_puzzle_solved=True, inventory=["star_crest"]),
-        progress=progress,
-    )
     assert planner.current_objective()["checkpoint_id"] == "back_passage_return_10A"
 
 
@@ -834,6 +829,31 @@ def test_reset_pin_index_env_forces_cell(
         assert str(opts["pb_bundle"]["state_path"]).replace("\\", "/").endswith(
             "states/cp33/cell.State"
         )
+
+
+def test_reset_pin_file_hot_reload_overrides_launcher_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in range(18, 34)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 40)),
+    }
+    pin_file = tmp_path / "yawn_reset_pin.env"
+    pin_file.write_text("RE1_YAWN_RESET_PIN_INDEX=33\n", encoding="utf-8")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_FILE", str(pin_file))
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_INDEX", "18")
+    opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(0))
+    assert opts["route_start_index"] == 34
+    pin_file.write_text("RE1_YAWN_RESET_PIN_INDEX=19\n", encoding="utf-8")
+    opts2 = sample_one_leg_options(tmp_path, stage, rng=random.Random(0))
+    assert opts2["route_start_index"] == 20
 
 
 def test_reset_pin_range_env_samples_inclusive_span(
@@ -1354,15 +1374,15 @@ def test_local_cas_rejects_story_regress_despite_better_hp(
 def test_capture_settles_cutscene_before_savestate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """gallery_complete (and similar) succeeds mid-cinema; do not drop the cell."""
+    """star_crest / gallery pickup succeeds mid-cinema; do not drop the cell."""
     monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "1")
     bridge = MagicMock()
     bridge.save_savestate.side_effect = (
         lambda path: Path(path).write_bytes(b"state")
     )
-    # After advancing gallery_portrait_6 → gallery_complete is active; success
-    # on gallery_complete leaves waypoint on the next leg (completed = that idx).
-    planner = _planner(start_index=_idx("gallery_complete_117") + 1)
+    # After advancing gallery_portrait_6 → star_crest is active; success
+    # on star_crest leaves waypoint on the next leg (completed = that idx).
+    planner = _planner(start_index=_idx("star_crest_117") + 1)
     # First read is post-settle; later reads are pre/post savestate probes.
     reads = [
         _state("117", in_control=True),
@@ -1408,7 +1428,7 @@ def test_capture_settles_cutscene_before_savestate(
     )
     assert skip_calls["n"] == 1
     assert proposal is not None
-    assert proposal["checkpoint_id"] == "gallery_complete_117"
+    assert proposal["checkpoint_id"] == "star_crest_117"
     assert bridge.save_savestate.called
 
 
