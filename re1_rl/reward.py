@@ -98,17 +98,19 @@ SOFTLOCK_TIMEOUT_PENALTY = -0.26666666666666666
 
 ENEMY_DAMAGE_REWARD = 0.014
 ENEMY_KILL_REWARD = 2.0
+# Shotgun vs cerberus is brutally ammo-inefficient in RE1 DC — steer to handgun.
+SHOTGUN_DOG_HIT_PENALTY = -0.7
 # Gallery crows: pest combat pays nothing (#7/#8).
 CROW_COMBAT_REWARD_SCALE = 0.0
 # Conservative ammo-waste tax.  A full inverse pickup tax (1.0) made scarce
 # weapons too expensive to explore; 0.10 keeps successful damage comfortably
 # more valuable while giving confirmed misses a small, immediate signal.
-ATTACK_MISS_TAX_SCALE = 0.10
+ATTACK_MISS_TAX_SCALE = 0.20
 KNIFE_MISS_PENALTY = -0.01 * ATTACK_MISS_TAX_SCALE
 ATTACK_DRY_FIRE_PENALTY = -0.005
 ATTACK_MACRO_FAILURE_PENALTY = -0.01
 # Max per-round miss tax when wasting the last round in inventory.
-AMMO_WASTE_MAX_PENALTY = 0.15
+AMMO_WASTE_MAX_PENALTY = 0.25
 # Flat legacy miss flag (unused); live knife tax uses KNIFE_MISS_PENALTY above.
 ATTACK_MISS_PENALTY = 0.0
 AMMO_WASTE_PENALTY = 0.0  # legacy stub; not read by compute_reward
@@ -118,7 +120,7 @@ AMMO_WASTE_PENALTY = 0.0  # legacy stub; not read by compute_reward
 # Deferred misses re-post ``ammo_spent`` on expiry — skip spend there via
 # ``pending_combat_expired`` so fire-step already paid once.
 AMMO_SPEND_TAX_PER_ROUND: dict[int, float] = {
-    0x02: 0.03,  # beretta / handgun
+    0x02: 0.04,  # beretta / handgun
     0x03: 0.25,  # shotgun
     0x04: 0.40,  # colt python dumdum
     0x05: 0.40,  # colt python magnum
@@ -402,6 +404,29 @@ def combat_overkill_penalty(state: dict[str, Any]) -> float:
     return total
 
 
+def shotgun_dog_hit_penalty(state: dict[str, Any]) -> float:
+    """Flat tax when a shotgun shell damages a cerberus (per combat event)."""
+    from re1_rl.attack_macro import SHOTGUN_WEAPON_ID
+
+    wid = _combat_ammo_weapon_id(state)
+    if int(wid) != int(SHOTGUN_WEAPON_ID):
+        return 0.0
+    events = state.get("combat_events")
+    if not events:
+        return 0.0
+    hits = 0
+    for ev in events:
+        if ev.get("reward_denied"):
+            continue
+        if int(ev.get("damage", 0) or 0) <= 0:
+            continue
+        if ev.get("is_cerberus"):
+            hits += 1
+    if hits <= 0:
+        return 0.0
+    return SHOTGUN_DOG_HIT_PENALTY * float(hits)
+
+
 # Legacy aliases (all rails off-path / leave-target is now terminal -4).
 WRONG_ROOM_PENALTY = -4.0
 # Room detour / leave-target: -4, zeros same-step positives, ends episode.
@@ -416,7 +441,7 @@ SHAPING_GAMMA = 1.0
 UNKNOWN_HOPS = 8.0
 DIST_NORM = 4096.0
 # Dominant terminal pulse on one-leg rails (unscaled; exploration uses CHECKPOINT_REWARD).
-RAILS_CHECKPOINT_REWARD = 12.0
+RAILS_CHECKPOINT_REWARD = 8.0
 # Navigation milestones keep full exploration magnitudes on rails (+4 / +2 ammo).
 RAILS_NAV_POSITIVE_SCALE = 1.0
 RAILS_NAV_POSITIVE_TERMS: frozenset[str] = frozenset({
@@ -684,6 +709,7 @@ def compute_reward(
         "ammo_spend": 0.0,
         "ammo_waste": 0.0,
         "combat_overkill": 0.0,
+        "shotgun_dog_hit": 0.0,
         "attack_dry_fire": 0.0,
         "attack_macro_failure": 0.0,
     }
@@ -982,6 +1008,10 @@ def compute_reward(
     if overkill < 0.0:
         bd["combat_overkill"] = overkill
 
+    dog_sg = shotgun_dog_hit_penalty(state)
+    if dog_sg < 0.0:
+        bd["shotgun_dog_hit"] = dog_sg
+
     # Ammo expenditure: every spent round (hit or miss). Deferred miss expiry
     # re-posts ammo_spent after the fire step already paid — skip that replay.
     rounds_spent = int(state.get("ammo_spent", 0) or 0)
@@ -995,18 +1025,20 @@ def compute_reward(
     if state.get("knife_swing_missed"):
         bd["attack_miss"] = KNIFE_MISS_PENALTY
     elif state.get("attack_missed"):
-        rounds = rounds_spent
-        if rounds > 0:
+        waste_rounds = int(state.get("deferred_waste_rounds") or 0)
+        if waste_rounds <= 0:
+            waste_rounds = rounds_spent
+        if waste_rounds > 0:
             from re1_rl.ammo_accounting import fireable_ammo_before_miss
 
             # Deferred projectile miss may resolve after a weapon swap.
             wid = _combat_ammo_weapon_id(state)
             ammo_before = fireable_ammo_before_miss(
-                state, wid, rounds_spent=rounds,
+                state, wid, rounds_spent=waste_rounds,
             )
             bd["ammo_waste"] = ammo_waste_penalty(
                 wid,
-                rounds,
+                waste_rounds,
                 ammo_before=ammo_before,
             )
     if state.get("attack_dry_fire"):

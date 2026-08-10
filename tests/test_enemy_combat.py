@@ -16,6 +16,7 @@ from re1_rl.enemy_combat import (
     enemy_combat_delta,
     enemy_combat_events,
     enemy_hp_by_slot,
+    is_cerberus_combat_entity,
     is_crow_combat_entity,
     is_crow_enemy,
     is_passive_crow_enemy,
@@ -233,6 +234,170 @@ def test_bazooka_pending_window_is_two_seconds() -> None:
     assert pending_combat_window_frames(2) == HITSCAN_PENDING_FRAMES
 
 
+def _fire_gl_pending(
+    prev: dict,
+    cur: dict,
+    *,
+    step_frames: int = 8,
+) -> dict:
+    fired = apply_combat_step_fields(prev, cur, attack=True)
+    return tick_pending_combat_credit(
+        prev,
+        fired,
+        attack=True,
+        ammo_spent=1,
+        weapon_id=0x07,
+        attack_outcome="ok",
+        step_emulated_frames=step_frames,
+    )
+
+
+def _tick_pending_no_hit(prev: dict, *, step_frames: int = 8) -> dict:
+    cur = {
+        "room_id": prev.get("room_id", ""),
+        "enemies": prev.get("enemies", []),
+    }
+    mid = apply_combat_step_fields(prev, cur, credit_damage=True)
+    return tick_pending_combat_credit(prev, mid, step_emulated_frames=step_frames)
+
+
+def test_rapid_gl_one_hit_two_deferred_misses() -> None:
+    """Three GL shots: one hit consumes a slot; two later expiries pay waste."""
+    enemies = [{"slot": 0, "hp": 100, "type_id": 15}]
+    base = {"room_id": "108", "enemies": enemies}
+
+    state = _fire_gl_pending(dict(base), dict(base))
+    prev = dict(state)
+    prev["pending_combat_shots"] = [dict(x) for x in state["pending_combat_shots"]]
+    state = _fire_gl_pending(prev, dict(base))
+    prev = dict(state)
+    prev["pending_combat_shots"] = [dict(x) for x in state["pending_combat_shots"]]
+    state = _fire_gl_pending(prev, dict(base))
+    assert len(state["pending_combat_shots"]) == 3
+
+    prev = dict(state)
+    prev["pending_combat_shots"] = [dict(x) for x in state["pending_combat_shots"]]
+    cur = {"room_id": "108", "enemies": [{"slot": 0, "hp": 60, "type_id": 15}]}
+    hit = apply_combat_step_fields(prev, cur, credit_damage=True)
+    hit = tick_pending_combat_credit(prev, hit, step_emulated_frames=8)
+    assert int(hit.get("enemy_damage") or 0) > 0
+    assert len(hit["pending_combat_shots"]) == 2
+
+    miss_rounds = 0
+    state = hit
+    for _ in range(60):
+        prev = dict(state)
+        if state.get("pending_combat_shots"):
+            prev["pending_combat_shots"] = [
+                dict(x) for x in state["pending_combat_shots"]
+            ]
+        state = _tick_pending_no_hit(prev)
+        if state.get("attack_missed"):
+            miss_rounds += int(state.get("ammo_spent") or 0)
+        if not state.get("pending_combat_shots"):
+            break
+    assert miss_rounds == 2
+
+
+def test_rapid_gl_fire_queues_each_shot() -> None:
+    """Later GL rounds must not overwrite an in-flight pending window."""
+    enemies = [{"slot": 0, "hp": 100, "type_id": 15}]
+    base = {"room_id": "108", "enemies": enemies}
+
+    s1 = _fire_gl_pending(dict(base), dict(base))
+    assert len(s1["pending_combat_shots"]) == 1
+
+    prev = dict(s1)
+    prev["pending_combat_shots"] = [dict(x) for x in s1["pending_combat_shots"]]
+    s2 = _fire_gl_pending(prev, dict(base))
+    assert len(s2["pending_combat_shots"]) == 2
+
+    prev = dict(s2)
+    prev["pending_combat_shots"] = [dict(x) for x in s2["pending_combat_shots"]]
+    s3 = _fire_gl_pending(prev, dict(base))
+    assert len(s3["pending_combat_shots"]) == 3
+
+
+def test_gl_hit_on_fire_step_still_queues_new_shot() -> None:
+    """Delayed damage on the same step as the next fire must not drop the new round."""
+    enemies = [{"slot": 0, "hp": 100, "type_id": 15}]
+    base = {"room_id": "108", "enemies": enemies}
+    armed = _fire_gl_pending(dict(base), dict(base))
+
+    prev = dict(armed)
+    prev["pending_combat_shots"] = [dict(x) for x in armed["pending_combat_shots"]]
+    cur = {
+        "room_id": "108",
+        "enemies": [{"slot": 0, "hp": 60, "type_id": 15}],
+        "enemy_damage": 40,
+        "enemy_kills": 0,
+    }
+    hit_and_fire = apply_combat_step_fields(prev, cur, attack=True)
+    out = tick_pending_combat_credit(
+        prev,
+        hit_and_fire,
+        attack=True,
+        ammo_spent=1,
+        weapon_id=0x07,
+        attack_outcome="ok",
+        step_emulated_frames=45,
+    )
+    assert len(out["pending_combat_shots"]) == 1
+    assert out["pending_combat_shots"][0]["ammo"] == 1
+
+
+def test_gl_clip_all_misses_expire_six_rounds() -> None:
+    """Six GL misses must eventually post six deferred waste rounds."""
+    enemies = [{"slot": 0, "hp": 100, "type_id": 15}]
+    base = {"room_id": "108", "enemies": enemies}
+    prev = dict(base)
+    miss_rounds = 0
+
+    for _ in range(6):
+        cur = dict(base)
+        fired = apply_combat_step_fields(prev, cur, attack=True)
+        prev = tick_pending_combat_credit(
+            prev,
+            fired,
+            attack=True,
+            ammo_spent=1,
+            weapon_id=0x07,
+            attack_outcome="ok",
+            step_emulated_frames=45,
+        )
+        if prev.get("attack_missed"):
+            miss_rounds += int(
+                prev.get("deferred_waste_rounds")
+                or prev.get("ammo_spent")
+                or 0
+            )
+        for _ in range(4):
+            cur2 = dict(base)
+            mid = apply_combat_step_fields(prev, cur2, credit_damage=True)
+            prev = tick_pending_combat_credit(prev, mid, step_emulated_frames=8)
+            if prev.get("attack_missed"):
+                miss_rounds += int(
+                    prev.get("deferred_waste_rounds")
+                    or prev.get("ammo_spent")
+                    or 0
+                )
+
+    for _ in range(80):
+        cur2 = dict(base)
+        mid = apply_combat_step_fields(prev, cur2, credit_damage=True)
+        nxt = tick_pending_combat_credit(prev, mid, step_emulated_frames=8)
+        if nxt.get("attack_missed"):
+            miss_rounds += int(
+                nxt.get("deferred_waste_rounds")
+                or nxt.get("ammo_spent")
+                or 0
+            )
+        prev = nxt
+        if not prev.get("pending_combat_shots") and not nxt.get("attack_missed"):
+            break
+    assert miss_rounds == 6
+
+
 def test_room_change_clears_pending_without_miss() -> None:
     prev = {
         "room_id": "108",
@@ -338,6 +503,29 @@ def test_crow_active_byte_marks_combat_event() -> None:
     assert len(events) == 1
     assert events[0]["is_crow"] is True
     assert events[0]["damage"] == 10
+
+
+def test_cerberus_active_byte_marks_combat_event() -> None:
+    assert is_cerberus_combat_entity(
+        {"type_id": 0x0F, "active_byte": 0x90},
+        hp_before=100,
+    )
+    assert not is_cerberus_combat_entity(
+        {"type_id": 0x0F, "active_byte": 0},
+        hp_before=100,
+    )
+    assert not is_cerberus_combat_entity(
+        {"type_id": 0x0F, "active_byte": 0x90},
+        hp_before=220,
+    )
+    events = enemy_combat_events(
+        [{"slot": 0, "hp": 100, "type_id": 0x0F, "active_byte": 0x90}],
+        [{"slot": 0, "hp": 60, "type_id": 0x0F, "active_byte": 0x90}],
+        room_id="300",
+    )
+    assert len(events) == 1
+    assert events[0]["is_cerberus"] is True
+    assert events[0]["damage"] == 40
 
 
 def test_passive_crow_detection() -> None:

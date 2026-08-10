@@ -766,6 +766,7 @@ class RE1Env(gym.Env):
                     "ammo_spend",
                     "ammo_waste",
                     "combat_overkill",
+                    "shotgun_dog_hit",
                     "attack_dry_fire",
                     "attack_macro_failure",
                 )
@@ -3731,12 +3732,12 @@ class RE1Env(gym.Env):
                 or 0
             )
             knife_weapon = wid == KNIFE_ID
+        from re1_rl.enemy_combat import has_pending_combat, tick_pending_combat_credit
+        from re1_rl.grab_escape import grab_bite_transition
+
         # Timed pending credit: dog/Beretta lag + grenade/bazooka flight.
         # Bare interact/door flicker still unpaid (no pending window).
-        credit_pending = (
-            int((self._prev_state or {}).get("pending_combat_frames") or 0) > 0
-            and not combat_attack
-        )
+        credit_pending = has_pending_combat(self._prev_state) and not combat_attack
         state = apply_combat_step_fields(
             self._prev_state,
             state,
@@ -3744,7 +3745,6 @@ class RE1Env(gym.Env):
             attack=combat_attack,
             credit_damage=credit_pending,
         )
-        from re1_rl.grab_escape import grab_bite_transition
 
         grab_detected = grab_bite_transition(self._prev_state, state)
         if grab_detected:
@@ -3781,6 +3781,8 @@ class RE1Env(gym.Env):
         )
         enemy_damage = int(state.get("enemy_damage", 0))
         enemy_kills = int(state.get("enemy_kills", 0))
+        if enemy_kills > 0 and bool(state.get("in_control", True)):
+            self._progress.note_leg_kills(str(state.get("room_id", "") or ""), enemy_kills)
         if combat_attack:
             self._fill_last_attack_obs(
                 self._prev_state,

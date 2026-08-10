@@ -132,7 +132,7 @@ def test_big_rewards_includes_small_combat_miss_taxes() -> None:
     from re1_rl.step_diag import _big_reward_events
 
     breakdown = {
-        "ammo_spend": -0.03,
+        "ammo_spend": -0.04,
         "ammo_waste": -0.01333,
         "attack_miss": -0.001,
         "step": -0.0002,

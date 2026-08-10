@@ -27,6 +27,13 @@ GALLERY_CROW_ROOMS: frozenset[str] = frozenset({"107", "117", "212"})
 # Exclusive crow combat rooms (no paid fauna spawns in almanac).
 CROW_ONLY_COMBAT_ROOMS: frozenset[str] = frozenset({"117"})
 
+# Cerberus / zombie-dog (hub-door classify + dog_attack_ram_trace 2026-07).
+# kind@0x05 is shared with Tyrant/Yawn — pair with HP band + active_byte.
+CERBERUS_RAM_TYPE_ID = 0x0F
+CERBERUS_HP_MAX = 120  # live dogs ~100; Tyrant 220+, Yawn 3050+
+CERBERUS_ACTIVE_BYTES: frozenset[int] = frozenset({0x2C, 0x44, 0x90})
+CERBERUS_TYPE_NAMES: frozenset[str] = frozenset({"cerberus", "zombie_dog"})
+
 
 def is_crow_combat_entity(meta: dict[str, Any]) -> bool:
     """True when RAM meta identifies a crow (gallery pests)."""
@@ -64,6 +71,27 @@ def is_crow_enemy(
     if tid is None or int(tid) != GALLERY_CROW_RAM_TYPE_ID:
         return False
     return bool(int(ent.get("in_room", ent.get("alive", 0))))
+
+
+def is_cerberus_combat_entity(
+    meta: dict[str, Any],
+    *,
+    hp_before: int | None = None,
+) -> bool:
+    """True for cerberus / zombie-dog hits (not Tyrant/Yawn at kind 0x0F)."""
+    name = str(meta.get("type_name") or meta.get("enemy_type") or "").lower()
+    if name in CERBERUS_TYPE_NAMES:
+        return True
+    tid = meta.get("type_id")
+    if tid is None or int(tid) != CERBERUS_RAM_TYPE_ID:
+        return False
+    hp = int(hp_before if hp_before is not None else meta.get("hp_before", 0))
+    if hp <= 0 or hp > CERBERUS_HP_MAX:
+        return False
+    ab = meta.get("active_byte")
+    if ab is None:
+        return False
+    return int(ab) in CERBERUS_ACTIVE_BYTES
 
 
 def is_passive_crow_enemy(
@@ -211,6 +239,8 @@ def _type_meta_by_slot(
             meta["type_name"] = str(name)
         if "active_byte" in ent:
             meta["active_byte"] = int(ent["active_byte"])
+        if "hp" in ent:
+            meta["hp"] = int(ent["hp"])
         if meta:
             out[slot] = meta
     return out
@@ -241,6 +271,12 @@ def enemy_combat_events(
             type_name=meta.get("type_name"),
         )
         is_crow = is_crow_combat_entity(meta)
+        is_cerberus = is_cerberus_combat_entity(meta, hp_before=before)
+        extra: dict[str, Any] = {}
+        if "type_id" in meta:
+            extra["type_id"] = meta["type_id"]
+        if "active_byte" in meta:
+            extra["active_byte"] = meta["active_byte"]
         if after <= 0:
             events.append({
                 "slot": slot,
@@ -250,7 +286,8 @@ def enemy_combat_events(
                 "killed": True,
                 "reward_denied": denied,
                 "is_crow": is_crow,
-                **({"type_id": meta["type_id"]} if "type_id" in meta else {}),
+                "is_cerberus": is_cerberus,
+                **extra,
             })
         elif after < before:
             events.append({
@@ -261,7 +298,8 @@ def enemy_combat_events(
                 "killed": False,
                 "reward_denied": denied,
                 "is_crow": is_crow,
-                **({"type_id": meta["type_id"]} if "type_id" in meta else {}),
+                "is_cerberus": is_cerberus,
+                **extra,
             })
     return events
 
@@ -376,7 +414,116 @@ def _clear_pending_fields(out: dict[str, Any]) -> None:
     out["pending_combat_ammo"] = 0
     out["pending_combat_weapon_id"] = 0
     out["pending_combat_knife"] = False
+    out["pending_combat_shots"] = []
     out["combat_damage_credit"] = False
+
+
+def has_pending_combat(state: dict[str, Any] | None) -> bool:
+    """True when at least one attack is still awaiting HP credit."""
+    if not state:
+        return False
+    shots = state.get("pending_combat_shots")
+    if isinstance(shots, list) and shots:
+        return True
+    return int(state.get("pending_combat_frames") or 0) > 0
+
+
+def _pending_shots_from_state(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Normalize legacy scalar pending fields into a per-shot queue."""
+    shots = state.get("pending_combat_shots")
+    if isinstance(shots, list) and shots:
+        return [
+            {
+                "frames_left": int(s.get("frames_left") or 0),
+                "ammo": int(s.get("ammo") or 0),
+                "weapon_id": int(s.get("weapon_id") or 0),
+                "knife": bool(s.get("knife")),
+            }
+            for s in shots
+        ]
+    left = int(state.get("pending_combat_frames") or 0)
+    if left <= 0:
+        return []
+    return [
+        {
+            "frames_left": left,
+            "ammo": int(state.get("pending_combat_ammo") or 0),
+            "weapon_id": int(state.get("pending_combat_weapon_id") or 0),
+            "knife": bool(state.get("pending_combat_knife")),
+        }
+    ]
+
+
+def _sync_pending_scalars(out: dict[str, Any], shots: list[dict[str, Any]]) -> None:
+    if not shots:
+        _clear_pending_fields(out)
+        return
+    front = shots[0]
+    out["pending_combat_shots"] = shots
+    out["pending_combat_frames"] = max(int(s["frames_left"]) for s in shots)
+    out["pending_combat_ammo"] = int(front["ammo"])
+    out["pending_combat_weapon_id"] = int(front["weapon_id"])
+    out["pending_combat_knife"] = bool(front["knife"])
+    out["combat_damage_credit"] = True
+
+
+def _age_pending_shots(
+    pending_shots: list[dict[str, Any]],
+    tick: int,
+) -> tuple[list[dict[str, Any]], int, int, int]:
+    still_pending: list[dict[str, Any]] = []
+    expired_knife = 0
+    expired_gun_ammo = 0
+    expired_wid = 0
+    for shot in pending_shots:
+        left = int(shot["frames_left"]) - tick
+        if left <= 0:
+            if shot["knife"]:
+                expired_knife += 1
+            elif int(shot["ammo"]) > 0:
+                expired_gun_ammo += int(shot["ammo"])
+                expired_wid = int(shot["weapon_id"])
+        else:
+            still_pending.append({**shot, "frames_left": left})
+    return still_pending, expired_knife, expired_gun_ammo, expired_wid
+
+
+def _apply_expired_miss(
+    out: dict[str, Any],
+    *,
+    expired_knife: int,
+    expired_gun_ammo: int,
+    expired_wid: int,
+) -> None:
+    if not expired_knife and not expired_gun_ammo:
+        return
+    out["pending_combat_expired"] = True
+    if expired_knife:
+        out["knife_swing_missed"] = True
+    if expired_gun_ammo:
+        out["attack_missed"] = True
+        out["ammo_spent"] = int(expired_gun_ammo)
+        out["pending_miss_weapon_id"] = int(expired_wid)
+
+
+def _finalize_pending(
+    out: dict[str, Any],
+    pending_shots: list[dict[str, Any]],
+    *,
+    expired_knife: int = 0,
+    expired_gun_ammo: int = 0,
+) -> None:
+    if pending_shots:
+        _sync_pending_scalars(out, pending_shots)
+    elif not (expired_knife or expired_gun_ammo):
+        _clear_pending_fields(out)
+    else:
+        out["pending_combat_shots"] = []
+        out["pending_combat_frames"] = 0
+        out["pending_combat_ammo"] = 0
+        out["pending_combat_weapon_id"] = 0
+        out["pending_combat_knife"] = False
+        out["combat_damage_credit"] = False
 
 
 def tick_pending_combat_credit(
@@ -401,20 +548,10 @@ def tick_pending_combat_credit(
     curr_room = str(out.get("room_id", "") or "")
     room_changed = bool(prev_room and curr_room and prev_room != curr_room)
 
-    pending_left = int(prev_state.get("pending_combat_frames") or 0)
-    pending_ammo = int(prev_state.get("pending_combat_ammo") or 0)
-    pending_wid = int(prev_state.get("pending_combat_weapon_id") or 0)
-    pending_knife = bool(prev_state.get("pending_combat_knife"))
+    pending_shots = _pending_shots_from_state(prev_state)
 
     hit = int(out.get("enemy_damage") or 0) > 0 or int(out.get("enemy_kills") or 0) > 0
     if room_changed:
-        _clear_pending_fields(out)
-        return out
-
-    if hit:
-        out["credited_from_pending"] = bool(
-            pending_left > 0 and not knife and not attack
-        )
         _clear_pending_fields(out)
         return out
 
@@ -423,43 +560,85 @@ def tick_pending_combat_credit(
         out.get("attack_macro_failure")
     )
 
+    if hit:
+        out["credited_from_pending"] = bool(
+            pending_shots and not knife and not attack
+        )
+        if pending_shots:
+            pending_shots = pending_shots[1:]
+
     if knife or attack:
         if failed_macro:
-            # Keep immediate miss flags from apply_combat_step_fields.
-            _clear_pending_fields(out)
+            # Keep in-flight projectiles; failed fire does not arm a new window.
+            _finalize_pending(out, pending_shots)
             return out
-        # Defer miss: strip same-step miss flags and wait for HP to post.
+        # Defer miss: strip same-step macro miss flags and wait for HP to post.
         out.pop("attack_missed", None)
         out.pop("knife_swing_missed", None)
+        tick = max(1, int(step_emulated_frames))
+        pending_shots, expired_knife, expired_gun_ammo, expired_wid = _age_pending_shots(
+            pending_shots, tick
+        )
+        new_rounds = int(ammo_spent)
+        if expired_gun_ammo > 0:
+            if new_rounds > 0:
+                # Same step: old round(s) missed while firing another.
+                out["deferred_waste_rounds"] = int(expired_gun_ammo)
+                out["attack_missed"] = True
+                out["pending_miss_weapon_id"] = int(expired_wid)
+            else:
+                _apply_expired_miss(
+                    out,
+                    expired_knife=expired_knife,
+                    expired_gun_ammo=expired_gun_ammo,
+                    expired_wid=expired_wid,
+                )
+        elif expired_knife:
+            _apply_expired_miss(
+                out,
+                expired_knife=expired_knife,
+                expired_gun_ammo=0,
+                expired_wid=0,
+            )
         wid = int(weapon_id or out.get("equipped_weapon_id") or 0)
-        out["pending_combat_frames"] = pending_combat_window_frames(wid)
-        out["pending_combat_ammo"] = int(ammo_spent)
-        out["pending_combat_weapon_id"] = wid
-        out["pending_combat_knife"] = bool(knife)
-        out["combat_damage_credit"] = True
+        pending_shots.append(
+            {
+                "frames_left": pending_combat_window_frames(wid),
+                "ammo": new_rounds,
+                "weapon_id": wid,
+                "knife": bool(knife),
+            }
+        )
+        _finalize_pending(
+            out,
+            pending_shots,
+            expired_knife=expired_knife,
+            expired_gun_ammo=expired_gun_ammo if new_rounds <= 0 else 0,
+        )
         return out
 
-    if pending_left <= 0:
+    if hit:
+        _finalize_pending(out, pending_shots)
+        return out
+
+    if not pending_shots:
         _clear_pending_fields(out)
         return out
 
     tick = max(1, int(step_emulated_frames))
-    left = max(0, pending_left - tick)
-    if left > 0:
-        out["pending_combat_frames"] = left
-        out["pending_combat_ammo"] = pending_ammo
-        out["pending_combat_weapon_id"] = pending_wid
-        out["pending_combat_knife"] = pending_knife
-        out["combat_damage_credit"] = True
-        return out
-
-    # Window expired with no hit — apply deferred miss once.
-    _clear_pending_fields(out)
-    out["pending_combat_expired"] = True
-    if pending_knife:
-        out["knife_swing_missed"] = True
-    elif pending_ammo > 0:
-        out["attack_missed"] = True
-        out["ammo_spent"] = pending_ammo
-        out["pending_miss_weapon_id"] = pending_wid
+    pending_shots, expired_knife, expired_gun_ammo, expired_wid = _age_pending_shots(
+        pending_shots, tick
+    )
+    _apply_expired_miss(
+        out,
+        expired_knife=expired_knife,
+        expired_gun_ammo=expired_gun_ammo,
+        expired_wid=expired_wid,
+    )
+    _finalize_pending(
+        out,
+        pending_shots,
+        expired_knife=expired_knife,
+        expired_gun_ammo=expired_gun_ammo,
+    )
     return out
