@@ -69,6 +69,9 @@ class ProgressTracker:
     leg_acquired_items: set[str] = field(default_factory=set)
     # Paid enemy kills during the current rails leg, keyed by room_id (10A etc.).
     leg_kills_by_room: dict[str, int] = field(default_factory=dict)
+    # Snapshot of ``leg_kills_by_room`` taken at claim time. Capture runs after
+    # claim clears the live map; successor sidecars still need kill evidence.
+    last_claimed_leg_kills: dict[str, int] = field(default_factory=dict)
     # Directed room transitions observed during the current rails leg. This
     # lets a checkpoint combine a valid entry with an event that settles a few
     # steps later without accepting an entry from a different room.
@@ -294,10 +297,27 @@ class ProgressTracker:
         if self.checkpoint_success:
             return False
         self.legs_completed += 1
+        self.last_claimed_leg_kills = {
+            str(room): int(n) for room, n in self.leg_kills_by_room.items()
+        }
         self.leg_acquired_items.clear()
         self.leg_kills_by_room.clear()
         self.checkpoint_success = self.legs_completed >= max(1, int(self.leg_span))
         return True
+
+    def leg_kills_for_capture(self) -> dict[str, int]:
+        """Kills visible to post-claim capture (snapshot preferred, else live)."""
+        if self.last_claimed_leg_kills:
+            return dict(self.last_claimed_leg_kills)
+        return {str(room): int(n) for room, n in self.leg_kills_by_room.items()}
+
+    def restore_claimed_leg_kills_for_sidecar(self) -> None:
+        """Rehydrate live kills from the claim snapshot for successor sidecars."""
+        if self.leg_kills_by_room or not self.last_claimed_leg_kills:
+            return
+        self.leg_kills_by_room.update(
+            {str(room): int(n) for room, n in self.last_claimed_leg_kills.items()}
+        )
 
     def begin_loadout_segment(
         self,

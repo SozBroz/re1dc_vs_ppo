@@ -112,11 +112,23 @@ def test_claim_checkpoint_success_clears_leg_kills() -> None:
     assert p.legs_completed == 1
     assert p.checkpoint_success is False
     assert p.leg_kills_by_room == {}
+    assert p.last_claimed_leg_kills == {"10A": 2}
+    assert p.leg_kills_for_capture() == {"10A": 2}
     p.note_leg_kills("10A", 1)
     assert p.claim_checkpoint_success() is True
     assert p.checkpoint_success is True
     assert p.leg_kills_by_room == {}
+    assert p.last_claimed_leg_kills == {"10A": 1}
     assert p.claim_checkpoint_success() is False
+
+
+def test_restore_claimed_leg_kills_for_sidecar() -> None:
+    p = ProgressTracker()
+    p.note_leg_kills("10A", 2)
+    assert p.claim_checkpoint_success() is True
+    assert p.leg_kills_by_room == {}
+    p.restore_claimed_leg_kills_for_sidecar()
+    assert p.leg_kills_by_room == {"10A": 2}
 
 
 def test_ever_held_round_trip() -> None:

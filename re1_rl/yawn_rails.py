@@ -715,13 +715,17 @@ def capture_successor_cell(
     if cid == "main_hall_106" and not any(str(k).startswith("106:") for k in ledgers):
         return None
     if cid == "crow_gallery_enter_117" and progress is not None:
-        leg_kills = int(getattr(progress, "leg_kills_by_room", {}).get("10A", 0))
+        # claim_checkpoint_success clears live kills before capture runs; use
+        # the claim-time snapshot (falls back to live for unit tests).
+        kills_map = progress.leg_kills_for_capture()
+        leg_kills = int(kills_map.get("10A", 0))
         if leg_kills < 2:
             print(
                 f"[yawn_capture] reject leg_kills_10A={leg_kills} need=2 cp={cid}",
                 flush=True,
             )
             return None
+        progress.restore_claimed_leg_kills_for_sidecar()
     # First climb to 203 has no cinema at this story beat — do not require 203:.
     next_checkpoint = planner.step_by_seq(completed + 2)
     capacity = successor_capacity(state, next_checkpoint)
