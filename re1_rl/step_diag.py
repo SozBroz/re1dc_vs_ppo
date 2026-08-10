@@ -230,6 +230,9 @@ def _equip_policy_probs(masked_probs: Any, mask: Any) -> dict[str, Any] | None:
 
 # Log individual reward channels at/above this absolute magnitude (with source).
 BIG_REWARD_ABS = 0.1
+# Combat spend/waste/miss taxes are smaller than nav crumbs but must always
+# show in memlog when non-zero (handgun waste ~0.013, knife miss ~0.001).
+_COMBAT_TAX_SOURCES = frozenset({"ammo_spend", "ammo_waste", "attack_miss"})
 
 
 def _big_reward_events(breakdown: Any) -> list[dict[str, Any]]:
@@ -242,7 +245,9 @@ def _big_reward_events(breakdown: Any) -> list[dict[str, Any]]:
             val = float(raw)
         except (TypeError, ValueError):
             continue
-        if abs(val) + 1e-12 >= BIG_REWARD_ABS:
+        if val == 0.0:
+            continue
+        if str(src) in _COMBAT_TAX_SOURCES or abs(val) + 1e-12 >= BIG_REWARD_ABS:
             out.append({"src": str(src), "r": round(val, 5)})
     out.sort(key=lambda x: (-abs(float(x["r"])), str(x["src"])))
     return out

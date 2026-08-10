@@ -50,6 +50,7 @@ def _sample_progress() -> ProgressTracker:
 
 def test_progress_round_trip() -> None:
     src = _sample_progress()
+    src.note_leg_kills("10A", 2)
     restored = ProgressTracker()
     apply_progress_sidecar(restored, progress_to_sidecar(src))
 
@@ -68,6 +69,54 @@ def test_progress_round_trip() -> None:
     assert restored.gallery_pending_reward == src.gallery_pending_reward
     assert restored.gallery_completed == src.gallery_completed
     assert restored.gallery_needs_reentry == src.gallery_needs_reentry
+    assert restored.leg_kills_by_room == {"10A": 2}
+
+
+def test_legacy_sidecar_without_leg_kills_defaults_empty() -> None:
+    restored = ProgressTracker()
+    restored.note_leg_kills("10A", 9)
+    apply_progress_sidecar(
+        restored,
+        {
+            "visited_rooms": ["105"],
+            "visited_at_waypoint": {},
+            "visited_at_route_seq": {},
+            "rewarded_cutscenes": [],
+            "rewarded_story_uses": [],
+            "rewarded_document_rooms": [],
+            "weapons_progressed": [],
+            "key_items_rewarded": [],
+            "penalized_offroute_rooms": [],
+            "kenneth_gate_breached": False,
+            "wrong_room_breached": False,
+            "softlock_cap_frames": 0,
+            "max_steps_bonus": 0,
+            "spawn_room_id": None,
+            "spawn_room_bonus_paid": False,
+            "cutscene_blocked_after_pickup_room": None,
+            "gallery_step_index": 0,
+            "gallery_pending_reward": 0.0,
+            "gallery_completed": False,
+            "gallery_puzzle_solved": False,
+            "gallery_needs_reentry": False,
+            "dining_statue_rewarded": False,
+        },
+    )
+    assert restored.leg_kills_by_room == {}
+
+
+def test_claim_checkpoint_success_clears_leg_kills() -> None:
+    p = ProgressTracker(leg_span=2)
+    p.note_leg_kills("10A", 2)
+    assert p.claim_checkpoint_success() is True
+    assert p.legs_completed == 1
+    assert p.checkpoint_success is False
+    assert p.leg_kills_by_room == {}
+    p.note_leg_kills("10A", 1)
+    assert p.claim_checkpoint_success() is True
+    assert p.checkpoint_success is True
+    assert p.leg_kills_by_room == {}
+    assert p.claim_checkpoint_success() is False
 
 
 def test_ever_held_round_trip() -> None:

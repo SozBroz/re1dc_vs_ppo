@@ -76,6 +76,11 @@ def progress_to_sidecar(progress: ProgressTracker) -> dict[str, Any]:
         "gallery_puzzle_solved": bool(progress.gallery_puzzle_solved),
         "gallery_needs_reentry": bool(progress.gallery_needs_reentry),
         "dining_statue_rewarded": bool(progress.dining_statue_rewarded),
+        "leg_kills_by_room": {
+            str(k).upper(): int(v)
+            for k, v in sorted(progress.leg_kills_by_room.items())
+            if str(k).strip() and int(v) > 0
+        },
     }
 
 
@@ -104,6 +109,17 @@ def apply_progress_sidecar(progress: ProgressTracker, data: dict[str, Any]) -> N
     progress.gallery_puzzle_solved = bool(data.get("gallery_puzzle_solved", False))
     progress.gallery_needs_reentry = bool(data.get("gallery_needs_reentry", False))
     progress.dining_statue_rewarded = bool(data.get("dining_statue_rewarded", False))
+    raw_kills = data.get("leg_kills_by_room")
+    progress.leg_kills_by_room = {}
+    if isinstance(raw_kills, dict):
+        for room, count in raw_kills.items():
+            room_id = str(room or "").upper()
+            try:
+                n = int(count)
+            except (TypeError, ValueError):
+                continue
+            if room_id and n > 0:
+                progress.leg_kills_by_room[room_id] = n
 
 
 def item_tracker_to_sidecar(items: ItemTracker) -> dict[str, Any]:

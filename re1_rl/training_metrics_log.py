@@ -340,6 +340,10 @@ def log_update_line(record: dict[str, Any]) -> None:
         parts.append(f"collect_s={float(record['collection_wall_s']):.1f}")
     if "train_wall_s" in record:
         parts.append(f"train_s={float(record['train_wall_s']):.1f}")
+    if "digested_steps_s" in record:
+        parts.append(f"digested={float(record['digested_steps_s']):.1f}/s")
+    if "next_cohort_steps" in record:
+        parts.append(f"next_cohort={int(record['next_cohort_steps'])}")
     if "relevance_step_keep_rate" in record:
         parts.append(
             f"rel_step_keep={float(record['relevance_step_keep_rate']):.3f}"

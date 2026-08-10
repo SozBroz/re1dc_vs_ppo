@@ -119,6 +119,24 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     ap.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help=(
+            "override DISTRIBUTED_EPOCH_HYPERPARAMS batch_size for PPO minibatches "
+            "(default: keep package value, currently 2048)"
+        ),
+    )
+    ap.add_argument(
+        "--min-host-free-gb",
+        type=float,
+        default=12.0,
+        help=(
+            "reject new rollouts with capacity_full when host free RAM falls "
+            "below this many GiB (default 12). 0 = disable."
+        ),
+    )
+    ap.add_argument(
         "--worker-buffer-steps",
         type=int,
         default=32_000,
@@ -233,6 +251,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="enable independent control/telemetry for selected logical rank 4",
     )
+    ap.add_argument(
+        "--eval-only",
+        action="store_true",
+        help=(
+            "worker: pull learner weights and run rollouts, but never upload "
+            "experience (memlog / fight-eval A/B harness)"
+        ),
+    )
     ap.add_argument("--total-steps", type=int, default=2_000_000,
                     help="training timesteps (0 = no limit, run until interrupted)")
     ap.add_argument("--curriculum", default="curriculum/yawn_rails_one_leg.json")
@@ -321,6 +347,10 @@ def _build_learner_model(args: argparse.Namespace, device: str):
             continue
         if hasattr(model, key):
             setattr(model, key, value)
+    batch_override = getattr(args, "batch_size", None)
+    if batch_override is not None:
+        model.batch_size = int(batch_override)
+        log(args.machine_name, f"--batch-size override -> {model.batch_size}")
     if hasattr(model, "lr_schedule"):
         lr = float(DISTRIBUTED_EPOCH_HYPERPARAMS["learning_rate"])
         model.lr_schedule = lambda _progress: lr
@@ -337,7 +367,7 @@ def _build_learner_model(args: argparse.Namespace, device: str):
     log(
         args.machine_name,
         f"epoch hyperparams lr={DISTRIBUTED_EPOCH_HYPERPARAMS['learning_rate']} "
-        f"batch_size={DISTRIBUTED_EPOCH_HYPERPARAMS['batch_size']} "
+        f"batch_size={model.batch_size} "
         f"n_epochs={DISTRIBUTED_EPOCH_HYPERPARAMS['n_epochs']} "
         f"gamma={DISTRIBUTED_EPOCH_HYPERPARAMS['gamma']} "
         f"target_kl={getattr(model, 'target_kl', None)}",
@@ -440,6 +470,7 @@ def _run_local_worker(
                 inference_batch_max=int(args.inference_batch_max),
                 actor_ranks=getattr(args, "actor_ranks", None),
                 memlog_actor_rank=4 if bool(getattr(args, "memlog", False)) else None,
+                eval_only=bool(getattr(args, "eval_only", False)),
             )
         finally:
             if learner_state is not None:
@@ -522,6 +553,7 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
                 inference_batch_max=int(args.inference_batch_max),
                 actor_ranks=getattr(args, "actor_ranks", None),
                 memlog_actor_rank=4 if bool(getattr(args, "memlog", False)) else None,
+                eval_only=bool(getattr(args, "eval_only", False)),
             )
     except KeyboardInterrupt:
         log(args.machine_name, "remote worker interrupted")
@@ -550,11 +582,13 @@ def _run_learner(args: argparse.Namespace) -> int:
         sync_interval = float(args.weight_sync_poll_s)
     max_pending_steps = max(int(getattr(args, "max_pending_steps", 0) or 0), 0)
     worker_buffer_steps = max(int(getattr(args, "worker_buffer_steps", 0) or 0), 0)
+    min_host_free_gb = float(getattr(args, "min_host_free_gb", 0.0) or 0.0)
     log(
         args.machine_name,
         f"learner starting: sync_interval_s={sync_interval:.0f} "
         f"max_pending_steps={max_pending_steps or 'unlimited'} "
         f"worker_buffer_steps={worker_buffer_steps or 'off'} "
+        f"min_host_free_gb={min_host_free_gb or 'off'} "
         f"batch_threshold={args.batch_threshold} max_staleness={args.max_staleness} "
         f"relevance_gate={args.relevance_gate} "
         f"relevance_max_age={args.relevance_max_age} "
@@ -599,6 +633,7 @@ def _run_learner(args: argparse.Namespace) -> int:
         expected_curriculum_id=normalize_curriculum_id(args.curriculum),
         expected_obs_schema_version=int(OBS_SCHEMA_VERSION),
         max_pending_steps=max_pending_steps,
+        min_host_free_gb=min_host_free_gb,
     )
     local_rollout_sink = LearnerRolloutSink(learner_state)
 
@@ -800,6 +835,20 @@ def _run_learner(args: argparse.Namespace) -> int:
             )
             epoch_update = int(status["epoch_id"])
             status_contributors = list(status.get("contributors") or [])
+            # Freeze the training cohort, then reopen admission so workers can
+            # fill the next bounded cohort while PPO trains.
+            train_batch = list(pending)
+            train_batch_steps = int(pending_steps)
+            pending.clear()
+            pending_steps = 0
+            next_epoch_id, next_expected = learner_state.begin_epoch()
+            waiting_for_fleet = False
+            log(
+                args.machine_name,
+                f"overlap: training snapshot steps={train_batch_steps}; "
+                f"next epoch {next_epoch_id} open "
+                f"expected={next_expected or '(none yet)'}",
+            )
             try:
                 from re1_rl.distributed.relevance_gate import RelevanceGateConfig
 
@@ -814,7 +863,7 @@ def _run_learner(args: argparse.Namespace) -> int:
                 train_t0 = time.monotonic()
                 trained = train_on_rollouts(
                     model,
-                    pending,
+                    train_batch,
                     machine_name=args.machine_name,
                     current_policy_version=pre_train_version,
                     max_staleness=int(args.max_staleness),
@@ -827,12 +876,19 @@ def _run_learner(args: argparse.Namespace) -> int:
                 version = weight_store.publish(export_policy_state_dict(model))
                 learner_state.set_current_version(version)
                 rss_after = _rss_gb()
+                next_admitted = int(learner_state.admitted_steps())
+                cycle_wall_s = collection_wall_s + train_wall_s
+                digested_sps = (
+                    float(trained) / cycle_wall_s if cycle_wall_s > 0 else 0.0
+                )
                 log(
                     args.machine_name,
-                    f"epoch train {trained} steps from {len(pending)} rollouts "
+                    f"epoch train {trained} steps from {len(train_batch)} rollouts "
                     f"merged_envs={merged_envs} contributors={status_contributors} -> "
                     f"policy_version={version} total={model.num_timesteps} "
-                    f"rss_gb={rss_after if rss_after is not None else 'n/a'}",
+                    f"rss_gb={rss_after if rss_after is not None else 'n/a'} "
+                    f"digested_sps={digested_sps:.1f} "
+                    f"next_cohort_steps={next_admitted}",
                 )
                 pitch = learner_state.pitch_summary()
                 log(
@@ -882,6 +938,10 @@ def _run_learner(args: argparse.Namespace) -> int:
                     extra={
                         "logger_scalars": fleet_metrics.get("logger_scalars") or {},
                         "pitch": pitch,
+                        "digested_steps_s": digested_sps,
+                        "next_cohort_steps": next_admitted,
+                        "active_cohort_steps": train_batch_steps,
+                        "host_free_gb": learner_state._host_free_gb(),
                     },
                 )
                 emit_fleet_epoch_metrics(metrics_jsonl, record)
@@ -914,25 +974,27 @@ def _run_learner(args: argparse.Namespace) -> int:
                 log(args.machine_name, f"epoch train failed: {exc}")
                 raise
             finally:
-                pending.clear()
-                pending_steps = 0
-                epoch_id, expected = learner_state.begin_epoch()
-                epoch_t0 = time.monotonic()
-                waiting_for_fleet = False
+                # Promote the next cohort already admitted during train. Do not
+                # begin_epoch again — that would discard admission counters.
                 pull_rollout_queue(
                     rollout_queue,
                     pending,
                     machine_name=args.machine_name,
                 )
                 pending_steps = sum(r.num_timesteps() for r in pending)
-                # Carry-forward was already admitted under the prior epoch; seed
-                # the new epoch counter so capacity accounting stays accurate.
                 with learner_state.lock:
-                    learner_state.epoch_admitted_steps = int(pending_steps)
+                    learner_state.epoch_admitted_steps = max(
+                        int(learner_state.epoch_admitted_steps),
+                        int(pending_steps),
+                    )
+                epoch_id = int(learner_state.epoch_id)
+                epoch_t0 = time.monotonic()
+                waiting_for_fleet = False
                 log(
                     args.machine_name,
-                    f"epoch {epoch_id} started; expected={expected or '(none yet)'} "
-                    f"carried_pending_steps={pending_steps}",
+                    f"epoch {epoch_id} continue after train; "
+                    f"carried_pending_steps={pending_steps} "
+                    f"admitted={learner_state.admitted_steps()}",
                 )
 
     except KeyboardInterrupt:
@@ -1009,6 +1071,8 @@ def main() -> int:
     args = build_parser().parse_args()
     if args.actor_ranks is not None:
         args.n_envs = len(args.actor_ranks)
+    if bool(getattr(args, "eval_only", False)):
+        os.environ["RE1_EVAL_ONLY"] = "1"
     if args.memlog:
         if args.synced_envs:
             raise SystemExit("--memlog requires the default async actor runtime")

@@ -139,6 +139,27 @@ def test_packed_train_single_train_call() -> None:
     assert model.num_timesteps == before + steps
 
 
+def test_fill_packed_buffer_vectorized_full_and_finite() -> None:
+    from re1_rl.distributed.learner_train import merge_rollouts
+    from re1_rl.distributed.packed_train import (
+        _merged_to_flat_segment,
+        fill_packed_rollout_buffer,
+    )
+
+    model = _tiny_model()
+    flat = _merged_to_flat_segment(model, merge_rollouts([_fake_rollout(n_steps=4, n_envs=2)]))
+    buf = fill_packed_rollout_buffer(model, flat)
+    n = int(flat["n"])
+    assert buf.buffer_size == n
+    assert buf.n_envs == 1
+    assert buf.full is True
+    assert buf.pos == n
+    assert buf.observations["frame"].shape[0] == n
+    assert np.isfinite(buf.returns).all()
+    assert np.isfinite(buf.advantages).all()
+    assert buf.action_masks.shape == (n, 1, N_ACTIONS)
+
+
 def test_train_on_rollouts_uses_packed_path() -> None:
     model = _tiny_model()
     before = model.num_timesteps

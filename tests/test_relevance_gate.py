@@ -99,6 +99,39 @@ def test_is_version_stale_for_gate() -> None:
     assert is_version_stale_for_gate(3, 5, 1)
 
 
+def test_is_version_lagged_for_gate() -> None:
+    from re1_rl.distributed.relevance_gate import is_version_lagged_for_gate
+
+    assert not is_version_lagged_for_gate(5, 5)
+    assert is_version_lagged_for_gate(4, 5)
+    assert is_version_lagged_for_gate(1, 5)
+
+
+def test_filter_gates_lag1_when_gate_all_lagged() -> None:
+    model = _tiny_model()
+    lag1_good = _fake_rollout(version=4)
+    lag1_good.log_probs = compute_new_log_probs(model, lag1_good)
+    lag1_bad = _fake_rollout(version=4)
+    lag1_bad.log_probs = np.full_like(lag1_bad.log_probs, -80.0)
+    fresh = _fake_rollout(version=5)
+
+    kept, stats, _details = filter_stale_rollouts(
+        model,
+        [lag1_good, lag1_bad, fresh],
+        current_policy_version=5,
+        max_staleness=1,
+        config=RelevanceGateConfig(ratio_clip=2.0, keep_frac=0.5),
+        gate_all_lagged=True,
+    )
+    assert stats.considered == 2
+    assert stats.kept == 1
+    assert stats.dropped == 1
+    kept_ids = {id(r) for r in kept}
+    assert id(lag1_good) in kept_ids
+    assert id(fresh) in kept_ids
+    assert id(lag1_bad) not in kept_ids
+
+
 def test_accept_rollout_soft_queues_stale_when_gate_enabled() -> None:
     store = WeightStore()
     q: queue.Queue = queue.Queue()

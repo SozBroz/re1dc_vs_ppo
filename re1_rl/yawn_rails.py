@@ -715,7 +715,7 @@ def capture_successor_cell(
     if cid == "main_hall_106" and not any(str(k).startswith("106:") for k in ledgers):
         return None
     if cid == "crow_gallery_enter_117" and progress is not None:
-        leg_kills = int(progress.leg_kills_by_room.get("10A", 0))
+        leg_kills = int(getattr(progress, "leg_kills_by_room", {}).get("10A", 0))
         if leg_kills < 2:
             print(
                 f"[yawn_capture] reject leg_kills_10A={leg_kills} need=2 cp={cid}",

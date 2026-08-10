@@ -239,3 +239,34 @@ def test_begin_epoch_resets_admitted_steps() -> None:
     state.begin_epoch()
     assert state.admitted_steps() == 0
     assert state.cohort_full() is False
+
+
+def test_begin_epoch_reopens_admission_for_overlap() -> None:
+    """Train-overlap path: reopen cohort while a prior cohort is held aside."""
+    store = WeightStore()
+    q: queue.Queue = queue.Queue()
+    state = LearnerState(
+        store,
+        q,
+        machine_name="t",
+        max_staleness=2,
+        worker_liveness_s=60,
+        max_pending_steps=8,
+    )
+    state.set_current_version(1)
+    state.begin_epoch()
+    assert state.accept_rollout(_rollout("pking"))[0]
+    assert state.accept_rollout(_rollout("workhorse1"))[0]
+    assert state.cohort_full() is True
+    assert state.accept_rollout(_rollout("workhorse2")) == (False, "capacity_full")
+
+    # Snapshot for train would drain ``q``; reopen admission for next cohort.
+    train_q: list = []
+    while not q.empty():
+        train_q.append(q.get_nowait())
+    assert len(train_q) == 2
+    state.begin_epoch()
+    assert state.cohort_full() is False
+    assert state.accept_rollout(_rollout("pking"))[0]
+    assert state.admitted_steps() == 4
+    assert q.qsize() == 1

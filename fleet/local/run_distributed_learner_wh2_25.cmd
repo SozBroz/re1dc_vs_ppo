@@ -1,9 +1,10 @@
 @echo off
 REM workhorse2 learner — 28 local envs (Doc04 medium RAM/VRAM budget); sync 360
 REM Headroom: @32 envs 10m soak peak ~41GB used / ~24GB free (pages_input~0).
-REM Package: sync 360 wall + n_steps=675 (6x gamma HL) + batch_size=2048 + n_epochs=4.
+REM Package: sync 360 wall + n_steps=1125 + batch_size=3072 + n_epochs=4.
 REM Memory bound: --max-pending-steps 100000 (default) + --worker-buffer-steps 32000
-REM (early flush); capacity_full backpressure pauses workers until next policy.
+REM (early flush); capacity_full backpressure pauses workers until next cohort/policy.
+REM Overlap: learner reopens admission at train start; --min-host-free-gb 12.
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE=workhorse2
@@ -46,6 +47,8 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --sync-interval-s %SYNC_INTERVAL_S% ^
   --max-staleness 1 ^
   --relevance-gate ^
+  --batch-size 3072 ^
+  --min-host-free-gb 12 ^
   --resume auto ^
   --headless ^
   --screenshot-mmf ^

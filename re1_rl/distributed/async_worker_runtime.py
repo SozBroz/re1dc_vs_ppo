@@ -262,14 +262,24 @@ def _flush_remote_epoch(
     worker_id: str,
     pack_max_envs: int = 16,
     flush_reason: str = "timer",
+    eval_only: bool = False,
 ) -> tuple[list[WorkerRollout], bool]:
     """Upload buffered experience (burst), then pull weights once.
 
     Returns ``(retained, capacity_full)``. Capacity-full packets are dropped.
+    When ``eval_only``, rollouts are discarded locally and never uploaded.
     """
     retained: list[WorkerRollout] = []
     capacity_full = False
-    if not buffered:
+    if eval_only and buffered:
+        total_steps = sum(r.num_timesteps() for r in buffered)
+        log(
+            machine_name,
+            f"sync epoch ({flush_reason}) eval-only: discarded "
+            f"{len(buffered)} actor-rollouts ({total_steps} steps); weight pull only",
+        )
+        buffered = []
+    elif not buffered:
         log(
             machine_name,
             f"sync epoch ({flush_reason}): no rollouts buffered; weight pull only",
@@ -353,10 +363,19 @@ def _flush_local_epoch(
     policy: InferencePolicy | None = None,
     weight_store: Any | None = None,
     flush_reason: str = "timer",
+    eval_only: bool = False,
 ) -> tuple[list[WorkerRollout], bool]:
     retained: list[WorkerRollout] = []
     capacity_full = False
-    if not buffered:
+    if eval_only and buffered:
+        total_steps = sum(r.num_timesteps() for r in buffered)
+        log(
+            machine_name,
+            f"sync epoch (local/{flush_reason}) eval-only: discarded "
+            f"{len(buffered)} actor-rollouts ({total_steps} steps)",
+        )
+        buffered = []
+    elif not buffered:
         log(machine_name, f"sync epoch (local/{flush_reason}): no rollouts buffered")
     else:
         total_steps = sum(r.num_timesteps() for r in buffered)
@@ -456,6 +475,7 @@ def run_async_worker_loop(
     weight_store: Any | None = None,
     actor_ranks: list[int] | None = None,
     memlog_actor_rank: int | None = None,
+    eval_only: bool = False,
 ) -> None:
     """Spawn desync actors and serve local inference until ``stop_event``.
 
@@ -464,7 +484,8 @@ def run_async_worker_loop(
     (0 = timer-only). Remotes then pull weights; locals pull from
     ``weight_store`` only at epoch flush (no mid-horizon hot-swap).
     On learner ``capacity_full``, drop the overflow packet and pause
-    buffering until a newer policy arrives.
+    buffering until the learner reopens admission (next cohort) or a
+    newer policy arrives.
     """
     ranks = (
         list(range(int(n_envs)))
@@ -486,7 +507,8 @@ def run_async_worker_loop(
         f"n_steps={n_steps}, sync_interval_s={sync_interval_s:.0f}, "
         f"buffer_flush_steps={buffer_cap or 'off'}, "
         f"headless={headless}, screenshot_mmf={screenshot_mmf}, "
-        f"inference_batch_max={inference_batch_max})",
+        f"inference_batch_max={inference_batch_max}, "
+        f"eval_only={eval_only})",
     )
     root = Path(project_root) if project_root else Path.cwd()
     best_log = root / "data" / "logs" / f"best_rooms_{machine_name}.jsonl"
@@ -505,9 +527,24 @@ def run_async_worker_loop(
     last_heartbeat = 0.0
     last_manifest_poll = 0.0
     last_yawn_rails_poll = 0.0
-    # When set, drop new actor rollouts until policy_version advances past this.
+    # When set, drop new actor rollouts until policy advances or cohort reopens.
     pause_until_policy_gt: int | None = None
     hb_stop = threading.Event()
+
+    def _learner_accepting_rollouts() -> bool:
+        """True when the learner can admit more steps (next cohort open)."""
+        if is_local:
+            state = getattr(rollout_sink, "_state", None)
+            if state is not None and hasattr(state, "cohort_full"):
+                return not bool(state.cohort_full())
+            return True
+        if isinstance(rollout_sink, WorkerClient):
+            try:
+                status = rollout_sink.fetch_status()
+                return not bool(status.get("cohort_full", False))
+            except Exception:
+                return False
+        return True
 
     def _heartbeat_loop() -> None:
         nonlocal last_manifest_poll, last_yawn_rails_poll
@@ -634,6 +671,7 @@ def run_async_worker_loop(
                     policy=policy,
                     weight_store=weight_store,
                     flush_reason=reason,
+                    eval_only=eval_only,
                 )
             elif isinstance(rollout_sink, WorkerClient):
                 buffered, capacity_full = _flush_remote_epoch(
@@ -643,6 +681,7 @@ def run_async_worker_loop(
                     machine_name=machine_name,
                     worker_id=worker_id,
                     flush_reason=reason,
+                    eval_only=eval_only,
                 )
             if epoch_infos:
                 progress.log_rollout_end(
@@ -656,20 +695,37 @@ def run_async_worker_loop(
                 log(
                     machine_name,
                     f"capacity backpressure: pause buffering until "
-                    f"policy_version > {pause_until_policy_gt}",
+                    f"cohort reopens or policy_version > {pause_until_policy_gt}",
                 )
 
         while not stop_event.is_set() and not stop_flag.value:
+            if eval_only:
+                try:
+                    from re1_rl.fight_eval_episodes import fight_eval_should_stop
+
+                    if fight_eval_should_stop(root):
+                        log(
+                            machine_name,
+                            "fight eval episode cap reached; stopping actors",
+                        )
+                        stop_flag.value = True
+                        break
+                except Exception:
+                    pass
+
             if policy.policy_version <= 0:
                 time.sleep(0.1)
                 continue
 
             if pause_until_policy_gt is not None:
-                if int(policy.policy_version) > int(pause_until_policy_gt):
+                policy_advanced = int(policy.policy_version) > int(pause_until_policy_gt)
+                cohort_reopened = _learner_accepting_rollouts()
+                if policy_advanced or cohort_reopened:
+                    why = "policy" if policy_advanced else "cohort_reopen"
                     log(
                         machine_name,
-                        f"capacity backpressure cleared "
-                        f"(policy_version={policy.policy_version})",
+                        f"capacity backpressure cleared ({why}, "
+                        f"policy_version={policy.policy_version})",
                     )
                     pause_until_policy_gt = None
                     epoch_t0 = time.monotonic()
@@ -722,7 +778,8 @@ def run_async_worker_loop(
                 if pause_until_policy_gt is not None:
                     # Safe boundary: finish serving acts, but do not grow RAM.
                     continue
-                buffered.append(rollout)
+                if not eval_only:
+                    buffered.append(rollout)
 
         if buffered:
             if is_local:
@@ -734,6 +791,7 @@ def run_async_worker_loop(
                     policy=policy,
                     weight_store=weight_store,
                     flush_reason="shutdown",
+                    eval_only=eval_only,
                 )
             elif isinstance(rollout_sink, WorkerClient):
                 buffered, _ = _flush_remote_epoch(
@@ -743,6 +801,7 @@ def run_async_worker_loop(
                     machine_name=machine_name,
                     worker_id=worker_id,
                     flush_reason="shutdown",
+                    eval_only=eval_only,
                 )
             if buffered:
                 log(

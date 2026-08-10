@@ -73,6 +73,7 @@ class LearnerState:
         expected_curriculum_id: str = "",
         expected_obs_schema_version: int | None = None,
         max_pending_steps: int = 0,
+        min_host_free_gb: float = 0.0,
     ) -> None:
         self.weight_store = weight_store
         self.rollout_queue = rollout_queue
@@ -82,6 +83,10 @@ class LearnerState:
         # 0 = unlimited. Otherwise admit at most this many env-steps per epoch
         # (first rollout always accepted even if alone it exceeds the cap).
         self.max_pending_steps = max(int(max_pending_steps), 0)
+        # 0 = disabled. Otherwise reject admits when host free RAM is below floor.
+        self.min_host_free_gb = max(float(min_host_free_gb), 0.0)
+        self._host_free_gb_cache: float | None = None
+        self._host_free_gb_cache_mono: float = 0.0
         # Soft-accept stale (version behind max_staleness) up to relevance_max_age;
         # train_on_rollouts applies the π_new/π_old ownership gate.
         self.relevance_gate = bool(relevance_gate)
@@ -261,6 +266,33 @@ class LearnerState:
                 and self.epoch_admitted_steps >= self.max_pending_steps
             )
 
+    def _host_free_gb(self) -> float | None:
+        """Cached free physical RAM in GiB (2s TTL). None if unavailable."""
+        now = time.monotonic()
+        if (
+            self._host_free_gb_cache is not None
+            and (now - self._host_free_gb_cache_mono) < 2.0
+        ):
+            return self._host_free_gb_cache
+        try:
+            import psutil
+
+            free = float(psutil.virtual_memory().available) / (1024.0**3)
+        except Exception:
+            return self._host_free_gb_cache
+        self._host_free_gb_cache = free
+        self._host_free_gb_cache_mono = now
+        return free
+
+    def host_memory_pressure(self) -> bool:
+        """True when free RAM is below ``min_host_free_gb`` (fail closed if unknown)."""
+        if self.min_host_free_gb <= 0:
+            return False
+        free = self._host_free_gb()
+        if free is None:
+            return False
+        return free < self.min_host_free_gb
+
     def admitted_steps(self) -> int:
         with self.lock:
             return int(self.epoch_admitted_steps)
@@ -355,6 +387,13 @@ class LearnerState:
                 self.steps_rejected_identity += steps
             return False, identity_reason
         with self.lock:
+            # Host RAM floor: stop admitting before the box pages.
+            if self.host_memory_pressure():
+                self.rollouts_rejected += 1
+                self.rollouts_rejected_capacity += 1
+                self.steps_rejected_ingest += steps
+                self.steps_rejected_capacity += steps
+                return False, "capacity_full"
             # Capacity gate: stop admitting once the epoch cohort is full.
             # Always allow the first rollout of an empty epoch so a single
             # oversized packet can still train (better than stalling forever).
@@ -584,10 +623,13 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "steps_rejected_capacity": self.state.steps_rejected_capacity,
                     "max_pending_steps": self.state.max_pending_steps,
                     "epoch_admitted_steps": self.state.epoch_admitted_steps,
+                    "min_host_free_gb": self.state.min_host_free_gb,
+                    "host_free_gb": self.state._host_free_gb(),
                     "cohort_full": (
                         self.state.max_pending_steps > 0
                         and self.state.epoch_admitted_steps >= self.state.max_pending_steps
-                    ),
+                    )
+                    or self.state.host_memory_pressure(),
                     "relevance_gate": self.state.relevance_gate,
                     "relevance_max_age": self.state.relevance_max_age,
                     "relevance_kept": self.state.relevance_kept,

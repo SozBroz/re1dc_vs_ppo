@@ -133,7 +133,7 @@ class WorkerClient:
                 log(
                     self.machine_name,
                     "rollout rejected (capacity_full); drop packet and wait for "
-                    "newer policy (backpressure)",
+                    "cohort reopen or newer policy (backpressure)",
                 )
             else:
                 log(
@@ -143,6 +143,13 @@ class WorkerClient:
                 )
             return False
         raise RuntimeError(f"POST /rollout failed with HTTP {code}: {resp[:200]!r}")
+
+    def fetch_status(self) -> dict[str, Any]:
+        """GET /status for cohort/capacity backpressure decisions."""
+        code, body = self._request("GET", "/status")
+        if code != 200:
+            raise RuntimeError(f"GET /status failed with HTTP {code}")
+        return json.loads(body.decode("utf-8"))
 
     def fetch_go_explore_manifest(self, since_version: int = 0) -> dict[str, Any]:
         code, body = self._request(

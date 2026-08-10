@@ -277,6 +277,14 @@ class WaypointPlanner:
                 cond, state, wp_room, progress
             )
 
+        if cond_type == "leg_kills_in_room":
+            if progress is None:
+                return False
+            room = str(cond.get("room_id", "")).upper()
+            min_kills = int(cond.get("min_kills", 1))
+            kills = getattr(progress, "leg_kills_by_room", None) or {}
+            return bool(room) and int(kills.get(room, 0)) >= min_kills
+
         if str(state.get("room_id", "")) != wp_room:
             return False
 

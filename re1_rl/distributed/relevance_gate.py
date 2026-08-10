@@ -41,7 +41,8 @@ DEFAULT_RATIO_CLIP = 2.0
 DEFAULT_PROB_FLOOR = 1e-8
 DEFAULT_KEEP_FRAC = 0.5
 DEFAULT_RELEVANCE_MAX_AGE = 8
-DEFAULT_MICROBATCH = 64
+# Larger microbatch for lag-1 overlap validation (no-grad evaluate_actions).
+DEFAULT_MICROBATCH = 256
 
 
 @dataclass(frozen=True)
@@ -220,6 +221,14 @@ def is_version_stale_for_gate(
     return int(policy_version) < min_ok
 
 
+def is_version_lagged_for_gate(
+    policy_version: int,
+    current_policy_version: int,
+) -> bool:
+    """True when rollout is behind the learner (any positive lag)."""
+    return int(policy_version) < int(current_policy_version)
+
+
 def filter_stale_rollouts(
     model: MaskablePPO,
     rollouts: list[WorkerRollout],
@@ -227,16 +236,29 @@ def filter_stale_rollouts(
     current_policy_version: int,
     max_staleness: int,
     config: RelevanceGateConfig | None = None,
+    gate_all_lagged: bool = True,
 ) -> tuple[list[WorkerRollout], RelevanceGateStats, list[dict[str, Any]]]:
-    """Keep fresh rollouts; gate stale ones by π_new ownership."""
+    """Keep current-version rollouts; gate lagged ones by π_new ownership.
+
+    When ``gate_all_lagged`` (default), every rollout with
+    ``policy_version < current`` is validated — including lag-1 samples that
+    classic ``max_staleness`` would admit unchecked. Ingest still uses
+    ``max_staleness`` / ``relevance_max_age`` for hard reject vs soft queue.
+    """
     cfg = config or RelevanceGateConfig()
     kept: list[WorkerRollout] = []
     stats = RelevanceGateStats()
     details: list[dict[str, Any]] = []
     for r in rollouts:
-        if not is_version_stale_for_gate(
-            r.policy_version, current_policy_version, max_staleness
-        ):
+        if gate_all_lagged:
+            needs_gate = is_version_lagged_for_gate(
+                r.policy_version, current_policy_version
+            )
+        else:
+            needs_gate = is_version_stale_for_gate(
+                r.policy_version, current_policy_version, max_staleness
+            )
+        if not needs_gate:
             kept.append(r)
             continue
         stats.considered += 1

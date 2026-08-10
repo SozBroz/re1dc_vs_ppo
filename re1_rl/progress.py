@@ -67,6 +67,8 @@ class ProgressTracker:
     # items, only this set satisfies ``acquired_item``. Key items and weapons
     # also accept current inventory / earlier episode reward bookkeeping.
     leg_acquired_items: set[str] = field(default_factory=set)
+    # Paid enemy kills during the current rails leg, keyed by room_id (10A etc.).
+    leg_kills_by_room: dict[str, int] = field(default_factory=dict)
     # Directed room transitions observed during the current rails leg. This
     # lets a checkpoint combine a valid entry with an event that settles a few
     # steps later without accepting an entry from a different room.
@@ -280,11 +282,20 @@ class ProgressTracker:
         if name:
             self.leg_acquired_items.add(name)
 
+    def note_leg_kills(self, room_id: str, kills: int) -> None:
+        """Accumulate paid kills in ``room_id`` for the current rails leg."""
+        room = str(room_id or "").upper()
+        n = int(kills)
+        if not room or n <= 0:
+            return
+        self.leg_kills_by_room[room] = int(self.leg_kills_by_room.get(room, 0)) + n
+
     def claim_checkpoint_success(self) -> bool:
         if self.checkpoint_success:
             return False
         self.legs_completed += 1
         self.leg_acquired_items.clear()
+        self.leg_kills_by_room.clear()
         self.checkpoint_success = self.legs_completed >= max(1, int(self.leg_span))
         return True
 

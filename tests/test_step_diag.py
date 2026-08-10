@@ -128,6 +128,23 @@ def test_truncate_in_place_not_unlink(monkeypatch, tmp_path: Path) -> None:
     assert end["ep_return_total"] == round(0.12346 + -0.01, 5)
 
 
+def test_big_rewards_includes_small_combat_miss_taxes() -> None:
+    from re1_rl.step_diag import _big_reward_events
+
+    breakdown = {
+        "ammo_spend": -0.03,
+        "ammo_waste": -0.01333,
+        "attack_miss": -0.001,
+        "step": -0.0002,
+    }
+    big = _big_reward_events(breakdown)
+    assert {row["src"] for row in big} == {
+        "ammo_spend",
+        "ammo_waste",
+        "attack_miss",
+    }
+
+
 def test_memlog_knife_fail_from_info(monkeypatch, tmp_path: Path) -> None:
     log_path = tmp_path / "pking_top_right_memlog.jsonl"
     monkeypatch.setenv("RE1_STEP_DIAG_PORT", "5759")

@@ -10,6 +10,7 @@ from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.buffers import MaskableDictRolloutBuffer
 
 from re1_rl.distributed.log_util import log
+from re1_rl.distributed.obs_preprocess import prepare_obs_for_policy
 from re1_rl.distributed.rollout_types import WorkerRollout, normalize_curriculum_id
 from re1_rl.loadout_learning import (
     apply_bounded_loadout_guidance,
@@ -138,11 +139,8 @@ def fill_packed_rollout_buffer(
     model: MaskablePPO,
     flat: dict[str, Any],
 ) -> MaskableDictRolloutBuffer:
-    """Fill a (n_steps=N, n_envs=1) buffer from flattened fleet samples."""
-    from re1_rl.distributed.learner_train import (
-        _normalize_advantages_safe,
-        _obs_step_for_buffer,
-    )
+    """Fill a (n_steps=N, n_envs=1) buffer via vectorized slice assignment."""
+    from re1_rl.distributed.learner_train import _normalize_advantages_safe
 
     n = int(flat["n"])
     buffer = MaskableDictRolloutBuffer(
@@ -155,25 +153,39 @@ def fill_packed_rollout_buffer(
         n_envs=1,
     )
     buffer.reset()
-    for i in range(n):
-        obs_step = _obs_step_for_buffer(
-            {k: flat["obs"][k][i : i + 1] for k in flat["obs"]},
-            model.observation_space,
-        )
-        buffer.add(
-            obs_step,
-            flat["actions"][i : i + 1],
-            flat["rewards"][i : i + 1],
-            flat["episode_starts"][i : i + 1],
-            torch.as_tensor(flat["values"][i : i + 1], device=model.device),
-            torch.as_tensor(flat["log_probs"][i : i + 1], device=model.device),
-            action_masks=flat["action_masks"][i : i + 1],
-        )
+
+    obs_prepared = prepare_obs_for_policy(flat["obs"], model.observation_space)
+    for key in buffer.observations:
+        arr = np.asarray(obs_prepared[key])
+        # (N, *shape) -> (N, 1, *shape)
+        buffer.observations[key][:, 0] = arr
+
+    actions = np.asarray(flat["actions"])
+    if actions.ndim == 1:
+        actions = actions.reshape(n, 1)
+    elif actions.ndim == 2 and actions.shape[1] != buffer.action_dim:
+        actions = actions.reshape(n, buffer.action_dim)
+    buffer.actions[:, 0] = actions.reshape(n, buffer.action_dim)
+
+    buffer.rewards[:, 0] = np.asarray(flat["rewards"], dtype=np.float32).reshape(n)
+    buffer.episode_starts[:, 0] = np.asarray(
+        flat["episode_starts"], dtype=np.float32
+    ).reshape(n)
+    buffer.values[:, 0] = np.asarray(flat["values"], dtype=np.float32).reshape(n)
+    buffer.log_probs[:, 0] = np.asarray(flat["log_probs"], dtype=np.float32).reshape(n)
+
+    masks = np.asarray(flat["action_masks"])
+    buffer.action_masks[:, 0] = masks.reshape(n, buffer.mask_dims).astype(
+        np.float32, copy=False
+    )
+
     returns = np.asarray(flat["returns"], dtype=np.float32).reshape(n, 1)
     advantages = np.asarray(flat["advantages"], dtype=np.float32).reshape(-1)
     advantages = _normalize_advantages_safe(advantages).reshape(n, 1)
     buffer.returns = returns
     buffer.advantages = advantages
+    buffer.pos = n
+    buffer.full = True
     buffer.generator_ready = False
     return buffer
 
@@ -218,6 +230,7 @@ def train_packed_on_rollouts(
     """One sample-weighted ``model.train()`` over all accepted rollouts."""
     from re1_rl.distributed.learner_train import (
         _policy_weights_finite,
+        _release_rollout_arrays,
         _restore_policy_state_dict,
         _snapshot_policy_state_dict,
         group_rollouts_for_train,
@@ -243,6 +256,8 @@ def train_packed_on_rollouts(
     for key in sorted(groups):
         group = groups[key]
         merged = merge_rollouts(group)
+        # Source arrays are fully copied into ``merged``; free them early.
+        _release_rollout_arrays(group)
         n_seg = int(merged["n_steps"]) * int(merged["n_envs"])
         version_counts[int(merged["policy_version"])] = (
             version_counts.get(int(merged["policy_version"]), 0) + n_seg
@@ -257,6 +272,7 @@ def train_packed_on_rollouts(
             guidance_transfers += float(guidance.get("transfers", 0.0))
             guidance_total += float(guidance.get("total", 0.0))
         segments.append(_merged_to_flat_segment(model, merged))
+        merged.clear()
 
     loadout_stats = {
         **loadout_stats,
@@ -264,6 +280,7 @@ def train_packed_on_rollouts(
         "guidance_total": guidance_total,
     }
     flat = _concat_flat_segments(segments)
+    segments.clear()
     n = int(flat["n"])
     if n < 2:
         if machine_name:
@@ -305,6 +322,8 @@ def train_packed_on_rollouts(
         model.set_mod_drop_masks(
             None if md is None else np.asarray(md, dtype=np.float32)
         )
+    # Buffer owns obs/scalars; drop the intermediate flat obs slab.
+    flat["obs"].clear()
 
     weight_snapshot = _snapshot_policy_state_dict(model)
     try:
