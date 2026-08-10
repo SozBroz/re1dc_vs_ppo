@@ -197,46 +197,67 @@ def test_box_withdraw_only_while_box_ui_open() -> None:
         in_control=False,
     )
     assert choose[BOX_WITHDRAW_ACTION]
-    assert not choose[BOX_DEPOSIT_ACTION]  # deposit policy off
+    assert choose[BOX_DEPOSIT_ACTION]  # knife is allowlisted; room_id None => room ok
     assert choose[BOX_CLOSE_ACTION]
     assert not choose[WITHDRAW_ACTION_BASE]
 
-    # When policy is on, deposit only in BOX_DEPOSIT_ROOMS (100), allowlisted items.
-    import re1_rl.item_box as item_box_mod
-
-    monkey = pytest.MonkeyPatch()
-    try:
-        monkey.setattr(item_box_mod, "BOX_DEPOSIT_POLICY_ENABLED", True)
-        heal_inv = [(0x44, 1)] + [(0, 0)] * 7
-        room100 = action_mask(
-            N_ACTIONS,
-            None,
-            equipped_weapon_id=0x01,
-            inventory=heal_inv,
-            box=box,
-            in_box_room=True,
-            box_ui_open=True,
-            box_phase=BOX_PHASE_CHOOSE,
-            in_control=False,
-            room_id="100",
-        )
-        assert room100[BOX_DEPOSIT_ACTION]
-        room118 = action_mask(
-            N_ACTIONS,
-            None,
-            equipped_weapon_id=0x01,
-            inventory=heal_inv,
-            box=box,
-            in_box_room=True,
-            box_ui_open=True,
-            box_phase=BOX_PHASE_CHOOSE,
-            in_control=False,
-            room_id="118",
-        )
-        assert not room118[BOX_DEPOSIT_ACTION]
-    finally:
-        monkey.undo()
-
+    # Deposit: BOX_DEPOSIT_ROOMS + DEPOSIT_ITEM_ALLOWLIST (knife + heals).
+    heal_inv = [(0x44, 1)] + [(0, 0)] * 7
+    room100 = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x01,
+        inventory=heal_inv,
+        box=box,
+        in_box_room=True,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_CHOOSE,
+        in_control=False,
+        room_id="100",
+    )
+    assert room100[BOX_DEPOSIT_ACTION]
+    room118 = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x01,
+        inventory=heal_inv,
+        box=box,
+        in_box_room=True,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_CHOOSE,
+        in_control=False,
+        room_id="118",
+    )
+    assert room118[BOX_DEPOSIT_ACTION]
+    # Non-box room: deposit mode stays closed.
+    room10b = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x01,
+        inventory=heal_inv,
+        box=box,
+        in_box_room=False,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_CHOOSE,
+        in_control=False,
+        room_id="10B",
+    )
+    assert not room10b[BOX_DEPOSIT_ACTION]
+    # Non-allowlisted item (ammo) cannot open deposit even in a box room.
+    ammo_inv = [(0x0B, 15)] + [(0, 0)] * 7
+    ammo_mask = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x02,
+        inventory=ammo_inv,
+        box=box,
+        in_box_room=True,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_CHOOSE,
+        in_control=False,
+        room_id="100",
+    )
+    assert not ammo_mask[BOX_DEPOSIT_ACTION]
     picking = action_mask(
         N_ACTIONS,
         None,

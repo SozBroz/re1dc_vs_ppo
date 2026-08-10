@@ -181,6 +181,11 @@ def dining_statue_progress_reward(
         return 0.0
     if dining_statue_nav_target(prev_state) != dining_statue_nav_target(state):
         return 0.0
+    # Live statue XZ jitters when Jill is not shoving (knife swings, idle, etc.).
+    if not (
+        dining_statue_pushing(prev_state) or dining_statue_pushing(state)
+    ):
+        return 0.0
     raw = dining_statue_progress_phi(d1) - dining_statue_progress_phi(d0)
     return float(
         np.clip(raw, -DINING_STATUE_PROGRESS_STEP, DINING_STATUE_PROGRESS_STEP)

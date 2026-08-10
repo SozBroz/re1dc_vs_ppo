@@ -66,8 +66,19 @@ def test_sparse_actor_grid_uses_logical_port_span(monkeypatch) -> None:
 
 def test_pking_launchers_reserve_and_preserve_memlog_port() -> None:
     root = Path(__file__).resolve().parents[1]
+    headless = (root / "fleet" / "local" / "run_distributed_worker_pking.cmd").read_text(
+        encoding="utf-8"
+    )
+    headless_19 = (
+        root / "fleet" / "local" / "run_distributed_worker_pking_headless_19.cmd"
+    ).read_text(encoding="utf-8")
+    assert "N_ENVS=20" in headless
+    assert "ACTOR_RANKS=0-19" in headless
+    assert "--actor-ranks %ACTOR_RANKS%" in headless
+    assert "RE1_STEP_DIAG_PORT=5759" in headless_19
+    assert "ACTOR_RANKS=0-3,5-19" in headless_19
+
     for name in (
-        "run_distributed_worker_pking.cmd",
         "run_distributed_worker_pking_visible.cmd",
         "run_distributed_worker_pking_capture_canary.cmd",
     ):
@@ -82,17 +93,27 @@ def test_pking_launchers_reserve_and_preserve_memlog_port() -> None:
     assert "--worker-id pking-memlog" in memlog
     assert "--actor-ranks 4" in memlog
     assert "--tile-windows" in memlog
-    assert "go_explore_phase_c.env.cmd" in memlog
-    assert "RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=1" in memlog
+    assert "--grid-cols 5" in memlog
+    assert "--grid-monitor right" in memlog
+    assert "memlog_danger_room.env.cmd" in memlog
+    assert "RE1_YAWN_RESET_PIN_RANGE=0-56" in (
+        root / "fleet" / "local" / "memlog_danger_room.env.cmd"
+    ).read_text(encoding="utf-8")
+    assert "--eval-only" not in memlog
 
-    for name in (
-        "start_worker_detached_pking.cmd",
-        "start_worker_detached_pking_visible.cmd",
-        "start_worker_detached_pking_capture_canary.cmd",
-    ):
-        text = (root / "fleet" / "local" / name).read_text(encoding="utf-8")
+    visible = (root / "fleet" / "local" / "start_worker_detached_pking_visible.cmd").read_text(
+        encoding="utf-8"
+    )
+    canary = (
+        root / "fleet" / "local" / "start_worker_detached_pking_capture_canary.cmd"
+    ).read_text(encoding="utf-8")
+    memlog_detach = (
+        root / "fleet" / "local" / "start_worker_detached_pking_memlog.cmd"
+    ).read_text(encoding="utf-8")
+    for text in (visible, canary):
         assert "worker-id pking-memlog" in text
         assert "$_ -ne 5759" in text
+    assert "run_memlog_agent.cmd" in memlog_detach
 
 
 def test_control_is_run_protected_and_updates_pause_speed(tmp_path: Path) -> None:

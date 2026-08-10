@@ -55,8 +55,8 @@ if (-not (Test-Path $wh2Start) -or -not (Test-Path $wh1Start)) {
 & scp.exe -o ConnectTimeout=10 $wh1Start "${WH1}:D:/re1_rl/_tmp_start_wh1_now.ps1"
 Invoke-FleetSsh $WH2 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\sshuser\re1_rl\_tmp_start_wh2_now.ps1'
 Invoke-FleetSsh $WH1 'powershell -NoProfile -ExecutionPolicy Bypass -File D:\re1_rl\_tmp_start_wh1_now.ps1'
-& cmd.exe /c (Join-Path $ROOT 'fleet\local\start_worker_detached_pking_headless_plus_memlog.cmd')
-Write-Host 'PKING_STARTED_HEADLESS_PLUS_MEMLOG'
+& cmd.exe /c (Join-Path $ROOT 'fleet\local\start_worker_detached_pking.cmd')
+Write-Host 'PKING_STARTED_HEADLESS_20'
 
 if ($SmokeCheck) {
   # One optional probe only — do not loop for minutes.

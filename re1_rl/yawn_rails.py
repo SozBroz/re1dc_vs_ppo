@@ -305,6 +305,9 @@ RESET_MIN_CHECKPOINT_INDEX = 18
 RESET_LATEST_CELL_WEIGHT = 0.50
 _RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
 _RESET_PIN_INDEX_ENV = "RE1_YAWN_RESET_PIN_INDEX"
+_RESET_PIN_RANGE_ENV = "RE1_YAWN_RESET_PIN_RANGE"
+_RESET_PIN_SET_ENV = "RE1_YAWN_RESET_PIN_SET"
+_RESET_PIN_SET_WEIGHT_ENV = "RE1_YAWN_RESET_PIN_SET_WEIGHT"
 _RESET_FRONTIER_FIGHT_ENV = "RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY"
 
 
@@ -331,10 +334,92 @@ def reset_pin_index_from_env() -> int | None:
     return idx
 
 
+def reset_pin_range_from_env() -> tuple[int, int] | None:
+    """``RE1_YAWN_RESET_PIN_RANGE=27-37`` — uniform resets over loadable cells in range.
+
+    Inclusive lo/hi. Accepted forms: ``27-37``, ``27:37``, ``27,37``.
+    Single-index pin (``RE1_YAWN_RESET_PIN_INDEX``) still wins when both are set.
+    """
+    raw = os.environ.get(_RESET_PIN_RANGE_ENV, "").strip()
+    if not raw:
+        return None
+    for sep in ("-", ":", ",", ".."):
+        if sep in raw:
+            left, right = raw.split(sep, 1)
+            break
+    else:
+        return None
+    try:
+        lo = int(left.strip(), 10)
+        hi = int(right.strip(), 10)
+    except ValueError:
+        return None
+    if lo < 0 or hi < 0:
+        return None
+    if hi < lo:
+        lo, hi = hi, lo
+    return lo, hi
+
+
+def reset_pin_set_from_env() -> tuple[frozenset[int], float] | None:
+    """``RE1_YAWN_RESET_PIN_SET=37,40,44`` — optional weighted pin-set blend.
+
+    With ``RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5`` (default), that fraction of resets
+    sample uniformly from the listed indices; the remainder uses the normal mix.
+    Single-index and range pins still override when set.
+    """
+    raw = os.environ.get(_RESET_PIN_SET_ENV, "").strip()
+    if not raw:
+        return None
+    indices: set[int] = set()
+    for part in raw.replace(":", ",").split(","):
+        token = part.strip()
+        if not token:
+            continue
+        try:
+            idx = int(token, 10)
+        except ValueError:
+            continue
+        if idx >= 0:
+            indices.add(idx)
+    if not indices:
+        return None
+    weight_raw = os.environ.get(_RESET_PIN_SET_WEIGHT_ENV, "0.5").strip()
+    try:
+        weight = float(weight_raw)
+    except ValueError:
+        weight = 0.5
+    return frozenset(indices), max(0.0, min(1.0, weight))
+
+
 def reset_frontier_fight_only_from_env() -> bool:
     """``RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=1`` — memlog grind on fight frontier."""
     raw = os.environ.get(_RESET_FRONTIER_FIGHT_ENV, "").strip().lower()
     return raw in {"1", "true", "yes", "on"}
+
+
+def _cells_in_pin_range(
+    cells: list[dict[str, Any]],
+    lo: int,
+    hi: int,
+) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in cells
+        if lo <= int(row.get("checkpoint_index", -1)) <= hi
+    ]
+
+
+def _cells_in_pin_set(
+    cells: list[dict[str, Any]],
+    indices: frozenset[int] | set[int],
+) -> list[dict[str, Any]]:
+    want = {int(x) for x in indices}
+    return [
+        row
+        for row in cells
+        if int(row.get("checkpoint_index", -1)) in want
+    ]
 
 
 def eligible_reset_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -406,6 +491,10 @@ def sample_one_leg_options(
     ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
     ``RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=1`` forces the fight-progression frontier.
     ``RE1_YAWN_RESET_PIN_INDEX=N`` forces curated cell ``cpNN`` (overrides mix).
+    ``RE1_YAWN_RESET_PIN_RANGE=LO-HI`` uniform over loadable cells in that range
+    (overridden by a single pin index when both are set).
+    ``RE1_YAWN_RESET_PIN_SET=37,40,44`` with optional
+    ``RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5`` blends pin-set vs normal mix.
     """
     all_cells = list(iter_loadable_cells(project_root, stage))
     cells = eligible_reset_cells(all_cells)
@@ -429,6 +518,26 @@ def sample_one_leg_options(
                 "is not loadable"
             )
         return _options_from_cell(pinned[0], stage, reset_source="route_cell_pin")
+    pin_range = reset_pin_range_from_env()
+    if pin_range is not None:
+        lo, hi = pin_range
+        ranged = _cells_in_pin_range(all_cells, lo, hi)
+        if not ranged:
+            raise ValueError(
+                f"RE1_YAWN_RESET_PIN_RANGE={lo}-{hi} but no loadable cells in range"
+            )
+        chosen = ranged[rng.randrange(len(ranged))]
+        return _options_from_cell(chosen, stage, reset_source="route_cell_pin_range")
+    pin_set_cfg = reset_pin_set_from_env()
+    if pin_set_cfg is not None:
+        indices, weight = pin_set_cfg
+        if weight > 0.0 and rng.random() < weight:
+            pinned = _cells_in_pin_set(all_cells, indices)
+            if pinned:
+                chosen = pinned[rng.randrange(len(pinned))]
+                return _options_from_cell(
+                    chosen, stage, reset_source="route_cell_pin_set"
+                )
     if reset_frontier_fight_only_from_env():
         from re1_rl.yawn_rails_payforward import sample_frontier_fight_options
 

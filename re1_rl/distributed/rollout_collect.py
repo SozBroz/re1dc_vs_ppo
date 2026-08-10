@@ -138,9 +138,12 @@ def collect_rollout(
         combat_targets[step] = combat
         world_event_targets[step] = world
         world_event_masks[step] = wmask
-        for info in infos:
+        for env_i, info in enumerate(infos):
             if info:
-                episode_infos.append(dict(info))
+                row = dict(info)
+                if "episode" in row:
+                    row["actor_rank"] = env_i
+                episode_infos.append(row)
         # Reset room/hp tracking on episode boundaries for next transition.
         for i, d in enumerate(done):
             if d:

@@ -40,10 +40,12 @@ class DashboardConfig:
     stale_after_s: float = 5.0
     stop_timeout_s: float = 8.0
     launcher: Path | None = None
+    memlog_subdirectory: str = "memlog"
 
     @property
     def memlog_dir(self) -> Path:
-        return self.root / "data" / "memlog"
+        sub = str(self.memlog_subdirectory or "memlog").strip() or "memlog"
+        return self.root / "data" / sub
 
     @property
     def launcher_path(self) -> Path:
@@ -651,6 +653,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--stale-after", type=float, default=5.0)
     parser.add_argument("--launcher", type=Path)
+    parser.add_argument(
+        "--memlog-dir",
+        default=os.environ.get("RE1_MEMLOG_DIRECTORY", "memlog").strip() or "memlog",
+        help="subdirectory under data/ (default: RE1_MEMLOG_DIRECTORY or memlog)",
+    )
     return parser
 
 
@@ -663,6 +670,7 @@ def main(argv: list[str] | None = None) -> int:
         learner_url=args.learner_url,
         stale_after_s=args.stale_after,
         launcher=args.launcher.resolve() if args.launcher else None,
+        memlog_subdirectory=str(args.memlog_dir),
     )
     server = DashboardHTTPServer((config.bind, config.port), DashboardService(config))
     print(f"RE1 memlog dashboard: http://{config.bind}:{config.port}")

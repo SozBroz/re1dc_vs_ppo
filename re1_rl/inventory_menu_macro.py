@@ -1193,25 +1193,31 @@ def execute_combine_macro(
     if died:
         return True, frames, {"ok": False, "reason": "died", "slot_a": slot_a, "slot_b": slot_b}
 
-    died, f = _tap(
-        client,
-        {"cross": True},
-        frames=SUBMENU_TAP_FRAMES,
-        prev_hp=prev_hp,
-        episode_start_hp=episode_start_hp,
-    )
-    frames += f
-    if died:
-        return True, frames, {"ok": False, "reason": "died", "slot_a": slot_a, "slot_b": slot_b}
-    died, f = _wait(
-        client,
-        frames=SUBMENU_SETTLE_FRAMES,
-        prev_hp=prev_hp,
-        episode_start_hp=episode_start_hp,
-    )
-    frames += f
-    if died:
-        return True, frames, {"ok": False, "reason": "died", "slot_a": slot_a, "slot_b": slot_b}
+    # After partner slot is highlighted: Cross selects it, then one or two more
+    # Cross taps confirm the merge prompt (live cp43 herb hunt 2026-08-10 —
+    # first confirm alone often no-ops; second confirm applies MIXED_GG).
+    for confirm_i in range(3):
+        died, f = _tap(
+            client,
+            {"cross": True},
+            frames=SUBMENU_TAP_FRAMES,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += f
+        if died:
+            return True, frames, {"ok": False, "reason": "died", "slot_a": slot_a, "slot_b": slot_b}
+        died, f = _wait(
+            client,
+            frames=max(SUBMENU_SETTLE_FRAMES, 30),
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += f
+        if died:
+            return True, frames, {"ok": False, "reason": "died", "slot_a": slot_a, "slot_b": slot_b}
+        if read_inventory(client) != inv_before:
+            break
 
     died, f = close_item_screen(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp

@@ -72,13 +72,13 @@ DEPOSIT_ITEM_ALLOWLIST = frozenset(
 # Env must leave these False — magic writes scuffed post-cp41 states.
 # When False, ``apply_deposit`` / ``apply_withdraw`` are no-ops (no write_ram).
 MAGIC_BOX_RAM_WRITES_ENABLED = False
-# Policy: withdraw + close only until deposit UI is re-enabled.
-# When flipped on: only ``BOX_DEPOSIT_ROOMS`` + ``DEPOSIT_ITEM_ALLOWLIST``.
-BOX_DEPOSIT_POLICY_ENABLED = False
-# First live deposit target is the mansion 1F box room (not storeroom 118).
-BOX_DEPOSIT_ROOMS = frozenset({"100"})
+# Policy: deposit UI allowed for knife + healing (``DEPOSIT_ITEM_ALLOWLIST``).
+# Live transfers still use ``item_box_ui_macro`` only (no magic RAM writes).
+BOX_DEPOSIT_POLICY_ENABLED = True
 
 BOX_ROOMS = frozenset({"100", "118", "30E", "403", "502", "50E", "600", "618"})
+# Any known item-box room may deposit allowlisted items (heal / knife bank).
+BOX_DEPOSIT_ROOMS = BOX_ROOMS
 
 
 def _typewriter_or_box_rooms() -> frozenset[str]:

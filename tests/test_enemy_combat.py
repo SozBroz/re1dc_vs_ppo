@@ -20,6 +20,8 @@ from re1_rl.enemy_combat import (
     is_crow_combat_entity,
     is_crow_enemy,
     is_passive_crow_enemy,
+    is_pool_ghost_coordinate,
+    is_pool_ghost_enemy,
     paid_combat_enemy_count,
     pending_combat_window_frames,
     tick_pending_combat_credit,
@@ -618,3 +620,48 @@ def test_paid_combat_enemy_count_skips_crows() -> None:
     ]
     assert paid_combat_enemy_count(gallery_crows, room_id="117") == 0
     assert paid_combat_enemy_count(gallery_crows, knife=True, room_id="117") == 0
+
+
+def test_pool_ghost_fingerprints_are_exact_coords() -> None:
+    assert is_pool_ghost_coordinate(24725, 6252)
+    assert is_pool_ghost_coordinate(30000, 30000)
+    assert not is_pool_ghost_coordinate(24726, 6252)
+    assert not is_pool_ghost_coordinate(6500, 24860)
+
+
+def test_attack_mask_skips_pool_ghosts_only_when_requested(monkeypatch) -> None:
+    monkeypatch.setenv("MASK_ATTACK_POOL_GHOSTS", "1")
+    ghost = {
+        "slot": 4,
+        "hp": 28,
+        "x": 24725,
+        "z": 6252,
+        "combat_near": 1,
+        "knife_near": 1,
+    }
+    real = {
+        "slot": 0,
+        "hp": 52,
+        "x": 12000,
+        "z": 14000,
+        "combat_near": 1,
+        "knife_near": 1,
+    }
+    enemies = [ghost, real]
+    assert combat_enemy_count(enemies) == 2
+    assert combat_enemy_count(enemies, for_attack_mask=True) == 1
+    assert paid_combat_enemy_count(enemies, for_attack_mask=True) == 1
+    assert is_pool_ghost_enemy(ghost)
+    assert not is_pool_ghost_enemy(real)
+
+
+def test_attack_mask_pool_ghost_filter_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("MASK_ATTACK_POOL_GHOSTS", "0")
+    ghost = {
+        "slot": 4,
+        "hp": 28,
+        "x": 24725,
+        "z": 6252,
+        "combat_near": 1,
+    }
+    assert combat_enemy_count([ghost], for_attack_mask=True) == 1

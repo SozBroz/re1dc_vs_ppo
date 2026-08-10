@@ -27,7 +27,7 @@ from re1_rl.herb_combine import (
 )
 from re1_rl.inventory_combine import apply_combine, plan_combine as plan_any_combine
 
-N_ACTIONS = 47
+N_ACTIONS = 45
 
 
 def _inv(*slots: tuple[int, int]) -> list[tuple[int, int]]:
@@ -111,5 +111,5 @@ def test_combine_action_mask_phases() -> None:
 def test_action_layout_includes_combine_menu() -> None:
     from re1_rl.env import ACTION_NAMES
 
-    assert len(ACTION_NAMES) == N_ACTIONS
     assert ACTION_NAMES[COMBINE_ACTION] == "combine"
+    assert len(ACTION_NAMES) == COMBINE_ACTION + 1 + 8

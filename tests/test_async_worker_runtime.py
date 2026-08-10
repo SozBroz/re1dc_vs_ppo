@@ -390,6 +390,35 @@ def test_safe_upload_succeeds_on_retry(monkeypatch: pytest.MonkeyPatch) -> None:
     assert client.calls == 2
 
 
+def test_flush_remote_epoch_eval_only_skips_upload(monkeypatch: pytest.MonkeyPatch) -> None:
+    from re1_rl.distributed import async_worker_runtime as awr
+
+    uploads: list[WorkerRollout] = []
+
+    class _Client:
+        def upload_rollout(self, rollout: WorkerRollout) -> bool:
+            uploads.append(rollout)
+            return True
+
+        def fetch_weights(self, min_version: int = 0):
+            return 0, b""
+
+    class _Policy:
+        policy_version = 1
+
+    retained, capacity_full = awr._flush_remote_epoch(
+        [_mini_rollout("pking-fight-eval")],
+        client=_Client(),
+        policy=_Policy(),
+        machine_name="pking",
+        worker_id="pking-fight-eval",
+        eval_only=True,
+    )
+    assert uploads == []
+    assert retained == []
+    assert capacity_full is False
+
+
 def test_flush_local_epoch_retains_when_sink_rejects() -> None:
     class _RejectFirstSink:
         def __init__(self) -> None:

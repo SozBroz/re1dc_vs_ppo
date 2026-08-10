@@ -86,6 +86,27 @@ def test_predict_masked_batch_never_samples_illegal() -> None:
         assert act == 3
 
 
+def test_inference_temperature_sharpens_masked_distribution() -> None:
+    policy_obs_space, act_space = _chw_obs_space()
+    n_actions = int(act_space.n)
+    obs = _hwc_batch(policy_obs_space, n_envs=1)
+    masks = np.zeros((1, n_actions), dtype=bool)
+    masks[0, [0, 1, 2]] = True
+
+    policy = InferencePolicy(policy_obs_space, act_space, device="cpu", temperature=1.0)
+    _actions, _values, _log_probs, _raw, probs_hot = (
+        policy.predict_masked_batch_with_diagnostics(obs, masks)
+    )
+    policy.set_temperature(0.8)
+    _actions2, _values2, _log_probs2, _raw2, probs_cold = (
+        policy.predict_masked_batch_with_diagnostics(obs, masks)
+    )
+
+    legal = np.where(masks[0])[0]
+    top_action = int(legal[int(np.argmax(probs_hot[0, legal]))])
+    assert probs_cold[0, top_action] >= probs_hot[0, top_action] - 1e-6
+
+
 def test_predict_masked_batch_diagnostics_match_sampling_distribution() -> None:
     policy_obs_space, act_space = _chw_obs_space()
     n_actions = int(act_space.n)

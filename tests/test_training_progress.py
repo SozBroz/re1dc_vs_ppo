@@ -47,6 +47,19 @@ def test_slim_progress_info_keeps_pickups() -> None:
     assert "state" not in slim
 
 
+def test_slim_progress_info_keeps_actor_rank() -> None:
+    slim = slim_progress_info(
+        {
+            "room_id": "106",
+            "actor_rank": 3,
+            "episode": {"r": -1.0, "l": 50},
+            "state": {"hp": 96},
+        }
+    )
+    assert slim["actor_rank"] == 3
+    assert "state" not in slim
+
+
 def test_slim_progress_info_keeps_go_explore_capture() -> None:
     proposal = {"cell_key": "v2|r=105|x=0|z=0|m=d", "bundle_b64": "AAAA"}
     slim = slim_progress_info(
@@ -126,6 +139,7 @@ def test_tracker_episode_best_rooms(tmp_path: Path, capsys) -> None:
                 "visited_rooms": ["105", "106"],
                 "n_rooms_visited": 2,
                 "bridge_port": 5555,
+                "actor_rank": 2,
                 "episode": {"r": -2.0, "l": 80},
                 "episode_failure": "hp_death",
                 "reward_breakdown": {},
@@ -135,6 +149,7 @@ def test_tracker_episode_best_rooms(tmp_path: Path, capsys) -> None:
     )
     out = capsys.readouterr().out
     assert "[episode] machine=t" in out
+    assert "worker=2" in out
     assert "rooms=2" in out
     assert "ids=['105', '106']" in out
     assert "[PB-rooms] machine=t best episode rooms=2" in out

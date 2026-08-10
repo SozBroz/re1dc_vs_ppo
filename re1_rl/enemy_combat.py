@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 # Imperator-validated 2026-07-23: infinite-respawn pests and the aquarium
@@ -33,6 +34,38 @@ CERBERUS_RAM_TYPE_ID = 0x0F
 CERBERUS_HP_MAX = 120  # live dogs ~100; Tyrant 220+, Yawn 3050+
 CERBERUS_ACTIVE_BYTES: frozenset[int] = frozenset({0x2C, 0x44, 0x90})
 CERBERUS_TYPE_NAMES: frozenset[str] = frozenset({"cerberus", "zombie_dog"})
+
+# Parked enemy slots keep hp>0 at fixed sentinel coords across unrelated rooms.
+# Exact (x, z) matches only — attack-mask path; does not affect combat pay/obs.
+# See docs/post_statue_campaign.plan.md (payforward fight ammo audit).
+POOL_GHOST_FINGERPRINTS: frozenset[tuple[int, int]] = frozenset(
+    {
+        (6456, 5245),  # hub-door classify ghost (many rooms)
+        (24725, 6252),  # live fleet s4 bleed (202/204/207/11A)
+        (24941, 5299),  # live fleet s5 bleed
+        (30000, 30000),  # RDT pool park (e.g. cp18 / room 108)
+    }
+)
+
+
+def mask_attack_pool_ghosts_enabled() -> bool:
+    return os.environ.get("MASK_ATTACK_POOL_GHOSTS", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+def is_pool_ghost_coordinate(x: int | float, z: int | float) -> bool:
+    """True when coords match a known off-map / parked slot fingerprint."""
+    return (int(x), int(z)) in POOL_GHOST_FINGERPRINTS
+
+
+def is_pool_ghost_enemy(ent: dict[str, Any]) -> bool:
+    if "x" not in ent or "z" not in ent:
+        return False
+    return is_pool_ghost_coordinate(ent["x"], ent["z"])
 
 
 def is_crow_combat_entity(meta: dict[str, Any]) -> bool:
@@ -141,6 +174,7 @@ def combat_enemy_count(
     *,
     max_dist: float | None = None,
     knife: bool = False,
+    for_attack_mask: bool = False,
 ) -> int:
     """Enemies near enough to justify knife/attack.
 
@@ -151,6 +185,12 @@ def combat_enemy_count(
     n = 0
     for ent in enemies or []:
         if int(ent.get("hp", 0)) <= 0:
+            continue
+        if (
+            for_attack_mask
+            and mask_attack_pool_ghosts_enabled()
+            and is_pool_ghost_enemy(ent)
+        ):
             continue
         if max_dist is not None:
             if not int(ent.get("in_room", ent.get("alive", 0))):
@@ -170,6 +210,7 @@ def paid_combat_enemy_count(
     *,
     knife: bool = False,
     room_id: str | None = None,
+    for_attack_mask: bool = False,
 ) -> int:
     """Near-band enemies that justify attack macros.
 
@@ -183,6 +224,12 @@ def paid_combat_enemy_count(
     n = 0
     for ent in enemies or []:
         if int(ent.get("hp", 0)) <= 0:
+            continue
+        if (
+            for_attack_mask
+            and mask_attack_pool_ghosts_enabled()
+            and is_pool_ghost_enemy(ent)
+        ):
             continue
         if is_crow_enemy(ent, room_id=room_id):
             continue

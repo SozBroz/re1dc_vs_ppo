@@ -1177,6 +1177,10 @@ def format_reward_panel(
         lines.append("Attack missed (no enemy damage).")
         interesting = True
 
+    if breakdown.get("ammo_spend", 0.0) and not quiet:
+        lines.append("Spent ammo (expenditure tax).")
+        interesting = True
+
     if breakdown.get("ammo_waste", 0.0) and not quiet:
         lines.append("Wasted ammo on a miss.")
         interesting = True

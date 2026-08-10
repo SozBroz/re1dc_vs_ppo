@@ -13,6 +13,17 @@ from typing import Any, Callable
 
 import numpy as np
 
+from re1_rl.inference_config import (
+    memlog_experiment_metadata,
+    memlog_fight_index_from_env,
+    memlog_max_episodes_from_env,
+)
+from re1_rl.fight_eval_score import (
+    end_quality_from_info,
+    load_manifest_row,
+    score_fight_attempt,
+)
+
 
 @dataclass(frozen=True)
 class MemlogControlState:
@@ -75,6 +86,7 @@ class MemlogControl:
     ) -> None:
         self.directory = Path(directory)
         self.path = self.directory / "control.json"
+        self.rank = int(rank)
         self.bridge = bridge
         self.ram_skipper = ram_skipper
         self.poll_s = max(float(poll_s), 0.01)
@@ -132,6 +144,26 @@ class MemlogControl:
         self._apply(state)
         self.state = state
         return state
+
+    def request_shutdown(self) -> None:
+        state = MemlogControlState(
+            run_id=self.state.run_id,
+            paused=self.state.paused,
+            speed_pct=self.state.speed_pct,
+            shutdown=True,
+        )
+        _atomic_json(
+            self.path,
+            {
+                "schema_version": 1,
+                "run_id": state.run_id,
+                "rank": self.rank,
+                "paused": state.paused,
+                "speed_pct": state.speed_pct,
+                "shutdown": True,
+            },
+        )
+        self.state = state
 
     def wait_until_runnable(
         self,
@@ -222,8 +254,26 @@ class MemlogTelemetry:
         self.n_steps = int(n_steps)
         self.max_event_bytes = int(max_event_bytes)
         self._latest: dict[str, Any] = {}
+        self._experiment = memlog_experiment_metadata()
         self._episode_return = 0.0
         self._episode_index = 1
+        self._episodes_completed = 0
+        self._episodes_path = self.directory / "episodes.jsonl"
+        self._fight_index = memlog_fight_index_from_env()
+        self._max_episodes = memlog_max_episodes_from_env()
+        self._project_root = Path(
+            os.environ.get("RE1_PROJECT_ROOT", Path.cwd())
+        ).resolve()
+        self._tip_row = load_manifest_row(self._project_root, self._fight_index)
+        succ_idx = self._fight_index + 1
+        self._incumbent_row = load_manifest_row(self._project_root, succ_idx)
+        self._incumbent_quality = None
+        if self._incumbent_row is not None:
+            from re1_rl.go_explore_archive import normalize_quality
+
+            self._incumbent_quality = normalize_quality(
+                self._incumbent_row.get("quality")
+            )
 
     def heartbeat(self, control: MemlogControlState, *, horizon_step: int) -> None:
         payload = dict(self._latest)
@@ -236,6 +286,7 @@ class MemlogTelemetry:
                 "horizon_step": int(horizon_step),
                 "n_steps": self.n_steps,
                 "control": asdict(control),
+                "experiment": dict(self._experiment),
             }
         )
         self._latest = payload
@@ -273,6 +324,7 @@ class MemlogTelemetry:
             "n_steps": self.n_steps,
             "episode_index": self._episode_index,
             "episode_return": self._episode_return,
+            "experiment": dict(self._experiment),
             "control": asdict(control),
             "pre_step": {
                 "observation": {
@@ -307,6 +359,7 @@ class MemlogTelemetry:
         self._latest = payload
         _atomic_json_best_effort(self.latest_path, payload)
         if done:
+            self._record_episode(info or {}, breakdown=breakdown)
             self._episode_return = 0.0
             self._episode_index += 1
         event_channels = {
@@ -340,3 +393,51 @@ class MemlogTelemetry:
             pass
         with self.events_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, separators=(",", ":"), allow_nan=False) + "\n")
+
+    def episodes_completed(self) -> int:
+        return int(self._episodes_completed)
+
+    def should_shutdown(self) -> bool:
+        cap = self._max_episodes
+        return cap is not None and self._episodes_completed >= int(cap)
+
+    def _record_episode(
+        self,
+        info: dict[str, Any],
+        *,
+        breakdown: dict[str, float],
+    ) -> None:
+        checkpoint_success = float(breakdown.get("checkpoint_success", 0.0)) > 0.0
+        end_q = end_quality_from_info(info)
+        scored: dict[str, Any] = {
+            "schema_version": 1,
+            "run_id": self.run_id,
+            "episode_index": int(self._episode_index),
+            "experiment": dict(self._experiment),
+            "fight_index": int(self._fight_index),
+            "checkpoint_success": bool(checkpoint_success),
+            "episode_failure": info.get("episode_failure"),
+            "end_quality": None if end_q is None else list(end_q),
+        }
+        if self._tip_row is not None:
+            scored.update(
+                score_fight_attempt(
+                    tip_row=self._tip_row,
+                    end_quality=end_q,
+                    fight_index=self._fight_index,
+                    checkpoint_success=checkpoint_success,
+                    incumbent_quality=self._incumbent_quality,
+                    project_root=self._project_root,
+                    episode_failure=(
+                        str(info.get("episode_failure"))
+                        if info.get("episode_failure")
+                        else None
+                    ),
+                )
+            )
+        self._episodes_completed += 1
+        self.directory.mkdir(parents=True, exist_ok=True)
+        with self._episodes_path.open("a", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(scored, separators=(",", ":"), allow_nan=False) + "\n"
+            )

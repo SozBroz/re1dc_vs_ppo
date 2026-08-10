@@ -11,9 +11,12 @@ if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
 set RE1_STEP_DIAG_PORT=5759
 set RE1_MACHINE_NAME=%MACHINE_NAME%
 set RE1_STEP_DIAG_LOG=D:\re1_rl\data\logs\pking_top_right_memlog.jsonl
-REM Memlog grinds the fight-progression frontier (same CP as 40%% train bias).
-call "%~dp0go_explore_phase_c.env.cmd"
-set RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=1
+set RE1_GRID_BOTTOM_INSET=48
+REM Memlog grinds cp18 / room 108 (L Passage) — same fight frontier as fleet bias.
+call "%~dp0memlog_danger_room.env.cmd"
+set RE1_MEMLOG_DIRECTORY=memlog
+set RE1_MEMLOG_EXPERIMENT=room_108_memlog
+set RE1_INFERENCE_TEMPERATURE=1.0
 if not exist data\go_explore mkdir data\go_explore
 
 if not exist data\logs mkdir data\logs
@@ -35,9 +38,10 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --skip-chunk 600 ^
   --sync-interval-s %SYNC_INTERVAL_S% ^
   --capture-checkpoints ^
-  --no-headless ^
+  --headless ^
   --tile-windows ^
   --grid-cols 5 ^
   --grid-rows 4 ^
+  --grid-monitor right ^
   --screenshot-mmf ^
   --inference-batch-max 1

@@ -10,6 +10,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.dining_statue_puzzle import (
+    DINING_PUSH_ANIM,
+    DINING_PUSH_GAME_STATE,
     DINING_STATUE_DROP_XZ,
     DINING_STATUE_FINAL_PUSH_XZ,
     DINING_STATUE_PROGRESS_BUDGET,
@@ -54,6 +56,14 @@ def _statue_state(**kw):
     )
     base.update(kw)
     return make_state(**base)
+
+
+def _pushing_statue_state(**kw):
+    return _statue_state(
+        game_state=DINING_PUSH_GAME_STATE,
+        player_anim=DINING_PUSH_ANIM,
+        **kw,
+    )
 
 def test_dining_statue_rising_edge_pays_and_extends() -> None:
     progress = ProgressTracker()
@@ -173,18 +183,26 @@ def test_statue_202_compass_off_when_knocked() -> None:
 def test_statue_progress_pays_half_when_closing() -> None:
     planner = _statue_planner()
     # One step that closes enough for the full +0.5 clip.
-    far = _statue_state(dining_statue_x=23000, dining_statue_z=3452)
-    closer = _statue_state(dining_statue_x=19000, dining_statue_z=3452)
+    far = _pushing_statue_state(dining_statue_x=23000, dining_statue_z=3452)
+    closer = _pushing_statue_state(dining_statue_x=19000, dining_statue_z=3452)
     pay = dining_statue_progress_reward(far, closer, planner)
     assert pay == pytest.approx(DINING_STATUE_PROGRESS_STEP)
 
 
 def test_statue_progress_penalizes_retreat() -> None:
     planner = _statue_planner()
-    near = _statue_state(dining_statue_x=18000, dining_statue_z=3452)
-    far = _statue_state(dining_statue_x=22000, dining_statue_z=3452)
+    near = _pushing_statue_state(dining_statue_x=18000, dining_statue_z=3452)
+    far = _pushing_statue_state(dining_statue_x=22000, dining_statue_z=3452)
     pay = dining_statue_progress_reward(near, far, planner)
     assert pay == pytest.approx(-DINING_STATUE_PROGRESS_STEP)
+
+
+def test_statue_progress_no_pay_when_not_pushing() -> None:
+    """Knife swings / idle must not farm statue distance jitter."""
+    planner = _statue_planner()
+    far = _statue_state(dining_statue_x=23000, dining_statue_z=3452, player_anim=0x14)
+    closer = _statue_state(dining_statue_x=19000, dining_statue_z=3452, player_anim=0x14)
+    assert dining_statue_progress_reward(far, closer, planner) == 0.0
 
 
 def test_statue_progress_full_shove_near_budget() -> None:
@@ -194,8 +212,8 @@ def test_statue_progress_full_shove_near_budget() -> None:
     xs.append(DINING_STATUE_DROP_XZ[0])
     total = 0.0
     for a, b in zip(xs, xs[1:]):
-        prev = _statue_state(dining_statue_x=a, dining_statue_z=3452)
-        cur = _statue_state(dining_statue_x=b, dining_statue_z=3452)
+        prev = _pushing_statue_state(dining_statue_x=a, dining_statue_z=3452)
+        cur = _pushing_statue_state(dining_statue_x=b, dining_statue_z=3452)
         total += dining_statue_progress_reward(prev, cur, planner)
     assert 6.0 <= total <= DINING_STATUE_PROGRESS_BUDGET + 0.01
 
@@ -203,8 +221,8 @@ def test_statue_progress_full_shove_near_budget() -> None:
 def test_statue_progress_in_compute_reward_breakdown() -> None:
     progress = ProgressTracker()
     planner = _statue_planner()
-    prev = _statue_state(dining_statue_x=23000, dining_statue_z=3452)
-    cur = _statue_state(dining_statue_x=19000, dining_statue_z=3452, step=2)
+    prev = _pushing_statue_state(dining_statue_x=23000, dining_statue_z=3452)
+    cur = _pushing_statue_state(dining_statue_x=19000, dining_statue_z=3452, step=2)
     _total, bd = _reward(progress, prev, cur, planner=planner, rails_mode=True)
     assert bd["dining_statue_progress"] == pytest.approx(DINING_STATUE_PROGRESS_STEP)
     assert bd["dining_statue"] == 0.0
@@ -212,6 +230,6 @@ def test_statue_progress_in_compute_reward_breakdown() -> None:
 
 def test_statue_progress_off_when_not_statue_checkpoint() -> None:
     planner = make_planner()  # not statue_202
-    far = _statue_state(dining_statue_x=23000, dining_statue_z=3452)
-    closer = _statue_state(dining_statue_x=19000, dining_statue_z=3452)
+    far = _pushing_statue_state(dining_statue_x=23000, dining_statue_z=3452)
+    closer = _pushing_statue_state(dining_statue_x=19000, dining_statue_z=3452)
     assert dining_statue_progress_reward(far, closer, planner) == 0.0

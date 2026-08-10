@@ -3307,12 +3307,17 @@ class RE1Env(gym.Env):
         room_for_mask = str(pose.get("room_id", "") or "") or None
         if MASK_ATTACK_PASSIVE_CROWS:
             knife_near = paid_combat_enemy_count(
-                enemies, knife=True, room_id=room_for_mask
+                enemies,
+                knife=True,
+                room_id=room_for_mask,
+                for_attack_mask=True,
             )
-            gun_near = paid_combat_enemy_count(enemies, room_id=room_for_mask)
+            gun_near = paid_combat_enemy_count(
+                enemies, room_id=room_for_mask, for_attack_mask=True
+            )
         else:
-            knife_near = combat_enemy_count(enemies, knife=True)
-            gun_near = combat_enemy_count(enemies)
+            knife_near = combat_enemy_count(enemies, knife=True, for_attack_mask=True)
+            gun_near = combat_enemy_count(enemies, for_attack_mask=True)
         # Refresh before masking so pickup Yes/No in room 118 cannot keep a
         # stale box-UI session (would hide noop→Cross).
         if bridge is not None and (
@@ -3358,7 +3363,9 @@ class RE1Env(gym.Env):
             grab_escape_pending=bool(
                 getattr(self, "_grab_escape_pending", False)
             ),
-            alive_enemies_in_room=combat_enemy_count(enemies),
+            alive_enemies_in_room=combat_enemy_count(
+                enemies, for_attack_mask=True
+            ),
             knife_enemies_near=knife_near,
             gun_enemies_near=gun_near,
             mask_combat_without_enemies=MASK_ATTACK_WITHOUT_ENEMIES,

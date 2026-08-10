@@ -17,10 +17,12 @@ Optional modality flags (env, all default OFF — fleet path unchanged):
   RE1_MOD_DROP=1            structured modality dropout (stored masks)
   RE1_MOD_DROP_RATE=0.05    branch-outage probability
   RE1_DISC_LR=1             discriminative LR (mature towers × RE1_DISC_LR_MULT)
+  RE1_USE_GROUPED_ENTROPY=1 grouped-entropy training ablation (learner only)
 """
 from __future__ import annotations
 
 from re1_rl.combat_efficient_extractor import FEATURES_DIM, RE1CombatEfficientExtractor
+from re1_rl.inference_config import grouped_entropy_training_from_env
 
 POLICY_KWARGS: dict = dict(
     net_arch=dict(pi=[512, 512], vf=[512, 512]),
@@ -31,5 +33,5 @@ POLICY_KWARGS: dict = dict(
 
 # Learner algorithm class (workers only need the policy / state_dict).
 PPO_ALGORITHM = "CombatEfficientPPO"
-USE_GROUPED_ENTROPY = False  # ablation flag; baseline uses stock MaskablePPO entropy
+USE_GROUPED_ENTROPY = grouped_entropy_training_from_env()
 AUX_COEF = 0.02

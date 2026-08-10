@@ -46,6 +46,8 @@ def slim_progress_info(info: dict[str, Any]) -> dict[str, Any]:
         )
     if "episode" in info:
         out["episode"] = info["episode"]
+    if info.get("actor_rank") is not None:
+        out["actor_rank"] = int(info["actor_rank"])
     if info.get("gallery_flawless") is not None:
         out["gallery_flawless"] = info["gallery_flawless"]
     if info.get("episode_failure") is not None:
@@ -201,8 +203,12 @@ class TrainingProgressTracker:
         port = info.get("bridge_port")
         keys = [i for i in items if _classify_item(i) == "key"]
         weapons = [i for i in items if _classify_item(i) == "weapon"]
+        worker = info.get("actor_rank")
+        worker_tag = (
+            f"worker={int(worker)} " if worker is not None else ""
+        )
         print(
-            f"[episode] machine={self.machine_name} port={port} "
+            f"[episode] machine={self.machine_name} {worker_tag}port={port} "
             f"rooms={n_rooms} ids={rooms} "
             f"keys={keys} weapons={weapons} items={items} "
             f"rew={rew:.3f} len={length} "

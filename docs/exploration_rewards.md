@@ -167,8 +167,13 @@ Hit / kill pay only when the step is an actual **knife** or **attack** action. E
 
 ## Miss / ammo waste
 
-On `attack_missed` with `ammo_spent > 0` only (hits pay nothing; knife has no
-clip tax):
+**Ammo expenditure** (`ammo_spend`) applies on every spent gun round (hit or
+miss): handgun **−0.03**, shotgun **−0.25**, magnum/GL/bazooka **−0.40**,
+rocket **−0.75**. Deferred miss expiry skips a second spend charge
+(`pending_combat_expired`).
+
+On `attack_missed` with `ammo_spent > 0` only, an extra miss waste tax also
+applies (knife has no clip tax):
 
 `per_missed_round = −AMMO_PICKUP_BONUS / clip_size × 0.10`
 
@@ -187,7 +192,8 @@ All remain unscaled in Yawn rails.
 | Grenade launcher / bazooka / rocket (acid/flame/explosive) | 6 (pack size; chamber holds 1) | −0.025 |
 
 `ATTACK_MISS_PENALTY` / `KNIFE_MISS_PENALTY` / `AMMO_WASTE_PENALTY` remain 0.0
-stubs; live tax writes `bd["ammo_waste"]` via the clip helpers.
+stubs; live waste writes `bd["ammo_waste"]` via the clip helpers; spend writes
+`bd["ammo_spend"]`.
 
 ## HP damage / heal
 

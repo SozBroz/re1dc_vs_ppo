@@ -836,6 +836,64 @@ def test_reset_pin_index_env_forces_cell(
         )
 
 
+def test_reset_pin_range_env_samples_inclusive_span(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in range(18, 38)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 45)),
+    }
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_INDEX", raising=False)
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_RANGE", "27-37")
+    starts: set[int] = set()
+    for seed in range(80):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        assert opts["reset_source"] == "route_cell_pin_range"
+        start = int(opts["route_start_index"])
+        assert 28 <= start <= 38
+        starts.add(start)
+    assert starts >= {28, 38}
+
+
+def test_reset_pin_set_env_blends_with_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in range(18, 55)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 60)),
+    }
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_INDEX", raising=False)
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_RANGE", raising=False)
+    monkeypatch.delenv("RE1_YAWN_PAYFORWARD_RIPPLE", raising=False)
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_SET", "37,40,44")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_SET_WEIGHT", "1.0")
+    starts: set[int] = set()
+    for seed in range(40):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        assert opts["reset_source"] == "route_cell_pin_set"
+        starts.add(int(opts["route_start_index"]))
+    assert starts <= {38, 41, 45}
+    assert starts >= {38, 45}
+
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_SET_WEIGHT", "0.0")
+    other = sample_one_leg_options(tmp_path, stage, rng=random.Random(0))
+    assert other["reset_source"] != "route_cell_pin_set"
+
+
 def test_chaining_curriculum_samples_bounded_remaining_span(tmp_path: Path) -> None:
     manifest = {
         "schema_version": 1,

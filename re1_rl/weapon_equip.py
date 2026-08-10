@@ -144,6 +144,21 @@ def weapon_already_equipped(
     )
 
 
+def weapon_has_fireable_ammo(
+    inventory: list[tuple[int, int]],
+    weapon_id: int,
+) -> bool:
+    """True for knife; guns need clip + matching reserve total > 0."""
+    wid = int(weapon_id) & 0xFF
+    if wid == KNIFE_ITEM_ID:
+        return True
+    if wid not in EQUIPPABLE_WEAPON_IDS:
+        return False
+    from re1_rl.ammo_accounting import total_fireable_ammo
+
+    return total_fireable_ammo(inventory, wid) > 0
+
+
 def slot_legal_for_equip(
     inventory: list[tuple[int, int]],
     slot: int,
@@ -151,16 +166,18 @@ def slot_legal_for_equip(
     equipped_weapon_id: int | None,
     equipped_slot_0based: int | None,
 ) -> bool:
-    """Legal equip: equippable weapon in slot, not already held.
+    """Legal equip: equippable weapon in slot, not already held, gun has ammo.
 
-    Empty guns (qty 0) stay equippable — ammo may sit in a spare pile
-    (e.g. handgun_bullets 0x0B) and get COMBINE-loaded afterward. Knife RAM
-    qty 0 is still a real item.
+    Guns with zero loaded + reserve rounds are masked (no dry equip during swap).
+    Knife RAM qty 0 is still a real item. Reserve piles (e.g. handgun_bullets)
+    count toward legality even when the weapon slot clip is empty.
     """
     if slot < 0 or slot >= len(inventory):
         return False
     item_id, _qty = inventory[slot]
     if int(item_id) not in EQUIPPABLE_WEAPON_IDS:
+        return False
+    if not weapon_has_fireable_ammo(inventory, int(item_id)):
         return False
     return not weapon_already_equipped(
         equipped_weapon_id,

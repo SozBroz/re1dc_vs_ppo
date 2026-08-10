@@ -861,8 +861,13 @@ def _actor_process(
                     horizon_step=step_i,
                     control=memlog_control.state,
                 )
+                if (done or trunc) and memlog_telemetry.should_shutdown():
+                    memlog_control.request_shutdown()
             if info:
-                episode_infos.append(slim_progress_info(info))
+                slim_src = info
+                if done or trunc:
+                    slim_src = {**info, "actor_rank": rank}
+                episode_infos.append(slim_progress_info(slim_src))
 
             # Exclude pure cutscene-skip ticks from the PPO buffer (zero reward,
             # frozen obs). Post-skip credit lands on the next live control step.
@@ -885,6 +890,12 @@ def _actor_process(
             step_i += 1
 
             if done or trunc:
+                try:
+                    from re1_rl.fight_eval_episodes import record_fight_eval_episode
+
+                    record_fight_eval_episode(info or {}, rank=rank)
+                except Exception:
+                    pass
                 if step_i > 0:
                     _emit_rollout(step_i)
                     _reset_bufs()

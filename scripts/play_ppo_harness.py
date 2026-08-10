@@ -141,6 +141,7 @@ def _format_combat_panel(
         "enemy_damage",
         "enemy_kill",
         "attack_miss",
+        "ammo_spend",
         "ammo_waste",
         "hp",
         "death",

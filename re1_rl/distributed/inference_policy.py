@@ -17,6 +17,7 @@ from re1_rl.distributed.weights import (
     load_policy_weights,
     state_dict_from_policy_bytes,
 )
+from re1_rl.inference_config import inference_temperature_from_env
 
 
 class InferencePolicy:
@@ -27,10 +28,17 @@ class InferencePolicy:
         observation_space: gym.Space,
         action_space: gym.Space,
         device: str | torch.device,
+        *,
+        temperature: float | None = None,
     ) -> None:
         self._device = torch.device(device)
         self._lock = threading.RLock()
         self._policy_version = 0
+        self._temperature = (
+            float(temperature)
+            if temperature is not None
+            else inference_temperature_from_env()
+        )
         self._model = build_inference_policy(observation_space, action_space, self._device)
         self._model.policy.to(self._device)
         self._model.policy.set_training_mode(False)
@@ -42,6 +50,21 @@ class InferencePolicy:
     def policy_version(self) -> int:
         with self._lock:
             return self._policy_version
+
+    @property
+    def temperature(self) -> float:
+        with self._lock:
+            return float(self._temperature)
+
+    def set_temperature(self, temperature: float) -> None:
+        with self._lock:
+            self._temperature = max(0.05, min(2.0, float(temperature)))
+
+    def _temper_logits(self, logits: torch.Tensor) -> torch.Tensor:
+        temp = float(self._temperature)
+        if abs(temp - 1.0) < 1e-8:
+            return logits
+        return logits / temp
 
     def load_from_state_dict(self, state_dict: dict[str, Any], policy_version: int) -> None:
         with self._lock:
@@ -152,6 +175,7 @@ class InferencePolicy:
                 logits[~mask] = torch.tensor(
                     -1e8, dtype=logits.dtype, device=logits.device
                 )
+                logits = self._temper_logits(logits)
                 cat = torch.distributions.Categorical(logits=logits)
                 actions = cat.sample()
                 log_probs = cat.log_prob(actions)
