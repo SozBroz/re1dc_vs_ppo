@@ -30,6 +30,7 @@ from re1_rl.item_box import (
     can_deposit,
     can_withdraw,
     read_box,
+    read_box_live,
     read_inventory,
 )
 from re1_rl.memory_map import (
@@ -55,6 +56,53 @@ CLOSE_MAX_ATTEMPTS = 4
 EXIT_NAV_MAX_DOWNS = 6
 # Open animation keeps mode/gs in the pause tree before the grid accepts d-pad.
 POST_OPEN_SETTLE_FRAMES = 90
+
+
+def _box_live_changed(
+    before: list[tuple[int, int]],
+    after: list[tuple[int, int]],
+) -> bool:
+    n = max(len(before), len(after))
+    for i in range(n):
+        b = before[i] if i < len(before) else (0, 0)
+        a = after[i] if i < len(after) else (0, 0)
+        if (int(b[0]), int(b[1])) != (int(a[0]), int(a[1])):
+            return True
+    return False
+
+
+def _finalize_transfer_failure(
+    report: dict[str, Any],
+    *,
+    inv_before: list[tuple[int, int]],
+    inv_after: list[tuple[int, int]],
+    box_before: list[tuple[int, int]],
+    box_after: list[tuple[int, int]],
+    box_live_before: list[tuple[int, int]],
+    box_live_after: list[tuple[int, int]],
+    default_reason: str,
+) -> None:
+    """Annotate failed transfers; never emit cursor_out on failure."""
+    from re1_rl.item_box import box_pollution_reason
+
+    report["reason"] = default_reason
+    report["inv_before"] = inv_before[:4]
+    report["inv_after"] = inv_after[:4]
+    report["box_before"] = box_before[:4]
+    report["box_after"] = box_after[:4]
+    ram_changed = inv_before != inv_after or _box_live_changed(
+        box_live_before, box_live_after
+    )
+    report["ram_changed"] = bool(ram_changed)
+    pollution = box_pollution_reason(box_live_after)
+    if pollution:
+        report["reason"] = pollution
+        report["exchange_detected"] = True
+    elif ram_changed:
+        report["reason"] = "exchange_detected"
+        report["exchange_detected"] = True
+    report.pop("inv_cursor", None)
+    report.pop("box_cursor", None)
 
 
 def _tap(
@@ -398,8 +446,7 @@ def execute_box_withdraw_ui(
         "action": "withdraw",
         "box_slot": int(box_slot),
         "moved": None,
-        "inv_cursor": int(inv_cursor),
-        "box_cursor": int(box_cursor),
+        "cursor_in": {"inv": int(inv_cursor), "box": int(box_cursor)},
     }
     frames = 0
     if not probe_box_ui_open(client):
@@ -425,6 +472,7 @@ def execute_box_withdraw_ui(
 
     inv_before = read_inventory(client)
     box_before = read_box(client)
+    box_live_before = read_box_live(client)
     ok, reason = can_withdraw(inv_before, box_before, slot)
     if not ok:
         report["reason"] = reason
@@ -452,7 +500,7 @@ def execute_box_withdraw_ui(
         report["frames"] = frames
         return True, frames, report
 
-    # Cross on empty slot → box list resumes at ``box_cursor`` (not always 0).
+    # Cross on empty slot → box list resumes at ``box_cursor``.
     died, f = _confirm_cross(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
@@ -487,6 +535,7 @@ def execute_box_withdraw_ui(
 
     inv_after = read_inventory(client)
     box_after = read_box(client)
+    box_live_after = read_box_live(client)
     report["frames"] = frames
     if not probe_box_ui_open(client):
         report["reason"] = "box_ui_closed_mid_transfer"
@@ -509,19 +558,29 @@ def execute_box_withdraw_ui(
     # Reject knife/key exchange: destination must have gained the box item.
     if moved and dest_after[0] not in (0, int(item_id)):
         moved = False
-        report["reason"] = "exchange_not_withdraw"
-        report["inv_before"] = inv_before
-        report["inv_after"] = inv_after
-        report["box_before"] = box_before[:4]
-        report["box_after"] = box_after[:4]
+        _finalize_transfer_failure(
+            report,
+            inv_before=inv_before,
+            inv_after=inv_after,
+            box_before=box_before,
+            box_after=box_after,
+            box_live_before=box_live_before,
+            box_live_after=box_live_after,
+            default_reason="exchange_not_withdraw",
+        )
         return False, frames, report
 
     if not moved:
-        report["reason"] = "transfer_no_effect"
-        report["inv_before"] = inv_before
-        report["inv_after"] = inv_after
-        report["box_before"] = box_before[:4]
-        report["box_after"] = box_after[:4]
+        _finalize_transfer_failure(
+            report,
+            inv_before=inv_before,
+            inv_after=inv_after,
+            box_before=box_before,
+            box_after=box_after,
+            box_live_before=box_live_before,
+            box_live_after=box_live_after,
+            default_reason="transfer_no_effect",
+        )
         return False, frames, report
 
     moved_qty = max(1, int(qty_before) - int(src_after[1]))
@@ -531,9 +590,8 @@ def execute_box_withdraw_ui(
     report["ok"] = True
     report["reason"] = ""
     report["moved"] = (item_id, moved_qty)
-    # Cursor rests on the withdrawn stack in inventory.
+    report["cursor_out"] = {"inv": int(dest), "box": int(slot)}
     report["inv_cursor"] = int(dest)
-    # Next Cross-into-box resumes on this list index.
     report["box_cursor"] = int(slot)
     return False, frames, report
 
@@ -551,15 +609,15 @@ def execute_box_deposit_ui(
 
     ``box_cursor`` is where the box list resumes on Cross (same session
     tracking as withdraw). Destination is the first empty modeled box slot
-    (never exchange onto an occupied entry).
+    (never exchange onto an occupied entry). Env must pass tracked cursors
+    from the prior transfer; failures annotate ``exchange_detected``.
     """
     report: dict[str, Any] = {
         "ok": False,
         "action": "deposit",
         "inv_slot": int(inv_slot),
         "moved": None,
-        "inv_cursor": int(inv_cursor),
-        "box_cursor": int(box_cursor),
+        "cursor_in": {"inv": int(inv_cursor), "box": int(box_cursor)},
     }
     frames = 0
     if not probe_box_ui_open(client):
@@ -573,6 +631,7 @@ def execute_box_deposit_ui(
 
     inv_before = read_inventory(client)
     box_before = read_box(client)
+    box_live_before = read_box_live(client)
     ok, reason = can_deposit(inv_before, box_before, slot)
     if not ok:
         report["reason"] = reason
@@ -601,7 +660,6 @@ def execute_box_deposit_ui(
         report["frames"] = frames
         return True, frames, report
 
-    # Cross on occupied inv → box list resumes at ``box_cursor``.
     died, f = _confirm_cross(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
@@ -636,6 +694,7 @@ def execute_box_deposit_ui(
 
     inv_after = read_inventory(client)
     box_after = read_box(client)
+    box_live_after = read_box_live(client)
     report["frames"] = frames
     report["dest_slot"] = int(dest)
 
@@ -657,18 +716,23 @@ def execute_box_deposit_ui(
     moved = bool(dest_got) and after_units < before_units
 
     if not moved:
-        report["reason"] = "transfer_no_effect"
-        report["inv_before"] = inv_before[:4]
-        report["inv_after"] = inv_after[:4]
-        report["box_before"] = box_before[:4]
-        report["box_after"] = box_after[:4]
+        _finalize_transfer_failure(
+            report,
+            inv_before=inv_before,
+            inv_after=inv_after,
+            box_before=box_before,
+            box_after=box_after,
+            box_live_before=box_live_before,
+            box_live_after=box_live_after,
+            default_reason="transfer_no_effect",
+        )
         return False, frames, report
 
     moved_qty = max(1, before_units - after_units)
     report["ok"] = True
     report["reason"] = ""
     report["moved"] = (item_id, moved_qty)
-    # Inv may compact after deposit; keep source index as a hint.
+    report["cursor_out"] = {"inv": int(slot), "box": int(dest)}
     report["inv_cursor"] = int(slot)
     report["box_cursor"] = int(dest)
     return False, frames, report

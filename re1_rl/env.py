@@ -657,6 +657,58 @@ class RE1Env(gym.Env):
             live = getattr(self, "_box_cache", None)
         return box_pollution_reason(live)
 
+    def _apply_box_ui_cursors_from_report(
+        self,
+        report: dict[str, Any],
+        *,
+        inv_cursor_in: int,
+        box_cursor_in: int,
+    ) -> None:
+        """Update session cursors only after a successful transfer."""
+        if not report.get("ok"):
+            self._log_box_transfer_report(
+                report,
+                inv_cursor_in=inv_cursor_in,
+                box_cursor_in=box_cursor_in,
+            )
+            return
+        if report.get("inv_cursor") is not None:
+            self._box_inv_cursor = int(report["inv_cursor"])
+        if report.get("box_cursor") is not None:
+            self._box_list_cursor = int(report["box_cursor"])
+
+    def _log_box_transfer_report(
+        self,
+        report: dict[str, Any],
+        *,
+        inv_cursor_in: int,
+        box_cursor_in: int,
+    ) -> None:
+        """Log cursor desync / exchange side effects (memlog + stderr when enabled)."""
+        if not report.get("exchange_detected") and not report.get("ram_changed"):
+            return
+        payload = {
+            "box_transfer_diag": True,
+            "action": report.get("action"),
+            "ok": report.get("ok"),
+            "reason": report.get("reason"),
+            "cursor_in": report.get("cursor_in")
+            or {"inv": inv_cursor_in, "box": box_cursor_in},
+            "cursor_out": report.get("cursor_out"),
+            "rehomed": report.get("rehomed"),
+            "exchange_detected": report.get("exchange_detected"),
+            "ram_changed": report.get("ram_changed"),
+        }
+        import logging
+
+        logging.getLogger(__name__).warning("box_ui_transfer: %s", payload)
+        diag = getattr(self, "_step_diag", None)
+        if diag is not None and hasattr(diag, "log_event"):
+            try:
+                diag.log_event(payload)
+            except (OSError, RuntimeError, TypeError, ValueError, AttributeError):
+                pass
+
     def _weapon_card_obs(self, state: dict[str, Any]) -> np.ndarray:
         from re1_rl.ammo_accounting import (
             inventory_slots_to_id_qty,
@@ -2606,10 +2658,11 @@ class RE1Env(gym.Env):
                 self._sticky_input.reset()
             if report.get("ok") and report.get("moved") is not None:
                 report = {**report, "box_transfer": "withdraw"}
-            if report.get("inv_cursor") is not None:
-                self._box_inv_cursor = int(report["inv_cursor"])
-            if report.get("box_cursor") is not None:
-                self._box_list_cursor = int(report["box_cursor"])
+            self._apply_box_ui_cursors_from_report(
+                report,
+                inv_cursor_in=inv_cursor,
+                box_cursor_in=box_cursor,
+            )
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_cache = None
             try:
@@ -2623,7 +2676,13 @@ class RE1Env(gym.Env):
                     "ok": False,
                     "reason": pollution,
                     "box_pollution": pollution,
+                    "exchange_detected": True,
                 }
+                self._log_box_transfer_report(
+                    report,
+                    inv_cursor_in=inv_cursor,
+                    box_cursor_in=box_cursor,
+                )
                 self._episode_failure_override = pollution
             return self._submenu_step(
                 a,
@@ -2667,10 +2726,11 @@ class RE1Env(gym.Env):
                 self._sticky_input.reset()
             if report.get("ok") and report.get("moved") is not None:
                 report = {**report, "box_transfer": "deposit"}
-            if report.get("inv_cursor") is not None:
-                self._box_inv_cursor = int(report["inv_cursor"])
-            if report.get("box_cursor") is not None:
-                self._box_list_cursor = int(report["box_cursor"])
+            self._apply_box_ui_cursors_from_report(
+                report,
+                inv_cursor_in=inv_cursor,
+                box_cursor_in=box_cursor,
+            )
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_cache = None
             try:
@@ -2684,7 +2744,13 @@ class RE1Env(gym.Env):
                     "ok": False,
                     "reason": pollution,
                     "box_pollution": pollution,
+                    "exchange_detected": True,
                 }
+                self._log_box_transfer_report(
+                    report,
+                    inv_cursor_in=inv_cursor,
+                    box_cursor_in=box_cursor,
+                )
                 self._episode_failure_override = pollution
             return self._submenu_step(
                 a,
@@ -3502,10 +3568,11 @@ class RE1Env(gym.Env):
                 except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
                     pickup_modal = False
                 if real_box and self._current_room_is_box_room():
-                    self._box_ui_open = True
-                    self._box_phase = BOX_PHASE_CHOOSE
-                    self._box_inv_cursor = 0
-                    self._box_list_cursor = 0
+                    if not self._box_ui_open:
+                        self._box_ui_open = True
+                        self._box_phase = BOX_PHASE_CHOOSE
+                        self._box_inv_cursor = 0
+                        self._box_list_cursor = 0
                     self._skipping_flag = False
                 elif pickup_modal:
                     self._auto_accept_pause_pickup_modal()

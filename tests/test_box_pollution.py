@@ -24,6 +24,16 @@ def test_box_pollution_clean_modeled_slots() -> None:
     assert box_pollution_reason(box) is None
 
 
+def test_box_pollution_beretta_in_modeled_slot() -> None:
+    box = [(0x0B, 15), (0x02, 14), (0x01, 0)] + [(0, 0)] * (BOX_SLOTS - 3)
+    assert box_pollution_reason(box) == "disallowed_item_in_box:beretta@1"
+
+
+def test_box_pollution_knife_bank_ok() -> None:
+    box = [(0x01, 0), (0x44, 1)] + [(0, 0)] * (BOX_SLOTS - 2)
+    assert box_pollution_reason(box) is None
+
+
 def test_integrity_gate_rejects_key_in_box_cache() -> None:
     box = [[0, 0] for _ in range(48)]
     box[46] = [0x35, 1]

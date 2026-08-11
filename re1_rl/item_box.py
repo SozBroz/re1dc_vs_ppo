@@ -80,6 +80,20 @@ BOX_ROOMS = frozenset({"100", "118", "30E", "403", "502", "50E", "600", "618"})
 # Any known item-box room may deposit allowlisted items (heal / knife bank).
 BOX_DEPOSIT_ROOMS = BOX_ROOMS
 
+# Knife/heals (deposit bank) plus ammo stacks normally kept in the box.
+BOX_STORABLE_ITEM_IDS = DEPOSIT_ITEM_ALLOWLIST | frozenset(
+    {
+        0x0B,  # handgun_bullets
+        0x0C,  # shotgun_shells
+        0x0D,  # dumdum_rounds
+        0x0E,  # magnum_rounds
+        0x0F,  # flamethrower_fuel
+        0x10,  # explosive_rounds
+        0x11,  # acid_rounds
+        0x12,  # flame_rounds
+    }
+)
+
 
 def _typewriter_or_box_rooms() -> frozenset[str]:
     """Union of RDT typewriter rooms and known item-box rooms."""
@@ -156,11 +170,14 @@ def read_inventory(bridge: _BridgeReadWrite) -> list[tuple[int, int]]:
 def box_pollution_reason(
     box: list[tuple[int, int]] | None,
 ) -> str | None:
-    """Reject key items anywhere in the box, or any item past the modeled 16.
+    """Reject illegal box contents (keys, weapons, deep scroll, non-bank items).
 
     Sparse UI scroll has parked knife/keys near the inventory boundary (e.g.
     shield_key @ slot 46). Those slots are invisible to BOX_SLOTS=16 reads and
     quality ``-box_ammo``, so polluted cells look clean while story keys vanish.
+
+    Modeled slots 0–15 may hold knife/heals/ammo only; beretta and other
+    weapons trigger ``disallowed_item_in_box`` (including qty-0 ghosts).
     """
     from re1_rl.item_todo import canonical_item
     from re1_rl.key_items import KEY_ITEM_NAMES
@@ -181,6 +198,9 @@ def box_pollution_reason(
         if i >= BOX_SLOTS:
             label = name or f"0x{item_id:02x}"
             return f"deep_box_item:{label}@{i}"
+        if int(item_id) not in BOX_STORABLE_ITEM_IDS:
+            label = name or f"0x{item_id:02x}"
+            return f"disallowed_item_in_box:{label}@{i}"
     return None
 
 

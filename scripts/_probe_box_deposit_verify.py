@@ -16,6 +16,7 @@ from re1_rl.item_box import (  # noqa: E402
     read_inventory,
 )
 from re1_rl.item_box_ui_macro import (  # noqa: E402
+    close_box_ui,
     execute_box_deposit_ui,
     execute_box_withdraw_ui,
     probe_box_ui_open,
@@ -67,7 +68,11 @@ def main() -> int:
         c.wait_for_client()
         c.set_speed(200)
         c.load_savestate(str(state.resolve()))
-        c.frameadvance(6)
+        c.frameadvance(4)
+        hp = int(c.read_ram([("hp", PLAYER_HP, "u16")])["hp"])
+        if probe_box_ui_open(c):
+            close_box_ui(c, prev_hp=hp, episode_start_hp=hp)
+            _wait(c, frames=30, prev_hp=hp, episode_start_hp=hp)
         fields = [(f"b{i}", ITEM_BOX_BASE + i * 2, "u16", 0) for i in range(48)]
         fields += [(f"i{i}", INVENTORY_BASE + i * 2, "u16", 0) for i in range(8)]
         fields += [
@@ -77,9 +82,7 @@ def main() -> int:
         ]
         c.write_ram(fields)
         c.frameadvance(4)
-        hp = int(c.read_ram([("hp", PLAYER_HP, "u16")])["hp"])
         c.step(buttons={"cross": True}, n=12, abort_on_zero_hp=False)
-        c.step(buttons={}, n=100, abort_on_zero_hp=False)
         _wait(c, frames=90, prev_hp=hp, episode_start_hp=hp)
         assert probe_box_ui_open(c), "box UI not open"
 
