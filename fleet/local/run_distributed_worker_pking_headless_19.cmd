@@ -20,13 +20,13 @@ set RE1_STEP_DIAG_PORT=5759
 set RE1_MACHINE_NAME=%MACHINE_NAME%
 
 call "%~dp0go_explore_phase_c.env.cmd"
-REM cp54+ mix: 50%% latest in range, 50%% uniform (override via data/yawn_reset_pin.env).
+REM Pin cp55 only (override via data/yawn_reset_pin.env).
 set RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=
-set RE1_YAWN_RESET_PIN_INDEX=
+set RE1_YAWN_RESET_PIN_INDEX=55
 set RE1_YAWN_RESET_PIN_SET=
 set RE1_YAWN_RESET_PIN_SET_WEIGHT=
-set RE1_YAWN_RESET_PIN_RANGE=54-100
-set RE1_YAWN_RESET_PIN_WEIGHTS=latest:50
+set RE1_YAWN_RESET_PIN_RANGE=
+set RE1_YAWN_RESET_PIN_WEIGHTS=
 if not exist data\go_explore mkdir data\go_explore
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py --role worker --machine-name %MACHINE_NAME% --worker-id pking --learner-host %LEARNER_HOST% --learner-port %FLEET_LEARNER_PORT% --curriculum curriculum/yawn_rails_one_leg.json --n-envs %N_ENVS% --actor-ranks %ACTOR_RANKS% --base-port %BASE_PORT% --total-steps 0 --training-speed 6400 --skip-chunk 600 --sync-interval-s %SYNC_INTERVAL_S% --capture-checkpoints --headless --tile-windows --grid-cols 5 --grid-rows 4 --grid-monitor right --screenshot-mmf --inference-batch-max %N_ENVS%

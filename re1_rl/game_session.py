@@ -354,6 +354,10 @@ def outside_gameplay_reason(
       subtree (live hunt 2026-07-07, play_human :7780)
     - In-mansion HP but ``game_state & 0x90000000`` clear while modal flags clear
       — legacy CONFIG path when in-control byte stays 0x80
+
+  Note: mansion room code ``100`` is ``stage_id=0`` + ``room_id`` byte ``0``.
+  That playable save/box room must not be confused with front-end room 0
+  (which only appears with ``hp == 0``).
     """
     room = int(ram.get("room_id", -1))
     stage = int(ram.get("stage_id", -1))
@@ -372,7 +376,9 @@ def outside_gameplay_reason(
         return "title_attract"
 
     if episode_start_hp > 0 and hp > 0 and stage <= _MAX_CURRICULUM_STAGE:
-        if room in (0, MENU_ROOM_ID):
+        # MENU_ROOM_ID only — room byte 0 with HP>0 is mansion save room 100
+        # (and other Xx00 stage rooms), not the title front-end.
+        if room == MENU_ROOM_ID:
             return "menu_room_in_run"
         if item_inventory_screen_from_ram(ram):
             return None
