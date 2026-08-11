@@ -61,8 +61,13 @@ def payforward_ripple_enabled(default: bool = False) -> bool:
 
 
 def fight_bias_weight_from_env() -> float:
-    """``RE1_YAWN_FIGHT_BIAS_WEIGHT`` — fraction on frontier fight (default 0.40)."""
-    raw = os.environ.get(_FIGHT_BIAS_ENV, "").strip()
+    """``RE1_YAWN_FIGHT_BIAS_WEIGHT`` — fraction on fight-bias cell (default 0.40).
+
+    Hot-reloadable via ``data/yawn_reset_pin.env`` (or ``RE1_YAWN_RESET_PIN_FILE``).
+    """
+    from re1_rl.yawn_rails import _pin_env_raw
+
+    raw = _pin_env_raw(_FIGHT_BIAS_ENV)
     if not raw:
         return float(_FIGHT_BIAS_WEIGHT)
     try:
@@ -75,8 +80,11 @@ def fight_bias_index_from_env() -> int | None:
     """``RE1_YAWN_FIGHT_BIAS_INDEX=N`` — fixed cpNN for the fight-bias reset branch.
 
     When set and loadable, replaces :func:`frontier_fight_index` for payforward resets.
+    Hot-reloadable via ``data/yawn_reset_pin.env`` (or ``RE1_YAWN_RESET_PIN_FILE``).
     """
-    raw = os.environ.get(_FIGHT_BIAS_INDEX_ENV, "").strip()
+    from re1_rl.yawn_rails import _pin_env_raw
+
+    raw = _pin_env_raw(_FIGHT_BIAS_INDEX_ENV)
     if not raw:
         return None
     try:

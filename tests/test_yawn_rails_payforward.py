@@ -6,6 +6,8 @@ import random
 from collections import Counter
 from pathlib import Path
 
+import pytest
+
 from re1_rl.go_explore_archive import quality_beats
 from re1_rl.yawn_rails_payforward import (
     STATUS_BLOCKED,
@@ -274,6 +276,52 @@ def test_fight_bias_index_overrides_frontier(tmp_path: Path, monkeypatch) -> Non
         counts[int(opts["route_start_index"]) - 1] += 1
     assert counts[44] / 8000 > 0.33
     assert counts[44] / 8000 < 0.55
+
+
+def test_fight_bias_pin_file_hot_reload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RE1_YAWN_PAYFORWARD_RIPPLE", "1")
+    monkeypatch.setenv("RE1_YAWN_FIGHT_BIAS_INDEX", "44")
+    monkeypatch.setenv("RE1_YAWN_FIGHT_BIAS_WEIGHT", "0.41")
+    cells_dir = tmp_path / "states" / "yawn_rails" / "cells"
+    cells = []
+    for idx, ammo in ((18, 75), (19, 80), (44, 30), (45, 25)):
+        d = cells_dir / f"cp{idx:02d}"
+        d.mkdir(parents=True)
+        (d / "cell.State").write_bytes(b"x" * 100)
+        (d / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+        cells.append(_row(idx, ammo))
+    stage = {
+        "route_steps": list(range(1, 60)),
+        "legs_per_episode": 1,
+        "cells_manifest": "states/yawn_rails/manifest.json",
+    }
+    pin_file = tmp_path / "workhorse_reset_pin.env"
+    pin_file.write_text(
+        "RE1_YAWN_FIGHT_BIAS_INDEX=44\nRE1_YAWN_FIGHT_BIAS_WEIGHT=0.41\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_FILE", str(pin_file))
+    counts: Counter[int] = Counter()
+    rng = random.Random(2)
+    for _ in range(4000):
+        opts = sample_payforward_options(tmp_path, stage, cells, rng=rng)
+        assert opts is not None
+        counts[int(opts["route_start_index"]) - 1] += 1
+    assert counts[44] / 4000 > 0.30
+
+    pin_file.write_text(
+        "RE1_YAWN_FIGHT_BIAS_INDEX=45\nRE1_YAWN_FIGHT_BIAS_WEIGHT=0.41\n",
+        encoding="utf-8",
+    )
+    counts2: Counter[int] = Counter()
+    for _ in range(4000):
+        opts = sample_payforward_options(tmp_path, stage, cells, rng=rng)
+        assert opts is not None
+        counts2[int(opts["route_start_index"]) - 1] += 1
+    assert counts2[45] / 4000 > 0.30
+    assert counts2[44] / 4000 < counts[44] / 4000
 
 
 def test_frontier_advances_when_fight_efficient(tmp_path: Path) -> None:

@@ -654,6 +654,8 @@ def sample_one_leg_options(
     newest loadable cp18+ cell with fixed indices. Overrides pin range/set.
     ``RE1_YAWN_RESET_PIN_SET=37,40,44`` with optional
     ``RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5`` blends pin-set vs normal mix.
+    ``RE1_YAWN_FIGHT_BIAS_INDEX`` / ``RE1_YAWN_FIGHT_BIAS_WEIGHT`` override the
+    payforward fight cell and its share (workhorse grind without fleet restart).
     ``data/yawn_reset_pin.env`` (or ``RE1_YAWN_RESET_PIN_FILE``) overrides the
     above on every reset without restarting the worker — edit the file live.
     """
