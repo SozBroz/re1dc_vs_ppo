@@ -22,6 +22,7 @@ _ITEM_NAME_TO_ID = {canonical_item(name): item_id for item_id, name in ITEM_IDS.
 # headroom for box withdraw/deposit after the storeroom chemical leg).
 CAPTURE_MIN_FREE_SLOTS: dict[str, int] = {
     "east_stairs_101_post_storeroom": 2,
+    "west_stairs_return_10B": 2,
 }
 
 
@@ -501,6 +502,62 @@ def reset_frontier_fight_only_from_env() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def parse_latest_range_mix_weight(raw: str) -> float | None:
+    """Parse ``latest:50`` (or ``latest:0.5``) for pin-range + uniform mix.
+
+    Optional trailing ``uniform`` / ``rest`` / ``range`` is ignored.
+    Returns ``None`` when ``raw`` names explicit cell indices alongside ``latest``.
+    """
+    stripped = raw.strip().lower().replace(" ", "")
+    if not stripped.startswith("latest"):
+        return None
+    parts = [p for p in stripped.replace(";", ",").split(",") if p]
+    if not parts:
+        return None
+    if len(parts) > 2:
+        return None
+    if len(parts) == 2 and parts[1] not in {"uniform", "rest", "range"}:
+        return None
+    token = parts[0]
+    for sep in (":", "=", "/"):
+        if sep in token:
+            left, right = token.split(sep, 1)
+            break
+    else:
+        return None
+    if left.strip() not in _LATEST_PIN_ALIASES:
+        return None
+    try:
+        weight = float(right.strip().rstrip("%"))
+    except ValueError:
+        return None
+    if weight <= 0.0:
+        return None
+    if right.strip().endswith("%") or weight > 1.0:
+        weight /= 100.0
+    return max(0.0, min(1.0, weight))
+
+
+def _sample_cell_from_pin_range_latest_mix(
+    cells: list[dict[str, Any]],
+    lo: int,
+    hi: int,
+    latest_weight: float,
+    *,
+    rng: random.Random,
+) -> dict[str, Any]:
+    """``latest_weight`` on newest loadable cell in ``[lo, hi]``; else uniform in range."""
+    ranged = _cells_in_pin_range(cells, lo, hi)
+    if not ranged:
+        raise ValueError(
+            f"RE1_YAWN_RESET_PIN_RANGE={lo}-{hi} but no loadable cells in range"
+        )
+    latest = ranged[-1]
+    if rng.random() < float(latest_weight):
+        return latest
+    return ranged[rng.randrange(len(ranged))]
+
+
 def _cells_in_pin_range(
     cells: list[dict[str, Any]],
     lo: int,
@@ -649,9 +706,12 @@ def sample_one_leg_options(
     ``RE1_YAWN_RESET_PIN_INDEX=N`` forces curated cell ``cpNN`` (overrides mix).
     ``RE1_YAWN_RESET_PIN_RANGE=LO-HI`` uniform over loadable cells in that range
     (overridden by a single pin index when both are set).
-    ``RE1_YAWN_RESET_PIN_WEIGHTS=33:20,36:30,40:50`` samples by explicit per-cell
+    ``RE1_YAWN_RESET_PIN_WEIGHTS=latest:50`` with a pin range: ``latest_weight`` on
+    the newest loadable cell in range, remainder uniform over that range (same as
+    the default cp18+ mix but floored at ``LO``).
+    Other ``RE1_YAWN_RESET_PIN_WEIGHTS`` entries sample by explicit per-cell
     weights (percentages or fractions; normalized). ``latest:50,33:50`` mixes the
-    newest loadable cp18+ cell with fixed indices. Overrides pin range/set.
+    newest loadable cp18+ cell with fixed indices. Overrides plain pin range/set.
     ``RE1_YAWN_RESET_PIN_SET=37,40,44`` with optional
     ``RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5`` blends pin-set vs normal mix.
     ``RE1_YAWN_FIGHT_BIAS_INDEX`` / ``RE1_YAWN_FIGHT_BIAS_WEIGHT`` override the
@@ -681,11 +741,22 @@ def sample_one_leg_options(
                 "is not loadable"
             )
         return _options_from_cell(pinned[0], stage, reset_source="route_cell_pin")
+    pin_range = reset_pin_range_from_env()
+    raw_pin_weights = _pin_env_raw(_RESET_PIN_WEIGHTS_ENV)
+    if pin_range is not None and raw_pin_weights:
+        latest_range_w = parse_latest_range_mix_weight(raw_pin_weights)
+        if latest_range_w is not None:
+            lo, hi = pin_range
+            chosen = _sample_cell_from_pin_range_latest_mix(
+                all_cells, lo, hi, latest_range_w, rng=rng
+            )
+            return _options_from_cell(
+                chosen, stage, reset_source="route_cell_pin_range_latest"
+            )
     pin_weights = reset_pin_weights_from_env()
     if pin_weights is not None:
         chosen = _sample_cell_from_pin_weights(all_cells, pin_weights, rng=rng)
         return _options_from_cell(chosen, stage, reset_source="route_cell_pin_weights")
-    pin_range = reset_pin_range_from_env()
     if pin_range is not None:
         lo, hi = pin_range
         ranged = _cells_in_pin_range(all_cells, lo, hi)

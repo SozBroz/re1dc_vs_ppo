@@ -882,6 +882,75 @@ def test_reset_pin_range_env_samples_inclusive_span(
     assert starts >= {28, 38}
 
 
+def test_reset_pin_range_latest_mix_samples_floor_and_latest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from collections import Counter
+
+    pin_file = tmp_path / "pin.env"
+    pin_file.write_text(
+        "RE1_YAWN_RESET_PIN_RANGE=54-100\nRE1_YAWN_RESET_PIN_WEIGHTS=latest:50\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_FILE", str(pin_file))
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in range(18, 56)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 60)),
+    }
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_INDEX", raising=False)
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_RANGE", "54-100")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_WEIGHTS", "latest:50")
+    counts: Counter[int] = Counter()
+    for seed in range(2000):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        assert opts["reset_source"] == "route_cell_pin_range_latest"
+        start = int(opts["route_start_index"])
+        assert 55 <= start <= 56
+        counts[start] += 1
+    assert counts[56] > 700
+    assert counts[55] > 200
+
+
+def test_reset_pin_range_latest_mix_tracks_new_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pin_file = tmp_path / "pin.env"
+    pin_file.write_text(
+        "RE1_YAWN_RESET_PIN_RANGE=54-100\nRE1_YAWN_RESET_PIN_WEIGHTS=latest:100\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_FILE", str(pin_file))
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in range(54, 56)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 60)),
+    }
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_INDEX", raising=False)
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_RANGE", "54-100")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_WEIGHTS", "latest:50")
+    for seed in range(20):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        assert opts["route_start_index"] == 56
+
+    manifest["cells"].append(_write_cell(tmp_path, 57))
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(0))
+    assert opts["route_start_index"] == 58
+
+
 def test_parse_pin_weights_accepts_percentages_and_fractions() -> None:
     from re1_rl.yawn_rails import PIN_WEIGHT_LATEST_KEY, parse_pin_weights
 
@@ -999,6 +1068,12 @@ def test_reset_pin_weights_renormalizes_when_some_cells_missing(
 def test_reset_pin_weights_overrides_pin_range(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    pin_file = tmp_path / "pin.env"
+    pin_file.write_text(
+        "RE1_YAWN_RESET_PIN_RANGE=27-37\nRE1_YAWN_RESET_PIN_WEIGHTS=40:100\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_FILE", str(pin_file))
     manifest = {
         "schema_version": 1,
         "route_id": "test",
@@ -1781,6 +1856,70 @@ def test_east_stairs_post_storeroom_capture_requires_two_free_slots(
     )
     assert proposal is not None
     assert proposal["checkpoint_id"] == "east_stairs_101_post_storeroom"
+
+
+def test_west_stairs_return_capture_requires_two_free_slots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """cp57 capture refuses when leaving save room 100 with fewer than 2 empty slots."""
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
+    bridge = MagicMock()
+    bridge.save_savestate.side_effect = (
+        lambda path: Path(path).write_bytes(b"state")
+    )
+    planner = _planner(start_index=_idx("west_stairs_return_10B") + 1)
+    six_items = (
+        ("knife", 0),
+        ("beretta", 14),
+        ("handgun_bullets", 16),
+        ("shield_key", 1),
+        ("green_herb", 1),
+        ("chemical", 1),
+    )
+    env = SimpleNamespace(
+        project_root=tmp_path,
+        _stage={
+            "mode": "yawn_rails",
+            "cells_manifest": "states/yawn_rails/manifest.json",
+            "route_id": "test",
+        },
+        _planner=planner,
+        bridge=bridge,
+        _macro_active=False,
+        _progress=None,
+        _step_count=300,
+        _read_state=lambda track_items=False: _state("101"),
+    )
+    monkeypatch.setattr(
+        "re1_rl.yawn_rails.dump_episode_sidecar",
+        lambda *_args, **_kwargs: {"schema_version": 1},
+    )
+    monkeypatch.setattr(
+        "re1_rl.go_explore_capture.compute_quality",
+        lambda *_args, **_kwargs: [96, 85, 68, 14, 1, 0, 0],
+    )
+
+    crowded = _state(
+        "101",
+        inventory_slots=[*six_items, ("shotgun", 1), (0, 0)],
+    )
+    assert (
+        capture_successor_cell(
+            env, crowded, {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
+        )
+        is None
+    )
+    bridge.save_savestate.assert_not_called()
+
+    ok_state = _state(
+        "101",
+        inventory_slots=[*six_items, (0, 0), (0, 0)],
+    )
+    proposal = capture_successor_cell(
+        env, ok_state, {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
+    )
+    assert proposal is not None
+    assert proposal["checkpoint_id"] == "west_stairs_return_10B"
 
 
 def test_118_almanac_has_chemical_but_not_square_crank() -> None:

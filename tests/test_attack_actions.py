@@ -243,7 +243,7 @@ def test_box_withdraw_only_while_box_ui_open() -> None:
         room_id="10B",
     )
     assert not room10b[BOX_DEPOSIT_ACTION]
-    # Non-allowlisted item (ammo) cannot open deposit even in a box room.
+    # Handgun ammo cannot open deposit even in room 100.
     ammo_inv = [(0x0B, 15)] + [(0, 0)] * 7
     ammo_mask = action_mask(
         N_ACTIONS,
@@ -258,6 +258,34 @@ def test_box_withdraw_only_while_box_ui_open() -> None:
         room_id="100",
     )
     assert not ammo_mask[BOX_DEPOSIT_ACTION]
+    # Room 100: bazooka + acid rounds can open deposit; room 118 cannot.
+    baz_inv = [(0x07, 6), (0x11, 6)] + [(0, 0)] * 6
+    baz100 = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x07,
+        inventory=baz_inv,
+        box=box,
+        in_box_room=True,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_CHOOSE,
+        in_control=False,
+        room_id="100",
+    )
+    assert baz100[BOX_DEPOSIT_ACTION]
+    baz118 = action_mask(
+        N_ACTIONS,
+        None,
+        equipped_weapon_id=0x07,
+        inventory=baz_inv,
+        box=box,
+        in_box_room=True,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_CHOOSE,
+        in_control=False,
+        room_id="118",
+    )
+    assert not baz118[BOX_DEPOSIT_ACTION]
     picking = action_mask(
         N_ACTIONS,
         None,

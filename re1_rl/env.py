@@ -2711,6 +2711,10 @@ class RE1Env(gym.Env):
             self._sticky_input.reset()
             self._macro_active = True
             try:
+                room_id = None
+                prev_st = getattr(self, "_prev_state", None) or {}
+                if isinstance(prev_st, dict):
+                    room_id = prev_st.get("room_id")
                 died, frames, report = execute_box_deposit_ui(
                     self.bridge,
                     int(slot),
@@ -2718,6 +2722,7 @@ class RE1Env(gym.Env):
                     episode_start_hp=episode_start_hp,
                     inv_cursor=inv_cursor,
                     box_cursor=box_cursor,
+                    room_id=str(room_id) if room_id is not None else None,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, 0

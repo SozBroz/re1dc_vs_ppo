@@ -34,6 +34,11 @@ def test_box_pollution_knife_bank_ok() -> None:
     assert box_pollution_reason(box) is None
 
 
+def test_box_pollution_bazooka_bank_ok() -> None:
+    box = [(0x07, 6), (0x11, 6), (0x0A, 1)] + [(0, 0)] * (BOX_SLOTS - 3)
+    assert box_pollution_reason(box) is None
+
+
 def test_integrity_gate_rejects_key_in_box_cache() -> None:
     box = [[0, 0] for _ in range(48)]
     box[46] = [0x35, 1]

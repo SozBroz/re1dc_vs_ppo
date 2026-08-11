@@ -16,7 +16,7 @@ RE1 DC box flow (imperator scaffolding 2026-08-07 / deposit hunt 2026-08-08):
   - Close: while the cursor is on the inventory grid, Triangle dismisses
     cleanly. EXIT (Down → Cross) is the fallback if Triangle misses.
 
-Policy: deposit stays off until room-100 allowlist enablement.
+Policy: deposit allowlist (knife/heals everywhere; room 100 also bazooka bank).
 """
 
 from __future__ import annotations
@@ -604,6 +604,7 @@ def execute_box_deposit_ui(
     episode_start_hp: int,
     inv_cursor: int = 0,
     box_cursor: int = 0,
+    room_id: str | None = None,
 ) -> tuple[bool, int, dict[str, Any]]:
     """Deposit ``inv_slot`` via occupied inv → Cross → empty box → Cross.
 
@@ -632,7 +633,7 @@ def execute_box_deposit_ui(
     inv_before = read_inventory(client)
     box_before = read_box(client)
     box_live_before = read_box_live(client)
-    ok, reason = can_deposit(inv_before, box_before, slot)
+    ok, reason = can_deposit(inv_before, box_before, slot, room_id=room_id)
     if not ok:
         report["reason"] = reason
         return False, 0, report

@@ -233,7 +233,7 @@ def _mask_box_ui_session(
             for i in range(N_SELECT_SLOT):
                 idx = SELECT_SLOT_BASE + i
                 if idx < n_actions:
-                    ok, _ = can_deposit(inventory, box, i)
+                    ok, _ = can_deposit(inventory, box, i, room_id=room_id)
                     mask[idx] = bool(ok)
         if BOX_CLOSE_ACTION < n_actions:
             mask[BOX_CLOSE_ACTION] = True
@@ -253,7 +253,7 @@ def _mask_box_ui_session(
         any_deposit = False
         if deposit_enabled and inventory is not None and box is not None:
             for i in range(min(N_SELECT_SLOT, len(inventory))):
-                ok, _ = can_deposit(inventory, box, i)
+                ok, _ = can_deposit(inventory, box, i, room_id=room_id)
                 if ok:
                     any_deposit = True
                     break

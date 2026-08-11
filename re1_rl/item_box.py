@@ -52,7 +52,8 @@ BOX_SLOTS_LIVE = 48
 INVENTORY_SLOTS = 8
 LOCKPICK_ITEM_ID = 0x31
 KNIFE_ITEM_ID = 0x01
-# Knife + healing items only (room-100 bank). Keys/ammo/weapons stay on person.
+# Knife + healing items only (global bank). Keys/ammo/weapons stay on person
+# except room-100 bazooka banking below.
 DEPOSIT_ITEM_ALLOWLIST = frozenset(
     {
         KNIFE_ITEM_ID,
@@ -68,6 +69,24 @@ DEPOSIT_ITEM_ALLOWLIST = frozenset(
         0x4B,  # mixed_herbs_ggb
     }
 )
+# Mansion Save Room (100): bank grenade/rocket launchers + their round packs.
+BAZOOKA_WEAPON_IDS = frozenset(
+    {
+        0x07,  # bazooka_acid
+        0x08,  # bazooka_explosive
+        0x09,  # bazooka_flame
+        0x0A,  # rocket_launcher
+    }
+)
+BAZOOKA_AMMO_IDS = frozenset(
+    {
+        0x10,  # explosive_rounds
+        0x11,  # acid_rounds
+        0x12,  # flame_rounds
+    }
+)
+ROOM_100_EXTRA_DEPOSIT_IDS = BAZOOKA_WEAPON_IDS | BAZOOKA_AMMO_IDS
+BOX_BAZOOKA_DEPOSIT_ROOMS = frozenset({"100"})
 
 # Env must leave these False — magic writes scuffed post-cp41 states.
 # When False, ``apply_deposit`` / ``apply_withdraw`` are no-ops (no write_ram).
@@ -80,19 +99,25 @@ BOX_ROOMS = frozenset({"100", "118", "30E", "403", "502", "50E", "600", "618"})
 # Any known item-box room may deposit allowlisted items (heal / knife bank).
 BOX_DEPOSIT_ROOMS = BOX_ROOMS
 
-# Knife/heals (deposit bank) plus ammo stacks normally kept in the box.
-BOX_STORABLE_ITEM_IDS = DEPOSIT_ITEM_ALLOWLIST | frozenset(
+# Knife/heals (deposit bank) plus ammo stacks normally kept in the box,
+# plus room-100 bazooka bank items (weapons + packs).
+BOX_STORABLE_ITEM_IDS = DEPOSIT_ITEM_ALLOWLIST | ROOM_100_EXTRA_DEPOSIT_IDS | frozenset(
     {
         0x0B,  # handgun_bullets
         0x0C,  # shotgun_shells
         0x0D,  # dumdum_rounds
         0x0E,  # magnum_rounds
         0x0F,  # flamethrower_fuel
-        0x10,  # explosive_rounds
-        0x11,  # acid_rounds
-        0x12,  # flame_rounds
     }
 )
+
+
+def deposit_allowlist_for_room(room_id: str | None) -> frozenset[int]:
+    """Base knife/heal bank; room 100 also allows bazooka variants + packs."""
+    rid = str(room_id or "").strip().upper()
+    if rid in BOX_BAZOOKA_DEPOSIT_ROOMS:
+        return DEPOSIT_ITEM_ALLOWLIST | ROOM_100_EXTRA_DEPOSIT_IDS
+    return DEPOSIT_ITEM_ALLOWLIST
 
 
 def _typewriter_or_box_rooms() -> frozenset[str]:
@@ -176,8 +201,9 @@ def box_pollution_reason(
     shield_key @ slot 46). Those slots are invisible to BOX_SLOTS=16 reads and
     quality ``-box_ammo``, so polluted cells look clean while story keys vanish.
 
-    Modeled slots 0–15 may hold knife/heals/ammo only; beretta and other
-    weapons trigger ``disallowed_item_in_box`` (including qty-0 ghosts).
+    Modeled slots 0–15 may hold knife/heals/ammo and room-100 bazooka bank
+    items; beretta and other non-bank weapons trigger ``disallowed_item_in_box``
+    (including qty-0 ghosts).
     """
     from re1_rl.item_todo import canonical_item
     from re1_rl.key_items import KEY_ITEM_NAMES
@@ -209,12 +235,14 @@ def can_deposit(
     box: list[tuple[int, int]],
     inv_slot: int,
     *,
+    room_id: str | None = None,
     enforce_allowlist: bool | None = None,
 ) -> tuple[bool, str]:
     """Legal iff source occupied, not lockpick, and box has a free empty slot.
 
     When ``BOX_DEPOSIT_POLICY_ENABLED`` (or ``enforce_allowlist=True``), only
-    ``DEPOSIT_ITEM_ALLOWLIST`` ids may deposit (knife + heals).
+    room-scoped allowlist ids may deposit (knife + heals; room 100 also
+    bazooka variants + their ammo packs).
     """
     if inv_slot < 0 or inv_slot >= len(inventory):
         return False, "bad_slot"
@@ -230,7 +258,7 @@ def can_deposit(
         if enforce_allowlist is None
         else bool(enforce_allowlist)
     )
-    if use_allowlist and int(item_id) not in DEPOSIT_ITEM_ALLOWLIST:
+    if use_allowlist and int(item_id) not in deposit_allowlist_for_room(room_id):
         return False, "not_allowlisted"
     if _first_empty_slot(box) is None:
         return False, "box_full"
@@ -316,6 +344,7 @@ def apply_deposit(
     inv_slot: int,
     *,
     equipped_weapon_id: int,
+    room_id: str | None = None,
 ) -> dict[str, Any]:
     """Validate, plan, write inventory + box; unequip if depositing equipped weapon.
 
@@ -330,7 +359,7 @@ def apply_deposit(
         }
     inventory = read_inventory(bridge)
     box = read_box(bridge)
-    ok, reason = can_deposit(inventory, box, inv_slot)
+    ok, reason = can_deposit(inventory, box, inv_slot, room_id=room_id)
     if not ok:
         return {"ok": False, "reason": reason, "moved": None, "unequipped": False}
 

@@ -29,6 +29,8 @@ from re1_rl.item_box import (  # noqa: E402
 def magic_box_writes(monkeypatch: pytest.MonkeyPatch) -> None:
     """Unit-test apply_* planners; live training keeps magic writes off."""
     monkeypatch.setattr(item_box_mod, "MAGIC_BOX_RAM_WRITES_ENABLED", True)
+    # Mechanics tests deposit arbitrary ids; live policy stays allowlisted.
+    monkeypatch.setattr(item_box_mod, "BOX_DEPOSIT_POLICY_ENABLED", False)
 from re1_rl.memory_map import (  # noqa: E402
     EQUIPPED_WEAPON_ID,
     EQUIPPED_SLOT_INDEX_1BASED,
@@ -145,6 +147,29 @@ def test_deposit_allowlist_knife_and_heals_only() -> None:
     assert ok_ammo_open
 
 
+def test_room_100_allows_bazooka_and_ammo_deposit() -> None:
+    inv = [(0x07, 6), (0x11, 6), (0x08, 0), (0x10, 6), (0x09, 3), (0x12, 6)] + [
+        (0, 0)
+    ] * 2
+    box = _empty_box()
+    for i in range(6):
+        ok, reason = can_deposit(
+            inv, box, i, room_id="100", enforce_allowlist=True
+        )
+        assert ok and reason == "", (i, reason)
+    # Other box rooms stay knife/heal only.
+    ok118, reason118 = can_deposit(
+        inv, box, 0, room_id="118", enforce_allowlist=True
+    )
+    assert not ok118 and reason118 == "not_allowlisted"
+    # Handgun ammo still blocked even in room 100.
+    inv_hg = [(0x0B, 15)] + [(0, 0)] * 7
+    ok_hg, reason_hg = can_deposit(
+        inv_hg, box, 0, room_id="100", enforce_allowlist=True
+    )
+    assert not ok_hg and reason_hg == "not_allowlisted"
+
+
 def test_box_ui_open_from_ram_requires_gs_90() -> None:
     from re1_rl.item_box_ui_macro import box_ui_open_from_ram
     from re1_rl.memory_map import PAUSE_MENU_GAME_MODE
@@ -171,7 +196,7 @@ def test_deposit_from_empty_slot_refused():
 def test_deposit_with_full_box_refused_when_no_empty_slot():
     inv = [(0x02, 15)] + [(0, 0)] * 7
     box = [(0x41, 1)] * BOX_SLOTS
-    ok, reason = can_deposit(inv, box, 0)
+    ok, reason = can_deposit(inv, box, 0, enforce_allowlist=False)
     assert not ok and reason == "box_full"
 
 
@@ -179,7 +204,7 @@ def test_deposit_does_not_merge_into_existing_same_id_stack():
     """Deposit uses first empty slot only — even if a same-id stack has room."""
     inv = [(0x0B, 10)] + [(0, 0)] * 7
     box = [(0x0B, 50)] + [(0, 0)] * (BOX_SLOTS - 1)
-    ok, reason = can_deposit(inv, box, 0)
+    ok, reason = can_deposit(inv, box, 0, enforce_allowlist=False)
     assert ok and reason == ""
     new_inv, new_box, moved = plan_deposit(inv, box, 0)
     assert moved == 10
