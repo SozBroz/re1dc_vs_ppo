@@ -100,6 +100,17 @@ ENEMY_DAMAGE_REWARD = 0.014
 ENEMY_KILL_REWARD = 2.0
 # Shotgun vs cerberus is brutally ammo-inefficient in RE1 DC — steer to handgun.
 SHOTGUN_DOG_HIT_PENALTY = -0.7
+# Magnum / bazooka on fodder (dog or zombie) — keep heavy ammo for bosses.
+HEAVY_WEAPON_FODDER_HIT_PENALTY = -2.0
+HEAVY_WEAPON_FODDER_IDS: frozenset[int] = frozenset(
+    {
+        0x04,  # colt python dumdum
+        0x05,  # colt python magnum
+        0x07,  # bazooka acid
+        0x08,  # bazooka explosive
+        0x09,  # bazooka flame
+    }
+)
 # Gallery crows: pest combat pays nothing (#7/#8).
 CROW_COMBAT_REWARD_SCALE = 0.0
 # Conservative ammo-waste tax.  A full inverse pickup tax (1.0) made scarce
@@ -427,6 +438,27 @@ def shotgun_dog_hit_penalty(state: dict[str, Any]) -> float:
     return SHOTGUN_DOG_HIT_PENALTY * float(hits)
 
 
+def heavy_weapon_fodder_hit_penalty(state: dict[str, Any]) -> float:
+    """−2 per magnum/bazooka hit on a dog or zombie."""
+    wid = _combat_ammo_weapon_id(state)
+    if int(wid) not in HEAVY_WEAPON_FODDER_IDS:
+        return 0.0
+    events = state.get("combat_events")
+    if not events:
+        return 0.0
+    hits = 0
+    for ev in events:
+        if ev.get("reward_denied"):
+            continue
+        if int(ev.get("damage", 0) or 0) <= 0:
+            continue
+        if ev.get("is_cerberus") or ev.get("is_zombie"):
+            hits += 1
+    if hits <= 0:
+        return 0.0
+    return HEAVY_WEAPON_FODDER_HIT_PENALTY * float(hits)
+
+
 # Legacy aliases (all rails off-path / leave-target is now terminal -4).
 WRONG_ROOM_PENALTY = -4.0
 # Room detour / leave-target: -4, zeros same-step positives, ends episode.
@@ -710,6 +742,7 @@ def compute_reward(
         "ammo_waste": 0.0,
         "combat_overkill": 0.0,
         "shotgun_dog_hit": 0.0,
+        "heavy_weapon_fodder_hit": 0.0,
         "attack_dry_fire": 0.0,
         "attack_macro_failure": 0.0,
     }
@@ -1011,6 +1044,10 @@ def compute_reward(
     dog_sg = shotgun_dog_hit_penalty(state)
     if dog_sg < 0.0:
         bd["shotgun_dog_hit"] = dog_sg
+
+    heavy_fodder = heavy_weapon_fodder_hit_penalty(state)
+    if heavy_fodder < 0.0:
+        bd["heavy_weapon_fodder_hit"] = heavy_fodder
 
     # Ammo expenditure: every spent round (hit or miss). Deferred miss expiry
     # re-posts ammo_spent after the fire step already paid — skip that replay.

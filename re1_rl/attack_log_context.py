@@ -79,6 +79,11 @@ def _static_spawns(room_id: str) -> list[dict[str, Any]]:
     return out
 
 
+def infer_enemy_type_for_slot(room_id: str, slot: int) -> str:
+    """Best-effort enemy_type string for a live combat slot from room_enemies.json."""
+    return _infer_type_for_slot(room_id, slot)
+
+
 def _infer_type_for_slot(room_id: str, slot: int) -> str:
     block = _room_enemies_table().get(str(room_id))
     if not isinstance(block, dict):

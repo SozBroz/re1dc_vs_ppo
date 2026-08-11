@@ -16,6 +16,7 @@ from re1_rl.reward import (
     ATTACK_MISS_TAX_SCALE,
     ENEMY_DAMAGE_REWARD,
     ENEMY_KILL_REWARD,
+    HEAVY_WEAPON_FODDER_HIT_PENALTY,
     KNIFE_MISS_PENALTY,
     MISS_TAX_CLIP_SIZE,
     REFERENCE_STEP_FRAMES,
@@ -26,6 +27,7 @@ from re1_rl.reward import (
     ammo_waste_penalty,
     combat_overkill_penalty,
     compute_reward,
+    heavy_weapon_fodder_hit_penalty,
     shotgun_dog_hit_penalty,
     SHOTGUN_DOG_HIT_PENALTY,
 )
@@ -271,6 +273,7 @@ def test_breakdown_keys_present() -> None:
     assert "ammo_waste" in bd
     assert "combat_overkill" in bd
     assert "shotgun_dog_hit" in bd
+    assert "heavy_weapon_fodder_hit" in bd
 
 
 def test_shotgun_dog_hit_penalty_per_event() -> None:
@@ -313,6 +316,68 @@ def test_shotgun_zombie_hit_no_dog_penalty() -> None:
         }
     ]
     assert shotgun_dog_hit_penalty(cur) == 0.0
+
+
+def test_magnum_zombie_hit_pays_heavy_fodder_penalty() -> None:
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    cur["equipped_weapon_id"] = 0x05
+    cur["ammo_spent"] = 1
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 100,
+            "killed": True,
+            "reward_denied": False,
+            "is_cerberus": False,
+            "is_zombie": True,
+            "type_id": 1,
+        }
+    ]
+    assert heavy_weapon_fodder_hit_penalty(cur) == pytest.approx(
+        HEAVY_WEAPON_FODDER_HIT_PENALTY
+    )
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["heavy_weapon_fodder_hit"] == pytest.approx(
+        HEAVY_WEAPON_FODDER_HIT_PENALTY
+    )
+
+
+def test_bazooka_dog_hit_pays_heavy_fodder_penalty() -> None:
+    cur = make_state(hp=96, step=2)
+    cur["equipped_weapon_id"] = 0x07
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 60,
+            "killed": False,
+            "reward_denied": False,
+            "is_cerberus": True,
+            "is_zombie": False,
+        }
+    ]
+    assert heavy_weapon_fodder_hit_penalty(cur) == pytest.approx(
+        HEAVY_WEAPON_FODDER_HIT_PENALTY
+    )
+
+
+def test_beretta_zombie_hit_no_heavy_fodder_penalty() -> None:
+    cur = make_state(hp=96, step=2)
+    cur["equipped_weapon_id"] = 0x02
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 12,
+            "killed": False,
+            "reward_denied": False,
+            "is_cerberus": False,
+            "is_zombie": True,
+        }
+    ]
+    assert heavy_weapon_fodder_hit_penalty(cur) == 0.0
 
 
 def test_beretta_dog_hit_no_shotgun_penalty() -> None:

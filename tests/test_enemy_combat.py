@@ -17,6 +17,7 @@ from re1_rl.enemy_combat import (
     enemy_combat_events,
     enemy_hp_by_slot,
     is_cerberus_combat_entity,
+    is_zombie_combat_entity,
     is_crow_combat_entity,
     is_crow_enemy,
     is_passive_crow_enemy,
@@ -527,7 +528,22 @@ def test_cerberus_active_byte_marks_combat_event() -> None:
     )
     assert len(events) == 1
     assert events[0]["is_cerberus"] is True
+    assert events[0].get("is_zombie") is False
     assert events[0]["damage"] == 40
+
+
+def test_zombie_type_marks_combat_event() -> None:
+    assert is_zombie_combat_entity({"type_id": 1})
+    assert is_zombie_combat_entity({"type_name": "zombie"})
+    assert not is_zombie_combat_entity({"type_name": "cerberus"})
+    events = enemy_combat_events(
+        [{"slot": 0, "hp": 40, "type_id": 1}],
+        [{"slot": 0, "hp": 28, "type_id": 1}],
+        room_id="104",
+    )
+    assert len(events) == 1
+    assert events[0]["is_zombie"] is True
+    assert events[0]["is_cerberus"] is False
 
 
 def test_passive_crow_detection() -> None:

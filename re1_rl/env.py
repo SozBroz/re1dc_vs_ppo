@@ -819,6 +819,7 @@ class RE1Env(gym.Env):
                     "ammo_waste",
                     "combat_overkill",
                     "shotgun_dog_hit",
+                    "heavy_weapon_fodder_hit",
                     "attack_dry_fire",
                     "attack_macro_failure",
                 )

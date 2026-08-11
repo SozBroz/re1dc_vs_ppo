@@ -35,6 +35,10 @@ CERBERUS_HP_MAX = 120  # live dogs ~100; Tyrant 220+, Yawn 3050+
 CERBERUS_ACTIVE_BYTES: frozenset[int] = frozenset({0x2C, 0x44, 0x90})
 CERBERUS_TYPE_NAMES: frozenset[str] = frozenset({"cerberus", "zombie_dog"})
 
+# Ordinary mansion zombies (test_enemy_combat + RDT model map).
+ZOMBIE_RAM_TYPE_IDS: frozenset[int] = frozenset({0x01, 0x02})
+ZOMBIE_TYPE_NAMES: frozenset[str] = frozenset({"zombie"})
+
 # Parked enemy slots keep hp>0 at fixed sentinel coords across unrelated rooms.
 # Exact (x, z) matches only — attack-mask path; does not affect combat pay/obs.
 # See docs/post_statue_campaign.plan.md (payforward fight ammo audit).
@@ -204,6 +208,33 @@ def is_cerberus_combat_entity(
     if ab is None:
         return False
     return int(ab) in CERBERUS_ACTIVE_BYTES
+
+
+def is_zombie_combat_entity(
+    meta: dict[str, Any],
+    *,
+    room_id: str | None = None,
+    slot: int | None = None,
+) -> bool:
+    """True for ordinary zombies (not dogs / crows / denied pests)."""
+    name = str(meta.get("type_name") or meta.get("enemy_type") or "").lower()
+    if name in ZOMBIE_TYPE_NAMES:
+        return True
+    if name in CERBERUS_TYPE_NAMES or name == "crow":
+        return False
+    if name and name in NO_COMBAT_REWARD_TYPE_NAMES:
+        return False
+    tid = meta.get("type_id")
+    if tid is not None and int(tid) in ZOMBIE_RAM_TYPE_IDS:
+        return True
+    # Live type_id is often 0 — fall back to static room roster by slot.
+    if room_id is not None and slot is not None and (
+        tid is None or int(tid) == 0
+    ):
+        from re1_rl.attack_log_context import infer_enemy_type_for_slot
+
+        return infer_enemy_type_for_slot(str(room_id), int(slot)) == "zombie"
+    return False
 
 
 def is_passive_crow_enemy(
@@ -400,9 +431,14 @@ def enemy_combat_events(
         )
         is_crow = is_crow_combat_entity(meta)
         is_cerberus = is_cerberus_combat_entity(meta, hp_before=before)
+        is_zombie = (not is_cerberus) and is_zombie_combat_entity(
+            meta, room_id=room_id, slot=slot,
+        )
         extra: dict[str, Any] = {}
         if "type_id" in meta:
             extra["type_id"] = meta["type_id"]
+        if "type_name" in meta:
+            extra["type_name"] = meta["type_name"]
         if "active_byte" in meta:
             extra["active_byte"] = meta["active_byte"]
         if after <= 0:
@@ -415,6 +451,7 @@ def enemy_combat_events(
                 "reward_denied": denied,
                 "is_crow": is_crow,
                 "is_cerberus": is_cerberus,
+                "is_zombie": is_zombie,
                 **extra,
             })
         elif after < before:
@@ -427,6 +464,7 @@ def enemy_combat_events(
                 "reward_denied": denied,
                 "is_crow": is_crow,
                 "is_cerberus": is_cerberus,
+                "is_zombie": is_zombie,
                 **extra,
             })
     return events
