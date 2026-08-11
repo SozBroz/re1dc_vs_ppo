@@ -215,6 +215,7 @@ def is_zombie_combat_entity(
     *,
     room_id: str | None = None,
     slot: int | None = None,
+    hp_before: int | None = None,
 ) -> bool:
     """True for ordinary zombies (not dogs / crows / denied pests)."""
     name = str(meta.get("type_name") or meta.get("enemy_type") or "").lower()
@@ -224,7 +225,18 @@ def is_zombie_combat_entity(
         return False
     if name and name in NO_COMBAT_REWARD_TYPE_NAMES:
         return False
+    hp = int(
+        hp_before
+        if hp_before is not None
+        else meta.get("hp_before", meta.get("hp", 0)) or 0
+    )
     tid = meta.get("type_id")
+    if tid is not None and int(tid) == CERBERUS_RAM_TYPE_ID:
+        # kind 0x0F is shared with cerberus/Tyrant/Yawn; only dogs match active_byte.
+        if is_cerberus_combat_entity(meta, hp_before=hp):
+            return False
+        if 0 < hp <= CERBERUS_HP_MAX:
+            return True
     if tid is not None and int(tid) in ZOMBIE_RAM_TYPE_IDS:
         return True
     # Live type_id is often 0 — fall back to static room roster by slot.
@@ -432,7 +444,7 @@ def enemy_combat_events(
         is_crow = is_crow_combat_entity(meta)
         is_cerberus = is_cerberus_combat_entity(meta, hp_before=before)
         is_zombie = (not is_cerberus) and is_zombie_combat_entity(
-            meta, room_id=room_id, slot=slot,
+            meta, room_id=room_id, slot=slot, hp_before=before,
         )
         extra: dict[str, Any] = {}
         if "type_id" in meta:

@@ -536,10 +536,26 @@ def test_zombie_type_marks_combat_event() -> None:
     assert is_zombie_combat_entity({"type_id": 1})
     assert is_zombie_combat_entity({"type_name": "zombie"})
     assert not is_zombie_combat_entity({"type_name": "cerberus"})
+    assert is_zombie_combat_entity({"type_id": 0x0F}, hp_before=25)
+    assert not is_zombie_combat_entity(
+        {"type_id": 0x0F, "active_byte": 0x90},
+        hp_before=100,
+    )
     events = enemy_combat_events(
         [{"slot": 0, "hp": 40, "type_id": 1}],
         [{"slot": 0, "hp": 28, "type_id": 1}],
         room_id="104",
+    )
+    assert len(events) == 1
+    assert events[0]["is_zombie"] is True
+    assert events[0]["is_cerberus"] is False
+
+
+def test_kind0f_low_hp_without_dog_byte_is_zombie_in_room_202() -> None:
+    events = enemy_combat_events(
+        [{"slot": 0, "hp": 25, "type_id": 0x0F, "active_byte": 0}],
+        [{"slot": 0, "hp": 0, "type_id": 0x0F, "active_byte": 0}],
+        room_id="202",
     )
     assert len(events) == 1
     assert events[0]["is_zombie"] is True

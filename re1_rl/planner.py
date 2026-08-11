@@ -326,7 +326,7 @@ class WaypointPlanner:
                 return False
             return (
                 want in progress.key_items_rewarded
-                or want in progress.weapons_progressed
+                or progress.weapon_progress_claimed(want)
             )
         if cond_type == "story_use":
             if progress is None:

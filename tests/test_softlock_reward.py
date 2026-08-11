@@ -429,6 +429,40 @@ def test_beretta_inventory_flicker_does_not_repay_weapon():
     assert bd["key_item"] == 0.0
 
 
+def test_bazooka_ammo_swap_does_not_repay_new_weapon():
+    from re1_rl.reward import NEW_WEAPON_PICKUP_BONUS
+
+    progress = ProgressTracker()
+    progress.first_visit("202")
+    prev = make_state(
+        room="202",
+        step=10,
+        inventory=["knife", "beretta", "bazooka_acid"],
+    )
+    progress.claim_weapon_progress("bazooka_acid")
+    cur = make_state(
+        room="202",
+        step=11,
+        inventory=["knife", "beretta", "bazooka_explosive"],
+        new_items=["bazooka_explosive"],
+    )
+    _, bd = _step(progress, prev, cur, step_frames=4)
+    assert bd["new_weapon"] == 0.0
+
+    fresh = ProgressTracker()
+    fresh.first_visit("212")
+    empty = make_state(room="212", step=0, inventory=["knife", "beretta"])
+    first = make_state(
+        room="212",
+        step=1,
+        inventory=["knife", "beretta", "bazooka_acid"],
+        new_items=["bazooka_acid"],
+    )
+    _, first_bd = _step(fresh, empty, first, step_frames=4)
+    assert first_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 4.0
+    assert "bazooka" in fresh.weapons_progressed
+
+
 def test_key_item_flicker_does_not_repay_bonus():
     progress = ProgressTracker()
     progress.first_visit("105")

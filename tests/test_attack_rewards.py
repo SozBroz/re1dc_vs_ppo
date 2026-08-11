@@ -364,6 +364,35 @@ def test_bazooka_dog_hit_pays_heavy_fodder_penalty() -> None:
     )
 
 
+def test_bazooka_kind0f_zombie_without_dog_byte_pays_heavy_fodder_penalty() -> None:
+    """Dining 2F zombies often expose type_id 0x0F without cerberus active_byte."""
+    planner = make_planner()
+    prev = make_state(hp=96, room="202", step=1)
+    cur = make_state(hp=96, room="202", step=2)
+    cur["equipped_weapon_id"] = 0x07
+    cur["ammo_spent"] = 1
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 25,
+            "killed": True,
+            "reward_denied": False,
+            "is_cerberus": False,
+            "is_zombie": True,
+            "type_id": 0x0F,
+        }
+    ]
+    assert heavy_weapon_fodder_hit_penalty(cur) == pytest.approx(
+        HEAVY_WEAPON_FODDER_HIT_PENALTY
+    )
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["heavy_weapon_fodder_hit"] == pytest.approx(
+        HEAVY_WEAPON_FODDER_HIT_PENALTY
+    )
+
+
 def test_beretta_zombie_hit_no_heavy_fodder_penalty() -> None:
     cur = make_state(hp=96, step=2)
     cur["equipped_weapon_id"] = 0x02

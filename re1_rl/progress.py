@@ -4,6 +4,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+# Grenade launcher ammo types share one weapon slot; only the first variant
+# should count as a new-weapon pickup this episode.
+BAZOOKA_WEAPON_NAMES: frozenset[str] = frozenset(
+    {
+        "bazooka_acid",
+        "bazooka_explosive",
+        "bazooka_flame",
+    }
+)
+BAZOOKA_PROGRESS_KEY = "bazooka"
+
+
+def weapon_progress_key(weapon_name: str) -> str:
+    name = str(weapon_name or "")
+    if name in BAZOOKA_WEAPON_NAMES:
+        return BAZOOKA_PROGRESS_KEY
+    return name
+
 
 @dataclass
 class ProgressTracker:
@@ -214,12 +232,31 @@ class ProgressTracker:
         return self._stagnation_frames >= int(threshold)
 
     def claim_weapon_progress(self, weapon_name: str) -> bool:
-        """True once per weapon name per episode (idle extend / stagnation)."""
+        """True once per weapon family per episode (idle extend / stagnation)."""
         name = str(weapon_name or "")
-        if not name or name in self.weapons_progressed:
+        if not name:
             return False
-        self.weapons_progressed.add(name)
+        key = weapon_progress_key(name)
+        if key in self.weapons_progressed:
+            return False
+        if key == BAZOOKA_PROGRESS_KEY and self.weapons_progressed.intersection(
+            BAZOOKA_WEAPON_NAMES
+        ):
+            return False
+        self.weapons_progressed.add(key)
         return True
+
+    def weapon_progress_claimed(self, weapon_name: str) -> bool:
+        """Whether this weapon (or family) already paid new-weapon progress."""
+        name = str(weapon_name or "")
+        if not name:
+            return False
+        key = weapon_progress_key(name)
+        if key in self.weapons_progressed:
+            return True
+        if key == BAZOOKA_PROGRESS_KEY:
+            return bool(self.weapons_progressed.intersection(BAZOOKA_WEAPON_NAMES))
+        return name in self.weapons_progressed
 
     def claim_key_item_bonus(self, item_name: str) -> bool:
         """True once per key-item name per episode (+4 pickup channel)."""
