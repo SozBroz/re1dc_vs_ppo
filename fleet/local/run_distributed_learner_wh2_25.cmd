@@ -21,6 +21,7 @@ set RE1_PB_V1_TYPEWRITER_ONLY=1
 set RE1_PB_DANGER_ROOMS=1
 
 call "%~dp0go_explore_phase_c.env.cmd"
+call "%~dp0workhorse_reset_cp44.env.cmd"
 if not exist data\go_explore mkdir data\go_explore
 
 if not exist data\logs mkdir data\logs

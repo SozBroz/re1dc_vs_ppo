@@ -248,6 +248,34 @@ def test_sample_payforward_progression_mix(tmp_path: Path, monkeypatch) -> None:
     assert counts[20] / 6000 < 0.25
 
 
+def test_fight_bias_index_overrides_frontier(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("RE1_YAWN_PAYFORWARD_RIPPLE", "1")
+    monkeypatch.setenv("RE1_YAWN_FIGHT_BIAS_INDEX", "44")
+    monkeypatch.setenv("RE1_YAWN_FIGHT_BIAS_WEIGHT", "0.41")
+    cells_dir = tmp_path / "states" / "yawn_rails" / "cells"
+    cells = []
+    for idx, ammo in ((18, 75), (19, 80), (37, 50), (38, 45), (44, 30)):
+        d = cells_dir / f"cp{idx:02d}"
+        d.mkdir(parents=True)
+        (d / "cell.State").write_bytes(b"x" * 100)
+        (d / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+        cells.append(_row(idx, ammo))
+    stage = {
+        "route_steps": list(range(1, 60)),
+        "legs_per_episode": 1,
+        "cells_manifest": "states/yawn_rails/manifest.json",
+    }
+    by_idx = {int(r["checkpoint_index"]): r for r in cells}
+    counts: Counter[int] = Counter()
+    rng = random.Random(1)
+    for _ in range(8000):
+        opts = sample_payforward_options(tmp_path, stage, cells, rng=rng)
+        assert opts is not None
+        counts[int(opts["route_start_index"]) - 1] += 1
+    assert counts[44] / 8000 > 0.33
+    assert counts[44] / 8000 < 0.55
+
+
 def test_frontier_advances_when_fight_efficient(tmp_path: Path) -> None:
     target = fight_target_for_index(18)
     assert target is not None

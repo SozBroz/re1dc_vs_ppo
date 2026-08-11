@@ -30,6 +30,7 @@ _FORCE_FIGHTS_ENV = "RE1_YAWN_PAYFORWARD_FORCE_FIGHTS"
 _IGNORE_FIGHTS_ENV = "RE1_YAWN_PAYFORWARD_IGNORE_FIGHTS"
 _FIGHT_BIAS_WEIGHT = 0.40
 _FIGHT_BIAS_ENV = "RE1_YAWN_FIGHT_BIAS_WEIGHT"
+_FIGHT_BIAS_INDEX_ENV = "RE1_YAWN_FIGHT_BIAS_INDEX"
 _LATEST_WEIGHT = 0.20  # legacy ripple store only
 _FIGHT_BUDGET = 0.80
 
@@ -68,6 +69,21 @@ def fight_bias_weight_from_env() -> float:
         return max(0.0, min(1.0, float(raw)))
     except ValueError:
         return float(_FIGHT_BIAS_WEIGHT)
+
+
+def fight_bias_index_from_env() -> int | None:
+    """``RE1_YAWN_FIGHT_BIAS_INDEX=N`` — fixed cpNN for the fight-bias reset branch.
+
+    When set and loadable, replaces :func:`frontier_fight_index` for payforward resets.
+    """
+    raw = os.environ.get(_FIGHT_BIAS_INDEX_ENV, "").strip()
+    if not raw:
+        return None
+    try:
+        idx = int(raw, 10)
+    except ValueError:
+        return None
+    return idx if idx >= 0 else None
 
 
 def _index_set_from_env(env_name: str) -> set[int]:
@@ -306,7 +322,11 @@ def choose_progression_reset_index(
     by_idx = {int(r["checkpoint_index"]): r for r in cells}
     idxs = sorted(by_idx)
     root = Path(project_root) if project_root is not None else None
-    frontier = frontier_fight_index(by_idx, project_root=root)
+    override = fight_bias_index_from_env()
+    if override is not None and int(override) in by_idx:
+        frontier = int(override)
+    else:
+        frontier = frontier_fight_index(by_idx, project_root=root)
     bias = float(_FIGHT_BIAS_WEIGHT if fight_bias is None else fight_bias)
     if frontier is not None and frontier in by_idx and rng.random() < bias:
         return int(frontier)
