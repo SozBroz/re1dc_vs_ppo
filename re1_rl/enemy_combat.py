@@ -57,6 +57,32 @@ def mask_attack_pool_ghosts_enabled() -> bool:
     )
 
 
+def mask_attack_inactive_enemies_enabled() -> bool:
+    """Skip enemy rows with active_byte@0xEC == 0 for attack-mask counts only."""
+    return os.environ.get("MASK_ATTACK_INACTIVE_ENEMIES", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+def is_inactive_enemy_slot(ent: dict[str, Any]) -> bool:
+    """True when RAM marks the slot inactive (corpse/parked), even if hp@0 > 0."""
+    if "active_byte" not in ent:
+        return False
+    return int(ent.get("active_byte", 0)) == 0
+
+
+def _skip_for_attack_mask(ent: dict[str, Any]) -> bool:
+    if mask_attack_inactive_enemies_enabled() and is_inactive_enemy_slot(ent):
+        return True
+    return (
+        mask_attack_pool_ghosts_enabled()
+        and is_pool_ghost_enemy(ent)
+    )
+
+
 def is_pool_ghost_coordinate(x: int | float, z: int | float) -> bool:
     """True when coords match a known off-map / parked slot fingerprint."""
     return (int(x), int(z)) in POOL_GHOST_FINGERPRINTS
@@ -186,11 +212,7 @@ def combat_enemy_count(
     for ent in enemies or []:
         if int(ent.get("hp", 0)) <= 0:
             continue
-        if (
-            for_attack_mask
-            and mask_attack_pool_ghosts_enabled()
-            and is_pool_ghost_enemy(ent)
-        ):
+        if for_attack_mask and _skip_for_attack_mask(ent):
             continue
         if max_dist is not None:
             if not int(ent.get("in_room", ent.get("alive", 0))):
@@ -225,11 +247,7 @@ def paid_combat_enemy_count(
     for ent in enemies or []:
         if int(ent.get("hp", 0)) <= 0:
             continue
-        if (
-            for_attack_mask
-            and mask_attack_pool_ghosts_enabled()
-            and is_pool_ghost_enemy(ent)
-        ):
+        if for_attack_mask and _skip_for_attack_mask(ent):
             continue
         if is_crow_enemy(ent, room_id=room_id):
             continue
