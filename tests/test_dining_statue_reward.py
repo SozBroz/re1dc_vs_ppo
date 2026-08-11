@@ -44,7 +44,8 @@ def _reward(progress: ProgressTracker, prev: dict, state: dict, *, planner=None,
 
 
 def _statue_planner() -> WaypointPlanner:
-    return WaypointPlanner(YAWN_ROUTE, route_steps=[55])
+    # route_steps[0] == seq 54 == statue_202
+    return WaypointPlanner(YAWN_ROUTE, route_steps=[54], start_index=0)
 
 
 def _statue_state(**kw):
