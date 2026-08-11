@@ -552,9 +552,11 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Objective:** Place a crest at the courtyard gate (any slot)
 - **Required items:** `star_crest`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **11A**. Hold: `star_crest`. Perform the story USE (inventory USE at the site).
+- **How to achieve:** Be in / reach **11A**. Hold: `star_crest`. Kill at least one enemy in **11A**, then perform the story USE (inventory USE at the site).
 - **Success condition:**
-- **any of:**
+- **all of:**
+  - At least 1 leg kill in room `11A`
+  - **any of:**
   - **all of:**
     - Story USE at `star_crest@11A_crest_slot`
     - No longer holding `star_crest`
@@ -622,6 +624,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **How to achieve:** Be in / reach **10B**. Navigate until the success enter/settle conditions fire.
 - **Success condition:**
 - Enter room `10B`
+- **Capture gate:** require **≥2 free inventory slots** on person (not in box) so the successor cell has headroom for storeroom→box logistics on later legs.
 
 ### `cp43` — `east_stairs_201` (seq 44)
 

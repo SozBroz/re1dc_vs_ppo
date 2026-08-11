@@ -18,6 +18,12 @@ from re1_rl.pb_sidecar import dump_episode_sidecar, utc_now_iso
 
 _ITEM_NAME_TO_ID = {canonical_item(name): item_id for item_id, name in ITEM_IDS.items()}
 
+# Minimum on-person empty slots required to admit a curated capture (cp42 needs
+# headroom for box withdraw/deposit after the storeroom chemical leg).
+CAPTURE_MIN_FREE_SLOTS: dict[str, int] = {
+    "east_stairs_101_post_storeroom": 2,
+}
+
 
 def _route_item(entry: Any) -> tuple[str, int]:
     if isinstance(entry, dict):
@@ -308,9 +314,12 @@ _RESET_PIN_INDEX_ENV = "RE1_YAWN_RESET_PIN_INDEX"
 _RESET_PIN_RANGE_ENV = "RE1_YAWN_RESET_PIN_RANGE"
 _RESET_PIN_SET_ENV = "RE1_YAWN_RESET_PIN_SET"
 _RESET_PIN_SET_WEIGHT_ENV = "RE1_YAWN_RESET_PIN_SET_WEIGHT"
+_RESET_PIN_WEIGHTS_ENV = "RE1_YAWN_RESET_PIN_WEIGHTS"
 _RESET_PIN_FILE_ENV = "RE1_YAWN_RESET_PIN_FILE"
 _DEFAULT_PIN_FILE = "data/yawn_reset_pin.env"
 _RESET_FRONTIER_FIGHT_ENV = "RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY"
+PIN_WEIGHT_LATEST_KEY = "latest"
+_LATEST_PIN_ALIASES = frozenset({"latest", "newest", "front", "frontier"})
 
 
 def _pin_file_path() -> Path | None:
@@ -430,6 +439,62 @@ def reset_pin_set_from_env() -> tuple[frozenset[int], float] | None:
     return frozenset(indices), max(0.0, min(1.0, weight))
 
 
+def parse_pin_weights(raw: str) -> dict[int | str, float] | None:
+    """Parse weighted reset mix.
+
+    Fixed cells: ``33:20,36:30,40:50`` or ``33=0.2,36=0.3``.
+    Dynamic latest: ``latest:50,33:50`` (newest loadable cp18+ cell each reset).
+    """
+    weights: dict[int | str, float] = {}
+    for part in raw.replace(";", ",").split(","):
+        token = part.strip()
+        if not token:
+            continue
+        for sep in (":", "=", "/"):
+            if sep in token:
+                left, right = token.split(sep, 1)
+                break
+        else:
+            continue
+        left_token = left.strip()
+        try:
+            weight = float(right.strip().rstrip("%"))
+        except ValueError:
+            continue
+        if weight <= 0.0:
+            continue
+        if left_token.lower() in _LATEST_PIN_ALIASES:
+            key: int | str = PIN_WEIGHT_LATEST_KEY
+        else:
+            try:
+                idx = int(left_token, 10)
+            except ValueError:
+                continue
+            if idx < 0:
+                continue
+            key = idx
+        weights[key] = weights.get(key, 0.0) + weight
+    if not weights:
+        return None
+    total = sum(weights.values())
+    if total <= 0.0:
+        return None
+    return {key: weight / total for key, weight in weights.items()}
+
+
+def reset_pin_weights_from_env() -> dict[int | str, float] | None:
+    """``RE1_YAWN_RESET_PIN_WEIGHTS=latest:50,33:50`` — per-cell reset mix.
+
+    Percentages and fractions are both accepted; values are normalized to sum to 1.
+    ``latest`` tracks the newest loadable cp18+ cell and updates as captures land.
+    Missing fixed cells are dropped and the remainder is renormalized.
+    """
+    raw = _pin_env_raw(_RESET_PIN_WEIGHTS_ENV)
+    if not raw:
+        return None
+    return parse_pin_weights(raw)
+
+
 def reset_frontier_fight_only_from_env() -> bool:
     """``RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=1`` — memlog grind on fight frontier."""
     raw = os.environ.get(_RESET_FRONTIER_FIGHT_ENV, "").strip().lower()
@@ -448,6 +513,33 @@ def _cells_in_pin_range(
     ]
 
 
+def _latest_reset_cell_index(cells: list[dict[str, Any]]) -> int | None:
+    """Newest loadable cell in the default reset pool (cp18+)."""
+    eligible = eligible_reset_cells(cells)
+    if eligible:
+        return int(eligible[-1]["checkpoint_index"])
+    if cells:
+        return int(cells[-1]["checkpoint_index"])
+    return None
+
+
+def _resolve_pin_weights(
+    cells: list[dict[str, Any]],
+    weights: dict[int | str, float],
+) -> dict[int, float]:
+    latest_idx = _latest_reset_cell_index(cells)
+    resolved: dict[int, float] = {}
+    for key, weight in weights.items():
+        if key == PIN_WEIGHT_LATEST_KEY:
+            if latest_idx is None:
+                continue
+            idx = latest_idx
+        else:
+            idx = int(key)
+        resolved[idx] = resolved.get(idx, 0.0) + weight
+    return resolved
+
+
 def _cells_in_pin_set(
     cells: list[dict[str, Any]],
     indices: frozenset[int] | set[int],
@@ -458,6 +550,32 @@ def _cells_in_pin_set(
         for row in cells
         if int(row.get("checkpoint_index", -1)) in want
     ]
+
+
+def _sample_cell_from_pin_weights(
+    cells: list[dict[str, Any]],
+    weights: dict[int | str, float],
+    *,
+    rng: random.Random,
+) -> dict[str, Any]:
+    by_index = {
+        int(row.get("checkpoint_index", -1)): row
+        for row in cells
+    }
+    resolved = _resolve_pin_weights(cells, weights)
+    available: dict[int, float] = {}
+    for idx, weight in resolved.items():
+        if idx in by_index:
+            available[idx] = available.get(idx, 0.0) + weight
+    if not available:
+        raise ValueError(
+            f"RE1_YAWN_RESET_PIN_WEIGHTS lists {sorted(weights)!r} but none are loadable"
+        )
+    total = sum(available.values())
+    indices = sorted(available)
+    probs = [available[idx] / total for idx in indices]
+    chosen_idx = rng.choices(indices, weights=probs, k=1)[0]
+    return by_index[chosen_idx]
 
 
 def eligible_reset_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -531,6 +649,9 @@ def sample_one_leg_options(
     ``RE1_YAWN_RESET_PIN_INDEX=N`` forces curated cell ``cpNN`` (overrides mix).
     ``RE1_YAWN_RESET_PIN_RANGE=LO-HI`` uniform over loadable cells in that range
     (overridden by a single pin index when both are set).
+    ``RE1_YAWN_RESET_PIN_WEIGHTS=33:20,36:30,40:50`` samples by explicit per-cell
+    weights (percentages or fractions; normalized). ``latest:50,33:50`` mixes the
+    newest loadable cp18+ cell with fixed indices. Overrides pin range/set.
     ``RE1_YAWN_RESET_PIN_SET=37,40,44`` with optional
     ``RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5`` blends pin-set vs normal mix.
     ``data/yawn_reset_pin.env`` (or ``RE1_YAWN_RESET_PIN_FILE``) overrides the
@@ -558,6 +679,10 @@ def sample_one_leg_options(
                 "is not loadable"
             )
         return _options_from_cell(pinned[0], stage, reset_source="route_cell_pin")
+    pin_weights = reset_pin_weights_from_env()
+    if pin_weights is not None:
+        chosen = _sample_cell_from_pin_weights(all_cells, pin_weights, rng=rng)
+        return _options_from_cell(chosen, stage, reset_source="route_cell_pin_weights")
     pin_range = reset_pin_range_from_env()
     if pin_range is not None:
         lo, hi = pin_range
@@ -899,6 +1024,16 @@ def capture_successor_cell(
             flush=True,
         )
         return None
+    min_free = CAPTURE_MIN_FREE_SLOTS.get(cid)
+    if min_free is not None:
+        free_slots = int(capacity.get("inventory_free_slots", 0))
+        if free_slots < int(min_free):
+            print(
+                f"[yawn_capture] reject inventory_free_slots={free_slots} "
+                f"need={int(min_free)} cp={cid}",
+                flush=True,
+            )
+            return None
 
     inv_names = {
         canonical_item(str(x))
