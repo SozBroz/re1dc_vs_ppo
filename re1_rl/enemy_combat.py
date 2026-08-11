@@ -42,10 +42,14 @@ POOL_GHOST_FINGERPRINTS: frozenset[tuple[int, int]] = frozenset(
     {
         (6456, 5245),  # hub-door classify ghost (many rooms)
         (24725, 6252),  # live fleet s4 bleed (202/204/207/11A)
+        (24717, 6060),  # fleet bleed stack (202/204/207/107)
         (24941, 5299),  # live fleet s5 bleed
+        (2710, 10875),  # cross-room bleed parked zombie row
         (30000, 30000),  # RDT pool park (e.g. cp18 / room 108)
     }
 )
+# Quantize world coords when detecting corpse piles for attack-mask only.
+_ATTACK_MASK_STACK_QUANT = 32
 
 
 def mask_attack_pool_ghosts_enabled() -> bool:
@@ -66,6 +70,81 @@ def is_pool_ghost_enemy(ent: dict[str, Any]) -> bool:
     if "x" not in ent or "z" not in ent:
         return False
     return is_pool_ghost_coordinate(ent["x"], ent["z"])
+
+
+def mask_attack_corpse_stacks_enabled() -> bool:
+    """Skip stacked inactive corpse piles for attack-mask counts only."""
+    return os.environ.get("MASK_ATTACK_CORPSE_STACKS", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+        "off",
+    )
+
+
+def _attack_mask_coord_key(x: int | float, z: int | float) -> tuple[int, int]:
+    q = int(_ATTACK_MASK_STACK_QUANT)
+    return (int(x) // q, int(z) // q)
+
+
+def _attack_mask_protected_entity(ent: dict[str, Any]) -> bool:
+    """Entities we never hide from attack mask when uncertain."""
+    ab = int(ent.get("active_byte", 0))
+    if ab != 0:
+        return True
+    meta = {
+        "type_id": ent.get("type_id"),
+        "active_byte": ab,
+        "hp_before": int(ent.get("hp", 0)),
+    }
+    return is_cerberus_combat_entity(meta, hp_before=int(ent.get("hp", 0)))
+
+
+def _stacked_inactive_corpse_coords(
+    enemies: list[dict[str, Any]] | None,
+) -> frozenset[tuple[int, int]]:
+    """Coords where 2+ combat_near rows share a tile and all are inactive."""
+    from collections import defaultdict
+
+    groups: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
+    for ent in enemies or []:
+        if int(ent.get("hp", 0)) <= 0:
+            continue
+        if not int(ent.get("combat_near", 0)):
+            continue
+        if "x" not in ent or "z" not in ent:
+            continue
+        groups[_attack_mask_coord_key(ent["x"], ent["z"])].append(ent)
+    corpse: set[tuple[int, int]] = set()
+    for coord, group in groups.items():
+        if len(group) < 3:
+            continue
+        if any(_attack_mask_protected_entity(e) for e in group):
+            continue
+        if all(int(e.get("active_byte", 0)) == 0 for e in group):
+            corpse.add(coord)
+    return frozenset(corpse)
+
+
+def _skip_for_attack_mask(
+    ent: dict[str, Any],
+    *,
+    all_enemies: list[dict[str, Any]] | None,
+    corpse_coords: frozenset[tuple[int, int]] | None = None,
+) -> bool:
+    if mask_attack_pool_ghosts_enabled() and is_pool_ghost_enemy(ent):
+        return True
+    if not mask_attack_corpse_stacks_enabled():
+        return False
+    if _attack_mask_protected_entity(ent):
+        return False
+    if int(ent.get("active_byte", 0)) != 0:
+        return False
+    if corpse_coords is None:
+        corpse_coords = _stacked_inactive_corpse_coords(all_enemies)
+    if "x" not in ent or "z" not in ent:
+        return False
+    return _attack_mask_coord_key(ent["x"], ent["z"]) in corpse_coords
 
 
 def is_crow_combat_entity(meta: dict[str, Any]) -> bool:
@@ -183,13 +262,14 @@ def combat_enemy_count(
     ``max_dist`` overrides both and requires ``in_room`` + stored ``dist``.
     """
     n = 0
+    corpse_coords = (
+        _stacked_inactive_corpse_coords(enemies) if for_attack_mask else frozenset()
+    )
     for ent in enemies or []:
         if int(ent.get("hp", 0)) <= 0:
             continue
-        if (
-            for_attack_mask
-            and mask_attack_pool_ghosts_enabled()
-            and is_pool_ghost_enemy(ent)
+        if for_attack_mask and _skip_for_attack_mask(
+            ent, all_enemies=enemies, corpse_coords=corpse_coords
         ):
             continue
         if max_dist is not None:
@@ -222,13 +302,14 @@ def paid_combat_enemy_count(
         if combat_enemy_count(enemies, knife=knife) > 0:
             return 0
     n = 0
+    corpse_coords = (
+        _stacked_inactive_corpse_coords(enemies) if for_attack_mask else frozenset()
+    )
     for ent in enemies or []:
         if int(ent.get("hp", 0)) <= 0:
             continue
-        if (
-            for_attack_mask
-            and mask_attack_pool_ghosts_enabled()
-            and is_pool_ghost_enemy(ent)
+        if for_attack_mask and _skip_for_attack_mask(
+            ent, all_enemies=enemies, corpse_coords=corpse_coords
         ):
             continue
         if is_crow_enemy(ent, room_id=room_id):

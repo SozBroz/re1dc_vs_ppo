@@ -665,3 +665,108 @@ def test_attack_mask_pool_ghost_filter_disabled(monkeypatch) -> None:
         "combat_near": 1,
     }
     assert combat_enemy_count([ghost], for_attack_mask=True) == 1
+
+
+def test_attack_mask_skips_fleet_bleed_fingerprints(monkeypatch) -> None:
+    monkeypatch.setenv("MASK_ATTACK_POOL_GHOSTS", "1")
+    bleed = {
+        "slot": 3,
+        "hp": 46,
+        "x": 24717,
+        "z": 6060,
+        "active_byte": 0,
+        "combat_near": 1,
+    }
+    parked = {
+        "slot": 2,
+        "hp": 42,
+        "x": 2710,
+        "z": 10875,
+        "active_byte": 0,
+        "combat_near": 1,
+    }
+    live = {
+        "slot": 0,
+        "hp": 55,
+        "x": 8000,
+        "z": 12050,
+        "active_byte": 0,
+        "combat_near": 1,
+    }
+    enemies = [bleed, parked, live]
+    assert combat_enemy_count(enemies) == 3
+    assert combat_enemy_count(enemies, for_attack_mask=True) == 1
+    assert paid_combat_enemy_count(enemies, for_attack_mask=True) == 1
+
+
+def test_attack_mask_corpse_stack_blocks_but_single_live_zombie_allows(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("MASK_ATTACK_POOL_GHOSTS", "1")
+    monkeypatch.setenv("MASK_ATTACK_CORPSE_STACKS", "1")
+    live = {
+        "slot": 0,
+        "hp": 55,
+        "x": 8000,
+        "z": 12050,
+        "active_byte": 0,
+        "type_id": 15,
+        "combat_near": 1,
+    }
+    corpses = [
+        {
+            "slot": 3,
+            "hp": 46,
+            "x": 9000,
+            "z": 12000,
+            "active_byte": 0,
+            "type_id": 13,
+            "combat_near": 1,
+        },
+        {
+            "slot": 4,
+            "hp": 48,
+            "x": 9000,
+            "z": 12000,
+            "active_byte": 0,
+            "type_id": 13,
+            "combat_near": 1,
+        },
+        {
+            "slot": 5,
+            "hp": 16,
+            "x": 9000,
+            "z": 12000,
+            "active_byte": 0,
+            "type_id": 13,
+            "combat_near": 1,
+        },
+    ]
+    assert combat_enemy_count([live], for_attack_mask=True) == 1
+    assert combat_enemy_count(corpses, for_attack_mask=True) == 0
+    assert combat_enemy_count([live, *corpses], for_attack_mask=True) == 1
+
+
+def test_attack_mask_keeps_active_landmine_and_cerberus(monkeypatch) -> None:
+    monkeypatch.setenv("MASK_ATTACK_POOL_GHOSTS", "1")
+    monkeypatch.setenv("MASK_ATTACK_CORPSE_STACKS", "1")
+    landmine = {
+        "slot": 0,
+        "hp": 1,
+        "x": 12000,
+        "z": 14000,
+        "active_byte": 0x90,
+        "type_id": 13,
+        "combat_near": 1,
+    }
+    dog = {
+        "slot": 1,
+        "hp": 100,
+        "x": 12050,
+        "z": 14050,
+        "active_byte": 0x90,
+        "type_id": 0x0F,
+        "combat_near": 1,
+    }
+    assert combat_enemy_count([landmine], for_attack_mask=True) == 1
+    assert combat_enemy_count([dog], for_attack_mask=True) == 1
