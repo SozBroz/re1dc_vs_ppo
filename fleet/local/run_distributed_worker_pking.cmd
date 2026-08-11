@@ -19,9 +19,9 @@ set RE1_PB_DANGER_ROOMS=1
 set RE1_MACHINE_NAME=%MACHINE_NAME%
 
 call "%~dp0go_explore_phase_c.env.cmd"
-REM cp52 only (override via data/yawn_reset_pin.env hot-reload).
+REM cp51 only (override via data/yawn_reset_pin.env hot-reload).
 set RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=
-set RE1_YAWN_RESET_PIN_INDEX=52
+set RE1_YAWN_RESET_PIN_INDEX=51
 set RE1_YAWN_RESET_PIN_SET=
 set RE1_YAWN_RESET_PIN_SET_WEIGHT=
 set RE1_YAWN_RESET_PIN_RANGE=
