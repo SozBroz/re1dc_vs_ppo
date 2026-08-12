@@ -856,6 +856,8 @@ def validate_route(
         text = json.dumps(checkpoint, sort_keys=True).lower()
         if "serum" in text:
             errors.append(f"{cid or i}: serum is forbidden in the Yawn route")
+        if "broken_shotgun" in text:
+            errors.append(f"{cid or i}: broken_shotgun is forbidden in the Yawn route")
         if room == "205":
             errors.append(f"{cid or i}: room 205 is not on the approved route")
         if i:

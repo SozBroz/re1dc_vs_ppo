@@ -59,8 +59,8 @@ COMBINE_ACTION = WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS  # 36
 SELECT_SLOT_BASE = COMBINE_ACTION + 1  # 37
 N_SELECT_SLOT = 8
 
-# Main Hall 1F (106) and 2F upper hall (203): attack macros always illegal.
-ALWAYS_ILLEGAL_ATTACK_ROOMS: frozenset[str] = frozenset({"106", "203"})
+# Main Hall 1F (106), 2F upper hall (203), Vacant Room (102): attack macros always illegal.
+ALWAYS_ILLEGAL_ATTACK_ROOMS: frozenset[str] = frozenset({"106", "203", "102"})
 
 
 def is_always_illegal_attack_room(room_id: str | None) -> bool:

@@ -237,9 +237,19 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     corridor_post = next(
         cp for cp in route if cp["checkpoint_id"] == "central_corridor_post_armor_103"
     )
+    vacant_101 = next(cp for cp in route if cp["checkpoint_id"] == "vacant_detour_enter_101")
+    vacant_102 = next(cp for cp in route if cp["checkpoint_id"] == "vacant_enter_102")
+    vacant_ammo = next(cp for cp in route if cp["checkpoint_id"] == "vacant_ammo_102")
+    vacant_ret_101 = next(cp for cp in route if cp["checkpoint_id"] == "vacant_return_101")
+    vacant_ret_103 = next(cp for cp in route if cp["checkpoint_id"] == "vacant_return_103")
     plant = next(cp for cp in route if cp["checkpoint_id"] == "plant_42_enter_10E")
     assert armor["seq"] + 1 == corridor_post["seq"]
-    assert corridor_post["seq"] + 1 == plant["seq"]
+    assert corridor_post["seq"] + 1 == vacant_101["seq"]
+    assert vacant_101["seq"] + 1 == vacant_102["seq"]
+    assert vacant_102["seq"] + 1 == vacant_ammo["seq"]
+    assert vacant_ammo["seq"] + 1 == vacant_ret_101["seq"]
+    assert vacant_ret_101["seq"] + 1 == vacant_ret_103["seq"]
+    assert vacant_ret_103["seq"] + 1 == plant["seq"]
     ammo_10e = next(cp for cp in route if cp["checkpoint_id"] == "ammo_10E")
     corridor_10e = next(
         cp for cp in route if cp["checkpoint_id"] == "central_corridor_post_10E_103"

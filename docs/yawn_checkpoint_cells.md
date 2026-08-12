@@ -1,6 +1,8 @@
 # Yawn rails checkpoint cells (`cpNN`)
 
-Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (94 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
+Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (98 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
+
+**Source of truth:** `data/yawn_checkpoint_route.json` (objectives and success conditions below are copied verbatim). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/cpNN/` for the completed index.
 
@@ -70,43 +72,48 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp59` | 60 | `tiger_room_enter_10C` | `10C` | navigate | Enter the tiger skull room |
 | `cp60` | 61 | `armor_key_10C` | `10C` | use_item | Use the chemical and take the armor key |
 | `cp61` | 62 | `central_corridor_post_armor_103` | `103` | navigate | Return through the Central Corridor before Plant 42 |
-| `cp62` | 63 | `plant_42_enter_10E` | `10E` | navigate | Enter the Room 42 / plant corridor |
-| `cp63` | 64 | `ammo_10E` | `10E` | pickup | Collect the Keeper's Room handgun bullets and shotgun shells |
-| `cp64` | 65 | `central_corridor_post_10E_103` | `103` | navigate | Return through the Central Corridor from Plant 42 |
-| `cp65` | 66 | `tea_transit_104_post_10E` | `104` | navigate | Cross the Tea Room toward Dining for the blue jewel |
-| `cp66` | 67 | `dining_enter_105_jewel` | `105` | navigate | Return to Dining Room for the blue jewel |
-| `cp67` | 68 | `blue_jewel_105` | `105` | pickup | Collect the blue jewel after the statue drop |
-| `cp68` | 69 | `tea_return_104_post_jewel` | `104` | navigate | Return through the Tea Room after the blue jewel |
-| `cp69` | 70 | `central_corridor_post_jewel_103` | `103` | navigate | Return through the Central Corridor toward the Forest |
-| `cp70` | 71 | `forest_enter_10D` | `10D` | navigate | Enter the Forest / keep room |
-| `cp71` | 72 | `wind_crest_10D` | `10D` | use_item | Use the blue jewel and take the wind crest |
-| `cp72` | 73 | `central_corridor_return_103` | `103` | navigate | Return to the Central Corridor after taking the wind crest |
-| `cp73` | 74 | `tea_return_104_post_wind` | `104` | navigate | Cross the Tea Room after taking the wind crest |
-| `cp74` | 75 | `dining_return_105_post_wind` | `105` | navigate | Cross Dining after taking the wind crest |
-| `cp75` | 76 | `main_hall_return_106_post_wind` | `106` | navigate | Reach Main Hall after taking the wind crest |
-| `cp76` | 77 | `upper_hall_return_203` | `203` | navigate | Return to Main Hall 2F |
-| `cp77` | 78 | `c_passage_return_204` | `204` | navigate | Return to the C Passage |
-| `cp78` | 79 | `richard_room_enter_20D` | `20D` | navigate | Enter the east wing hallway for Richard |
-| `cp79` | 80 | `richard_cutscene_20D` | `20D` | navigate | Trigger Richard's Pillar Passage cutscene |
-| `cp80` | 81 | `richard_forced_return_204` | `204` | navigate | Continue from Richard's cutscene into the C Passage |
-| `cp81` | 82 | `east_stairs_201_post_richard` | `207` | navigate | Reach East Stairway 2F after Richard |
-| `cp82` | 83 | `east_stairs_101_post_richard` | `10B` | navigate | Descend East Stairway after Richard |
-| `cp83` | 84 | `yawn_box_enter_118` | `118` | navigate | Enter the storeroom for Yawn box prep |
-| `cp84` | 85 | `yawn_box_prep_118` | `118` | navigate | Prepare inventory at the item box and wait for the lab timer to expire naturally |
-| `cp85` | 86 | `east_stairs_101_to_yawn` | `10B` | navigate | Return to East Stairway 1F for Yawn |
-| `cp86` | 87 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
-| `cp87` | 88 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
-| `cp88` | 89 | `moon_hall_enter_20D` | `20D` | navigate | Enter the east wing hallway for attic ammo |
-| `cp89` | 90 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
-| `cp90` | 91 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
-| `cp91` | 92 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
-| `cp92` | 93 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
+| `cp62` | 63 | `vacant_detour_enter_101` | `101` | navigate | Detour to 1F Left Stairs (101) for Vacant Room ammo |
+| `cp63` | 64 | `vacant_enter_102` | `102` | navigate | Enter the Vacant Room (102) |
+| `cp64` | 65 | `vacant_ammo_102` | `102` | pickup | Collect Vacant Room shotgun shells and handgun clips |
+| `cp65` | 66 | `vacant_return_101` | `101` | navigate | Leave the Vacant Room back to 1F Left Stairs (101) |
+| `cp66` | 67 | `vacant_return_103` | `103` | navigate | Return through F Passage (103) toward Keeper's Room |
+| `cp67` | 68 | `plant_42_enter_10E` | `10E` | navigate | Enter the Room 42 / plant corridor |
+| `cp68` | 69 | `ammo_10E` | `10E` | pickup | Collect the Keeper's Room handgun bullets and shotgun shells |
+| `cp69` | 70 | `central_corridor_post_10E_103` | `103` | navigate | Return through the Central Corridor from Plant 42 |
+| `cp70` | 71 | `tea_transit_104_post_10E` | `104` | navigate | Cross the Tea Room toward Dining for the blue jewel |
+| `cp71` | 72 | `dining_enter_105_jewel` | `105` | navigate | Return to Dining Room for the blue jewel |
+| `cp72` | 73 | `blue_jewel_105` | `105` | pickup | Collect the blue jewel after the statue drop |
+| `cp73` | 74 | `tea_return_104_post_jewel` | `104` | navigate | Return through the Tea Room after the blue jewel |
+| `cp74` | 75 | `central_corridor_post_jewel_103` | `103` | navigate | Return through the Central Corridor toward the Forest |
+| `cp75` | 76 | `forest_enter_10D` | `10D` | navigate | Enter the Forest / keep room |
+| `cp76` | 77 | `wind_crest_10D` | `10D` | use_item | Use the blue jewel and take the wind crest |
+| `cp77` | 78 | `central_corridor_return_103` | `103` | navigate | Return to the Central Corridor after taking the wind crest |
+| `cp78` | 79 | `tea_return_104_post_wind` | `104` | navigate | Cross the Tea Room after taking the wind crest |
+| `cp79` | 80 | `dining_return_105_post_wind` | `105` | navigate | Cross Dining after taking the wind crest |
+| `cp80` | 81 | `main_hall_return_106_post_wind` | `106` | navigate | Reach Main Hall after taking the wind crest |
+| `cp81` | 82 | `upper_hall_return_203` | `203` | navigate | Return to Main Hall 2F |
+| `cp82` | 83 | `c_passage_return_204` | `204` | navigate | Return to the C Passage |
+| `cp83` | 84 | `richard_room_enter_20D` | `20D` | navigate | Enter the east wing hallway for Richard |
+| `cp84` | 85 | `richard_cutscene_20D` | `20D` | navigate | Trigger Richard's Pillar Passage cutscene |
+| `cp85` | 86 | `richard_forced_return_204` | `204` | navigate | Continue from Richard's cutscene into the C Passage |
+| `cp86` | 87 | `east_stairs_201_post_richard` | `207` | navigate | Reach East Stairway 2F after Richard |
+| `cp87` | 88 | `east_stairs_101_post_richard` | `10B` | navigate | Descend East Stairway after Richard |
+| `cp88` | 89 | `yawn_box_enter_118` | `118` | navigate | Enter the storeroom for Yawn box prep |
+| `cp89` | 90 | `yawn_box_prep_118` | `118` | navigate | Prepare inventory at the item box and wait for the lab timer to expire naturally |
+| `cp90` | 91 | `east_stairs_101_to_yawn` | `10B` | navigate | Return to East Stairway 1F for Yawn |
+| `cp91` | 92 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
+| `cp92` | 93 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
+| `cp93` | 94 | `moon_hall_enter_20D` | `20D` | navigate | Enter the east wing hallway for attic ammo |
+| `cp94` | 95 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
+| `cp95` | 96 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
+| `cp96` | 97 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
+| `cp97` | 98 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
 
 ## Details
 
 ### `cp00` — `emblem_105` (seq 1)
 
-- **Room:** `105`
+- **Room:** `105` (DINING ROOM)
 - **Action:** `pickup`
 - **Objective:** Pick up the wooden emblem
 - **Required items:** _(none)_
@@ -119,12 +126,12 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp01` — `kenneth_104` (seq 2)
 
-- **Room:** `104`
+- **Room:** `104` (TEA ROOM)
 - **Action:** `navigate`
 - **Objective:** Reach the Tea Room and trigger Kenneth
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **104**. Navigate until the success enter/settle conditions fire. Must observe a `104:` cutscene, then settle after it.
+- **How to achieve:** Be in / reach **104**. Navigate until the success condition fires.
 - **Success condition:**
 - **all of:**
   - Enter room `104`
@@ -133,12 +140,12 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp02` — `barry_return_105` (seq 3)
 
-- **Room:** `105`
+- **Room:** `105` (DINING ROOM)
 - **Action:** `navigate`
 - **Objective:** Return to Barry in Dining
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **105**. Navigate until the success enter/settle conditions fire. Must see post-Kenneth Barry return beat (`105:2:s1`), then settle.
+- **How to achieve:** Be in / reach **105**. Navigate until the success condition fires.
 - **Success condition:**
 - **all of:**
   - Enter room `105` from `104`
@@ -147,12 +154,12 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp03` — `main_hall_106` (seq 4)
 
-- **Room:** `106`
+- **Room:** `106` (MAIN HALL)
 - **Action:** `navigate`
 - **Objective:** Reach Main Hall after Kenneth
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **106**. Navigate until the success enter/settle conditions fire. Must observe a `106:` cutscene, then settle after it.
+- **How to achieve:** Be in / reach **106**. Navigate until the success condition fires.
 - **Success condition:**
 - **all of:**
   - Enter room `106`
@@ -161,12 +168,12 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp04` — `upper_hall_203` (seq 5)
 
-- **Room:** `203`
+- **Room:** `203` (HALL 2F)
 - **Action:** `navigate`
 - **Objective:** Climb to Main Hall 2F
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **203**. Navigate until the success enter/settle conditions fire. First climb to 2F has **no cutscene**; settle in-room only.
+- **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
 - **Success condition:**
 - **all of:**
   - Enter room `203`
@@ -174,12 +181,12 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp05` — `barry_hall_return_106` (seq 6)
 
-- **Room:** `106`
+- **Room:** `106` (MAIN HALL)
 - **Action:** `navigate`
 - **Objective:** Return from Main Hall 2F (203) back to Main Hall 1F (106)
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **106**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **106**. Navigate until the success condition fires.
 - **Success condition:**
 - **all of:**
   - Enter room `106` from `203`
@@ -187,40 +194,40 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp06` — `dining_return_105` (seq 7)
 
-- **Room:** `105`
+- **Room:** `105` (DINING ROOM)
 - **Action:** `navigate`
 - **Objective:** Return to Dining
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **105**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **105**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `105`
 
 ### `cp07` — `ammo_104` (seq 8)
 
-- **Room:** `104`
+- **Room:** `104` (TEA ROOM)
 - **Action:** `navigate`
 - **Objective:** Pass through the Tea Room toward the Bar
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **104**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **104**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `104`
 
 ### `cp08` — `bar_enter_10F` (seq 9)
 
-- **Room:** `10F`
+- **Room:** `10F` (BAR)
 - **Action:** `navigate`
 - **Objective:** Enter the Bar
 - **Required items:** `emblem`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10F**. Hold: `emblem`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10F**. Hold: `emblem`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `10F`
 
 ### `cp09` — `music_notes_10F` (seq 10)
 
-- **Room:** `10F`
+- **Room:** `10F` (BAR)
 - **Action:** `pickup`
 - **Objective:** Take the music notes (after wooden emblem alcove)
 - **Required items:** `emblem`
@@ -233,7 +240,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp10` — `piano_music_notes_10F` (seq 11)
 
-- **Room:** `10F`
+- **Room:** `10F` (BAR)
 - **Action:** `use_item`
 - **Objective:** Play the piano with the music notes
 - **Required items:** `music_notes`
@@ -246,7 +253,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp11` — `gold_emblem_10F` (seq 12)
 
-- **Room:** `10F`
+- **Room:** `10F` (BAR)
 - **Action:** `pickup`
 - **Objective:** Take the gold emblem from the piano bookshelf (wooden emblem may still be held)
 - **Required items:** _(none)_
@@ -259,48 +266,48 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp12` — `place_emblem_10F` (seq 13)
 
-- **Room:** `10F`
+- **Room:** `10F` (BAR)
 - **Action:** `use_item`
 - **Objective:** USE the wooden emblem into the bookshelf slot after taking gold
 - **Required items:** `emblem`, `gold_emblem`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10F**. Hold: `emblem`, `gold_emblem`. Perform the story USE (inventory USE at the site). Put the wooden emblem back after taking gold; inventory must lose emblem.
+- **How to achieve:** Be in / reach **10F**. Hold: `emblem`, `gold_emblem`. Consume `emblem` via story USE. Perform the story USE (inventory USE at the site).
 - **Success condition:**
 - **all of:**
   - Enter room `10F`
   - **any of:**
     - Story USE at `emblem@10F_alcove`
     - Story USE at `emblem@10F_wall`
-  - No longer holding `emblem`
+  - Lack item `emblem` in inventory
 
 ### `cp13` — `tea_return_104` (seq 14)
 
-- **Room:** `104`
+- **Room:** `104` (TEA ROOM)
 - **Action:** `navigate`
 - **Objective:** Leave the Bar through the Tea Room
 - **Required items:** `gold_emblem`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **104**. Hold: `gold_emblem`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **104**. Hold: `gold_emblem`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `104`
 
 ### `cp14` — `place_gold_emblem_105` (seq 15)
 
-- **Room:** `105`
+- **Room:** `105` (DINING ROOM)
 - **Action:** `use_item`
 - **Objective:** Place the gold emblem on the dining fireplace (must leave inventory)
 - **Required items:** `gold_emblem`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **105**. Hold: `gold_emblem`. Perform the story USE (inventory USE at the site). USE gold emblem on dining fireplace; must leave inventory.
+- **How to achieve:** Be in / reach **105**. Hold: `gold_emblem`. Consume `gold_emblem` via story USE. Perform the story USE (inventory USE at the site).
 - **Success condition:**
 - **all of:**
   - Enter room `105`
   - Story USE at `gold_emblem@105_fireplace`
-  - No longer holding `gold_emblem`
+  - Lack item `gold_emblem` in inventory
 
 ### `cp15` — `shield_key_105` (seq 16)
 
-- **Room:** `105`
+- **Room:** `105` (DINING ROOM)
 - **Action:** `pickup`
 - **Objective:** Take the shield key after the fireplace opens
 - **Required items:** _(none)_
@@ -313,40 +320,40 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp16` — `ink_106` (seq 17)
 
-- **Room:** `106`
+- **Room:** `106` (MAIN HALL)
 - **Action:** `navigate`
 - **Objective:** Return through Main Hall
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **106**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **106**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `106`
 
 ### `cp17` — `gallery_107` (seq 18)
 
-- **Room:** `107`
+- **Room:** `107` (GALLERY)
 - **Action:** `navigate`
 - **Objective:** Cross the Art Room
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **107**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **107**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `107`
 
 ### `cp18` — `l_passage_enter_108` (seq 19)
 
-- **Room:** `108`
+- **Room:** `108` (L PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Enter the L Passage (dangerous hallway)
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **108**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **108**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `108`
 
 ### `cp19` — `ammo_108` (seq 20)
 
-- **Room:** `108`
+- **Room:** `108` (L PASSAGE)
 - **Action:** `pickup`
 - **Objective:** Collect the L Passage handgun bullets (already in hallway)
 - **Required items:** _(none)_
@@ -357,40 +364,40 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp20` — `winding_109` (seq 21)
 
-- **Room:** `109`
+- **Room:** `109` (TRAP PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Reach the Winding Passage
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **109**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **109**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `109`
 
 ### `cp21` — `trap_entry_115` (seq 22)
 
-- **Room:** `115`
+- **Room:** `115` (TRAP ROOM)
 - **Action:** `navigate`
 - **Objective:** Enter the shotgun trap room
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **115**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **115**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `115`
 
 ### `cp22` — `shotgun_room_enter_116` (seq 23)
 
-- **Room:** `116`
+- **Room:** `116` (LIVING ROOM)
 - **Action:** `navigate`
 - **Objective:** Enter the shotgun armor room
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **116**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **116**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `116`
 
 ### `cp23` — `shotgun_116` (seq 24)
 
-- **Room:** `116`
+- **Room:** `116` (LIVING ROOM)
 - **Action:** `pickup`
 - **Objective:** Take the shotgun
 - **Required items:** _(none)_
@@ -401,211 +408,210 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp24` — `barry_reenter_115` (seq 25)
 
-- **Room:** `115`
+- **Room:** `115` (TRAP ROOM)
 - **Action:** `navigate`
 - **Objective:** Re-enter the trap room from the armor room with the shotgun
 - **Required items:** `shotgun`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **115**. Hold: `shotgun`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **115**. Hold: `shotgun`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `115` from `116`
 
 ### `cp25` — `barry_rescue_115` (seq 26)
 
-- **Room:** `115`
+- **Room:** `115` (TRAP ROOM)
 - **Action:** `navigate`
 - **Objective:** Trigger the ceiling-lowering Barry rescue (already re-entered with shotgun)
 - **Required items:** `shotgun`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **115**. Hold: `shotgun`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **115**. Hold: `shotgun`. Navigate until the success condition fires.
 - **Success condition:**
 - **all of:**
-  - Holding item `shotgun`
+  - Have item `shotgun` in inventory
   - Observe cutscene with prefix `115:`
 
 ### `cp26` — `back_passage_10A` (seq 27)
 
-- **Room:** `10A`
+- **Room:** `10A` (BACK PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Reach the Back Passage
 - **Required items:** `shotgun`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10A**. Hold: `shotgun`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10A**. Hold: `shotgun`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `10A`
 
 ### `cp27` — `crow_gallery_enter_117` (seq 28)
 
-- **Room:** `117`
+- **Room:** `117` (LARGE GALLERY)
 - **Action:** `navigate`
 - **Objective:** Enter the crow gallery
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **117**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **117**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `117`
 
 ### `cp28` — `gallery_portrait_1_117` (seq 29)
 
-- **Room:** `117`
+- **Room:** `117` (LARGE GALLERY)
 - **Action:** `navigate`
 - **Objective:** Interact with gallery portrait 1 (newborn)
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **117**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **117**. Navigate until the success condition fires.
 - **Success condition:**
-- `gallery_progress`: `{"min_steps": 1, "type": "gallery_progress"}`
+- Gallery puzzle progress >= 0
 
 ### `cp29` — `gallery_portrait_2_117` (seq 30)
 
-- **Room:** `117`
+- **Room:** `117` (LARGE GALLERY)
 - **Action:** `navigate`
 - **Objective:** Interact with gallery portrait 2 (infant)
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **117**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **117**. Navigate until the success condition fires.
 - **Success condition:**
-- `gallery_progress`: `{"min_steps": 2, "type": "gallery_progress"}`
+- Gallery puzzle progress >= 0
 
 ### `cp30` — `gallery_portrait_3_117` (seq 31)
 
-- **Room:** `117`
+- **Room:** `117` (LARGE GALLERY)
 - **Action:** `navigate`
 - **Objective:** Interact with gallery portrait 3 (boy)
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **117**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **117**. Navigate until the success condition fires.
 - **Success condition:**
-- `gallery_progress`: `{"min_steps": 3, "type": "gallery_progress"}`
+- Gallery puzzle progress >= 0
 
 ### `cp31` — `gallery_portrait_4_117` (seq 32)
 
-- **Room:** `117`
+- **Room:** `117` (LARGE GALLERY)
 - **Action:** `navigate`
 - **Objective:** Interact with gallery portrait 4 (young man)
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **117**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **117**. Navigate until the success condition fires.
 - **Success condition:**
-- `gallery_progress`: `{"min_steps": 4, "type": "gallery_progress"}`
+- Gallery puzzle progress >= 0
 
 ### `cp32` — `gallery_portrait_5_117` (seq 33)
 
-- **Room:** `117`
+- **Room:** `117` (LARGE GALLERY)
 - **Action:** `navigate`
 - **Objective:** Interact with gallery portrait 5 (middle-aged man)
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **117**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **117**. Navigate until the success condition fires.
 - **Success condition:**
-- `gallery_progress`: `{"min_steps": 5, "type": "gallery_progress"}`
+- Gallery puzzle progress >= 0
 
 ### `cp33` — `gallery_portrait_6_117` (seq 34)
 
-- **Room:** `117`
+- **Room:** `117` (LARGE GALLERY)
 - **Action:** `navigate`
 - **Objective:** Interact with gallery portrait 6 (old man)
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **117**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **117**. Navigate until the success condition fires.
 - **Success condition:**
-- `gallery_progress`: `{"min_steps": 6, "type": "gallery_progress"}`
+- Gallery puzzle progress >= 0
 
 ### `cp34` — `star_crest_117` (seq 35)
 
-- **Room:** `117`
+- **Room:** `117` (LARGE GALLERY)
 - **Action:** `pickup`
 - **Objective:** Complete the gallery puzzle and take the star crest
 - **Required items:** _(none)_
 - **Items gained:** `star_crest`
-- **How to achieve:** Be in / reach **117**. Finish the portrait sequence / final switch, then pick up `star_crest`.
+- **How to achieve:** Be in / reach **117**. Pick up `star_crest`.
 - **Success condition:**
 - Acquire item `star_crest`
-- **Note:** Former duplicate `gallery_complete_117` cell removed; this is the crest pickup leg.
 
 ### `cp35` — `back_passage_return_10A` (seq 36)
 
-- **Room:** `10A`
+- **Room:** `10A` (BACK PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Return to the Back Passage with the star crest
 - **Required items:** `star_crest`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10A**. Hold: `star_crest`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10A**. Hold: `star_crest`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `10A`
 
 ### `cp36` — `courtyard_enter_11A` (seq 37)
 
-- **Room:** `11A`
+- **Room:** `11A` (ROOFED PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Enter the courtyard crest gate
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **11A**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **11A**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `11A`
 
 ### `cp37` — `crest_gate_11A` (seq 38)
 
-- **Room:** `11A`
+- **Room:** `11A` (ROOFED PASSAGE)
 - **Action:** `use_item`
 - **Objective:** Place a crest at the courtyard gate (any slot)
 - **Required items:** `star_crest`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **11A**. Hold: `star_crest`. Kill at least one enemy in **11A**, then perform the story USE (inventory USE at the site).
+- **How to achieve:** Be in / reach **11A**. Hold: `star_crest`. Consume `star_crest` via story USE. Perform the story USE (inventory USE at the site).
 - **Success condition:**
 - **all of:**
-  - At least 1 leg kill in room `11A`
+  - Kill **1** enemy in room `11A` this leg
   - **any of:**
-  - **all of:**
-    - Story USE at `star_crest@11A_crest_slot`
-    - No longer holding `star_crest`
-  - **all of:**
-    - Story USE at `sun_crest@11A_crest_slot`
-    - No longer holding `sun_crest`
-  - **all of:**
-    - Story USE at `moon_crest@11A_crest_slot`
-    - No longer holding `moon_crest`
-  - **all of:**
-    - Story USE at `wind_crest@11A_crest_slot`
-    - No longer holding `wind_crest`
+    - **all of:**
+      - Story USE at `star_crest@11A_crest_slot`
+      - Lack item `star_crest` in inventory
+    - **all of:**
+      - Story USE at `sun_crest@11A_crest_slot`
+      - Lack item `sun_crest` in inventory
+    - **all of:**
+      - Story USE at `moon_crest@11A_crest_slot`
+      - Lack item `moon_crest` in inventory
+    - **all of:**
+      - Story USE at `wind_crest@11A_crest_slot`
+      - Lack item `wind_crest` in inventory
 
 ### `cp38` — `back_passage_post_crest_10A` (seq 39)
 
-- **Room:** `10A`
+- **Room:** `10A` (BACK PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Return through the Back Passage after opening the courtyard gate
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10A**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10A**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `10A`
 
 ### `cp39` — `east_stairs_101` (seq 40)
 
-- **Room:** `10B`
+- **Room:** `10B` (1F RIGHT STAIRS)
 - **Action:** `navigate`
 - **Objective:** Reach East Stairway 1F
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10B**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10B**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `10B`
 
 ### `cp40` — `storeroom_enter_118` (seq 41)
 
-- **Room:** `118`
+- **Room:** `118` (STAIRS UNDER ROOM)
 - **Action:** `navigate`
 - **Objective:** Enter the mansion storeroom
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **118**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **118**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `118`
 
 ### `cp41` — `chemical_118` (seq 42)
 
-- **Room:** `118`
+- **Room:** `118` (STAIRS UNDER ROOM)
 - **Action:** `pickup`
 - **Objective:** Take the herbicide from the mansion storeroom
 - **Required items:** _(none)_
@@ -616,52 +622,51 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp42` — `east_stairs_101_post_storeroom` (seq 43)
 
-- **Room:** `10B`
+- **Room:** `10B` (1F RIGHT STAIRS)
 - **Action:** `navigate`
 - **Objective:** Return to East Stairway 1F from the storeroom
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10B**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10B**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `10B`
-- **Capture gate:** require **≥2 free inventory slots** on person (not in box) so the successor cell has headroom for storeroom→box logistics on later legs.
 
 ### `cp43` — `east_stairs_201` (seq 44)
 
-- **Room:** `207`
+- **Room:** `207` (2F RIGHT STAIRS)
 - **Action:** `navigate`
 - **Objective:** Climb East Stairway to 2F
 - **Required items:** `chemical`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **207**. Hold: `chemical`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **207**. Hold: `chemical`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `207`
 
 ### `cp44` — `c_passage_204` (seq 45)
 
-- **Room:** `204`
+- **Room:** `204` (C PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Reach the C Passage
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **204**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **204**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `204`
 
 ### `cp45` — `upper_hall_enter_203` (seq 46)
 
-- **Room:** `203`
+- **Room:** `203` (HALL 2F)
 - **Action:** `navigate`
 - **Objective:** Enter Upper Hall for Barry's acid rounds
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **203**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `203`
 
 ### `cp46` — `acid_rounds_203` (seq 47)
 
-- **Room:** `203`
+- **Room:** `203` (HALL 2F)
 - **Action:** `pickup`
 - **Objective:** Receive Barry's acid rounds
 - **Required items:** _(none)_
@@ -672,29 +677,29 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp47` — `terrace_entry_211` (seq 48)
 
-- **Room:** `211`
+- **Room:** `211` (TERRACE PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Reach the Terrace Entry
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **211**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **211**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `211`
 
 ### `cp48` — `terrace_enter_212` (seq 49)
 
-- **Room:** `212`
+- **Room:** `212` (TERRACE)
 - **Action:** `navigate`
 - **Objective:** Enter the terrace balcony
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **212**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **212**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `212`
 
 ### `cp49` — `bazooka_212` (seq 50)
 
-- **Room:** `212`
+- **Room:** `212` (TERRACE)
 - **Action:** `pickup`
 - **Objective:** Take the bazooka on the terrace
 - **Required items:** _(none)_
@@ -705,122 +710,122 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp50` — `terrace_return_211` (seq 51)
 
-- **Room:** `211`
+- **Room:** `211` (TERRACE PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Return through Terrace Entry from the balcony
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **211**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **211**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `211`
 
 ### `cp51` — `upper_hall_203_post_terrace` (seq 52)
 
-- **Room:** `203`
+- **Room:** `203` (HALL 2F)
 - **Action:** `navigate`
 - **Objective:** Return through Upper Hall toward Dining 2F
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **203**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `203`
 
 ### `cp52` — `dining_2f_enter_202` (seq 53)
 
-- **Room:** `202`
+- **Room:** `202` (DINING ROOM 2F)
 - **Action:** `navigate`
 - **Objective:** Enter Dining Room 2F
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **202**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **202**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `202`
 
 ### `cp53` — `statue_202` (seq 54)
 
-- **Room:** `202`
+- **Room:** `202` (DINING ROOM 2F)
 - **Action:** `navigate`
 - **Objective:** Push the Dining 2F statue down
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **202**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **202**. Navigate until the success condition fires.
 - **Success condition:**
 - State flag `dining_statue_knocked` == `True`
 
 ### `cp54` — `west_stairs_207` (seq 55)
 
-- **Room:** `201`
+- **Room:** `201` (2F LEFT STAIRS)
 - **Action:** `navigate`
 - **Objective:** Reach West Stairway 2F
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **201**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **201**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `201`
 
 ### `cp55` — `west_stairs_10B` (seq 56)
 
-- **Room:** `101`
+- **Room:** `101` (1F LEFT STAIRS)
 - **Action:** `navigate`
 - **Objective:** Descend West Stairway
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **101**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **101**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `101`
 
 ### `cp56` — `save_100` (seq 57)
 
-- **Room:** `100`
+- **Room:** `100` (SAVE ROOM)
 - **Action:** `navigate`
 - **Objective:** Reach the Mansion Save Room
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **100**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **100**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `100`
 
 ### `cp57` — `west_stairs_return_10B` (seq 58)
 
-- **Room:** `101`
+- **Room:** `101` (1F LEFT STAIRS)
 - **Action:** `navigate`
 - **Objective:** Return through West Stairway before the Central Corridor
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **101**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **101**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `101`
 
 ### `cp58` — `central_corridor_103` (seq 59)
 
-- **Room:** `103`
+- **Room:** `103` (F PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Reach the Central Corridor
 - **Required items:** `chemical`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **103**. Hold: `chemical`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **103**. Hold: `chemical`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `103`
 
 ### `cp59` — `tiger_room_enter_10C` (seq 60)
 
-- **Room:** `10C`
+- **Room:** `10C` (GREEN HOUSE)
 - **Action:** `navigate`
 - **Objective:** Enter the tiger skull room
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10C**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10C**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `10C`
 
 ### `cp60` — `armor_key_10C` (seq 61)
 
-- **Room:** `10C`
+- **Room:** `10C` (GREEN HOUSE)
 - **Action:** `use_item`
 - **Objective:** Use the chemical and take the armor key
 - **Required items:** `chemical`
 - **Items gained:** `armor_key`
-- **How to achieve:** Be in / reach **10C**. Hold: `chemical`. Perform the story USE (inventory USE at the site). Gains: `armor_key`.
+- **How to achieve:** Be in / reach **10C**. Hold: `chemical`. Consume `chemical` via story USE. Gains: `armor_key`.
 - **Success condition:**
 - **all of:**
   - Story USE at `chemical@10C_greenhouse_pump`
@@ -828,75 +833,132 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 ### `cp61` — `central_corridor_post_armor_103` (seq 62)
 
-- **Room:** `103`
+- **Room:** `103` (F PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Return through the Central Corridor before Plant 42
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **103**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **103**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `103`
 
-### `cp62` — `plant_42_enter_10E` (seq 63)
+### `cp62` — `vacant_detour_enter_101` (seq 63)
 
-- **Room:** `10E`
+- **Room:** `101` (1F LEFT STAIRS)
+- **Action:** `navigate`
+- **Objective:** Detour to 1F Left Stairs (101) for Vacant Room ammo
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **101**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `101` from `103`
+
+### `cp63` — `vacant_enter_102` (seq 64)
+
+- **Room:** `102` (VACANT ROOM)
+- **Action:** `navigate`
+- **Objective:** Enter the Vacant Room (102)
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **102**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `102` from `101`
+
+### `cp64` — `vacant_ammo_102` (seq 65)
+
+- **Room:** `102` (VACANT ROOM)
+- **Action:** `pickup`
+- **Objective:** Collect Vacant Room shotgun shells and handgun clips
+- **Required items:** _(none)_
+- **Items gained:** `shotgun_shells`, `handgun_bullets`
+- **How to achieve:** Be in / reach **102**. Pick up `shotgun_shells`, `handgun_bullets`.
+- **Success condition:**
+- **all of:**
+  - Acquire item `shotgun_shells`
+  - Acquire item `handgun_bullets`
+
+### `cp65` — `vacant_return_101` (seq 66)
+
+- **Room:** `101` (1F LEFT STAIRS)
+- **Action:** `navigate`
+- **Objective:** Leave the Vacant Room back to 1F Left Stairs (101)
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **101**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `101` from `102`
+
+### `cp66` — `vacant_return_103` (seq 67)
+
+- **Room:** `103` (F PASSAGE)
+- **Action:** `navigate`
+- **Objective:** Return through F Passage (103) toward Keeper's Room
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **103**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `103` from `101`
+
+### `cp67` — `plant_42_enter_10E` (seq 68)
+
+- **Room:** `10E` (EMPLOYEE ROOM)
 - **Action:** `navigate`
 - **Objective:** Enter the Room 42 / plant corridor
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10E**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10E**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `10E`
 
-### `cp63` — `ammo_10E` (seq 64)
+### `cp68` — `ammo_10E` (seq 69)
 
-- **Room:** `10E`
+- **Room:** `10E` (EMPLOYEE ROOM)
 - **Action:** `pickup`
 - **Objective:** Collect the Keeper's Room handgun bullets and shotgun shells
 - **Required items:** _(none)_
 - **Items gained:** `handgun_bullets`, `shotgun_shells`
-- **How to achieve:** Be in / reach **10E**. Pick up `handgun_bullets`.
+- **How to achieve:** Be in / reach **10E**. Pick up `handgun_bullets`, `shotgun_shells`.
 - **Success condition:**
 - **all of:**
   - Acquire item `handgun_bullets`
   - Acquire item `shotgun_shells`
 
-### `cp64` — `central_corridor_post_10E_103` (seq 65)
+### `cp69` — `central_corridor_post_10E_103` (seq 70)
 
-- **Room:** `103`
+- **Room:** `103` (F PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Return through the Central Corridor from Plant 42
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **103**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **103**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `103`
 
-### `cp65` — `tea_transit_104_post_10E` (seq 66)
+### `cp70` — `tea_transit_104_post_10E` (seq 71)
 
-- **Room:** `104`
+- **Room:** `104` (TEA ROOM)
 - **Action:** `navigate`
 - **Objective:** Cross the Tea Room toward Dining for the blue jewel
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **104**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **104**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `104`
 
-### `cp66` — `dining_enter_105_jewel` (seq 67)
+### `cp71` — `dining_enter_105_jewel` (seq 72)
 
-- **Room:** `105`
+- **Room:** `105` (DINING ROOM)
 - **Action:** `navigate`
 - **Objective:** Return to Dining Room for the blue jewel
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **105**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **105**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `105`
 
-### `cp67` — `blue_jewel_105` (seq 68)
+### `cp72` — `blue_jewel_105` (seq 73)
 
-- **Room:** `105`
+- **Room:** `105` (DINING ROOM)
 - **Action:** `pickup`
 - **Objective:** Collect the blue jewel after the statue drop
 - **Required items:** _(none)_
@@ -905,242 +967,242 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Acquire item `blue_jewel`
 
-### `cp68` — `tea_return_104_post_jewel` (seq 69)
+### `cp73` — `tea_return_104_post_jewel` (seq 74)
 
-- **Room:** `104`
+- **Room:** `104` (TEA ROOM)
 - **Action:** `navigate`
 - **Objective:** Return through the Tea Room after the blue jewel
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **104**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **104**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `104`
 
-### `cp69` — `central_corridor_post_jewel_103` (seq 70)
+### `cp74` — `central_corridor_post_jewel_103` (seq 75)
 
-- **Room:** `103`
+- **Room:** `103` (F PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Return through the Central Corridor toward the Forest
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **103**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **103**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `103`
 
-### `cp70` — `forest_enter_10D` (seq 71)
+### `cp75` — `forest_enter_10D` (seq 76)
 
-- **Room:** `10D`
+- **Room:** `10D` (TIGER STATUE ROOM)
 - **Action:** `navigate`
 - **Objective:** Enter the Forest / keep room
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10D**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10D**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `10D`
 
-### `cp71` — `wind_crest_10D` (seq 72)
+### `cp76` — `wind_crest_10D` (seq 77)
 
-- **Room:** `10D`
+- **Room:** `10D` (TIGER STATUE ROOM)
 - **Action:** `use_item`
 - **Objective:** Use the blue jewel and take the wind crest
 - **Required items:** `blue_jewel`
 - **Items gained:** `wind_crest`
-- **How to achieve:** Be in / reach **10D**. Hold: `blue_jewel`. Perform the story USE (inventory USE at the site). Gains: `wind_crest`.
+- **How to achieve:** Be in / reach **10D**. Hold: `blue_jewel`. Consume `blue_jewel` via story USE. Gains: `wind_crest`.
 - **Success condition:**
 - **all of:**
   - Story USE at `blue_jewel@10D_tiger_eye`
   - Acquire item `wind_crest`
 
-### `cp72` — `central_corridor_return_103` (seq 73)
+### `cp77` — `central_corridor_return_103` (seq 78)
 
-- **Room:** `103`
+- **Room:** `103` (F PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Return to the Central Corridor after taking the wind crest
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **103**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **103**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `103`
 
-### `cp73` — `tea_return_104_post_wind` (seq 74)
+### `cp78` — `tea_return_104_post_wind` (seq 79)
 
-- **Room:** `104`
+- **Room:** `104` (TEA ROOM)
 - **Action:** `navigate`
 - **Objective:** Cross the Tea Room after taking the wind crest
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **104**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **104**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `104`
 
-### `cp74` — `dining_return_105_post_wind` (seq 75)
+### `cp79` — `dining_return_105_post_wind` (seq 80)
 
-- **Room:** `105`
+- **Room:** `105` (DINING ROOM)
 - **Action:** `navigate`
 - **Objective:** Cross Dining after taking the wind crest
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **105**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **105**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `105`
 
-### `cp75` — `main_hall_return_106_post_wind` (seq 76)
+### `cp80` — `main_hall_return_106_post_wind` (seq 81)
 
-- **Room:** `106`
+- **Room:** `106` (MAIN HALL)
 - **Action:** `navigate`
 - **Objective:** Reach Main Hall after taking the wind crest
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **106**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **106**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `106`
 
-### `cp76` — `upper_hall_return_203` (seq 77)
+### `cp81` — `upper_hall_return_203` (seq 82)
 
-- **Room:** `203`
+- **Room:** `203` (HALL 2F)
 - **Action:** `navigate`
 - **Objective:** Return to Main Hall 2F
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **203**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **203**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `203`
 
-### `cp77` — `c_passage_return_204` (seq 78)
+### `cp82` — `c_passage_return_204` (seq 83)
 
-- **Room:** `204`
+- **Room:** `204` (C PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Return to the C Passage
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **204**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **204**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `204`
 
-### `cp78` — `richard_room_enter_20D` (seq 79)
+### `cp83` — `richard_room_enter_20D` (seq 84)
 
-- **Room:** `20D`
+- **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Enter the east wing hallway for Richard
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **20D**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **20D**. Navigate until the success condition fires.
 - **Success condition:**
-- `room_enter_any`: `{"room_ids": ["20D", "204"], "type": "room_enter_any"}`
+- Enter any of: `20D`, `204`
 
-### `cp79` — `richard_cutscene_20D` (seq 80)
+### `cp84` — `richard_cutscene_20D` (seq 85)
 
-- **Room:** `20D`
+- **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Trigger Richard's Pillar Passage cutscene
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **20D**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **20D**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
 - Observe cutscene with prefix `20D:`
 
-### `cp80` — `richard_forced_return_204` (seq 81)
+### `cp85` — `richard_forced_return_204` (seq 86)
 
-- **Room:** `204`
+- **Room:** `204` (C PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Continue from Richard's cutscene into the C Passage
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **204**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **204**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `204`
 
-### `cp81` — `east_stairs_201_post_richard` (seq 82)
+### `cp86` — `east_stairs_201_post_richard` (seq 87)
 
-- **Room:** `207`
+- **Room:** `207` (2F RIGHT STAIRS)
 - **Action:** `navigate`
 - **Objective:** Reach East Stairway 2F after Richard
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **207**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **207**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `207`
 
-### `cp82` — `east_stairs_101_post_richard` (seq 83)
+### `cp87` — `east_stairs_101_post_richard` (seq 88)
 
-- **Room:** `10B`
+- **Room:** `10B` (1F RIGHT STAIRS)
 - **Action:** `navigate`
 - **Objective:** Descend East Stairway after Richard
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10B**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10B**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `10B`
 
-### `cp83` — `yawn_box_enter_118` (seq 84)
+### `cp88` — `yawn_box_enter_118` (seq 89)
 
-- **Room:** `118`
+- **Room:** `118` (STAIRS UNDER ROOM)
 - **Action:** `navigate`
 - **Objective:** Enter the storeroom for Yawn box prep
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **118**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **118**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `118`
 
-### `cp84` — `yawn_box_prep_118` (seq 85)
+### `cp89` — `yawn_box_prep_118` (seq 90)
 
-- **Room:** `118`
+- **Room:** `118` (STAIRS UNDER ROOM)
 - **Action:** `navigate`
 - **Objective:** Prepare inventory at the item box and wait for the lab timer to expire naturally
 - **Required items:** `shield_key`, `shotgun`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **118**. Hold: `shield_key`, `shotgun`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **118**. Hold: `shield_key`, `shotgun`. Navigate until the success condition fires.
 - **Success condition:**
 - State flag `lab_timer` == `0`
 
-### `cp85` — `east_stairs_101_to_yawn` (seq 86)
+### `cp90` — `east_stairs_101_to_yawn` (seq 91)
 
-- **Room:** `10B`
+- **Room:** `10B` (1F RIGHT STAIRS)
 - **Action:** `navigate`
 - **Objective:** Return to East Stairway 1F for Yawn
 - **Required items:** `shield_key`, `shotgun`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10B**. Hold: `shield_key`, `shotgun`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **10B**. Hold: `shield_key`, `shotgun`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `10B`
 
-### `cp86` — `east_stairs_201_to_yawn` (seq 87)
+### `cp91` — `east_stairs_201_to_yawn` (seq 92)
 
-- **Room:** `207`
+- **Room:** `207` (2F RIGHT STAIRS)
 - **Action:** `navigate`
 - **Objective:** Climb East Stairway for Yawn
 - **Required items:** `shield_key`, `shotgun`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **207**. Hold: `shield_key`, `shotgun`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **207**. Hold: `shield_key`, `shotgun`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `207`
 
-### `cp87` — `c_passage_204_to_yawn` (seq 88)
+### `cp92` — `c_passage_204_to_yawn` (seq 93)
 
-- **Room:** `204`
+- **Room:** `204` (C PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Cross the C Passage from East Stairway toward Moon Hall
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **204**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **204**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `204`
 
-### `cp88` — `moon_hall_enter_20D` (seq 89)
+### `cp93` — `moon_hall_enter_20D` (seq 94)
 
-- **Room:** `20D`
+- **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `navigate`
 - **Objective:** Enter the east wing hallway for attic ammo
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **20D**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **20D**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `20D`
 
-### `cp89` — `ammo_20D` (seq 90)
+### `cp94` — `ammo_20D` (seq 95)
 
-- **Room:** `20D`
+- **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `pickup`
 - **Objective:** Collect the mandatory Pillar Passage handgun bullets
 - **Required items:** _(none)_
@@ -1149,31 +1211,31 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Acquire item `handgun_bullets`
 
-### `cp90` — `attic_entry_20E` (seq 91)
+### `cp95` — `attic_entry_20E` (seq 96)
 
-- **Room:** `20E`
+- **Room:** `20E` (FRONT OF ATTIC)
 - **Action:** `navigate`
 - **Objective:** Reach the shield-key attic entrance
 - **Required items:** `shield_key`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **20E**. Hold: `shield_key`. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **20E**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `20E` from `20D`
 
-### `cp91` — `yawn_arena_enter_210` (seq 92)
+### `cp96` — `yawn_arena_enter_210` (seq 97)
 
-- **Room:** `210`
+- **Room:** `210` (ATTIC)
 - **Action:** `navigate`
 - **Objective:** Enter the Yawn moon corridor
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **210**. Navigate until the success enter/settle conditions fire.
+- **How to achieve:** Be in / reach **210**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `210`
 
-### `cp92` — `yawn_moon_210` (seq 93)
+### `cp97` — `yawn_moon_210` (seq 98)
 
-- **Room:** `210`
+- **Room:** `210` (ATTIC)
 - **Action:** `fight`
 - **Objective:** Complete the Yawn encounter, collect the shells, and take the moon crest
 - **Required items:** `shield_key`, `shotgun`
@@ -1183,4 +1245,3 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **all of:**
   - Acquire item `shotgun_shells`
   - Acquire item `moon_crest`
-

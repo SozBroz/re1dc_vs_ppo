@@ -70,6 +70,23 @@ def test_attack_masked_without_ammo() -> None:
     assert not can_attack_with_ammo(inv, 0x02)
 
 
+def test_attack_masked_in_vacant_room_102() -> None:
+    inv = [(0x02, 5)] + [(0, 0)] * 7
+    m = action_mask(
+        N_ACTIONS,
+        None,
+        room_id="102",
+        equipped_weapon_id=0x02,
+        inventory=inv,
+        player_anim=0,
+        player_aux=0,
+        player_recovery=0,
+    )
+    assert not m[ATTACK_ACTION]
+    assert not m[ATTACK_UP_ACTION]
+    assert not m[ATTACK_DOWN_ACTION]
+
+
 def test_attack_legal_with_beretta_ammo() -> None:
     inv = [(0x02, 5)] + [(0, 0)] * 7
     m = action_mask(

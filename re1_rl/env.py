@@ -902,6 +902,7 @@ class RE1Env(gym.Env):
         """Return Gym termination flags, preserving the Wesker terminal mark."""
         kenneth_gate_failure = self._progress.kenneth_gate_breached
         wrong_room_failure = self._progress.wrong_room_breached
+        forbidden_item_failure = self._progress.forbidden_item_breached
         gallery_wrong_failure = self._progress.gallery_wrong_breached
         capture_ineligible_failure = self._progress.capture_ineligible_breached
         box_pollution = getattr(self, "_episode_failure_override", None)
@@ -913,6 +914,7 @@ class RE1Env(gym.Env):
             bool(state.get("dead"))
             or kenneth_gate_failure
             or wrong_room_failure
+            or forbidden_item_failure
             or gallery_wrong_failure
             or bool(box_pollution)
             or capture_ineligible_failure
@@ -923,6 +925,7 @@ class RE1Env(gym.Env):
             if (
                 kenneth_gate_failure
                 or wrong_room_failure
+                or forbidden_item_failure
                 or gallery_wrong_failure
                 or box_pollution
                 or capture_ineligible_failure
@@ -933,6 +936,8 @@ class RE1Env(gym.Env):
             reason = "main_hall_before_kenneth"
         elif wrong_room_failure:
             reason = "wrong_room"
+        elif forbidden_item_failure:
+            reason = "forbidden_item"
         elif gallery_wrong_failure:
             reason = "gallery_wrong_portrait"
         elif box_pollution:

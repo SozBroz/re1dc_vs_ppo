@@ -377,8 +377,10 @@ class BizHawkClient:
             req["sticky"] = sticky or {}
             req["frame_buttons"] = frame_buttons
             req["n"] = len(frame_buttons)
-        elif sticky is not None:
-            req["sticky"] = sticky
+        elif sticky is not None or pulse or pulse_hold:
+            # pulse/pulse_hold require sticky-mode wire path; passing only
+            # pulse_hold without sticky used to drop face buttons entirely.
+            req["sticky"] = sticky or {}
             req["pulse"] = pulse or {}
             req["pulse_hold"] = pulse_hold or {}
             req["pulse_on"] = int(pulse_frames_on)

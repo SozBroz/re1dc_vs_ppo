@@ -465,6 +465,9 @@ WRONG_ROOM_PENALTY = -4.0
 # In-room pickup order is never gated — only graph hops toward the checkpoint.
 WRONG_ROOM_TERMINAL_PENALTY = -4.0
 WRONG_ROOM_TERMINAL_FROM_CHECKPOINT_ID = "l_passage_enter_108"
+# Jill Standard Yawn route never needs broken_shotgun (Barry trap rescue).
+FORBIDDEN_ITEM_TERMINAL_PENALTY = -4.0
+YAWN_FORBIDDEN_ITEMS = frozenset({"broken_shotgun"})
 RETREAT_PENALTY = -4.0
 SUCCESS_ROOM_BONUS = CHECKPOINT_REWARD
 PBRS_GRAPH_WEIGHT = 0.02
@@ -719,6 +722,7 @@ def compute_reward(
         "typewriter_save": 0.0,
         "retreat": 0.0,
         "wrong_room": 0.0,
+        "forbidden_item": 0.0,
         "item": 0.0,
         "ammo_pickup": 0.0,
         "box_withdraw": 0.0,
@@ -854,6 +858,13 @@ def compute_reward(
     ammo_progress = False
     for raw in new_items:
         name = canonical_item(str(raw))
+        if (
+            rails_mode
+            and name in YAWN_FORBIDDEN_ITEMS
+            and progress is not None
+            and progress.breach_forbidden_item()
+        ):
+            bd["forbidden_item"] = FORBIDDEN_ITEM_TERMINAL_PENALTY
         if progress is not None:
             progress.note_leg_acquired(name)
         if name in _KEY_ITEM_NAME_SET:
@@ -1088,7 +1099,9 @@ def compute_reward(
         bd["attack_macro_failure"] = ATTACK_MACRO_FAILURE_PENALTY
 
     if progress is not None and (
-        progress.kenneth_gate_breached or progress.wrong_room_breached
+        progress.kenneth_gate_breached
+        or progress.wrong_room_breached
+        or progress.forbidden_item_breached
     ):
         for term, value in bd.items():
             if value > 0.0:
