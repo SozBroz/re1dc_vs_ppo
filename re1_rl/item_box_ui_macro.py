@@ -24,6 +24,7 @@ from __future__ import annotations
 from typing import Any
 
 from re1_rl.inventory_menu_macro import slot_nav_moves
+from re1_rl.inventory_stacking import effective_transfer_qty
 from re1_rl.item_box import (
     BOX_SLOTS,
     INVENTORY_SLOTS,
@@ -744,11 +745,22 @@ def execute_box_deposit_ui(
     if expected_item_id is not None and int(item_id) != int(expected_item_id):
         report["reason"] = "expected_item_mismatch"
         return False, 0, report
-    nav_from = deposit_inventory_nav_from(
-        inv_cursor, slot, trust_inv_cursor=trust_inv_cursor
-    )
-    if nav_from == 0 and int(inv_cursor) == slot and slot != 0 and not trust_inv_cursor:
+
+    if not trust_inv_cursor:
+        died, f = _home_inventory(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames += f
+        if died:
+            report["died"] = True
+            report["frames"] = frames
+            return True, frames, report
+        nav_from = 0
         report["rehomed"] = True
+    else:
+        nav_from = deposit_inventory_nav_from(
+            inv_cursor, slot, trust_inv_cursor=trust_inv_cursor
+        )
 
     died, f = _navigate_inventory(
         client,
@@ -763,6 +775,15 @@ def execute_box_deposit_ui(
         report["frames"] = frames
         return True, frames, report
 
+    inv_at_cursor = read_inventory(client)
+    if (
+        slot >= len(inv_at_cursor)
+        or int(inv_at_cursor[slot][0]) != int(item_id)
+        or effective_transfer_qty(item_id, inv_at_cursor[slot][1]) <= 0
+    ):
+        report["reason"] = "inv_slot_drift"
+        return False, frames, report
+
     died, f = _confirm_cross(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
     )
@@ -772,21 +793,32 @@ def execute_box_deposit_ui(
         report["frames"] = frames
         return True, frames, report
 
-    list_from = max(0, min(BOX_SLOTS - 1, int(box_cursor)))
-    if list_from > 0:
-        died, f = _home_box_list(
-            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
-        )
-        frames += f
-        if died:
-            report["died"] = True
-            report["frames"] = frames
-            return True, frames, report
-        list_from = 0
+    died, f = _home_box_list(
+        client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+    )
+    frames += f
+    if died:
+        report["died"] = True
+        report["frames"] = frames
+        return True, frames, report
+
+    box_mid = read_box(client)
+    dest = next(
+        (i for i, (iid, _q) in enumerate(box_mid) if int(iid) == 0),
+        None,
+    )
+    if dest is None:
+        report["reason"] = "box_full"
+        return False, frames, report
+    report["dest_slot"] = int(dest)
+
+    if int(box_mid[int(dest)][0]) != 0:
+        report["reason"] = "dest_occupied"
+        return False, frames, report
 
     died, f = _navigate_box_list(
         client,
-        list_from,
+        0,
         int(dest),
         prev_hp=prev_hp,
         episode_start_hp=episode_start_hp,
@@ -796,6 +828,11 @@ def execute_box_deposit_ui(
         report["died"] = True
         report["frames"] = frames
         return True, frames, report
+
+    box_pre = read_box(client)
+    if dest >= len(box_pre) or int(box_pre[int(dest)][0]) != 0:
+        report["reason"] = "dest_occupied_pre_confirm"
+        return False, frames, report
 
     died, f = _confirm_cross(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
@@ -810,12 +847,11 @@ def execute_box_deposit_ui(
     box_after = read_box(client)
     box_live_after = read_box_live(client)
     report["frames"] = frames
-    report["dest_slot"] = int(dest)
 
     dest_got = (
         dest < len(box_after)
-        and int(box_before[dest][0]) == 0
-        and int(box_after[dest][0]) == int(item_id)
+        and int(box_pre[int(dest)][0]) == 0
+        and int(box_after[int(dest)][0]) == int(item_id)
     )
     before_units = sum(
         1 if (int(q) <= 0 and int(iid) == int(item_id)) else int(q)

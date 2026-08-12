@@ -205,6 +205,15 @@ def test_deposit_inventory_nav_from_untrusted_cursor() -> None:
     assert deposit_inventory_nav_from(3, 5, trust_inv_cursor=False) == 3
 
 
+def test_deposit_rejects_non_allowlisted_weapon_id() -> None:
+    from re1_rl.item_box import can_deposit
+
+    inv = [(0x02, 15)] + [(0, 0)] * 7  # beretta
+    box = [(0, 0)] * 16
+    ok, reason = can_deposit(inv, box, 0, room_id="100", enforce_allowlist=True)
+    assert not ok and reason == "not_allowlisted"
+
+
 def test_deposit_from_empty_slot_refused():
     inv = _empty_inventory()
     box = _empty_box()
