@@ -89,6 +89,17 @@ BAZOOKA_AMMO_IDS = frozenset(
 )
 ROOM_100_EXTRA_DEPOSIT_IDS = BAZOOKA_WEAPON_IDS | BAZOOKA_AMMO_IDS
 BOX_BAZOOKA_DEPOSIT_ROOMS = frozenset({"100"})
+# Room 118 yawn prep: ammo may be banked (then withdrawn) while rearranging
+# the pack so wind_crest can sit in the box before leaving.
+ROOM_118_AMMO_DEPOSIT_IDS = frozenset(
+    {
+        0x0B,  # handgun_bullets
+        0x0C,  # shotgun_shells
+        0x0D,  # dumdum_rounds
+        0x0E,  # magnum_rounds
+        0x0F,  # flamethrower_fuel
+    }
+) | BAZOOKA_AMMO_IDS
 
 # Env must leave these False — magic writes scuffed post-cp41 states.
 # When False, ``apply_deposit`` / ``apply_withdraw`` are no-ops (no write_ram).
@@ -122,7 +133,7 @@ def deposit_allowlist_for_room(room_id: str | None) -> frozenset[int]:
     if rid in BOX_BAZOOKA_DEPOSIT_ROOMS:
         return DEPOSIT_ITEM_ALLOWLIST | ROOM_100_EXTRA_DEPOSIT_IDS
     if rid == YAWN_BOX_PREP_ROOM:
-        return DEPOSIT_ITEM_ALLOWLIST | {WIND_CREST_ITEM_ID}
+        return DEPOSIT_ITEM_ALLOWLIST | {WIND_CREST_ITEM_ID} | ROOM_118_AMMO_DEPOSIT_IDS
     return DEPOSIT_ITEM_ALLOWLIST
 
 

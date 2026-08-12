@@ -3609,6 +3609,7 @@ class RE1Env(gym.Env):
             equip_switch_cooldown=int(
                 getattr(self, "_equip_switch_cooldown", 0)
             ),
+            box_inv_cursor=int(getattr(self, "_box_inv_cursor", 0) or 0),
         )
         if (
             box_ui_open

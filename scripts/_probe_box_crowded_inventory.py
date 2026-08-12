@@ -243,11 +243,7 @@ def _cp40_two_empty_slots() -> tuple[list[tuple[int, int]], list[tuple[int, int]
 
 
 def _cp40_crowded() -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
-    """7/8 inv slots used — empty at even slot 6 (box-UI reachable).
-
-    Left/Right only move from empty cells. An empty at slot 7 with slot 6
-    occupied is unreachable from slot 0 — use slot 6 for positive cases.
-    """
+    """7/8 inv slots used — empty at even slot 6."""
     inv = [
         (KNIFE_ITEM_ID, 0),
         (BERETTA, 14),
@@ -262,8 +258,8 @@ def _cp40_crowded() -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
     return inv, box
 
 
-def _unreachable_odd_empty() -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
-    """Only empty is odd-col slot 7 with slot 6 occupied — withdraw must fail."""
+def _odd_empty_slot7() -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+    """Only empty is odd-col slot 7 with slot 6 occupied."""
     inv = [
         (KNIFE_ITEM_ID, 0),
         (BERETTA, 14),
@@ -426,19 +422,18 @@ def _case_full_inventory_withdraw_blocked(c: BizHawkClient, hp: int, cur: Cursor
     assert read_box(c) == box_before
 
 
-def _case_unreachable_odd_empty_withdraw(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
-    """Empty only at slot 7 with 6 occupied — cannot Left/Right onto it."""
-    inv, box = _unreachable_odd_empty()
+def _case_withdraw_into_odd_empty_slot7(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
+    """Empty only at slot 7 with 6 occupied — still a legal withdraw dest."""
+    inv, box = _odd_empty_slot7()
     _setup_layout(c, hp=hp, inventory=inv, box=box)
     assert first_empty_inventory_slot(read_inventory(c)) == 7
 
-    inv_before = list(read_inventory(c))
-    report = _withdraw(c, hp=hp, cur=cur, box_slot=0, expect_ok=False)
-    assert report.get("reason") == "empty_slot_unreachable", report
-    assert cur.inv == 0 and cur.box == 0
-    assert read_inventory(c) == inv_before
-    _assert_keys_on_person(read_inventory(c), label="unreachable_odd")
-    _assert_no_keys_in_box(read_box_live(c), label="unreachable_odd")
+    r0 = _withdraw(c, hp=hp, cur=cur, box_slot=0)
+    assert r0["moved"] == (CLIP, 15)
+    assert cur.inv == 7, f"cursor should rest on inv slot 7, got {cur.inv}"
+    assert read_inventory(c)[7][0] == CLIP
+    _assert_keys_on_person(read_inventory(c), label="odd_empty_slot7")
+    _assert_no_keys_in_box(read_box_live(c), label="odd_empty_slot7")
 
 
 def _case_deposit_both_herbs(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
@@ -623,7 +618,7 @@ CASES: list[Case] = [
     Case("cp40_withdraw_knife_herb", lambda c: None, _case_cp40_withdraw_knife_herb),
     Case("double_withdraw_two_empty_slots", lambda c: None, _case_double_withdraw),
     Case("single_withdraw_then_blocked", lambda c: None, _case_single_withdraw_on_full_inv),
-    Case("unreachable_odd_empty_withdraw", lambda c: None, _case_unreachable_odd_empty_withdraw),
+    Case("withdraw_into_odd_empty_slot7", lambda c: None, _case_withdraw_into_odd_empty_slot7),
     Case("full_inventory_withdraw_blocked", lambda c: None, _case_full_inventory_withdraw_blocked),
     Case("withdraw_deposit_rewithdraw", lambda c: None, _case_withdraw_deposit_rewithdraw),
     Case("deposit_both_herbs", lambda c: None, _case_deposit_both_herbs),

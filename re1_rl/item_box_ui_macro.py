@@ -7,7 +7,8 @@ RE1 DC box flow (imperator scaffolding 2026-08-07 / deposit hunt 2026-08-08):
     box list; resume position is the last box slot selected this session,
     slot 0 after a fresh open) → Up/Down to the source box slot → Cross.
     The game places the item in the chosen empty slot and leaves the cursor
-    on it.
+    on it. Inventory D-pad uses the same 2×4 grid as the pause ITEM menu
+    (every slot is selectable; Left/Right stay inside the grid).
   - Deposit: move to an **occupied** inventory slot → Cross (enters box list
     at ``box_cursor``) → Up/Down to the first empty box slot → Cross.
     Cross on an occupied box slot **exchanges** (avoid). Deposit onto
@@ -214,7 +215,7 @@ def first_reachable_empty_inventory_slot(
     *,
     from_slot: int = 0,
 ) -> int | None:
-    """Lowest empty inv slot reachable under box-UI horizontal rules."""
+    """Lowest empty inv slot the box-UI D-pad can reach from ``from_slot``."""
     start = max(0, min(INVENTORY_SLOTS - 1, int(from_slot)))
     for i, (item_id, _qty) in enumerate(inventory[:INVENTORY_SLOTS]):
         if int(item_id) != 0:
@@ -227,20 +228,45 @@ def first_reachable_empty_inventory_slot(
     return None
 
 
+def box_deposit_slot_reachable(
+    inventory: list[tuple[int, int]],
+    slot: int,
+    *,
+    from_slot: int = 0,
+) -> bool:
+    """True when the box-UI D-pad can reach ``slot`` from ``from_slot``."""
+    start = max(0, min(INVENTORY_SLOTS - 1, int(from_slot)))
+    dest = int(slot)
+    try:
+        box_inventory_nav_moves(start, dest, inventory)
+        return True
+    except ValueError:
+        pass
+    anchor = first_reachable_empty_inventory_slot(inventory, from_slot=start)
+    if anchor is None:
+        return False
+    try:
+        box_inventory_nav_moves(int(anchor), dest, inventory)
+        return True
+    except ValueError:
+        return False
+
+
 def box_inventory_nav_moves(
     from_slot: int,
     to_slot: int,
     inventory: list[tuple[int, int]],
 ) -> list[str]:
-    """D-pad path for the item-box inventory grid.
+    """D-pad path for the item-box inventory grid (all 8 slots).
 
-    Live RE1 DC box UI (QA 2026-08-11): **Up/Down work from any slot**, but
-    **Left/Right only move when the current slot is empty**. Horizontal taps
-    from an occupied cell are no-ops — the cursor stays put, so Cross deposits
-    / withdraws the wrong item (shield_key / chemical mistaken for the target).
+    Same 2×4 layout as the pause ITEM menu. Vertical first, then one
+    horizontal tap: **Right only from column 0**, **Left only from column 1**.
+    That stays inside the inventory grid — Left from slot 0 / Right from
+    slot 1 would jump to the box item list.
 
-    Raises ``ValueError`` when no legal path exists (e.g. only slot 7 empty and
-    slot 6 occupied — cannot enter column 1).
+    Occupancy does not block movement. Deposit and withdraw must highlight
+    every inventory slot, including a full-pack wind crest at slot 7.
+    ``inventory`` is unused (kept so existing call sites stay valid).
     """
     src = int(from_slot)
     dst = int(to_slot)
@@ -248,52 +274,8 @@ def box_inventory_nav_moves(
         return []
     if src < 0 or dst < 0 or src >= INVENTORY_SLOTS or dst >= INVENTORY_SLOTS:
         raise ValueError(f"box inv slot out of range: {src} -> {dst}")
-
-    empty = {
-        i
-        for i, (iid, _q) in enumerate(inventory[:INVENTORY_SLOTS])
-        if int(iid) == 0
-    }
-    # BFS on grid; horizontal edges only from empty cells.
-    cols = 2
-    start = src
-    prev: dict[int, tuple[int, str]] = {}
-    queue = [start]
-    seen = {start}
-    while queue:
-        cur = queue.pop(0)
-        if cur == dst:
-            break
-        cr, cc = divmod(cur, cols)
-        candidates: list[tuple[int, str]] = []
-        if cr > 0:
-            candidates.append(((cr - 1) * cols + cc, "up"))
-        if cr < (INVENTORY_SLOTS // cols) - 1:
-            candidates.append(((cr + 1) * cols + cc, "down"))
-        # Horizontal only when standing on an empty slot.
-        if cur in empty:
-            if cc > 0:
-                candidates.append((cr * cols + (cc - 1), "left"))
-            if cc < cols - 1:
-                candidates.append((cr * cols + (cc + 1), "right"))
-        for nxt, direction in candidates:
-            if nxt in seen:
-                continue
-            seen.add(nxt)
-            prev[nxt] = (cur, direction)
-            queue.append(nxt)
-    if dst not in prev and dst != start:
-        raise ValueError(
-            f"box inv unreachable {src} -> {dst} (empty={sorted(empty)})"
-        )
-    moves_rev: list[str] = []
-    cur = dst
-    while cur != start:
-        p, direction = prev[cur]
-        moves_rev.append(direction)
-        cur = p
-    moves_rev.reverse()
-    return moves_rev
+    _ = inventory
+    return slot_nav_moves(src, dst)
 
 
 def deposit_inventory_nav_from(
@@ -467,8 +449,8 @@ def _navigate_inventory(
 ) -> tuple[bool, int, str]:
     """Navigate inventory grid. Returns ``(died, frames, reason)``.
 
-    When ``inventory`` is provided (box UI), use empty-slot-aware horizontal
-    moves. ``reason`` is set on unreachable targets.
+    When ``inventory`` is provided (box UI), use the 2×4 inventory grid path.
+    ``reason`` is set on out-of-range targets.
     """
     frames = 0
     if int(from_slot) == int(to_slot):
@@ -945,10 +927,8 @@ def execute_box_deposit_ui(
         if int(iid) and is_key_item_id(int(iid)) and effective_transfer_qty(iid, q) > 0
     }
 
-    # Extended-session nav: use empty-slot-aware paths. Prefer a direct path from
-    # the tracked cursor; only re-anchor onto a reachable empty when the target
-    # is otherwise unreachable (horizontal requires standing on empty). Never
-    # invent an empty-cursor position — that deposited beretta/shield_key live.
+    # Prefer a direct path from the tracked cursor. Re-anchor onto a reachable
+    # empty only if the target is somehow off-grid from here.
     nav_from = deposit_inventory_nav_from(
         int(inv_cursor), int(slot), trust_inv_cursor=trust_inv_cursor
     )
@@ -967,7 +947,7 @@ def execute_box_deposit_ui(
         if anchor is None:
             report["reason"] = (
                 f"inv_slot_unreachable:box inv unreachable "
-                f"{nav_from} -> {slot} (need empty bridge)"
+                f"{nav_from} -> {slot}"
             )
             report["frames"] = frames
             return False, frames, report

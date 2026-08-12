@@ -122,46 +122,40 @@ def test_box_inventory_nav_vertical_any_occupancy() -> None:
     assert box_inventory_nav_moves(6, 0, inv) == ["up", "up", "up"]
 
 
-def test_box_inventory_nav_horizontal_only_from_empty() -> None:
-    from re1_rl.item_box_ui_macro import box_inventory_nav_moves
-
-    inv = [(0x01, 0), (0x02, 1), (0x0B, 15), (0x35, 1), (0x44, 1), (0x03, 4), (0, 0), (0x44, 1)]
-    # From empty 6 → right to 7.
-    assert box_inventory_nav_moves(6, 7, inv) == ["right"]
-    # Odd-col herb@1 via empty bridge at 6: down to 6, right, up×3.
-    assert box_inventory_nav_moves(0, 1, inv) == [
-        "down",
-        "down",
-        "down",
-        "right",
-        "up",
-        "up",
-        "up",
-    ]
-
-
-def test_box_inventory_nav_odd_empty_unreachable() -> None:
+def test_box_inventory_nav_every_slot_from_full_pack() -> None:
     from re1_rl.item_box_ui_macro import (
+        box_deposit_slot_reachable,
         box_inventory_nav_moves,
         first_reachable_empty_inventory_slot,
     )
 
-    inv = [
-        (0x01, 0),
-        (0x02, 1),
-        (0x0B, 15),
+    # Full pack — wind crest at slot 7 must still be a legal D-pad target.
+    full = [
+        (0x02, 15),
+        (0x0B, 24),
         (0x35, 1),
-        (0x44, 1),
-        (0x03, 4),
-        (0x44, 1),
-        (0, 0),
+        (0x03, 7),
+        (0x11, 6),
+        (0x34, 4),
+        (0x0C, 2),
+        (0x29, 1),
     ]
-    try:
-        box_inventory_nav_moves(0, 7, inv)
-        raise AssertionError("expected unreachable")
-    except ValueError as exc:
-        assert "unreachable" in str(exc)
-    assert first_reachable_empty_inventory_slot(inv, from_slot=0) is None
+    assert box_inventory_nav_moves(0, 7, full) == ["down", "down", "down", "right"]
+    assert box_inventory_nav_moves(6, 7, full) == ["right"]
+    assert box_inventory_nav_moves(0, 1, full) == ["right"]
+    for slot in range(8):
+        assert box_deposit_slot_reachable(full, slot, from_slot=0)
+
+    # Only empty is odd-col slot 7; withdraw dest must still be reachable.
+    odd_empty = list(full)
+    odd_empty[7] = (0, 0)
+    assert box_inventory_nav_moves(0, 7, odd_empty) == [
+        "down",
+        "down",
+        "down",
+        "right",
+    ]
+    assert first_reachable_empty_inventory_slot(odd_empty, from_slot=0) == 7
 
 
 def test_encode_box_blind_to_deep_slots() -> None:

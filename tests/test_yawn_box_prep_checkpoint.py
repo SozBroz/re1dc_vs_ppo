@@ -39,6 +39,61 @@ def test_can_deposit_wind_crest_at_118() -> None:
     assert ok and reason == ""
 
 
+def test_full_pack_select_slot_7_deposit_masked() -> None:
+    from re1_rl.action_mask import (
+        BOX_DEPOSIT_ACTION,
+        BOX_PHASE_DEPOSIT_SLOT,
+        SELECT_SLOT_BASE,
+        action_mask,
+    )
+    from re1_rl.env import ACTION_NAMES
+    from re1_rl.item_box_ui_macro import box_deposit_slot_reachable
+
+    inv = [
+        (0x02, 15),
+        (0x0B, 24),
+        (0x35, 1),
+        (0x03, 7),
+        (0x11, 6),
+        (0x34, 4),
+        (0x0C, 2),
+        (WIND_CREST_ITEM_ID, 1),
+    ]
+    box = [(0, 0)] * BOX_SLOTS
+    box[1] = (0x01, 0)
+    box[2] = (0x07, 4)
+    assert is_deposit_allowed_item(0x0C, "118")
+    assert is_deposit_allowed_item(WIND_CREST_ITEM_ID, "118")
+    assert box_deposit_slot_reachable(inv, 6, from_slot=0)
+    assert box_deposit_slot_reachable(inv, 7, from_slot=0)
+    ok6, _ = can_deposit(inv, box, 6, room_id="118", enforce_allowlist=True)
+    ok7, _ = can_deposit(inv, box, 7, room_id="118", enforce_allowlist=True)
+    assert ok6 and ok7
+
+    n = len(ACTION_NAMES)
+    mask = action_mask(
+        n,
+        None,
+        inventory=inv,
+        box=box,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_DEPOSIT_SLOT,
+        room_id="118",
+    )
+    assert mask[SELECT_SLOT_BASE + 6]
+    assert mask[SELECT_SLOT_BASE + 7]
+    choose = action_mask(
+        n,
+        None,
+        inventory=inv,
+        box=box,
+        box_ui_open=True,
+        box_phase=0,
+        room_id="118",
+    )
+    assert choose[BOX_DEPOSIT_ACTION]
+
+
 def test_deposit_crest_then_withdraw_bazooka() -> None:
     inv = [
         (0x02, 15),

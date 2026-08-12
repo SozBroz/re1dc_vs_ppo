@@ -196,6 +196,7 @@ def _mask_box_ui_session(
     inventory: list[tuple[int, int]] | None,
     box: list[tuple[int, int]] | None,
     room_id: str | None = None,
+    box_inv_cursor: int = 0,
 ) -> np.ndarray:
     """Legal actions while the item-box UI is open (in_control is false)."""
     from re1_rl.item_box import (
@@ -216,6 +217,13 @@ def _mask_box_ui_session(
         room_id is None or str(room_id) in BOX_DEPOSIT_ROOMS
     )
     deposit_enabled = bool(BOX_DEPOSIT_POLICY_ENABLED) and deposit_room_ok
+    _ = box_inv_cursor
+
+    def _deposit_ok(slot: int) -> bool:
+        if inventory is None or box is None:
+            return False
+        ok, _ = can_deposit(inventory, box, slot, room_id=room_id)
+        return bool(ok)
 
     if phase == BOX_PHASE_WITHDRAW_SLOT:
         if inventory is not None and box is not None and has_empty_inv:
@@ -234,8 +242,7 @@ def _mask_box_ui_session(
             for i in range(N_SELECT_SLOT):
                 idx = SELECT_SLOT_BASE + i
                 if idx < n_actions:
-                    ok, _ = can_deposit(inventory, box, i, room_id=room_id)
-                    mask[idx] = bool(ok)
+                    mask[idx] = _deposit_ok(i)
         if BOX_CLOSE_ACTION < n_actions:
             mask[BOX_CLOSE_ACTION] = True
         return mask
@@ -268,8 +275,7 @@ def _mask_box_ui_session(
         any_deposit = False
         if deposit_enabled and inventory is not None and box is not None:
             for i in range(min(N_SELECT_SLOT, len(inventory))):
-                ok, _ = can_deposit(inventory, box, i, room_id=room_id)
-                if ok:
+                if _deposit_ok(i):
                     any_deposit = True
                     break
         mask[BOX_DEPOSIT_ACTION] = any_deposit
@@ -311,6 +317,7 @@ def action_mask(
     rewarded_story_uses: set[str] | frozenset[str] | None = None,
     document_examine_open: bool = False,
     equip_switch_cooldown: int = 0,
+    box_inv_cursor: int = 0,
 ) -> np.ndarray:
     """Return bool mask (True = legal) for MaskablePPO / ActionMasker."""
     del prev_action
@@ -336,6 +343,7 @@ def action_mask(
             inventory=inventory,
             box=box,
             room_id=room_id,
+            box_inv_cursor=box_inv_cursor,
         )
     if not in_control:
         mask[:] = False
