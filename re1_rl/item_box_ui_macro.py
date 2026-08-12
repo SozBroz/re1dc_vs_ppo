@@ -63,6 +63,11 @@ POST_OPEN_SETTLE_FRAMES = 90
 # Never Up-spam a fixed 15 from an unknown/zero resume — home exactly
 # ``from_slot`` taps when the session cursor is known and > 0.
 BOX_LIST_HOME_UPS = BOX_SLOTS - 1
+# Vertical-only inventory re-home (no Left/Right). Unsafe from slot 0:
+# live D1 showed Up from slot 0 hits EXIT (header), not a no-op.
+# ``execute_box_deposit_ui`` therefore skips this on cold open.
+# Odd columns stay odd. Do not add Left until live C9.
+HOME_INVENTORY_TAPS: tuple[tuple[str, int], ...] = (("up", 3),)
 # Aliases for QA probes (``scripts/_probe_box_withdraw_qa.py``).
 MOVE_TAP_FRAMES = BOX_MOVE_TAP_FRAMES
 MOVE_SETTLE_FRAMES = BOX_MOVE_SETTLE_FRAMES
@@ -100,6 +105,42 @@ def _first_empty_modeled_slot(box: list[tuple[int, int]]) -> int | None:
         if int(iid) == 0:
             return int(i)
     return None
+
+
+def unexpected_keys_lost(
+    keys_before: set[int],
+    keys_after: set[int],
+    intended_item_id: int,
+    room_id: str | None,
+) -> set[int]:
+    """Keys that left the person and were not the intended allowlisted deposit.
+
+    ``lost = keys_before - keys_after``. If the intended id is legal to deposit
+    in ``room_id`` (room-118 wind crest), drop it from ``lost``. Remaining ids
+    are a fail (``key_item_deposited``): shield_key / armor_key leaving in 118
+    still fail; crest leaving in room 100 still fails.
+    """
+    from re1_rl.item_box import is_deposit_allowed_item
+
+    lost = {int(i) & 0xFF for i in keys_before} - {int(i) & 0xFF for i in keys_after}
+    intended = int(intended_item_id) & 0xFF
+    if intended in lost and is_deposit_allowed_item(intended, room_id):
+        lost.discard(intended)
+    return lost
+
+
+def transfer_failure_zeros_session_cursors(report: dict[str, Any]) -> bool:
+    """True when env must discard session cursors after a failed transfer.
+
+    ``env._apply_box_ui_cursors_from_report`` zeros ``_box_inv_cursor`` /
+    ``_box_list_cursor`` when the transfer failed and RAM changed (including
+    ``exchange_detected``). A successful 118 crest deposit must not take this
+    path: ``unexpected_keys_lost`` empty means we never call
+    ``_finalize_transfer_failure``.
+    """
+    if report.get("ok"):
+        return False
+    return bool(report.get("exchange_detected") or report.get("ram_changed"))
 
 
 def _finalize_transfer_failure(
@@ -370,10 +411,12 @@ def _home_inventory(
     """Re-home inventory grid onto slot 0 without Left/Right pane switches.
 
     Box UI places the item list beside the inventory grid; Left/Right can leave
-    the grid and park the cursor on a deep box slot. Vertical clamp only.
+    the grid. Vertical clamp only (Up×3). Do **not** call this when the cursor
+    is already on slot 0: live D1 showed Up from slot 0 hits EXIT.
+    Odd columns still land on slot 1 (no Left until live C9).
     """
     frames = 0
-    for direction, taps in (("up", 4), ("down", 1)):
+    for direction, taps in HOME_INVENTORY_TAPS:
         died, f = _move(
             client,
             direction,
@@ -870,16 +913,11 @@ def execute_box_deposit_ui(
         and int(inv_cursor) == 0
         and int(box_cursor) == 0
     )
+    # Open already parks the red cursor on inv slot 0. Do not Up-home:
+    # live D1 (QS1) showed Up from slot 0 hits EXIT, then the assumed
+    # 0→7 path (down×3, right) lands on bullets@1 and Cross-deposits them.
     if cold_session:
-        died, f = _home_inventory(
-            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
-        )
-        frames += f
-        if died:
-            report["died"] = True
-            report["frames"] = frames
-            return True, frames, report
-        report["inv_homed"] = True
+        report["inv_homed"] = False
 
     inv_before = read_inventory(client)
     box_before = read_box(client)
@@ -1074,13 +1112,14 @@ def execute_box_deposit_ui(
     box_live_after = read_box_live(client)
     report["frames"] = frames
 
-    # Any key that left the person is an automatic fail (wrong-cursor deposit).
+    # Keys that left the person fail, except the intended allowlisted deposit
+    # (room-118 wind crest). Raw ``keys_before - keys_after`` false-fails that.
     keys_after = {
         int(iid)
         for iid, q in inv_after
         if int(iid) and is_key_item_id(int(iid)) and effective_transfer_qty(iid, q) > 0
     }
-    if keys_before - keys_after:
+    if unexpected_keys_lost(keys_before, keys_after, int(item_id), room_id):
         _finalize_transfer_failure(
             report,
             inv_before=inv_before,

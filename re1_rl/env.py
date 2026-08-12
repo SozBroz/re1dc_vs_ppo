@@ -696,7 +696,9 @@ class RE1Env(gym.Env):
                 inv_cursor_in=inv_cursor_in,
                 box_cursor_in=box_cursor_in,
             )
-            if report.get("exchange_detected") or report.get("ram_changed"):
+            from re1_rl.item_box_ui_macro import transfer_failure_zeros_session_cursors
+
+            if transfer_failure_zeros_session_cursors(report):
                 self._box_inv_cursor = 0
                 self._box_list_cursor = 0
                 self._box_inv_trusted_at_cursor = False
