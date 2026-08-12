@@ -62,13 +62,16 @@ def test_full_pack_select_slot_7_deposit_masked() -> None:
     box = [(0, 0)] * BOX_SLOTS
     box[1] = (0x01, 0)
     box[2] = (0x07, 4)
-    assert is_deposit_allowed_item(0x0C, "118")
+    assert not is_deposit_allowed_item(0x0C, "118")  # shotgun_shells
+    assert not is_deposit_allowed_item(0x0B, "118")  # handgun_bullets
+    assert not is_deposit_allowed_item(0x11, "118")  # acid_rounds
     assert is_deposit_allowed_item(WIND_CREST_ITEM_ID, "118")
     assert box_deposit_slot_reachable(inv, 6, from_slot=0)
     assert box_deposit_slot_reachable(inv, 7, from_slot=0)
-    ok6, _ = can_deposit(inv, box, 6, room_id="118", enforce_allowlist=True)
+    ok6, why6 = can_deposit(inv, box, 6, room_id="118", enforce_allowlist=True)
     ok7, _ = can_deposit(inv, box, 7, room_id="118", enforce_allowlist=True)
-    assert ok6 and ok7
+    assert not ok6 and why6 == "not_allowlisted"
+    assert ok7
 
     n = len(ACTION_NAMES)
     mask = action_mask(
@@ -80,7 +83,7 @@ def test_full_pack_select_slot_7_deposit_masked() -> None:
         box_phase=BOX_PHASE_DEPOSIT_SLOT,
         room_id="118",
     )
-    assert mask[SELECT_SLOT_BASE + 6]
+    assert not mask[SELECT_SLOT_BASE + 6]
     assert mask[SELECT_SLOT_BASE + 7]
     choose = action_mask(
         n,
