@@ -170,6 +170,16 @@ def test_room_100_allows_bazooka_and_ammo_deposit() -> None:
     assert not ok_hg and reason_hg == "not_allowlisted"
 
 
+def test_deposit_ink_ribbon_allowed_in_all_box_rooms() -> None:
+    inv = [(0x2F, 3)] + [(0, 0)] * 7
+    box = _empty_box()
+    for room in ("100", "118"):
+        ok, reason = can_deposit(
+            inv, box, 0, room_id=room, enforce_allowlist=True
+        )
+        assert ok and reason == "", (room, reason)
+
+
 def test_box_ui_open_from_ram_requires_gs_90() -> None:
     from re1_rl.item_box_ui_macro import box_ui_open_from_ram
     from re1_rl.memory_map import PAUSE_MENU_GAME_MODE

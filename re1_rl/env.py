@@ -896,6 +896,7 @@ class RE1Env(gym.Env):
         kenneth_gate_failure = self._progress.kenneth_gate_breached
         wrong_room_failure = self._progress.wrong_room_breached
         gallery_wrong_failure = self._progress.gallery_wrong_breached
+        capture_ineligible_failure = self._progress.capture_ineligible_breached
         box_pollution = getattr(self, "_episode_failure_override", None)
         checkpoint_success = (
             self._stage.get("mode") == "yawn_rails"
@@ -907,6 +908,7 @@ class RE1Env(gym.Env):
             or wrong_room_failure
             or gallery_wrong_failure
             or bool(box_pollution)
+            or capture_ineligible_failure
             or checkpoint_success
         )
         truncated = (
@@ -916,6 +918,7 @@ class RE1Env(gym.Env):
                 or wrong_room_failure
                 or gallery_wrong_failure
                 or box_pollution
+                or capture_ineligible_failure
             )
             else self._episode_truncated()
         )
@@ -927,6 +930,8 @@ class RE1Env(gym.Env):
             reason = "gallery_wrong_portrait"
         elif box_pollution:
             reason = str(box_pollution)
+        elif capture_ineligible_failure:
+            reason = "checkpoint_capture_ineligible"
         elif checkpoint_success:
             reason = "checkpoint_success"
         else:
@@ -1185,6 +1190,26 @@ class RE1Env(gym.Env):
                     self._yawn_rails_capture_pending = []
                     pending_yr = self._yawn_rails_capture_pending
                 pending_yr.append(yr_prop)
+        self._apply_yawn_capture_ineligibility_penalty(breakdown)
+
+    def _apply_yawn_capture_ineligibility_penalty(
+        self, breakdown: dict[str, float]
+    ) -> None:
+        """Claw back checkpoint_success when capture was hard-ineligible (not quality)."""
+        from re1_rl.reward import RAILS_CAPTURE_INELIGIBLE_PENALTY
+        from re1_rl.yawn_rails import yawn_capture_ineligible_reason
+
+        if float(breakdown.get("checkpoint_success", 0.0)) <= 0.0:
+            return
+        if not yawn_capture_ineligible_reason(self):
+            return
+        if not self._progress.breach_capture_ineligible():
+            return
+        for term, value in breakdown.items():
+            if value > 0.0:
+                breakdown[term] = 0.0
+        breakdown["checkpoint_success"] = 0.0
+        breakdown["checkpoint_capture_ineligible"] = RAILS_CAPTURE_INELIGIBLE_PENALTY
 
     def _go_explore_archive(self):
         """Lazy-load canonical archive (monolithic / learner-local)."""
@@ -3192,6 +3217,9 @@ class RE1Env(gym.Env):
             breakdown,
             typewriter_save_complete=save_complete,
         )
+        from re1_rl.reward import REWARD_SCALE
+
+        reward = sum(breakdown.values()) * REWARD_SCALE
         terminated, truncated, episode_failure = self._termination_flags(state)
         self._update_loadout_segment(
             self._prev_state,
@@ -3914,6 +3942,10 @@ class RE1Env(gym.Env):
                 breakdown[k] = breakdown.get(k, 0.0) + v
             self._post_skip_reward = 0.0
             self._post_skip_bd = {}
+
+        from re1_rl.reward import REWARD_SCALE
+
+        reward = sum(breakdown.values()) * REWARD_SCALE
 
         if combat_attack:
             self._record_attack_telemetry(

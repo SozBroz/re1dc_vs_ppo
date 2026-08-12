@@ -62,6 +62,8 @@ class ProgressTracker:
     kenneth_gate_breached: bool = False
     # Rails off-path: wrong_room penalty ends the episode (like Kenneth gate).
     wrong_room_breached: bool = False
+    # Checkpoint nav succeeded but successor capture was hard-ineligible.
+    capture_ineligible_breached: bool = False
     # Spawn room (usually dining 105): visited at reset; no +new_room payout —
     # fresh start matches archive/PB sidecars that already carry spawn credit.
     spawn_room_id: str | None = None
@@ -296,6 +298,15 @@ class ProgressTracker:
         if self.wrong_room_breached:
             return False
         self.wrong_room_breached = True
+        self.softlock_cap_frames = 0
+        return True
+
+    def breach_capture_ineligible(self) -> bool:
+        """Mark hard capture ineligibility as terminal; true only on first breach."""
+        if self.capture_ineligible_breached:
+            return False
+        self.capture_ineligible_breached = True
+        self.checkpoint_success = False
         self.softlock_cap_frames = 0
         return True
 

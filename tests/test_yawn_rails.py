@@ -23,6 +23,7 @@ from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
     CHECKPOINT_MAX_STEPS_EXTENSION,
+    RAILS_CAPTURE_INELIGIBLE_PENALTY,
     RAILS_CHECKPOINT_REWARD,
     SOFTLOCK_EXTENSION_FRAMES,
     compute_reward,
@@ -34,6 +35,7 @@ from re1_rl.yawn_rails import (
     successor_capacity,
     validate_manifest_cells,
     validate_route,
+    yawn_capture_ineligible_reason,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -1909,6 +1911,7 @@ def test_west_stairs_return_capture_requires_two_free_slots(
         )
         is None
     )
+    assert yawn_capture_ineligible_reason(env) == "inventory_free_slots"
     bridge.save_savestate.assert_not_called()
 
     ok_state = _state(
@@ -1919,7 +1922,29 @@ def test_west_stairs_return_capture_requires_two_free_slots(
         env, ok_state, {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
     )
     assert proposal is not None
+    assert yawn_capture_ineligible_reason(env) is None
     assert proposal["checkpoint_id"] == "west_stairs_return_10B"
+
+
+def test_capture_ineligible_claws_back_checkpoint_reward() -> None:
+    """Hard capture ineligibility replaces +8 checkpoint_success with -4 failure."""
+    progress = ProgressTracker(leg_span=1)
+    progress.checkpoint_success = True
+    env = SimpleNamespace(
+        _progress=progress,
+        _stage={"mode": "yawn_rails"},
+    )
+    setattr(env, "_yawn_capture_ineligible_reason", "inventory_free_slots")
+    breakdown = {
+        "checkpoint_success": RAILS_CHECKPOINT_REWARD,
+        "new_room": 4.0,
+    }
+    RE1Env._apply_yawn_capture_ineligibility_penalty(env, breakdown)
+    assert breakdown["checkpoint_success"] == 0.0
+    assert breakdown["checkpoint_capture_ineligible"] == RAILS_CAPTURE_INELIGIBLE_PENALTY
+    assert breakdown["new_room"] == 0.0
+    assert progress.capture_ineligible_breached
+    assert not progress.checkpoint_success
 
 
 def test_118_almanac_has_chemical_but_not_square_crank() -> None:

@@ -19,12 +19,12 @@ set RE1_PB_DANGER_ROOMS=1
 set RE1_MACHINE_NAME=%MACHINE_NAME%
 
 call "%~dp0go_explore_phase_c.env.cmd"
-REM Pin cp55 only (override via data/yawn_reset_pin.env).
+REM Uniform cp56 + cp57 (override via data/yawn_reset_pin.env).
 set RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=
-set RE1_YAWN_RESET_PIN_INDEX=55
+set RE1_YAWN_RESET_PIN_INDEX=
 set RE1_YAWN_RESET_PIN_SET=
 set RE1_YAWN_RESET_PIN_SET_WEIGHT=
-set RE1_YAWN_RESET_PIN_RANGE=
+set RE1_YAWN_RESET_PIN_RANGE=56-57
 set RE1_YAWN_RESET_PIN_WEIGHTS=
 if not exist data\go_explore mkdir data\go_explore
 

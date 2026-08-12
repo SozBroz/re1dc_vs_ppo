@@ -25,6 +25,22 @@ CAPTURE_MIN_FREE_SLOTS: dict[str, int] = {
     "west_stairs_return_10B": 2,
 }
 
+_CAPTURE_INELIGIBLE_ATTR = "_yawn_capture_ineligible_reason"
+
+
+def _mark_capture_ineligible(env: Any, reason: str) -> None:
+    setattr(env, _CAPTURE_INELIGIBLE_ATTR, str(reason))
+
+
+def yawn_capture_ineligible_reason(env: Any) -> str | None:
+    """Hard pre-compare capture reject from the last ``capture_successor_cell`` call."""
+    reason = getattr(env, _CAPTURE_INELIGIBLE_ATTR, None)
+    return str(reason) if reason else None
+
+
+def _clear_capture_ineligible(env: Any) -> None:
+    setattr(env, _CAPTURE_INELIGIBLE_ATTR, None)
+
 
 def _route_item(entry: Any) -> tuple[str, int]:
     if isinstance(entry, dict):
@@ -1004,6 +1020,7 @@ def capture_successor_cell(
     """
     if float(breakdown.get("checkpoint_success", 0.0)) <= 0.0:
         return None
+    _clear_capture_ineligible(env)
     stage = getattr(env, "_stage", {})
     if stage.get("mode") != "yawn_rails":
         return None
@@ -1034,6 +1051,7 @@ def capture_successor_cell(
             )
         except (OSError, RuntimeError, ValueError, TypeError, AttributeError):
             pass
+        _mark_capture_ineligible(env, "unsettled")
         return None
     room_id = str(state.get("room_id", "") or "")
     # Refuse door-threshold / cutscene-spoof captures (Wesker→fake 106, Kenneth
@@ -1042,6 +1060,7 @@ def capture_successor_cell(
 
     if expected_room and room_id.upper() != expected_room.upper():
         if not barry_rescue_capture_room_ok(cid, room_id, expected_room):
+            _mark_capture_ineligible(env, "room_mismatch")
             return None
     progress = getattr(env, "_progress", None)
     ledgers: set[str] = set()
@@ -1052,14 +1071,18 @@ def capture_successor_cell(
     if cid == "barry_rescue_115" and not any(
         str(k).startswith("115:") for k in ledgers
     ):
+        _mark_capture_ineligible(env, "cutscene_gate")
         return None
     if cid == "kenneth_104" and not any(str(k).startswith("104:") for k in ledgers):
+        _mark_capture_ineligible(env, "cutscene_gate")
         return None
     if cid == "barry_return_105" and not any(
         str(k).startswith("105:2:s1") for k in ledgers
     ):
+        _mark_capture_ineligible(env, "cutscene_gate")
         return None
     if cid == "main_hall_106" and not any(str(k).startswith("106:") for k in ledgers):
+        _mark_capture_ineligible(env, "cutscene_gate")
         return None
     if cid in (
         "crow_gallery_enter_117",
@@ -1084,6 +1107,7 @@ def capture_successor_cell(
                 f"need={need} cp={cid}",
                 flush=True,
             )
+            _mark_capture_ineligible(env, "leg_kills")
             return None
         progress.restore_claimed_leg_kills_for_sidecar()
     # First climb to 203 has no cinema at this story beat — do not require 203:.
@@ -1096,6 +1120,7 @@ def capture_successor_cell(
             f"need={capacity.get('next_slots_needed')}",
             flush=True,
         )
+        _mark_capture_ineligible(env, "inventory_infeasible")
         return None
     min_free = CAPTURE_MIN_FREE_SLOTS.get(cid)
     if min_free is not None:
@@ -1106,6 +1131,7 @@ def capture_successor_cell(
                 f"need={int(min_free)} cp={cid}",
                 flush=True,
             )
+            _mark_capture_ineligible(env, "inventory_free_slots")
             return None
 
     inv_names = {
@@ -1121,6 +1147,7 @@ def capture_successor_cell(
                 f"item={name!r} cp={cid}",
                 flush=True,
             )
+            _mark_capture_ineligible(env, "consume_before_gain")
             return None
 
     from re1_rl.go_explore_capture import compute_quality
@@ -1176,6 +1203,7 @@ def capture_successor_cell(
                         f"live={live_room!r} expected={expected_room!r} cp={cid}",
                         flush=True,
                     )
+                    _mark_capture_ineligible(env, "room_drift")
                     return False
             if not live_state.get("in_control", True) or live_state.get("dead"):
                 print(
@@ -1184,6 +1212,7 @@ def capture_successor_cell(
                     f"dead={live_state.get('dead')} cp={cid}",
                     flush=True,
                 )
+                _mark_capture_ineligible(env, "unsettled")
                 return False
             env.bridge.save_savestate(str(state_path))
             if callable(read_state):
@@ -1197,6 +1226,7 @@ def capture_successor_cell(
                         f"cp={cid} err={exc!r}",
                         flush=True,
                     )
+                    _mark_capture_ineligible(env, "post_save_read")
                     return False
                 if expected_room and after_room.upper() != expected_room.upper():
                     if not barry_rescue_capture_room_ok(
@@ -1207,6 +1237,7 @@ def capture_successor_cell(
                             f"after={after_room!r} expected={expected_room!r} cp={cid}",
                             flush=True,
                         )
+                        _mark_capture_ineligible(env, "room_drift")
                         return False
                 live_room = after_room
             return True
@@ -1231,6 +1262,7 @@ def capture_successor_cell(
                 f"[yawn_capture] reject box pollution {pollution} cp={cid}",
                 flush=True,
             )
+            _mark_capture_ineligible(env, "box_pollution")
             return None
 
         sidecar = dump_episode_sidecar(

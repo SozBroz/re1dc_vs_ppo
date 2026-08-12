@@ -52,11 +52,13 @@ BOX_SLOTS_LIVE = 48
 INVENTORY_SLOTS = 8
 LOCKPICK_ITEM_ID = 0x31
 KNIFE_ITEM_ID = 0x01
-# Knife + healing items only (global bank). Keys/ammo/weapons stay on person
+INK_RIBBON_ITEM_ID = 0x2F
+# Knife + healing + ink ribbons (global bank). Keys/ammo/weapons stay on person
 # except room-100 bazooka banking below.
 DEPOSIT_ITEM_ALLOWLIST = frozenset(
     {
         KNIFE_ITEM_ID,
+        INK_RIBBON_ITEM_ID,
         0x41,  # first_aid_spray_alt
         0x43,  # red_herb
         0x44,  # green_herb

@@ -474,6 +474,9 @@ UNKNOWN_HOPS = 8.0
 DIST_NORM = 4096.0
 # Dominant terminal pulse on one-leg rails (unscaled; exploration uses CHECKPOINT_REWARD).
 RAILS_CHECKPOINT_REWARD = 8.0
+# Hard capture gate failure (inventory headroom, leg kills, unsettled state, etc.).
+# Distinct from quality compare (LOSE_TO_INCUMBENT) — not worth filing at all.
+RAILS_CAPTURE_INELIGIBLE_PENALTY = -4.0
 # Navigation milestones keep full exploration magnitudes on rails (+4 / +2 ammo).
 RAILS_NAV_POSITIVE_SCALE = 1.0
 RAILS_NAV_POSITIVE_TERMS: frozenset[str] = frozenset({
@@ -730,6 +733,7 @@ def compute_reward(
         "shotgun_return": 0.0,
         "new_weapon": 0.0,
         "checkpoint_success": 0.0,
+        "checkpoint_capture_ineligible": 0.0,
         "success_room": 0.0,
         "hp": 0.0,
         "death": 0.0,

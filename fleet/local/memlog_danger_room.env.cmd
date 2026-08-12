@@ -1,8 +1,8 @@
 @echo off
-REM Memlog actor: pin cp52 (statue_202 leg; same as fleet pking grind).
+REM Memlog actor: same cp55+cp56 mix as pking headless worker.
 call "%~dp0go_explore_phase_c.env.cmd"
 set RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=
-set RE1_YAWN_RESET_PIN_INDEX=52
+set RE1_YAWN_RESET_PIN_INDEX=
 set RE1_YAWN_RESET_PIN_SET=
 set RE1_YAWN_RESET_PIN_SET_WEIGHT=
-set RE1_YAWN_RESET_PIN_RANGE=
+set RE1_YAWN_RESET_PIN_RANGE=55-56
