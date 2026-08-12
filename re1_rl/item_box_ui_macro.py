@@ -57,6 +57,9 @@ CLOSE_TRIANGLE_FRAMES = 12
 CLOSE_SETTLE_FRAMES = 40
 CLOSE_MAX_ATTEMPTS = 4
 EXIT_NAV_MAX_DOWNS = 6
+# After Triangle-close, wait in the field so the next Cross is interact, not a
+# leftover box confirm (live G0 2026-08-12 deposited bullets that way).
+FIELD_AFTER_CLOSE_FRAMES = 50
 # Open animation keeps mode/gs in the pause tree before the grid accepts d-pad.
 POST_OPEN_SETTLE_FRAMES = 90
 # Extra Ups from slot 0 WRAP through the 48-slot live list (0-15 → land on 33).
@@ -629,6 +632,131 @@ def close_box_ui(
     return bool(died), frames, report
 
 
+def reset_box_ui_session(
+    client: Any,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+    inv_cursor: int = 0,
+) -> tuple[bool, int, dict[str, Any]]:
+    """Close and reopen so inventory is on slot 0 and the box list resumes at 0.
+
+    Live fleet (510fa56): a failed deposit left the cursor in the 48-slot list;
+    env zeroed software cursors; the next select_slot_7 treated that as a cold
+    open and deposited handgun bullets, then walked the list to shield_key@8.
+    Triangle-close + Cross-open is the only home that does not Up into EXIT.
+    """
+    report: dict[str, Any] = {"ok": False, "action": "reset_session"}
+    frames = 0
+    if probe_box_ui_open(client):
+        died, f, close_rep = close_box_ui(
+            client,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            inv_cursor=inv_cursor,
+        )
+        frames += f
+        report["close"] = close_rep
+        if died:
+            report["died"] = True
+            report["frames"] = frames
+            return True, frames, report
+        if probe_box_ui_open(client):
+            report["reason"] = "close_failed"
+            report["frames"] = frames
+            return False, frames, report
+
+    died, f = _wait(
+        client,
+        frames=FIELD_AFTER_CLOSE_FRAMES,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+    )
+    frames += f
+    if died:
+        report["died"] = True
+        report["frames"] = frames
+        return True, frames, report
+
+    for attempt in range(5):
+        died, f = _tap(
+            client,
+            {"cross": True},
+            frames=OPEN_PANE_TAP_FRAMES if attempt else 12,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += f
+        if died:
+            report["died"] = True
+            report["frames"] = frames
+            return True, frames, report
+        # Match harness open_box: idle 50, then POST_OPEN_SETTLE 90.
+        idle = FIELD_AFTER_CLOSE_FRAMES if attempt == 0 else OPEN_PANE_SETTLE_FRAMES
+        died, f = _wait(
+            client,
+            frames=idle,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += f
+        if died:
+            report["died"] = True
+            report["frames"] = frames
+            return True, frames, report
+        died, f = _wait(
+            client,
+            frames=POST_OPEN_SETTLE_FRAMES if attempt == 0 else 0,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
+        frames += f
+        if died:
+            report["died"] = True
+            report["frames"] = frames
+            return True, frames, report
+        if probe_box_ui_open(client):
+            report["ok"] = True
+            report["inv_cursor"] = 0
+            report["box_cursor"] = 0
+            report["frames"] = frames
+            return False, frames, report
+
+    report["reason"] = "reopen_failed"
+    report["frames"] = frames
+    return False, frames, report
+
+
+def _close_after_failed_transfer(
+    client: Any,
+    report: dict[str, Any],
+    frames: int,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+    inv_cursor: int = 0,
+) -> tuple[bool, int]:
+    """Triangle-close after a transfer that already moved the UI cursor.
+
+    Leaves the box closed so the next policy action cannot walk the 48-slot
+    list with software cursors zeroed. Does not reopen.
+    """
+    if not probe_box_ui_open(client):
+        report["closed_after_fail"] = {"ok": True, "skipped": True}
+        report["frames"] = frames
+        return False, frames
+    died, f, close_rep = close_box_ui(
+        client,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+        inv_cursor=inv_cursor,
+    )
+    frames += f
+    report["closed_after_fail"] = close_rep
+    report["frames"] = frames
+    return died, frames
+
+
 def execute_box_withdraw_ui(
     client: Any,
     box_slot: int,
@@ -665,18 +793,6 @@ def execute_box_withdraw_ui(
         report["reason"] = "bad_slot"
         return False, 0, report
 
-    died, f = _wait(
-        client,
-        frames=POST_OPEN_SETTLE_FRAMES,
-        prev_hp=prev_hp,
-        episode_start_hp=episode_start_hp,
-    )
-    frames += f
-    if died:
-        report["died"] = True
-        report["frames"] = frames
-        return True, frames, report
-
     inv_before = read_inventory(client)
     box_before = read_box(client)
     box_live_before = read_box_live(client)
@@ -685,11 +801,8 @@ def execute_box_withdraw_ui(
         report["reason"] = reason
         return False, frames, report
 
-    dest = first_reachable_empty_inventory_slot(
-        inv_before, from_slot=int(inv_cursor)
-    )
+    dest = first_reachable_empty_inventory_slot(inv_before, from_slot=0)
     if dest is None:
-        # Distinguish "full" from "empty but unreachable under box-UI nav rules".
         if first_empty_inventory_slot(inv_before) is None:
             report["reason"] = "inventory_full"
         else:
@@ -699,6 +812,24 @@ def execute_box_withdraw_ui(
 
     item_id, qty_before = box_before[slot]
     cursor = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
+
+    def _abort(reason: str | None = None) -> tuple[bool, int, dict[str, Any]]:
+        nonlocal frames
+        if reason is not None:
+            report["reason"] = reason
+        report["frames"] = frames
+        died_c, frames = _close_after_failed_transfer(
+            client,
+            report,
+            frames,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            inv_cursor=0,
+        )
+        if died_c:
+            report["died"] = True
+            return True, frames, report
+        return False, frames, report
 
     died, f, nav_reason = _navigate_inventory(
         client,
@@ -714,17 +845,13 @@ def execute_box_withdraw_ui(
         report["frames"] = frames
         return True, frames, report
     if nav_reason:
-        report["reason"] = nav_reason
-        report["frames"] = frames
-        return False, frames, report
+        return _abort(nav_reason)
 
     # Must be on an empty inventory cell before Cross — otherwise we deposit
     # whatever is highlighted (beretta / shield_key live failures).
     inv_pre_cross = read_inventory(client)
     if dest >= len(inv_pre_cross) or int(inv_pre_cross[int(dest)][0]) != 0:
-        report["reason"] = "withdraw_dest_not_empty"
-        report["frames"] = frames
-        return False, frames, report
+        return _abort("withdraw_dest_not_empty")
 
     # Cross on empty slot → box list resumes at ``box_cursor``.
     died, f = _confirm_cross(
@@ -754,8 +881,7 @@ def execute_box_withdraw_ui(
         list_from = 0
 
     if int(slot) >= BOX_SLOTS:
-        report["reason"] = "box_slot_unmodeled"
-        return False, frames, report
+        return _abort("box_slot_unmodeled")
 
     died, f = _navigate_box_list(
         client,
@@ -784,8 +910,7 @@ def execute_box_withdraw_ui(
     box_live_after = read_box_live(client)
     report["frames"] = frames
     if not probe_box_ui_open(client):
-        report["reason"] = "box_ui_closed_mid_transfer"
-        return False, frames, report
+        return _abort("box_ui_closed_mid_transfer")
 
     src_after = box_after[slot] if slot < len(box_after) else (0, 0)
     dest_after = inv_after[dest] if dest < len(inv_after) else (0, 0)
@@ -814,7 +939,7 @@ def execute_box_withdraw_ui(
             box_live_after=box_live_after,
             default_reason="exchange_not_withdraw",
         )
-        return False, frames, report
+        return _abort()
 
     if not moved:
         _finalize_transfer_failure(
@@ -827,7 +952,7 @@ def execute_box_withdraw_ui(
             box_live_after=box_live_after,
             default_reason="transfer_no_effect",
         )
-        return False, frames, report
+        return _abort()
 
     from re1_rl.item_box import box_pollution_reason
 
@@ -842,7 +967,7 @@ def execute_box_withdraw_ui(
             box_live_after=box_live_after,
             default_reason="deep_box_write",
         )
-        return False, frames, report
+        return _abort()
 
     pollution = box_pollution_reason(box_live_after, room_id=room_id)
     if pollution:
@@ -856,7 +981,7 @@ def execute_box_withdraw_ui(
             box_live_after=box_live_after,
             default_reason=pollution,
         )
-        return False, frames, report
+        return _abort()
 
     moved_qty = max(1, int(qty_before) - int(src_after[1]))
     if dest_after[0] == int(item_id) and inv_before[dest][0] == 0:
@@ -908,17 +1033,6 @@ def execute_box_deposit_ui(
         report["reason"] = "bad_slot"
         return False, 0, report
 
-    cold_session = (
-        not trust_inv_cursor
-        and int(inv_cursor) == 0
-        and int(box_cursor) == 0
-    )
-    # Open already parks the red cursor on inv slot 0. Do not Up-home:
-    # live D1 (QS1) showed Up from slot 0 hits EXIT, then the assumed
-    # 0→7 path (down×3, right) lands on bullets@1 and Cross-deposits them.
-    if cold_session:
-        report["inv_homed"] = False
-
     inv_before = read_inventory(client)
     box_before = read_box(client)
     box_live_before = read_box_live(client)
@@ -958,6 +1072,24 @@ def execute_box_deposit_ui(
         report["reason"] = "expected_item_mismatch"
         return False, 0, report
 
+    def _abort(reason: str | None = None) -> tuple[bool, int, dict[str, Any]]:
+        nonlocal frames
+        if reason is not None:
+            report["reason"] = reason
+        report["frames"] = frames
+        died_c, frames = _close_after_failed_transfer(
+            client,
+            report,
+            frames,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            inv_cursor=0,
+        )
+        if died_c:
+            report["died"] = True
+            return True, frames, report
+        return False, frames, report
+
     # Snapshot key-item occupancy so a wrong-cursor Cross cannot silently bank them.
     keys_before = {
         int(iid)
@@ -965,52 +1097,10 @@ def execute_box_deposit_ui(
         if int(iid) and is_key_item_id(int(iid)) and effective_transfer_qty(iid, q) > 0
     }
 
-    # Prefer a direct path from the tracked cursor. Re-anchor onto a reachable
-    # empty only if the target is somehow off-grid from here.
-    nav_from = deposit_inventory_nav_from(
-        int(inv_cursor), int(slot), trust_inv_cursor=trust_inv_cursor
-    )
-    if cold_session:
-        nav_from = 0
-    try:
-        box_inventory_nav_moves(nav_from, int(slot), inv_before)
-        direct_ok = True
-    except ValueError:
-        direct_ok = False
-
-    if not trust_inv_cursor and not direct_ok:
-        anchor = first_reachable_empty_inventory_slot(
-            inv_before, from_slot=nav_from
-        )
-        if anchor is None:
-            report["reason"] = (
-                f"inv_slot_unreachable:box inv unreachable "
-                f"{nav_from} -> {slot}"
-            )
-            report["frames"] = frames
-            return False, frames, report
-        if int(anchor) != int(nav_from):
-            died, f, nav_reason = _navigate_inventory(
-                client,
-                nav_from,
-                int(anchor),
-                prev_hp=prev_hp,
-                episode_start_hp=episode_start_hp,
-                inventory=inv_before,
-            )
-            frames += f
-            if died:
-                report["died"] = True
-                report["frames"] = frames
-                return True, frames, report
-            if nav_reason:
-                report["reason"] = nav_reason
-                report["frames"] = frames
-                return False, frames, report
-            nav_from = int(anchor)
-        report["rehomed"] = True
-    elif not trust_inv_cursor:
-        report["rehomed"] = False
+    # Fresh open (and post-transfer reset) parks the red cursor on inv slot 0.
+    nav_from = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
+    report["rehomed"] = False
+    report["inv_homed"] = False
 
     died, f, nav_reason = _navigate_inventory(
         client,
@@ -1026,9 +1116,7 @@ def execute_box_deposit_ui(
         report["frames"] = frames
         return True, frames, report
     if nav_reason:
-        report["reason"] = nav_reason
-        report["frames"] = frames
-        return False, frames, report
+        return _abort(nav_reason)
 
     inv_at_cursor = read_inventory(client)
     if (
@@ -1036,8 +1124,7 @@ def execute_box_deposit_ui(
         or int(inv_at_cursor[slot][0]) != int(item_id)
         or effective_transfer_qty(item_id, inv_at_cursor[slot][1]) <= 0
     ):
-        report["reason"] = "inv_slot_drift"
-        return False, frames, report
+        return _abort("inv_slot_drift")
 
     died, f = _confirm_cross(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
@@ -1068,17 +1155,14 @@ def execute_box_deposit_ui(
     box_mid = read_box(client)
     dest = _first_empty_modeled_slot(box_mid)
     if dest is None or int(dest) >= BOX_SLOTS:
-        report["reason"] = "box_full"
-        return False, frames, report
+        return _abort("box_full")
     expected = report.get("expected_dest")
     if expected is not None and int(dest) != int(expected):
-        report["reason"] = "dest_drift"
-        return False, frames, report
+        return _abort("dest_drift")
     report["dest_slot"] = int(dest)
 
     if int(box_mid[int(dest)][0]) != 0:
-        report["reason"] = "dest_occupied"
-        return False, frames, report
+        return _abort("dest_occupied")
 
     died, f = _navigate_box_list(
         client,
@@ -1095,8 +1179,7 @@ def execute_box_deposit_ui(
 
     box_pre = read_box(client)
     if dest >= len(box_pre) or int(box_pre[int(dest)][0]) != 0:
-        report["reason"] = "dest_occupied_pre_confirm"
-        return False, frames, report
+        return _abort("dest_occupied_pre_confirm")
 
     died, f = _confirm_cross(
         client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
@@ -1130,7 +1213,7 @@ def execute_box_deposit_ui(
             box_live_after=box_live_after,
             default_reason="key_item_deposited",
         )
-        return False, frames, report
+        return _abort()
 
     dest_got = (
         dest < len(box_after)
@@ -1167,7 +1250,7 @@ def execute_box_deposit_ui(
                 else "transfer_no_effect"
             ),
         )
-        return False, frames, report
+        return _abort()
 
     if _deep_box_changed(box_live_before, box_live_after):
         _finalize_transfer_failure(
@@ -1180,7 +1263,7 @@ def execute_box_deposit_ui(
             box_live_after=box_live_after,
             default_reason="deep_box_write",
         )
-        return False, frames, report
+        return _abort()
 
     pollution = box_pollution_reason(box_live_after, room_id=room_id)
     if pollution:
@@ -1194,7 +1277,7 @@ def execute_box_deposit_ui(
             box_live_after=box_live_after,
             default_reason=pollution,
         )
-        return False, frames, report
+        return _abort()
 
     # Absolute contract: deposited item sits at the first empty modeled slot.
     if int(box_after[int(dest)][0]) != int(item_id) or int(dest) != int(
@@ -1210,7 +1293,7 @@ def execute_box_deposit_ui(
             box_live_after=box_live_after,
             default_reason="dest_not_first_empty",
         )
-        return False, frames, report
+        return _abort()
 
     moved_qty = max(1, before_units - after_units)
     # UI rests on the deposit source index after the transfer (inventory may

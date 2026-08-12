@@ -265,6 +265,27 @@ def test_u9_home_inventory_vertical_only_odd_column_misses_slot_0() -> None:
         assert landing_col != 0
 
 
+def test_session_reset_is_the_production_home() -> None:
+    """Close on failed nav; never Up-home from slot 0. Close+reopen does not
+    park on slot 0 — the box UI restores the last inventory cell.
+    """
+    import inspect
+
+    from re1_rl.item_box_ui_macro import (
+        execute_box_deposit_ui,
+        execute_box_withdraw_ui,
+        reset_box_ui_session,
+    )
+
+    dep = inspect.getsource(execute_box_deposit_ui)
+    wd = inspect.getsource(execute_box_withdraw_ui)
+    assert "_close_after_failed_transfer" in dep
+    assert "_close_after_failed_transfer" in wd
+    assert "_home_inventory" not in dep
+    assert "_home_inventory" not in wd
+    assert callable(reset_box_ui_session)
+
+
 def test_u10_7pack_withdraw_legal_before_deposit_capture_still_needs_crest() -> None:
     inv = [
         (BERETTA_ID, 15),

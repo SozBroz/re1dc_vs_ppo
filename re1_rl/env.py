@@ -3742,6 +3742,24 @@ class RE1Env(gym.Env):
                         self._box_phase = BOX_PHASE_CHOOSE
                         self._box_inv_cursor = 0
                         self._box_list_cursor = 0
+                        # Open animation can eat the first D-pads (live: 0→7
+                        # became Right onto bullets). Wait out the grid home.
+                        try:
+                            from re1_rl.item_box_ui_macro import POST_OPEN_SETTLE_FRAMES
+
+                            self.bridge.step(
+                                buttons={},
+                                n=int(POST_OPEN_SETTLE_FRAMES),
+                                abort_on_zero_hp=False,
+                            )
+                        except (
+                            OSError,
+                            RuntimeError,
+                            ValueError,
+                            AttributeError,
+                            TypeError,
+                        ):
+                            pass
                     self._skipping_flag = False
                 elif pickup_modal:
                     self._auto_accept_pause_pickup_modal()
