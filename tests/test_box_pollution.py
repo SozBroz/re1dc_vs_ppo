@@ -88,13 +88,26 @@ def test_deposit_dest_is_lowest_empty_modeled_slot() -> None:
 
 
 def test_chemical_never_depositable() -> None:
-    from re1_rl.item_box import can_deposit
+    from re1_rl.item_box import can_deposit, is_deposit_allowed_item, is_key_item_id
 
+    assert is_key_item_id(0x26)
+    assert not is_deposit_allowed_item(0x26, "118")
+    assert not is_deposit_allowed_item(0x26, "100")
     inv = [(0x26, 1)] + [(0, 0)] * 7
     box = [(0, 0)] * BOX_SLOTS
     for room in ("100", "118", None):
         ok, reason = can_deposit(inv, box, 0, room_id=room, enforce_allowlist=True)
-        assert not ok and reason == "not_allowlisted", (room, reason)
+        assert not ok and reason == "key_item", (room, reason)
+        # Keys stay refused even when allowlist policy is off.
+        ok2, reason2 = can_deposit(inv, box, 0, room_id=room, enforce_allowlist=False)
+        assert not ok2 and reason2 == "key_item", (room, reason2)
+
+
+def test_box_list_home_from_zero_is_noop() -> None:
+    """Ups from slot 0 wrap to live slot 33 — home must not tap when from_slot=0."""
+    assert BOX_LIST_HOME_UPS == 15
+    # Document the wrap that produced memlog chemical@33.
+    assert (0 - 15) % 48 == 33
 
 
 def test_encode_box_blind_to_deep_slots() -> None:

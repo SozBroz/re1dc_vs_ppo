@@ -77,7 +77,9 @@ def room100_boss_bank_preflight(
         slot = _slot_for_item(inventory, item_id)
         if slot is None:
             return False, f"missing_inv:{item_id:#x}"
-        ok, reason = can_deposit(inventory, box, int(slot), room_id=rid)
+        ok, reason = can_deposit(
+            inventory, box, int(slot), room_id=rid, enforce_allowlist=True
+        )
         if not ok:
             return False, reason or "deposit_blocked"
     empty_box = sum(1 for iid, _q in box[:16] if int(iid) == 0)
@@ -160,6 +162,12 @@ def execute_room100_boss_bank_ui(
             return False, frames, report
         inv_after = read_inventory(client)
         box_after = read_box(client)
+        box_live_step = read_box_live(client)
+        pol_step = box_pollution_reason(box_live_step)
+        if pol_step:
+            report["reason"] = pol_step
+            report["frames"] = frames
+            return False, frames, report
         if _count_item(inv_after, int(item_id)) >= _count_item(
             inv_before, int(item_id)
         ):
@@ -167,7 +175,11 @@ def execute_room100_boss_bank_ui(
             report["frames"] = frames
             return False, frames, report
         dest = step.get("dest_slot")
-        if dest is not None and int(box_after[int(dest)][0]) != int(item_id):
+        if dest is None or int(dest) >= 16:
+            report["reason"] = "dest_unmodeled"
+            report["frames"] = frames
+            return False, frames, report
+        if int(box_after[int(dest)][0]) != int(item_id):
             report["reason"] = "wrong_box_dest"
             report["frames"] = frames
             return False, frames, report

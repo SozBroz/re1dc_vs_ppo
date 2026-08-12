@@ -58,9 +58,9 @@ CLOSE_MAX_ATTEMPTS = 4
 EXIT_NAV_MAX_DOWNS = 6
 # Open animation keeps mode/gs in the pause tree before the grid accepts d-pad.
 POST_OPEN_SETTLE_FRAMES = 90
-# Extra Ups clamp at slot 0 within the modeled window. Do NOT spam through the
-# full 48-slot live length — excess Ups break list focus / transfer confirms
-# (live QA 2026-08-11). Deep pollution is rejected by preflight instead.
+# Extra Ups from slot 0 WRAP through the 48-slot live list (0-15 → land on 33).
+# Never Up-spam a fixed 15 from an unknown/zero resume — home exactly
+# ``from_slot`` taps when the session cursor is known and > 0.
 BOX_LIST_HOME_UPS = BOX_SLOTS - 1
 # Aliases for QA probes (``scripts/_probe_box_withdraw_qa.py``).
 MOVE_TAP_FRAMES = BOX_MOVE_TAP_FRAMES
@@ -294,9 +294,13 @@ def _home_inventory(
     prev_hp: int,
     episode_start_hp: int,
 ) -> tuple[bool, int]:
-    """Re-home the inventory grid cursor onto slot 0 (safe from any slot)."""
+    """Re-home inventory grid onto slot 0 without Left/Right pane switches.
+
+    Box UI places the item list beside the inventory grid; Left/Right can leave
+    the grid and park the cursor on a deep box slot. Vertical clamp only.
+    """
     frames = 0
-    for direction, taps in (("left", 2), ("up", 3), ("down", 1)):
+    for direction, taps in (("up", 4), ("down", 1)):
         died, f = _move(
             client,
             direction,
@@ -315,14 +319,22 @@ def _home_box_list(
     *,
     prev_hp: int,
     episode_start_hp: int,
+    from_slot: int = 0,
 ) -> tuple[bool, int]:
-    """Re-home the box item list cursor onto slot 0."""
+    """Move box-list cursor from ``from_slot`` up to slot 0 (exact taps).
+
+    ``from_slot == 0`` is a no-op. Blind Up-spam from 0 wraps to deep slots
+    (live: 15 Ups → slot 33) and deposits into NN-invisible RAM.
+    """
+    taps = max(0, min(BOX_SLOTS_LIVE - 1, int(from_slot)))
+    if taps <= 0:
+        return False, 0
     return _move(
         client,
         "up",
         prev_hp=prev_hp,
         episode_start_hp=episode_start_hp,
-        taps=BOX_LIST_HOME_UPS,
+        taps=taps,
     )
 
 
@@ -334,8 +346,13 @@ def _navigate_box_list(
     prev_hp: int,
     episode_start_hp: int,
 ) -> tuple[bool, int]:
-    """Up/Down within the box item list (not the inventory grid)."""
-    delta = int(to_slot) - int(from_slot)
+    """Up/Down within the **modeled** box item list only (slots 0..BOX_SLOTS-1)."""
+    src = max(0, min(BOX_SLOTS - 1, int(from_slot)))
+    dst = max(0, min(BOX_SLOTS - 1, int(to_slot)))
+    if int(to_slot) >= BOX_SLOTS or int(to_slot) < 0:
+        # Caller must not request deep destinations.
+        return False, 0
+    delta = int(dst) - int(src)
     if delta == 0:
         return False, 0
     direction = "down" if delta > 0 else "up"
@@ -600,12 +617,15 @@ def execute_box_withdraw_ui(
         report["frames"] = frames
         return True, frames, report
 
-    # Only home when the tracked resume cursor is past slot 0. Blind Up-spam
-    # from slot 0 breaks the confirm (live QA 2026-08-11).
+    # Only home when the tracked resume cursor is past slot 0. Exact Ups equal
+    # to the resume index — never a fixed 15 (wraps 0→33 on the live 48-list).
     list_from = max(0, min(BOX_SLOTS - 1, int(box_cursor)))
     if list_from > 0:
         died, f = _home_box_list(
-            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+            client,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            from_slot=list_from,
         )
         frames += f
         if died:
@@ -613,6 +633,10 @@ def execute_box_withdraw_ui(
             report["frames"] = frames
             return True, frames, report
         list_from = 0
+
+    if int(slot) >= BOX_SLOTS:
+        report["reason"] = "box_slot_unmodeled"
+        return False, frames, report
 
     died, f = _navigate_box_list(
         client,
@@ -774,21 +798,43 @@ def execute_box_deposit_ui(
         report["reason"] = pollution_before
         report["exchange_detected"] = True
         return False, 0, report
-    ok, reason = can_deposit(inv_before, box_before, slot, room_id=room_id)
+    # Live path always enforces allowlist; keys are hard-denied inside can_deposit.
+    ok, reason = can_deposit(
+        inv_before,
+        box_before,
+        slot,
+        room_id=room_id,
+        enforce_allowlist=True,
+    )
     if not ok:
         report["reason"] = reason
         return False, 0, report
 
+    from re1_rl.item_box import is_key_item_id, is_deposit_allowed_item
+
+    item_id, qty_before = inv_before[slot]
+    if is_key_item_id(int(item_id)) or not is_deposit_allowed_item(
+        int(item_id), room_id
+    ):
+        report["reason"] = "key_item" if is_key_item_id(int(item_id)) else "not_allowlisted"
+        return False, 0, report
+
     dest = _first_empty_modeled_slot(box_before)
-    if dest is None:
+    if dest is None or int(dest) >= BOX_SLOTS:
         report["reason"] = "box_full"
         return False, 0, report
     report["expected_dest"] = int(dest)
 
-    item_id, qty_before = inv_before[slot]
     if expected_item_id is not None and int(item_id) != int(expected_item_id):
         report["reason"] = "expected_item_mismatch"
         return False, 0, report
+
+    # Snapshot key-item occupancy so a wrong-cursor Cross cannot silently bank them.
+    keys_before = {
+        int(iid)
+        for iid, q in inv_before
+        if int(iid) and is_key_item_id(int(iid)) and effective_transfer_qty(iid, q) > 0
+    }
 
     if not trust_inv_cursor:
         died, f = _home_inventory(
@@ -837,18 +883,26 @@ def execute_box_deposit_ui(
         report["frames"] = frames
         return True, frames, report
 
-    died, f = _home_box_list(
-        client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
-    )
-    frames += f
-    if died:
-        report["died"] = True
-        report["frames"] = frames
-        return True, frames, report
+    # Resume at tracked box_cursor after Cross-in. Exact home only — never
+    # Up×15 from slot 0 (wraps to live slot 33; memlog chemical@33).
+    list_from = max(0, min(BOX_SLOTS - 1, int(box_cursor)))
+    if list_from > 0:
+        died, f = _home_box_list(
+            client,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            from_slot=list_from,
+        )
+        frames += f
+        if died:
+            report["died"] = True
+            report["frames"] = frames
+            return True, frames, report
+        list_from = 0
 
     box_mid = read_box(client)
     dest = _first_empty_modeled_slot(box_mid)
-    if dest is None:
+    if dest is None or int(dest) >= BOX_SLOTS:
         report["reason"] = "box_full"
         return False, frames, report
     expected = report.get("expected_dest")
@@ -863,7 +917,7 @@ def execute_box_deposit_ui(
 
     died, f = _navigate_box_list(
         client,
-        0,
+        list_from,
         int(dest),
         prev_hp=prev_hp,
         episode_start_hp=episode_start_hp,
@@ -893,8 +947,28 @@ def execute_box_deposit_ui(
     box_live_after = read_box_live(client)
     report["frames"] = frames
 
+    # Any key that left the person is an automatic fail (wrong-cursor deposit).
+    keys_after = {
+        int(iid)
+        for iid, q in inv_after
+        if int(iid) and is_key_item_id(int(iid)) and effective_transfer_qty(iid, q) > 0
+    }
+    if keys_before - keys_after:
+        _finalize_transfer_failure(
+            report,
+            inv_before=inv_before,
+            inv_after=inv_after,
+            box_before=box_before,
+            box_after=box_after,
+            box_live_before=box_live_before,
+            box_live_after=box_live_after,
+            default_reason="key_item_deposited",
+        )
+        return False, frames, report
+
     dest_got = (
         dest < len(box_after)
+        and int(dest) < BOX_SLOTS
         and int(box_pre[int(dest)][0]) == 0
         and int(box_after[int(dest)][0]) == int(item_id)
     )

@@ -122,6 +122,24 @@ def deposit_allowlist_for_room(room_id: str | None) -> frozenset[int]:
     return DEPOSIT_ITEM_ALLOWLIST
 
 
+def is_key_item_id(item_id: int) -> bool:
+    """True for story keys (chemical, crest, shield_key, …). Never depositable."""
+    from re1_rl.item_todo import canonical_item
+    from re1_rl.key_items import KEY_ITEM_NAMES
+    from re1_rl.memory_map import ITEM_IDS
+
+    name = canonical_item(ITEM_IDS.get(int(item_id) & 0xFF, "") or "")
+    return bool(name) and name in KEY_ITEM_NAMES
+
+
+def is_deposit_allowed_item(item_id: int, room_id: str | None = None) -> bool:
+    """Allowlist gate used by masks + macros (keys always False)."""
+    iid = int(item_id) & 0xFF
+    if iid == 0 or is_key_item_id(iid):
+        return False
+    return iid in deposit_allowlist_for_room(room_id)
+
+
 def _typewriter_or_box_rooms() -> frozenset[str]:
     """Union of RDT typewriter rooms and known item-box rooms."""
     from re1_rl.typewriter_save import TYPEWRITER_ROOMS
@@ -240,11 +258,11 @@ def can_deposit(
     room_id: str | None = None,
     enforce_allowlist: bool | None = None,
 ) -> tuple[bool, str]:
-    """Legal iff source occupied, not lockpick, and box has a free empty slot.
+    """Legal iff source occupied, allowlisted, and modeled box has a free slot.
 
-    When ``BOX_DEPOSIT_POLICY_ENABLED`` (or ``enforce_allowlist=True``), only
-    room-scoped allowlist ids may deposit (knife + heals; room 100 also
-    bazooka variants + their ammo packs).
+    Key items (chemical, crests, …) are **always** refused — not policy-gated.
+    Destination is the first empty slot among the modeled 16 only; deep UI
+    scroll slots (16–47) are invisible to the NN and must never be targets.
     """
     if inv_slot < 0 or inv_slot >= len(inventory):
         return False, "bad_slot"
@@ -253,6 +271,8 @@ def can_deposit(
         return False, "empty_slot"
     if item_id == LOCKPICK_ITEM_ID:
         return False, "lockpick"
+    if is_key_item_id(int(item_id)):
+        return False, "key_item"
     if effective_transfer_qty(item_id, qty) <= 0:
         return False, "empty_slot"
     use_allowlist = (
@@ -260,9 +280,11 @@ def can_deposit(
         if enforce_allowlist is None
         else bool(enforce_allowlist)
     )
+    # Live macros always pass enforce_allowlist=True. Keys already refused above.
     if use_allowlist and int(item_id) not in deposit_allowlist_for_room(room_id):
         return False, "not_allowlisted"
-    if _first_empty_slot(box) is None:
+    modeled = list(box)[:BOX_SLOTS]
+    if _first_empty_slot(modeled) is None:
         return False, "box_full"
     return True, ""
 
