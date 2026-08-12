@@ -196,6 +196,15 @@ def test_box_ui_open_from_ram_requires_gs_90() -> None:
     )
 
 
+def test_deposit_inventory_nav_from_untrusted_cursor() -> None:
+    from re1_rl.item_box_ui_macro import deposit_inventory_nav_from
+
+    assert deposit_inventory_nav_from(5, 5, trust_inv_cursor=False) == 0
+    assert deposit_inventory_nav_from(5, 5, trust_inv_cursor=True) == 5
+    assert deposit_inventory_nav_from(0, 5, trust_inv_cursor=False) == 0
+    assert deposit_inventory_nav_from(3, 5, trust_inv_cursor=False) == 3
+
+
 def test_deposit_from_empty_slot_refused():
     inv = _empty_inventory()
     box = _empty_box()

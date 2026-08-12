@@ -431,6 +431,23 @@ def apply_withdraw(bridge: _BridgeReadWrite, box_slot: int) -> dict[str, Any]:
     }
 
 
+def write_inventory_box_curation(
+    bridge: _BridgeReadWrite,
+    inventory: list[tuple[int, int]],
+    box: list[tuple[int, int]],
+) -> None:
+    """Curation-only RAM write for cell repair scripts (not live training)."""
+    inv = list(inventory)[:INVENTORY_SLOTS]
+    bx = list(box)[:BOX_SLOTS]
+    while len(inv) < INVENTORY_SLOTS:
+        inv.append((0, 0))
+    while len(bx) < BOX_SLOTS:
+        bx.append((0, 0))
+    fields = _slot_write_fields("inv", INVENTORY_BASE, inv)
+    fields.extend(_slot_write_fields("box", ITEM_BOX_BASE, bx))
+    bridge.write_ram(fields)
+
+
 def is_box_room(room_id: str) -> bool:
     """True when ``room_id`` is a known item-box room."""
     return str(room_id).strip().upper() in BOX_ROOMS

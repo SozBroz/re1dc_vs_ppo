@@ -56,6 +56,11 @@ CLOSE_MAX_ATTEMPTS = 4
 EXIT_NAV_MAX_DOWNS = 6
 # Open animation keeps mode/gs in the pause tree before the grid accepts d-pad.
 POST_OPEN_SETTLE_FRAMES = 90
+# Box list has at most BOX_SLOTS modeled entries; extra Ups clamp at slot 0.
+BOX_LIST_HOME_UPS = BOX_SLOTS - 1
+# Aliases for QA probes (``scripts/_probe_box_withdraw_qa.py``).
+MOVE_TAP_FRAMES = BOX_MOVE_TAP_FRAMES
+MOVE_SETTLE_FRAMES = BOX_MOVE_SETTLE_FRAMES
 
 
 def _box_live_changed(
@@ -176,6 +181,25 @@ def first_empty_inventory_slot(inventory: list[tuple[int, int]]) -> int | None:
     return None
 
 
+def deposit_inventory_nav_from(
+    inv_cursor: int,
+    inv_slot: int,
+    *,
+    trust_inv_cursor: bool,
+) -> int:
+    """Inventory grid start slot for deposit navigation.
+
+    When tracked ``inv_cursor`` equals the deposit target but the UI never
+    moved there (common beretta-in-box bug), callers must pass
+    ``trust_inv_cursor=False`` so navigation re-anchors from slot 0.
+    """
+    cursor = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
+    slot = int(inv_slot)
+    if cursor == slot and slot != 0 and not trust_inv_cursor:
+        return 0
+    return cursor
+
+
 def _move(
     client: Any,
     direction: str,
@@ -234,6 +258,47 @@ def _confirm_cross(
     )
     frames += f
     return died, frames
+
+
+_confirm_transfer = _confirm_cross
+
+
+def _home_inventory(
+    client: Any,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int]:
+    """Re-home the inventory grid cursor onto slot 0 (safe from any slot)."""
+    frames = 0
+    for direction, taps in (("left", 2), ("up", 3), ("down", 1)):
+        died, f = _move(
+            client,
+            direction,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            taps=taps,
+        )
+        frames += f
+        if died:
+            return True, frames
+    return False, frames
+
+
+def _home_box_list(
+    client: Any,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int]:
+    """Re-home the box item list cursor onto slot 0."""
+    return _move(
+        client,
+        "up",
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+        taps=BOX_LIST_HOME_UPS,
+    )
 
 
 def _navigate_box_list(
@@ -511,6 +576,17 @@ def execute_box_withdraw_ui(
         return True, frames, report
 
     list_from = max(0, min(BOX_SLOTS - 1, int(box_cursor)))
+    if list_from > 0:
+        died, f = _home_box_list(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames += f
+        if died:
+            report["died"] = True
+            report["frames"] = frames
+            return True, frames, report
+        list_from = 0
+
     died, f = _navigate_box_list(
         client,
         list_from,
@@ -583,6 +659,22 @@ def execute_box_withdraw_ui(
         )
         return False, frames, report
 
+    from re1_rl.item_box import box_pollution_reason
+
+    pollution = box_pollution_reason(box_live_after)
+    if pollution:
+        _finalize_transfer_failure(
+            report,
+            inv_before=inv_before,
+            inv_after=inv_after,
+            box_before=box_before,
+            box_after=box_after,
+            box_live_before=box_live_before,
+            box_live_after=box_live_after,
+            default_reason=pollution,
+        )
+        return False, frames, report
+
     moved_qty = max(1, int(qty_before) - int(src_after[1]))
     if dest_after[0] == int(item_id) and inv_before[dest][0] == 0:
         moved_qty = max(moved_qty, int(dest_after[1]))
@@ -605,6 +697,8 @@ def execute_box_deposit_ui(
     inv_cursor: int = 0,
     box_cursor: int = 0,
     room_id: str | None = None,
+    trust_inv_cursor: bool = False,
+    expected_item_id: int | None = None,
 ) -> tuple[bool, int, dict[str, Any]]:
     """Deposit ``inv_slot`` via occupied inv → Cross → empty box → Cross.
 
@@ -647,10 +741,18 @@ def execute_box_deposit_ui(
         return False, 0, report
 
     item_id, qty_before = inv_before[slot]
-    cursor = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
+    if expected_item_id is not None and int(item_id) != int(expected_item_id):
+        report["reason"] = "expected_item_mismatch"
+        return False, 0, report
+    nav_from = deposit_inventory_nav_from(
+        inv_cursor, slot, trust_inv_cursor=trust_inv_cursor
+    )
+    if nav_from == 0 and int(inv_cursor) == slot and slot != 0 and not trust_inv_cursor:
+        report["rehomed"] = True
+
     died, f = _navigate_inventory(
         client,
-        cursor,
+        nav_from,
         slot,
         prev_hp=prev_hp,
         episode_start_hp=episode_start_hp,
@@ -671,6 +773,17 @@ def execute_box_deposit_ui(
         return True, frames, report
 
     list_from = max(0, min(BOX_SLOTS - 1, int(box_cursor)))
+    if list_from > 0:
+        died, f = _home_box_list(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames += f
+        if died:
+            report["died"] = True
+            report["frames"] = frames
+            return True, frames, report
+        list_from = 0
+
     died, f = _navigate_box_list(
         client,
         list_from,
@@ -715,6 +828,8 @@ def execute_box_deposit_ui(
         if int(iid) == int(item_id)
     )
     moved = bool(dest_got) and after_units < before_units
+    if moved and int(box_after[int(dest)][0]) != int(item_id):
+        moved = False
 
     if not moved:
         _finalize_transfer_failure(
@@ -725,7 +840,27 @@ def execute_box_deposit_ui(
             box_after=box_after,
             box_live_before=box_live_before,
             box_live_after=box_live_after,
-            default_reason="transfer_no_effect",
+            default_reason=(
+                "wrong_item_deposited"
+                if dest_got and int(box_after[int(dest)][0]) != int(item_id)
+                else "transfer_no_effect"
+            ),
+        )
+        return False, frames, report
+
+    from re1_rl.item_box import box_pollution_reason
+
+    pollution = box_pollution_reason(box_live_after)
+    if pollution:
+        _finalize_transfer_failure(
+            report,
+            inv_before=inv_before,
+            inv_after=inv_after,
+            box_before=box_before,
+            box_after=box_after,
+            box_live_before=box_live_before,
+            box_live_after=box_live_after,
+            default_reason=pollution,
         )
         return False, frames, report
 

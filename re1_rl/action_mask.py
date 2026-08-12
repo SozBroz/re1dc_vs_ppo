@@ -73,6 +73,7 @@ def is_always_illegal_attack_room(room_id: str | None) -> bool:
 BOX_WITHDRAW_ACTION = DEPOSIT_ACTION_BASE + 0  # deposit_slot_0
 BOX_DEPOSIT_ACTION = DEPOSIT_ACTION_BASE + 1  # deposit_slot_1
 BOX_CLOSE_ACTION = DEPOSIT_ACTION_BASE + 2  # deposit_slot_2
+BOX_BANK_BOSS_ACTION = DEPOSIT_ACTION_BASE + 3  # deposit_slot_3 — room-100 boss bank preset
 
 # box_phase: 0 = choose withdraw/deposit/close; 1 = pick box slot; 2 = pick inv slot
 BOX_PHASE_CHOOSE = 0
@@ -240,6 +241,20 @@ def _mask_box_ui_session(
         return mask
 
     # BOX_PHASE_CHOOSE: withdraw / close (deposit wired but policy-gated).
+    from re1_rl.boss_prep_macro import room100_boss_bank_preflight
+
+    if BOX_BANK_BOSS_ACTION < n_actions:
+        ok_bank = False
+        if (
+            deposit_enabled
+            and inventory is not None
+            and box is not None
+            and str(room_id or "").strip().upper() == "100"
+        ):
+            ok_bank, _ = room100_boss_bank_preflight(
+                inventory, box, room_id=room_id
+            )
+        mask[BOX_BANK_BOSS_ACTION] = bool(ok_bank)
     if BOX_WITHDRAW_ACTION < n_actions:
         any_withdraw = False
         if inventory is not None and box is not None and has_empty_inv:

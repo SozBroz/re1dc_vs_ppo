@@ -115,6 +115,7 @@ from re1_rl.action_mask import (
     ATTACK_ACTION,
     ATTACK_DOWN_ACTION,
     ATTACK_UP_ACTION,
+    BOX_BANK_BOSS_ACTION,
     BOX_CLOSE_ACTION,
     BOX_DEPOSIT_ACTION,
     BOX_PHASE_CHOOSE,
@@ -401,6 +402,7 @@ class RE1Env(gym.Env):
         self._box_phase = BOX_PHASE_CHOOSE
         self._box_inv_cursor = 0
         self._box_list_cursor = 0
+        self._box_inv_trusted_at_cursor = False
         self._episode_failure_override: str | None = None
         self._use_phase = 0
         self._inventory_before_use: list[tuple[int, int]] | None = None
@@ -671,11 +673,16 @@ class RE1Env(gym.Env):
                 inv_cursor_in=inv_cursor_in,
                 box_cursor_in=box_cursor_in,
             )
+            if report.get("exchange_detected") or report.get("ram_changed"):
+                self._box_inv_cursor = 0
+                self._box_list_cursor = 0
+                self._box_inv_trusted_at_cursor = False
             return
         if report.get("inv_cursor") is not None:
             self._box_inv_cursor = int(report["inv_cursor"])
         if report.get("box_cursor") is not None:
             self._box_list_cursor = int(report["box_cursor"])
+        self._box_inv_trusted_at_cursor = True
 
     def _log_box_transfer_report(
         self,
@@ -1530,6 +1537,7 @@ class RE1Env(gym.Env):
         self._box_phase = BOX_PHASE_CHOOSE
         self._box_inv_cursor = 0
         self._box_list_cursor = 0
+        self._box_inv_trusted_at_cursor = False
         self._episode_failure_override = None
         self._last_attack_obs = empty_last_attack()
         self._last_skip_frames = 0
@@ -2367,13 +2375,14 @@ class RE1Env(gym.Env):
         if int(getattr(self, "_combine_phase", 0)) > 0:
             return True
         a = int(action)
-        return a in (
+        return         a in (
             USE_ACTION,
             EQUIP_ACTION,
             COMBINE_ACTION,
             BOX_WITHDRAW_ACTION,
             BOX_DEPOSIT_ACTION,
             BOX_CLOSE_ACTION,
+            BOX_BANK_BOSS_ACTION,
         ) or (
             WITHDRAW_ACTION_BASE <= a < WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS
         )
@@ -2550,7 +2559,12 @@ class RE1Env(gym.Env):
         if not bool(getattr(self, "_box_ui_open", False)):
             return False
         a = int(action)
-        if a in (BOX_WITHDRAW_ACTION, BOX_DEPOSIT_ACTION, BOX_CLOSE_ACTION):
+        if a in (
+            BOX_WITHDRAW_ACTION,
+            BOX_DEPOSIT_ACTION,
+            BOX_CLOSE_ACTION,
+            BOX_BANK_BOSS_ACTION,
+        ):
             return True
         if WITHDRAW_ACTION_BASE <= a < WITHDRAW_ACTION_BASE + N_WITHDRAW_ACTIONS:
             return True
@@ -2646,10 +2660,73 @@ class RE1Env(gym.Env):
                         magic_report={"ok": False, "reason": "deposit_room_blocked"},
                     )
                 self._box_phase = BOX_PHASE_DEPOSIT_SLOT
+                self._box_inv_trusted_at_cursor = False
                 return self._submenu_step(
                     a,
                     step_emulated_frames=self.frame_skip,
                     magic_report={"ok": True, "reason": "box_deposit_open"},
+                )
+            if a == BOX_BANK_BOSS_ACTION:
+                from re1_rl.boss_prep_macro import execute_room100_boss_bank_ui
+
+                self._sticky_input.reset()
+                self._macro_active = True
+                try:
+                    room_id = None
+                    prev_st = getattr(self, "_prev_state", None) or {}
+                    if isinstance(prev_st, dict):
+                        room_id = prev_st.get("room_id")
+                    died, frames, report = execute_room100_boss_bank_ui(
+                        self.bridge,
+                        prev_hp=prev_hp,
+                        episode_start_hp=episode_start_hp,
+                        inv_cursor=inv_cursor,
+                        box_cursor=box_cursor,
+                        room_id=str(room_id) if room_id is not None else None,
+                    )
+                except (OSError, RuntimeError, ValueError) as exc:
+                    died, frames = False, 0
+                    report = {
+                        "ok": False,
+                        "reason": f"error:{exc}",
+                        "action": "boss_bank_room100",
+                    }
+                finally:
+                    self._macro_active = False
+                    self._sticky_input.reset()
+                if report.get("ok"):
+                    report = {**report, "box_transfer": "boss_bank"}
+                self._apply_box_ui_cursors_from_report(
+                    report,
+                    inv_cursor_in=inv_cursor,
+                    box_cursor_in=box_cursor,
+                )
+                self._box_phase = BOX_PHASE_CHOOSE
+                self._box_cache = None
+                try:
+                    self._box_ui_open = probe_box_ui_open(self.bridge)
+                except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                    self._box_ui_open = True
+                pollution = self._box_pollution_failure()
+                if pollution:
+                    report = {
+                        **report,
+                        "ok": False,
+                        "reason": pollution,
+                        "box_pollution": pollution,
+                        "exchange_detected": True,
+                    }
+                    self._log_box_transfer_report(
+                        report,
+                        inv_cursor_in=inv_cursor,
+                        box_cursor_in=box_cursor,
+                    )
+                    self._episode_failure_override = pollution
+                return self._submenu_step(
+                    a,
+                    step_emulated_frames=max(int(frames), self.frame_skip),
+                    magic_report=report,
+                    died=bool(died),
                 )
             return self._submenu_step(
                 a,
@@ -2740,6 +2817,14 @@ class RE1Env(gym.Env):
                 prev_st = getattr(self, "_prev_state", None) or {}
                 if isinstance(prev_st, dict):
                     room_id = prev_st.get("room_id")
+                from re1_rl.item_box import read_inventory
+
+                inv_before = read_inventory(self.bridge)
+                expected_id = (
+                    int(inv_before[int(slot)][0])
+                    if 0 <= int(slot) < len(inv_before)
+                    else None
+                )
                 died, frames, report = execute_box_deposit_ui(
                     self.bridge,
                     int(slot),
@@ -2748,6 +2833,8 @@ class RE1Env(gym.Env):
                     inv_cursor=inv_cursor,
                     box_cursor=box_cursor,
                     room_id=str(room_id) if room_id is not None else None,
+                    trust_inv_cursor=False,
+                    expected_item_id=expected_id,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, 0

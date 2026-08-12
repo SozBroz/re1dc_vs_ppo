@@ -1,0 +1,24 @@
+{
+  "bundle_sha256": "42d96ac7566c88ffc46c6a36a1a38a7d09057e33e8c1a32b00738d0aabdc9eb1",
+  "bytes": 1362326,
+  "captured_in_box_room": false,
+  "checkpoint_id": "west_stairs_return_10B",
+  "checkpoint_index": 57,
+  "inventory_feasible": true,
+  "inventory_free_slots": 2,
+  "next_checkpoint_id": "central_corridor_103",
+  "next_slots_needed": 0,
+  "quality": [
+    96,
+    190,
+    0,
+    16,
+    1,
+    -3,
+    -85
+  ],
+  "room_id": "101",
+  "route_id": "yawn_quest_v2",
+  "sidecar_sha256": "aea8438cab2b351da6057b4296258622b2657c304422dfd36e4febdb2336b8f7",
+  "state_sha256": "5786a3cedc7786ae98b9321c90e19b1dec8787a720aa93c5379a5912614217ce"
+}
