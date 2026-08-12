@@ -1060,6 +1060,7 @@ def capture_successor_cell(
     # at 105→104 entry pose before tea-room settle, etc.).
     from re1_rl.barry_rescue_checkpoint import barry_rescue_capture_room_ok
     from re1_rl.richard_cutscene_checkpoint import richard_cutscene_capture_room_ok
+    from re1_rl.yawn_box_prep_checkpoint import yawn_box_prep_capture_room_ok
 
     def _scripted_exit_capture_ok(
         completed_cid: str, live_room: str, expect_room: str
@@ -1067,6 +1068,8 @@ def capture_successor_cell(
         return barry_rescue_capture_room_ok(
             completed_cid, live_room, expect_room
         ) or richard_cutscene_capture_room_ok(
+            completed_cid, live_room, expect_room
+        ) or yawn_box_prep_capture_room_ok(
             completed_cid, live_room, expect_room
         )
 

@@ -250,10 +250,7 @@ def box_pollution_reason(
             continue
         name = canonical_item(ITEM_IDS.get(item_id, "") or "")
         if name and name in key_names:
-            if (
-                name == "wind_crest"
-                and str(room_id or "").strip().upper() == "118"
-            ):
+            if name == "wind_crest":
                 continue
             return f"key_item_in_box:{name}@{i}"
         if i >= BOX_SLOTS:

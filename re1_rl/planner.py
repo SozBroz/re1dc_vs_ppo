@@ -271,13 +271,27 @@ class WaypointPlanner:
                 str(key).startswith(prefix) for key in progress.observed_cutscenes
             )
 
+        if cond_type == "yawn_box_prep_exit":
+            from re1_rl.yawn_box_prep_checkpoint import yawn_box_prep_exit_met
+
+            return yawn_box_prep_exit_met(state, prev_state, progress)
+
         if cond_type == "has_item":
             # Inventory checks are room-agnostic (cp25 Barry rescue ends in 109).
             return WaypointPlanner._check_in_room_condition(
                 cond, state, wp_room, progress
             )
 
-        if cond_type in ("lacks_item", "item_in_box", "yawn_box_weapon_ammo_clear"):
+        if cond_type in (
+            "lacks_item",
+            "item_in_box",
+            "yawn_box_weapon_ammo_clear",
+        ):
+            return WaypointPlanner._check_in_room_condition(
+                cond, state, wp_room, progress
+            )
+
+        if cond_type == "state_flag" and str(cond.get("field", "")) == "lab_timer":
             return WaypointPlanner._check_in_room_condition(
                 cond, state, wp_room, progress
             )

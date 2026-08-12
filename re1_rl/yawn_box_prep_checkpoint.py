@@ -15,6 +15,7 @@ from re1_rl.item_todo import canonical_item
 WIND_CREST_ITEM_ID = 0x29
 YAWN_BOX_PREP_CHECKPOINT_ID = "yawn_box_prep_118"
 YAWN_BOX_PREP_ROOM = "118"
+YAWN_BOX_PREP_EXIT_ROOM = "10B"
 WIND_CREST_NAME = "wind_crest"
 
 
@@ -153,3 +154,72 @@ def yawn_box_prep_capture_ready(
     if WIND_CREST_NAME in inv:
         return "wind_crest_still_held"
     return None
+
+
+def yawn_box_prep_ready(state: dict[str, Any] | None) -> bool:
+    """True when crest is banked, guns/ammo are out of the box, and lab timer is 0."""
+    st = state or {}
+    if int(st.get("lab_timer", 1) or 0) != 0:
+        return False
+    return yawn_box_prep_capture_ready(
+        box_pairs_from_state(st),
+        list(st.get("inventory") or []),
+    ) is None
+
+
+def yawn_box_prep_exit_met(
+    state: dict[str, Any] | None,
+    prev_state: dict[str, Any] | None,
+    progress: Any,
+) -> bool:
+    """Success: leave 118 into 10B with the box already prepped."""
+    st = state or {}
+    if str(st.get("room_id", "")).upper() != YAWN_BOX_PREP_EXIT_ROOM:
+        return False
+    immediate = (
+        prev_state is not None
+        and str(prev_state.get("room_id", "")).upper() == YAWN_BOX_PREP_ROOM
+    )
+    latched = bool(
+        progress is not None
+        and progress.leg_entered_from(YAWN_BOX_PREP_EXIT_ROOM, {YAWN_BOX_PREP_ROOM})
+    )
+    if not (immediate or latched):
+        return False
+    return yawn_box_prep_ready(st)
+
+
+def _on_yawn_box_prep_leg(planner: Any) -> bool:
+    obj = (planner.current_objective() or {}) if planner is not None else {}
+    return str(obj.get("checkpoint_id") or "") == YAWN_BOX_PREP_CHECKPOINT_ID
+
+
+def should_suppress_wrong_room(
+    planner: Any,
+    prev_room: str,
+    room: str,
+    state: dict[str, Any] | None,
+) -> bool:
+    """Skip terminal wrong_room for a successful 118→10B exit after box prep."""
+    if not _on_yawn_box_prep_leg(planner):
+        return False
+    if str(prev_room).upper() != YAWN_BOX_PREP_ROOM:
+        return False
+    if str(room).upper() != YAWN_BOX_PREP_EXIT_ROOM:
+        return False
+    return yawn_box_prep_ready(state)
+
+
+def yawn_box_prep_capture_room_ok(
+    completed_cid: str,
+    room_id: str,
+    expected_room: str,
+) -> bool:
+    """Allow cp89 capture in the east-stairs exit room (prep room is 118)."""
+    if completed_cid != YAWN_BOX_PREP_CHECKPOINT_ID:
+        return False
+    rid = str(room_id or "").upper()
+    if rid == YAWN_BOX_PREP_EXIT_ROOM:
+        return True
+    exp = str(expected_room or "").upper()
+    return bool(exp and rid == exp)

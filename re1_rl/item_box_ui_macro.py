@@ -111,6 +111,7 @@ def _finalize_transfer_failure(
     box_live_before: list[tuple[int, int]],
     box_live_after: list[tuple[int, int]],
     default_reason: str,
+    room_id: str | None = None,
 ) -> None:
     """Annotate failed transfers; never emit cursor_out on failure."""
     from re1_rl.item_box import box_pollution_reason
@@ -124,7 +125,9 @@ def _finalize_transfer_failure(
         box_live_before, box_live_after
     )
     report["ram_changed"] = bool(ram_changed)
-    pollution = box_pollution_reason(box_live_after)
+    pollution = box_pollution_reason(
+        box_live_after, room_id=room_id or report.get("room_id")
+    )
     if pollution:
         report["reason"] = pollution
         report["exchange_detected"] = True
@@ -609,6 +612,7 @@ def execute_box_withdraw_ui(
     episode_start_hp: int,
     inv_cursor: int = 0,
     box_cursor: int = 0,
+    room_id: str | None = None,
 ) -> tuple[bool, int, dict[str, Any]]:
     """Withdraw ``box_slot`` via empty-inv-slot → box list → Cross.
 
@@ -624,6 +628,7 @@ def execute_box_withdraw_ui(
         "box_slot": int(box_slot),
         "moved": None,
         "cursor_in": {"inv": int(inv_cursor), "box": int(box_cursor)},
+        "room_id": room_id,
     }
     frames = 0
     if not probe_box_ui_open(client):
@@ -814,7 +819,7 @@ def execute_box_withdraw_ui(
         )
         return False, frames, report
 
-    pollution = box_pollution_reason(box_live_after)
+    pollution = box_pollution_reason(box_live_after, room_id=room_id)
     if pollution:
         _finalize_transfer_failure(
             report,
@@ -866,6 +871,7 @@ def execute_box_deposit_ui(
         "inv_slot": int(inv_slot),
         "moved": None,
         "cursor_in": {"inv": int(inv_cursor), "box": int(box_cursor)},
+        "room_id": room_id,
     }
     frames = 0
     if not probe_box_ui_open(client):
@@ -898,7 +904,7 @@ def execute_box_deposit_ui(
     box_live_before = read_box_live(client)
     from re1_rl.item_box import box_pollution_reason
 
-    pollution_before = box_pollution_reason(box_live_before)
+    pollution_before = box_pollution_reason(box_live_before, room_id=room_id)
     if pollution_before:
         report["reason"] = pollution_before
         report["exchange_detected"] = True
@@ -1157,7 +1163,7 @@ def execute_box_deposit_ui(
         )
         return False, frames, report
 
-    pollution = box_pollution_reason(box_live_after)
+    pollution = box_pollution_reason(box_live_after, room_id=room_id)
     if pollution:
         _finalize_transfer_failure(
             report,

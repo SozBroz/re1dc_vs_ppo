@@ -99,7 +99,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp86` | 87 | `east_stairs_201_post_richard` | `207` | navigate | Reach East Stairway 2F after Richard |
 | `cp87` | 88 | `east_stairs_101_post_richard` | `10B` | navigate | Descend East Stairway after Richard |
 | `cp88` | 89 | `yawn_box_enter_118` | `118` | navigate | Enter the storeroom for Yawn box prep |
-| `cp89` | 90 | `yawn_box_prep_118` | `118` | navigate | Deposit wind crest at item box (no guns/ammo in box); wait for lab timer |
+| `cp89` | 90 | `yawn_box_prep_118` | `118` | navigate | Deposit wind crest, withdraw guns/ammo, leave 118 to 10B |
 | `cp90` | 91 | `east_stairs_101_to_yawn` | `10B` | navigate | Return to East Stairway 1F for Yawn |
 | `cp91` | 92 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
 | `cp92` | 93 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
@@ -1149,16 +1149,14 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `118` (STAIRS UNDER ROOM)
 - **Action:** `navigate`
-- **Objective:** Prepare inventory at the item box: deposit `wind_crest`, leave no guns or ammo in the box (knife ok), and wait for the lab timer to expire naturally
+- **Objective:** Deposit `wind_crest`, withdraw guns/ammo from the item box (knife ok), wait for the lab timer, then leave to East Stairway `10B`
 - **Required items:** `shield_key`, `shotgun`
 - **Items gained:** _(none)_
 - **Consume before gain:** `wind_crest` (must be deposited in the item box, not on person)
-- **How to achieve:** Be in / reach **118**. Hold: `shield_key`, `shotgun`. Use the item box to deposit `wind_crest` and clear guns/ammo from the box. Navigate until the success condition fires.
+- **How to achieve:** Be in **118**. Hold: `shield_key`, `shotgun`. Use the item box to deposit `wind_crest` and withdraw guns/ammo. Leave to **10B** with the box clean.
 - **Success condition:**
-- State flag `lab_timer` == `0`
-- `wind_crest` not on person (`lacks_item`)
-- `wind_crest` in item box (`item_in_box`)
-- No guns or ammo in item box (`yawn_box_weapon_ammo_clear`; knife allowed)
+- `yawn_box_prep_exit`: leave `118` into `10B` with `lab_timer == 0`, `wind_crest` in the box (not on person), and no guns/ammo in the box (knife allowed)
+- Leaving `118` without those box conditions still ends the episode as `wrong_room`
 
 ### `cp90` — `east_stairs_101_to_yawn` (seq 91)
 

@@ -698,17 +698,25 @@ def test_yawn_box_prep_requires_natural_lab_timer_expiry() -> None:
     assert planner.current_objective()["checkpoint_id"] == "yawn_box_prep_118"
     assert "118" in BOX_ROOMS
 
-    active = _state("118")
-    active["lab_timer"] = 1
-    assert not planner.advance_if_success(active, progress=ProgressTracker())
-
-    expired = _state("118")
-    expired["lab_timer"] = 0
-    expired["inventory"] = ["shield_key", "shotgun"]
     box = [(0, 0)] * 48
     box[0] = (WIND_CREST_ITEM_ID, 1)
+    prev = _state("118")
+
+    ticking = _state("10B")
+    ticking["lab_timer"] = 1
+    ticking["inventory"] = ["shield_key", "shotgun"]
+    ticking["box_cache"] = box
+    assert not planner.advance_if_success(
+        ticking, progress=ProgressTracker(), prev_state=prev
+    )
+
+    expired = _state("10B")
+    expired["lab_timer"] = 0
+    expired["inventory"] = ["shield_key", "shotgun"]
     expired["box_cache"] = box
-    assert planner.advance_if_success(expired, progress=ProgressTracker())
+    assert planner.advance_if_success(
+        expired, progress=ProgressTracker(), prev_state=prev
+    )
 
 
 def test_richard_checkpoint_accepts_forced_settle_in_204() -> None:

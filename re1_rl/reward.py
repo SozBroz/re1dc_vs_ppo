@@ -803,10 +803,15 @@ def compute_reward(
             from re1_rl.richard_cutscene_checkpoint import (
                 should_suppress_wrong_room as richard_suppress_wrong_room,
             )
+            from re1_rl.yawn_box_prep_checkpoint import (
+                should_suppress_wrong_room as yawn_box_prep_suppress_wrong_room,
+            )
 
-            if barry_suppress_wrong_room(
-                planner, prev_room, room, state
-            ) or richard_suppress_wrong_room(planner, prev_room, room, state):
+            if (
+                barry_suppress_wrong_room(planner, prev_room, room, state)
+                or richard_suppress_wrong_room(planner, prev_room, room, state)
+                or yawn_box_prep_suppress_wrong_room(planner, prev_room, room, state)
+            ):
                 pass
             else:
                 left_target = (
