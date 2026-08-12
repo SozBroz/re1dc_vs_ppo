@@ -797,9 +797,16 @@ def compute_reward(
 
         target = planner.next_waypoint_room()
         if room_changed and target is not None:
-            from re1_rl.barry_rescue_checkpoint import should_suppress_wrong_room
+            from re1_rl.barry_rescue_checkpoint import (
+                should_suppress_wrong_room as barry_suppress_wrong_room,
+            )
+            from re1_rl.richard_cutscene_checkpoint import (
+                should_suppress_wrong_room as richard_suppress_wrong_room,
+            )
 
-            if should_suppress_wrong_room(planner, prev_room, room, state):
+            if barry_suppress_wrong_room(
+                planner, prev_room, room, state
+            ) or richard_suppress_wrong_room(planner, prev_room, room, state):
                 pass
             else:
                 left_target = (

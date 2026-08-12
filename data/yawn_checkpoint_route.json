@@ -1452,11 +1452,8 @@
     "required_items": [],
     "items_gained": [],
     "success_condition": {
-      "type": "room_enter_any",
-      "room_ids": [
-        "20D",
-        "204"
-      ]
+      "type": "room_enter",
+      "room_id": "20D"
     }
   },
   {

@@ -1088,7 +1088,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **20D**. Navigate until the success condition fires.
 - **Success condition:**
-- Enter any of: `20D`, `204`
+- Enter room `20D`
 
 ### `cp84` — `richard_cutscene_20D` (seq 85)
 

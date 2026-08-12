@@ -1059,9 +1059,19 @@ def capture_successor_cell(
     # Refuse door-threshold / cutscene-spoof captures (Wesker→fake 106, Kenneth
     # at 105→104 entry pose before tea-room settle, etc.).
     from re1_rl.barry_rescue_checkpoint import barry_rescue_capture_room_ok
+    from re1_rl.richard_cutscene_checkpoint import richard_cutscene_capture_room_ok
+
+    def _scripted_exit_capture_ok(
+        completed_cid: str, live_room: str, expect_room: str
+    ) -> bool:
+        return barry_rescue_capture_room_ok(
+            completed_cid, live_room, expect_room
+        ) or richard_cutscene_capture_room_ok(
+            completed_cid, live_room, expect_room
+        )
 
     if expected_room and room_id.upper() != expected_room.upper():
-        if not barry_rescue_capture_room_ok(cid, room_id, expected_room):
+        if not _scripted_exit_capture_ok(cid, room_id, expected_room):
             _mark_capture_ineligible(env, "room_mismatch")
             return None
     progress = getattr(env, "_progress", None)
@@ -1072,6 +1082,11 @@ def capture_successor_cell(
         )
     if cid == "barry_rescue_115" and not any(
         str(k).startswith("115:") for k in ledgers
+    ):
+        _mark_capture_ineligible(env, "cutscene_gate")
+        return None
+    if cid == "richard_cutscene_20D" and not any(
+        str(k).startswith("20D:") for k in ledgers
     ):
         _mark_capture_ineligible(env, "cutscene_gate")
         return None
@@ -1199,7 +1214,7 @@ def capture_successor_cell(
                 except (OSError, RuntimeError, ValueError, TypeError, AttributeError):
                     live_room = room_id
             if expected_room and live_room.upper() != expected_room.upper():
-                if not barry_rescue_capture_room_ok(cid, live_room, expected_room):
+                if not _scripted_exit_capture_ok(cid, live_room, expected_room):
                     print(
                         f"[yawn_capture] reject pre-save room drift "
                         f"live={live_room!r} expected={expected_room!r} cp={cid}",
@@ -1231,7 +1246,7 @@ def capture_successor_cell(
                     _mark_capture_ineligible(env, "post_save_read")
                     return False
                 if expected_room and after_room.upper() != expected_room.upper():
-                    if not barry_rescue_capture_room_ok(
+                    if not _scripted_exit_capture_ok(
                         cid, after_room, expected_room
                     ):
                         print(

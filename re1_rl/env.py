@@ -1990,13 +1990,25 @@ class RE1Env(gym.Env):
         if inv_after is not None:
             state["inventory"] = policy_inventory_to_names(inv_after)
         from re1_rl.barry_rescue_checkpoint import note_barry_rescue_skip_settle
+        from re1_rl.richard_cutscene_checkpoint import (
+            note_richard_cutscene_skip_settle,
+        )
 
+        skip_entry = skip_trap_entry or entry_prev
+        skip_frames = int(getattr(self, "_skip_session_frames", 0) or 0)
         note_barry_rescue_skip_settle(
             self._planner,
             self._progress,
-            skip_trap_entry or entry_prev,
+            skip_entry,
             state,
-            skip_frames=int(getattr(self, "_skip_session_frames", 0) or 0),
+            skip_frames=skip_frames,
+        )
+        note_richard_cutscene_skip_settle(
+            self._planner,
+            self._progress,
+            skip_entry,
+            state,
+            skip_frames=skip_frames,
         )
         # Reward qualification is duration-based with explicit exclusions (menu,
         # pickup, death, opening, pre-Kenneth hall, message-box text). Door
