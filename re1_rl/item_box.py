@@ -116,9 +116,13 @@ BOX_STORABLE_ITEM_IDS = DEPOSIT_ITEM_ALLOWLIST | ROOM_100_EXTRA_DEPOSIT_IDS | fr
 
 def deposit_allowlist_for_room(room_id: str | None) -> frozenset[int]:
     """Base knife/heal bank; room 100 also allows bazooka variants + packs."""
+    from re1_rl.yawn_box_prep_checkpoint import WIND_CREST_ITEM_ID, YAWN_BOX_PREP_ROOM
+
     rid = str(room_id or "").strip().upper()
     if rid in BOX_BAZOOKA_DEPOSIT_ROOMS:
         return DEPOSIT_ITEM_ALLOWLIST | ROOM_100_EXTRA_DEPOSIT_IDS
+    if rid == YAWN_BOX_PREP_ROOM:
+        return DEPOSIT_ITEM_ALLOWLIST | {WIND_CREST_ITEM_ID}
     return DEPOSIT_ITEM_ALLOWLIST
 
 
@@ -134,7 +138,11 @@ def is_key_item_id(item_id: int) -> bool:
 
 def is_deposit_allowed_item(item_id: int, room_id: str | None = None) -> bool:
     """Allowlist gate used by masks + macros (keys always False)."""
+    from re1_rl.yawn_box_prep_checkpoint import wind_crest_deposit_allowed
+
     iid = int(item_id) & 0xFF
+    if wind_crest_deposit_allowed(iid, room_id):
+        return True
     if iid == 0 or is_key_item_id(iid):
         return False
     return iid in deposit_allowlist_for_room(room_id)
@@ -214,6 +222,8 @@ def read_inventory(bridge: _BridgeReadWrite) -> list[tuple[int, int]]:
 
 def box_pollution_reason(
     box: list[tuple[int, int]] | None,
+    *,
+    room_id: str | None = None,
 ) -> str | None:
     """Reject illegal box contents (keys, weapons, deep scroll, non-bank items).
 
@@ -240,6 +250,11 @@ def box_pollution_reason(
             continue
         name = canonical_item(ITEM_IDS.get(item_id, "") or "")
         if name and name in key_names:
+            if (
+                name == "wind_crest"
+                and str(room_id or "").strip().upper() == "118"
+            ):
+                continue
             return f"key_item_in_box:{name}@{i}"
         if i >= BOX_SLOTS:
             label = name or f"0x{item_id:02x}"
@@ -271,7 +286,11 @@ def can_deposit(
         return False, "empty_slot"
     if item_id == LOCKPICK_ITEM_ID:
         return False, "lockpick"
-    if is_key_item_id(int(item_id)):
+    from re1_rl.yawn_box_prep_checkpoint import wind_crest_deposit_allowed
+
+    if is_key_item_id(int(item_id)) and not wind_crest_deposit_allowed(
+        int(item_id), room_id
+    ):
         return False, "key_item"
     if effective_transfer_qty(item_id, qty) <= 0:
         return False, "empty_slot"

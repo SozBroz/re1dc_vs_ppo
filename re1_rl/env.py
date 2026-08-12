@@ -544,7 +544,7 @@ class RE1Env(gym.Env):
             enemies, room_code, in_control,
         )
         p_vx, p_vz = self._player_motion.update(px, pz, room_code, in_control)
-        return {
+        state_dict = {
             "hp": hp,
             "room_id": room_code,
             "x": px,
@@ -602,6 +602,21 @@ class RE1Env(gym.Env):
             "player_recovery": int(ram.get("player_recovery", 0)),
             "anim_history": list(getattr(self, "_anim_history", [])),
         }
+        from re1_rl.item_box import is_box_room
+
+        if is_box_room(room_code):
+            cache = getattr(self, "_box_cache", None)
+            if cache is None:
+                try:
+                    from re1_rl.item_box import read_box_live
+
+                    cache = read_box_live(self.bridge)
+                    self._box_cache = cache
+                except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                    cache = None
+            if cache is not None:
+                state_dict["box_cache"] = list(cache)
+        return state_dict
 
     def _init_anim_history(self) -> None:
         from re1_rl.knife_macro import read_knife_hooks
@@ -657,7 +672,21 @@ class RE1Env(gym.Env):
             self._box_cache = live
         except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
             live = getattr(self, "_box_cache", None)
-        return box_pollution_reason(live)
+
+        planner = getattr(self, "_planner", None)
+        cid = ""
+        if planner is not None:
+            obj = planner.current_objective() or {}
+            cid = str(obj.get("checkpoint_id", "") or "")
+
+        room_id = str(
+            (getattr(self, "_prev_state", {}) or {}).get("room_id", "") or ""
+        )
+        if cid == "yawn_box_prep_118":
+            from re1_rl.yawn_box_prep_checkpoint import yawn_box_prep_box_pollution_reason
+
+            return yawn_box_prep_box_pollution_reason(live)
+        return box_pollution_reason(live, room_id=room_id)
 
     def _apply_box_ui_cursors_from_report(
         self,

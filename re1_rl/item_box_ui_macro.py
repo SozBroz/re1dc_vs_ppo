@@ -918,9 +918,7 @@ def execute_box_deposit_ui(
     from re1_rl.item_box import is_key_item_id, is_deposit_allowed_item
 
     item_id, qty_before = inv_before[slot]
-    if is_key_item_id(int(item_id)) or not is_deposit_allowed_item(
-        int(item_id), room_id
-    ):
+    if not is_deposit_allowed_item(int(item_id), room_id):
         report["reason"] = "key_item" if is_key_item_id(int(item_id)) else "not_allowlisted"
         return False, 0, report
 

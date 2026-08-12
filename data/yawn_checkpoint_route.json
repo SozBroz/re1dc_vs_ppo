@@ -1540,10 +1540,29 @@
       "shotgun"
     ],
     "items_gained": [],
+    "consume_before_gain": [
+      "wind_crest"
+    ],
     "success_condition": {
-      "type": "state_flag",
-      "field": "lab_timer",
-      "value": 0
+      "type": "all_of",
+      "conditions": [
+        {
+          "type": "state_flag",
+          "field": "lab_timer",
+          "value": 0
+        },
+        {
+          "type": "lacks_item",
+          "item": "wind_crest"
+        },
+        {
+          "type": "item_in_box",
+          "item": "wind_crest"
+        },
+        {
+          "type": "yawn_box_weapon_ammo_clear"
+        }
+      ]
     }
   },
   {

@@ -277,6 +277,11 @@ class WaypointPlanner:
                 cond, state, wp_room, progress
             )
 
+        if cond_type in ("lacks_item", "item_in_box", "yawn_box_weapon_ammo_clear"):
+            return WaypointPlanner._check_in_room_condition(
+                cond, state, wp_room, progress
+            )
+
         if cond_type == "leg_kills_in_room":
             if progress is None:
                 return False
@@ -308,6 +313,24 @@ class WaypointPlanner:
             inv = {canonical_item(str(x)) for x in state.get("inventory", [])}
             want = canonical_item(str(cond.get("item", "")))
             return bool(want) and want not in inv
+        if cond_type == "item_in_box":
+            from re1_rl.item_box import BOX_SLOTS_LIVE
+            from re1_rl.yawn_box_prep_checkpoint import box_has_item, box_pairs_from_state
+
+            want = canonical_item(str(cond.get("item", "")))
+            max_slot = int(cond.get("max_slot", BOX_SLOTS_LIVE - 1))
+            return bool(want) and box_has_item(
+                box_pairs_from_state(state),
+                want,
+                max_slot=max_slot,
+            )
+        if cond_type == "yawn_box_weapon_ammo_clear":
+            from re1_rl.yawn_box_prep_checkpoint import (
+                box_pairs_from_state,
+                yawn_box_weapon_ammo_clear,
+            )
+
+            return yawn_box_weapon_ammo_clear(box_pairs_from_state(state))
         if cond_type == "acquired_item":
             want = canonical_item(str(cond.get("item", "")))
             if not want:

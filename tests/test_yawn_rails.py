@@ -692,6 +692,8 @@ def test_yawn_episode_terminates_only_after_configured_leg_span() -> None:
 
 
 def test_yawn_box_prep_requires_natural_lab_timer_expiry() -> None:
+    from re1_rl.yawn_box_prep_checkpoint import WIND_CREST_ITEM_ID
+
     planner = _planner(start_index=_idx("yawn_box_prep_118"))
     assert planner.current_objective()["checkpoint_id"] == "yawn_box_prep_118"
     assert "118" in BOX_ROOMS
@@ -702,6 +704,10 @@ def test_yawn_box_prep_requires_natural_lab_timer_expiry() -> None:
 
     expired = _state("118")
     expired["lab_timer"] = 0
+    expired["inventory"] = ["shield_key", "shotgun"]
+    box = [(0, 0)] * 48
+    box[0] = (WIND_CREST_ITEM_ID, 1)
+    expired["box_cache"] = box
     assert planner.advance_if_success(expired, progress=ProgressTracker())
 
 

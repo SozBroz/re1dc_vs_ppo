@@ -1274,6 +1274,13 @@ def capture_successor_cell(
         except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
             live_box = getattr(env, "_box_cache", None)
         pollution = box_pollution_reason(live_box)
+        if cid == "yawn_box_prep_118":
+            from re1_rl.yawn_box_prep_checkpoint import yawn_box_prep_capture_ready
+
+            pollution = yawn_box_prep_capture_ready(
+                live_box,
+                list(live_state.get("inventory") or []),
+            )
         if pollution:
             print(
                 f"[yawn_capture] reject box pollution {pollution} cp={cid}",

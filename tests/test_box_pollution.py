@@ -89,9 +89,12 @@ def test_deposit_dest_is_lowest_empty_modeled_slot() -> None:
 
 def test_chemical_never_depositable() -> None:
     from re1_rl.item_box import can_deposit, is_deposit_allowed_item, is_key_item_id
+    from re1_rl.yawn_box_prep_checkpoint import WIND_CREST_ITEM_ID
 
     assert is_key_item_id(0x26)
     assert not is_deposit_allowed_item(0x26, "118")
+    assert is_deposit_allowed_item(WIND_CREST_ITEM_ID, "118")
+    assert not is_deposit_allowed_item(WIND_CREST_ITEM_ID, "100")
     assert not is_deposit_allowed_item(0x26, "100")
     inv = [(0x26, 1)] + [(0, 0)] * 7
     box = [(0, 0)] * BOX_SLOTS

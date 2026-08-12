@@ -785,7 +785,7 @@ def integrity_gate_ok(
                     pairs.append((int(entry[0]), int(entry[1])))
                 except (TypeError, ValueError):
                     continue
-        pollution = box_pollution_reason(pairs)
+        pollution = box_pollution_reason(pairs, room_id=room)
         if pollution:
             return False, pollution
     return True, "ok"
