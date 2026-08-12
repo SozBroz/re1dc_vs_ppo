@@ -62,6 +62,9 @@ EXIT_NAV_MAX_DOWNS = 6
 FIELD_AFTER_CLOSE_FRAMES = 50
 # Open animation keeps mode/gs in the pause tree before the grid accepts d-pad.
 POST_OPEN_SETTLE_FRAMES = 90
+# Harness open_box: idle 50 + POST_OPEN 90. Fleet was D-padding during the
+# animation (memlog: select_slot_7 deposits CLIP, then beretta).
+GRID_READY_FRAMES = FIELD_AFTER_CLOSE_FRAMES + POST_OPEN_SETTLE_FRAMES
 # Extra Ups from slot 0 WRAP through the 48-slot live list (0-15 → land on 33).
 # Never Up-spam a fixed 15 from an unknown/zero resume — home exactly
 # ``from_slot`` taps when the session cursor is known and > 0.
@@ -219,6 +222,21 @@ def _wait(
         client,
         {},
         frames=frames,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+    )
+
+
+def _wait_box_grid_ready(
+    client: Any,
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int]:
+    """Idle until the box inventory grid accepts D-pad (same budget as harness open)."""
+    return _wait(
+        client,
+        frames=GRID_READY_FRAMES,
         prev_hp=prev_hp,
         episode_start_hp=episode_start_hp,
     )
@@ -813,6 +831,15 @@ def execute_box_withdraw_ui(
     item_id, qty_before = box_before[slot]
     cursor = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
 
+    died, f = _wait_box_grid_ready(
+        client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+    )
+    frames += f
+    if died:
+        report["died"] = True
+        report["frames"] = frames
+        return True, frames, report
+
     def _abort(reason: str | None = None) -> tuple[bool, int, dict[str, Any]]:
         nonlocal frames
         if reason is not None:
@@ -1071,6 +1098,15 @@ def execute_box_deposit_ui(
     if expected_item_id is not None and int(item_id) != int(expected_item_id):
         report["reason"] = "expected_item_mismatch"
         return False, 0, report
+
+    died, f = _wait_box_grid_ready(
+        client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+    )
+    frames += f
+    if died:
+        report["died"] = True
+        report["frames"] = frames
+        return True, frames, report
 
     def _abort(reason: str | None = None) -> tuple[bool, int, dict[str, Any]]:
         nonlocal frames

@@ -2443,7 +2443,7 @@ class RE1Env(gym.Env):
 
     def _sync_box_ui_session_from_ram(self) -> None:
         """Enter/leave the box-UI policy session from live pause-tree RAM."""
-        from re1_rl.item_box_ui_macro import probe_box_ui_open
+        from re1_rl.item_box_ui_macro import GRID_READY_FRAMES, probe_box_ui_open
 
         try:
             open_now = probe_box_ui_open(self.bridge)
@@ -2457,6 +2457,22 @@ class RE1Env(gym.Env):
                 # box list resumes at slot 0 on first Cross-in.
                 self._box_inv_cursor = 0
                 self._box_list_cursor = 0
+                # Mask-path rising edge used to skip settle; policy then
+                # D-padded during the open animation (CLIP then beretta).
+                try:
+                    self.bridge.step(
+                        buttons={},
+                        n=int(GRID_READY_FRAMES),
+                        abort_on_zero_hp=False,
+                    )
+                except (
+                    OSError,
+                    RuntimeError,
+                    ValueError,
+                    AttributeError,
+                    TypeError,
+                ):
+                    pass
             return
         if self._box_ui_open and not open_now:
             self._box_ui_open = False
@@ -3738,28 +3754,7 @@ class RE1Env(gym.Env):
                     pickup_modal = False
                 if real_box and self._current_room_is_box_room():
                     if not self._box_ui_open:
-                        self._box_ui_open = True
-                        self._box_phase = BOX_PHASE_CHOOSE
-                        self._box_inv_cursor = 0
-                        self._box_list_cursor = 0
-                        # Open animation can eat the first D-pads (live: 0→7
-                        # became Right onto bullets). Wait out the grid home.
-                        try:
-                            from re1_rl.item_box_ui_macro import POST_OPEN_SETTLE_FRAMES
-
-                            self.bridge.step(
-                                buttons={},
-                                n=int(POST_OPEN_SETTLE_FRAMES),
-                                abort_on_zero_hp=False,
-                            )
-                        except (
-                            OSError,
-                            RuntimeError,
-                            ValueError,
-                            AttributeError,
-                            TypeError,
-                        ):
-                            pass
+                        self._sync_box_ui_session_from_ram()
                     self._skipping_flag = False
                 elif pickup_modal:
                     self._auto_accept_pause_pickup_modal()
