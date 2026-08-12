@@ -27,6 +27,7 @@ from re1_rl.inventory_menu_macro import slot_nav_moves
 from re1_rl.inventory_stacking import effective_transfer_qty
 from re1_rl.item_box import (
     BOX_SLOTS,
+    BOX_SLOTS_LIVE,
     INVENTORY_SLOTS,
     can_deposit,
     can_withdraw,
@@ -57,7 +58,9 @@ CLOSE_MAX_ATTEMPTS = 4
 EXIT_NAV_MAX_DOWNS = 6
 # Open animation keeps mode/gs in the pause tree before the grid accepts d-pad.
 POST_OPEN_SETTLE_FRAMES = 90
-# Box list has at most BOX_SLOTS modeled entries; extra Ups clamp at slot 0.
+# Extra Ups clamp at slot 0 within the modeled window. Do NOT spam through the
+# full 48-slot live length — excess Ups break list focus / transfer confirms
+# (live QA 2026-08-11). Deep pollution is rejected by preflight instead.
 BOX_LIST_HOME_UPS = BOX_SLOTS - 1
 # Aliases for QA probes (``scripts/_probe_box_withdraw_qa.py``).
 MOVE_TAP_FRAMES = BOX_MOVE_TAP_FRAMES
@@ -75,6 +78,27 @@ def _box_live_changed(
         if (int(b[0]), int(b[1])) != (int(a[0]), int(a[1])):
             return True
     return False
+
+
+def _deep_box_changed(
+    before: list[tuple[int, int]],
+    after: list[tuple[int, int]],
+) -> bool:
+    """True when any slot past the modeled window differs."""
+    n = max(len(before), len(after), BOX_SLOTS_LIVE)
+    for i in range(BOX_SLOTS, n):
+        b = before[i] if i < len(before) else (0, 0)
+        a = after[i] if i < len(after) else (0, 0)
+        if (int(b[0]), int(b[1])) != (int(a[0]), int(a[1])):
+            return True
+    return False
+
+
+def _first_empty_modeled_slot(box: list[tuple[int, int]]) -> int | None:
+    for i, (iid, _q) in enumerate(box[:BOX_SLOTS]):
+        if int(iid) == 0:
+            return int(i)
+    return None
 
 
 def _finalize_transfer_failure(
@@ -576,6 +600,8 @@ def execute_box_withdraw_ui(
         report["frames"] = frames
         return True, frames, report
 
+    # Only home when the tracked resume cursor is past slot 0. Blind Up-spam
+    # from slot 0 breaks the confirm (live QA 2026-08-11).
     list_from = max(0, min(BOX_SLOTS - 1, int(box_cursor)))
     if list_from > 0:
         died, f = _home_box_list(
@@ -662,6 +688,19 @@ def execute_box_withdraw_ui(
 
     from re1_rl.item_box import box_pollution_reason
 
+    if _deep_box_changed(box_live_before, box_live_after):
+        _finalize_transfer_failure(
+            report,
+            inv_before=inv_before,
+            inv_after=inv_after,
+            box_before=box_before,
+            box_after=box_after,
+            box_live_before=box_live_before,
+            box_live_after=box_live_after,
+            default_reason="deep_box_write",
+        )
+        return False, frames, report
+
     pollution = box_pollution_reason(box_live_after)
     if pollution:
         _finalize_transfer_failure(
@@ -728,18 +767,23 @@ def execute_box_deposit_ui(
     inv_before = read_inventory(client)
     box_before = read_box(client)
     box_live_before = read_box_live(client)
+    from re1_rl.item_box import box_pollution_reason
+
+    pollution_before = box_pollution_reason(box_live_before)
+    if pollution_before:
+        report["reason"] = pollution_before
+        report["exchange_detected"] = True
+        return False, 0, report
     ok, reason = can_deposit(inv_before, box_before, slot, room_id=room_id)
     if not ok:
         report["reason"] = reason
         return False, 0, report
 
-    dest = next(
-        (i for i, (iid, _q) in enumerate(box_before) if int(iid) == 0),
-        None,
-    )
+    dest = _first_empty_modeled_slot(box_before)
     if dest is None:
         report["reason"] = "box_full"
         return False, 0, report
+    report["expected_dest"] = int(dest)
 
     item_id, qty_before = inv_before[slot]
     if expected_item_id is not None and int(item_id) != int(expected_item_id):
@@ -803,12 +847,13 @@ def execute_box_deposit_ui(
         return True, frames, report
 
     box_mid = read_box(client)
-    dest = next(
-        (i for i, (iid, _q) in enumerate(box_mid) if int(iid) == 0),
-        None,
-    )
+    dest = _first_empty_modeled_slot(box_mid)
     if dest is None:
         report["reason"] = "box_full"
+        return False, frames, report
+    expected = report.get("expected_dest")
+    if expected is not None and int(dest) != int(expected):
+        report["reason"] = "dest_drift"
         return False, frames, report
     report["dest_slot"] = int(dest)
 
@@ -884,7 +929,18 @@ def execute_box_deposit_ui(
         )
         return False, frames, report
 
-    from re1_rl.item_box import box_pollution_reason
+    if _deep_box_changed(box_live_before, box_live_after):
+        _finalize_transfer_failure(
+            report,
+            inv_before=inv_before,
+            inv_after=inv_after,
+            box_before=box_before,
+            box_after=box_after,
+            box_live_before=box_live_before,
+            box_live_after=box_live_after,
+            default_reason="deep_box_write",
+        )
+        return False, frames, report
 
     pollution = box_pollution_reason(box_live_after)
     if pollution:
@@ -897,6 +953,22 @@ def execute_box_deposit_ui(
             box_live_before=box_live_before,
             box_live_after=box_live_after,
             default_reason=pollution,
+        )
+        return False, frames, report
+
+    # Absolute contract: deposited item sits at the first empty modeled slot.
+    if int(box_after[int(dest)][0]) != int(item_id) or int(dest) != int(
+        report.get("expected_dest", dest)
+    ):
+        _finalize_transfer_failure(
+            report,
+            inv_before=inv_before,
+            inv_after=inv_after,
+            box_before=box_before,
+            box_after=box_after,
+            box_live_before=box_live_before,
+            box_live_after=box_live_after,
+            default_reason="dest_not_first_empty",
         )
         return False, frames, report
 

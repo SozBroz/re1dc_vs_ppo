@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from re1_rl.go_explore_capture import integrity_gate_ok
-from re1_rl.item_box import BOX_SLOTS, box_pollution_reason
+from re1_rl.item_box import BOX_SLOTS, BOX_SLOTS_LIVE, box_pollution_reason, plan_deposit
+from re1_rl.item_box_ui_macro import (
+    BOX_LIST_HOME_UPS,
+    _deep_box_changed,
+    _first_empty_modeled_slot,
+)
+from re1_rl.obs_encoder import encode_box
 from re1_rl.progress import ProgressTracker
 
 
@@ -11,6 +17,15 @@ def test_box_pollution_key_in_deep_slot() -> None:
     box = [(0, 0)] * 48
     box[46] = (0x35, 1)  # shield_key
     assert box_pollution_reason(box) == "key_item_in_box:shield_key@46"
+
+
+def test_box_pollution_chemical_is_key_item() -> None:
+    box = [(0, 0)] * 48
+    box[0] = (0x26, 1)  # chemical
+    assert box_pollution_reason(box) == "key_item_in_box:chemical@0"
+    box2 = [(0, 0)] * 48
+    box2[40] = (0x26, 1)
+    assert box_pollution_reason(box2) == "key_item_in_box:chemical@40"
 
 
 def test_box_pollution_deep_ammo() -> None:
@@ -52,3 +67,51 @@ def test_integrity_gate_rejects_key_in_box_cache() -> None:
     ok, reason = integrity_gate_ok(state, ProgressTracker())
     assert not ok
     assert reason == "key_item_in_box:shield_key@46"
+
+
+def test_box_list_home_covers_modeled_window() -> None:
+    assert BOX_LIST_HOME_UPS == BOX_SLOTS - 1
+    assert BOX_LIST_HOME_UPS == 15
+    # Live length is wider, but excess Ups break transfers (do not home to 47).
+    assert BOX_SLOTS_LIVE > BOX_SLOTS
+
+
+def test_deposit_dest_is_lowest_empty_modeled_slot() -> None:
+    inv = [(0x01, 0)] + [(0, 0)] * 7
+    box = [(0x0B, 15)] * 5 + [(0, 0)] * (BOX_SLOTS - 5)
+    assert _first_empty_modeled_slot(box) == 5
+    _new_inv, new_box, moved = plan_deposit(inv, box, 0)
+    assert moved == 1
+    assert new_box[5] == (0x01, 0)
+    assert all(new_box[i] == box[i] for i in range(5))
+    assert _first_empty_modeled_slot(new_box) == 6
+
+
+def test_chemical_never_depositable() -> None:
+    from re1_rl.item_box import can_deposit
+
+    inv = [(0x26, 1)] + [(0, 0)] * 7
+    box = [(0, 0)] * BOX_SLOTS
+    for room in ("100", "118", None):
+        ok, reason = can_deposit(inv, box, 0, room_id=room, enforce_allowlist=True)
+        assert not ok and reason == "not_allowlisted", (room, reason)
+
+
+def test_encode_box_blind_to_deep_slots() -> None:
+    box = [(0, 0)] * 48
+    box[30] = (0x26, 1)
+    vec = encode_box(box, in_box_room=True)
+    # Modeled slots stay empty in obs even though live RAM is polluted.
+    assert float(vec[0]) == 0.0
+    assert float(vec[32]) == 1.0  # free_slots / 16 == 1.0
+    assert box_pollution_reason(box) == "key_item_in_box:chemical@30"
+
+
+def test_deep_box_changed_detects_tail_writes() -> None:
+    before = [(0, 0)] * 48
+    after = list(before)
+    after[40] = (0x01, 0)
+    assert _deep_box_changed(before, after)
+    after2 = list(before)
+    after2[3] = (0x01, 0)
+    assert not _deep_box_changed(before, after2)
