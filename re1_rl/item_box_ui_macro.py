@@ -206,6 +206,93 @@ def first_empty_inventory_slot(inventory: list[tuple[int, int]]) -> int | None:
     return None
 
 
+def first_reachable_empty_inventory_slot(
+    inventory: list[tuple[int, int]],
+    *,
+    from_slot: int = 0,
+) -> int | None:
+    """Lowest empty inv slot reachable under box-UI horizontal rules."""
+    start = max(0, min(INVENTORY_SLOTS - 1, int(from_slot)))
+    for i, (item_id, _qty) in enumerate(inventory[:INVENTORY_SLOTS]):
+        if int(item_id) != 0:
+            continue
+        try:
+            box_inventory_nav_moves(start, i, inventory)
+        except ValueError:
+            continue
+        return i
+    return None
+
+
+def box_inventory_nav_moves(
+    from_slot: int,
+    to_slot: int,
+    inventory: list[tuple[int, int]],
+) -> list[str]:
+    """D-pad path for the item-box inventory grid.
+
+    Live RE1 DC box UI (QA 2026-08-11): **Up/Down work from any slot**, but
+    **Left/Right only move when the current slot is empty**. Horizontal taps
+    from an occupied cell are no-ops — the cursor stays put, so Cross deposits
+    / withdraws the wrong item (shield_key / chemical mistaken for the target).
+
+    Raises ``ValueError`` when no legal path exists (e.g. only slot 7 empty and
+    slot 6 occupied — cannot enter column 1).
+    """
+    src = int(from_slot)
+    dst = int(to_slot)
+    if src == dst:
+        return []
+    if src < 0 or dst < 0 or src >= INVENTORY_SLOTS or dst >= INVENTORY_SLOTS:
+        raise ValueError(f"box inv slot out of range: {src} -> {dst}")
+
+    empty = {
+        i
+        for i, (iid, _q) in enumerate(inventory[:INVENTORY_SLOTS])
+        if int(iid) == 0
+    }
+    # BFS on grid; horizontal edges only from empty cells.
+    cols = 2
+    start = src
+    prev: dict[int, tuple[int, str]] = {}
+    queue = [start]
+    seen = {start}
+    while queue:
+        cur = queue.pop(0)
+        if cur == dst:
+            break
+        cr, cc = divmod(cur, cols)
+        candidates: list[tuple[int, str]] = []
+        if cr > 0:
+            candidates.append(((cr - 1) * cols + cc, "up"))
+        if cr < (INVENTORY_SLOTS // cols) - 1:
+            candidates.append(((cr + 1) * cols + cc, "down"))
+        # Horizontal only when standing on an empty slot.
+        if cur in empty:
+            if cc > 0:
+                candidates.append((cr * cols + (cc - 1), "left"))
+            if cc < cols - 1:
+                candidates.append((cr * cols + (cc + 1), "right"))
+        for nxt, direction in candidates:
+            if nxt in seen:
+                continue
+            seen.add(nxt)
+            prev[nxt] = (cur, direction)
+            queue.append(nxt)
+    if dst not in prev and dst != start:
+        raise ValueError(
+            f"box inv unreachable {src} -> {dst} (empty={sorted(empty)})"
+        )
+    moves_rev: list[str] = []
+    cur = dst
+    while cur != start:
+        p, direction = prev[cur]
+        moves_rev.append(direction)
+        cur = p
+    moves_rev.reverse()
+    return moves_rev
+
+
 def deposit_inventory_nav_from(
     inv_cursor: int,
     inv_slot: int,
@@ -372,51 +459,32 @@ def _navigate_inventory(
     *,
     prev_hp: int,
     episode_start_hp: int,
-) -> tuple[bool, int]:
+    inventory: list[tuple[int, int]] | None = None,
+) -> tuple[bool, int, str]:
+    """Navigate inventory grid. Returns ``(died, frames, reason)``.
+
+    When ``inventory`` is provided (box UI), use empty-slot-aware horizontal
+    moves. ``reason`` is set on unreachable targets.
+    """
     frames = 0
     if int(from_slot) == int(to_slot):
-        return False, 0
+        return False, 0, ""
     try:
-        moves = slot_nav_moves(int(from_slot), int(to_slot))
-    except ValueError:
-        # Fallback: walk via slot 0 when upward path would hit EXIT header.
-        died, f = _move(
-            client,
-            "left",
-            prev_hp=prev_hp,
-            episode_start_hp=episode_start_hp,
-            taps=2,
-        )
-        frames += f
-        if died:
-            return True, frames
-        died, f = _move(
-            client,
-            "up",
-            prev_hp=prev_hp,
-            episode_start_hp=episode_start_hp,
-            taps=3,
-        )
-        frames += f
-        if died:
-            return True, frames
-        # Re-home may land on EXIT — nudge down onto slot 0.
-        died, f = _move(
-            client, "down", prev_hp=prev_hp, episode_start_hp=episode_start_hp, taps=1
-        )
-        frames += f
-        if died:
-            return True, frames
-        moves = slot_nav_moves(0, int(to_slot))
-        from_slot = 0
+        if inventory is not None:
+            moves = box_inventory_nav_moves(int(from_slot), int(to_slot), inventory)
+        else:
+            moves = slot_nav_moves(int(from_slot), int(to_slot))
+    except ValueError as exc:
+        return False, 0, f"inv_slot_unreachable:{exc}"
     for direction in moves:
+        # Never Left/Right-fallback into the box list pane.
         died, f = _move(
             client, direction, prev_hp=prev_hp, episode_start_hp=episode_start_hp
         )
         frames += f
         if died:
-            return True, frames
-    return False, frames
+            return True, frames, ""
+    return False, frames, ""
 
 
 def close_box_ui(
@@ -472,12 +540,13 @@ def close_box_ui(
     report["path"] = "triangle_then_exit"
     cursor = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
     try:
-        died, f = _navigate_inventory(
+        died, f, _nav_reason = _navigate_inventory(
             client,
             cursor,
             5,
             prev_hp=prev_hp,
             episode_start_hp=episode_start_hp,
+            inventory=None,  # EXIT path uses legacy nav
         )
         frames += f
         if died:
@@ -585,27 +654,46 @@ def execute_box_withdraw_ui(
         report["reason"] = reason
         return False, frames, report
 
-    dest = first_empty_inventory_slot(inv_before)
+    dest = first_reachable_empty_inventory_slot(
+        inv_before, from_slot=int(inv_cursor)
+    )
     if dest is None:
-        report["reason"] = "inventory_full"
+        # Distinguish "full" from "empty but unreachable under box-UI nav rules".
+        if first_empty_inventory_slot(inv_before) is None:
+            report["reason"] = "inventory_full"
+        else:
+            report["reason"] = "empty_slot_unreachable"
         return False, frames, report
     report["dest_slot"] = int(dest)
 
     item_id, qty_before = box_before[slot]
     cursor = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
 
-    died, f = _navigate_inventory(
+    died, f, nav_reason = _navigate_inventory(
         client,
         cursor,
         int(dest),
         prev_hp=prev_hp,
         episode_start_hp=episode_start_hp,
+        inventory=inv_before,
     )
     frames += f
     if died:
         report["died"] = True
         report["frames"] = frames
         return True, frames, report
+    if nav_reason:
+        report["reason"] = nav_reason
+        report["frames"] = frames
+        return False, frames, report
+
+    # Must be on an empty inventory cell before Cross — otherwise we deposit
+    # whatever is highlighted (beretta / shield_key live failures).
+    inv_pre_cross = read_inventory(client)
+    if dest >= len(inv_pre_cross) or int(inv_pre_cross[int(dest)][0]) != 0:
+        report["reason"] = "withdraw_dest_not_empty"
+        report["frames"] = frames
+        return False, frames, report
 
     # Cross on empty slot → box list resumes at ``box_cursor``.
     died, f = _confirm_cross(
@@ -836,34 +924,68 @@ def execute_box_deposit_ui(
         if int(iid) and is_key_item_id(int(iid)) and effective_transfer_qty(iid, q) > 0
     }
 
-    if not trust_inv_cursor:
-        died, f = _home_inventory(
-            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
-        )
-        frames += f
-        if died:
-            report["died"] = True
-            report["frames"] = frames
-            return True, frames, report
-        nav_from = 0
-        report["rehomed"] = True
-    else:
-        nav_from = deposit_inventory_nav_from(
-            inv_cursor, slot, trust_inv_cursor=trust_inv_cursor
-        )
+    # Extended-session nav: use empty-slot-aware paths. Prefer a direct path from
+    # the tracked cursor; only re-anchor onto a reachable empty when the target
+    # is otherwise unreachable (horizontal requires standing on empty). Never
+    # invent an empty-cursor position — that deposited beretta/shield_key live.
+    nav_from = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
+    try:
+        box_inventory_nav_moves(nav_from, int(slot), inv_before)
+        direct_ok = True
+    except ValueError:
+        direct_ok = False
 
-    died, f = _navigate_inventory(
+    if not trust_inv_cursor and not direct_ok:
+        anchor = first_reachable_empty_inventory_slot(
+            inv_before, from_slot=nav_from
+        )
+        if anchor is None:
+            report["reason"] = (
+                f"inv_slot_unreachable:box inv unreachable "
+                f"{nav_from} -> {slot} (need empty bridge)"
+            )
+            report["frames"] = frames
+            return False, frames, report
+        if int(anchor) != int(nav_from):
+            died, f, nav_reason = _navigate_inventory(
+                client,
+                nav_from,
+                int(anchor),
+                prev_hp=prev_hp,
+                episode_start_hp=episode_start_hp,
+                inventory=inv_before,
+            )
+            frames += f
+            if died:
+                report["died"] = True
+                report["frames"] = frames
+                return True, frames, report
+            if nav_reason:
+                report["reason"] = nav_reason
+                report["frames"] = frames
+                return False, frames, report
+            nav_from = int(anchor)
+        report["rehomed"] = True
+    elif not trust_inv_cursor:
+        report["rehomed"] = False
+
+    died, f, nav_reason = _navigate_inventory(
         client,
         nav_from,
         slot,
         prev_hp=prev_hp,
         episode_start_hp=episode_start_hp,
+        inventory=inv_before,
     )
     frames += f
     if died:
         report["died"] = True
         report["frames"] = frames
         return True, frames, report
+    if nav_reason:
+        report["reason"] = nav_reason
+        report["frames"] = frames
+        return False, frames, report
 
     inv_at_cursor = read_inventory(client)
     if (
@@ -1047,10 +1169,32 @@ def execute_box_deposit_ui(
         return False, frames, report
 
     moved_qty = max(1, before_units - after_units)
+    # UI rests on the deposit source index after the transfer (inventory may
+    # pack under that index). Prefer parking on a reachable empty so the next
+    # withdraw Cross cannot fire on a compacted beretta/key.
+    inv_out = int(slot)
+    park = first_reachable_empty_inventory_slot(inv_after, from_slot=int(slot))
+    if park is not None and int(park) != int(slot):
+        died, f, nav_reason = _navigate_inventory(
+            client,
+            int(slot),
+            int(park),
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+            inventory=inv_after,
+        )
+        frames += f
+        report["frames"] = frames
+        if died:
+            report["died"] = True
+            return True, frames, report
+        if not nav_reason:
+            inv_out = int(park)
+            report["parked_empty"] = inv_out
     report["ok"] = True
     report["reason"] = ""
     report["moved"] = (item_id, moved_qty)
-    report["cursor_out"] = {"inv": int(slot), "box": int(dest)}
-    report["inv_cursor"] = int(slot)
+    report["cursor_out"] = {"inv": inv_out, "box": int(dest)}
+    report["inv_cursor"] = inv_out
     report["box_cursor"] = int(dest)
     return False, frames, report

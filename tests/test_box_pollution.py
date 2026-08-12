@@ -110,6 +110,57 @@ def test_box_list_home_from_zero_is_noop() -> None:
     assert (0 - 15) % 48 == 33
 
 
+def test_box_inventory_nav_vertical_any_occupancy() -> None:
+    from re1_rl.item_box_ui_macro import box_inventory_nav_moves
+
+    # Col-0 path ignores occupancy for Up/Down.
+    inv = [(0x01, 0), (0x02, 1), (0x0B, 15), (0x35, 1), (0x44, 1), (0x03, 4), (0, 0), (0, 0)]
+    assert box_inventory_nav_moves(0, 6, inv) == ["down", "down", "down"]
+    assert box_inventory_nav_moves(6, 0, inv) == ["up", "up", "up"]
+
+
+def test_box_inventory_nav_horizontal_only_from_empty() -> None:
+    from re1_rl.item_box_ui_macro import box_inventory_nav_moves
+
+    inv = [(0x01, 0), (0x02, 1), (0x0B, 15), (0x35, 1), (0x44, 1), (0x03, 4), (0, 0), (0x44, 1)]
+    # From empty 6 → right to 7.
+    assert box_inventory_nav_moves(6, 7, inv) == ["right"]
+    # Odd-col herb@1 via empty bridge at 6: down to 6, right, up×3.
+    assert box_inventory_nav_moves(0, 1, inv) == [
+        "down",
+        "down",
+        "down",
+        "right",
+        "up",
+        "up",
+        "up",
+    ]
+
+
+def test_box_inventory_nav_odd_empty_unreachable() -> None:
+    from re1_rl.item_box_ui_macro import (
+        box_inventory_nav_moves,
+        first_reachable_empty_inventory_slot,
+    )
+
+    inv = [
+        (0x01, 0),
+        (0x02, 1),
+        (0x0B, 15),
+        (0x35, 1),
+        (0x44, 1),
+        (0x03, 4),
+        (0x44, 1),
+        (0, 0),
+    ]
+    try:
+        box_inventory_nav_moves(0, 7, inv)
+        raise AssertionError("expected unreachable")
+    except ValueError as exc:
+        assert "unreachable" in str(exc)
+    assert first_reachable_empty_inventory_slot(inv, from_slot=0) is None
+
+
 def test_encode_box_blind_to_deep_slots() -> None:
     box = [(0, 0)] * 48
     box[30] = (0x26, 1)

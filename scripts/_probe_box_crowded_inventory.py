@@ -36,6 +36,7 @@ from re1_rl.item_box_ui_macro import (  # noqa: E402
     execute_box_deposit_ui,
     execute_box_withdraw_ui,
     first_empty_inventory_slot,
+    first_reachable_empty_inventory_slot,
     probe_box_ui_open,
     _wait,
 )
@@ -242,19 +243,39 @@ def _cp40_two_empty_slots() -> tuple[list[tuple[int, int]], list[tuple[int, int]
 
 
 def _cp40_crowded() -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
-  """7/8 inv slots used — cp40 storeroom loadout."""
-  inv = [
-      (KNIFE_ITEM_ID, 0),
-      (BERETTA, 14),
-      (CLIP, 16),
-      (SHIELD_KEY, 1),
-      (GREEN_HERB, 1),
-      (SHOTGUN, 4),
-      (GREEN_HERB, 1),
-      (0, 0),
-  ]
-  box = [(CLIP, 15), (CLIP, 15)] + [(0, 0)] * 46
-  return inv, box
+    """7/8 inv slots used — empty at even slot 6 (box-UI reachable).
+
+    Left/Right only move from empty cells. An empty at slot 7 with slot 6
+    occupied is unreachable from slot 0 — use slot 6 for positive cases.
+    """
+    inv = [
+        (KNIFE_ITEM_ID, 0),
+        (BERETTA, 14),
+        (CLIP, 16),
+        (SHIELD_KEY, 1),
+        (GREEN_HERB, 1),
+        (SHOTGUN, 4),
+        (0, 0),
+        (GREEN_HERB, 1),
+    ]
+    box = [(CLIP, 15), (CLIP, 15)] + [(0, 0)] * 46
+    return inv, box
+
+
+def _unreachable_odd_empty() -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+    """Only empty is odd-col slot 7 with slot 6 occupied — withdraw must fail."""
+    inv = [
+        (KNIFE_ITEM_ID, 0),
+        (BERETTA, 14),
+        (CLIP, 16),
+        (SHIELD_KEY, 1),
+        (GREEN_HERB, 1),
+        (SHOTGUN, 4),
+        (GREEN_HERB, 1),
+        (0, 0),
+    ]
+    box = [(CLIP, 15), (CLIP, 15)] + [(0, 0)] * 46
+    return inv, box
 
 
 def _full_inventory() -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
@@ -281,34 +302,52 @@ def _sparse_box_crowded_inv() -> tuple[list[tuple[int, int]], list[tuple[int, in
 # --- Test cases -------------------------------------------------------------
 
 
+def _assert_keys_on_person(inv: list[tuple[int, int]], *, label: str) -> None:
+    if not any(iid == SHIELD_KEY for iid, _ in inv):
+        raise AssertionError(f"{label}: shield_key missing from inventory")
+
+
+def _assert_no_keys_in_box(box_live: list[tuple[int, int]], *, label: str) -> None:
+    slots = [i for i, (iid, _) in enumerate(box_live) if iid == SHIELD_KEY]
+    if slots:
+        raise AssertionError(f"{label}: shield_key in box slots {slots}")
+
+
 def _case_cp40_withdraw_knife_herb(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
     inv, box = _cp40_crowded()
     _setup_layout(c, hp=hp, inventory=inv, box=box)
     empty = first_empty_inventory_slot(read_inventory(c))
-    assert empty == 7, f"expected empty inv slot 7, got {empty}"
+    assert empty == 6, f"expected empty inv slot 6, got {empty}"
 
     r0 = _withdraw(c, hp=hp, cur=cur, box_slot=0)
     assert r0["moved"] == (CLIP, 15)
-    assert cur.inv == 7, f"cursor should rest on inv slot 7, got {cur.inv}"
+    assert cur.inv == 6, f"cursor should rest on inv slot 6, got {cur.inv}"
+    _assert_keys_on_person(read_inventory(c), label="after_withdraw")
+
+    # Deposit even-col herb before knife so packing does not trap us without
+    # a reachable empty bridge for odd-col targets.
+    inv_now = read_inventory(c)
+    herb_slot = next(i for i, (iid, _) in enumerate(inv_now) if iid == GREEN_HERB and i % 2 == 0)
+    r1 = _deposit(c, hp=hp, cur=cur, inv_slot=herb_slot)
+    assert r1["moved"][0] == GREEN_HERB
+    _assert_keys_on_person(read_inventory(c), label="after_herb")
 
     knife_slot = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == KNIFE_ITEM_ID)
-    r1 = _deposit(c, hp=hp, cur=cur, inv_slot=knife_slot)
-    assert r1["moved"][0] == KNIFE_ITEM_ID
-
-    inv_now = read_inventory(c)
-    herb_slot = next(i for i, (iid, _) in enumerate(inv_now) if iid == GREEN_HERB)
-    r2 = _deposit(c, hp=hp, cur=cur, inv_slot=herb_slot)
-    assert r2["moved"][0] == GREEN_HERB
+    r2 = _deposit(c, hp=hp, cur=cur, inv_slot=knife_slot)
+    assert r2["moved"][0] == KNIFE_ITEM_ID
 
     box_live = read_box_live(c)
     _assert_clean_box(box_live, label="cp40_session")
     _assert_no_beretta(box_live, label="cp40_session")
+    _assert_no_keys_in_box(box_live, label="cp40_session")
+    _assert_keys_on_person(read_inventory(c), label="cp40_session")
     assert any(iid == KNIFE_ITEM_ID for iid, _ in box_live[:16])
     assert sum(1 for iid, _ in box_live[:16] if iid == GREEN_HERB) >= 1
     assert not any(iid == KNIFE_ITEM_ID for iid, _ in read_inventory(c))
 
 
 def _case_double_withdraw(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
+    """Two empties in different columns: deposit between withdraws (box-UI rule)."""
     inv, box = _cp40_two_empty_slots()
     _setup_layout(c, hp=hp, inventory=inv, box=box)
     assert first_empty_inventory_slot(read_inventory(c)) == 6
@@ -316,6 +355,11 @@ def _case_double_withdraw(c: BizHawkClient, hp: int, cur: CursorTracker) -> None
     _withdraw(c, hp=hp, cur=cur, box_slot=0)
     inv_after_1 = read_inventory(c)
     assert any(iid == CLIP and q > 0 for iid, q in inv_after_1)
+    # Slot 6 filled; remaining empty at 7 is odd-col — unreachable until we
+    # free a bridge. Bank knife (even col) so the next withdraw can proceed.
+    ks = next(i for i, (iid, _) in enumerate(inv_after_1) if iid == KNIFE_ITEM_ID)
+    _deposit(c, hp=hp, cur=cur, inv_slot=ks)
+    _assert_keys_on_person(read_inventory(c), label="double_mid")
 
     _withdraw(c, hp=hp, cur=cur, box_slot=1)
     inv_after_2 = read_inventory(c)
@@ -323,8 +367,49 @@ def _case_double_withdraw(c: BizHawkClient, hp: int, cur: CursorTracker) -> None
     assert clip_count >= 30, f"expected ~30 bullets on person, got {clip_count}"
 
     box16 = read_box(c)
-    assert box16[0][0] == 0 and box16[1][0] == 0, "both box slots 0/1 should be empty"
+    assert box16[1][0] == 0, "box slot 1 should be empty after second withdraw"
     _assert_clean_box(read_box_live(c), label="double_withdraw")
+    _assert_no_keys_in_box(read_box_live(c), label="double_withdraw")
+
+
+def _case_withdraw_deposit_rewithdraw(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
+    inv, box = _sparse_box_crowded_inv()
+    _setup_layout(c, hp=hp, inventory=inv, box=box)
+
+    _withdraw(c, hp=hp, cur=cur, box_slot=0)
+    hs = next(
+        i
+        for i, (iid, _) in enumerate(read_inventory(c))
+        if iid == GREEN_HERB and i % 2 == 0
+    )
+    _deposit(c, hp=hp, cur=cur, inv_slot=hs)
+    knife_slot = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == KNIFE_ITEM_ID)
+    _deposit(c, hp=hp, cur=cur, inv_slot=knife_slot)
+    _assert_keys_on_person(read_inventory(c), label="rewithdraw_mid")
+
+    # Box has knife + reopen ammo via RAM for second withdraw
+    c.write_ram([("b1", ITEM_BOX_BASE + 2, "u16", _encode_slot(CLIP, 15))])
+    c.frameadvance(2)
+
+    _withdraw(c, hp=hp, cur=cur, box_slot=1)
+    inv_final = read_inventory(c)
+    assert sum(q for iid, q in inv_final if iid == CLIP) >= 15
+    _assert_clean_box(read_box_live(c), label="rewithdraw")
+    _assert_no_beretta(read_box_live(c), label="rewithdraw")
+    _assert_keys_on_person(inv_final, label="rewithdraw")
+    _assert_no_keys_in_box(read_box_live(c), label="rewithdraw")
+
+
+def _case_single_withdraw_on_full_inv(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
+    """7/8 slots used: only one withdraw fits; second is correctly blocked."""
+    inv, box = _cp40_crowded()
+    _setup_layout(c, hp=hp, inventory=inv, box=box)
+
+    _withdraw(c, hp=hp, cur=cur, box_slot=0)
+    report = _withdraw(c, hp=hp, cur=cur, box_slot=1, expect_ok=False)
+    assert report.get("reason") == "inventory_full"
+    _assert_clean_box(read_box_live(c), label="single_withdraw_full")
+    _assert_keys_on_person(read_inventory(c), label="single_withdraw_full")
 
 
 def _case_full_inventory_withdraw_blocked(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
@@ -341,56 +426,41 @@ def _case_full_inventory_withdraw_blocked(c: BizHawkClient, hp: int, cur: Cursor
     assert read_box(c) == box_before
 
 
-def _case_withdraw_deposit_rewithdraw(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
-    inv, box = _sparse_box_crowded_inv()
+def _case_unreachable_odd_empty_withdraw(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
+    """Empty only at slot 7 with 6 occupied — cannot Left/Right onto it."""
+    inv, box = _unreachable_odd_empty()
     _setup_layout(c, hp=hp, inventory=inv, box=box)
+    assert first_empty_inventory_slot(read_inventory(c)) == 7
 
-    _withdraw(c, hp=hp, cur=cur, box_slot=0)
-    knife_slot = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == KNIFE_ITEM_ID)
-    _deposit(c, hp=hp, cur=cur, inv_slot=knife_slot)
-
-    # Box slot 0 now has knife; add ammo back via RAM for second withdraw test
-    box_now = read_box_live(c)
-    fields = [
-        ("b1", ITEM_BOX_BASE + 2, "u16", _encode_slot(CLIP, 15)),
-    ]
-    c.write_ram(fields)
-    c.frameadvance(2)
-
-    _withdraw(c, hp=hp, cur=cur, box_slot=1)
-    inv_final = read_inventory(c)
-    assert sum(q for iid, q in inv_final if iid == CLIP) >= 15
-    _assert_clean_box(read_box_live(c), label="rewithdraw")
-    _assert_no_beretta(read_box_live(c), label="rewithdraw")
-
-
-def _case_single_withdraw_on_full_inv(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
-    """7/8 slots used: only one withdraw fits; second is correctly blocked."""
-    inv, box = _cp40_crowded()
-    _setup_layout(c, hp=hp, inventory=inv, box=box)
-
-    _withdraw(c, hp=hp, cur=cur, box_slot=0)
-    report = _withdraw(c, hp=hp, cur=cur, box_slot=1, expect_ok=False)
-    assert report.get("reason") == "inventory_full"
-    _assert_clean_box(read_box_live(c), label="single_withdraw_full")
+    inv_before = list(read_inventory(c))
+    report = _withdraw(c, hp=hp, cur=cur, box_slot=0, expect_ok=False)
+    assert report.get("reason") == "empty_slot_unreachable", report
+    assert cur.inv == 0 and cur.box == 0
+    assert read_inventory(c) == inv_before
+    _assert_keys_on_person(read_inventory(c), label="unreachable_odd")
+    _assert_no_keys_in_box(read_box_live(c), label="unreachable_odd")
 
 
 def _case_deposit_both_herbs(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
     inv, box = _cp40_crowded()
     _setup_layout(c, hp=hp, inventory=inv, box=box)
 
-    # One empty slot: withdraw once, bank knife to free a slot, withdraw again.
+    # Bank both herbs while an empty bridge still exists (before filling inv).
     _withdraw(c, hp=hp, cur=cur, box_slot=0)
+    hs_even = next(
+        i
+        for i, (iid, _) in enumerate(read_inventory(c))
+        if iid == GREEN_HERB and i % 2 == 0
+    )
+    _deposit(c, hp=hp, cur=cur, inv_slot=hs_even)
+    # After even deposit, park should leave a reachable empty for odd herb.
+    inv_now = read_inventory(c)
+    hs_odd = next(i for i, (iid, _) in enumerate(inv_now) if iid == GREEN_HERB)
+    _deposit(c, hp=hp, cur=cur, inv_slot=hs_odd)
     ks = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == KNIFE_ITEM_ID)
     _deposit(c, hp=hp, cur=cur, inv_slot=ks)
+    _assert_keys_on_person(read_inventory(c), label="both_herbs_mid")
     _withdraw(c, hp=hp, cur=cur, box_slot=1)
-
-    inv_now = read_inventory(c)
-    assert sum(1 for iid, _ in inv_now if iid == GREEN_HERB) == 2
-    for _ in range(2):
-        inv_now = read_inventory(c)
-        hs = next(i for i, (iid, _) in enumerate(inv_now) if iid == GREEN_HERB)
-        _deposit(c, hp=hp, cur=cur, inv_slot=hs)
 
     box_live = read_box_live(c)
     herb_in_box = sum(1 for iid, _ in box_live[:16] if iid == GREEN_HERB)
@@ -398,18 +468,126 @@ def _case_deposit_both_herbs(c: BizHawkClient, hp: int, cur: CursorTracker) -> N
     assert not any(iid == GREEN_HERB for iid, _ in read_inventory(c))
     _assert_clean_box(box_live, label="both_herbs")
     _assert_no_beretta(box_live, label="both_herbs")
+    _assert_no_keys_in_box(box_live, label="both_herbs")
+    _assert_keys_on_person(read_inventory(c), label="both_herbs")
+
+
+def _case_triple_session(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
+    """Multi-transfer open-box session without close; keys never bank."""
+    inv, box = _cp40_crowded()
+    box[2] = (CLIP, 15)
+    _setup_layout(c, hp=hp, inventory=inv, box=box)
+
+    _withdraw(c, hp=hp, cur=cur, box_slot=0)
+    hs = next(
+        i
+        for i, (iid, _) in enumerate(read_inventory(c))
+        if iid == GREEN_HERB and i % 2 == 0
+    )
+    _deposit(c, hp=hp, cur=cur, inv_slot=hs)
+    _assert_keys_on_person(read_inventory(c), label="triple_mid1")
+    # Second herb while empty bridge still available.
+    hs2 = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == GREEN_HERB)
+    _deposit(c, hp=hp, cur=cur, inv_slot=hs2)
+    ks = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == KNIFE_ITEM_ID)
+    _deposit(c, hp=hp, cur=cur, inv_slot=ks)
+    _withdraw(c, hp=hp, cur=cur, box_slot=1)
+    _withdraw(c, hp=hp, cur=cur, box_slot=2)
+
+    live = read_box_live(c)
+    _assert_clean_box(live, label="triple_session")
+    _assert_no_beretta(live, label="triple_session")
+    _assert_no_keys_in_box(live, label="triple_session")
+    _assert_keys_on_person(read_inventory(c), label="triple_session")
+    assert any(iid == KNIFE_ITEM_ID for iid, _ in live[:16])
+    assert sum(1 for iid, _ in live[:16] if iid == GREEN_HERB) >= 2
+
+
+def _case_extended_session_no_close(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
+    """Long open-box session: many withdraw/deposit cycles; keys never bank."""
+    inv = [
+        (KNIFE_ITEM_ID, 0),
+        (BERETTA, 14),
+        (CLIP, 16),
+        (SHIELD_KEY, 1),
+        (GREEN_HERB, 1),
+        (SHOTGUN, 4),
+        (0, 0),
+        (GREEN_HERB, 1),
+    ]
+    box = [
+        (CLIP, 15),
+        (CLIP, 15),
+        (GREEN_HERB, 1),
+        (CLIP, 15),
+    ] + [(0, 0)] * 44
+    _setup_layout(c, hp=hp, inventory=inv, box=box)
+
+    transfers = 0
+    # Wave 1: withdraw + bank even herb + knife
+    _withdraw(c, hp=hp, cur=cur, box_slot=0)
+    transfers += 1
+    _assert_keys_on_person(read_inventory(c), label="ext1")
+    hs = next(
+        i
+        for i, (iid, _) in enumerate(read_inventory(c))
+        if iid == GREEN_HERB and i % 2 == 0
+    )
+    _deposit(c, hp=hp, cur=cur, inv_slot=hs)
+    transfers += 1
+    hs2 = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == GREEN_HERB)
+    _deposit(c, hp=hp, cur=cur, inv_slot=hs2)
+    transfers += 1
+    ks = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == KNIFE_ITEM_ID)
+    _deposit(c, hp=hp, cur=cur, inv_slot=ks)
+    transfers += 1
+    _assert_keys_on_person(read_inventory(c), label="ext2")
+    _assert_no_keys_in_box(read_box_live(c), label="ext2")
+
+    # Wave 2: more withdraws into freed slots, bank box herb
+    _withdraw(c, hp=hp, cur=cur, box_slot=1)
+    transfers += 1
+    _withdraw(c, hp=hp, cur=cur, box_slot=2)
+    transfers += 1
+    inv_now = read_inventory(c)
+    assert sum(1 for iid, _ in inv_now if iid == GREEN_HERB) >= 1
+    hs = next(i for i, (iid, _) in enumerate(inv_now) if iid == GREEN_HERB)
+    _deposit(c, hp=hp, cur=cur, inv_slot=hs)
+    transfers += 1
+    _withdraw(c, hp=hp, cur=cur, box_slot=3)
+    transfers += 1
+
+    assert transfers >= 7, transfers
+    shield_slot = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == SHIELD_KEY)
+    ok, reason = can_deposit(read_inventory(c), read_box(c), shield_slot)
+    assert not ok and reason == "key_item", (ok, reason)
+    _d, _f, blocked = execute_box_deposit_ui(
+        c,
+        shield_slot,
+        prev_hp=hp,
+        episode_start_hp=hp,
+        inv_cursor=cur.inv,
+        box_cursor=cur.box,
+    )
+    assert not blocked.get("ok")
+    assert blocked.get("reason") == "key_item"
+    _assert_keys_on_person(read_inventory(c), label="ext_final")
+    live = read_box_live(c)
+    _assert_no_keys_in_box(live, label="ext_final")
+    _assert_clean_box(live, label="ext_final")
+    _assert_no_beretta(live, label="ext_final")
 
 
 def _case_stale_cursor_rejected(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
     inv, box = _cp40_crowded()
     _setup_layout(c, hp=hp, inventory=inv, box=box)
 
-    wd = _withdraw(c, hp=hp, cur=cur, box_slot=0)
-    assert cur.inv == 7
+    _withdraw(c, hp=hp, cur=cur, box_slot=0)
+    assert cur.inv == 6
     saved_inv, saved_box = cur.inv, cur.box
 
     knife_slot = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == KNIFE_ITEM_ID)
-    # Deliberately stale inv cursor (0 instead of 7)
+    # Deliberately stale inv cursor (0 instead of 6) while UI rests on filled dest.
     _d, _f, bad = execute_box_deposit_ui(
         c,
         knife_slot,
@@ -419,47 +597,42 @@ def _case_stale_cursor_rejected(c: BizHawkClient, hp: int, cur: CursorTracker) -
         box_cursor=cur.box,
     )
     assert not bad.get("ok"), bad
-    assert bad.get("exchange_detected") or bad.get("ram_changed") or "disallowed" in str(
-        bad.get("reason", "")
-    )
+    reason = str(bad.get("reason", ""))
+    assert (
+        bad.get("exchange_detected")
+        or bad.get("ram_changed")
+        or "disallowed" in reason
+        or reason
+        in (
+            "transfer_no_effect",
+            "wrong_item_deposited",
+            "key_item_deposited",
+            "inv_slot_drift",
+        )
+        or reason.startswith("inv_slot_unreachable")
+        or reason.startswith("key_item_in_box")
+    ), bad
     cur.inv, cur.box = saved_inv, saved_box  # env would not apply failed report
+    _assert_keys_on_person(read_inventory(c), label="stale_after_bad")
+    _assert_no_keys_in_box(read_box_live(c), label="stale_after_bad")
 
     # Recovery: correct cursors should still work
     _deposit(c, hp=hp, cur=cur, inv_slot=knife_slot)
     _assert_no_beretta(read_box_live(c), label="after_stale_recovery")
-
-
-def _case_triple_session(c: BizHawkClient, hp: int, cur: CursorTracker) -> None:
-    """Withdraw → knife → herb → withdraw → herb — full cp41-style banking."""
-    inv, box = _cp40_crowded()
-    box[2] = (CLIP, 15)  # third ammo stack in box
-    _setup_layout(c, hp=hp, inventory=inv, box=box)
-
-    _withdraw(c, hp=hp, cur=cur, box_slot=0)
-    ks = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == KNIFE_ITEM_ID)
-    _deposit(c, hp=hp, cur=cur, inv_slot=ks)
-    hs = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == GREEN_HERB)
-    _deposit(c, hp=hp, cur=cur, inv_slot=hs)
-    _withdraw(c, hp=hp, cur=cur, box_slot=1)
-    inv_now = read_inventory(c)
-    hs2 = next(i for i, (iid, _) in enumerate(inv_now) if iid == GREEN_HERB)
-    _deposit(c, hp=hp, cur=cur, inv_slot=hs2)
-
-    live = read_box_live(c)
-    _assert_clean_box(live, label="triple_session")
-    _assert_no_beretta(live, label="triple_session")
-    assert any(iid == KNIFE_ITEM_ID for iid, _ in live[:16])
+    _assert_keys_on_person(read_inventory(c), label="after_stale_recovery")
 
 
 CASES: list[Case] = [
     Case("cp40_withdraw_knife_herb", lambda c: None, _case_cp40_withdraw_knife_herb),
     Case("double_withdraw_two_empty_slots", lambda c: None, _case_double_withdraw),
     Case("single_withdraw_then_blocked", lambda c: None, _case_single_withdraw_on_full_inv),
+    Case("unreachable_odd_empty_withdraw", lambda c: None, _case_unreachable_odd_empty_withdraw),
     Case("full_inventory_withdraw_blocked", lambda c: None, _case_full_inventory_withdraw_blocked),
     Case("withdraw_deposit_rewithdraw", lambda c: None, _case_withdraw_deposit_rewithdraw),
     Case("deposit_both_herbs", lambda c: None, _case_deposit_both_herbs),
     Case("stale_cursor_rejected", lambda c: None, _case_stale_cursor_rejected),
     Case("triple_session_cp41_style", lambda c: None, _case_triple_session),
+    Case("extended_session_keys_stay", lambda c: None, _case_extended_session_no_close),
 ]
 
 
