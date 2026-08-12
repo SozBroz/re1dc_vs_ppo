@@ -112,9 +112,17 @@ def apply_logistics_feasibility_mask(
         pressure += len(row.get("items_gained", []))
         peak = max(peak, pressure)
     required_headroom = min(INVENTORY_SLOTS, max(0, peak))
+    from re1_rl.yawn_box_prep_checkpoint import yawn_box_forbidden_weapon_ammo_ids
+
+    guns_ammo = yawn_box_forbidden_weapon_ammo_ids()
     for slot in range(min(N_WITHDRAW_ACTIONS, len(box))):
         action = WITHDRAW_ACTION_BASE + slot
         if action >= len(mask) or not mask[action]:
+            continue
+        # Never block taking guns/ammo back out of the box. Yawn 118 prep
+        # cannot succeed with bazooka banked; the headroom guard was leaving
+        # only Close legal after Withdraw-open.
+        if int(box[slot][0]) & 0xFF in guns_ammo:
             continue
         _new_box, new_inventory, moved = plan_withdraw(inventory, box, slot)
         if moved <= 0:

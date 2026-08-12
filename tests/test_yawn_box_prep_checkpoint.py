@@ -221,3 +221,49 @@ def test_suppress_wrong_room_only_when_prep_ready() -> None:
     assert not should_suppress_wrong_room(planner, "118", "10A", ready)
     assert yawn_box_prep_capture_room_ok("yawn_box_prep_118", "10B", "118")
     assert not yawn_box_prep_capture_room_ok("yawn_box_prep_118", "10A", "118")
+
+
+def test_logistics_mask_allows_bazooka_withdraw_on_fullish_pack() -> None:
+    """One empty slot + later pickups must not hide withdraw_box for bazooka."""
+    from re1_rl.action_mask import (
+        BOX_CLOSE_ACTION,
+        BOX_PHASE_WITHDRAW_SLOT,
+        BOX_WITHDRAW_ACTION,
+        WITHDRAW_ACTION_BASE,
+        action_mask,
+    )
+    from re1_rl.env import ACTION_NAMES
+    from re1_rl.yawn_rails import apply_logistics_feasibility_mask
+    from tests.test_yawn_rails import _idx, _planner
+
+    inv = [
+        (0x02, 15),
+        (0x0B, 24),
+        (0x35, 1),
+        (0x03, 7),
+        (0x11, 6),
+        (0x34, 4),
+        (0x0C, 2),
+        (0, 0),
+    ]
+    box = [(0, 0)] * BOX_SLOTS
+    box[1] = (0x01, 0)
+    box[2] = (0x07, 4)
+    n = len(ACTION_NAMES)
+    mask = action_mask(
+        n,
+        None,
+        inventory=inv,
+        box=box,
+        in_box_room=True,
+        box_ui_open=True,
+        box_phase=BOX_PHASE_WITHDRAW_SLOT,
+        in_control=False,
+        room_id="118",
+    )
+    apply_logistics_feasibility_mask(
+        mask, inv, box, _planner(start_index=_idx("yawn_box_prep_118"))
+    )
+    assert mask[WITHDRAW_ACTION_BASE + 2]
+    assert mask[BOX_CLOSE_ACTION]
+    assert not mask[BOX_WITHDRAW_ACTION]
