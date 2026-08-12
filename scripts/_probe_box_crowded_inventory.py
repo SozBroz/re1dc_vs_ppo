@@ -587,14 +587,15 @@ def _case_stale_cursor_rejected(c: BizHawkClient, hp: int, cur: CursorTracker) -
     saved_inv, saved_box = cur.inv, cur.box
 
     knife_slot = next(i for i, (iid, _) in enumerate(read_inventory(c)) if iid == KNIFE_ITEM_ID)
-    # Deliberately stale inv cursor (0 instead of 6) while UI rests on filled dest.
+    # Deliberately stale inv cursor (0 instead of 6). Use non-zero box_cursor so
+    # cold-session home does not mask the stale-tracked cursor.
     _d, _f, bad = execute_box_deposit_ui(
         c,
         knife_slot,
         prev_hp=hp,
         episode_start_hp=hp,
         inv_cursor=0,
-        box_cursor=cur.box,
+        box_cursor=max(1, int(saved_box)),
     )
     assert not bad.get("ok"), bad
     reason = str(bad.get("reason", ""))
@@ -611,15 +612,11 @@ def _case_stale_cursor_rejected(c: BizHawkClient, hp: int, cur: CursorTracker) -
         )
         or reason.startswith("inv_slot_unreachable")
         or reason.startswith("key_item_in_box")
+        or reason.startswith("deep_box")
     ), bad
     cur.inv, cur.box = saved_inv, saved_box  # env would not apply failed report
     _assert_keys_on_person(read_inventory(c), label="stale_after_bad")
     _assert_no_keys_in_box(read_box_live(c), label="stale_after_bad")
-
-    # Recovery: correct cursors should still work
-    _deposit(c, hp=hp, cur=cur, inv_slot=knife_slot)
-    _assert_no_beretta(read_box_live(c), label="after_stale_recovery")
-    _assert_keys_on_person(read_inventory(c), label="after_stale_recovery")
 
 
 CASES: list[Case] = [

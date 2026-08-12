@@ -301,14 +301,15 @@ def deposit_inventory_nav_from(
 ) -> int:
     """Inventory grid start slot for deposit navigation.
 
-    When tracked ``inv_cursor`` equals the deposit target but the UI never
-    moved there (common beretta-in-box bug), callers must pass
-    ``trust_inv_cursor=False`` so navigation re-anchors from slot 0.
+    Returns the tracked inventory cursor unless callers opt into
+    ``trust_inv_cursor=True`` (env has verified the UI rests there).
     """
     cursor = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
     slot = int(inv_slot)
-    if cursor == slot and slot != 0 and not trust_inv_cursor:
-        return 0
+    if trust_inv_cursor:
+        return cursor
+    if cursor == slot:
+        return cursor
     return cursor
 
 
@@ -876,6 +877,22 @@ def execute_box_deposit_ui(
         report["reason"] = "bad_slot"
         return False, 0, report
 
+    cold_session = (
+        not trust_inv_cursor
+        and int(inv_cursor) == 0
+        and int(box_cursor) == 0
+    )
+    if cold_session:
+        died, f = _home_inventory(
+            client, prev_hp=prev_hp, episode_start_hp=episode_start_hp
+        )
+        frames += f
+        if died:
+            report["died"] = True
+            report["frames"] = frames
+            return True, frames, report
+        report["inv_homed"] = True
+
     inv_before = read_inventory(client)
     box_before = read_box(client)
     box_live_before = read_box_live(client)
@@ -928,7 +945,11 @@ def execute_box_deposit_ui(
     # the tracked cursor; only re-anchor onto a reachable empty when the target
     # is otherwise unreachable (horizontal requires standing on empty). Never
     # invent an empty-cursor position — that deposited beretta/shield_key live.
-    nav_from = max(0, min(INVENTORY_SLOTS - 1, int(inv_cursor)))
+    nav_from = deposit_inventory_nav_from(
+        int(inv_cursor), int(slot), trust_inv_cursor=trust_inv_cursor
+    )
+    if cold_session:
+        nav_from = 0
     try:
         box_inventory_nav_moves(nav_from, int(slot), inv_before)
         direct_ok = True
