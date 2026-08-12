@@ -17,6 +17,15 @@ YAWN_BOX_PREP_CHECKPOINT_ID = "yawn_box_prep_118"
 YAWN_BOX_PREP_ROOM = "118"
 YAWN_BOX_PREP_EXIT_ROOM = "10B"
 WIND_CREST_NAME = "wind_crest"
+YAWN_BOX_PREP_HELD_KEYS = ("armor_key", "shield_key")
+YAWN_BOX_PREP_HELD_FIREPOWER = (
+    "beretta",
+    "shotgun",
+    "bazooka_acid",
+    "handgun_bullets",
+    "shotgun_shells",
+    "acid_rounds",
+)
 
 
 def wind_crest_deposit_allowed(item_id: int, room_id: str | None) -> bool:
@@ -140,6 +149,26 @@ def yawn_box_prep_box_pollution_reason(
     return None
 
 
+def _inventory_name_set(
+    inventory_names: list[str] | tuple[str, ...] | None,
+) -> set[str]:
+    return {canonical_item(str(x)) for x in (inventory_names or []) if str(x).strip()}
+
+
+def yawn_box_prep_held_reason(
+    inventory_names: list[str] | tuple[str, ...] | None,
+) -> str | None:
+    """Person must hold both mansion keys and the guns/ammo for this loadout."""
+    inv = _inventory_name_set(inventory_names)
+    for name in YAWN_BOX_PREP_HELD_KEYS:
+        if name not in inv:
+            return f"missing_held:{name}"
+    for name in YAWN_BOX_PREP_HELD_FIREPOWER:
+        if name not in inv:
+            return f"missing_held:{name}"
+    return None
+
+
 def yawn_box_prep_capture_ready(
     box: list[tuple[int, int]] | None,
     inventory_names: list[str] | tuple[str, ...] | None,
@@ -150,17 +179,15 @@ def yawn_box_prep_capture_ready(
         return pollution
     if not box_has_item(box, WIND_CREST_NAME):
         return "wind_crest_not_in_box"
-    inv = {canonical_item(str(x)) for x in (inventory_names or []) if str(x).strip()}
+    inv = _inventory_name_set(inventory_names)
     if WIND_CREST_NAME in inv:
         return "wind_crest_still_held"
-    return None
+    return yawn_box_prep_held_reason(inventory_names)
 
 
 def yawn_box_prep_ready(state: dict[str, Any] | None) -> bool:
-    """True when crest is banked, guns/ammo are out of the box, and lab timer is 0."""
+    """True when crest is banked and keys plus guns/ammo are on person."""
     st = state or {}
-    if int(st.get("lab_timer", 1) or 0) != 0:
-        return False
     return yawn_box_prep_capture_ready(
         box_pairs_from_state(st),
         list(st.get("inventory") or []),
@@ -172,7 +199,7 @@ def yawn_box_prep_exit_met(
     prev_state: dict[str, Any] | None,
     progress: Any,
 ) -> bool:
-    """Success: leave 118 into 10B with the box already prepped."""
+    """Success: leave 118 into 10B with keys and firepower on person."""
     st = state or {}
     if str(st.get("room_id", "")).upper() != YAWN_BOX_PREP_EXIT_ROOM:
         return False

@@ -1149,13 +1149,13 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `118` (STAIRS UNDER ROOM)
 - **Action:** `navigate`
-- **Objective:** Deposit `wind_crest`, withdraw guns/ammo from the item box (knife ok), wait for the lab timer, then leave to East Stairway `10B`
+- **Objective:** Deposit `wind_crest`, withdraw guns/ammo from the item box (knife ok), then leave to East Stairway `10B`
 - **Required items:** `shield_key`, `shotgun`
 - **Items gained:** _(none)_
 - **Consume before gain:** `wind_crest` (must be deposited in the item box, not on person)
 - **How to achieve:** Be in **118**. Hold: `shield_key`, `shotgun`. Use the item box to deposit `wind_crest` and withdraw guns/ammo. Leave to **10B** with the box clean.
 - **Success condition:**
-- `yawn_box_prep_exit`: leave `118` into `10B` with `lab_timer == 0`, `wind_crest` in the box (not on person), and no guns/ammo in the box (knife allowed)
+- `yawn_box_prep_exit`: leave `118` into `10B` holding `armor_key` + `shield_key` and the guns/ammo (`beretta`, `shotgun`, `bazooka_acid`, `handgun_bullets`, `shotgun_shells`, `acid_rounds`); `wind_crest` in the box (not on person); no guns/ammo in the box (knife allowed). Lab timer is not a gate.
 - Leaving `118` without those box conditions still ends the episode as `wrong_room`
 
 ### `cp90` — `east_stairs_101_to_yawn` (seq 91)

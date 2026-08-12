@@ -77,11 +77,14 @@ That allowlist may change later for this same checkpoint. Do not bake “crest i
 
 ### This CP — success is an end state
 
-Leave `118` → `10B` with `lab_timer == 0` and:
+Leave `118` → `10B` holding both mansion keys and the guns/ammo on person:
 
-1. `wind_crest` in the box, not on person
-2. No guns or ammo in the box (knife may stay)
-3. Mansion keys not in the box (they cannot be deposited under the current mask; if they appear there, that is the swap bug)
+1. `armor_key` and `shield_key` on person
+2. `beretta`, `shotgun`, `bazooka_acid`, `handgun_bullets`, `shotgun_shells`, `acid_rounds` on person
+3. `wind_crest` in the box, not on person
+4. No guns or ammo in the box (knife may stay)
+
+Lab timer is not a gate.
 
 There is **no unique sequence**. Order can be withdraw-then-deposit or deposit-then-withdraw whenever the pack has a hole.
 

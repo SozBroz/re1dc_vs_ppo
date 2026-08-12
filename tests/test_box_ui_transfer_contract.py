@@ -324,7 +324,20 @@ def test_u10_7pack_withdraw_legal_before_deposit_capture_still_needs_crest() -> 
 
     ready_box = list(banked_box)
     ready_box[1] = (0, 0)
-    assert yawn_box_prep_capture_ready(ready_box, names_after_bank) is None
+    ready_names = [
+        "beretta",
+        "handgun_bullets",
+        "shield_key",
+        "shotgun",
+        "acid_rounds",
+        "armor_key",
+        "shotgun_shells",
+        "bazooka_acid",
+    ]
+    assert yawn_box_prep_capture_ready(ready_box, names_after_bank) == (
+        "missing_held:bazooka_acid"
+    )
+    assert yawn_box_prep_capture_ready(ready_box, ready_names) is None
     assert yawn_box_prep_capture_ready(ready_box, inv_names) == "wind_crest_still_held"
     assert yawn_box_prep_capture_ready(_typical_box(), names_after_bank) == (
         "yawn_box_weapon_ammo:bazooka_acid@1"

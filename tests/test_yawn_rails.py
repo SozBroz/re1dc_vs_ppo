@@ -691,7 +691,7 @@ def test_yawn_episode_terminates_only_after_configured_leg_span() -> None:
     )
 
 
-def test_yawn_box_prep_requires_natural_lab_timer_expiry() -> None:
+def test_yawn_box_prep_ignores_lab_timer_requires_keys_and_firepower() -> None:
     from re1_rl.yawn_box_prep_checkpoint import WIND_CREST_ITEM_ID
 
     planner = _planner(start_index=_idx("yawn_box_prep_118"))
@@ -701,21 +701,31 @@ def test_yawn_box_prep_requires_natural_lab_timer_expiry() -> None:
     box = [(0, 0)] * 48
     box[0] = (WIND_CREST_ITEM_ID, 1)
     prev = _state("118")
+    ready_inv = [
+        "beretta",
+        "handgun_bullets",
+        "shield_key",
+        "shotgun",
+        "acid_rounds",
+        "armor_key",
+        "shotgun_shells",
+        "bazooka_acid",
+    ]
 
-    ticking = _state("10B")
-    ticking["lab_timer"] = 1
-    ticking["inventory"] = ["shield_key", "shotgun"]
-    ticking["box_cache"] = box
+    missing_key = _state("10B")
+    missing_key["lab_timer"] = 0
+    missing_key["inventory"] = [n for n in ready_inv if n != "armor_key"]
+    missing_key["box_cache"] = box
     assert not planner.advance_if_success(
-        ticking, progress=ProgressTracker(), prev_state=prev
+        missing_key, progress=ProgressTracker(), prev_state=prev
     )
 
-    expired = _state("10B")
-    expired["lab_timer"] = 0
-    expired["inventory"] = ["shield_key", "shotgun"]
-    expired["box_cache"] = box
+    ticking = _state("10B")
+    ticking["lab_timer"] = 8600
+    ticking["inventory"] = list(ready_inv)
+    ticking["box_cache"] = box
     assert planner.advance_if_success(
-        expired, progress=ProgressTracker(), prev_state=prev
+        ticking, progress=ProgressTracker(), prev_state=prev
     )
 
 

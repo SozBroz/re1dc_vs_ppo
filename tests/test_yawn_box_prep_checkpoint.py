@@ -150,12 +150,29 @@ def test_generic_pollution_allows_banked_wind_crest_and_bazooka() -> None:
     assert box_pollution_reason(box, room_id="10B") is None
 
 
+def _ready_inv() -> list[str]:
+    return [
+        "beretta",
+        "handgun_bullets",
+        "shield_key",
+        "shotgun",
+        "acid_rounds",
+        "armor_key",
+        "shotgun_shells",
+        "bazooka_acid",
+    ]
+
+
 def test_yawn_box_prep_capture_requires_wind_in_box_not_on_person() -> None:
     box = _box()
     box[0] = (WIND_CREST_ITEM_ID, 1)
-    assert yawn_box_prep_capture_ready(box, []) is None
-    assert yawn_box_prep_capture_ready(box, ["wind_crest"]) == "wind_crest_still_held"
-    assert yawn_box_prep_capture_ready(_box(), []) == "wind_crest_not_in_box"
+    assert yawn_box_prep_capture_ready(box, _ready_inv()) is None
+    assert yawn_box_prep_capture_ready(box, []) == "missing_held:armor_key"
+    assert (
+        yawn_box_prep_capture_ready(box, _ready_inv() + ["wind_crest"])
+        == "wind_crest_still_held"
+    )
+    assert yawn_box_prep_capture_ready(_box(), _ready_inv()) == "wind_crest_not_in_box"
 
 
 def test_yawn_box_weapon_ammo_clear() -> None:
@@ -176,14 +193,12 @@ def test_planner_yawn_box_prep_succeeds_on_leave_to_10b() -> None:
     box[0] = (WIND_CREST_ITEM_ID, 1)
 
     still_in = _state("118")
-    still_in["lab_timer"] = 0
-    still_in["inventory"] = ["shield_key", "shotgun"]
+    still_in["inventory"] = list(_ready_inv())
     still_in["box_cache"] = box
     assert not planner.advance_if_success(still_in, progress=progress)
 
     dirty_leave = _state("10B")
-    dirty_leave["lab_timer"] = 0
-    dirty_leave["inventory"] = ["shield_key", "shotgun", "wind_crest"]
+    dirty_leave["inventory"] = list(_ready_inv()) + ["wind_crest"]
     dirty_leave["box_cache"] = [(0, 0)] * BOX_SLOTS_LIVE
     dirty_leave["box_cache"][2] = (0x07, 4)
     assert not planner.advance_if_success(
@@ -191,8 +206,8 @@ def test_planner_yawn_box_prep_succeeds_on_leave_to_10b() -> None:
     )
 
     ready = _state("10B")
-    ready["lab_timer"] = 0
-    ready["inventory"] = ["shield_key", "shotgun", "bazooka_acid"]
+    ready["lab_timer"] = 8600
+    ready["inventory"] = list(_ready_inv())
     ready["box_cache"] = box
     assert planner.advance_if_success(
         ready, progress=progress, prev_state=_state("118")
@@ -207,14 +222,14 @@ def test_suppress_wrong_room_only_when_prep_ready() -> None:
     box = [(0, 0)] * BOX_SLOTS_LIVE
     box[0] = (WIND_CREST_ITEM_ID, 1)
     ready = _state("10B")
-    ready["lab_timer"] = 0
-    ready["inventory"] = ["shield_key", "shotgun"]
+    ready["lab_timer"] = 8600
+    ready["inventory"] = list(_ready_inv())
     ready["box_cache"] = box
     assert should_suppress_wrong_room(planner, "118", "10B", ready)
     assert yawn_box_prep_ready(ready)
 
     dirty = dict(ready)
-    dirty["inventory"] = ["shield_key", "shotgun", "wind_crest"]
+    dirty["inventory"] = list(_ready_inv()) + ["wind_crest"]
     dirty["box_cache"] = [(0, 0)] * BOX_SLOTS_LIVE
     dirty["box_cache"][2] = (0x07, 4)
     assert not should_suppress_wrong_room(planner, "118", "10B", dirty)
