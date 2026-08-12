@@ -409,6 +409,33 @@ class WaypointPlanner:
             return completed_steps(raw) >= min_steps
         return False
 
+    def skip_spawn_satisfied_room_enters(self, spawn_room: str) -> int:
+        """Advance past ``room_enter`` checkpoints already true at spawn.
+
+        Exit-room captures (cp89 ``yawn_box_prep_118`` in ``10B``) otherwise
+        auto-complete the next ``room_enter`` on the first step and reset.
+        Does not skip ``room_enter_from`` (needs a real transition).
+        """
+        spawn = str(spawn_room or "").strip().upper()
+        skipped = 0
+        while True:
+            step = self.current_objective()
+            if not step:
+                break
+            cond = step.get("success_condition")
+            if not isinstance(cond, dict):
+                break
+            if str(cond.get("type", "room_enter")) != "room_enter":
+                break
+            target = str(
+                cond.get("room_id") or step.get("room_id") or ""
+            ).strip().upper()
+            if not spawn or spawn != target:
+                break
+            self._index += 1
+            skipped += 1
+        return skipped
+
     @property
     def waypoint_index(self) -> int:
         return self._index

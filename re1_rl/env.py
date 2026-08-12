@@ -1654,6 +1654,17 @@ class RE1Env(gym.Env):
         self._visited.update(state["room_id"], state["x"], state["z"])
         self._prev_state = state
         self._prev_hp = state["hp"]
+        skipped = self._planner.skip_spawn_satisfied_room_enters(
+            str(state.get("room_id", ""))
+        )
+        if skipped:
+            self._route_start_index += skipped
+            print(
+                f"[rails] skip {skipped} spawn-satisfied room_enter(s) "
+                f"start={self._route_start_index} room={state.get('room_id')!r} "
+                f"next={self._planner.next_waypoint_room()!r}",
+                flush=True,
+            )
         if getattr(self, "_typewriter_save_detector", None) is not None:
             # Sidecar/PB starts hold off save detect until control+ribbons stable.
             self._typewriter_save_detector.begin_episode(

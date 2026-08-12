@@ -165,9 +165,9 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
             f"{cp['checkpoint_id']} still bundles enter with {extras}"
         )
     assert [(cp["room_id"], cp["checkpoint_id"]) for cp in route[-10:]] == [
+        ("10B", "east_stairs_101_post_richard"),
         ("118", "yawn_box_enter_118"),
         ("118", "yawn_box_prep_118"),
-        ("10B", "east_stairs_101_to_yawn"),
         ("207", "east_stairs_201_to_yawn"),
         ("204", "c_passage_204_to_yawn"),
         ("20D", "moon_hall_enter_20D"),
@@ -618,8 +618,8 @@ def test_goal_encodes_selected_one_leg_checkpoint() -> None:
 
 def test_goal_appends_six_masked_checkpoint_semantic_slots() -> None:
     encoder = ObsEncoder(ROOMS, _graph(), curriculum_stage_index=1)
-    # Lookahead from east stairs after Richard: … ammo_20D, attic, yawn enter, yawn.
-    planner = _planner(start_index=_idx("east_stairs_101_to_yawn"))
+    # Lookahead from east stairs 1F after box prep: climb 207 … ammo_20D, attic, yawn.
+    planner = _planner(start_index=_idx("east_stairs_201_to_yawn"))
     goal = encoder.encode_goal(
         _state("10B", inventory=["shield_key", "shotgun"]),
         planner,
@@ -628,13 +628,13 @@ def test_goal_appends_six_masked_checkpoint_semantic_slots() -> None:
         GOAL_LOOKAHEAD_SLOTS, GOAL_LOOKAHEAD_SLOT_DIM
     )
     assert slots[0, 0] == 1.0
-    assert slots[0, 1] == encoder._room_idx_norm("10B")
+    assert slots[0, 1] == encoder._room_idx_norm("207")
     pickup_slots = [i for i in range(GOAL_LOOKAHEAD_SLOTS) if slots[i, 3 + 1] == 1.0]
     assert pickup_slots, "expected a pickup in lookahead"
     assert any(
         planner.peek_objective(offset) is not None
         and planner.peek_objective(offset)["checkpoint_id"] == "yawn_moon_210"
-        for offset in range(0, _ROUTE_N - _idx("east_stairs_101_to_yawn"))
+        for offset in range(0, _ROUTE_N - _idx("east_stairs_201_to_yawn"))
     )
 
 
@@ -727,6 +727,31 @@ def test_yawn_box_prep_ignores_lab_timer_requires_keys_and_firepower() -> None:
     assert planner.advance_if_success(
         ticking, progress=ProgressTracker(), prev_state=prev
     )
+
+
+def test_cp89_start_is_climb_to_207_not_reenter_10b() -> None:
+    """Box-prep cell sits in 10B; next real door is 207, not another enter-10B."""
+    planner = _planner(start_index=_idx("east_stairs_201_to_yawn"))
+    assert planner.current_objective()["checkpoint_id"] == "east_stairs_201_to_yawn"
+    assert not planner.advance_if_success(
+        _state("10B"), progress=ProgressTracker()
+    )
+    assert planner.skip_spawn_satisfied_room_enters("10B") == 0
+
+
+def test_spawn_in_exit_room_skips_tautological_room_enter() -> None:
+    """Richard cp84 sits in 204; next CP is room_enter 204 — skip or 1-step reset."""
+    planner = _planner(start_index=_idx("richard_forced_return_204"))
+    assert planner.current_objective()["checkpoint_id"] == "richard_forced_return_204"
+    already_there = _planner(start_index=_idx("richard_forced_return_204"))
+    assert already_there.advance_if_success(
+        _state("204"), progress=ProgressTracker()
+    )
+
+    skipped = planner.skip_spawn_satisfied_room_enters("204")
+    assert skipped == 1
+    assert planner.current_objective()["checkpoint_id"] == "east_stairs_201_post_richard"
+    assert planner.skip_spawn_satisfied_room_enters("204") == 0
 
 
 def test_richard_checkpoint_accepts_forced_settle_in_204() -> None:

@@ -212,7 +212,7 @@ def test_planner_yawn_box_prep_succeeds_on_leave_to_10b() -> None:
     assert planner.advance_if_success(
         ready, progress=progress, prev_state=_state("118")
     )
-    assert planner.current_objective()["checkpoint_id"] == "east_stairs_101_to_yawn"
+    assert planner.current_objective()["checkpoint_id"] == "east_stairs_201_to_yawn"
 
 
 def test_suppress_wrong_room_only_when_prep_ready() -> None:

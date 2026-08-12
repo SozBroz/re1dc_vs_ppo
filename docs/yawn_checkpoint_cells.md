@@ -1,6 +1,6 @@
 # Yawn rails checkpoint cells (`cpNN`)
 
-Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (98 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
+Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (97 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
 
 **Source of truth:** `data/yawn_checkpoint_route.json` (objectives and success conditions below are copied verbatim). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
@@ -100,14 +100,13 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp87` | 88 | `east_stairs_101_post_richard` | `10B` | navigate | Descend East Stairway after Richard |
 | `cp88` | 89 | `yawn_box_enter_118` | `118` | navigate | Enter the storeroom for Yawn box prep |
 | `cp89` | 90 | `yawn_box_prep_118` | `118` | navigate | Deposit wind crest, withdraw guns/ammo, leave 118 to 10B |
-| `cp90` | 91 | `east_stairs_101_to_yawn` | `10B` | navigate | Return to East Stairway 1F for Yawn |
-| `cp91` | 92 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
-| `cp92` | 93 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
-| `cp93` | 94 | `moon_hall_enter_20D` | `20D` | navigate | Enter the east wing hallway for attic ammo |
-| `cp94` | 95 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
-| `cp95` | 96 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
-| `cp96` | 97 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
-| `cp97` | 98 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
+| `cp90` | 91 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
+| `cp91` | 92 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
+| `cp92` | 93 | `moon_hall_enter_20D` | `20D` | navigate | Enter the east wing hallway for attic ammo |
+| `cp93` | 94 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
+| `cp94` | 95 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
+| `cp95` | 96 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
+| `cp96` | 97 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
 
 ## Details
 
@@ -1157,19 +1156,9 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - `yawn_box_prep_exit`: leave `118` into `10B` holding `armor_key` + `shield_key` and the guns/ammo (`beretta`, `shotgun`, `bazooka_acid`, `handgun_bullets`, `shotgun_shells`, `acid_rounds`); `wind_crest` in the box (not on person); no guns/ammo in the box (knife allowed). Lab timer is not a gate.
 - Leaving `118` without those box conditions still ends the episode as `wrong_room`
+- Captured cell sits in `10B`. Next checkpoint is climb to `207` (`east_stairs_201_to_yawn`). There is no second enter-`10B` step.
 
-### `cp90` — `east_stairs_101_to_yawn` (seq 91)
-
-- **Room:** `10B` (1F RIGHT STAIRS)
-- **Action:** `navigate`
-- **Objective:** Return to East Stairway 1F for Yawn
-- **Required items:** `shield_key`, `shotgun`
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10B**. Hold: `shield_key`, `shotgun`. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `10B`
-
-### `cp91` — `east_stairs_201_to_yawn` (seq 92)
+### `cp90` — `east_stairs_201_to_yawn` (seq 91)
 
 - **Room:** `207` (2F RIGHT STAIRS)
 - **Action:** `navigate`
@@ -1180,7 +1169,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `207`
 
-### `cp92` — `c_passage_204_to_yawn` (seq 93)
+### `cp91` — `c_passage_204_to_yawn` (seq 92)
 
 - **Room:** `204` (C PASSAGE)
 - **Action:** `navigate`
@@ -1191,7 +1180,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `204`
 
-### `cp93` — `moon_hall_enter_20D` (seq 94)
+### `cp92` — `moon_hall_enter_20D` (seq 93)
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `navigate`
@@ -1202,7 +1191,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `20D`
 
-### `cp94` — `ammo_20D` (seq 95)
+### `cp93` — `ammo_20D` (seq 94)
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `pickup`
@@ -1213,7 +1202,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Acquire item `handgun_bullets`
 
-### `cp95` — `attic_entry_20E` (seq 96)
+### `cp94` — `attic_entry_20E` (seq 95)
 
 - **Room:** `20E` (FRONT OF ATTIC)
 - **Action:** `navigate`
@@ -1224,7 +1213,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `20E` from `20D`
 
-### `cp96` — `yawn_arena_enter_210` (seq 97)
+### `cp95` — `yawn_arena_enter_210` (seq 96)
 
 - **Room:** `210` (ATTIC)
 - **Action:** `navigate`
@@ -1235,7 +1224,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `210`
 
-### `cp97` — `yawn_moon_210` (seq 98)
+### `cp96` — `yawn_moon_210` (seq 97)
 
 - **Room:** `210` (ATTIC)
 - **Action:** `fight`

@@ -1549,22 +1549,6 @@
   },
   {
     "seq": 91,
-    "checkpoint_id": "east_stairs_101_to_yawn",
-    "room_id": "10B",
-    "objective": "Return to East Stairway 1F for Yawn",
-    "action_type": "navigate",
-    "required_items": [
-      "shield_key",
-      "shotgun"
-    ],
-    "items_gained": [],
-    "success_condition": {
-      "type": "room_enter",
-      "room_id": "10B"
-    }
-  },
-  {
-    "seq": 92,
     "checkpoint_id": "east_stairs_201_to_yawn",
     "room_id": "207",
     "objective": "Climb East Stairway for Yawn",
@@ -1590,10 +1574,10 @@
       "type": "room_enter",
       "room_id": "204"
     },
-    "seq": 93
+    "seq": 92
   },
   {
-    "seq": 94,
+    "seq": 93,
     "checkpoint_id": "moon_hall_enter_20D",
     "room_id": "20D",
     "objective": "Enter the east wing hallway for attic ammo",
@@ -1606,7 +1590,7 @@
     }
   },
   {
-    "seq": 95,
+    "seq": 94,
     "checkpoint_id": "ammo_20D",
     "room_id": "20D",
     "objective": "Collect the mandatory Pillar Passage handgun bullets",
@@ -1621,7 +1605,7 @@
     }
   },
   {
-    "seq": 96,
+    "seq": 95,
     "checkpoint_id": "attic_entry_20E",
     "room_id": "20E",
     "objective": "Reach the shield-key attic entrance",
@@ -1639,7 +1623,7 @@
     }
   },
   {
-    "seq": 97,
+    "seq": 96,
     "checkpoint_id": "yawn_arena_enter_210",
     "room_id": "210",
     "objective": "Enter the Yawn moon corridor",
@@ -1652,7 +1636,7 @@
     }
   },
   {
-    "seq": 98,
+    "seq": 97,
     "checkpoint_id": "yawn_moon_210",
     "room_id": "210",
     "objective": "Complete the Yawn encounter, collect the shells, and take the moon crest",
