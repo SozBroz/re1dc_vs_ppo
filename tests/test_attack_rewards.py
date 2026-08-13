@@ -409,6 +409,34 @@ def test_beretta_zombie_hit_no_heavy_fodder_penalty() -> None:
     assert heavy_weapon_fodder_hit_penalty(cur) == 0.0
 
 
+def test_bazooka_yawn_hit_no_heavy_fodder_penalty() -> None:
+    """Room 210 Yawn is kind 0x0F with logical HP 120 — not dining fodder."""
+    planner = make_planner()
+    prev = make_state(hp=96, room="210", step=1)
+    cur = make_state(hp=96, room="210", step=2)
+    cur["equipped_weapon_id"] = 0x07
+    cur["ammo_spent"] = 1
+    prev["enemies"] = [
+        {"slot": 0, "hp": 120, "type_id": 0x0F, "active_byte": 15}
+    ]
+    cur["enemies"] = [
+        {"slot": 0, "hp": 105, "type_id": 0x0F, "active_byte": 15}
+    ]
+    from re1_rl.enemy_combat import apply_combat_step_fields
+
+    cur = apply_combat_step_fields(
+        prev, cur, knife=False, attack=True, credit_damage=True
+    )
+    assert cur["combat_events"][0]["is_yawn"] is True
+    assert cur["combat_events"][0]["is_zombie"] is False
+    assert heavy_weapon_fodder_hit_penalty(cur) == 0.0
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["heavy_weapon_fodder_hit"] == 0.0
+    assert bd["enemy_damage"] == pytest.approx(15 * ENEMY_DAMAGE_REWARD)
+
+
 def test_beretta_dog_hit_no_shotgun_penalty() -> None:
     cur = make_state(hp=96, step=2)
     cur["equipped_weapon_id"] = 0x02

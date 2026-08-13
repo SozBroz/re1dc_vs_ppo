@@ -2,7 +2,7 @@
 
 Port 7788 — does not touch training fleet ports.
 
-  python scripts/watch_door_agent_rewards.py --steps 400 --learner-host 192.168.0.111
+  python scripts/watch_door_agent_rewards.py --steps 400 --learner-host 192.168.0.116
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ def main() -> int:
     ap.add_argument("--port", type=int, default=7788)
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--speed", type=int, default=3200)
-    ap.add_argument("--learner-host", default="192.168.0.111")
+    ap.add_argument("--learner-host", default="192.168.0.116")
     ap.add_argument("--learner-port", type=int, default=8765)
     ap.add_argument("--checkpoint", type=Path, default=None)
     ap.add_argument("--savestate", type=Path, default=DOOR_STATE)

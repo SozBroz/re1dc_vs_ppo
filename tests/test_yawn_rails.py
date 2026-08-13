@@ -917,6 +917,36 @@ def test_reset_pin_file_hot_reload_overrides_launcher_env(
     assert opts2["route_start_index"] == 20
 
 
+def test_reset_pin_file_resolved_from_project_root_not_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in range(18, 34)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 40)),
+    }
+    pin_dir = tmp_path / "data"
+    pin_dir.mkdir()
+    (pin_dir / "yawn_reset_pin.env").write_text(
+        "RE1_YAWN_RESET_PIN_INDEX=33\n", encoding="utf-8"
+    )
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_FILE", raising=False)
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_INDEX", "18")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_FILE", " ")
+    opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(0))
+    assert opts["route_start_index"] == 34
+    assert opts["reset_source"] == "route_cell_pin"
+
+
 def test_reset_pin_range_env_samples_inclusive_span(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1390,6 +1420,54 @@ def test_checkpoint_success_proposes_without_local_install_when_sync_on(
     staging_root = tmp_path / "states/yawn_rails/.staging"
     if staging_root.is_dir():
         assert list(staging_root.iterdir()) == []
+
+
+def test_terminal_yawn_moon_capture_proposes_cp96(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Last route leg (yawn_moon_210) must still install cp96."""
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "1")
+    bridge = MagicMock()
+    bridge.save_savestate.side_effect = (
+        lambda path: Path(path).write_bytes(b"state")
+    )
+    moon_idx = _idx("yawn_moon_210")
+    planner = _planner(start_index=moon_idx)
+    planner._index = moon_idx + 1
+    inv = [
+        "shield_key",
+        "shotgun",
+        "shotgun_shells",
+        "moon_crest",
+        "beretta",
+    ]
+    env = SimpleNamespace(
+        project_root=tmp_path,
+        _stage={
+            "mode": "yawn_rails",
+            "cells_manifest": "states/yawn_rails/manifest.json",
+            "route_id": "test",
+        },
+        _planner=planner,
+        bridge=bridge,
+        _macro_active=False,
+        _read_state=lambda track_items=False: _state("210", inventory=inv),
+    )
+    monkeypatch.setattr(
+        "re1_rl.yawn_rails.dump_episode_sidecar",
+        lambda *_args, **_kwargs: {"schema_version": 1},
+    )
+
+    proposal = capture_successor_cell(
+        env,
+        _state("210", inventory=inv),
+        {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
+    )
+    assert proposal is not None
+    assert proposal["checkpoint_index"] == moon_idx
+    assert proposal["checkpoint_id"] == "yawn_moon_210"
+    assert proposal["next_checkpoint_id"] == ""
+    assert bridge.save_savestate.called
 
 
 def test_local_cas_installs_better_and_rejects_worse(

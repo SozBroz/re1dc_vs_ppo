@@ -60,14 +60,16 @@ def payforward_ripple_enabled(default: bool = False) -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
-def fight_bias_weight_from_env() -> float:
+def fight_bias_weight_from_env(
+    project_root: Path | str | None = None,
+) -> float:
     """``RE1_YAWN_FIGHT_BIAS_WEIGHT`` — fraction on fight-bias cell (default 0.40).
 
     Hot-reloadable via ``data/yawn_reset_pin.env`` (or ``RE1_YAWN_RESET_PIN_FILE``).
     """
     from re1_rl.yawn_rails import _pin_env_raw
 
-    raw = _pin_env_raw(_FIGHT_BIAS_ENV)
+    raw = _pin_env_raw(_FIGHT_BIAS_ENV, project_root)
     if not raw:
         return float(_FIGHT_BIAS_WEIGHT)
     try:
@@ -76,7 +78,9 @@ def fight_bias_weight_from_env() -> float:
         return float(_FIGHT_BIAS_WEIGHT)
 
 
-def fight_bias_index_from_env() -> int | None:
+def fight_bias_index_from_env(
+    project_root: Path | str | None = None,
+) -> int | None:
     """``RE1_YAWN_FIGHT_BIAS_INDEX=N`` — fixed cpNN for the fight-bias reset branch.
 
     When set and loadable, replaces :func:`frontier_fight_index` for payforward resets.
@@ -84,7 +88,7 @@ def fight_bias_index_from_env() -> int | None:
     """
     from re1_rl.yawn_rails import _pin_env_raw
 
-    raw = _pin_env_raw(_FIGHT_BIAS_INDEX_ENV)
+    raw = _pin_env_raw(_FIGHT_BIAS_INDEX_ENV, project_root)
     if not raw:
         return None
     try:
@@ -330,7 +334,7 @@ def choose_progression_reset_index(
     by_idx = {int(r["checkpoint_index"]): r for r in cells}
     idxs = sorted(by_idx)
     root = Path(project_root) if project_root is not None else None
-    override = fight_bias_index_from_env()
+    override = fight_bias_index_from_env(root)
     if override is not None and int(override) in by_idx:
         frontier = int(override)
     else:

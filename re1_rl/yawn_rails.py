@@ -347,14 +347,19 @@ PIN_WEIGHT_LATEST_KEY = "latest"
 _LATEST_PIN_ALIASES = frozenset({"latest", "newest", "front", "frontier"})
 
 
-def _pin_file_path() -> Path | None:
-    """Optional hot-reload pin file (read every reset; no worker restart)."""
-    raw = os.environ.get(_RESET_PIN_FILE_ENV, _DEFAULT_PIN_FILE).strip()
-    if not raw:
-        return None
+def _pin_file_path(project_root: Path | str | None = None) -> Path | None:
+    """Optional hot-reload pin file (read every reset; no worker restart).
+
+    Relative paths resolve against ``project_root`` (repo root), not process cwd.
+    Actors can spawn with a different cwd; missing the overlay used to fall
+    through to the launcher pin silently. Blank ``RE1_YAWN_RESET_PIN_FILE``
+    (including whitespace) uses ``data/yawn_reset_pin.env``.
+    """
+    raw = os.environ.get(_RESET_PIN_FILE_ENV, _DEFAULT_PIN_FILE).strip() or _DEFAULT_PIN_FILE
     path = Path(raw)
     if not path.is_absolute():
-        path = Path.cwd() / path
+        base = Path(project_root) if project_root is not None else Path.cwd()
+        path = base / path
     return path if path.is_file() else None
 
 
@@ -371,9 +376,11 @@ def _parse_pin_file(path: Path) -> dict[str, str]:
     return out
 
 
-def _pin_env_raw(key: str) -> str | None:
+def _pin_env_raw(
+    key: str, project_root: Path | str | None = None
+) -> str | None:
     """Pin knob: file override wins when key is present; else launcher env."""
-    pin_file = _pin_file_path()
+    pin_file = _pin_file_path(project_root)
     if pin_file is not None:
         overrides = _parse_pin_file(pin_file)
         if key in overrides:
@@ -389,12 +396,14 @@ def reset_latest_only_from_env() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
-def reset_pin_index_from_env() -> int | None:
+def reset_pin_index_from_env(
+    project_root: Path | str | None = None,
+) -> int | None:
     """``RE1_YAWN_RESET_PIN_INDEX=N`` — force every reset onto curated cell ``cpNN``.
 
     Loads ``cpN`` so the next success captures ``cp{N+1}`` (e.g. pin 33 → hunt cp34).
     """
-    raw = _pin_env_raw(_RESET_PIN_INDEX_ENV)
+    raw = _pin_env_raw(_RESET_PIN_INDEX_ENV, project_root)
     if not raw:
         return None
     try:
@@ -406,13 +415,15 @@ def reset_pin_index_from_env() -> int | None:
     return idx
 
 
-def reset_pin_range_from_env() -> tuple[int, int] | None:
+def reset_pin_range_from_env(
+    project_root: Path | str | None = None,
+) -> tuple[int, int] | None:
     """``RE1_YAWN_RESET_PIN_RANGE=27-37`` — uniform resets over loadable cells in range.
 
     Inclusive lo/hi. Accepted forms: ``27-37``, ``27:37``, ``27,37``.
     Single-index pin (``RE1_YAWN_RESET_PIN_INDEX``) still wins when both are set.
     """
-    raw = _pin_env_raw(_RESET_PIN_RANGE_ENV)
+    raw = _pin_env_raw(_RESET_PIN_RANGE_ENV, project_root)
     if not raw:
         return None
     for sep in ("-", ":", ",", ".."):
@@ -433,14 +444,16 @@ def reset_pin_range_from_env() -> tuple[int, int] | None:
     return lo, hi
 
 
-def reset_pin_set_from_env() -> tuple[frozenset[int], float] | None:
+def reset_pin_set_from_env(
+    project_root: Path | str | None = None,
+) -> tuple[frozenset[int], float] | None:
     """``RE1_YAWN_RESET_PIN_SET=37,40,44`` — optional weighted pin-set blend.
 
     With ``RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5`` (default), that fraction of resets
     sample uniformly from the listed indices; the remainder uses the normal mix.
     Single-index and range pins still override when set.
     """
-    raw = _pin_env_raw(_RESET_PIN_SET_ENV)
+    raw = _pin_env_raw(_RESET_PIN_SET_ENV, project_root)
     if not raw:
         return None
     indices: set[int] = set()
@@ -456,7 +469,7 @@ def reset_pin_set_from_env() -> tuple[frozenset[int], float] | None:
             indices.add(idx)
     if not indices:
         return None
-    weight_raw = _pin_env_raw(_RESET_PIN_SET_WEIGHT_ENV) or "0.5"
+    weight_raw = _pin_env_raw(_RESET_PIN_SET_WEIGHT_ENV, project_root) or "0.5"
     try:
         weight = float(weight_raw)
     except ValueError:
@@ -507,14 +520,16 @@ def parse_pin_weights(raw: str) -> dict[int | str, float] | None:
     return {key: weight / total for key, weight in weights.items()}
 
 
-def reset_pin_weights_from_env() -> dict[int | str, float] | None:
+def reset_pin_weights_from_env(
+    project_root: Path | str | None = None,
+) -> dict[int | str, float] | None:
     """``RE1_YAWN_RESET_PIN_WEIGHTS=latest:50,33:50`` — per-cell reset mix.
 
     Percentages and fractions are both accepted; values are normalized to sum to 1.
     ``latest`` tracks the newest loadable cp18+ cell and updates as captures land.
     Missing fixed cells are dropped and the remainder is renormalized.
     """
-    raw = _pin_env_raw(_RESET_PIN_WEIGHTS_ENV)
+    raw = _pin_env_raw(_RESET_PIN_WEIGHTS_ENV, project_root)
     if not raw:
         return None
     return parse_pin_weights(raw)
@@ -742,10 +757,11 @@ def sample_one_leg_options(
     payforward fight cell and its share (workhorse grind without fleet restart).
     ``data/yawn_reset_pin.env`` (or ``RE1_YAWN_RESET_PIN_FILE``) overrides the
     above on every reset without restarting the worker — edit the file live.
+    Relative pin paths are resolved from ``project_root``, not process cwd.
     """
     all_cells = list(iter_loadable_cells(project_root, stage))
     cells = eligible_reset_cells(all_cells)
-    pin_index = reset_pin_index_from_env()
+    pin_index = reset_pin_index_from_env(project_root)
     if pin_index is not None:
         pinned = [
             row
@@ -765,8 +781,8 @@ def sample_one_leg_options(
                 "is not loadable"
             )
         return _options_from_cell(pinned[0], stage, reset_source="route_cell_pin")
-    pin_range = reset_pin_range_from_env()
-    raw_pin_weights = _pin_env_raw(_RESET_PIN_WEIGHTS_ENV)
+    pin_range = reset_pin_range_from_env(project_root)
+    raw_pin_weights = _pin_env_raw(_RESET_PIN_WEIGHTS_ENV, project_root)
     if pin_range is not None and raw_pin_weights:
         latest_range_w = parse_latest_range_mix_weight(raw_pin_weights)
         if latest_range_w is not None:
@@ -777,7 +793,7 @@ def sample_one_leg_options(
             return _options_from_cell(
                 chosen, stage, reset_source="route_cell_pin_range_latest"
             )
-    pin_weights = reset_pin_weights_from_env()
+    pin_weights = reset_pin_weights_from_env(project_root)
     if pin_weights is not None:
         chosen = _sample_cell_from_pin_weights(all_cells, pin_weights, rng=rng)
         return _options_from_cell(chosen, stage, reset_source="route_cell_pin_weights")
@@ -790,7 +806,7 @@ def sample_one_leg_options(
             )
         chosen = ranged[rng.randrange(len(ranged))]
         return _options_from_cell(chosen, stage, reset_source="route_cell_pin_range")
-    pin_set_cfg = reset_pin_set_from_env()
+    pin_set_cfg = reset_pin_set_from_env(project_root)
     if pin_set_cfg is not None:
         indices, weight = pin_set_cfg
         if weight > 0.0 and rng.random() < weight:
@@ -1036,7 +1052,7 @@ def capture_successor_cell(
         return None
     planner = env._planner
     completed = int(planner.waypoint_index) - 1
-    if completed < 0 or completed >= planner.total_waypoints - 1:
+    if completed < 0 or completed >= planner.total_waypoints:
         return None
     completed_cp = planner.step_by_seq(completed + 1) or {}
     cid = str(completed_cp.get("checkpoint_id", "") or "")

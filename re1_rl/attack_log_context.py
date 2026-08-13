@@ -167,7 +167,7 @@ def build_attack_log_context(
     pz = int(state.get("z", 0))
     prev_enemies = list(prev_state.get("enemies") or [])
     curr_enemies = list(state.get("enemies") or [])
-    events = enemy_combat_events(prev_enemies, curr_enemies)
+    events = enemy_combat_events(prev_enemies, curr_enemies, room_id=room_id)
 
     nearest = nearest_static_enemy(room_id, px, pz)
     target_guess = "-"

@@ -34,6 +34,7 @@ CERBERUS_RAM_TYPE_ID = 0x0F
 CERBERUS_HP_MAX = 120  # live dogs ~100; Tyrant 220+, Yawn 3050+
 CERBERUS_ACTIVE_BYTES: frozenset[int] = frozenset({0x2C, 0x44, 0x90})
 CERBERUS_TYPE_NAMES: frozenset[str] = frozenset({"cerberus", "zombie_dog"})
+YAWN_TYPE_NAMES: frozenset[str] = frozenset({"snake_yawn", "yawn"})
 
 # Ordinary mansion zombies (test_enemy_combat + RDT model map).
 ZOMBIE_RAM_TYPE_IDS: frozenset[int] = frozenset({0x01, 0x02})
@@ -189,6 +190,35 @@ def is_crow_enemy(
     return bool(int(ent.get("in_room", ent.get("alive", 0))))
 
 
+def is_yawn_combat_entity(
+    meta: dict[str, Any],
+    *,
+    room_id: str | None = None,
+    slot: int | None = None,
+) -> bool:
+    """True for attic Yawn. Logical HP is 120, same kind byte as dogs/zombies."""
+    name = str(meta.get("type_name") or meta.get("enemy_type") or "").lower()
+    if name in YAWN_TYPE_NAMES:
+        return True
+    if meta.get("yawn_translated"):
+        return True
+    from re1_rl.yawn_hp import YAWN_ROOM, is_yawn_raw_hp
+
+    room = str(room_id or "").strip().upper()
+    if "hp_raw" in meta and is_yawn_raw_hp(int(meta["hp_raw"] or 0), room_id=room or None):
+        return True
+    if room != YAWN_ROOM:
+        return False
+    tid = meta.get("type_id")
+    if tid is not None and int(tid) == CERBERUS_RAM_TYPE_ID:
+        return True
+    if slot is not None and (tid is None or int(tid) == 0):
+        from re1_rl.attack_log_context import infer_enemy_type_for_slot
+
+        return infer_enemy_type_for_slot(room, int(slot)) == "snake_yawn"
+    return False
+
+
 def is_cerberus_combat_entity(
     meta: dict[str, Any],
     *,
@@ -221,7 +251,9 @@ def is_zombie_combat_entity(
     name = str(meta.get("type_name") or meta.get("enemy_type") or "").lower()
     if name in ZOMBIE_TYPE_NAMES:
         return True
-    if name in CERBERUS_TYPE_NAMES or name == "crow":
+    if name in CERBERUS_TYPE_NAMES or name in YAWN_TYPE_NAMES or name == "crow":
+        return False
+    if is_yawn_combat_entity(meta, room_id=room_id, slot=slot):
         return False
     if name and name in NO_COMBAT_REWARD_TYPE_NAMES:
         return False
@@ -412,6 +444,10 @@ def _type_meta_by_slot(
             meta["active_byte"] = int(ent["active_byte"])
         if "hp" in ent:
             meta["hp"] = int(ent["hp"])
+        if "hp_raw" in ent:
+            meta["hp_raw"] = int(ent["hp_raw"])
+        if ent.get("yawn_translated"):
+            meta["yawn_translated"] = True
         if meta:
             out[slot] = meta
     return out
@@ -442,8 +478,11 @@ def enemy_combat_events(
             type_name=meta.get("type_name"),
         )
         is_crow = is_crow_combat_entity(meta)
-        is_cerberus = is_cerberus_combat_entity(meta, hp_before=before)
-        is_zombie = (not is_cerberus) and is_zombie_combat_entity(
+        is_yawn = is_yawn_combat_entity(meta, room_id=room_id, slot=slot)
+        is_cerberus = (not is_yawn) and is_cerberus_combat_entity(
+            meta, hp_before=before
+        )
+        is_zombie = (not is_cerberus) and (not is_yawn) and is_zombie_combat_entity(
             meta, room_id=room_id, slot=slot, hp_before=before,
         )
         extra: dict[str, Any] = {}
@@ -464,6 +503,7 @@ def enemy_combat_events(
                 "is_crow": is_crow,
                 "is_cerberus": is_cerberus,
                 "is_zombie": is_zombie,
+                "is_yawn": is_yawn,
                 **extra,
             })
         elif after < before:
@@ -477,6 +517,7 @@ def enemy_combat_events(
                 "is_crow": is_crow,
                 "is_cerberus": is_cerberus,
                 "is_zombie": is_zombie,
+                "is_yawn": is_yawn,
                 **extra,
             })
     return events

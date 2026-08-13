@@ -448,7 +448,7 @@ def heavy_weapon_fodder_hit_penalty(state: dict[str, Any]) -> float:
         return 0.0
     hits = 0
     for ev in events:
-        if ev.get("reward_denied"):
+        if ev.get("reward_denied") or ev.get("is_yawn"):
             continue
         if int(ev.get("damage", 0) or 0) <= 0:
             continue

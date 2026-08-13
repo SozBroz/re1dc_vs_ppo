@@ -18,6 +18,7 @@ from re1_rl.enemy_combat import (
     enemy_hp_by_slot,
     is_cerberus_combat_entity,
     is_zombie_combat_entity,
+    is_yawn_combat_entity,
     is_crow_combat_entity,
     is_crow_enemy,
     is_passive_crow_enemy,
@@ -560,6 +561,58 @@ def test_kind0f_low_hp_without_dog_byte_is_zombie_in_room_202() -> None:
     assert len(events) == 1
     assert events[0]["is_zombie"] is True
     assert events[0]["is_cerberus"] is False
+    assert events[0].get("is_yawn") is False
+
+
+def test_kind0f_translated_yawn_in_room_210_is_not_zombie() -> None:
+    """Attic Yawn shares kind 0x0F; logical HP 120 looks like a dining zombie."""
+    assert is_yawn_combat_entity(
+        {"type_id": 0x0F, "hp": 120, "active_byte": 15},
+        room_id="210",
+        slot=0,
+    )
+    assert not is_zombie_combat_entity(
+        {"type_id": 0x0F, "hp": 120, "active_byte": 15},
+        room_id="210",
+        slot=0,
+        hp_before=120,
+    )
+    events = enemy_combat_events(
+        [{"slot": 0, "hp": 120, "type_id": 0x0F, "active_byte": 15}],
+        [{"slot": 0, "hp": 75, "type_id": 0x0F, "active_byte": 15}],
+        room_id="210",
+    )
+    assert len(events) == 1
+    assert events[0]["is_yawn"] is True
+    assert events[0]["is_zombie"] is False
+    assert events[0]["is_cerberus"] is False
+    assert events[0]["damage"] == 45
+
+
+def test_yawn_translated_flag_is_not_zombie_even_without_room() -> None:
+    events = enemy_combat_events(
+        [
+            {
+                "slot": 0,
+                "hp": 120,
+                "hp_raw": 3050,
+                "type_id": 0x0F,
+                "yawn_translated": True,
+            }
+        ],
+        [
+            {
+                "slot": 0,
+                "hp": 105,
+                "hp_raw": 3035,
+                "type_id": 0x0F,
+                "yawn_translated": True,
+            }
+        ],
+        room_id="210",
+    )
+    assert events[0]["is_yawn"] is True
+    assert events[0]["is_zombie"] is False
 
 
 def test_passive_crow_detection() -> None:
