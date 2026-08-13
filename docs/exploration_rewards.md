@@ -137,17 +137,18 @@ There are no examine, idle-settle, dining↔tea, or room-change special cases in
 the pay path. A short door/examine freeze is unpaid; a door load lasting at
 least 450 frames may pay. This is an intentional simplicity tradeoff.
 
-### Item box (validated 2026-08-07)
+### Item box (updated 2026-08-13)
 
 | Event | Magnitude | Notes |
 |-------|-----------|-------|
-| Successful open-box withdraw | **+1.0** (`BOX_WITHDRAW_BONUS`) | Per completed transfer; full magnitude on Yawn rails. Deposit still policy-off. |
+| Open-box withdraw | **0** | No transfer reward. |
+| Open-box deposit | **0** | No transfer reward. |
 
 ### Not yet validated
 
 | ID | Notes |
 |----|--------|
-| f | Cutscene/settle pay while using an item box (separate from withdraw +1) |
+| f | Cutscene/settle pay while using an item box |
 
 Do not invent further box pay/deny rules without imperator validation.
 

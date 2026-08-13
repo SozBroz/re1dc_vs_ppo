@@ -417,7 +417,7 @@ def test_typewriter_or_box_rooms():
     assert not is_typewriter_or_box_room(None)
 
 
-def test_box_withdraw_success_pays_one() -> None:
+def test_box_withdraw_success_pays_nothing() -> None:
     import pytest
 
     from re1_rl.progress import ProgressTracker
@@ -436,8 +436,8 @@ def test_box_withdraw_success_pays_one() -> None:
         rails_mode=True,
         return_breakdown=True,
     )
-    assert bd["box_withdraw"] == pytest.approx(BOX_WITHDRAW_BONUS)
-    assert BOX_WITHDRAW_BONUS == pytest.approx(1.0)
+    assert bd["box_withdraw"] == pytest.approx(0.0)
+    assert BOX_WITHDRAW_BONUS == pytest.approx(0.0)
 
 
 if __name__ == "__main__":
