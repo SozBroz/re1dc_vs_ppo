@@ -128,7 +128,7 @@ def _stacked_inactive_corpse_coords(
 
     groups: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
     for ent in enemies or []:
-        if int(ent.get("hp", 0)) <= 0:
+        if _combat_hp(ent) <= 0:
             continue
         if not int(ent.get("combat_near", 0)):
             continue
@@ -365,13 +365,25 @@ def combat_reward_denied(
     return False
 
 
+def _combat_hp(ent: dict[str, Any]) -> int:
+    """HP for living-target tests and damage deltas.
+
+    Wiki-scale Yawn ``hp`` hits 0 after 120 damage while raw stays ~2700 and
+    Yawn keeps fighting. Use ``hp_raw`` so the attack mask and combat pay do
+    not treat that bar as a corpse.
+    """
+    if ent.get("yawn_translated") and "hp_raw" in ent:
+        return max(0, int(ent.get("hp_raw") or 0))
+    return int(ent.get("hp", 0))
+
+
 def alive_enemy_count(enemies: list[dict[str, Any]] | None) -> int:
     """Enemies with in-room coordinates (excludes off-map pool ghosts)."""
     n = 0
     for ent in enemies or []:
         if not ent.get("alive", True):
             continue
-        if int(ent.get("hp", 0)) > 0:
+        if _combat_hp(ent) > 0:
             n += 1
     return n
 
@@ -394,7 +406,7 @@ def combat_enemy_count(
         _stacked_inactive_corpse_coords(enemies) if for_attack_mask else frozenset()
     )
     for ent in enemies or []:
-        if int(ent.get("hp", 0)) <= 0:
+        if _combat_hp(ent) <= 0:
             continue
         if for_attack_mask and _skip_for_attack_mask(
             ent, all_enemies=enemies, corpse_coords=corpse_coords
@@ -434,7 +446,7 @@ def paid_combat_enemy_count(
         _stacked_inactive_corpse_coords(enemies) if for_attack_mask else frozenset()
     )
     for ent in enemies or []:
-        if int(ent.get("hp", 0)) <= 0:
+        if _combat_hp(ent) <= 0:
             continue
         if for_attack_mask and _skip_for_attack_mask(
             ent, all_enemies=enemies, corpse_coords=corpse_coords
@@ -453,7 +465,7 @@ def enemy_hp_by_slot(enemies: list[dict[str, Any]]) -> dict[int, int]:
     out: dict[int, int] = {}
     for ent in enemies:
         slot = int(ent.get("slot", -1))
-        hp = int(ent.get("hp", 0))
+        hp = _combat_hp(ent)
         if slot >= 0 and hp > 0:
             out[slot] = hp
     return out
@@ -639,7 +651,7 @@ def format_enemy_table(enemies: list[dict[str, Any]] | None) -> str:
         if ent.get("yawn_part"):
             continue
         slot = int(ent.get("slot", -1))
-        hp = int(ent.get("hp", 0))
+        hp = _combat_hp(ent)
         if slot < 0 or hp <= 0:
             continue
         extra = ""

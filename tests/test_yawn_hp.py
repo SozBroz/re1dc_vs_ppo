@@ -90,6 +90,48 @@ def test_decode_includes_yawn_body_parts_without_spatial_slots() -> None:
     assert by_slot[7]["alive"] == 0
 
 
+def test_logical_zero_keeps_live_presence_flags() -> None:
+    """Wiki 120 hitting 0 is not a corpse — Yawn keeps fighting on raw HP."""
+    ents = [
+        {
+            "slot": 0,
+            "hp": 2735,
+            "type_id": 0x0F,
+            "alive": 1,
+            "in_room": 1,
+            "combat_near": 1,
+            "knife_near": 1,
+        }
+    ]
+    out = apply_yawn_hp_translate(ents, room_id="210")
+    assert out[0]["hp"] == 0
+    assert out[0]["hp_raw"] == 2735
+    assert out[0]["yawn_translated"] is True
+    assert out[0]["in_room"] == 1
+    assert out[0]["alive"] == 1
+    assert out[0]["combat_near"] == 1
+    assert out[0]["knife_near"] == 1
+
+
+def test_one_logical_hp_still_live_and_hittable() -> None:
+    ents = [
+        {
+            "slot": 0,
+            "hp": YAWN_RAW_FULL - 119,
+            "type_id": 0x0F,
+            "alive": 1,
+            "in_room": 1,
+            "combat_near": 1,
+            "knife_near": 1,
+        }
+    ]
+    out = apply_yawn_hp_translate(ents, room_id="210")
+    assert out[0]["hp"] == 1
+    assert out[0]["alive"] == 1
+    assert out[0]["combat_near"] == 1
+    assert out[0]["knife_near"] == 1
+
+
 def test_tiger_tyrant_not_translated() -> None:
     """Black Tiger ~204 / Tyrant ~220 stay raw (low hundreds)."""
     for room, hp in (("30C", 204), ("513", 220)):

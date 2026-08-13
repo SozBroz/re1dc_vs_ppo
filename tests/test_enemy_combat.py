@@ -42,6 +42,34 @@ def test_alive_enemy_count() -> None:
     assert alive_enemy_count(None) == 0
 
 
+def test_non_yawn_combat_ignores_stray_hp_raw() -> None:
+    """Dogs/zombies keep using ``hp``. ``hp_raw`` is Yawn-translate only."""
+    zombie = {
+        "slot": 0,
+        "hp": 52,
+        "hp_raw": 2735,
+        "type_id": 1,
+        "combat_near": 1,
+        "alive": True,
+    }
+    dog = {
+        "slot": 1,
+        "hp": 80,
+        "hp_raw": 3050,
+        "type_id": 0x0F,
+        "active_byte": 0x1C,
+        "combat_near": 1,
+        "alive": True,
+    }
+    assert enemy_hp_by_slot([zombie, dog]) == {0: 52, 1: 80}
+    assert combat_enemy_count([zombie, dog]) == 2
+    prev = {"room_id": "20B", "enemies": [dict(dog, hp=80, hp_raw=3050)]}
+    cur = {"room_id": "20B", "enemies": [dict(dog, hp=60, hp_raw=3050)]}
+    out = apply_combat_step_fields(prev, cur, attack=True)
+    assert out["enemy_damage"] == 20
+    assert out["enemy_kills"] == 0
+
+
 def test_combat_enemy_count() -> None:
     enemies = [
         {"slot": 0, "hp": 80, "combat_near": 1, "knife_near": 1},
@@ -709,7 +737,8 @@ def test_yawn_head_and_body_same_step_does_not_double_pay() -> None:
     assert out["combat_events"][0]["slot"] == 0
 
 
-def test_yawn_retreat_still_counts_as_kill() -> None:
+def test_yawn_past_wiki_bar_is_damage_not_a_kill() -> None:
+    """Crossing wiki 120 is not a corpse. Raw still drops; keep paying chips."""
     prev = {
         "room_id": "210",
         "enemies": [
@@ -729,8 +758,76 @@ def test_yawn_retreat_still_counts_as_kill() -> None:
         ],
     }
     out = apply_combat_step_fields(prev, cur)
-    assert out["enemy_damage"] == 25
-    assert out["enemy_kills"] == 1
+    assert out["enemy_damage"] == 90
+    assert out["enemy_kills"] == 0
+    assert out["combat_events"][0]["killed"] is False
+
+
+def test_yawn_damage_after_wiki_bar_still_pays() -> None:
+    prev = {
+        "room_id": "210",
+        "enemies": [
+            {
+                "slot": 0, "hp": 0, "hp_raw": 2865, "type_id": 0x0F,
+                "yawn_translated": True, "combat_near": 1,
+            }
+        ],
+    }
+    cur = {
+        "room_id": "210",
+        "enemies": [
+            {
+                "slot": 0, "hp": 0, "hp_raw": 2854, "type_id": 0x0F,
+                "yawn_translated": True, "combat_near": 1,
+            }
+        ],
+    }
+    out = apply_combat_step_fields(prev, cur)
+    assert out["enemy_damage"] == 11
+    assert out["enemy_kills"] == 0
+
+
+def test_yawn_past_wiki_bar_still_counts_for_attack_mask() -> None:
+    leftover = {
+        "slot": 0,
+        "hp": 0,
+        "hp_raw": 2735,
+        "type_id": 0x0F,
+        "yawn_translated": True,
+        "alive": 1,
+        "in_room": 1,
+        "combat_near": 1,
+        "knife_near": 1,
+    }
+    live = {
+        "slot": 0,
+        "hp": 1,
+        "hp_raw": 2931,
+        "type_id": 0x0F,
+        "yawn_translated": True,
+        "alive": 1,
+        "in_room": 1,
+        "combat_near": 1,
+        "knife_near": 1,
+    }
+    dead = {
+        "slot": 0,
+        "hp": 0,
+        "hp_raw": 0,
+        "type_id": 0x0F,
+        "yawn_translated": True,
+        "alive": 0,
+        "combat_near": 0,
+    }
+    assert combat_enemy_count([leftover], for_attack_mask=True) == 1
+    assert paid_combat_enemy_count(
+        [leftover], room_id="210", for_attack_mask=True
+    ) == 1
+    assert combat_enemy_count([live], for_attack_mask=True) == 1
+    assert paid_combat_enemy_count(
+        [live], room_id="210", for_attack_mask=True
+    ) == 1
+    assert combat_enemy_count([dead], for_attack_mask=True) == 0
 
 
 def test_yawn_body_sentinel_collapse_does_not_pay() -> None:

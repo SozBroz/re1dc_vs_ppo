@@ -4,8 +4,9 @@ Attic firewatch (2026-07-23): ``hp@0`` starts at **3050** and chips ~11/beretta
 shot. Wiki / imperator: attic retreat after **120** damage (cannot die); library
 fight **140**. Both encounters are room ``210``.
 
-``logical = max(0, logical_max - (raw_full - hp_raw))`` preserves per-shot
-deltas, so combat rewards stay honest while spatial ``hp/255`` stays in-band.
+``logical = max(0, logical_max - (raw_full - hp_raw))`` keeps spatial ``hp/255``
+in-band. Wiki 120 is **not** a death: attic Yawn keeps fighting with raw still
+~2700. Combat pay and the attack mask must use ``hp_raw``, not this clamp.
 """
 
 from __future__ import annotations
@@ -51,7 +52,7 @@ def apply_yawn_hp_translate(
     room_id: str | None,
     logical_max: int = YAWN_LOGICAL_MAX_DEFAULT,
 ) -> list[dict[str, Any]]:
-    """Rewrite Yawn ``hp`` to logical; keep ``hp_raw`` for debugging."""
+    """Rewrite Yawn ``hp`` to wiki-scale; keep ``hp_raw`` for combat / mask."""
     if room_id is None or str(room_id).upper() != YAWN_ROOM:
         return enemies
     out: list[dict[str, Any]] = []

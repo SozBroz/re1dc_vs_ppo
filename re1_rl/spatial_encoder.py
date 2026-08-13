@@ -376,7 +376,10 @@ class SpatialEncoder:
             v[i:i + 5] = _egocentric(px, pz, theta,
                                      float(e.get("x", 0)), float(e.get("z", 0)))
             v[i + 5] = float(e.get("type_id", 0)) / MAX_ENEMY_TYPE
-            v[i + 6] = float(np.clip(float(e.get("hp", 0)) / 255.0, 0.0, 1.0))
+            hp = float(e.get("hp", 0))
+            if e.get("yawn_translated") and hp <= 0:
+                hp = 1.0
+            v[i + 6] = float(np.clip(hp / 255.0, 0.0, 1.0))
             v[i + 7] = 1.0
             v[i + 8] = clip_vel(float(e.get("world_vx", 0)))
             v[i + 9] = clip_vel(float(e.get("world_vz", 0)))
