@@ -175,6 +175,17 @@ def is_gun_aim_stable(anim: int, aux: int, recovery: int) -> bool:
     return recovery == 0 and aux == GUN_AUX_TRACK and anim == AIM_ANIM_STABLE
 
 
+def is_gun_up_aim_ready(anim: int, aux: int, recovery: int) -> bool:
+    """High-aim fire window. rec may still drain.
+
+    Idle R1+Up: 0x12 raise -> 0x15 high-aim -> 0x13. Fire on 0x15 (or 0x13 if
+    a link re-locks there). Do not require rec==0 and do not treat leftover
+    0x14 as ready (Cross then dry-fires).
+    """
+    del recovery
+    return aux == GUN_AUX_TRACK and anim in (0x15, AIM_ANIM_STABLE)
+
+
 def is_gun_link_ready(anim: int, aux: int, recovery: int) -> bool:
     """Post-shot recovery is over; a following macro may buffer its next input."""
     return recovery == 0 and aux == GUN_AUX_TRACK and anim in (
@@ -775,14 +786,23 @@ def _execute_ranged_attack_up_macro(
     ammo_before = _ammo_count(bridge, weapon_id)
     total = 0
     trail: list[str] = []
+    phases: list[str] = []
+    last_phase = ""
+    fire_frame: int | None = None
     up_aim = {"r1": True, "up": True}
     up_fire = {"r1": True, "up": True, "cross": True}
 
     def _observe() -> tuple[int, int, int]:
+        nonlocal last_phase
         anim, aux, rec = read_knife_hooks(bridge)
         trail.append(f"f{total}:anim=0x{anim:02X} aux=0x{aux:02X} rec={rec}")
         if len(trail) > 16:
             trail.pop(0)
+        phase = f"0x{anim:02X}/0x{aux:02X}/{rec}"
+        key = phase.rsplit("/", 1)[0]
+        if key != last_phase:
+            phases.append(f"f{total}:{phase}")
+            last_phase = key
         return anim, aux, rec
 
     def _step(buttons: dict[str, bool]) -> bool:
@@ -802,18 +822,24 @@ def _execute_ranged_attack_up_macro(
         spent = max(0, ammo_before - _ammo_count(bridge, weapon_id))
         report["frames"] = total
         report["trail"] = list(trail)
+        report["aim_phases"] = list(phases)
+        if fire_frame is not None:
+            report["fire_frame"] = fire_frame
         report["ammo_spent"] = spent
         report["outcome"] = "dry_fire" if outcome == "ok" and spent <= 0 else outcome
         return died, total, report
 
     neutral: dict[str, bool] = {}
+    # One continuous R1+Up hold. Neutral retries drop the raise and waste the
+    # shotgun/launcher lock-in (see is_gun_up_aim_ready).
     aim_ok, aim_died = _hold_aim_with_retry(
         _step,
         _observe,
         up_aim,
         neutral,
-        is_gun_aim_stable,
+        is_gun_up_aim_ready,
         max_wait=UP_AIM_MAX_FRAMES,
+        max_retries=0,
     )
     if aim_died:
         return _finish("death", True)
@@ -827,6 +853,8 @@ def _execute_ranged_attack_up_macro(
         if anim == FIRE_ANIM and aux == GUN_AUX_TRACK:
             report["saw_fire_anim"] = True
         if _ammo_count(bridge, weapon_id) < ammo_before:
+            fire_frame = total
+            report["saw_fire_anim"] = True
             break
     else:
         return _finish("ammo_timeout", False)

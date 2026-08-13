@@ -29,9 +29,11 @@ from re1_rl.attack_macro import (
     can_attack_with_ammo,
     execute_attack_down_macro,
     execute_attack_macro,
+    execute_attack_up_macro,
     frame_budget,
     is_aim_stable,
     is_attack_settle_wait_state,
+    is_gun_up_aim_ready,
 )
 from re1_rl.weapon_equip import (
     EQUIPPABLE_WEAPON_IDS,
@@ -949,6 +951,181 @@ def test_standing_knife_aim_ready_accepts_draining_recovery() -> None:
     assert is_standing_knife_aim_ready(0x13, 0x04, 1)
     assert is_standing_knife_aim_ready(0x12, 0x04, 0)
     assert not is_standing_knife_aim_ready(0x13, 0x03, 0)
+
+
+def test_gun_up_aim_ready_accepts_draining_recovery() -> None:
+    assert is_gun_up_aim_ready(0x15, 0x03, 0)
+    assert is_gun_up_aim_ready(0x13, 0x03, 2)
+    assert is_gun_up_aim_ready(0x13, 0x03, 0)
+    assert not is_gun_up_aim_ready(0x14, 0x03, 0)
+    assert not is_gun_up_aim_ready(0x17, 0x03, 0)
+    assert not is_gun_up_aim_ready(0x12, 0x03, 3)
+    assert not is_gun_up_aim_ready(0x00, 0x00, 0)
+
+
+def test_attack_up_shotgun_fires_while_recovery_drains() -> None:
+    from unittest.mock import MagicMock
+
+    bridge = MagicMock()
+    bridge.attack_pins = None
+    bridge.frame_ring = None
+    ammo = {"qty": 0x0703}
+    hook_seq = (
+        [(0, 0, 0)] * 2
+        + [(0x12, 0x03, 3)] * 4
+        + [(0x15, 0x03, 0)] * 2
+        + [(0x14, 0x03, rec) for rec in (2, 1, 0)]
+        + [(0x13, 0x03, 0)] * 4
+    )
+    hook_iter = iter(hook_seq)
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "equipped_weapon_id" in names:
+            return {"equipped_weapon_id": 0x03}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        if any(n.startswith("inv_slot_") for n in names):
+            return {n: ammo["qty"] if n == "inv_slot_0" else 0 for n in names}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0x13, 0x03, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    def step(**kwargs):
+        for btn in kwargs.get("frame_buttons") or []:
+            if btn.get("cross") and btn.get("up") and btn.get("r1"):
+                ammo["qty"] = 0x0603
+            assert btn != {}, "up-aim must not drop R1 to retry-neutral"
+        return (0, False)
+
+    bridge.read_ram.side_effect = read_ram
+    bridge.step.side_effect = step
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, frames, report = execute_attack_up_macro(
+        bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
+    )
+    assert not died
+    assert report["aim_mode"] == "up"
+    assert report["outcome"] == "ok"
+    assert report["ammo_spent"] == 1
+    assert report["saw_fire_anim"] is True
+    assert report["link_aim_held"] is True
+    assert frames < 40
+
+
+def test_attack_up_bazooka_fires_while_recovery_drains() -> None:
+    from unittest.mock import MagicMock
+
+    bridge = MagicMock()
+    bridge.attack_pins = None
+    bridge.frame_ring = None
+    ammo = {"qty": 0x0407}
+    hook_seq = (
+        [(0x12, 0x03, 3)] * 4
+        + [(0x15, 0x03, 0)] * 2
+        + [(0x14, 0x03, 0)] * 3
+        + [(0x13, 0x03, 0)] * 4
+    )
+    hook_iter = iter(hook_seq)
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "equipped_weapon_id" in names:
+            return {"equipped_weapon_id": 0x07}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        if any(n.startswith("inv_slot_") for n in names):
+            return {n: ammo["qty"] if n == "inv_slot_0" else 0 for n in names}
+        try:
+            a, x, r = next(hook_iter)
+        except StopIteration:
+            a, x, r = (0x13, 0x03, 0)
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    def step(**kwargs):
+        for btn in kwargs.get("frame_buttons") or []:
+            if btn.get("cross") and btn.get("up") and btn.get("r1"):
+                ammo["qty"] = 0x0307
+        return (0, False)
+
+    bridge.read_ram.side_effect = read_ram
+    bridge.step.side_effect = step
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, _frames, report = execute_attack_up_macro(
+        bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
+    )
+    assert not died
+    assert report["macro_path"] == "bazooka_up:bazooka_acid"
+    assert report["outcome"] == "ok"
+    assert report["ammo_spent"] == 1
+
+
+def test_attack_up_waits_out_previous_fire_anim_before_cross() -> None:
+    from unittest.mock import MagicMock
+
+    bridge = MagicMock()
+    bridge.attack_pins = None
+    bridge.frame_ring = None
+    ammo = {"qty": 0x0703}
+    fired_while_prev = {"n": 0}
+    hook_seq = (
+        [(0x14, 0x03, 0)] * 4
+        + [(0x17, 0x03, 0)] * 2
+        + [(0x13, 0x03, 2)] * 2
+        + [(0x14, 0x03, 0)] * 3
+        + [(0x13, 0x03, 0)] * 4
+    )
+    hook_iter = iter(hook_seq)
+    current = {"hooks": (0x14, 0x03, 0)}
+
+    def read_ram(fields):
+        names = {f[0] for f in fields}
+        if "equipped_weapon_id" in names:
+            return {"equipped_weapon_id": 0x03}
+        if "player_hp" in names:
+            return {"player_hp": 96}
+        if any(n.startswith("inv_slot_") for n in names):
+            return {n: ammo["qty"] if n == "inv_slot_0" else 0 for n in names}
+        try:
+            current["hooks"] = next(hook_iter)
+        except StopIteration:
+            current["hooks"] = (0x13, 0x03, 0)
+        a, x, r = current["hooks"]
+        return {
+            "player_anim": a,
+            "player_action_aux": x,
+            "player_recovery_timer": r,
+        }
+
+    def step(**kwargs):
+        for btn in kwargs.get("frame_buttons") or []:
+            if btn.get("cross") and btn.get("up") and btn.get("r1"):
+                if current["hooks"][0] in (0x14, 0x17):
+                    fired_while_prev["n"] += 1
+                else:
+                    ammo["qty"] = 0x0603
+        return (0, False)
+
+    bridge.read_ram.side_effect = read_ram
+    bridge.step.side_effect = step
+    empty = {k: False for k in ("up", "down", "left", "right", "square")}
+    died, _frames, report = execute_attack_up_macro(
+        bridge, empty_sticky=empty, prev_hp=96, episode_start_hp=96,
+    )
+    assert not died
+    assert fired_while_prev["n"] == 0
+    assert report["outcome"] == "ok"
+    assert report["ammo_spent"] == 1
 
 
 def test_standing_knife_macro_aims_from_neutral_with_recovery_drain() -> None:
