@@ -11,7 +11,7 @@ JSON schema (v2)::
         "room_id": "105",
         "tile_bin": [3, 1],
         "milestone_digest": "gallery:idle",
-        "quality": [hp, ammo_dmg_weighted, healing_centi, ever_held_count, poison, -ink_ribbons, -box_ammo],
+        "quality": [hp, ammo_dmg_weighted, healing_centi, ever_held_count, poison, -ink_ribbons, -box_ammo, -leg_frames],
         "visit_count": 2,
         "bundle_path": null,
         "meta": {}
@@ -51,20 +51,30 @@ _MAX_CELLS_PER_ROOM_ENV = "RE1_GO_MAX_CELLS_PER_ROOM"
 _DEFAULT_MAX_CELLS_PER_ROOM = 40
 
 # (hp, ammo_dmg_weighted, healing, ever_held_count, poison_ok,
-#  -ink_ribbons_in_inventory, -box_ammo_dmg_weighted)
-Quality = tuple[int, int, int, int, int, int, int]
-QUALITY_LEN = 7
+#  -ink_ribbons_in_inventory, -box_ammo_dmg_weighted, -leg_frames)
+Quality = tuple[int, int, int, int, int, int, int, int]
+QUALITY_LEN = 8
+LEG_FRAMES_QUALITY_INDEX = 7
+# Existing cells pad as infinitely slow so equal-survival recaptures install.
+LEG_FRAMES_SENTINEL = 99_999_999
+
+
+def _pad_quality_dim(index: int) -> int:
+    if index == LEG_FRAMES_QUALITY_INDEX:
+        return -LEG_FRAMES_SENTINEL
+    return 0
 
 
 def normalize_quality(
     raw: Quality | list[int] | tuple[int, ...] | None,
 ) -> Quality:
-    """Pad/truncate to the current quality arity (legacy shorter tuples pad with 0)."""
+    """Pad/truncate to 8 dims. Missing dim 7 is ``-LEG_FRAMES_SENTINEL``, not 0."""
     if raw is None:
-        return (0, 0, 0, 0, 0, 0, 0)
-    vals = [int(x) for x in list(raw)[:QUALITY_LEN]]
+        vals: list[int] = []
+    else:
+        vals = [int(x) for x in list(raw)[:QUALITY_LEN]]
     while len(vals) < QUALITY_LEN:
-        vals.append(0)
+        vals.append(_pad_quality_dim(len(vals)))
     return (
         int(vals[0]),
         int(vals[1]),
@@ -73,7 +83,21 @@ def normalize_quality(
         int(vals[4]),
         int(vals[5]),
         int(vals[6]),
+        int(vals[7]),
     )
+
+
+def attach_leg_frames(
+    raw: Quality | list[int] | tuple[int, ...] | None,
+    leg_frames: int | None,
+) -> Quality:
+    """Set quality[7] = ``-leg_frames`` (fewer frames wins). None → sentinel."""
+    q = list(normalize_quality(raw))
+    if leg_frames is None:
+        q[LEG_FRAMES_QUALITY_INDEX] = -LEG_FRAMES_SENTINEL
+    else:
+        q[LEG_FRAMES_QUALITY_INDEX] = -max(0, int(leg_frames))
+    return normalize_quality(q)
 
 
 def max_cells_per_room_default() -> int:

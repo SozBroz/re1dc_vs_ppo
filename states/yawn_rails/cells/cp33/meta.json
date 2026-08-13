@@ -1,6 +1,6 @@
 {
-  "bundle_sha256": "0141c354926baa29ff6475a44b3fb5f61961008c2206e7f58f2a13482abd6465",
-  "bytes": 1453177,
+  "bundle_sha256": "4f8d4ef0a2663448c3077b397fb5fa6c0dfcbbf7638bef1ef373c741c0f0bd2b",
+  "bytes": 1447434,
   "captured_in_box_room": false,
   "checkpoint_id": "gallery_portrait_6_117",
   "checkpoint_index": 33,
@@ -11,14 +11,15 @@
   "quality": [
     96,
     104,
-    1,
+    33,
     11,
     1,
     0,
-    -30
+    -30,
+    -99999999
   ],
   "room_id": "117",
   "route_id": "yawn_quest_v2",
-  "sidecar_sha256": "913642cad7e9d515f6bea7a330fcb1264d640018503d57f66e99f857a8de14d0",
-  "state_sha256": "f1bfe6075431083a9a8f41b658ac6dc40b44c25c72237d03662ad46ad4ec49ab"
+  "sidecar_sha256": "97b9fbaf3abc676dbe9bab7d5e008a0d1f957230dab662a3bbb263fdefd088ab",
+  "state_sha256": "85905eeccfca54948f5737429f16ee1dd49aff532770c2c613248323826b11b7"
 }

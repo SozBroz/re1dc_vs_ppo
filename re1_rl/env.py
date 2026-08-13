@@ -414,6 +414,7 @@ class RE1Env(gym.Env):
         self._last_attack_obs = empty_last_attack()
         self._stage: dict[str, Any] = {}
         self._step_count = 0
+        self._leg_replay = None
         self._prev_state: dict[str, Any] = {}
         self._prev_hp = 0
         self._grab_escape_pending = False
@@ -1451,6 +1452,7 @@ class RE1Env(gym.Env):
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)
         opts = dict(options or {})
+        self._reset_options = opts
         self._route_start_index = int(opts.get("route_start_index", 0))
         self._stop_bg_skip()
         self.bridge.hp_floor = 0
@@ -1608,6 +1610,11 @@ class RE1Env(gym.Env):
         self._init_anim_history()
 
         self._step_count = 0
+        self._leg_replay = None
+        if str(self._stage.get("mode") or "") == "yawn_rails":
+            from re1_rl.leg_replay import new_leg_replay_buffer
+
+            self._leg_replay = new_leg_replay_buffer()
         self._frame_stack = []
         self.bridge.frame_ring.clear()
         self.bridge.attack_pins.clear()
@@ -2230,6 +2237,15 @@ class RE1Env(gym.Env):
         max_ep_steps = int(self._stage.get("max_steps", 3000))
         self._skip_cache_truncated = self._episode_truncated()
 
+    def _record_leg_replay_step(self, action: int, emu_frames: int) -> None:
+        buf = getattr(self, "_leg_replay", None)
+        if buf is None:
+            return
+        try:
+            buf.append(int(action), max(0, int(emu_frames)))
+        except (TypeError, ValueError, OverflowError):
+            return
+
     def _fast_cutscene_step(
         self, action: int
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
@@ -2244,6 +2260,7 @@ class RE1Env(gym.Env):
         if pending is not None:
             return pending
         self._step_count += 1
+        self._record_leg_replay_step(action, 0)
         # Main-thread flush of door crossings noted by the bg skip worker.
         try:
             self._credit_async_skip_room_crossing()
@@ -2334,6 +2351,7 @@ class RE1Env(gym.Env):
         self._skipping_flag = False
         self._sticky_input.reset()
         self._step_count += 1
+        self._record_leg_replay_step(action, int(self.frame_skip))
         try:
             frame_obs = self._capture_step_obs()
             state = self._read_state()
@@ -2475,10 +2493,10 @@ class RE1Env(gym.Env):
         report: dict[str, Any],
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         """Stay in-episode after a failed OPTIONS dismiss (0 reward, not done)."""
-        del action
         self._skipping_flag = False
         self._sticky_input.reset()
         self._step_count += 1
+        self._record_leg_replay_step(int(action), int(self.frame_skip))
         try:
             frame_obs = self._capture_step_obs()
             state = self._read_state(track_items=False)
@@ -3396,6 +3414,7 @@ class RE1Env(gym.Env):
                 return death
         assert self._planner is not None
         self._step_count += 1
+        self._record_leg_replay_step(action, int(step_emulated_frames))
         macro_pins = self._refresh_anim_history_before_obs()
         frame_obs = self._capture_step_obs()
         if macro_pins:
@@ -4065,6 +4084,7 @@ class RE1Env(gym.Env):
                 died_during_skip = False
 
         self._step_count += 1
+        self._record_leg_replay_step(action, int(step_emulated_frames))
         macro_pins = self._refresh_anim_history_before_obs()
         frame_obs = self.bridge.build_frame_stack()
         if macro_pins:

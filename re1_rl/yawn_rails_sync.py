@@ -24,6 +24,7 @@ from typing import Any, Iterator
 from re1_rl.go_explore_archive import quality_beats
 from re1_rl.go_explore_merge import (
     CELL_META_NAME,
+    CELL_REPLAY_NAME,
     CELL_SIDECAR_NAME,
     CELL_STATE_NAME,
     make_cell_bundle_zip,
@@ -358,6 +359,9 @@ def try_install_yawn_cell(
         try:
             shutil.copy2(state_src, incoming / CELL_STATE_NAME)
             shutil.copy2(side_src, incoming / CELL_SIDECAR_NAME)
+            replay_src = Path(staged_dir) / CELL_REPLAY_NAME
+            if replay_src.is_file():
+                shutil.copy2(replay_src, incoming / CELL_REPLAY_NAME)
             meta_src = Path(staged_dir) / CELL_META_NAME
             if meta_src.is_file():
                 shutil.copy2(meta_src, incoming / CELL_META_NAME)
@@ -433,7 +437,7 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _as_quality(raw: Any) -> tuple[int, int, int, int, int, int, int] | None:
+def _as_quality(raw: Any) -> tuple[int, ...] | None:
     if not isinstance(raw, (list, tuple)) or len(raw) < 5:
         return None
     try:
@@ -469,8 +473,9 @@ def pack_cell_bundle(
     state_bytes: bytes,
     sidecar: dict[str, Any] | bytes | str,
     meta: dict[str, Any] | None = None,
+    replay: dict[str, Any] | bytes | str | None = None,
 ) -> bytes:
-    """Zip ``cell.State`` + ``cell.sidecar.json`` (+ optional meta)."""
+    """Zip ``cell.State`` + ``cell.sidecar.json`` (+ optional meta / replay)."""
     if isinstance(sidecar, (bytes, bytearray)):
         side_obj = json.loads(bytes(sidecar).decode("utf-8"))
     elif isinstance(sidecar, str):
@@ -481,6 +486,7 @@ def pack_cell_bundle(
         state_bytes=state_bytes,
         sidecar=side_obj,
         meta=meta,
+        replay=replay,
     )
 
 
@@ -500,6 +506,13 @@ def build_capture_proposal(
     state_bytes = Path(state_path).read_bytes()
     side_text = Path(sidecar_path).read_text(encoding="utf-8")
     sidecar = json.loads(side_text)
+    replay = None
+    replay_path = Path(state_path).parent / CELL_REPLAY_NAME
+    if replay_path.is_file():
+        try:
+            replay = json.loads(replay_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            replay = None
     from re1_rl.go_explore_archive import normalize_quality
 
     q = list(normalize_quality(quality))
@@ -526,7 +539,9 @@ def build_capture_proposal(
         if key in (capacity or {})
     }
     meta.update(capacity_meta)
-    blob = pack_cell_bundle(state_bytes=state_bytes, sidecar=sidecar, meta=meta)
+    blob = pack_cell_bundle(
+        state_bytes=state_bytes, sidecar=sidecar, meta=meta, replay=replay
+    )
     with zipfile.ZipFile(io.BytesIO(blob)) as zf:
         state_sha = _sha256_bytes(zf.read(CELL_STATE_NAME))
         side_sha = _sha256_bytes(zf.read(CELL_SIDECAR_NAME))
@@ -994,6 +1009,9 @@ class YawnRailsCellStore:
             meta_p = d / CELL_META_NAME
             if meta_p.is_file():
                 zf.write(meta_p, CELL_META_NAME)
+            replay_p = d / CELL_REPLAY_NAME
+            if replay_p.is_file():
+                zf.write(replay_p, CELL_REPLAY_NAME)
         return buf.getvalue()
 
 

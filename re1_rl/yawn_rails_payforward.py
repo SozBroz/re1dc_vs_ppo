@@ -486,7 +486,9 @@ def project_end_quality(
     """Optimistic quality after completing ``route_step`` (no HP loss)."""
     from re1_rl.go_explore_capture import healing_weight_centi
 
-    hp, ammo, healing, slots, poison, neg_ribbons, neg_box = normalize_quality(start_q)
+    hp, ammo, healing, slots, poison, neg_ribbons, neg_box, neg_frames = (
+        normalize_quality(start_q)
+    )
     for name in _pickup_names(route_step):
         ammo += int(_PICKUP_AMMO_BONUS.get(name, 0))
         healing += healing_weight_centi(name)
@@ -501,6 +503,7 @@ def project_end_quality(
         int(poison),
         int(neg_ribbons),
         int(neg_box),
+        int(neg_frames),
     )
 
 
@@ -511,7 +514,9 @@ def strip_pickup_bonuses(
     """Reverse optimistic pickup bonuses (incumbent already includes the gain)."""
     from re1_rl.go_explore_capture import healing_weight_centi
 
-    hp, ammo, healing, slots, poison, neg_ribbons, neg_box = normalize_quality(end_q)
+    hp, ammo, healing, slots, poison, neg_ribbons, neg_box, neg_frames = (
+        normalize_quality(end_q)
+    )
     for name in _pickup_names(route_step):
         ammo = max(0, ammo - int(_PICKUP_AMMO_BONUS.get(name, 0)))
         healing = max(0, healing - healing_weight_centi(name))
@@ -525,6 +530,7 @@ def strip_pickup_bonuses(
         int(poison),
         int(neg_ribbons),
         int(neg_box),
+        int(neg_frames),
     )
 
 

@@ -15,6 +15,7 @@ from re1_rl.go_explore_archive import (
     ARCHIVE_VERSION,
     ArchiveCell,
     GoExploreArchive,
+    LEG_FRAMES_SENTINEL,
     acquire_archive_lock,
     quality_beats,
     release_archive_lock,
@@ -41,6 +42,18 @@ def test_quality_beats_lexicographic() -> None:
     # Lowest priority: less ammo left in the box (higher -box_ammo) wins.
     assert quality_beats((8, 30, 0, 0, 1, 0, 0), (8, 30, 0, 0, 1, 0, -30))
     assert not quality_beats((8, 30, 0, 0, 1, 0, -30), (8, 30, 0, 0, 1, 0, 0))
+    from re1_rl.go_explore_archive import LEG_FRAMES_SENTINEL, normalize_quality
+
+    padded = normalize_quality((8, 30, 0, 0, 1, 0, 0))
+    assert padded[7] == -LEG_FRAMES_SENTINEL
+    assert quality_beats(
+        (8, 30, 0, 0, 1, 0, 0, -100),
+        (8, 30, 0, 0, 1, 0, 0),
+    )
+    assert not quality_beats(
+        (8, 30, 0, 0, 1, 0, 0, -500),
+        (8, 30, 0, 0, 1, 0, 0, -100),
+    )
 
 
 def test_upsert_and_frontier_yawn_filter(tmp_path: Path) -> None:
@@ -160,7 +173,7 @@ def test_save_load_roundtrip(tmp_path: Path) -> None:
     assert isinstance(cell, ArchiveCell)
     assert cell.room_id == "10F"
     assert cell.milestone_digest == digest
-    assert cell.quality == (7, 4, 1, 2, 1, 0, 0)
+    assert cell.quality == (7, 4, 1, 2, 1, 0, 0, -LEG_FRAMES_SENTINEL)
     assert cell.bundle_path == "cells/x/cell.State"
     assert cell.meta["worker"] == "test"
     assert cell.record_id

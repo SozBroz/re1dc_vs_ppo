@@ -31,6 +31,7 @@ from re1_rl.reward import (
 from re1_rl.room_graph import RoomGraph, load_valid_rooms
 from re1_rl.yawn_rails import (
     capture_successor_cell,
+    iter_loadable_cells,
     sample_one_leg_options,
     successor_capacity,
     validate_manifest_cells,
@@ -793,6 +794,45 @@ def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: P
     assert a["reset_source"] == "route_cell"
     assert a["reset_source"] not in {"pb", "archive", "route_initial"}
     assert a["leg_span"] == 1
+
+
+def test_terminal_cp96_is_never_loadable(tmp_path: Path) -> None:
+    """cp96 has no next hunt target — no agent may reset into it."""
+    import shutil
+
+    route_src = ROOT / "data" / "yawn_checkpoint_route.json"
+    shutil.copy(route_src, tmp_path / "yawn_checkpoint_route.json")
+    cells = []
+    for idx in (95, 96):
+        row = _write_cell(tmp_path, idx)
+        row["next_checkpoint_id"] = "" if idx == 96 else "yawn_moon_210"
+        cells.append(row)
+    manifest = {"schema_version": 1, "route_id": "test", "cells": cells}
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_path": "yawn_checkpoint_route.json",
+        "route_steps": list(range(1, _ROUTE_N + 1)),
+    }
+    loadable = iter_loadable_cells(tmp_path, stage)
+    indices = {int(r["checkpoint_index"]) for r in loadable}
+    assert 96 not in indices
+    assert 95 in indices
+
+
+def test_empty_next_checkpoint_id_excluded_even_without_route_path(
+    tmp_path: Path,
+) -> None:
+    cells = [_write_cell(tmp_path, 18), _write_cell(tmp_path, 96)]
+    cells[1]["next_checkpoint_id"] = ""
+    manifest = {"schema_version": 1, "route_id": "test", "cells": cells}
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {"route_id": "test", "cells_manifest": "manifest.json"}
+    loadable = iter_loadable_cells(tmp_path, stage)
+    indices = {int(r["checkpoint_index"]) for r in loadable}
+    assert 18 in indices
+    assert 96 not in indices
 
 
 def test_reset_mix_half_latest_half_any_eligible(tmp_path: Path) -> None:

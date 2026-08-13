@@ -1,24 +1,25 @@
 {
-  "bundle_sha256": "6e2db37e328f5799c8ad615db99dcc0eb294086883b7a6c954384f59bea92352",
-  "bytes": 1456300,
+  "bundle_sha256": "2425b8e71ed76e69fdb507dba3f6268f2ca721a0396794fc6b7a58acb5835906",
+  "bytes": 1511132,
   "captured_in_box_room": true,
   "checkpoint_id": "storeroom_enter_118",
   "checkpoint_index": 40,
   "inventory_feasible": true,
-  "inventory_free_slots": 1,
+  "inventory_free_slots": 2,
   "next_checkpoint_id": "chemical_118",
   "next_slots_needed": 0,
   "quality": [
     96,
-    83,
-    2,
-    12,
+    92,
+    68,
+    13,
     1,
     0,
-    -30
+    -30,
+    -99999999
   ],
   "room_id": "118",
   "route_id": "yawn_quest_v2",
-  "sidecar_sha256": "8e670f1d2b00ea04279ca4ecf5c2a2d50f736f9b8592e67e2557e7f676047816",
-  "state_sha256": "81188acebaef5c3d258aac340e1c56a25d1d6ae189a68465add8c0f52cc926d4"
+  "sidecar_sha256": "fe523fc8f508e4110588898dcb605838b6e67a65ca09f6ca25cc8227b5799c6d",
+  "state_sha256": "7bd2111fc6604b75314fba5836dc70542a9ecb97bac4f259c06dad44eb1d78b3"
 }

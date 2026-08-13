@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import random
@@ -234,7 +235,20 @@ def _sampling_row_eligible(
         checkpoint_index = int(row["checkpoint_index"])
     except (KeyError, TypeError, ValueError):
         return False
+    # Terminal captures (cp96 / empty next id) have nothing left to hunt.
+    if "next_checkpoint_id" in row and not str(row.get("next_checkpoint_id") or "").strip():
+        return False
     next_checkpoint = _checkpoint_after_row(project_root, stage, checkpoint_index)
+    if next_checkpoint is None and stage.get("route_path"):
+        try:
+            route = json.loads(
+                (project_root / str(stage["route_path"])).read_text(encoding="utf-8")
+            )
+            route_n = len(route) if isinstance(route, list) else 0
+        except (OSError, json.JSONDecodeError, TypeError):
+            route_n = 0
+        if route_n > 0 and checkpoint_index == route_n - 1:
+            return False
     mandatory_pickup = bool((next_checkpoint or {}).get("items_gained"))
     if not mandatory_pickup:
         return True
@@ -1329,10 +1343,31 @@ def capture_successor_cell(
 
         checkpoint_id = str(completed_cp.get("checkpoint_id", "") or cid)
         route_id = str(stage.get("route_id") or "yawn_quest_v2")
+        from re1_rl.go_explore_archive import attach_leg_frames
+        from re1_rl.leg_replay import maybe_write_capture_tape, should_write_leg_replay
+
+        to_state_sha = hashlib.sha256(state_path.read_bytes()).hexdigest()
+        settled = not bool(unsettled_state.get("in_control", True))
         quality = compute_quality(
             live_state,
             ever_held=getattr(getattr(env, "_items", None), "ever_held", None),
             env=env,
+        )
+        leg_frames = None
+        if should_write_leg_replay(env, completed):
+            buf = getattr(env, "_leg_replay", None)
+            if buf is not None:
+                leg_frames = int(buf.leg_frames)
+        quality = attach_leg_frames(quality, leg_frames)
+        maybe_write_capture_tape(
+            env,
+            staging,
+            completed_index=completed,
+            completed_id=checkpoint_id,
+            settled=settled,
+            live_state=live_state,
+            quality=quality,
+            to_state_sha256=to_state_sha,
         )
         _log_capture_quality_vs_incumbent(
             root,

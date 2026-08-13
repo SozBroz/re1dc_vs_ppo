@@ -190,3 +190,68 @@ def refresh_yawn_quality_metadata(project_root: Path | str) -> list[dict[str, An
         store_path.write_text(json.dumps(store, indent=2) + "\n", encoding="utf-8")
 
     return changes
+
+
+def seed_leg_frames_sentinel(project_root: Path | str) -> int:
+    """Force quality[7] = -LEG_FRAMES_SENTINEL on every yawn cell on disk.
+
+    Existing 7-dim rows are padded; any stored speed dim is overwritten so the
+    next equal-survival capture installs.
+    """
+    from re1_rl.go_explore_archive import (
+        LEG_FRAMES_QUALITY_INDEX,
+        LEG_FRAMES_SENTINEL,
+        attach_leg_frames,
+    )
+    from re1_rl.yawn_rails_sync import MANIFEST_FILENAME, cell_dir_name, yawn_rails_root
+
+    yroot = yawn_rails_root(project_root)
+    man_path = yroot / MANIFEST_FILENAME
+    store_path = yroot / "store.json"
+    updated = 0
+    sentinel_q7 = -int(LEG_FRAMES_SENTINEL)
+
+    def _force(raw: Any) -> list[int] | None:
+        if not isinstance(raw, (list, tuple)) or len(raw) < 5:
+            return None
+        q = list(attach_leg_frames(raw, None))
+        q[LEG_FRAMES_QUALITY_INDEX] = sentinel_q7
+        return q
+
+    if man_path.is_file():
+        man = json.loads(man_path.read_text(encoding="utf-8-sig"))
+        for row in man.get("cells") or []:
+            if not isinstance(row, dict):
+                continue
+            q = _force(row.get("quality"))
+            if q is None:
+                continue
+            row["quality"] = q
+            updated += 1
+            try:
+                idx = int(row["checkpoint_index"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            meta_p = yroot / "cells" / cell_dir_name(idx) / "meta.json"
+            if meta_p.is_file():
+                try:
+                    meta = json.loads(meta_p.read_text(encoding="utf-8-sig"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                meta["quality"] = q
+                meta_p.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+        man_path.write_text(json.dumps(man, indent=2) + "\n", encoding="utf-8")
+
+    if store_path.is_file():
+        store = json.loads(store_path.read_text(encoding="utf-8-sig"))
+        cells = store.get("cells") or {}
+        if isinstance(cells, dict):
+            for _key, cell in cells.items():
+                if not isinstance(cell, dict):
+                    continue
+                q = _force(cell.get("quality"))
+                if q is None:
+                    continue
+                cell["quality"] = q
+        store_path.write_text(json.dumps(store, indent=2) + "\n", encoding="utf-8")
+    return updated

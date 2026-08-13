@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "archive_version": 691,
+  "archive_version": 832,
   "route_id": "yawn_quest_v2",
   "cells": [
     {
@@ -13,7 +13,9 @@
         1,
         4,
         1,
-        0
+        0,
+        0,
+        -99999999
       ],
       "bundle_sha256": "53b1982331046c3095a5ec1d88ce5e37e27d30644066f3923ee82476c09e0b61",
       "bytes": 1520919,
@@ -36,7 +38,8 @@
         5,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "b4529ad1e2b62461ae8295ff89ee6abc934e6c51c667a6b293013667589f46b9",
       "bytes": 1447208,
@@ -54,15 +57,16 @@
       "room_id": "105",
       "quality": [
         96,
-        74,
+        75,
         0,
         5,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
-      "bundle_sha256": "a4a50bfae243b615a8b54f860324722532ccfdb5f186a2b7806303aef483e061",
-      "bytes": 1578718,
+      "bundle_sha256": "8c90258751aa55482d4d96b342876cc95176eef333f7096d8bad629731f8c614",
+      "bytes": 1578410,
       "state_path": "states/yawn_rails/cells/cp02/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp02/cell.sidecar.json",
       "inventory_free_slots": 4,
@@ -77,15 +81,16 @@
       "room_id": "106",
       "quality": [
         96,
-        74,
+        75,
         0,
         5,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
-      "bundle_sha256": "34839532238258d9b5e5ac8bd1a4d1537f19312ba727c7d92f9e6e9c2b277ef8",
-      "bytes": 1501503,
+      "bundle_sha256": "61e8de8885f8e99fc87da1618d13b46d3fdb4ca667509e3db8132568ee424bd2",
+      "bytes": 1489999,
       "state_path": "states/yawn_rails/cells/cp03/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp03/cell.sidecar.json",
       "inventory_free_slots": 4,
@@ -100,15 +105,16 @@
       "room_id": "203",
       "quality": [
         96,
-        74,
+        75,
         0,
-        6,
+        5,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
-      "bundle_sha256": "24ae57dfddbfbc80531032a9f701bf4f09de3a597a02d8046cbc90a4f2a1d3f6",
-      "bytes": 1594485,
+      "bundle_sha256": "9b53f52c0c5e1b58e8d6767858ccd029511676ef71d6fd3a62134e06d0827c62",
+      "bytes": 1599658,
       "state_path": "states/yawn_rails/cells/cp04/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp04/cell.sidecar.json",
       "inventory_free_slots": 4,
@@ -123,15 +129,16 @@
       "room_id": "106",
       "quality": [
         96,
-        74,
+        75,
         0,
-        6,
+        5,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
-      "bundle_sha256": "e9f939d61beef1f37f5281c991be8f2c810b65a297847418d86a843fad26533d",
-      "bytes": 1575212,
+      "bundle_sha256": "374ccd77281f90b394fa242cde2fa13ffdec0a08a9d3602b58cf763e01d4e0b0",
+      "bytes": 1563902,
       "state_path": "states/yawn_rails/cells/cp05/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp05/cell.sidecar.json",
       "inventory_free_slots": 4,
@@ -146,15 +153,16 @@
       "room_id": "105",
       "quality": [
         96,
-        74,
+        75,
         0,
         6,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
-      "bundle_sha256": "901a20d78e75b77efc691b74bf37e27a2436a545cd25a6214138687101e43712",
-      "bytes": 1454658,
+      "bundle_sha256": "6263ec79d4029239f051cf76470243af90d2cdeea5480425c9b8892d285f92cc",
+      "bytes": 1446835,
       "state_path": "states/yawn_rails/cells/cp06/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp06/cell.sidecar.json",
       "inventory_free_slots": 4,
@@ -169,15 +177,16 @@
       "room_id": "104",
       "quality": [
         96,
-        74,
+        75,
         0,
-        6,
+        5,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
-      "bundle_sha256": "1e6408c925cc4524f5d30ed84413cfa148703a4009153d48bc124e61e24efe59",
-      "bytes": 1503873,
+      "bundle_sha256": "bdaecadfae09d58581bcb67d6996543dd81d12e57fa51b5d21a44db9edd8a799",
+      "bytes": 1499019,
       "state_path": "states/yawn_rails/cells/cp07/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp07/cell.sidecar.json",
       "inventory_free_slots": 4,
@@ -196,7 +205,9 @@
         1,
         6,
         1,
-        0
+        0,
+        0,
+        -99999999
       ],
       "bundle_sha256": "b7e288ee4e99fdc224649c40828e5abed0401180e9ed8f93537e431c6be31fe4",
       "bytes": 1472951,
@@ -219,7 +230,8 @@
         7,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "a15c48ba354ece65d5a9c54d24fa787483ad61967c36a896e6af620e8ffd25c7",
       "bytes": 1491187,
@@ -242,7 +254,8 @@
         7,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "a8ffedc6a6f1a5f66ea3a57562998a8cc34f1a8f31c4ecc5e4d301ae833d3dbf",
       "bytes": 1516733,
@@ -265,7 +278,8 @@
         8,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "61838113eb3774d5f9ed2cd108751b5bd8dcbc61c98943bb5083a117280106db",
       "bytes": 1512493,
@@ -288,7 +302,8 @@
         8,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "5459001b56c9f73278028e324f2d6f5be816d86333b1483c561ad0aa706e4644",
       "bytes": 1513956,
@@ -311,7 +326,8 @@
         8,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "a79005428894dc502ae929d06e676df9e7cc9fa6fa4683792fa990c57d6e5e39",
       "bytes": 1519711,
@@ -334,7 +350,8 @@
         8,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "5aead4602f8b4fa9809df61743ac31a96e7c983ce128dab4199725575a104cda",
       "bytes": 1424163,
@@ -357,7 +374,8 @@
         9,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "0d5b332e2ce6bea07665256ebcd5d294a18a04ef5f9138538caa1d01df4ef6ec",
       "bytes": 1404354,
@@ -380,7 +398,8 @@
         9,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "84e01afe68f8e828fba52bec4ef304eae868fbc562415f0948766bfc77bbfa9e",
       "bytes": 1351231,
@@ -403,7 +422,8 @@
         9,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "5bc52a9106d7a219cb7015b20e3acff4a100c1f637818b505b5ce91caa094c9a",
       "bytes": 1483584,
@@ -426,7 +446,8 @@
         9,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "599780eab6956bf5712fdf5a08601564b13e831ec755982f243dc9a760b50ab3",
       "bytes": 1491411,
@@ -449,7 +470,8 @@
         9,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "697a1efb2fdeb7a4451a7c32ed0fe912f22b299099e4ab0fa51f2c6692473926",
       "bytes": 1520714,
@@ -472,7 +494,8 @@
         9,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "cdc8c8000f3e8aea04567bee1c41ba8c48aeb6566ed6e7dc6f9539b60dad3451",
       "bytes": 1464688,
@@ -495,7 +518,8 @@
         10,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "b9536b3f7e1884633b33ba6ca9a883d28128fb88034a8ab5ac6e221176084449",
       "bytes": 1466884,
@@ -518,7 +542,8 @@
         10,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "864fd29182f4dba26e673103a4d1400387aeb66d228b8445626259b9ed52f772",
       "bytes": 1390203,
@@ -541,7 +566,8 @@
         11,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "e972e33b4e5383c2f3ce33dbe206aa4ca3effc88c814cb23d9768782af65ad82",
       "bytes": 1358862,
@@ -564,7 +590,8 @@
         11,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "62b08dcce11d2455214b2ce57cf321038cf36ab5826b46d3f2c88d4ea3d0900c",
       "bytes": 1456244,
@@ -587,7 +614,8 @@
         11,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "ba7db0c389b282b287c0541a4e665b74f42d1983d6b649699fad2dfe6c16a18a",
       "bytes": 1476670,
@@ -610,7 +638,8 @@
         11,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "64af7d584a21b202f55e6dc7ea32ea502737f6873438276ba6aa43091693ce6f",
       "bytes": 1385044,
@@ -633,7 +662,8 @@
         11,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "478d8ba53ae04391585d469e67c98a97f807eda96240d4ba67f8aaf893daa548",
       "bytes": 1490952,
@@ -656,7 +686,8 @@
         11,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "7fefaa0bd74583a03d90826453ac0ada4348daafbb899c930336bed7c2402196",
       "bytes": 1451773,
@@ -679,7 +710,8 @@
         11,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "0381ad8ee4ba2c39ffeea88baa5a480efb6fe86d8931d333a6156226057d986e",
       "bytes": 1464506,
@@ -702,7 +734,8 @@
         11,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "75dae15799617e0263340994145f726dd30fd14d42412e497925b35d82f6eacb",
       "bytes": 1454547,
@@ -725,7 +758,8 @@
         11,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "cc3e64884b1201ae626cc5e295f6855dbcdc77253caa7042a1eb0b6bc8b34586",
       "bytes": 1452083,
@@ -748,7 +782,8 @@
         11,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "d9a6d1b7450c7c333d0a8f8a00902c9d6e91b874800bc4533768720741e0a0ef",
       "bytes": 1442434,
@@ -771,7 +806,8 @@
         11,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "4f8d4ef0a2663448c3077b397fb5fa6c0dfcbbf7638bef1ef373c741c0f0bd2b",
       "bytes": 1447434,
@@ -794,7 +830,8 @@
         12,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "373634179a9bf9f5325799496f6e1bcd9797864b68eaa73d99399d060af10d45",
       "bytes": 1455239,
@@ -817,7 +854,8 @@
         12,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "025c2c17e780d1c73828a58e0d31c39eb62f8a77e71286a0bc69748989a5abde",
       "bytes": 1517392,
@@ -840,7 +878,8 @@
         12,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "848fe30c0857603164566afe57dbe4e6335bcf06f967442ce8e09f4e40455ee6",
       "bytes": 1522555,
@@ -858,15 +897,16 @@
       "room_id": "11A",
       "quality": [
         96,
-        97,
+        98,
         33,
         12,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
-      "bundle_sha256": "64317bb64205df2ac1e9c9d407ee6d3d5e1bcb66156db83e54b8449a899599db",
-      "bytes": 1571517,
+      "bundle_sha256": "30d93701d08dc6cb504d43a63574aae881f07b84a5b39fc39b02b9565a3c0055",
+      "bytes": 1572603,
       "state_path": "states/yawn_rails/cells/cp37/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp37/cell.sidecar.json",
       "inventory_free_slots": 2,
@@ -882,14 +922,15 @@
       "quality": [
         96,
         98,
-        1,
+        33,
         12,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
-      "bundle_sha256": "6c7ed784e6cd5c7e8f6e63bf55d1a7e6199ed139ea9415dbf65345f9714775c9",
-      "bytes": 1538075,
+      "bundle_sha256": "cbb51ed3464495cfe325bd7373a57b29abf810293ecf7a2e32dbd36f581254e4",
+      "bytes": 1539428,
       "state_path": "states/yawn_rails/cells/cp38/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp38/cell.sidecar.json",
       "inventory_free_slots": 2,
@@ -909,7 +950,8 @@
         12,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
       "bundle_sha256": "d6bfe729c4de5d5b486c0f155df750112b94d1d0dacb4f2a921ce1c1f968acde",
       "bytes": 1491931,
@@ -928,17 +970,18 @@
       "quality": [
         96,
         92,
-        66,
-        12,
+        68,
+        13,
         1,
         0,
-        -30
+        -30,
+        -99999999
       ],
-      "bundle_sha256": "4d57a4830e81f5bfd2687dd72a6d954cd937811f650b2450cad2ebea0fe363b5",
-      "bytes": 1510230,
+      "bundle_sha256": "2425b8e71ed76e69fdb507dba3f6268f2ca721a0396794fc6b7a58acb5835906",
+      "bytes": 1511132,
       "state_path": "states/yawn_rails/cells/cp40/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp40/cell.sidecar.json",
-      "inventory_free_slots": 1,
+      "inventory_free_slots": 2,
       "next_checkpoint_id": "chemical_118",
       "next_slots_needed": 0,
       "inventory_feasible": true,
@@ -955,7 +998,8 @@
         14,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "32f844fd2e6797a38f5d75eb5a1f59b01cae82f75b9b78bb70e7fb9399377f22",
       "bytes": 1511609,
@@ -978,7 +1022,8 @@
         14,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "bf92aa964a3431b8e028667aaf1a5cf5ab77fb244c8cd9dc28bbeb8c885d4e42",
       "bytes": 1538555,
@@ -1001,7 +1046,8 @@
         14,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "46f8dbddd9916d21dd3c55cd167132fb4d6c383071fe344103a97bf1086c664c",
       "bytes": 1458981,
@@ -1024,7 +1070,8 @@
         14,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "c46df2ed525c4287dfdd85af4e2c7cd83051ca9b0c32202db72272064fcd2f9e",
       "bytes": 1395281,
@@ -1047,7 +1094,8 @@
         14,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "1377bb50beb27a0de8b5534bfc8db9b3d2da27377fa44c6b89dfaacf30bdf0e8",
       "bytes": 1398866,
@@ -1070,7 +1118,8 @@
         15,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "bd9f44edff006d12034e3ca47c77985af487d3f45fb2208308f40226f416c2dd",
       "bytes": 1495734,
@@ -1093,7 +1142,8 @@
         15,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "b83d2a45c414d1314faf94ccca2e750702d5c8152f1c363c60ff0e03b3b9b417",
       "bytes": 1506099,
@@ -1116,7 +1166,8 @@
         15,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "f384da35fa2589b97e49a2e4c03c668a8dc61f372f7a1282c2c4358cad1fde1c",
       "bytes": 1421723,
@@ -1139,7 +1190,8 @@
         16,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "bd5cf92e3460c1798b4453ecf46a7dc99a4d529c531f4fa3537134ab921f073a",
       "bytes": 1490484,
@@ -1162,7 +1214,8 @@
         16,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "bcc33779dd42b0c07683b84f8d6d369f29b059453c9b45fb9f1453d9896deb97",
       "bytes": 1407885,
@@ -1185,7 +1238,8 @@
         16,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "246eb45fbd0c4ab492c472de8346dce8244ee063679ee0a2bdb665c5aa811d81",
       "bytes": 1495650,
@@ -1208,7 +1262,8 @@
         16,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "ee90fd1d42c0578fe34fce9534d23d0a4729131e4ab2dc7ced16b610b4ad1e92",
       "bytes": 1469049,
@@ -1231,7 +1286,8 @@
         16,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "ae1717a6683b94ff588f681b9e5d4f7c18b255c38848c7ab5f4f3aa9f732d518",
       "bytes": 1534996,
@@ -1254,7 +1310,8 @@
         16,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "271728a6370e8b49a8d2177e74f158f504296d7bbe2ce0ae3510c188310a2dab",
       "bytes": 1510065,
@@ -1277,7 +1334,8 @@
         16,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "a54db95ef11e5f910afdf653db91a3d277e0248d86fcbd1a4d722bda040dc4a0",
       "bytes": 1374178,
@@ -1300,7 +1358,8 @@
         16,
         1,
         0,
-        0
+        0,
+        -99999999
       ],
       "bundle_sha256": "c94221956e103c3a90b3d21f8d2ad886ec1d92991adfdc3789654bb9d89ba758",
       "bytes": 1419627,
@@ -1313,20 +1372,45 @@
       "captured_in_box_room": true
     },
     {
+      "checkpoint_index": 57,
+      "checkpoint_id": "west_stairs_return_10B",
+      "room_id": "101",
+      "quality": [
+        96,
+        190,
+        0,
+        16,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "944736c59f08964093e358c57491e55ad3148c932800a169945b3be8cf595949",
+      "bytes": 1351384,
+      "state_path": "states/yawn_rails/cells/cp57/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp57/cell.sidecar.json",
+      "inventory_free_slots": 2,
+      "next_checkpoint_id": "central_corridor_103",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
       "checkpoint_index": 58,
       "checkpoint_id": "central_corridor_103",
       "room_id": "103",
       "quality": [
         96,
-        55,
+        184,
         0,
-        17,
+        16,
         1,
         0,
-        0
+        -60,
+        -99999999
       ],
-      "bundle_sha256": "a409c096c0e1c3612bf6e7b2677f54383110bb02e1a2076a045650f7df3e81f3",
-      "bytes": 1504730,
+      "bundle_sha256": "9e1dade0feae68119ee249599884575958e6f9150e6aca6bbb3e45e2a97de552",
+      "bytes": 1503908,
       "state_path": "states/yawn_rails/cells/cp58/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp58/cell.sidecar.json",
       "inventory_free_slots": 2,
@@ -1341,18 +1425,19 @@
       "room_id": "10C",
       "quality": [
         96,
+        169,
         0,
-        0,
-        17,
+        16,
         1,
         0,
-        0
+        -60,
+        -99999999
       ],
-      "bundle_sha256": "8944d7404adeb9017960403c26c16eefcf0e17d7e5ffc153271544544126d267",
-      "bytes": 1282401,
+      "bundle_sha256": "b145651af68d5b22ac440d855c5a3ee9a33126f9b1c26f48fcefdd7b33e61838",
+      "bytes": 1282460,
       "state_path": "states/yawn_rails/cells/cp59/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp59/cell.sidecar.json",
-      "inventory_free_slots": 3,
+      "inventory_free_slots": 2,
       "next_checkpoint_id": "armor_key_10C",
       "next_slots_needed": 1,
       "inventory_feasible": true,
@@ -1364,15 +1449,16 @@
       "room_id": "10C",
       "quality": [
         96,
-        0,
-        33,
+        169,
+        101,
         19,
         1,
         0,
-        0
+        -60,
+        -99999999
       ],
-      "bundle_sha256": "fc3d78cfcf3469d116e234b6e0d8f9d28d5c21f4e17e6d49e84f10d80e9b669f",
-      "bytes": 1312448,
+      "bundle_sha256": "0568a3529696f5367d5aae2bafce685cea3a44d3e3465fd9c3b32cd0cc98a697",
+      "bytes": 1313958,
       "state_path": "states/yawn_rails/cells/cp60/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp60/cell.sidecar.json",
       "inventory_free_slots": 0,
@@ -1387,18 +1473,19 @@
       "room_id": "103",
       "quality": [
         96,
-        17,
-        0,
-        18,
+        169,
+        101,
+        19,
         1,
         0,
-        0
+        -60,
+        -99999999
       ],
-      "bundle_sha256": "f9d5afaad342a9dfff2b4a0d87161e9f75a48591d50f67a7e859bab06e357bb5",
-      "bytes": 1516765,
+      "bundle_sha256": "5562a3d7023c191ffa484a9c4f992b13924af4d6d647239c1251dab471734f07",
+      "bytes": 1517802,
       "state_path": "states/yawn_rails/cells/cp61/cell.State",
       "sidecar_path": "states/yawn_rails/cells/cp61/cell.sidecar.json",
-      "inventory_free_slots": 2,
+      "inventory_free_slots": 1,
       "next_checkpoint_id": "plant_42_enter_10E",
       "next_slots_needed": 0,
       "inventory_feasible": true,
@@ -1406,32 +1493,849 @@
     },
     {
       "checkpoint_index": 62,
+      "checkpoint_id": "vacant_detour_enter_101",
+      "room_id": "101",
+      "quality": [
+        96,
+        169,
+        101,
+        19,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "bfa817ab429871d2e79a3adbed46a1d95e0438203bcfba4b5c253c86ca06c936",
+      "bytes": 1378980,
+      "state_path": "states/yawn_rails/cells/cp62/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp62/cell.sidecar.json",
+      "inventory_free_slots": 1,
+      "next_checkpoint_id": "vacant_enter_102",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 63,
+      "checkpoint_id": "vacant_enter_102",
+      "room_id": "102",
+      "quality": [
+        96,
+        169,
+        101,
+        19,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "ed68b2748cc30afaa0e833314a8c08402681ad300c47d5f78b2645558fab4c88",
+      "bytes": 1352194,
+      "state_path": "states/yawn_rails/cells/cp63/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp63/cell.sidecar.json",
+      "inventory_free_slots": 1,
+      "next_checkpoint_id": "vacant_ammo_102",
+      "next_slots_needed": 1,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 64,
+      "checkpoint_id": "vacant_ammo_102",
+      "room_id": "102",
+      "quality": [
+        96,
+        227,
+        101,
+        20,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "84830a43af3f1b3d283b5da4cca376769290302c71a518c568180b9fd6387193",
+      "bytes": 1370778,
+      "state_path": "states/yawn_rails/cells/cp64/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp64/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "vacant_return_101",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 65,
+      "checkpoint_id": "vacant_return_101",
+      "room_id": "101",
+      "quality": [
+        96,
+        227,
+        101,
+        20,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "9bd8c56da99026eb83573d63040943bfab2b4b22506a2603a0ea70fd774530ea",
+      "bytes": 1327492,
+      "state_path": "states/yawn_rails/cells/cp65/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp65/cell.sidecar.json",
+      "inventory_free_slots": 1,
+      "next_checkpoint_id": "vacant_return_103",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 66,
+      "checkpoint_id": "vacant_return_103",
+      "room_id": "103",
+      "quality": [
+        96,
+        227,
+        101,
+        20,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "1a18362673d5e31f93803a11b7c9408084b651ab31e6d32c216cfc3bd3221cd0",
+      "bytes": 1464876,
+      "state_path": "states/yawn_rails/cells/cp66/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp66/cell.sidecar.json",
+      "inventory_free_slots": 1,
+      "next_checkpoint_id": "plant_42_enter_10E",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 67,
       "checkpoint_id": "plant_42_enter_10E",
       "room_id": "10E",
       "quality": [
-        36,
-        2,
-        0,
-        18,
+        96,
+        221,
+        101,
+        20,
         1,
         0,
-        0
+        -60,
+        -99999999
       ],
-      "bundle_sha256": "6bd5d33bca5ae8095ea4e390580e7add71f4f4ff39eb7887200986feb98dda2c",
-      "bytes": 1403345,
-      "state_path": "states/yawn_rails/cells/cp62/cell.State",
-      "sidecar_path": "states/yawn_rails/cells/cp62/cell.sidecar.json",
-      "inventory_free_slots": 2,
+      "bundle_sha256": "05aa0aa30965d7f6de8a116bec2c3be922fee5140669e30b53f0885f11cb53b5",
+      "bytes": 1446917,
+      "state_path": "states/yawn_rails/cells/cp67/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp67/cell.sidecar.json",
+      "inventory_free_slots": 1,
       "next_checkpoint_id": "ammo_10E",
       "next_slots_needed": 1,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 68,
+      "checkpoint_id": "ammo_10E",
+      "room_id": "10E",
+      "quality": [
+        96,
+        245,
+        0,
+        20,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "8b3f09187b8136bde86bd19abf150adebeeae39d8dd68ecf0ace03f7b382af88",
+      "bytes": 1428154,
+      "state_path": "states/yawn_rails/cells/cp68/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp68/cell.sidecar.json",
+      "inventory_free_slots": 1,
+      "next_checkpoint_id": "central_corridor_post_10E_103",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 69,
+      "checkpoint_id": "central_corridor_post_10E_103",
+      "room_id": "103",
+      "quality": [
+        96,
+        245,
+        0,
+        20,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "92bce7e89c9d426422cc185a6cbf0ab751c31ad951ca9e013b41f3f32c19e168",
+      "bytes": 1498340,
+      "state_path": "states/yawn_rails/cells/cp69/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp69/cell.sidecar.json",
+      "inventory_free_slots": 1,
+      "next_checkpoint_id": "tea_transit_104_post_10E",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 70,
+      "checkpoint_id": "tea_transit_104_post_10E",
+      "room_id": "104",
+      "quality": [
+        96,
+        245,
+        0,
+        20,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "030770d43683bd1a0e8f0f4d1dd726da1cc41ca22eea2eb2a29eb5bd80091c17",
+      "bytes": 1413687,
+      "state_path": "states/yawn_rails/cells/cp70/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp70/cell.sidecar.json",
+      "inventory_free_slots": 1,
+      "next_checkpoint_id": "dining_enter_105_jewel",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 71,
+      "checkpoint_id": "dining_enter_105_jewel",
+      "room_id": "105",
+      "quality": [
+        96,
+        245,
+        0,
+        20,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "d6e84fdd1d7869c0dace865b37d641bc084754dfbdce6b3573e4fb511d29fbe3",
+      "bytes": 1454735,
+      "state_path": "states/yawn_rails/cells/cp71/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp71/cell.sidecar.json",
+      "inventory_free_slots": 1,
+      "next_checkpoint_id": "blue_jewel_105",
+      "next_slots_needed": 1,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 72,
+      "checkpoint_id": "blue_jewel_105",
+      "room_id": "105",
+      "quality": [
+        96,
+        245,
+        0,
+        21,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "575af21a4beabd3f6a2cb32efcfe8f80d175084a6a66f9b2b116309acdabcb89",
+      "bytes": 1400039,
+      "state_path": "states/yawn_rails/cells/cp72/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp72/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "tea_return_104_post_jewel",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 73,
+      "checkpoint_id": "tea_return_104_post_jewel",
+      "room_id": "104",
+      "quality": [
+        96,
+        245,
+        0,
+        21,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "c7dde705b374468a2320422061fa243ffdd4e986f476ba456b979db9d366c115",
+      "bytes": 1475673,
+      "state_path": "states/yawn_rails/cells/cp73/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp73/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "central_corridor_post_jewel_103",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 74,
+      "checkpoint_id": "central_corridor_post_jewel_103",
+      "room_id": "103",
+      "quality": [
+        96,
+        245,
+        0,
+        21,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "d2876524c0705ca37647d22224036161f48aa6e0c36a6c8d7c975b0b4b18c3d6",
+      "bytes": 1544158,
+      "state_path": "states/yawn_rails/cells/cp74/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp74/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "forest_enter_10D",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 75,
+      "checkpoint_id": "forest_enter_10D",
+      "room_id": "10D",
+      "quality": [
+        96,
+        245,
+        0,
+        21,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "2d2f5bb976d571ced41b7cce54edaf09a382cc542d5310681efbfd98dd7c0cd6",
+      "bytes": 1498671,
+      "state_path": "states/yawn_rails/cells/cp75/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp75/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "wind_crest_10D",
+      "next_slots_needed": 1,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 76,
+      "checkpoint_id": "wind_crest_10D",
+      "room_id": "10D",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "e954076de37963fa4b1ce139db5a3b9173a550e4a811a041df5df6474957052f",
+      "bytes": 1516433,
+      "state_path": "states/yawn_rails/cells/cp76/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp76/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "central_corridor_return_103",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 77,
+      "checkpoint_id": "central_corridor_return_103",
+      "room_id": "103",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "8778d740562e82d9b5b62b92a49579045cc702e32b8799bac6c456226ade8a19",
+      "bytes": 1608239,
+      "state_path": "states/yawn_rails/cells/cp77/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp77/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "tea_return_104_post_wind",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 78,
+      "checkpoint_id": "tea_return_104_post_wind",
+      "room_id": "104",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "1373d82972ce3245412aaff87a2c789b0c69371c922134141efabc8a5cd1164d",
+      "bytes": 1472179,
+      "state_path": "states/yawn_rails/cells/cp78/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp78/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "dining_return_105_post_wind",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 79,
+      "checkpoint_id": "dining_return_105_post_wind",
+      "room_id": "105",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "981eb2d3ed70481a7ea35a97201330f6623dca194c163dc5e7d2f45e7045d3eb",
+      "bytes": 1456740,
+      "state_path": "states/yawn_rails/cells/cp79/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp79/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "main_hall_return_106_post_wind",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 80,
+      "checkpoint_id": "main_hall_return_106_post_wind",
+      "room_id": "106",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "b6362927dadd057c04d0e2eaeb71ba412c7657586f92931dc7fa7fb93d6762d5",
+      "bytes": 1375969,
+      "state_path": "states/yawn_rails/cells/cp80/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp80/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "upper_hall_return_203",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 81,
+      "checkpoint_id": "upper_hall_return_203",
+      "room_id": "203",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "d99d853700cd81ee0225d8fcf6523301612c5bf3438bc6d38bfdf0ab2075933f",
+      "bytes": 1536993,
+      "state_path": "states/yawn_rails/cells/cp81/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp81/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "c_passage_return_204",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 82,
+      "checkpoint_id": "c_passage_return_204",
+      "room_id": "204",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "244de1ddf155b1486b1ac3600f67080169aee72f5bd0ab76d8e48ca7984a9ffc",
+      "bytes": 1429644,
+      "state_path": "states/yawn_rails/cells/cp82/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp82/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "richard_room_enter_20D",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 83,
+      "checkpoint_id": "richard_room_enter_20D",
+      "room_id": "20D",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "da07c28cedcedf6b503648f98c8ee89d07e4406217f4ffe6a32b0e2c53dfb3e1",
+      "bytes": 1425391,
+      "state_path": "states/yawn_rails/cells/cp83/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp83/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "richard_cutscene_20D",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 84,
+      "checkpoint_id": "richard_cutscene_20D",
+      "room_id": "204",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "ad50b8cdb793380f85505fdfd3a304eb8c4bb40548cdeb5f610643fe3171e9ab",
+      "bytes": 1370585,
+      "state_path": "states/yawn_rails/cells/cp84/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp84/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "richard_forced_return_204",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 85,
+      "checkpoint_id": "richard_forced_return_204",
+      "room_id": "204",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "b2cac4c06808ab50a5efbb3553881d1a66d63af0d0829e3831e2ffed69b6a3c9",
+      "bytes": 1431579,
+      "state_path": "states/yawn_rails/cells/cp85/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp85/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "east_stairs_201_post_richard",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 86,
+      "checkpoint_id": "east_stairs_201_post_richard",
+      "room_id": "207",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "a9f56a09d301548e923c6729bd3bdc3e4548f5b162714573cc2ca9433c7ad5d6",
+      "bytes": 1436424,
+      "state_path": "states/yawn_rails/cells/cp86/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp86/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "east_stairs_101_post_richard",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 87,
+      "checkpoint_id": "east_stairs_101_post_richard",
+      "room_id": "10B",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "30c1e337c83d8a795f719d5a6442803558d5d409427c13cd6aea6832d62b8e76",
+      "bytes": 1543351,
+      "state_path": "states/yawn_rails/cells/cp87/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp87/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "yawn_box_enter_118",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 88,
+      "checkpoint_id": "yawn_box_enter_118",
+      "room_id": "118",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        -60,
+        -99999999
+      ],
+      "bundle_sha256": "da398e37d02c9971ff3f8586af9236038535b64e345b44421291f93bd8e0c62b",
+      "bytes": 1516335,
+      "state_path": "states/yawn_rails/cells/cp88/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp88/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "yawn_box_prep_118",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": true
+    },
+    {
+      "checkpoint_index": 89,
+      "checkpoint_id": "yawn_box_prep_118",
+      "room_id": "10B",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        0,
+        -99999999
+      ],
+      "bundle_sha256": "a60ae3b6d80da4527363890b4f72cc79852c3971635ab3ca0f20e2c7a61d6e58",
+      "bytes": 1494700,
+      "state_path": "states/yawn_rails/cells/cp89/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp89/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "east_stairs_101_to_yawn",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 90,
+      "checkpoint_id": "east_stairs_201_to_yawn",
+      "room_id": "207",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        0,
+        -99999999
+      ],
+      "bundle_sha256": "c043b6d5a2e322f3027fd2595230c6f502689ba5343c7e3d7e26fe171c7f4b3e",
+      "bytes": 1502485,
+      "state_path": "states/yawn_rails/cells/cp90/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp90/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "c_passage_204_to_yawn",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 91,
+      "checkpoint_id": "c_passage_204_to_yawn",
+      "room_id": "204",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        0,
+        -99999999
+      ],
+      "bundle_sha256": "c0f6be9e3678efab21e56ac4c4e82f4cae7d0a914e8757ef63a0f1e5c6b4e7f9",
+      "bytes": 1424649,
+      "state_path": "states/yawn_rails/cells/cp91/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp91/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "moon_hall_enter_20D",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 92,
+      "checkpoint_id": "moon_hall_enter_20D",
+      "room_id": "20D",
+      "quality": [
+        96,
+        245,
+        0,
+        22,
+        1,
+        0,
+        0,
+        -99999999
+      ],
+      "bundle_sha256": "3b6ce5dd78523c3f07369a2d7374db92bfd8f432f0aa632fb62c71da7add1c11",
+      "bytes": 1418085,
+      "state_path": "states/yawn_rails/cells/cp92/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp92/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "ammo_20D",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 93,
+      "checkpoint_id": "ammo_20D",
+      "room_id": "20D",
+      "quality": [
+        96,
+        260,
+        0,
+        22,
+        1,
+        0,
+        0,
+        -99999999
+      ],
+      "bundle_sha256": "84d003e8b728fa7f8500bf7b5fddafb7994e0b5feae43ff696fc6008d4d20a92",
+      "bytes": 1423952,
+      "state_path": "states/yawn_rails/cells/cp93/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp93/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "attic_entry_20E",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 94,
+      "checkpoint_id": "attic_entry_20E",
+      "room_id": "20E",
+      "quality": [
+        96,
+        260,
+        0,
+        22,
+        1,
+        0,
+        0,
+        -99999999
+      ],
+      "bundle_sha256": "2d0f4eb5f6bc172e4a692d657dc7b4645419d8450c5874531c28288795fb31b0",
+      "bytes": 1458411,
+      "state_path": "states/yawn_rails/cells/cp94/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp94/cell.sidecar.json",
+      "inventory_free_slots": 0,
+      "next_checkpoint_id": "yawn_arena_enter_210",
+      "next_slots_needed": 0,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 95,
+      "checkpoint_id": "yawn_arena_enter_210",
+      "room_id": "210",
+      "quality": [
+        96,
+        260,
+        0,
+        22,
+        1,
+        0,
+        0,
+        -99999999
+      ],
+      "bundle_sha256": "810e84e80e31021043b3c7e3ec0a62e36948aca281a2ae9dc123407c480f9d83",
+      "bytes": 1425058,
+      "state_path": "states/yawn_rails/cells/cp95/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp95/cell.sidecar.json",
+      "inventory_free_slots": 1,
+      "next_checkpoint_id": "yawn_moon_210",
+      "next_slots_needed": 1,
+      "inventory_feasible": true,
+      "captured_in_box_room": false
+    },
+    {
+      "checkpoint_index": 96,
+      "checkpoint_id": "yawn_moon_210",
+      "room_id": "210",
+      "quality": [
+        1,
+        43,
+        0,
+        24,
+        1,
+        0,
+        0,
+        -99999999
+      ],
+      "bundle_sha256": "a9badc24a2e87a7a3794eb1f0f9e1469f5786faf9f82291a0c71442e1197ed66",
+      "bytes": 1392752,
+      "state_path": "states/yawn_rails/cells/cp96/cell.State",
+      "sidecar_path": "states/yawn_rails/cells/cp96/cell.sidecar.json",
+      "inventory_free_slots": 2,
+      "next_checkpoint_id": "",
+      "next_slots_needed": 0,
       "inventory_feasible": true,
       "captured_in_box_room": false
     }
   ],
   "cache_stats": {
-    "manifest_cells": 63,
+    "manifest_cells": 97,
     "fetched_last_poll": 0,
     "pruned_dirs_last_poll": 0,
-    "remote_cell_count": 63
+    "remote_cell_count": 97
   }
 }

@@ -35,6 +35,7 @@ from re1_rl.milestone_digest import parse_cell_key_v2
 CELL_STATE_NAME = "cell.State"
 CELL_SIDECAR_NAME = "cell.sidecar.json"
 CELL_META_NAME = "meta.json"
+CELL_REPLAY_NAME = "leg_replay.json"
 
 
 def default_archive_path() -> Path:
@@ -460,6 +461,7 @@ def make_cell_bundle_zip(
     state_bytes: bytes,
     sidecar: dict[str, Any],
     meta: dict[str, Any] | None = None,
+    replay: dict[str, Any] | bytes | str | None = None,
 ) -> bytes:
     """Helper for tests / capture: build a cell zip in memory."""
     buf = io.BytesIO()
@@ -474,4 +476,14 @@ def make_cell_bundle_zip(
                 CELL_META_NAME,
                 json.dumps(meta, indent=2, sort_keys=True) + "\n",
             )
+        if replay is not None:
+            if isinstance(replay, (bytes, bytearray)):
+                replay_text = bytes(replay).decode("utf-8")
+            elif isinstance(replay, str):
+                replay_text = replay
+            else:
+                replay_text = json.dumps(replay, separators=(",", ":")) + "\n"
+            if not replay_text.endswith("\n"):
+                replay_text += "\n"
+            zf.writestr(CELL_REPLAY_NAME, replay_text)
     return buf.getvalue()

@@ -68,6 +68,7 @@ _PURGE_DONE: set[str] = set()
 CELL_STATE_NAME = "cell.State"
 CELL_SIDECAR_NAME = "cell.sidecar.json"
 CELL_META_NAME = "meta.json"
+CELL_REPLAY_NAME = "leg_replay.json"
 INCOMING_NAME = ".incoming"
 
 # Healing quality weights in centi-units (quality[2] stays int).
@@ -455,8 +456,11 @@ def quality_replace_significant(
     # Fewer on-person ink ribbons (higher -ribbons) is a real logistics win.
     if n[5] > o[5]:
         return True
-    # Less damage-weighted ammo left in the item box (higher -box_ammo) wins last.
+    # Less damage-weighted ammo left in the item box (higher -box_ammo).
     if n[6] > o[6]:
+        return True
+    # Faster equal-survival legs (higher -leg_frames) must install.
+    if n[7] > o[7]:
         return True
     return False
 
@@ -723,8 +727,9 @@ def compute_quality(
     the count of distinct items in ``ever_held`` (sidecar semantics), not occupied
     inventory slots. ``poison`` is ``1`` when healthy, ``0`` when poisoned. Holding
     ink ribbons is penalized. ``-box_ammo`` is the negated damage-weighted ammo
-    still sitting in the item box — lowest-priority tiebreaker so equal total
-    firepower prefers ammo withdrawn (empty box → ``0`` beats ``-30``).
+    still sitting in the item box — equal total firepower prefers ammo withdrawn
+    (empty box → ``0`` beats ``-30``). ``-leg_frames`` is attached by yawn
+    capture via ``attach_leg_frames`` (not computed here).
     """
     from re1_rl.weapon_damage import damage_weighted_ammo_score
 

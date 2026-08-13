@@ -379,6 +379,15 @@ def test_quality_replace_accepts_one_unit_resource_gain(
     assert not quality_replace_significant(old, old)
 
 
+def test_quality_replace_significant_faster_equal_survival() -> None:
+    old = (96, 60, 0, 8, 1, 0, 0)
+    faster = (96, 60, 0, 8, 1, 0, 0, -400)
+    slower = (96, 60, 0, 8, 1, 0, 0, -800)
+    assert quality_replace_significant(faster, old)
+    assert quality_replace_significant(faster, slower)
+    assert not quality_replace_significant(slower, faster)
+
+
 def test_purge_orphan_cell_dirs(tmp_path: Path) -> None:
     root = tmp_path / "cells"
     orphan = root / "deadbeef"
