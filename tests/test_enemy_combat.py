@@ -19,6 +19,7 @@ from re1_rl.enemy_combat import (
     is_cerberus_combat_entity,
     is_zombie_combat_entity,
     is_yawn_combat_entity,
+    is_boss_combat_entity,
     is_crow_combat_entity,
     is_crow_enemy,
     is_passive_crow_enemy,
@@ -562,6 +563,7 @@ def test_kind0f_low_hp_without_dog_byte_is_zombie_in_room_202() -> None:
     assert events[0]["is_zombie"] is True
     assert events[0]["is_cerberus"] is False
     assert events[0].get("is_yawn") is False
+    assert events[0].get("is_boss") is False
 
 
 def test_kind0f_translated_yawn_in_room_210_is_not_zombie() -> None:
@@ -584,9 +586,37 @@ def test_kind0f_translated_yawn_in_room_210_is_not_zombie() -> None:
     )
     assert len(events) == 1
     assert events[0]["is_yawn"] is True
+    assert events[0]["is_boss"] is True
     assert events[0]["is_zombie"] is False
     assert events[0]["is_cerberus"] is False
     assert events[0]["damage"] == 45
+
+
+def test_black_tiger_plant42_tyrant_are_bosses_not_fodder() -> None:
+    tiger = enemy_combat_events(
+        [{"slot": 0, "hp": 200, "type_id": 0x14}],
+        [{"slot": 0, "hp": 160, "type_id": 0x14}],
+        room_id="30C",
+    )
+    plant = enemy_combat_events(
+        [{"slot": 0, "hp": 400, "type_id": 0x10}],
+        [{"slot": 0, "hp": 350, "type_id": 0x10}],
+        room_id="40C",
+    )
+    tyrant = enemy_combat_events(
+        [{"slot": 0, "hp": 220, "type_id": 0x0F, "active_byte": 0}],
+        [{"slot": 0, "hp": 180, "type_id": 0x0F, "active_byte": 0}],
+        room_id="513",
+    )
+    for events, label in ((tiger, "tiger"), (plant, "plant"), (tyrant, "tyrant")):
+        assert len(events) == 1, label
+        assert events[0]["is_boss"] is True, label
+        assert events[0]["is_zombie"] is False, label
+        assert events[0]["is_cerberus"] is False, label
+    assert is_boss_combat_entity({"type_id": 0x14}, room_id="30C")
+    assert is_boss_combat_entity({"type_id": 0x10}, room_id="40C")
+    assert is_boss_combat_entity({"type_id": 0x0F}, hp_before=220, room_id="513")
+    assert not is_boss_combat_entity({"type_id": 0x0F}, hp_before=25, room_id="202")
 
 
 def test_yawn_translated_flag_is_not_zombie_even_without_room() -> None:
@@ -612,6 +642,7 @@ def test_yawn_translated_flag_is_not_zombie_even_without_room() -> None:
         room_id="210",
     )
     assert events[0]["is_yawn"] is True
+    assert events[0]["is_boss"] is True
     assert events[0]["is_zombie"] is False
 
 

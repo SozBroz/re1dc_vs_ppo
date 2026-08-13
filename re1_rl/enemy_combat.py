@@ -35,6 +35,21 @@ CERBERUS_HP_MAX = 120  # live dogs ~100; Tyrant 220+, Yawn 3050+
 CERBERUS_ACTIVE_BYTES: frozenset[int] = frozenset({0x2C, 0x44, 0x90})
 CERBERUS_TYPE_NAMES: frozenset[str] = frozenset({"cerberus", "zombie_dog"})
 YAWN_TYPE_NAMES: frozenset[str] = frozenset({"snake_yawn", "yawn"})
+BOSS_TYPE_NAMES: frozenset[str] = frozenset(
+    {
+        "snake_yawn",
+        "yawn",
+        "black_tiger",
+        "tyrant",
+        "super_tyrant",
+        "plant42",
+        "plant_42",
+    }
+)
+BLACK_TIGER_RAM_TYPE_ID = 0x14
+PLANT42_RAM_TYPE_ID = 0x10
+# Live Tyrant ~220; dogs / translated Yawn sit at or below CERBERUS_HP_MAX.
+TYRANT_HP_MIN = 200
 
 # Ordinary mansion zombies (test_enemy_combat + RDT model map).
 ZOMBIE_RAM_TYPE_IDS: frozenset[int] = frozenset({0x01, 0x02})
@@ -219,6 +234,40 @@ def is_yawn_combat_entity(
     return False
 
 
+def is_boss_combat_entity(
+    meta: dict[str, Any],
+    *,
+    room_id: str | None = None,
+    slot: int | None = None,
+    hp_before: int | None = None,
+) -> bool:
+    """True for Jill Standard named bosses (Yawn, Black Tiger, Plant 42, Tyrant)."""
+    if is_yawn_combat_entity(meta, room_id=room_id, slot=slot):
+        return True
+    name = str(meta.get("type_name") or meta.get("enemy_type") or "").lower()
+    if name in BOSS_TYPE_NAMES:
+        return True
+    tid = meta.get("type_id")
+    if tid is not None:
+        kind = int(tid)
+        if kind == BLACK_TIGER_RAM_TYPE_ID or kind == PLANT42_RAM_TYPE_ID:
+            return True
+        hp = int(
+            hp_before
+            if hp_before is not None
+            else meta.get("hp_before", meta.get("hp", 0)) or 0
+        )
+        if kind == CERBERUS_RAM_TYPE_ID and hp >= TYRANT_HP_MIN:
+            return True
+    if room_id is not None and slot is not None and (
+        tid is None or int(tid) == 0
+    ):
+        from re1_rl.attack_log_context import infer_enemy_type_for_slot
+
+        return infer_enemy_type_for_slot(str(room_id), int(slot)) in BOSS_TYPE_NAMES
+    return False
+
+
 def is_cerberus_combat_entity(
     meta: dict[str, Any],
     *,
@@ -251,9 +300,13 @@ def is_zombie_combat_entity(
     name = str(meta.get("type_name") or meta.get("enemy_type") or "").lower()
     if name in ZOMBIE_TYPE_NAMES:
         return True
-    if name in CERBERUS_TYPE_NAMES or name in YAWN_TYPE_NAMES or name == "crow":
+    if name in CERBERUS_TYPE_NAMES or name in BOSS_TYPE_NAMES or name == "crow":
         return False
     if is_yawn_combat_entity(meta, room_id=room_id, slot=slot):
+        return False
+    if is_boss_combat_entity(
+        meta, room_id=room_id, slot=slot, hp_before=hp_before
+    ):
         return False
     if name and name in NO_COMBAT_REWARD_TYPE_NAMES:
         return False
@@ -479,11 +532,19 @@ def enemy_combat_events(
         )
         is_crow = is_crow_combat_entity(meta)
         is_yawn = is_yawn_combat_entity(meta, room_id=room_id, slot=slot)
-        is_cerberus = (not is_yawn) and is_cerberus_combat_entity(
+        is_boss = is_boss_combat_entity(
+            meta, room_id=room_id, slot=slot, hp_before=before
+        )
+        is_cerberus = (not is_yawn) and (not is_boss) and is_cerberus_combat_entity(
             meta, hp_before=before
         )
-        is_zombie = (not is_cerberus) and (not is_yawn) and is_zombie_combat_entity(
-            meta, room_id=room_id, slot=slot, hp_before=before,
+        is_zombie = (
+            (not is_cerberus)
+            and (not is_yawn)
+            and (not is_boss)
+            and is_zombie_combat_entity(
+                meta, room_id=room_id, slot=slot, hp_before=before,
+            )
         )
         extra: dict[str, Any] = {}
         if "type_id" in meta:
@@ -504,6 +565,7 @@ def enemy_combat_events(
                 "is_cerberus": is_cerberus,
                 "is_zombie": is_zombie,
                 "is_yawn": is_yawn,
+                "is_boss": is_boss,
                 **extra,
             })
         elif after < before:
@@ -518,6 +580,7 @@ def enemy_combat_events(
                 "is_cerberus": is_cerberus,
                 "is_zombie": is_zombie,
                 "is_yawn": is_yawn,
+                "is_boss": is_boss,
                 **extra,
             })
     return events

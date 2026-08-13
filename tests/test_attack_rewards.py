@@ -17,6 +17,7 @@ from re1_rl.reward import (
     ENEMY_DAMAGE_REWARD,
     ENEMY_KILL_REWARD,
     HEAVY_WEAPON_FODDER_HIT_PENALTY,
+    BOSS_COMBAT_REWARD_SCALE,
     KNIFE_MISS_PENALTY,
     MISS_TAX_CLIP_SIZE,
     REFERENCE_STEP_FRAMES,
@@ -428,13 +429,69 @@ def test_bazooka_yawn_hit_no_heavy_fodder_penalty() -> None:
         prev, cur, knife=False, attack=True, credit_damage=True
     )
     assert cur["combat_events"][0]["is_yawn"] is True
+    assert cur["combat_events"][0]["is_boss"] is True
     assert cur["combat_events"][0]["is_zombie"] is False
     assert heavy_weapon_fodder_hit_penalty(cur) == 0.0
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
     assert bd["heavy_weapon_fodder_hit"] == 0.0
-    assert bd["enemy_damage"] == pytest.approx(15 * ENEMY_DAMAGE_REWARD)
+    assert bd["enemy_damage"] == pytest.approx(
+        15 * ENEMY_DAMAGE_REWARD * BOSS_COMBAT_REWARD_SCALE
+    )
+
+
+def test_boss_hits_pay_four_times_fodder_stays_one_x() -> None:
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    boss = make_state(hp=96, step=2)
+    boss["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 10,
+            "killed": False,
+            "reward_denied": False,
+            "is_boss": True,
+            "is_yawn": False,
+        }
+    ]
+    fodder = make_state(hp=96, step=2)
+    fodder["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 10,
+            "killed": False,
+            "reward_denied": False,
+            "is_boss": False,
+            "is_zombie": True,
+        }
+    ]
+    _, boss_bd = compute_reward(
+        prev, boss, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    _, fodder_bd = compute_reward(
+        prev, fodder, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert boss_bd["enemy_damage"] == pytest.approx(
+        10 * ENEMY_DAMAGE_REWARD * BOSS_COMBAT_REWARD_SCALE
+    )
+    assert fodder_bd["enemy_damage"] == pytest.approx(10 * ENEMY_DAMAGE_REWARD)
+    kill = make_state(hp=96, step=2)
+    kill["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 40,
+            "killed": True,
+            "reward_denied": False,
+            "is_boss": True,
+        }
+    ]
+    _, kill_bd = compute_reward(
+        prev, kill, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert kill_bd["enemy_kill"] == pytest.approx(
+        ENEMY_KILL_REWARD * BOSS_COMBAT_REWARD_SCALE
+    )
 
 
 def test_beretta_dog_hit_no_shotgun_penalty() -> None:

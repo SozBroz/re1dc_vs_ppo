@@ -113,6 +113,8 @@ HEAVY_WEAPON_FODDER_IDS: frozenset[int] = frozenset(
 )
 # Gallery crows: pest combat pays nothing (#7/#8).
 CROW_COMBAT_REWARD_SCALE = 0.0
+# Named bosses (Yawn / Black Tiger / Plant 42 / Tyrant): 4× hit and kill pay.
+BOSS_COMBAT_REWARD_SCALE = 4.0
 # Conservative ammo-waste tax.  A full inverse pickup tax (1.0) made scarce
 # weapons too expensive to explore; 0.10 keeps successful damage comfortably
 # more valuable while giving confirmed misses a small, immediate signal.
@@ -448,7 +450,7 @@ def heavy_weapon_fodder_hit_penalty(state: dict[str, Any]) -> float:
         return 0.0
     hits = 0
     for ev in events:
-        if ev.get("reward_denied") or ev.get("is_yawn"):
+        if ev.get("reward_denied") or ev.get("is_yawn") or ev.get("is_boss"):
             continue
         if int(ev.get("damage", 0) or 0) <= 0:
             continue
@@ -666,7 +668,7 @@ def potential(
 
 
 def enemy_combat_rewards(state: dict[str, Any]) -> tuple[float, float]:
-    """Return ``(damage_pay, kill_pay)`` honoring per-event crow scaling."""
+    """Return ``(damage_pay, kill_pay)`` honoring per-event crow / boss scaling."""
     events = state.get("combat_events")
     if events:
         damage_pay = 0.0
@@ -674,9 +676,12 @@ def enemy_combat_rewards(state: dict[str, Any]) -> tuple[float, float]:
         for ev in events:
             if ev.get("reward_denied"):
                 continue
-            scale = (
-                CROW_COMBAT_REWARD_SCALE if ev.get("is_crow") else 1.0
-            )
+            if ev.get("is_crow"):
+                scale = CROW_COMBAT_REWARD_SCALE
+            elif ev.get("is_boss") or ev.get("is_yawn"):
+                scale = BOSS_COMBAT_REWARD_SCALE
+            else:
+                scale = 1.0
             damage_pay += ENEMY_DAMAGE_REWARD * int(ev.get("damage", 0)) * scale
             if ev.get("killed"):
                 kill_pay += ENEMY_KILL_REWARD * scale
