@@ -44,6 +44,7 @@ from re1_rl.weapon_equip import (
     any_legal_equip_slot,
     slot_legal_for_equip,
 )
+from re1_rl.yawn_hp import YAWN_ROOM
 
 ATTACK_UP_ACTION = 6
 ATTACK_ACTION = 7
@@ -394,6 +395,13 @@ def action_mask(
         is_typewriter_or_box_room(room_id)
         or is_always_illegal_attack_room(room_id)
     )
+    # Room 210 (attic/library Yawn): mapped enemy XZ is a nest slot, not the
+    # live body, so nearby-enemy gating never sees him activate. Keep attack
+    # macros legal whenever a weapon can fire.
+    require_nearby_enemy = (
+        mask_combat_without_enemies
+        and str(room_id or "").strip().upper() != YAWN_ROOM
+    )
 
     if not in_submenu:
         if attacks_banned:
@@ -404,7 +412,7 @@ def action_mask(
                 equipped_weapon_id=equipped_weapon_id,
                 equipped_slot_0based=equipped_slot_0based,
                 inventory=inventory,
-                mask_combat_without_enemies=mask_combat_without_enemies,
+                mask_combat_without_enemies=require_nearby_enemy,
                 knife_enemies=knife_enemies,
                 gun_enemies=gun_enemies,
                 alive_enemies_in_room=alive_enemies_in_room,
@@ -427,7 +435,7 @@ def action_mask(
                 equipped_weapon_id=equipped_weapon_id,
                 equipped_slot_0based=equipped_slot_0based,
                 inventory=inventory,
-                mask_combat_without_enemies=mask_combat_without_enemies,
+                mask_combat_without_enemies=require_nearby_enemy,
                 knife_enemies=knife_enemies,
                 gun_enemies=gun_enemies,
                 alive_enemies_in_room=alive_enemies_in_room,

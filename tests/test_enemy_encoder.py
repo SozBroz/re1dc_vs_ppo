@@ -200,6 +200,15 @@ def test_yawn_hp_3050_decodes() -> None:
     assert decoded[0]["combat_near"] == 1
 
 
+def test_yawn_hp_encodes_as_hp_over_255_clipped() -> None:
+    """Raw 3050 uses the same hp/255 clip as every other enemy (saturates at 1)."""
+    enc = SpatialEncoder(None, None)
+    v = enc.encode(make_state([
+        {"x": 11000, "z": 10000, "type_id": 0x0F, "hp": 3050, "alive": True},
+    ]))
+    assert v[IDX["enemy0_hp"]] == 1.0
+
+
 if __name__ == "__main__":
     import pytest
 

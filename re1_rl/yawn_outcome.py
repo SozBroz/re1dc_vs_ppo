@@ -81,10 +81,10 @@ def _raw_hp(ent: dict[str, Any]) -> int:
 
 
 def _logical_hp(ent: dict[str, Any]) -> int:
-    if ent.get("yawn_translated"):
-        return max(0, int(ent.get("hp") or 0))
     raw = _raw_hp(ent)
-    return yawn_logical_hp(raw, logical_max=YAWN_LOGICAL_MAX_DEFAULT)
+    if is_yawn_raw_hp(raw):
+        return yawn_logical_hp(raw, logical_max=YAWN_LOGICAL_MAX_DEFAULT)
+    return max(0, int(ent.get("hp") or 0))
 
 
 def _yawn_in_combat(ent: dict[str, Any]) -> bool:

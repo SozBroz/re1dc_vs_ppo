@@ -1,11 +1,11 @@
-"""Yawn HP translation: raw RAM pool → wiki-scale logical HP for the NN.
+"""Yawn HP helpers.
 
 Attic firewatch (2026-07-23): ``hp@0`` starts at **3050** and chips ~11/beretta
 shot. Wiki / imperator: attic retreat after **120** damage (cannot die); library
 fight **140**. Both encounters are room ``210``.
 
-``logical = max(0, logical_max - (raw_full - hp_raw))`` preserves per-shot
-deltas, so combat rewards stay honest while spatial ``hp/255`` stays in-band.
+Live ``hp`` stays the raw table value. Spatial encodes it as ``hp/255`` like
+every other enemy. ``yawn_logical_hp`` is only for retreat/outcome math.
 """
 
 from __future__ import annotations
@@ -51,7 +51,8 @@ def apply_yawn_hp_translate(
     room_id: str | None,
     logical_max: int = YAWN_LOGICAL_MAX_DEFAULT,
 ) -> list[dict[str, Any]]:
-    """Rewrite Yawn ``hp`` to logical; keep ``hp_raw`` for debugging."""
+    """Tag attic Yawn; leave ``hp`` as the raw table value."""
+    del logical_max
     if room_id is None or str(room_id).upper() != YAWN_ROOM:
         return enemies
     out: list[dict[str, Any]] = []
@@ -60,7 +61,6 @@ def apply_yawn_hp_translate(
         raw = int(e.get("hp", 0))
         if is_yawn_raw_hp(raw, room_id=room_id):
             e["hp_raw"] = raw
-            e["hp"] = yawn_logical_hp(raw, logical_max=logical_max)
             e["yawn_translated"] = True
         out.append(e)
     return out

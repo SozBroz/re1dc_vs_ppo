@@ -314,10 +314,10 @@ def enemy_table_fields() -> list[tuple[str, int, str]]:
 def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
     """[{x, z, hp, alive, in_room, combat_near, ...}] from enemy table RAM.
 
-    Room ``210`` Yawn: raw ``hp@0`` ~3050 is translated to wiki-scale logical
-    HP (attic 120) via :mod:`re1_rl.yawn_hp` so spatial ``hp/255`` stays sane.
-    Extra 0xFFFF body-part rows are kept for combat pay (``yawn_part``) but
-    marked not-alive so they do not fill spatial / attack-mask slots.
+    Room ``210`` Yawn: raw ``hp@0`` ~3050 is left as-is (spatial ``hp/255``
+    like other enemies). Extra 0xFFFF body-part rows are kept for combat pay
+    (``yawn_part``) but marked not-alive so they do not fill spatial /
+    attack-mask slots.
     """
     from re1_rl.yawn_hp import YAWN_RAM_TYPE_ID, YAWN_ROOM, apply_yawn_hp_translate
 
