@@ -14,8 +14,12 @@ from re1_rl.yawn_outcome import (
     YawnOutcome,
     detect_yawn_outcome,
     yawn_contact_edge,
+    yawn_in_combat_in_state,
     yawn_poison_active,
+    yawn_poison_hp_floor_active,
+    yawn_poison_lethal_should_floor,
     yawn_retreat_detected,
+    yawn_should_latch_retreat,
     yawn_telemetry,
 )
 
@@ -149,7 +153,7 @@ def test_killed_when_raw_hp_hits_zero() -> None:
     progress = ProgressTracker()
     prev = {"room_id": "210", "hp": 50, "dead": False}
     state = {"room_id": "210", "hp": 50, "dead": False}
-    prev_enemies = [_yawn_ent(hp_raw=500)]
+    prev_enemies = [_yawn_ent(hp_raw=YAWN_RAW_FULL - 10)]
     # Corpse keeps yawn_translated so the detector still sees the slot.
     cur_enemies = [
         {
@@ -188,3 +192,80 @@ def test_telemetry_dict_keys() -> None:
     assert tel["yawn_contact"] is True
     assert "yawn_logical_hp" in tel
     assert tel["yawn_room"] == "210"
+
+
+def test_poison_floor_when_yawn_already_gone() -> None:
+    """QuickSave after retreat: no rising-edge, Yawn absent, poison still ticks."""
+    state = {"room_id": "210", "hp": 2, "dead": False, "enemies": []}
+    assert yawn_poison_hp_floor_active(state) is True
+    assert yawn_poison_lethal_should_floor(hp=0, prev_hp=2, state=state) is True
+    assert yawn_poison_lethal_should_floor(hp=2, prev_hp=4, state=state) is False
+
+
+def test_poison_floor_quicksave1_leftover_yawn_row() -> None:
+    """Live QuickSave1: logical 0 / raw 2735 / still in_room after retreat."""
+    state = {
+        "room_id": "210",
+        "hp": 54,
+        "dead": False,
+        "enemies": [
+            {
+                "slot": 0,
+                "hp": 0,
+                "hp_raw": 2735,
+                "yawn_translated": True,
+                "in_room": 1,
+                "alive": 1,
+                "active_byte": 2,
+            }
+        ],
+    }
+    assert yawn_in_combat_in_state(state) is False
+    assert yawn_poison_hp_floor_active(state) is True
+    assert yawn_should_latch_retreat(state) is True
+    assert yawn_poison_lethal_should_floor(hp=0, prev_hp=2, state=state) is True
+
+
+def test_poison_floor_does_not_cover_in_combat_bite() -> None:
+    state = {
+        "room_id": "210",
+        "hp": 4,
+        "dead": False,
+        "enemies": [_yawn_ent(hp_raw=YAWN_RAW_FULL - 40)],
+    }
+    assert yawn_poison_hp_floor_active(state) is False
+    assert yawn_poison_lethal_should_floor(hp=0, prev_hp=2, state=state) is False
+
+
+def test_poison_floor_follows_out_of_210_but_zombies_still_kill() -> None:
+    progress = ProgressTracker()
+    assert progress.note_yawn_retreat() is True
+    assert progress.note_yawn_retreat() is False
+    state_210 = {"room_id": "210", "hp": 0, "dead": False, "enemies": []}
+    assert yawn_poison_hp_floor_active(state_210, yawn_retreated=True) is True
+    assert yawn_poison_lethal_should_floor(
+        hp=0, prev_hp=2, yawn_retreated=True, state=state_210
+    )
+    hall = {"room_id": "20E", "hp": 0, "enemies": []}
+    assert yawn_poison_hp_floor_active(hall, yawn_retreated=True) is True
+    assert yawn_poison_lethal_should_floor(
+        hp=0, prev_hp=2, yawn_retreated=True, state=hall
+    )
+    assert (
+        yawn_poison_lethal_should_floor(
+            hp=0, prev_hp=28, yawn_retreated=True, state=hall
+        )
+        is False
+    )
+
+
+def test_poison_floor_inactive_chipped_yawn() -> None:
+    state = {
+        "room_id": "210",
+        "hp": 2,
+        "dead": False,
+        "enemies": [_yawn_ent(hp_raw=YAWN_RAW_FULL - 80, in_room=0, active_byte=0)],
+    }
+    assert yawn_poison_hp_floor_active(state) is True
+    assert yawn_poison_lethal_should_floor(hp=0, prev_hp=2, state=state) is True
+

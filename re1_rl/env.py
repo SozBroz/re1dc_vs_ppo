@@ -528,7 +528,6 @@ class RE1Env(gym.Env):
         # Compose the community room code "SRR" (stage 1-7, room hex), e.g.
         # stage=0 room=5 -> "105" (Dining Room); matches rooms.json / route.
         room_code = f"{int(ram['stage_id']) + 1}{int(ram['room_id']):02X}"
-        hp = int(ram.get("player_hp", 0))
         inv_slots = decode_inventory_slots(ram)  # eight RAM-aligned slots
         occupied_inv = decode_inventory(ram)
         if track_items:
@@ -543,6 +542,16 @@ class RE1Env(gym.Env):
         enemies = self._enemy_motion.update(
             enemies, room_code, in_control,
         )
+        hp = int(ram.get("player_hp", 0))
+        self._apply_yawn_poison_hp_floor(
+            {
+                "room_id": room_code,
+                "hp": hp,
+                "dead": False,
+                "enemies": enemies,
+            }
+        )
+        hp = self._revive_zero_hp_under_yawn_floor(hp)
         p_vx, p_vz = self._player_motion.update(px, pz, room_code, in_control)
         state_dict = {
             "hp": hp,
@@ -1444,6 +1453,9 @@ class RE1Env(gym.Env):
         opts = dict(options or {})
         self._route_start_index = int(opts.get("route_start_index", 0))
         self._stop_bg_skip()
+        self.bridge.hp_floor = 0
+        if getattr(self, "_progress", None) is not None:
+            self._progress.yawn_retreated = False
         self._skipping_flag = False
         self._bg_death = False
         self._skip_cache_obs = None
@@ -1550,6 +1562,12 @@ class RE1Env(gym.Env):
         self.bridge.frameadvance(1)
         if self._ram_skip.use_engine_patches:
             self._ram_skip.install_engine_patches()
+        # Slot-1 / post-retreat cells: Yawn is already gone, poison may tick
+        # during the reset skip. Arm the HP floor before that skip runs.
+        try:
+            self._read_state(track_items=False)
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            pass
         self._skip_uncontrolled()
         # Pickup Yes/No on the savestate (chemical QS0): accept, then close the
         # leftover ITEM grid. Orphan Triangle first would cancel/strand Yes/No.
@@ -2109,6 +2127,43 @@ class RE1Env(gym.Env):
         if hp_now > 0:
             self._episode_min_hp = min(self._episode_min_hp, hp_now)
 
+    def _apply_yawn_poison_hp_floor(self, state: dict[str, Any]) -> None:
+        """Arm Lua/Python HP floor after attic Yawn leaves combat."""
+        from re1_rl.yawn_outcome import (
+            YAWN_POISON_HP_FLOOR,
+            yawn_poison_hp_floor_active,
+            yawn_retreat_detected,
+            yawn_should_latch_retreat,
+        )
+
+        progress = getattr(self, "_progress", None)
+        if progress is not None:
+            if yawn_retreat_detected(
+                state,
+                getattr(self, "_prev_state", None),
+                enemies=state.get("enemies"),
+            ) or yawn_should_latch_retreat(state):
+                progress.note_yawn_retreat()
+        retreated = bool(getattr(progress, "yawn_retreated", False)) if progress else False
+        active = yawn_poison_hp_floor_active(state, yawn_retreated=retreated)
+        self.bridge.hp_floor = YAWN_POISON_HP_FLOOR if active else 0
+
+    def _revive_zero_hp_under_yawn_floor(self, hp: int) -> int:
+        """Write the post-retreat floor if poison just hit 0. Returns HP after."""
+        from re1_rl.yawn_outcome import YAWN_POISON_CHIP_MAX
+
+        floor = int(getattr(self.bridge, "hp_floor", 0) or 0)
+        prev = int(getattr(self, "_prev_hp", 0) or 0)
+        if int(hp) > 0 or floor <= 0:
+            return int(hp)
+        if not (0 < prev <= YAWN_POISON_CHIP_MAX):
+            return int(hp)
+        try:
+            self.bridge.write_ram([("player_hp", PLAYER_HP, "u16", floor)])
+        except (OSError, RuntimeError, ValueError):
+            return int(hp)
+        return floor
+
     def _poll_death_during_skip(self) -> bool:
         """Lightweight HP poll while async skip is burning (dog/hunter scenes)."""
         if self._skip_cache_state and self._skip_cache_state.get("dead"):
@@ -2121,6 +2176,13 @@ class RE1Env(gym.Env):
         except (OSError, RuntimeError, ValueError):
             return False
         start_hp = getattr(self, "_episode_start_hp", 0)
+        if player_died(hp, prev_hp=self._prev_hp, episode_start_hp=start_hp):
+            # Refresh floor from live enemies: retreat may have settled in skip.
+            try:
+                self._read_state(track_items=False)
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                pass
+            hp = self._revive_zero_hp_under_yawn_floor(hp)
         if not player_died(hp, prev_hp=self._prev_hp, episode_start_hp=start_hp):
             return False
         try:
@@ -2128,6 +2190,7 @@ class RE1Env(gym.Env):
             hp2 = int(hp_ram2.get("player_hp", 0))
         except (OSError, RuntimeError, ValueError):
             return True
+        hp2 = self._revive_zero_hp_under_yawn_floor(hp2)
         return player_died(hp2, prev_hp=self._prev_hp, episode_start_hp=start_hp)
 
     def _confirm_death_after_abort(self) -> str | None:
@@ -2244,6 +2307,15 @@ class RE1Env(gym.Env):
 
     def _probe_episode_failure(self) -> str | None:
         ram = self._failure_ram_probe()
+        hp = int(ram.get("player_hp", 0))
+        if hp <= 0:
+            try:
+                self._read_state(track_items=False)
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                pass
+            revived = self._revive_zero_hp_under_yawn_floor(hp)
+            if revived != hp:
+                ram = self._failure_ram_probe()
         return episode_failure_reason(
             ram,
             episode_start_hp=getattr(self, "_episode_start_hp", 0),

@@ -17,14 +17,25 @@ from re1_rl.yawn_hp import (
     yawn_logical_hp,
 )
 
+# Post-retreat poison chips of 2 can drain HP to 0; write this instead of dying.
+YAWN_POISON_HP_FLOOR = 1
+# Live QuickSave1 ticks were 2; Yawn bites are ~28. Zombie hits are larger.
+YAWN_POISON_CHIP_MAX = 4
+
 __all__ = (
     "YAWN_ROOM",
+    "YAWN_POISON_HP_FLOOR",
+    "YAWN_POISON_CHIP_MAX",
     "YawnOutcome",
     "YawnOutcomeResult",
     "find_yawn_entities",
     "yawn_poison_active",
     "yawn_contact_edge",
     "yawn_retreat_detected",
+    "yawn_in_combat_in_state",
+    "yawn_should_latch_retreat",
+    "yawn_poison_hp_floor_active",
+    "yawn_poison_lethal_should_floor",
     "detect_yawn_outcome",
     "yawn_telemetry",
 )
@@ -88,10 +99,13 @@ def _logical_hp(ent: dict[str, Any]) -> int:
 
 
 def _yawn_in_combat(ent: dict[str, Any]) -> bool:
-    """True when Yawn is an active combatant (in-room / active, HP remaining)."""
-    logical = _logical_hp(ent)
-    raw = _raw_hp(ent)
-    if logical <= 0 and raw <= 0:
+    """True when Yawn is an active combatant (in-room / active, HP remaining).
+
+    Attic fight-1 retreat leaves a translated row at logical 0 with raw HP
+    still ~2700 (QuickSave1). That leftover slot is not in combat — poison
+    ticks start then, and they must not be treated as a live bite.
+    """
+    if _logical_hp(ent) <= 0:
         return False
     active = ent.get("active_byte")
     if active is not None and int(active) == 0:
@@ -211,6 +225,68 @@ def yawn_retreat_detected(
         return False
     # Inactive / left combat after a chip this step or earlier in the fight.
     return cur_hp < prev_hp or damaged_before
+
+
+def yawn_in_combat_in_state(state: dict[str, Any] | None) -> bool:
+    """True when a Yawn row in room ``210`` is an active combatant."""
+    room = _room_id(state)
+    enemies = None if state is None else state.get("enemies")
+    cur = _primary_yawn(enemies, room_id=room or YAWN_ROOM)
+    return cur is not None and _yawn_in_combat(cur)
+
+
+def yawn_poison_hp_floor_active(
+    state: dict[str, Any] | None,
+    *,
+    yawn_retreated: bool = False,
+) -> bool:
+    """True when attic poison must not be allowed to reach 0 HP.
+
+    Poison ticks only after Yawn leaves the table. Bites (~28) still kill while
+    Yawn is in combat. Floor when:
+
+    - this episode already latched retreat (any room — poison keeps ticking
+      after you leave 210), or
+    - we are in ``210`` and Yawn is not in combat (covers QuickSave / cells
+      loaded after retreat, where the rising edge never fires).
+
+    Lua still only rewrites 0 HP when the previous live value was a poison
+    chip (``<= YAWN_POISON_CHIP_MAX``), so a zombie hit in the next room dies.
+    """
+    room = _room_id(state)
+    if yawn_retreated:
+        return True
+    if room != YAWN_ROOM:
+        return False
+    return not yawn_in_combat_in_state(state)
+
+
+def yawn_should_latch_retreat(state: dict[str, Any] | None) -> bool:
+    """True when room ``210`` already shows attic retreat (logical-0 leftover)."""
+    if _room_id(state) != YAWN_ROOM:
+        return False
+    enemies = None if state is None else state.get("enemies")
+    found = find_yawn_entities(enemies, room_id=YAWN_ROOM)
+    if not found:
+        return False
+    return not yawn_in_combat_in_state(state) and any(
+        _logical_hp(e) <= 0 for e in found
+    )
+
+
+def yawn_poison_lethal_should_floor(
+    *,
+    hp: int,
+    prev_hp: int = 0,
+    yawn_retreated: bool = False,
+    state: dict[str, Any] | None = None,
+) -> bool:
+    """True when a 0-HP read is a post-retreat poison tick, not a real hit."""
+    if int(hp) > 0:
+        return False
+    if not yawn_poison_hp_floor_active(state, yawn_retreated=yawn_retreated):
+        return False
+    return 0 < int(prev_hp) <= YAWN_POISON_CHIP_MAX
 
 
 def yawn_telemetry(result: YawnOutcomeResult) -> dict[str, Any]:

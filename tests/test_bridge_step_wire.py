@@ -46,3 +46,43 @@ def test_legacy_buttons_when_no_pulse() -> None:
     req = captured[0]
     assert req["buttons"] == {"cross": True}
     assert "sticky" not in req
+
+
+def test_hp_floor_included_on_step_and_fast_forward() -> None:
+    client = BizHawkClient(port=5992)
+    client._client = MagicMock()
+    captured: list[dict] = []
+
+    def _capture(cmd: dict) -> dict:
+        captured.append(cmd)
+        return {
+            "ok": True,
+            "frame": 1,
+            "burned": 0,
+            "mode": 0,
+            "in_control": True,
+            "msg_open": False,
+            "scene_active": False,
+            "death_abort": False,
+        }
+
+    client._request = _capture  # type: ignore[method-assign]
+    client.hp_floor = 1
+    client.step(buttons={"cross": True}, n=1, abort_on_zero_hp=False)
+    assert captured[0]["hp_floor"] == 1
+    assert captured[0]["hp_floor_chip_max"] == 4
+    captured.clear()
+    client.fast_forward(
+        10,
+        mode_addr=0x800C3000,
+        mask=0x80,
+        death_hp_addr=0x800C51AC,
+        abort_on_zero_hp=True,
+    )
+    assert captured[0]["hp_floor"] == 1
+    assert captured[0]["hp_floor_chip_max"] == 4
+    captured.clear()
+    client.hp_floor = 0
+    client.step(buttons={"cross": True}, n=1, abort_on_zero_hp=False)
+    assert "hp_floor" not in captured[0]
+

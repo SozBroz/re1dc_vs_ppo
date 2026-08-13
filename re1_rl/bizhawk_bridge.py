@@ -21,6 +21,7 @@ from re1_rl.frame_ring import (
     decode_png_b64,
 )
 from re1_rl.memory_map import DEFAULT_RAM_FIELDS, PLAYER_HP
+from re1_rl.yawn_outcome import YAWN_POISON_CHIP_MAX
 
 _DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SCREENSHOT_PATH = str(_DEFAULT_ROOT / "data" / "_frame.png")
@@ -70,6 +71,9 @@ class BizHawkClient:
         self.camera_whiten_bank: Any | None = None
         self.whiten_context: Any | None = None
         self._zombie_attack_latch: Any | None = None
+        # 0 = disabled. When > 0, Lua writes this value instead of aborting at 0 HP
+        # (post-Yawn-retreat poison ticks must not end the episode).
+        self.hp_floor: int = 0
 
     # ------------------------------------------------------------------
     # Connection lifecycle
@@ -392,6 +396,10 @@ class BizHawkClient:
         if death_hp_addr is not None:
             req["death_hp_addr"] = int(death_hp_addr)
             req["abort_on_zero_hp"] = bool(abort_on_zero_hp)
+        floor = int(getattr(self, "hp_floor", 0) or 0)
+        if floor > 0:
+            req["hp_floor"] = floor
+            req["hp_floor_chip_max"] = int(YAWN_POISON_CHIP_MAX)
         if capture_final and self.screenshot_mmf and not self._screenshot_mmf_disabled:
             req["capture_final_mmf"] = True
             req["mmf_name"] = self.mmf_name
@@ -464,6 +472,10 @@ class BizHawkClient:
         if death_hp_addr is not None:
             req["death_hp_addr"] = int(death_hp_addr)
             req["abort_on_zero_hp"] = bool(abort_on_zero_hp)
+        floor = int(getattr(self, "hp_floor", 0) or 0)
+        if floor > 0:
+            req["hp_floor"] = floor
+            req["hp_floor_chip_max"] = int(YAWN_POISON_CHIP_MAX)
         resp = self._request(req)
         if not resp.get("ok"):
             raise RuntimeError(resp.get("error", "fast_forward failed"))

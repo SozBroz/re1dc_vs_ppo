@@ -178,6 +178,32 @@ local function write_field(addr, dtype, value)
     end
 end
 
+-- When hp_floor > 0, a 0-HP read from a poison-sized chip is rewritten
+-- instead of aborting. Zombie/bite drops (last live HP > chip_max) still die.
+-- Returns saw_positive_hp, dead, last_hp.
+local function apply_hp_floor_check(
+    hp_off, hp_floor, chip_max, abort_on_zero_hp, saw_positive_hp, last_hp
+)
+    if not hp_off then
+        return saw_positive_hp, false, last_hp
+    end
+    local hp = memory.read_u16_le(hp_off, "MainRAM")
+    local floor = tonumber(hp_floor) or 0
+    chip_max = tonumber(chip_max) or 4
+    last_hp = tonumber(last_hp) or 0
+    if hp > 0 then
+        return true, false, hp
+    end
+    if floor > 0 and last_hp > 0 and last_hp <= chip_max then
+        memory.write_u16_le(hp_off, floor, "MainRAM")
+        return saw_positive_hp, false, floor
+    end
+    if abort_on_zero_hp and saw_positive_hp then
+        return saw_positive_hp, true, last_hp
+    end
+    return saw_positive_hp, false, last_hp
+end
+
 --[[
   GameShark-style engine patches, re-applied before EVERY frame advance
   (savestate loads revert MainRAM, and 8-type GameShark codes are defined as
@@ -510,8 +536,11 @@ local function handle_command(cmd)
         end
         local hp_off = cmd.death_hp_addr and ps1_to_mainram(tonumber(cmd.death_hp_addr)) or nil
         local abort_on_zero_hp = cmd.abort_on_zero_hp == true
+        local hp_floor = tonumber(cmd.hp_floor) or 0
+        local hp_floor_chip_max = tonumber(cmd.hp_floor_chip_max) or 4
         local saw_positive_hp = false
         local death_during_step = false
+        local last_hp = 0
         -- echo_joypad: read back joypad.get() after each advance so Python can
         -- verify BizHawk actually delivered the schedule (input-delivery QA).
         local echo = cmd.echo_joypad == true
@@ -519,20 +548,18 @@ local function handle_command(cmd)
         local capture_final_mmf = cmd.capture_final_mmf == true
         local mmf_name = cmd.mmf_name or ("re1_screenshot_" .. tostring(cmd.port or 0))
         if hp_off then
-            local hp = memory.read_u16_le(hp_off, "MainRAM")
-            if hp > 0 then
+            last_hp = memory.read_u16_le(hp_off, "MainRAM")
+            if last_hp > 0 then
                 saw_positive_hp = true
             end
         end
         for i = 1, n do
-            if hp_off then
-                local hp = memory.read_u16_le(hp_off, "MainRAM")
-                if hp > 0 then
-                    saw_positive_hp = true
-                elseif abort_on_zero_hp and saw_positive_hp then
-                    death_during_step = true
-                    break
-                end
+            saw_positive_hp, death_during_step, last_hp = apply_hp_floor_check(
+                hp_off, hp_floor, hp_floor_chip_max, abort_on_zero_hp,
+                saw_positive_hp, last_hp
+            )
+            if death_during_step then
+                break
             end
             if use_frame_buttons then
                 apply_buttons(frame_buttons[i] or {})
@@ -556,14 +583,12 @@ local function handle_command(cmd)
                 table.sort(held)
                 joypad_echo[i] = table.concat(held, "+")
             end
-            if hp_off then
-                local hp = memory.read_u16_le(hp_off, "MainRAM")
-                if hp > 0 then
-                    saw_positive_hp = true
-                elseif abort_on_zero_hp and saw_positive_hp then
-                    death_during_step = true
-                    break
-                end
+            saw_positive_hp, death_during_step, last_hp = apply_hp_floor_check(
+                hp_off, hp_floor, hp_floor_chip_max, abort_on_zero_hp,
+                saw_positive_hp, last_hp
+            )
+            if death_during_step then
+                break
             end
         end
         if use_sticky or use_frame_buttons then
@@ -615,8 +640,11 @@ local function handle_command(cmd)
         local settle_need = tonumber(cmd.settle) or 10
         local hp_off = cmd.death_hp_addr and ps1_to_mainram(tonumber(cmd.death_hp_addr)) or nil
         local abort_on_zero_hp = cmd.abort_on_zero_hp == true
+        local hp_floor = tonumber(cmd.hp_floor) or 0
+        local hp_floor_chip_max = tonumber(cmd.hp_floor_chip_max) or 4
         local saw_positive_hp = false
         local death_abort = false
+        local last_hp = 0
 
         local function bit_set(off, m)
             if not off then
@@ -682,8 +710,8 @@ local function handle_command(cmd)
         end
         note_peaks()
         if hp_off then
-            local hp = memory.read_u16_le(hp_off, "MainRAM")
-            if hp > 0 then
+            last_hp = memory.read_u16_le(hp_off, "MainRAM")
+            if last_hp > 0 then
                 saw_positive_hp = true
             end
         end
@@ -694,16 +722,14 @@ local function handle_command(cmd)
             end
             local settle = 0
             while burned < maxn do
-                if hp_off then
-                    local hp = memory.read_u16_le(hp_off, "MainRAM")
-                    if hp > 0 then
-                        saw_positive_hp = true
-                    elseif abort_on_zero_hp and saw_positive_hp then
-                        -- Hunter/dog death uses scene_flag while in-control;
-                        -- abort before cross-mash reloads from Continue.
-                        death_abort = true
-                        break
-                    end
+                saw_positive_hp, death_abort, last_hp = apply_hp_floor_check(
+                    hp_off, hp_floor, hp_floor_chip_max, abort_on_zero_hp,
+                    saw_positive_hp, last_hp
+                )
+                if death_abort then
+                    -- Hunter/dog death uses scene_flag while in-control;
+                    -- abort before cross-mash reloads from Continue.
+                    break
                 end
                 local btn = {}
                 local hp_zero = false
@@ -722,6 +748,13 @@ local function handle_command(cmd)
                 apply_patches(true)
                 emu.frameadvance()
                 burned = burned + 1
+                saw_positive_hp, death_abort, last_hp = apply_hp_floor_check(
+                    hp_off, hp_floor, hp_floor_chip_max, abort_on_zero_hp,
+                    saw_positive_hp, last_hp
+                )
+                if death_abort then
+                    break
+                end
                 in_control, mode = ctl()
                 msg = msg_off and bit_set(msg_off, msg_mask) or false
                 scene = scene_active_read(scene_off)

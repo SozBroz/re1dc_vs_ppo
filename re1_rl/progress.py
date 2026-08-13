@@ -62,6 +62,8 @@ class ProgressTracker:
     kenneth_gate_breached: bool = False
     # Rails off-path: wrong_room penalty ends the episode (like Kenneth gate).
     wrong_room_breached: bool = False
+    # Attic Yawn left the table this episode; post-retreat poison cannot kill.
+    yawn_retreated: bool = False
     # Yawn route: forbidden pickups (e.g. broken_shotgun in Vacant Room detour).
     forbidden_item_breached: bool = False
     # Checkpoint nav succeeded but successor capture was hard-ineligible.
@@ -293,6 +295,13 @@ class ProgressTracker:
         if room_id in self.penalized_offroute_rooms:
             return False
         self.penalized_offroute_rooms.add(room_id)
+        return True
+
+    def note_yawn_retreat(self) -> bool:
+        """Latch attic Yawn retreat; true only on the first observation."""
+        if self.yawn_retreated:
+            return False
+        self.yawn_retreated = True
         return True
 
     def breach_wrong_room(self) -> bool:
