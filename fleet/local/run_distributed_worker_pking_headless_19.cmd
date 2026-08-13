@@ -20,12 +20,12 @@ set RE1_STEP_DIAG_PORT=5759
 set RE1_MACHINE_NAME=%MACHINE_NAME%
 
 call "%~dp0go_explore_phase_c.env.cmd"
-REM Pin cp65–cp100 uniform (override via data/yawn_reset_pin.env).
+REM Equal mix: true fresh start + loadable cp00–cp95 (override via data/yawn_reset_pin.env).
 set RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=
 set RE1_YAWN_RESET_PIN_INDEX=
 set RE1_YAWN_RESET_PIN_SET=
 set RE1_YAWN_RESET_PIN_SET_WEIGHT=
-set RE1_YAWN_RESET_PIN_RANGE=65-100
+set RE1_YAWN_RESET_PIN_RANGE=
 set RE1_YAWN_RESET_PIN_WEIGHTS=
 if not exist data\go_explore mkdir data\go_explore
 

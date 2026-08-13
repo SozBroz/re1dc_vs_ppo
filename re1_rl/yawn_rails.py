@@ -344,9 +344,11 @@ def validate_manifest_cells(
     return errors
 
 
-# Non-PLR reset mix: 50% frontier cell; remaining 50% uniform over any
-# eligible cp18+ cell (including latest). Conditions before cp18 are frozen.
-RESET_MIN_CHECKPOINT_INDEX = 18
+# Default reset mix: equal chance of a true fresh start (init savestate,
+# working on cp00) plus each loadable cell in [0, 95]. cp96 is never a
+# start — completing it ends the episode. Pin/PLR/payforward still override.
+RESET_MIN_CHECKPOINT_INDEX = 0
+RESET_MAX_CHECKPOINT_INDEX = 95
 RESET_LATEST_CELL_WEIGHT = 0.50
 _RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
 _RESET_PIN_INDEX_ENV = "RE1_YAWN_RESET_PIN_INDEX"
@@ -689,12 +691,32 @@ def _sample_cell_from_pin_weights(
 
 
 def eligible_reset_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Cells the random reset sampler may use (cp18+ only)."""
+    """Cells the random reset sampler may use (cp00–cp95; never the terminal cp96)."""
     return [
         row
         for row in cells
-        if int(row.get("checkpoint_index", -1)) >= RESET_MIN_CHECKPOINT_INDEX
+        if RESET_MIN_CHECKPOINT_INDEX
+        <= int(row.get("checkpoint_index", -1))
+        <= RESET_MAX_CHECKPOINT_INDEX
     ]
+
+
+def _playthrough_leg_span(stage: dict[str, Any], start_index: int) -> int:
+    """Remaining route cells from this start through the Yawn fight (cp96)."""
+    route_steps = list(stage.get("route_steps", []))
+    start = max(0, int(start_index))
+    if route_steps:
+        return max(1, len(route_steps) - start)
+    return max(1, int(stage.get("legs_per_episode", 1)))
+
+
+def _fresh_start_options(stage: dict[str, Any]) -> dict[str, Any]:
+    """Dining init savestate, hunting seq 1 (emblem). Not the same as loading cp00."""
+    return {
+        "route_start_index": 0,
+        "leg_span": _playthrough_leg_span(stage, 0),
+        "reset_source": "route_initial",
+    }
 
 
 def _choose_reset_candidate(
@@ -703,17 +725,15 @@ def _choose_reset_candidate(
     rng: random.Random,
     latest_only: bool = False,
 ) -> dict[str, Any]:
-    """50% latest eligible cell; else uniform over any eligible cp18+ cell."""
+    """Uniform over eligible cp00–cp95 cells (no fresh start; no latest bias)."""
     eligible = eligible_reset_cells(cells)
     if not eligible:
         raise ValueError(
-            f"no loadable Yawn rails cells at checkpoint_index>={RESET_MIN_CHECKPOINT_INDEX}"
+            "no loadable Yawn rails cells at checkpoint_index "
+            f"{RESET_MIN_CHECKPOINT_INDEX}-{RESET_MAX_CHECKPOINT_INDEX}"
         )
-    latest = eligible[-1]
     if latest_only:
-        return latest
-    if rng.random() < float(RESET_LATEST_CELL_WEIGHT):
-        return latest
+        return eligible[-1]
     return eligible[rng.randrange(len(eligible))]
 
 
@@ -724,14 +744,9 @@ def _options_from_cell(
     reset_source: str = "route_cell",
 ) -> dict[str, Any]:
     start_index = int(chosen["checkpoint_index"]) + 1
-    route_steps = list(stage.get("route_steps", []))
-    remaining = max(1, len(route_steps) - start_index)
-    # Global legs_per_episode remains a hard cap for non-PLR mode; PLR widens
-    # per endpoint instead of jumping the whole curriculum to 6-leg episodes.
-    leg_span = min(max(1, int(stage.get("legs_per_episode", 1))), remaining)
     opts: dict[str, Any] = {
         "route_start_index": start_index,
-        "leg_span": leg_span,
+        "leg_span": _playthrough_leg_span(stage, start_index),
         "reset_source": reset_source if start_index else "route_initial",
     }
     if start_index:
@@ -749,22 +764,25 @@ def sample_one_leg_options(
     *,
     rng: random.Random,
 ) -> dict[str, Any]:
-    """Choose a curated start and bounded checkpoint span.
+    """Choose a start cell and a play-through span to the Yawn fight.
 
-    Default: 50% latest; 50% uniform over any loadable cp18+ cell.
+    Default: equal chance of a true fresh start (init savestate) or any
+    loadable cell in cp00–cp95. Completing cp96 ends the episode; the agent
+    otherwise keeps playing until a punishment terminal (death, wrong room,
+    invalid capture, …). Each completed cell still captures a successor.
     ``RE1_YAWN_PAYFORWARD_RIPPLE=1`` enables fight-progression mix instead:
     40% frontier fight cell, 60% uniform over all loadable cells from cp00.
     ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
     ``RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY=1`` forces the fight-progression frontier.
     ``RE1_YAWN_RESET_PIN_INDEX=N`` forces curated cell ``cpNN`` (overrides mix).
     ``RE1_YAWN_RESET_PIN_RANGE=LO-HI`` uniform over loadable cells in that range
-    (overridden by a single pin index when both are set).
+    (overridden by a single pin index when both are set). Pin ranges do not
+    include the fresh start.
     ``RE1_YAWN_RESET_PIN_WEIGHTS=latest:50`` with a pin range: ``latest_weight`` on
-    the newest loadable cell in range, remainder uniform over that range (same as
-    the default cp18+ mix but floored at ``LO``).
+    the newest loadable cell in range, remainder uniform over that range.
     Other ``RE1_YAWN_RESET_PIN_WEIGHTS`` entries sample by explicit per-cell
     weights (percentages or fractions; normalized). ``latest:50,33:50`` mixes the
-    newest loadable cp18+ cell with fixed indices. Overrides plain pin range/set.
+    newest loadable cell with fixed indices. Overrides plain pin range/set.
     ``RE1_YAWN_RESET_PIN_SET=37,40,44`` with optional
     ``RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5`` blends pin-set vs normal mix.
     ``RE1_YAWN_FIGHT_BIAS_INDEX`` / ``RE1_YAWN_FIGHT_BIAS_WEIGHT`` override the
@@ -848,8 +866,16 @@ def sample_one_leg_options(
         pf = sample_payforward_options(project_root, stage, all_cells, rng=rng)
         if pf is not None:
             return pf
-    chosen = _choose_reset_candidate(cells, rng=rng, latest_only=latest_only)
-    return _options_from_cell(chosen, stage)
+    if latest_only:
+        chosen = _choose_reset_candidate(cells, rng=rng, latest_only=True)
+        return _options_from_cell(chosen, stage)
+    if not cells:
+        return _fresh_start_options(stage)
+    # Equal chance: true fresh start + each loadable cp00–cp95 cell.
+    slot = rng.randrange(len(cells) + 1)
+    if slot == 0:
+        return _fresh_start_options(stage)
+    return _options_from_cell(cells[slot - 1], stage)
 
 
 def validate_route(

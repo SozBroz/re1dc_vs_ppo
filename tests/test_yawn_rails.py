@@ -469,12 +469,37 @@ def test_pre_cutscene_room_dwell_does_not_satisfy_post_cutscene_settle() -> None
     progress.note_leg_room_transition("104", "105")
     _settle(progress, "105", steps=90)  # walk-up before Barry return beat
     progress.observe_cutscene("105:2:s1")
+    barry_inv = ["knife", "beretta", "first_aid_spray_alt", "emblem"]
     assert not planner.advance_if_success(
-        _state("105"), progress=progress, prev_state=_state("104")
+        _state("105", inventory=barry_inv),
+        progress=progress,
+        prev_state=_state("104", inventory=barry_inv),
     )
     _settle(progress, "105", steps=60)
     assert planner.advance_if_success(
-        _state("105"), progress=progress, prev_state=_state("104")
+        _state("105", inventory=barry_inv),
+        progress=progress,
+        prev_state=_state("104", inventory=barry_inv),
+    )
+
+
+def test_barry_return_requires_first_aid_spray() -> None:
+    planner = _planner(start_index=_idx("barry_return_105"))
+    progress = ProgressTracker()
+    progress.note_leg_room_transition("104", "105")
+    progress.observe_cutscene("105:2:s1")
+    _settle(progress, "105", steps=60)
+    no_spray = ["knife", "beretta", "emblem"]
+    assert not planner.advance_if_success(
+        _state("105", inventory=no_spray),
+        progress=progress,
+        prev_state=_state("104", inventory=no_spray),
+    )
+    with_spray = ["knife", "beretta", "first_aid_spray_alt", "emblem"]
+    assert planner.advance_if_success(
+        _state("105", inventory=with_spray),
+        progress=progress,
+        prev_state=_state("104", inventory=with_spray),
     )
 
 
@@ -794,9 +819,68 @@ def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: P
     a = sample_one_leg_options(tmp_path, stage, rng=random.Random(7))
     b = sample_one_leg_options(tmp_path, stage, rng=random.Random(7))
     assert a == b
-    assert a["reset_source"] == "route_cell"
-    assert a["reset_source"] not in {"pb", "archive", "route_initial"}
-    assert a["leg_span"] == 1
+    assert a["reset_source"] in {"route_cell", "route_initial"}
+    assert a["reset_source"] not in {"pb", "archive"}
+    if a["reset_source"] == "route_initial":
+        assert a["route_start_index"] == 0
+        assert "pb_bundle" not in a
+    else:
+        assert a["route_start_index"] == 19
+        assert "pb_bundle" in a
+
+
+def test_default_mix_equal_fresh_and_each_loadable_cell(tmp_path: Path) -> None:
+    """Fresh start is its own slot, equal with each cp00–cp95 cell — not cp00."""
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in (0, 18, 95)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 98)),
+    }
+    counts: dict[str, int] = {"fresh": 0, "cp00": 0, "cp18": 0, "cp95": 0}
+    for seed in range(8000):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        if opts["reset_source"] == "route_initial":
+            counts["fresh"] += 1
+            assert opts["route_start_index"] == 0
+            assert "pb_bundle" not in opts
+            assert opts["leg_span"] == 97
+        else:
+            start = int(opts["route_start_index"])
+            cell = start - 1
+            counts[f"cp{cell:02d}"] += 1
+            assert opts["leg_span"] == 97 - start
+    total = sum(counts.values())
+    assert total == 8000
+    for key, n in counts.items():
+        assert n / total == pytest.approx(0.25, abs=0.03), f"{key}={n}"
+
+
+def test_cp95_playthrough_is_the_yawn_fight_only(tmp_path: Path) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, 95)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 98)),
+    }
+    monkey_hits = 0
+    for seed in range(200):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        if opts.get("route_start_index") == 96:
+            monkey_hits += 1
+            assert opts["leg_span"] == 1
+            assert opts["reset_source"] == "route_cell"
+    assert monkey_hits > 0
 
 
 def test_terminal_cp96_is_never_loadable(tmp_path: Path) -> None:
@@ -838,9 +922,9 @@ def test_empty_next_checkpoint_id_excluded_even_without_route_path(
     assert 96 not in indices
 
 
-def test_reset_mix_half_latest_half_any_eligible(tmp_path: Path) -> None:
-    # 3 eligible cells → P(latest)=0.5+0.5/3; each specific cell in the
-    # any-bucket gets 0.5/3 (including latest again).
+def test_reset_mix_uniform_over_eligible_cells_and_fresh(
+    tmp_path: Path,
+) -> None:
     manifest = {
         "schema_version": 1,
         "route_id": "test",
@@ -858,9 +942,10 @@ def test_reset_mix_half_latest_half_any_eligible(tmp_path: Path) -> None:
         start = int(opts["route_start_index"])
         per_start[start] = per_start.get(start, 0) + 1
     total = sum(per_start.values())
-    assert per_start.get(21, 0) / total == pytest.approx(0.5 + 0.5 / 3.0, abs=0.04)
-    assert per_start.get(19, 0) / total == pytest.approx(0.5 / 3.0, abs=0.04)
-    assert per_start.get(20, 0) / total == pytest.approx(0.5 / 3.0, abs=0.04)
+    # fresh + 3 cells → 4 equal slots
+    assert set(per_start) == {0, 19, 20, 21}
+    for start in (0, 19, 20, 21):
+        assert per_start[start] / total == pytest.approx(0.25, abs=0.04)
 
 
 def test_reset_latest_only_env_pins_newest_cell(
@@ -1259,7 +1344,7 @@ def test_reset_pin_set_env_blends_with_default(
     assert other["reset_source"] != "route_cell_pin_set"
 
 
-def test_chaining_curriculum_samples_bounded_remaining_span(tmp_path: Path) -> None:
+def test_playthrough_curriculum_spans_remaining_route(tmp_path: Path) -> None:
     manifest = {
         "schema_version": 1,
         "route_id": "test",
@@ -1272,9 +1357,15 @@ def test_chaining_curriculum_samples_bounded_remaining_span(tmp_path: Path) -> N
         "route_steps": list(range(1, 30)),
         "legs_per_episode": 6,
     }
-    opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(1))
-    assert opts["route_start_index"] == 19
-    assert opts["leg_span"] == 6
+    cell_opts = None
+    for seed in range(40):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        if opts["reset_source"] == "route_cell":
+            cell_opts = opts
+            break
+    assert cell_opts is not None
+    assert cell_opts["route_start_index"] == 19
+    assert cell_opts["leg_span"] == 10  # remaining through end, not the old 6-cap
     chaining = json.loads(
         (ROOT / "curriculum/yawn_rails_chaining.json").read_text(encoding="utf-8")
     )
@@ -1285,10 +1376,10 @@ def test_chaining_curriculum_samples_bounded_remaining_span(tmp_path: Path) -> N
     assert chaining["episode_mode"] == "multi_leg"
     assert chaining["route_id"] == "yawn_quest_v2"
     assert chaining["route_steps"][-1] == _ROUTE_N
-    assert one_leg["episode_mode"] == "one_leg"
+    assert one_leg["episode_mode"] == "play_through"
+    assert one_leg["legs_per_episode"] == _ROUTE_N
     assert one_leg["route_id"] == "yawn_quest_v2"
     assert one_leg["route_steps"][-1] == _ROUTE_N
-    assert "legs_per_episode" not in one_leg
 
 
 def test_successor_capacity_uses_stack_headroom_and_consumption() -> None:
@@ -1415,7 +1506,7 @@ def test_sampling_filters_legacy_and_infeasible_mandatory_pickup_rows(
         "cells_manifest": "manifest.json",
     }
     chosen = sample_one_leg_options(tmp_path, stage, rng=random.Random(0))
-    assert chosen["reset_source"] == "route_cell"
+    assert chosen["reset_source"] in {"route_cell", "route_initial"}
 
 
 def test_checkpoint_success_proposes_without_local_install_when_sync_on(
@@ -1948,11 +2039,17 @@ def test_barry_return_capture_requires_105_2_s1(
         _macro_active=False,
         _progress=progress,
         _step_count=300,
-        _read_state=lambda track_items=False: _state("105"),
+        _read_state=lambda track_items=False: _state(
+            "105", inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"]
+        ),
     )
     assert (
         capture_successor_cell(
-            env, _state("105"), {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
+            env,
+            _state(
+                "105", inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"]
+            ),
+            {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
         )
         is None
     )
@@ -1967,8 +2064,11 @@ def test_barry_return_capture_requires_105_2_s1(
             "episode_history": {"room_entries": [["105", 100]]},
         },
     )
+    barry_state = _state(
+        "105", inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"]
+    )
     proposal = capture_successor_cell(
-        env, _state("105"), {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
+        env, barry_state, {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
     )
     assert proposal is not None
     assert proposal["checkpoint_id"] == "barry_return_105"

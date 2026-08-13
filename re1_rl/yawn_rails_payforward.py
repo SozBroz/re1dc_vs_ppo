@@ -960,10 +960,10 @@ def sample_payforward_options(
             return None
         start_index = int(chosen["checkpoint_index"]) + 1
         route_steps = list(stage.get("route_steps", []))
-        remaining = max(1, len(route_steps) - start_index)
+        remaining = max(1, len(route_steps) - start_index) if route_steps else 1
         return {
             "route_start_index": start_index,
-            "leg_span": min(1, remaining),
+            "leg_span": remaining,
             "reset_source": "route_cell",
             "pb_bundle": {
                 "state_path": str(chosen["state_path"]),
@@ -988,11 +988,11 @@ def sample_frontier_fight_options(
         return None
     start_index = int(chosen["checkpoint_index"]) + 1
     route_steps = list(stage.get("route_steps", []))
-    remaining = max(1, len(route_steps) - start_index)
+    remaining = max(1, len(route_steps) - start_index) if route_steps else 1
     by_idx = {int(r["checkpoint_index"]): r for r in cells}
     return {
         "route_start_index": start_index,
-        "leg_span": min(1, remaining),
+        "leg_span": remaining,
         "reset_source": "route_cell_frontier_fight",
         "pb_bundle": {
             "state_path": str(chosen["state_path"]),

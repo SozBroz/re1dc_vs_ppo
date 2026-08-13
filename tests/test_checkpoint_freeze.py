@@ -5,6 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from re1_rl.env import RE1Env
 from re1_rl.progress import ProgressTracker
 
@@ -29,11 +31,74 @@ def test_checkpoint_success_does_not_terminate_until_captured() -> None:
     assert reason is None
 
 
-def test_checkpoint_success_terminates_after_decision_capture() -> None:
-    env = _term_env(captured=True)
-    terminated, _truncated, reason = RE1Env._termination_flags(env, {"dead": False})
+def test_intermediate_capture_does_not_terminate_or_stick_captured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "re1_rl.yawn_rails.capture_successor_cell", lambda *_a, **_k: None
+    )
+    progress = ProgressTracker(leg_span=10)
+    progress.checkpoint_success = False
+    env = SimpleNamespace(
+        _progress=progress,
+        _checkpoint_freeze_pending=True,
+        _checkpoint_captured=False,
+        _macro_active=True,
+        _apply_yawn_capture_ineligibility_penalty=lambda _bd: None,
+    )
+    RE1Env._finish_checkpoint_capture(
+        env, {"room_id": "105"}, {"checkpoint_success": 12.0}
+    )
+    assert env._checkpoint_captured is False
+    assert env._checkpoint_freeze_pending is False
+    terminated, _trunc, reason = RE1Env._termination_flags(
+        SimpleNamespace(
+            _stage={"mode": "yawn_rails", "max_steps": 3000},
+            _progress=progress,
+            _checkpoint_captured=env._checkpoint_captured,
+            _episode_failure_override=None,
+            _step_count=3,
+            _episode_truncated=lambda: False,
+        ),
+        {"dead": False},
+    )
+    assert terminated is False
+    assert reason is None
+
+
+def test_last_leg_capture_terminates_after_decision_frame(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "re1_rl.yawn_rails.capture_successor_cell", lambda *_a, **_k: None
+    )
+    progress = ProgressTracker(leg_span=1)
+    progress.checkpoint_success = True
+    env = SimpleNamespace(
+        _progress=progress,
+        _checkpoint_freeze_pending=True,
+        _checkpoint_captured=False,
+        _macro_active=True,
+        _apply_yawn_capture_ineligibility_penalty=lambda _bd: None,
+    )
+    RE1Env._finish_checkpoint_capture(
+        env, {"room_id": "210"}, {"checkpoint_success": 12.0}
+    )
+    assert env._checkpoint_captured is True
+    terminated, _trunc, reason = RE1Env._termination_flags(
+        SimpleNamespace(
+            _stage={"mode": "yawn_rails", "max_steps": 3000},
+            _progress=progress,
+            _checkpoint_captured=True,
+            _episode_failure_override=None,
+            _step_count=3,
+            _episode_truncated=lambda: False,
+        ),
+        {"dead": False},
+    )
     assert terminated is True
     assert reason == "checkpoint_success"
+
 
 
 def test_decision_capture_ignores_policy_action() -> None:

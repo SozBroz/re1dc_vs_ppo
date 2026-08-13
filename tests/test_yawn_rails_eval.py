@@ -28,16 +28,16 @@ def _stage() -> dict:
     )
 
 
-def test_real_manifest_includes_contiguous_cp03() -> None:
+def test_real_manifest_keeps_early_route_starts() -> None:
     stage = _stage()
-    errors = validate_manifest_cells(ROOT, stage, require_contiguous_prefix=5)
+    errors = validate_manifest_cells(ROOT, stage, require_contiguous_prefix=2)
     assert errors == []
     cells = list_eval_cells(ROOT, stage)
     ids = [c["cell_id"] for c in cells]
     assert ids[0] == "route_initial"
-    for i in range(5):
-        assert f"cp{i:02d}" in ids
-    assert "cp03" in ids
+    assert "cp00" in ids
+    assert "cp01" in ids
+    # cp02–cp07 are intentionally dropped from the live start mix / recapture.
 
 
 def test_equal_weight_schedule_balances_cells() -> None:

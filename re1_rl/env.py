@@ -1245,7 +1245,7 @@ class RE1Env(gym.Env):
             self._arm_checkpoint_freeze()
 
     def _arm_checkpoint_freeze(self) -> None:
-        """Mark CP success. Capture/terminate only on the next decision frame."""
+        """Mark CP success. Capture on the next decision frame; last cell ends."""
         self._checkpoint_freeze_pending = True
         self._macro_active = True
         self._skipping_flag = False
@@ -1264,8 +1264,13 @@ class RE1Env(gym.Env):
             pending_yr.append(yr_prop)
         self._apply_yawn_capture_ineligibility_penalty(breakdown)
         self._checkpoint_freeze_pending = False
-        self._checkpoint_captured = not bool(
+        ineligible = bool(
             getattr(self._progress, "capture_ineligible_breached", False)
+        )
+        # Last remaining cell (cp96 / configured leg_span) ends the episode
+        # after capture. Intermediate cells keep playing from here.
+        self._checkpoint_captured = (
+            not ineligible and bool(self._progress.checkpoint_success)
         )
         self._macro_active = False
 

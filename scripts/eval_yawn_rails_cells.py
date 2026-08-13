@@ -113,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     stage = load_stage(curriculum)
 
-    errors = validate_manifest_cells(PROJECT_ROOT, stage, require_contiguous_prefix=5)
+    errors = validate_manifest_cells(PROJECT_ROOT, stage, require_contiguous_prefix=2)
     if args.validate_only:
         payload = {
             "ok": not errors,

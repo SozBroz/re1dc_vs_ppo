@@ -10,10 +10,10 @@ set RE1_GO_EXPLORE_SYNC=0
 set RE1_YAWN_RAILS_SYNC=1
 set RE1_YAWN_RAILS_ROOT=states\yawn_rails
 set RE1_YAWN_RAILS_MANIFEST_POLL_S=60
-REM Fight-progression reset mix: 40%% frontier fight + 60%% uniform cp00+.
-REM No latest-cell bias. Frontier advances cp18 -> cp26 -> ... on ammo efficiency.
-set RE1_YAWN_PAYFORWARD_RIPPLE=1
-set RE1_YAWN_FIGHT_BIAS_WEIGHT=0.40
+REM Equal mix: true fresh start + loadable cp00–cp95. Completing a cell
+REM captures a successor and keeps playing until a punishment terminal or cp96.
+set RE1_YAWN_PAYFORWARD_RIPPLE=0
+set RE1_YAWN_FIGHT_BIAS_WEIGHT=
 set RE1_GO_EXPLORE_MANIFEST_POLL_S=60
 REM Learner HTTP for lazy bundle fetch in worker subprocesses (archive resets).
 if not defined RE1_LEARNER_HOST set RE1_LEARNER_HOST=%FLEET_LEARNER_HOST%
