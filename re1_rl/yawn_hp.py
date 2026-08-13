@@ -16,6 +16,8 @@ from typing import Any
 YAWN_RAW_FULL = 3050
 # Room for both Yawn fights (route_jill_anypct).
 YAWN_ROOM = "210"
+# Same kind byte as Cerberus / Tyrant; room 210 disambiguates.
+YAWN_RAM_TYPE_ID = 0x0F
 # Raw pools this high are Yawn (zombies/hunters/tiger/tyrant sit well below).
 YAWN_RAW_MIN = 500
 # Default logical max = attic retreat budget. Library (140) needs a second

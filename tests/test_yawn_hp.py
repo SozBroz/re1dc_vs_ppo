@@ -54,6 +54,42 @@ def test_decode_enemy_table_translates_yawn() -> None:
     assert decoded[0]["hp"] == 120
 
 
+def test_decode_includes_yawn_body_parts_without_spatial_slots() -> None:
+    ram = {
+        "stage_id": 1,
+        "room_id": 0x10,
+        "player_x": 6100,
+        "player_z": 3600,
+        "enemy0_hp": 3050,
+        "enemy0_type_id": 0x0F,
+        "enemy0_x": 9437,
+        "enemy0_z": 2334,
+        "enemy0_active_byte": 2,
+        "enemy2_hp": 65535,
+        "enemy2_type_id": 0x0F,
+        "enemy2_x": 8000,
+        "enemy2_z": 4000,
+        "enemy2_active_byte": 2,
+        "enemy7_hp": 65535,
+        "enemy7_type_id": 0x0F,
+        "enemy7_x": 7000,
+        "enemy7_z": 5000,
+        "enemy7_active_byte": 2,
+    }
+    decoded = decode_enemy_table(ram)
+    by_slot = {int(e["slot"]): e for e in decoded}
+    assert by_slot[0]["hp"] == 120
+    assert by_slot[0].get("yawn_part") in (None, 0)
+    assert by_slot[0]["alive"] == 1
+    assert by_slot[0]["combat_near"] == 1
+    assert by_slot[2]["yawn_part"] == 1
+    assert by_slot[2]["alive"] == 0
+    assert by_slot[2]["combat_near"] == 0
+    assert by_slot[2]["hp"] == 65535
+    assert by_slot[7]["yawn_part"] == 1
+    assert by_slot[7]["alive"] == 0
+
+
 def test_tiger_tyrant_not_translated() -> None:
     """Black Tiger ~204 / Tyrant ~220 stay raw (low hundreds)."""
     for room, hp in (("30C", 204), ("513", 220)):

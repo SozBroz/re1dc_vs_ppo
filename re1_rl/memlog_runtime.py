@@ -368,19 +368,25 @@ class MemlogTelemetry:
             if key not in _IGNORED_EVENT_CHANNELS and value != 0.0
         }
         if event_channels:
-            self._append_event(
-                {
-                    "run_id": self.run_id,
-                    "rank": self.rank,
-                    "time_unix_s": payload["heartbeat_unix_s"],
-                    "horizon_step": int(horizon_step),
-                    "reward": float(reward),
-                    "reward_breakdown": event_channels,
-                    "room_id": info.get("room_id"),
-                    "action": int(action),
-                    "action_name": info.get("action_name"),
-                }
-            )
+            event = {
+                "run_id": self.run_id,
+                "rank": self.rank,
+                "time_unix_s": payload["heartbeat_unix_s"],
+                "horizon_step": int(horizon_step),
+                "reward": float(reward),
+                "reward_breakdown": event_channels,
+                "room_id": info.get("room_id"),
+                "action": int(action),
+                "action_name": info.get("action_name"),
+            }
+            audit = info.get("combat_audit") or {}
+            if audit.get("combat_events") or audit.get("enemy_damage"):
+                event["combat_hp"] = audit.get("enemy_damage")
+                event["combat_events"] = audit.get("combat_events") or []
+                event["credited_from_pending"] = bool(
+                    audit.get("credited_from_pending")
+                )
+            self._append_event(event)
 
     def _append_event(self, event: dict[str, Any]) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)

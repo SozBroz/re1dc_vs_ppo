@@ -841,6 +841,17 @@ class RE1Env(gym.Env):
             "enemy_kills": int(state.get("enemy_kills", 0) or 0),
             "pending_combat_frames": int(state.get("pending_combat_frames") or 0),
             "credited_from_pending": bool(state.get("credited_from_pending")),
+            "combat_events": [
+                {
+                    "slot": ev.get("slot"),
+                    "damage": ev.get("damage"),
+                    "killed": ev.get("killed"),
+                    "is_yawn": ev.get("is_yawn"),
+                    "is_boss": ev.get("is_boss"),
+                    "type_id": ev.get("type_id"),
+                }
+                for ev in list(state.get("combat_events") or [])[:6]
+            ],
             "combat_reward_terms": {
                 key: float(breakdown.get(key, 0.0))
                 for key in (

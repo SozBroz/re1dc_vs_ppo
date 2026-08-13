@@ -646,6 +646,111 @@ def test_yawn_translated_flag_is_not_zombie_even_without_room() -> None:
     assert events[0]["is_zombie"] is False
 
 
+def test_yawn_body_part_hit_pays_without_attack() -> None:
+    """Body-slot chip in 210 pays even when the fire step already ended."""
+    prev = {
+        "room_id": "210",
+        "enemies": [
+            {
+                "slot": 0, "hp": 120, "hp_raw": 3050, "type_id": 0x0F,
+                "yawn_translated": True, "x": 9437, "z": 2334,
+            },
+            {
+                "slot": 2, "hp": 65535, "type_id": 0x0F, "yawn_part": True,
+                "x": 8000, "z": 4000,
+            },
+        ],
+    }
+    cur = {
+        "room_id": "210",
+        "enemies": [
+            {
+                "slot": 0, "hp": 120, "hp_raw": 3050, "type_id": 0x0F,
+                "yawn_translated": True, "x": 9437, "z": 2334,
+            },
+            {
+                "slot": 2, "hp": 65490, "type_id": 0x0F, "yawn_part": True,
+                "x": 8000, "z": 4000,
+            },
+        ],
+    }
+    out = apply_combat_step_fields(prev, cur)
+    assert out["enemy_damage"] == 45
+    assert out["enemy_kills"] == 0
+    assert out["combat_events"][0]["is_yawn"] is True
+    assert out["combat_events"][0]["yawn_part"] is True
+    assert out["combat_events"][0]["killed"] is False
+
+
+def test_yawn_head_and_body_same_step_does_not_double_pay() -> None:
+    prev = {
+        "room_id": "210",
+        "enemies": [
+            {
+                "slot": 0, "hp": 120, "hp_raw": 3050, "type_id": 0x0F,
+                "yawn_translated": True,
+            },
+            {"slot": 1, "hp": 65535, "type_id": 0x0F, "yawn_part": True},
+        ],
+    }
+    cur = {
+        "room_id": "210",
+        "enemies": [
+            {
+                "slot": 0, "hp": 75, "hp_raw": 3005, "type_id": 0x0F,
+                "yawn_translated": True,
+            },
+            {"slot": 1, "hp": 65415, "type_id": 0x0F, "yawn_part": True},
+        ],
+    }
+    out = apply_combat_step_fields(prev, cur)
+    assert out["enemy_damage"] == 45
+    assert len(out["combat_events"]) == 1
+    assert out["combat_events"][0]["slot"] == 0
+
+
+def test_yawn_retreat_still_counts_as_kill() -> None:
+    prev = {
+        "room_id": "210",
+        "enemies": [
+            {
+                "slot": 0, "hp": 25, "hp_raw": 2955, "type_id": 0x0F,
+                "yawn_translated": True,
+            }
+        ],
+    }
+    cur = {
+        "room_id": "210",
+        "enemies": [
+            {
+                "slot": 0, "hp": 0, "hp_raw": 2865, "type_id": 0x0F,
+                "yawn_translated": True,
+            }
+        ],
+    }
+    out = apply_combat_step_fields(prev, cur)
+    assert out["enemy_damage"] == 25
+    assert out["enemy_kills"] == 1
+
+
+def test_yawn_body_sentinel_collapse_does_not_pay() -> None:
+    prev = {
+        "room_id": "210",
+        "enemies": [
+            {"slot": 3, "hp": 65535, "type_id": 0x0F, "yawn_part": True},
+        ],
+    }
+    cur = {
+        "room_id": "210",
+        "enemies": [
+            {"slot": 3, "hp": 1, "type_id": 0x0F, "yawn_part": True},
+        ],
+    }
+    out = apply_combat_step_fields(prev, cur)
+    assert out["enemy_damage"] == 0
+    assert out["combat_events"] == []
+
+
 def test_passive_crow_detection() -> None:
     assert is_crow_enemy(
         {"slot": 0, "hp": 20, "active_byte": 0x04, "combat_near": 1}

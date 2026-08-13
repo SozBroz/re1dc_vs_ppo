@@ -667,8 +667,54 @@ def potential(
     return PBRS_GRAPH_WEIGHT * phi_g, PBRS_DOOR_WEIGHT * phi_d
 
 
+def _combat_event_scale(ev: dict[str, Any], *, room_id: str) -> float:
+    """Crow / boss multiplier for one HP-delta event.
+
+    Live pending-credit hits sometimes arrive without ``is_yawn`` / ``is_boss``
+    flags (or with only the scalar ``enemy_damage`` fallback). Reclassify from
+    type_id / room / slot so attic Yawn cannot pay 1× by omission.
+    """
+    if ev.get("is_crow"):
+        return CROW_COMBAT_REWARD_SCALE
+    if ev.get("is_boss") or ev.get("is_yawn"):
+        return BOSS_COMBAT_REWARD_SCALE
+    from re1_rl.enemy_combat import is_boss_combat_entity, is_yawn_combat_entity
+
+    slot = ev.get("slot")
+    hp_before = ev.get("hp_before")
+    if is_yawn_combat_entity(ev, room_id=room_id, slot=slot):
+        return BOSS_COMBAT_REWARD_SCALE
+    if is_boss_combat_entity(
+        ev, room_id=room_id, slot=slot, hp_before=hp_before
+    ):
+        return BOSS_COMBAT_REWARD_SCALE
+    return 1.0
+
+
+def _state_boss_combat_scale(state: dict[str, Any]) -> float:
+    """Boss multiplier when paying the scalar ``enemy_damage`` fallback."""
+    from re1_rl.enemy_combat import is_boss_combat_entity, is_yawn_combat_entity
+    from re1_rl.yawn_hp import YAWN_ROOM
+
+    room = str(state.get("room_id") or "").strip().upper()
+    if room == YAWN_ROOM:
+        return BOSS_COMBAT_REWARD_SCALE
+    for ent in state.get("enemies") or []:
+        if not isinstance(ent, dict):
+            continue
+        slot = ent.get("slot")
+        if is_yawn_combat_entity(ent, room_id=room, slot=slot):
+            return BOSS_COMBAT_REWARD_SCALE
+        if is_boss_combat_entity(
+            ent, room_id=room, slot=slot, hp_before=ent.get("hp")
+        ):
+            return BOSS_COMBAT_REWARD_SCALE
+    return 1.0
+
+
 def enemy_combat_rewards(state: dict[str, Any]) -> tuple[float, float]:
     """Return ``(damage_pay, kill_pay)`` honoring per-event crow / boss scaling."""
+    room_id = str(state.get("room_id") or "")
     events = state.get("combat_events")
     if events:
         damage_pay = 0.0
@@ -676,21 +722,17 @@ def enemy_combat_rewards(state: dict[str, Any]) -> tuple[float, float]:
         for ev in events:
             if ev.get("reward_denied"):
                 continue
-            if ev.get("is_crow"):
-                scale = CROW_COMBAT_REWARD_SCALE
-            elif ev.get("is_boss") or ev.get("is_yawn"):
-                scale = BOSS_COMBAT_REWARD_SCALE
-            else:
-                scale = 1.0
+            scale = _combat_event_scale(ev, room_id=room_id)
             damage_pay += ENEMY_DAMAGE_REWARD * int(ev.get("damage", 0)) * scale
             if ev.get("killed"):
                 kill_pay += ENEMY_KILL_REWARD * scale
         return damage_pay, kill_pay
+    scale = _state_boss_combat_scale(state)
     enemy_damage = int(state.get("enemy_damage", 0) or 0)
     enemy_kills = int(state.get("enemy_kills", 0) or 0)
     return (
-        ENEMY_DAMAGE_REWARD * enemy_damage,
-        ENEMY_KILL_REWARD * enemy_kills,
+        ENEMY_DAMAGE_REWARD * enemy_damage * scale,
+        ENEMY_KILL_REWARD * enemy_kills * scale,
     )
 
 

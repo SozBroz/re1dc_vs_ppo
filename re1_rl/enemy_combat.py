@@ -501,6 +501,8 @@ def _type_meta_by_slot(
             meta["hp_raw"] = int(ent["hp_raw"])
         if ent.get("yawn_translated"):
             meta["yawn_translated"] = True
+        if ent.get("yawn_part"):
+            meta["yawn_part"] = True
         if meta:
             out[slot] = meta
     return out
@@ -553,6 +555,8 @@ def enemy_combat_events(
             extra["type_name"] = meta["type_name"]
         if "active_byte" in meta:
             extra["active_byte"] = meta["active_byte"]
+        if meta.get("yawn_part"):
+            extra["yawn_part"] = True
         if after <= 0:
             events.append({
                 "slot": slot,
@@ -583,7 +587,47 @@ def enemy_combat_events(
                 "is_boss": is_boss,
                 **extra,
             })
-    return events
+    return _collapse_yawn_body_events(events, room_id=room_id)
+
+
+# Body-part sentinel drops above this are cinema/counter thrash, not a chip.
+YAWN_BODY_HIT_MAX = 200
+
+
+def _collapse_yawn_body_events(
+    events: list[dict[str, Any]],
+    *,
+    room_id: str | None,
+) -> list[dict[str, Any]]:
+    """Pay Yawn body chips; if the head bar also moved, keep that event only."""
+    from re1_rl.yawn_hp import YAWN_ROOM
+
+    if str(room_id or "").strip().upper() != YAWN_ROOM:
+        return events
+    head: list[dict[str, Any]] = []
+    body: list[dict[str, Any]] = []
+    other: list[dict[str, Any]] = []
+    for ev in events:
+        is_part = bool(ev.get("yawn_part")) or (
+            bool(ev.get("is_yawn")) and int(ev.get("slot", 0) or 0) != 0
+        )
+        if is_part:
+            dmg = int(ev.get("damage", 0) or 0)
+            if dmg < 1 or dmg > YAWN_BODY_HIT_MAX:
+                continue
+            part = dict(ev)
+            part["killed"] = False
+            part["is_yawn"] = True
+            part["is_boss"] = True
+            part["yawn_part"] = True
+            body.append(part)
+        elif ev.get("is_yawn"):
+            head.append(ev)
+        else:
+            other.append(ev)
+    if head:
+        return other + head
+    return other + body
 
 
 def format_enemy_table(enemies: list[dict[str, Any]] | None) -> str:
@@ -592,6 +636,8 @@ def format_enemy_table(enemies: list[dict[str, Any]] | None) -> str:
         return "-"
     parts: list[str] = []
     for ent in sorted(enemies, key=lambda e: int(e.get("slot", 99))):
+        if ent.get("yawn_part"):
+            continue
         slot = int(ent.get("slot", -1))
         hp = int(ent.get("hp", 0))
         if slot < 0 or hp <= 0:
@@ -624,6 +670,10 @@ def apply_combat_step_fields(
     ``credit_damage`` pays HP deltas while a pending shot window is open (dog
     lag / grenade flight). It must not set miss flags. Arm via
     ``tick_pending_combat_credit`` after a fire that has not yet resolved.
+
+    Room ``210`` Yawn is the exception: head or body-part HP chips pay even
+    without a fire this step (shotgun recovery / bite cinema), so body hits
+    cannot be eaten by the interact-flicker gate.
     """
     out = dict(state)
     prev_room = str(prev_state.get("room_id", "") or "")
@@ -634,17 +684,16 @@ def apply_combat_step_fields(
         out["combat_events"] = []
         return out
 
-    if not knife and not attack and not credit_damage:
-        out["enemy_damage"] = 0
-        out["enemy_kills"] = 0
-        out["combat_events"] = []
-        return out
-
     prev_enemies = list(prev_state.get("enemies", []) or [])
     curr_enemies = list(out.get("enemies", []) or [])
     # Room-wide deny (exclusive wasp/adder/shark halls) zeroes combat pay even
     # before type_id is mapped — still record events with reward_denied.
     if combat_reward_denied(room_id=curr_room):
+        if not knife and not attack and not credit_damage:
+            out["enemy_damage"] = 0
+            out["enemy_kills"] = 0
+            out["combat_events"] = []
+            return out
         combat_events = enemy_combat_events(
             prev_enemies, curr_enemies, room_id=curr_room
         )
@@ -660,6 +709,17 @@ def apply_combat_step_fields(
     combat_events = enemy_combat_events(
         prev_enemies, curr_enemies, room_id=curr_room
     )
+    yawn_hit = any(
+        (not ev.get("reward_denied"))
+        and ev.get("is_yawn")
+        and int(ev.get("damage", 0) or 0) > 0
+        for ev in combat_events
+    )
+    if not knife and not attack and not credit_damage and not yawn_hit:
+        out["enemy_damage"] = 0
+        out["enemy_kills"] = 0
+        out["combat_events"] = []
+        return out
     enemy_damage = 0
     enemy_kills = 0
     for ev in combat_events:

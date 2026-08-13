@@ -103,7 +103,7 @@ def test_proprio_player_world_velocity():
 def test_enemy_table_fields_mapped() -> None:
     """HP/x/z/active at slot offsets -> decode with in-room + combat flags."""
     fields = enemy_table_fields()
-    assert len(fields) == 6 * len({"hp", "type_id", "x", "z", "active_byte"})
+    assert len(fields) == 16 * len({"hp", "type_id", "x", "z", "active_byte"})
     ram = {
         "player_x": 7000,
         "player_z": 15000,

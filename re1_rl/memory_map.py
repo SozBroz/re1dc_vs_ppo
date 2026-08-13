@@ -258,6 +258,9 @@ MESSAGE_FLAG_MASK = 0x80
 ENEMY_TABLE_BASE: int | None = 0x800C532C
 ENEMY_SLOT_STRIDE = 0x18C  # confirmed: GS first zombie + second slot
 ENEMY_TABLE_SLOTS = 6
+# Yawn's body is ~14 collision parts in extra table rows (hp@0 often 0xFFFF).
+# RAM-read width; decode still uses 6 slots outside room 210.
+ENEMY_TABLE_SCAN_SLOTS = 16
 # Per-slot HP at struct base (ASL / GS). Cap rejects empty-slot garbage
 # (0xFFFF) and keeps Yawn (~3050 on spawn cinema QS5 / 210) visible.
 ENEMY_HP_MAX_PLAUSIBLE = 4000
@@ -301,7 +304,7 @@ def enemy_table_fields() -> list[tuple[str, int, str]]:
     if ENEMY_TABLE_BASE is None or not ENEMY_FIELD_OFFSETS:
         return []
     fields: list[tuple[str, int, str]] = []
-    for slot in range(ENEMY_TABLE_SLOTS):
+    for slot in range(ENEMY_TABLE_SCAN_SLOTS):
         base = ENEMY_TABLE_BASE + slot * ENEMY_SLOT_STRIDE
         for fname, (off, dtype) in ENEMY_FIELD_OFFSETS.items():
             fields.append((f"enemy{slot}_{fname}", base + off, dtype))
@@ -313,8 +316,10 @@ def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
 
     Room ``210`` Yawn: raw ``hp@0`` ~3050 is translated to wiki-scale logical
     HP (attic 120) via :mod:`re1_rl.yawn_hp` so spatial ``hp/255`` stays sane.
+    Extra 0xFFFF body-part rows are kept for combat pay (``yawn_part``) but
+    marked not-alive so they do not fill spatial / attack-mask slots.
     """
-    from re1_rl.yawn_hp import apply_yawn_hp_translate
+    from re1_rl.yawn_hp import YAWN_RAM_TYPE_ID, YAWN_ROOM, apply_yawn_hp_translate
 
     out: list[dict[str, int]] = []
     if ENEMY_TABLE_BASE is None or not ENEMY_FIELD_OFFSETS:
@@ -322,22 +327,39 @@ def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
     px = int(ram.get("player_x", 0))
     pz = int(ram.get("player_z", 0))
     room_code = f"{int(ram.get('stage_id', 0)) + 1}{int(ram.get('room_id', 0)):02X}"
-    for slot in range(ENEMY_TABLE_SLOTS):
+    n_slots = (
+        ENEMY_TABLE_SCAN_SLOTS if room_code == YAWN_ROOM else ENEMY_TABLE_SLOTS
+    )
+    for slot in range(n_slots):
         vals = {f: int(ram.get(f"enemy{slot}_{f}", 0)) for f in ENEMY_FIELD_OFFSETS}
         hp = vals.get("hp", 0)
-        if hp <= 0 or hp > ENEMY_HP_MAX_PLAUSIBLE:
-            continue
         x = int(vals.get("x", 0))
         z = int(vals.get("z", 0))
         in_room = enemy_coords_in_room_band(x, z)
+        is_yawn_part = (
+            room_code == YAWN_ROOM
+            and int(vals.get("type_id", 0)) == YAWN_RAM_TYPE_ID
+            and in_room
+            and hp > 0
+            and not (slot == 0 and hp <= ENEMY_HP_MAX_PLAUSIBLE)
+        )
+        if not is_yawn_part and (hp <= 0 or hp > ENEMY_HP_MAX_PLAUSIBLE):
+            continue
         dist = math.hypot(px - x, pz - z)
         combat_near = in_room and dist < ENEMY_COMBAT_NEAR_DIST
         knife_near = in_room and dist < ENEMY_KNIFE_COMBAT_NEAR_DIST
         vals["slot"] = slot
-        vals["alive"] = 1 if in_room else 0
-        vals["in_room"] = 1 if in_room else 0
-        vals["combat_near"] = 1 if combat_near else 0
-        vals["knife_near"] = 1 if knife_near else 0
+        if is_yawn_part:
+            vals["yawn_part"] = 1
+            vals["alive"] = 0
+            vals["in_room"] = 1
+            vals["combat_near"] = 0
+            vals["knife_near"] = 0
+        else:
+            vals["alive"] = 1 if in_room else 0
+            vals["in_room"] = 1 if in_room else 0
+            vals["combat_near"] = 1 if combat_near else 0
+            vals["knife_near"] = 1 if knife_near else 0
         vals["dist"] = int(dist)
         out.append(vals)
     return apply_yawn_hp_translate(out, room_id=room_code)

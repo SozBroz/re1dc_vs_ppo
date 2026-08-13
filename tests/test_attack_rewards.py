@@ -494,6 +494,53 @@ def test_boss_hits_pay_four_times_fodder_stays_one_x() -> None:
     )
 
 
+def test_flagless_attic_events_still_pay_boss_scale() -> None:
+    """Pending-credit memlog hits paid 1× when is_yawn/is_boss were omitted."""
+    planner = make_planner()
+    prev = make_state(hp=96, room="210", step=1)
+    cur = make_state(hp=96, room="210", step=2)
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 60,
+            "killed": False,
+            "reward_denied": False,
+            "type_id": 15,
+            "active_byte": 15,
+        }
+    ]
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["enemy_damage"] == pytest.approx(
+        60 * ENEMY_DAMAGE_REWARD * BOSS_COMBAT_REWARD_SCALE
+    )
+
+
+def test_scalar_fallback_in_attic_pays_boss_scale() -> None:
+    planner = make_planner()
+    prev = make_state(hp=96, room="210", step=1)
+    cur = make_state(hp=96, room="210", step=2)
+    cur["enemy_damage"] = 120
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["enemy_damage"] == pytest.approx(
+        120 * ENEMY_DAMAGE_REWARD * BOSS_COMBAT_REWARD_SCALE
+    )
+
+
+def test_scalar_fallback_outside_attic_stays_one_x() -> None:
+    planner = make_planner()
+    prev = make_state(hp=96, room="105", step=1)
+    cur = make_state(hp=96, room="105", step=2)
+    cur["enemy_damage"] = 20
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["enemy_damage"] == pytest.approx(20 * ENEMY_DAMAGE_REWARD)
+
+
 def test_beretta_dog_hit_no_shotgun_penalty() -> None:
     cur = make_state(hp=96, step=2)
     cur["equipped_weapon_id"] = 0x02
