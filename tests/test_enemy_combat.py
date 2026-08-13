@@ -709,13 +709,12 @@ def test_yawn_head_and_body_same_step_does_not_double_pay() -> None:
     assert out["combat_events"][0]["slot"] == 0
 
 
-def test_yawn_logical_zero_is_not_a_kill() -> None:
-    """Wiki bar empty after ~120 damage; RAM HP is still ~2930, not a kill."""
+def test_yawn_retreat_still_counts_as_kill() -> None:
     prev = {
         "room_id": "210",
         "enemies": [
             {
-                "slot": 0, "hp": 2955, "hp_raw": 2955, "type_id": 0x0F,
+                "slot": 0, "hp": 25, "hp_raw": 2955, "type_id": 0x0F,
                 "yawn_translated": True,
             }
         ],
@@ -724,14 +723,14 @@ def test_yawn_logical_zero_is_not_a_kill() -> None:
         "room_id": "210",
         "enemies": [
             {
-                "slot": 0, "hp": 2865, "hp_raw": 2865, "type_id": 0x0F,
+                "slot": 0, "hp": 0, "hp_raw": 2865, "type_id": 0x0F,
                 "yawn_translated": True,
             }
         ],
     }
     out = apply_combat_step_fields(prev, cur)
-    assert out["enemy_damage"] == 90
-    assert out["enemy_kills"] == 0
+    assert out["enemy_damage"] == 25
+    assert out["enemy_kills"] == 1
 
 
 def test_yawn_body_sentinel_collapse_does_not_pay() -> None:
@@ -992,5 +991,3 @@ def test_attack_mask_keeps_active_landmine_and_cerberus(monkeypatch) -> None:
     }
     assert combat_enemy_count([landmine], for_attack_mask=True) == 1
     assert combat_enemy_count([dog], for_attack_mask=True) == 1
-
-

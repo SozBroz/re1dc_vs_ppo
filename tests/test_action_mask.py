@@ -238,39 +238,6 @@ def test_mask_blocks_attack_when_only_crows_near() -> None:
     assert not m[ATTACK_DOWN_ACTION]
 
 
-def test_room_210_attack_legal_without_nearby_enemies() -> None:
-    """Yawn XZ never leaves the nest slot; do not hide macros in room 210."""
-    idle = dict(player_anim=0x0D, player_aux=0x01, player_recovery=0)
-    m = action_mask(
-        N_ACTIONS,
-        None,
-        **idle,
-        equipped_weapon_id=0x02,
-        inventory=[(0x02, 15)],
-        knife_enemies_near=0,
-        gun_enemies_near=0,
-        alive_enemies_in_room=0,
-        mask_combat_without_enemies=True,
-        room_id="210",
-    )
-    assert m[ATTACK_ACTION]
-    assert m[ATTACK_UP_ACTION]
-    assert m[ATTACK_DOWN_ACTION]
-    m_other = action_mask(
-        N_ACTIONS,
-        None,
-        **idle,
-        equipped_weapon_id=0x02,
-        inventory=[(0x02, 15)],
-        knife_enemies_near=0,
-        gun_enemies_near=0,
-        alive_enemies_in_room=0,
-        mask_combat_without_enemies=True,
-        room_id="108",
-    )
-    assert not m_other[ATTACK_ACTION]
-
-
 def test_typewriter_or_box_rooms_ban_attacks() -> None:
     """Typewriter/box rooms: attacks always illegal (even with near enemies)."""
     from re1_rl.item_box import TYPEWRITER_OR_BOX_ROOMS

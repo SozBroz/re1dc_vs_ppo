@@ -3588,15 +3588,8 @@ class RE1Env(gym.Env):
                 enemies, room_id=room_for_mask, for_attack_mask=True
             )
         else:
-            knife_near = combat_enemy_count(
-                enemies,
-                knife=True,
-                for_attack_mask=True,
-                room_id=room_for_mask,
-            )
-            gun_near = combat_enemy_count(
-                enemies, for_attack_mask=True, room_id=room_for_mask
-            )
+            knife_near = combat_enemy_count(enemies, knife=True, for_attack_mask=True)
+            gun_near = combat_enemy_count(enemies, for_attack_mask=True)
         # Refresh before masking so pickup Yes/No in room 118 cannot keep a
         # stale box-UI session (would hide noop→Cross).
         if bridge is not None and (
@@ -3643,7 +3636,7 @@ class RE1Env(gym.Env):
                 getattr(self, "_grab_escape_pending", False)
             ),
             alive_enemies_in_room=combat_enemy_count(
-                enemies, for_attack_mask=True, room_id=room_for_mask
+                enemies, for_attack_mask=True
             ),
             knife_enemies_near=knife_near,
             gun_enemies_near=gun_near,

@@ -211,7 +211,7 @@ def is_yawn_combat_entity(
     room_id: str | None = None,
     slot: int | None = None,
 ) -> bool:
-    """True for attic Yawn. Kind 0x0F in room 210; same kind byte as dogs/zombies."""
+    """True for attic Yawn. Logical HP is 120, same kind byte as dogs/zombies."""
     name = str(meta.get("type_name") or meta.get("enemy_type") or "").lower()
     if name in YAWN_TYPE_NAMES:
         return True
@@ -382,7 +382,6 @@ def combat_enemy_count(
     max_dist: float | None = None,
     knife: bool = False,
     for_attack_mask: bool = False,
-    room_id: str | None = None,
 ) -> int:
     """Enemies near enough to justify knife/attack.
 
@@ -390,7 +389,6 @@ def combat_enemy_count(
     ``knife=True`` uses ``knife_near`` (``ENEMY_KNIFE_COMBAT_NEAR_DIST``).
     ``max_dist`` overrides both and requires ``in_room`` + stored ``dist``.
     """
-    del room_id
     n = 0
     corpse_coords = (
         _stacked_inactive_corpse_coords(enemies) if for_attack_mask else frozenset()

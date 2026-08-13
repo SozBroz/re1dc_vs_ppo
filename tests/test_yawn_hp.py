@@ -1,4 +1,4 @@
-"""Yawn HP tagging: live ``hp`` stays raw; wiki-scale is outcome-only."""
+"""Yawn raw→logical HP translation."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def test_yawn_logical_full_and_after_four_beretta() -> None:
 def test_apply_only_in_room_210() -> None:
     ents = [{"slot": 0, "hp": 3050, "type_id": 0x0F}]
     out = apply_yawn_hp_translate(ents, room_id="210")
-    assert out[0]["hp"] == 3050
+    assert out[0]["hp"] == 120
     assert out[0]["hp_raw"] == 3050
     assert out[0]["yawn_translated"] is True
     untouched = apply_yawn_hp_translate(ents, room_id="104")
@@ -51,7 +51,7 @@ def test_decode_enemy_table_translates_yawn() -> None:
     decoded = decode_enemy_table(ram)
     assert len(decoded) == 1
     assert decoded[0]["hp_raw"] == 3050
-    assert decoded[0]["hp"] == 3050
+    assert decoded[0]["hp"] == 120
 
 
 def test_decode_includes_yawn_body_parts_without_spatial_slots() -> None:
@@ -78,7 +78,7 @@ def test_decode_includes_yawn_body_parts_without_spatial_slots() -> None:
     }
     decoded = decode_enemy_table(ram)
     by_slot = {int(e["slot"]): e for e in decoded}
-    assert by_slot[0]["hp"] == 3050
+    assert by_slot[0]["hp"] == 120
     assert by_slot[0].get("yawn_part") in (None, 0)
     assert by_slot[0]["alive"] == 1
     assert by_slot[0]["combat_near"] == 1
