@@ -17,6 +17,23 @@ from re1_rl.go_explore_merge import CELL_META_NAME, CELL_REPLAY_NAME
 ACTION_MAP_VERSION = 1
 SCHEMA_VERSION = 1
 _UINT16_MAX = 65535
+# Packed LSB-first; must match lua/re1_client.lua TAPE_BUTTON_ORDER.
+JOYPAD_BUTTON_ORDER = (
+    "up",
+    "down",
+    "left",
+    "right",
+    "cross",
+    "triangle",
+    "square",
+    "circle",
+    "start",
+    "select",
+    "r1",
+    "l1",
+    "r2",
+    "l2",
+)
 
 
 class LegReplayBuffer:
@@ -159,6 +176,7 @@ def build_leg_replay_payload(
         ]
     root = getattr(env, "project_root", None)
     n_actions = int(getattr(getattr(env, "action_space", None), "n", 45) or 45)
+    joypad_bits = _joypad_bits_from_env(env)
     payload = {
         "schema_version": SCHEMA_VERSION,
         "from_checkpoint_index": from_index,
@@ -173,6 +191,7 @@ def build_leg_replay_payload(
             "async_cutscene_skip": bool(getattr(env, "_async_cutscene_skip", False)),
             "code_commit": _git_commit(root),
             "action_map_version": ACTION_MAP_VERSION,
+            "joypad_tape": bool(joypad_bits),
         },
         "actions": actions,
         "emu_frames_per_step": emu_frames,
@@ -191,7 +210,30 @@ def build_leg_replay_payload(
             "leg_kills_by_room": kills,
         },
     }
+    if joypad_bits:
+        payload["joypad_bits"] = joypad_bits
+        payload["joypad_frames"] = len(joypad_bits)
     return payload
+
+
+def _joypad_bits_from_env(env: Any) -> list[int] | None:
+    bridge = getattr(env, "bridge", None)
+    dump = getattr(bridge, "tape_dump", None)
+    if not callable(dump):
+        return None
+    try:
+        frames = dump()
+    except (OSError, RuntimeError, ValueError, TypeError, AttributeError):
+        return None
+    if not isinstance(frames, list) or not frames:
+        return None
+    out: list[int] = []
+    for item in frames:
+        try:
+            out.append(max(0, int(item)) & 0xFFFF)
+        except (TypeError, ValueError):
+            return None
+    return out
 
 
 def write_leg_replay_json(path: Path, payload: dict[str, Any]) -> None:

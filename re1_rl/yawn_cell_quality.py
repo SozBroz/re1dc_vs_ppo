@@ -192,6 +192,80 @@ def refresh_yawn_quality_metadata(project_root: Path | str) -> list[dict[str, An
     return changes
 
 
+def seed_cell_leg_frames_sentinel(
+    project_root: Path | str, checkpoint_index: int
+) -> bool:
+    """Force one cell's quality[7] to ``-LEG_FRAMES_SENTINEL`` (infinitely slow).
+
+    Next equal-survival recapture installs via the speed-significant rule.
+    """
+    from re1_rl.go_explore_archive import (
+        LEG_FRAMES_QUALITY_INDEX,
+        LEG_FRAMES_SENTINEL,
+        attach_leg_frames,
+    )
+    from re1_rl.yawn_rails_sync import MANIFEST_FILENAME, cell_dir_name, yawn_rails_root
+
+    idx = int(checkpoint_index)
+    yroot = yawn_rails_root(project_root)
+    man_path = yroot / MANIFEST_FILENAME
+    if not man_path.is_file():
+        return False
+    sentinel_q7 = -int(LEG_FRAMES_SENTINEL)
+    man = json.loads(man_path.read_text(encoding="utf-8-sig"))
+    found = False
+    quality: list[int] | None = None
+    for row in man.get("cells") or []:
+        if not isinstance(row, dict):
+            continue
+        try:
+            if int(row.get("checkpoint_index")) != idx:
+                continue
+        except (TypeError, ValueError):
+            continue
+        raw = row.get("quality")
+        if not isinstance(raw, (list, tuple)) or len(raw) < 5:
+            return False
+        quality = list(attach_leg_frames(raw, None))
+        quality[LEG_FRAMES_QUALITY_INDEX] = sentinel_q7
+        row["quality"] = quality
+        found = True
+        break
+    if not found or quality is None:
+        return False
+    man_path.write_text(json.dumps(man, indent=2) + "\n", encoding="utf-8")
+    meta_p = yroot / "cells" / cell_dir_name(idx) / "meta.json"
+    if meta_p.is_file():
+        try:
+            meta = json.loads(meta_p.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError):
+            meta = {}
+        if isinstance(meta, dict):
+            meta["quality"] = quality
+            meta_p.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+    store_path = yroot / "store.json"
+    if store_path.is_file():
+        try:
+            store = json.loads(store_path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError):
+            store = None
+        cells = store.get("cells") if isinstance(store, dict) else None
+        if isinstance(cells, dict):
+            for _key, cell in cells.items():
+                if not isinstance(cell, dict):
+                    continue
+                try:
+                    if int(cell.get("checkpoint_index", -1)) != idx:
+                        continue
+                except (TypeError, ValueError):
+                    continue
+                cell["quality"] = quality
+            store_path.write_text(
+                json.dumps(store, indent=2) + "\n", encoding="utf-8"
+            )
+    return True
+
+
 def seed_leg_frames_sentinel(project_root: Path | str) -> int:
     """Force quality[7] = -LEG_FRAMES_SENTINEL on every yawn cell on disk.
 

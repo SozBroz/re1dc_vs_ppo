@@ -681,10 +681,13 @@ def test_yawn_episode_terminates_only_after_configured_leg_span() -> None:
         _progress=progress,
         _stage={"mode": "yawn_rails"},
         _episode_truncated=lambda: False,
+        _checkpoint_captured=False,
     )
     progress.claim_checkpoint_success()
     assert RE1Env._termination_flags(env, _state("105")) == (False, False, None)
     progress.claim_checkpoint_success()
+    assert RE1Env._termination_flags(env, _state("104")) == (False, False, None)
+    env._checkpoint_captured = True
     assert RE1Env._termination_flags(env, _state("104")) == (
         True,
         False,

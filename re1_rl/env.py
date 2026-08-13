@@ -415,6 +415,8 @@ class RE1Env(gym.Env):
         self._stage: dict[str, Any] = {}
         self._step_count = 0
         self._leg_replay = None
+        self._checkpoint_freeze_pending = False
+        self._checkpoint_captured = False
         self._prev_state: dict[str, Any] = {}
         self._prev_hp = 0
         self._grab_escape_pending = False
@@ -955,6 +957,7 @@ class RE1Env(gym.Env):
         checkpoint_success = (
             self._stage.get("mode") == "yawn_rails"
             and self._progress.checkpoint_success
+            and bool(getattr(self, "_checkpoint_captured", False))
         )
         terminated = (
             bool(state.get("dead"))
@@ -1239,16 +1242,141 @@ class RE1Env(gym.Env):
                 pending = self._go_explore_capture_pending
             pending.append(proposal)
         if float(breakdown.get("checkpoint_success", 0.0)) > 0.0:
-            from re1_rl.yawn_rails import capture_successor_cell
+            self._arm_checkpoint_freeze()
 
-            yr_prop = capture_successor_cell(self, state, breakdown)
-            if yr_prop is not None:
-                pending_yr = getattr(self, "_yawn_rails_capture_pending", None)
-                if pending_yr is None:
-                    self._yawn_rails_capture_pending = []
-                    pending_yr = self._yawn_rails_capture_pending
-                pending_yr.append(yr_prop)
+    def _arm_checkpoint_freeze(self) -> None:
+        """Mark CP success. Capture/terminate only on the next decision frame."""
+        self._checkpoint_freeze_pending = True
+        self._macro_active = True
+        self._skipping_flag = False
+
+    def _finish_checkpoint_capture(
+        self, state: dict[str, Any], breakdown: dict[str, float]
+    ) -> None:
+        from re1_rl.yawn_rails import capture_successor_cell
+
+        yr_prop = capture_successor_cell(self, state, breakdown)
+        if yr_prop is not None:
+            pending_yr = getattr(self, "_yawn_rails_capture_pending", None)
+            if pending_yr is None:
+                self._yawn_rails_capture_pending = []
+                pending_yr = self._yawn_rails_capture_pending
+            pending_yr.append(yr_prop)
         self._apply_yawn_capture_ineligibility_penalty(breakdown)
+        self._checkpoint_freeze_pending = False
+        self._checkpoint_captured = not bool(
+            getattr(self._progress, "capture_ineligible_breached", False)
+        )
+        self._macro_active = False
+
+    def _try_decision_checkpoint_capture(self, action: int):
+        """If CP already succeeded, freeze before any new policy inputs.
+
+        Pickup Yes/No / leftover ITEM close are the previous interact finishing,
+        not a new policy act. Turbo settle is forbidden here — it stutters.
+        """
+        if not getattr(self, "_checkpoint_freeze_pending", False):
+            return None
+        if getattr(self, "_checkpoint_captured", False):
+            return None
+        self._stop_bg_skip()
+        self._macro_active = True
+        self._skipping_flag = False
+        try:
+            self._auto_accept_pause_pickup_modal()
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            pass
+        try:
+            self._dismiss_non_box_pause_menu_if_safe()
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            pass
+        try:
+            state = dict(self._read_state())
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            state = dict(getattr(self, "_prev_state") or {})
+        if state.get("dead") or int(state.get("hp", 0) or 0) <= 0:
+            self._checkpoint_freeze_pending = False
+            self._macro_active = False
+            return None
+        if not bool(state.get("in_control", True)):
+            return self._checkpoint_wait_control_step(action)
+        gate = {"checkpoint_success": 1.0}
+        self._finish_checkpoint_capture(state, gate)
+        return self._checkpoint_freeze_obs(action, state, gate)
+
+    def _checkpoint_wait_control_step(self, action: int):
+        """Play cinema at current speed; never apply the pending policy action."""
+        from re1_rl.sticky_input import empty_sticky
+
+        hold_n = max(1, int(self.frame_skip))
+        try:
+            self.bridge.step(
+                n=hold_n,
+                sticky=empty_sticky(),
+                abort_on_zero_hp=False,
+                ring_stride=0,
+                capture_final=True,
+            )
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            pass
+        self._step_count += 1
+        self._record_leg_replay_step(0, hold_n)
+        try:
+            state = dict(self._read_state())
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            state = dict(getattr(self, "_prev_state") or {})
+        if (
+            bool(state.get("in_control", True))
+            and not state.get("dead")
+            and int(state.get("hp", 0) or 0) > 0
+        ):
+            gate = {"checkpoint_success": 1.0}
+            self._finish_checkpoint_capture(state, gate)
+            return self._checkpoint_freeze_obs(action, state, gate)
+        obs = self._checkpoint_live_obs(state)
+        info = {
+            "room_id": state.get("room_id"),
+            "checkpoint_freeze_wait": True,
+            "action_name": ACTION_NAMES[int(action)]
+            if 0 <= int(action) < len(ACTION_NAMES)
+            else str(action),
+            "bridge_port": getattr(self.bridge, "port", None),
+        }
+        return obs, 0.0, False, self._episode_truncated(), info
+
+    def _checkpoint_live_obs(self, state: dict[str, Any]) -> dict[str, Any]:
+        try:
+            frame_obs = self.bridge.build_frame_stack()
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            frame_obs = np.zeros(FRAME_SHAPE, dtype=np.uint8)
+        return self._build_obs(frame_obs, state)
+
+    def _checkpoint_freeze_obs(
+        self,
+        action: int,
+        state: dict[str, Any],
+        gate: dict[str, float],
+    ):
+        from re1_rl.reward import REWARD_SCALE
+
+        self._prev_state = dict(state)
+        terminated, truncated, episode_failure = self._termination_flags(state)
+        obs = self._checkpoint_live_obs(state)
+        reward = 0.0
+        if float(gate.get("checkpoint_capture_ineligible", 0.0)) != 0.0:
+            reward = sum(gate.values()) * REWARD_SCALE
+        info = {
+            "room_id": state.get("room_id"),
+            "hp": state.get("hp"),
+            "checkpoint_freeze": True,
+            "action_name": ACTION_NAMES[int(action)]
+            if 0 <= int(action) < len(ACTION_NAMES)
+            else str(action),
+            "bridge_port": getattr(self.bridge, "port", None),
+            "reward_breakdown": dict(gate),
+            "episode_failure": episode_failure,
+        }
+        return obs, float(reward), bool(terminated), bool(truncated), info
 
     def _apply_yawn_capture_ineligibility_penalty(
         self, breakdown: dict[str, float]
@@ -1485,6 +1613,8 @@ class RE1Env(gym.Env):
         self._pb_captured_triggers = set()
         self._go_explore_capture_pending = []
         self._yawn_rails_capture_pending = []
+        self._checkpoint_freeze_pending = False
+        self._checkpoint_captured = False
         self._go_explore_archive_cache = None
         self._go_capture_budget = {"last_capture_step": -10**9}
         # Progress reasons waiting for in_control (cutscene/pickup settle).
@@ -1611,10 +1741,17 @@ class RE1Env(gym.Env):
 
         self._step_count = 0
         self._leg_replay = None
+        self._checkpoint_freeze_pending = False
+        self._checkpoint_captured = False
         if str(self._stage.get("mode") or "") == "yawn_rails":
             from re1_rl.leg_replay import new_leg_replay_buffer
 
             self._leg_replay = new_leg_replay_buffer()
+            try:
+                self.bridge.tape_clear()
+                self.bridge.tape_enable(True)
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                pass
         self._frame_stack = []
         self.bridge.frame_ring.clear()
         self.bridge.attack_pins.clear()
@@ -3817,6 +3954,9 @@ class RE1Env(gym.Env):
         # action_masks() for this step already saw the pre-tick cooldown.
         if int(getattr(self, "_equip_switch_cooldown", 0)) > 0:
             self._equip_switch_cooldown -= 1
+        freeze = self._try_decision_checkpoint_capture(action)
+        if freeze is not None:
+            return freeze
         self._start_bg_skip()
         if self._bg_death:
             self._bg_death = False

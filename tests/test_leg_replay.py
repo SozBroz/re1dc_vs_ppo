@@ -21,7 +21,7 @@ from re1_rl.leg_replay import (
     should_write_leg_replay,
     write_leg_replay_json,
 )
-from re1_rl.yawn_cell_quality import seed_leg_frames_sentinel
+from re1_rl.yawn_cell_quality import seed_cell_leg_frames_sentinel, seed_leg_frames_sentinel
 from re1_rl.yawn_rails_sync import (
     CELL_SIDECAR_NAME,
     CELL_STATE_NAME,
@@ -84,6 +84,8 @@ def test_payload_schema_and_write(tmp_path: Path) -> None:
     assert payload["leg_frames"] == 26
     assert payload["contract"]["frame_skip"] == 8
     assert payload["contract"]["async_cutscene_skip"] is True
+    assert payload["contract"]["joypad_tape"] is False
+    assert "joypad_bits" not in payload
     assert payload["end"]["quality"][7] == -26
     dest = tmp_path / CELL_REPLAY_NAME
     write_leg_replay_json(dest, payload)
@@ -145,6 +147,63 @@ def test_seed_leg_frames_sentinel_overwrites_speed(tmp_path: Path) -> None:
     new_q = attach_leg_frames(row["quality"][:7], 400)
     assert quality_beats(new_q, row["quality"])
     assert quality_replace_significant(new_q, row["quality"])
+
+
+def test_seed_cell_leg_frames_sentinel_only_touches_that_index(tmp_path: Path) -> None:
+    yr = yawn_rails_root(tmp_path)
+    for idx, speed in ((18, -12), (19, -7656)):
+        cell = yr / "cells" / f"cp{idx:02d}"
+        cell.mkdir(parents=True)
+        (cell / "meta.json").write_text(
+            json.dumps({"checkpoint_index": idx, "quality": [96, 79, 0, 9, 1, 0, -30, speed]}),
+            encoding="utf-8",
+        )
+    man = {
+        "schema_version": 1,
+        "cells": [
+            {"checkpoint_index": 18, "quality": [96, 79, 0, 9, 1, 0, -30, -12]},
+            {"checkpoint_index": 19, "quality": [96, 79, 0, 9, 1, 0, -30, -7656]},
+        ],
+    }
+    (yr / "manifest.json").write_text(json.dumps(man), encoding="utf-8")
+    assert seed_cell_leg_frames_sentinel(tmp_path, 19) is True
+    rows = json.loads((yr / "manifest.json").read_text(encoding="utf-8"))["cells"]
+    assert rows[0]["quality"][7] == -12
+    assert rows[1]["quality"][7] == -LEG_FRAMES_SENTINEL
+    meta19 = json.loads((yr / "cells" / "cp19" / "meta.json").read_text(encoding="utf-8"))
+    assert meta19["quality"][7] == -LEG_FRAMES_SENTINEL
+    meta18 = json.loads((yr / "cells" / "cp18" / "meta.json").read_text(encoding="utf-8"))
+    assert meta18["quality"][7] == -12
+
+
+def test_payload_includes_joypad_bits_when_bridge_dumps() -> None:
+    buf = LegReplayBuffer()
+    buf.append(1, 8)
+    env = SimpleNamespace(
+        _route_start_index=19,
+        _leg_replay=buf,
+        _async_cutscene_skip=False,
+        frame_skip=8,
+        project_root=".",
+        action_space=SimpleNamespace(n=45),
+        _progress=SimpleNamespace(leg_kills_for_capture=lambda: {}),
+        _reset_options={"pb_bundle": {}},
+        bridge=SimpleNamespace(tape_dump=lambda: [1, 0, 4]),
+    )
+    quality = attach_leg_frames((96, 40, 0, 8, 1, 0, 0), 8)
+    payload = build_leg_replay_payload(
+        env,
+        completed_index=19,
+        completed_id="ammo_108",
+        settled=False,
+        live_state={"room_id": "108", "x": 1, "z": 2, "facing": 3, "hp": 96, "in_control": True},
+        quality=quality,
+        to_state_sha256="abc",
+    )
+    assert payload is not None
+    assert payload["contract"]["joypad_tape"] is True
+    assert payload["joypad_bits"] == [1, 0, 4]
+    assert payload["joypad_frames"] == 3
 
 
 def test_normalize_pads_missing_speed_with_sentinel() -> None:

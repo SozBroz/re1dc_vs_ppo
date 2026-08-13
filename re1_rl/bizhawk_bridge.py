@@ -502,6 +502,25 @@ class BizHawkClient:
     def set_speed(self, percent: int) -> None:
         self._request({"cmd": "speed", "percent": int(percent)})
 
+    def tape_enable(self, on: bool = True) -> None:
+        self._request({"cmd": "tape_enable", "on": bool(on)})
+
+    def tape_clear(self) -> None:
+        self._request({"cmd": "tape_clear"})
+
+    def tape_dump(self) -> list[int]:
+        resp = self._request({"cmd": "tape_dump"})
+        raw = resp.get("frames") or []
+        if not isinstance(raw, list):
+            return []
+        out: list[int] = []
+        for item in raw:
+            try:
+                out.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        return out
+
     def set_invisible(self, on: bool) -> None:
         """Toggle BizHawk invisible emulation (no rendering; max speed)."""
         self._request({"cmd": "invisible", "on": bool(on)})

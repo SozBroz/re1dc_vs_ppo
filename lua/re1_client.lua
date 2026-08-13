@@ -273,10 +273,48 @@ local BUTTON_MAP = {
     l2 = "P1 L2",
 }
 
+-- TAS-grade per-frame joypad tape (YouTube / pixel-perfect replay).
+-- Bit 0 = up, then down, left, right, cross, triangle, square, circle,
+-- start, select, r1, l1, r2, l2. Must match re1_rl.leg_replay.JOYPAD_BUTTON_ORDER.
+local TAPE_ON = false
+local TAPE_FRAMES = {}
+local LAST_BTN = {}
+local TAPE_BUTTON_ORDER = {
+    "up", "down", "left", "right",
+    "cross", "triangle", "square", "circle",
+    "start", "select", "r1", "l1", "r2", "l2",
+}
+
+local function pack_buttons(btn)
+    local bits = 0
+    local p = 1
+    btn = btn or {}
+    for i = 1, #TAPE_BUTTON_ORDER do
+        if btn[TAPE_BUTTON_ORDER[i]] == true then
+            bits = bits + p
+        end
+        p = p * 2
+    end
+    return bits
+end
+
+local function tape_record(btn)
+    if not TAPE_ON then
+        return
+    end
+    TAPE_FRAMES[#TAPE_FRAMES + 1] = pack_buttons(btn)
+end
+
+local function emu_advance()
+    tape_record(LAST_BTN)
+    emu.frameadvance()
+end
+
 local function apply_buttons(btn)
+    LAST_BTN = btn or {}
     local out = {}
     for friendly, core_name in pairs(BUTTON_MAP) do
-        out[core_name] = btn[friendly] == true
+        out[core_name] = LAST_BTN[friendly] == true
     end
     joypad.set(out)
 end
@@ -499,7 +537,7 @@ local function handle_command(cmd)
         local n = cmd.n or 1
         for _ = 1, n do
             apply_patches()
-            emu.frameadvance()
+            emu_advance()
         end
         return { ok = true, frame = emu.framecount() }
 
@@ -571,7 +609,7 @@ local function handle_command(cmd)
                 apply_buttons(legacy_btn)
             end
             apply_patches()
-            emu.frameadvance()
+            emu_advance()
             if echo then
                 local j = joypad.get()
                 local held = {}
@@ -746,7 +784,7 @@ local function handle_command(cmd)
                 end
                 apply_buttons(btn)
                 apply_patches(true)
-                emu.frameadvance()
+                emu_advance()
                 burned = burned + 1
                 saw_positive_hp, death_abort, last_hp = apply_hp_floor_check(
                     hp_off, hp_floor, hp_floor_chip_max, abort_on_zero_hp,
@@ -873,6 +911,21 @@ local function handle_command(cmd)
 
     elseif op == "quit" then
         return { ok = true, bye = true }
+
+    elseif op == "tape_enable" then
+        TAPE_ON = cmd.on == true
+        return { ok = true, on = TAPE_ON, n = #TAPE_FRAMES }
+
+    elseif op == "tape_clear" then
+        TAPE_FRAMES = {}
+        return { ok = true, n = 0 }
+
+    elseif op == "tape_dump" then
+        return {
+            ok = true,
+            n = #TAPE_FRAMES,
+            frames = setmetatable(TAPE_FRAMES, { __jsontype = "array" }),
+        }
 
     else
         return { ok = false, error = "unknown cmd: " .. tostring(op) }
