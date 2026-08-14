@@ -117,7 +117,9 @@ def cell_timeout_frames(
         return 0
     fps = int(table.get("fps") or _FPS)
     cap = int(table.get("cap_frames") or _CAP_FRAMES)
-    if bool(row.get("hard")):
+    if row.get("multiplier") is not None:
+        mult = float(row["multiplier"])
+    elif bool(row.get("hard")):
         mult = float(table.get("hard_multiplier") or _HARD_MULT)
     elif bool(row.get("cutscene")):
         mult = float(table.get("cutscene_multiplier") or _CUTSCENE_MULT)

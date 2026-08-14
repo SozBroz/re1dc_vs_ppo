@@ -51,9 +51,17 @@ def test_cp_budgets_match_imperator_multipliers() -> None:
     assert cell_timeout_frames(8, ROOT) == 6175  # 25.73s * 4 hard
     assert cell_timeout_frames(9, ROOT) == 25680  # 1:47 * 4 hard
     assert cell_timeout_frames(18, ROOT) == 2513  # 20.94s * 2
-    assert cell_timeout_frames(19, ROOT) == 0
+    assert cell_timeout_frames(19, ROOT) == 20154  # 1:07.18 * 5 (2.5x buffer)
+    assert cell_timeout_frames(20, ROOT) == 2797  # 23.31s * 2
+    assert cell_timeout_frames(25, ROOT) == 21240  # 3:56 * 1.5 cutscene
+    assert cell_timeout_frames(27, ROOT) == 20242  # 1:24.34 * 4 hard
+    assert cell_timeout_frames(34, ROOT) == 4234  # 35.28s * 2
+    assert cell_timeout_frames(35, ROOT) == 0
     assert cell_timeout_frames(8, ROOT) < CAP
     assert cell_timeout_frames(9, ROOT) < CAP
+    assert cell_timeout_frames(19, ROOT) < CAP
+    assert cell_timeout_frames(25, ROOT) < CAP
+    assert cell_timeout_frames(27, ROOT) < CAP
 
 
 def test_created_index_is_seq_minus_one() -> None:
