@@ -234,6 +234,28 @@ local function apply_patches(force_turbo)
     end
 end
 
+-- Must match re1_rl.memory_map + ram_skip.scene_active / message_open.
+-- Recording's fast_forward uses apply_patches(true) on these spans; tape_play
+-- must do the same or in-control scripted scenes (bar examine, Kenneth) play
+-- at 1x while the tape still holds only the turbo-length Cross mash.
+local TAPE_GAME_MODE = 0x800C3003
+local TAPE_IN_CONTROL_MASK = 0x80
+local TAPE_MESSAGE_FLAG = 0x800C8665
+local TAPE_MESSAGE_MASK = 0x80
+local TAPE_SCENE_FLAG = 0x800C3002
+local TAPE_SCENE_BIT = 0x10
+
+local function tape_skip_force_turbo()
+    local mode = memory.readbyte(ps1_to_mainram(TAPE_GAME_MODE), "MainRAM")
+    local in_control = math.floor(mode / TAPE_IN_CONTROL_MASK) % 2 == 1
+    local msg = memory.readbyte(ps1_to_mainram(TAPE_MESSAGE_FLAG), "MainRAM")
+    local msg_open = math.floor(msg / TAPE_MESSAGE_MASK) % 2 == 1
+    local scene = memory.readbyte(ps1_to_mainram(TAPE_SCENE_FLAG), "MainRAM")
+    local scene_active = (math.floor(scene / TAPE_SCENE_BIT) % 2 == 1)
+        or (math.floor(scene % 128) ~= 0)
+    return (not in_control) or msg_open or scene_active
+end
+
 -- client.invisibleemulation is absent in some BizHawk 2.11 builds; degrade to
 -- rendering the fast-forward rather than crashing the whole client loop.
 local function set_invisible(on)
@@ -926,6 +948,25 @@ local function handle_command(cmd)
             n = #TAPE_FRAMES,
             frames = setmetatable(TAPE_FRAMES, { __jsontype = "array" }),
         }
+
+    elseif op == "tape_play" then
+        local frames = cmd.frames or {}
+        local n = #frames
+        for i = 1, n do
+            local bits = tonumber(frames[i]) or 0
+            local btn = {}
+            local p = 1
+            for b = 1, #TAPE_BUTTON_ORDER do
+                if math.floor(bits / p) % 2 == 1 then
+                    btn[TAPE_BUTTON_ORDER[b]] = true
+                end
+                p = p * 2
+            end
+            apply_buttons(btn)
+            apply_patches(tape_skip_force_turbo())
+            emu_advance()
+        end
+        return { ok = true, n = n, frame = emu.framecount() }
 
     else
         return { ok = false, error = "unknown cmd: " .. tostring(op) }

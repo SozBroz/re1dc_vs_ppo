@@ -508,6 +508,13 @@ class BizHawkClient:
     def tape_clear(self) -> None:
         self._request({"cmd": "tape_clear"})
 
+    def tape_play(self, frames: list[int]) -> int:
+        bits = [max(0, int(b)) & 0xFFFF for b in frames]
+        if not bits:
+            return 0
+        resp = self._request({"cmd": "tape_play", "frames": bits})
+        return int(resp.get("n") or 0)
+
     def tape_dump(self) -> list[int]:
         resp = self._request({"cmd": "tape_dump"})
         raw = resp.get("frames") or []

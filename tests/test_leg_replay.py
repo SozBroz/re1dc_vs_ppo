@@ -206,6 +206,16 @@ def test_payload_includes_joypad_bits_when_bridge_dumps() -> None:
     assert payload["joypad_frames"] == 3
 
 
+def test_joypad_replay_keeps_engine_patches_and_skip_turbo() -> None:
+    """cp13 stayed in 10F when joypad replay omitted door-skip/turbo writes."""
+    root = Path(__file__).resolve().parents[1]
+    lua = (root / "lua" / "re1_client.lua").read_text(encoding="utf-8")
+    replay = (root / "scripts" / "replay_leg.py").read_text(encoding="utf-8")
+    assert "apply_patches(tape_skip_force_turbo())" in lua
+    assert "TAPE_SCENE_FLAG = 0x800C3002" in lua
+    assert "turbo_patches=True" in replay
+
+
 def test_normalize_pads_missing_speed_with_sentinel() -> None:
     q = normalize_quality((96, 40, 0, 8, 1, 0, 0))
     assert len(q) == 8
