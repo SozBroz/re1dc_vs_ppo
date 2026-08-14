@@ -72,7 +72,7 @@ def _planner(start_index: int = 0) -> WaypointPlanner:
     )
 
 
-def _settle(progress: ProgressTracker, room: str, steps: int = 30) -> None:
+def _settle(progress: ProgressTracker, room: str, steps: int = 2) -> None:
     """Accumulate in-control dwell required by cutscene/door settle gates."""
     for _ in range(int(steps)):
         progress.record_in_control_step(room, True)
@@ -304,7 +304,7 @@ def test_rails_nav_crumbs_keep_full_exploration_magnitudes() -> None:
     )
     assert bd["new_room"] == pytest.approx(4.0)
     assert bd["wrong_room"] == 0.0
-    assert bd["checkpoint_success"] == 0.0  # needs cutscene + settle
+    assert bd["checkpoint_success"] == pytest.approx(RAILS_CHECKPOINT_REWARD)
 
 
 def test_checkpoint_key_item_already_held_pays_terminal_reward() -> None:
@@ -329,16 +329,14 @@ def test_checkpoint_key_item_already_held_pays_terminal_reward() -> None:
 
 
 def test_barry_hall_return_is_203_to_106_path_only() -> None:
-    """cp05: main-hall needs 106: settle; return from 203 needs control dwell."""
+    """cp05: return from 203 is room_enter_from only (no in-control dwell)."""
     first_entry = _planner(start_index=3)
     hall = ProgressTracker()
     hall.observe_cutscene("106:1:s0")
-    _settle(hall, "106", steps=45)
     assert first_entry.advance_if_success(_state("106"), progress=hall)
 
     return_entry = _planner(start_index=5)
     ret = ProgressTracker()
-    _settle(ret, "106")
     assert return_entry.advance_if_success(
         _state("106"),
         progress=ret,
@@ -347,7 +345,6 @@ def test_barry_hall_return_is_203_to_106_path_only() -> None:
 
     wrong_return = _planner(start_index=5)
     bad = ProgressTracker()
-    _settle(bad, "106")
     assert not wrong_return.advance_if_success(
         _state("106"),
         progress=bad,
@@ -361,7 +358,6 @@ def test_barry_hall_return_pays_checkpoint_on_stairs_down() -> None:
     progress.seed_spawn_room("203")
     # Kenneth already paid so 203→106 is not the illegal pre-Kenneth hall gate.
     progress.observed_cutscenes.add("104:0:s0")
-    _settle(progress, "106")
     reward, bd = compute_reward(
         _state("203"),
         _state("106"),
@@ -382,7 +378,6 @@ def test_barry_hall_return_pays_checkpoint_on_stairs_down() -> None:
 def test_barry_hall_return_latches_203_entry_same_leg() -> None:
     planner = _planner(start_index=5)
     progress = ProgressTracker()
-    _settle(progress, "106")
 
     assert planner.advance_if_success(
         _state("106"),
@@ -397,7 +392,6 @@ def test_barry_hall_return_latches_203_entry_same_leg() -> None:
 def test_barry_hall_return_does_not_latch_wrong_from_room() -> None:
     planner = _planner(start_index=5)
     progress = ProgressTracker()
-    _settle(progress, "106")
 
     assert not planner.advance_if_success(
         _state("106"),
@@ -447,39 +441,96 @@ def test_cp39_leg_east_stairs_101_room_enter() -> None:
     assert planner.advance_if_success(_state("10B"), progress=progress)
 
 
-def test_kenneth_requires_cutscene_and_in_control_settle() -> None:
+def test_cp01_completes_on_tea_room_enter() -> None:
     planner = _planner(start_index=_idx("kenneth_104"))
-    bare = ProgressTracker()
-    assert not planner.advance_if_success(_state("104"), progress=bare)
+    progress = ProgressTracker()
+    assert not planner.advance_if_success(_state("105"), progress=progress)
+    assert planner.advance_if_success(_state("104"), progress=progress)
 
-    mid = ProgressTracker()
-    mid.observe_cutscene("104:0:s0")
-    assert not planner.advance_if_success(_state("104"), progress=mid)
 
-    ok = ProgressTracker()
-    ok.observe_cutscene("104:0:s0")
-    _settle(ok, "104", steps=45)
-    assert planner.advance_if_success(_state("104"), progress=ok)
+def test_cp01_capture_does_not_require_kenneth(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
+    bridge = MagicMock()
+    bridge.save_savestate.side_effect = (
+        lambda path: Path(path).write_bytes(b"state")
+    )
+    planner = _planner(start_index=_idx("kenneth_104") + 1)
+    env = SimpleNamespace(
+        project_root=tmp_path,
+        _stage={
+            "mode": "yawn_rails",
+            "cells_manifest": "states/yawn_rails/manifest.json",
+            "route_id": "test",
+        },
+        _planner=planner,
+        bridge=bridge,
+        _macro_active=False,
+        _progress=ProgressTracker(),
+        _step_count=300,
+        _read_state=lambda track_items=False: _state("104", inventory=["emblem"]),
+    )
+    monkeypatch.setattr(
+        "re1_rl.yawn_rails.dump_episode_sidecar",
+        lambda *_args, **_kwargs: {"schema_version": 1},
+    )
+    proposal = capture_successor_cell(
+        env,
+        _state("104", inventory=["emblem"]),
+        {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
+    )
+    assert proposal is not None
+    assert proposal["checkpoint_id"] == "kenneth_104"
+    assert proposal["checkpoint_index"] == 1
+
+
+def _barry_slots(*, beretta_qty: int = 15, spray: bool = True) -> list[tuple[str, int]]:
+    slots: list[tuple[str, int]] = [("knife", 1), ("beretta", int(beretta_qty))]
+    if spray:
+        slots.append(("first_aid_spray_alt", 1))
+    slots.append(("emblem", 1))
+    return slots
+
+
+def _barry_state(room: str, *, beretta_qty: int = 15, spray: bool = True) -> dict:
+    slots = _barry_slots(beretta_qty=beretta_qty, spray=spray)
+    return _state(room, inventory=[n for n, _ in slots], inventory_slots=slots)
 
 
 def test_pre_cutscene_room_dwell_does_not_satisfy_post_cutscene_settle() -> None:
-    """Barry/Kenneth success must settle AFTER the cinema, not from walk-up dwell."""
+    """Barry return still needs Kenneth; walk-up dwell alone does not complete."""
     planner = _planner(start_index=_idx("barry_return_105"))
     progress = ProgressTracker()
     progress.note_leg_room_transition("104", "105")
-    _settle(progress, "105", steps=90)  # walk-up before Barry return beat
-    progress.observe_cutscene("105:2:s1")
-    barry_inv = ["knife", "beretta", "first_aid_spray_alt", "emblem"]
+    _settle(progress, "105", steps=90)
     assert not planner.advance_if_success(
-        _state("105", inventory=barry_inv),
+        _barry_state("105"),
         progress=progress,
-        prev_state=_state("104", inventory=barry_inv),
+        prev_state=_barry_state("104"),
     )
-    _settle(progress, "105", steps=60)
+    progress.observe_cutscene("104:0:s0")
     assert planner.advance_if_success(
-        _state("105", inventory=barry_inv),
+        _barry_state("105"),
         progress=progress,
-        prev_state=_state("104", inventory=barry_inv),
+        prev_state=_barry_state("104"),
+    )
+
+
+def test_barry_return_requires_kenneth_cutscene() -> None:
+    planner = _planner(start_index=_idx("barry_return_105"))
+    progress = ProgressTracker()
+    progress.note_leg_room_transition("104", "105")
+    assert not planner.advance_if_success(
+        _barry_state("105"),
+        progress=progress,
+        prev_state=_barry_state("104"),
+    )
+    progress.observe_cutscene("104:0:s0")
+    assert planner.advance_if_success(
+        _barry_state("105"),
+        progress=progress,
+        prev_state=_barry_state("104"),
     )
 
 
@@ -487,41 +538,51 @@ def test_barry_return_requires_first_aid_spray() -> None:
     planner = _planner(start_index=_idx("barry_return_105"))
     progress = ProgressTracker()
     progress.note_leg_room_transition("104", "105")
-    progress.observe_cutscene("105:2:s1")
-    _settle(progress, "105", steps=60)
-    no_spray = ["knife", "beretta", "emblem"]
+    progress.observe_cutscene("104:0:s0")
     assert not planner.advance_if_success(
-        _state("105", inventory=no_spray),
+        _barry_state("105", spray=False),
         progress=progress,
-        prev_state=_state("104", inventory=no_spray),
+        prev_state=_barry_state("104", spray=False),
     )
-    with_spray = ["knife", "beretta", "first_aid_spray_alt", "emblem"]
     assert planner.advance_if_success(
-        _state("105", inventory=with_spray),
+        _barry_state("105"),
         progress=progress,
-        prev_state=_state("104", inventory=with_spray),
+        prev_state=_barry_state("104"),
+    )
+
+
+def test_barry_return_requires_exactly_15_handgun_ammo() -> None:
+    planner = _planner(start_index=_idx("barry_return_105"))
+    progress = ProgressTracker()
+    progress.note_leg_room_transition("104", "105")
+    progress.observe_cutscene("104:0:s0")
+    for qty in (14, 16, 0):
+        assert not planner.advance_if_success(
+            _barry_state("105", beretta_qty=qty),
+            progress=progress,
+            prev_state=_barry_state("104", beretta_qty=qty),
+        )
+    assert planner.advance_if_success(
+        _barry_state("105", beretta_qty=15),
+        progress=progress,
+        prev_state=_barry_state("104", beretta_qty=15),
     )
 
 
 def test_upper_hall_203_is_room_enter_settle_without_cutscene() -> None:
     """First climb to 203 has no cinema; cutscene gate would softlock cp04 forever."""
     planner = _planner(start_index=_idx("upper_hall_203"))
-    bare = ProgressTracker()
-    assert not planner.advance_if_success(_state("203"), progress=bare)
-    ok = ProgressTracker()
-    _settle(ok, "203", steps=30)
-    assert planner.advance_if_success(_state("203"), progress=ok)
+    assert planner.advance_if_success(_state("203"), progress=ProgressTracker())
 
 
 def test_main_hall_rejects_room_spoof_without_106_cutscene() -> None:
     planner = _planner(start_index=_idx("main_hall_106"))
     spoof = ProgressTracker()
-    _settle(spoof, "106", steps=45)
+    _settle(spoof, "106", steps=2)
     assert not planner.advance_if_success(_state("106"), progress=spoof)
 
     ok = ProgressTracker()
     ok.observe_cutscene("106:1:s0")
-    _settle(ok, "106", steps=45)
     assert planner.advance_if_success(_state("106"), progress=ok)
 
 
@@ -627,6 +688,23 @@ def test_shotgun_rescue_requires_reentry_shotgun_and_ceiling_cutscene() -> None:
     )
 
 
+def test_fresh_emblem_has_in_room_wayfinder() -> None:
+    """Fresh start is already in 105; compass must point at the wooden emblem."""
+    encoder = ObsEncoder(ROOMS, _graph(), curriculum_stage_index=1)
+    planner = _planner(start_index=0)
+    assert planner.current_objective()["checkpoint_id"] == "emblem_105"
+    assert planner.objective_type() == "pickup"
+    assert planner.next_waypoint_room() == "105"
+    # Dining spawn is west of the fireplace emblem (32700, 8300).
+    state = _state("105", inventory=["knife", "beretta"], x=18000, z=4000)
+    goal = encoder.encode_goal(state, planner)
+    assert goal[GOAL_IDX["in_target_room"]] == 1.0
+    assert goal[GOAL_IDX["obj_pickup"]] == 1.0
+    assert goal[GOAL_IDX["doors_available"]] == 1.0
+    assert goal[GOAL_IDX["door_distance"]] > 0.2
+    assert goal[GOAL_IDX["door_delta_x"]] > 0.0
+
+
 def test_goal_encodes_selected_one_leg_checkpoint() -> None:
     graph = _graph()
     encoder = ObsEncoder(ROOMS, graph, curriculum_stage_index=1)
@@ -684,7 +762,6 @@ def test_two_leg_episode_pays_each_checkpoint_and_resets_acquisitions() -> None:
     assert planner.waypoint_index == 1
 
     progress.observe_cutscene("104:kenneth")
-    _settle(progress, "104", steps=45)
     _, second = compute_reward(
         _state("105", inventory=["emblem"]),
         _state("104", inventory=["emblem"]),
@@ -1090,6 +1167,7 @@ def test_reset_pin_range_env_samples_inclusive_span(
         "route_steps": list(range(1, 45)),
     }
     monkeypatch.delenv("RE1_YAWN_RESET_PIN_INDEX", raising=False)
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_INCLUDE_FRESH", raising=False)
     monkeypatch.setenv("RE1_YAWN_RESET_PIN_RANGE", "27-37")
     starts: set[int] = set()
     for seed in range(80):
@@ -1099,6 +1177,66 @@ def test_reset_pin_range_env_samples_inclusive_span(
         assert 28 <= start <= 38
         starts.add(start)
     assert starts >= {28, 38}
+
+
+def test_reset_pin_range_include_fresh_mixes_init_and_range(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in (0, 3, 8, 18)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 45)),
+    }
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_INDEX", raising=False)
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_WEIGHTS", raising=False)
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_RANGE", "0-8")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_INCLUDE_FRESH", "1")
+    counts: dict[str, int] = {"fresh": 0, "cp00": 0, "cp03": 0, "cp08": 0, "other": 0}
+    for seed in range(4000):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        if opts["reset_source"] == "route_initial":
+            counts["fresh"] += 1
+            assert opts["route_start_index"] == 0
+            assert "pb_bundle" not in opts
+        else:
+            cell = int(opts["route_start_index"]) - 1
+            key = f"cp{cell:02d}"
+            counts[key if key in counts else "other"] += 1
+    assert counts["other"] == 0
+    total = sum(counts.values())
+    for key in ("fresh", "cp00", "cp03", "cp08"):
+        assert counts[key] / total == pytest.approx(0.25, abs=0.04), f"{key}={counts[key]}"
+
+
+def test_reset_pin_range_include_fresh_empty_range_is_fresh_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in (18, 40)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 45)),
+    }
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_INDEX", raising=False)
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_WEIGHTS", raising=False)
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_RANGE", "0-8")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_INCLUDE_FRESH", "1")
+    for seed in range(40):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        assert opts["reset_source"] == "route_initial"
+        assert opts["route_start_index"] == 0
+        assert "pb_bundle" not in opts
 
 
 def test_reset_pin_range_latest_mix_samples_floor_and_latest(
@@ -1605,6 +1743,40 @@ def test_terminal_yawn_moon_capture_proposes_cp96(
     assert bridge.save_savestate.called
 
 
+def test_orphan_disk_meta_is_not_incumbent(tmp_path: Path) -> None:
+    from re1_rl.yawn_rails_sync import (
+        CELL_META_NAME,
+        _existing_cell_quality,
+        yawn_rails_root,
+    )
+
+    yr = yawn_rails_root(tmp_path)
+    slot = yr / "cells" / "cp00"
+    slot.mkdir(parents=True)
+    (slot / CELL_META_NAME).write_text(
+        json.dumps({"quality": [96, 45, 100, 4, 1, 0, -30, -99999999]}),
+        encoding="utf-8",
+    )
+    assert _existing_cell_quality(yr, 0) is None
+    (yr / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "cells": [
+                    {
+                        "checkpoint_index": 0,
+                        "quality": [96, 45, 100, 4, 1, 0, -30, -12],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    q = _existing_cell_quality(yr, 0)
+    assert q is not None
+    assert q[7] == -12
+
+
 def test_local_cas_installs_better_and_rejects_worse(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -2015,7 +2187,7 @@ def test_capture_settles_item_menu_before_skip(
     assert "shotgun_116" in out
 
 
-def test_barry_return_capture_requires_105_2_s1(
+def test_barry_return_capture_requires_kenneth(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
@@ -2027,7 +2199,7 @@ def test_barry_return_capture_requires_105_2_s1(
     )
     planner = _planner(start_index=_idx("barry_return_105") + 1)
     progress = ProgressTracker()
-    progress.observed_cutscenes.add("104:0:s0")  # Kenneth only — missing return beat
+    progress.observed_cutscenes.add("105:2:s1")  # Barry beat only — missing Kenneth
     env = SimpleNamespace(
         project_root=tmp_path,
         _stage={
@@ -2056,7 +2228,7 @@ def test_barry_return_capture_requires_105_2_s1(
     )
     bridge.save_savestate.assert_not_called()
 
-    progress.observed_cutscenes.add("105:2:s1")
+    progress.observed_cutscenes.add("104:0:s0")
     monkeypatch.setattr(
         "re1_rl.yawn_rails.dump_episode_sidecar",
         lambda *_args, **_kwargs: {

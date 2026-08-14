@@ -323,6 +323,28 @@ class WaypointPlanner:
             inv = {canonical_item(str(x)) for x in state.get("inventory", [])}
             want = canonical_item(str(cond.get("item", "")))
             return bool(want) and want in inv
+        if cond_type == "inventory_ammo_exact":
+            try:
+                want = int(cond.get("qty"))
+            except (TypeError, ValueError):
+                return False
+            slots = state.get("inventory_slots")
+            if slots is None:
+                return False
+            from re1_rl.ammo_accounting import (
+                inventory_slots_to_id_qty,
+                total_fireable_ammo,
+            )
+
+            weapon = canonical_item(
+                str(cond.get("weapon") or cond.get("item") or "beretta")
+            )
+            wid = next(
+                (iid for iid, name in ITEM_IDS.items() if name == weapon),
+                0x02,
+            )
+            got = total_fireable_ammo(inventory_slots_to_id_qty(slots), wid)
+            return got == want
         if cond_type == "lacks_item":
             inv = {canonical_item(str(x)) for x in state.get("inventory", [])}
             want = canonical_item(str(cond.get("item", "")))

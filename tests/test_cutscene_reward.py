@@ -263,6 +263,36 @@ def test_room_paired_cutscene_pays_once() -> None:
     assert "105:2" in progress.rewarded_cutscenes
 
 
+def test_door_paired_same_room_key_is_not_kenneth() -> None:
+    """Tea-room door settle mints 104:0:s0 with new_room pairing; that is not Kenneth."""
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    prev = make_state(room="105", cam_id=2, hp=96)
+    cur = make_state(
+        room="104",
+        cam_id=0,
+        hp=96,
+        cutscene_key="104:0:s0",
+        cutscene_paired_new_room=True,
+    )
+    _, bd = compute_reward(
+        prev, cur, make_planner(), progress=progress, return_breakdown=True
+    )
+    assert bd["new_room"] > 0.0
+    assert bd["new_cutscene"] == 0.0
+    assert "104:0:s0" not in progress.observed_cutscenes
+    assert "104:0:s0" not in progress.rewarded_cutscenes
+    assert not kenneth_cutscene_seen(progress.observed_cutscenes | progress.rewarded_cutscenes)
+
+    real = make_state(room="104", cam_id=0, hp=96, cutscene_key="104:0:s0")
+    _, after = compute_reward(
+        cur, real, make_planner(), progress=progress, return_breakdown=True
+    )
+    assert after["new_cutscene"] == 0.0
+    assert "104:0:s0" in progress.observed_cutscenes
+    assert kenneth_cutscene_seen(progress.observed_cutscenes)
+
+
 def test_illegal_main_hall_gate_irreversibly_disables_positive_rewards() -> None:
     assert illegal_main_hall_before_kenneth_transition(
         "105", "106", rewarded_cutscenes=set()

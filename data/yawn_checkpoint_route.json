@@ -27,37 +27,24 @@
     "seq": 2,
     "checkpoint_id": "kenneth_104",
     "room_id": "104",
-    "objective": "Reach the Tea Room and trigger Kenneth",
+    "objective": "Enter the Tea Room",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
-      "type": "all_of",
-      "conditions": [
-        {
-          "type": "room_enter",
-          "room_id": "104"
-        },
-        {
-          "type": "observed_cutscene",
-          "prefix": "104:"
-        },
-        {
-          "type": "in_control_steps_since_cutscene",
-          "prefix": "104:",
-          "room_id": "104",
-          "min_steps": 45
-        }
-      ]
+      "type": "room_enter",
+      "room_id": "104"
     }
   },
   {
     "seq": 3,
     "checkpoint_id": "barry_return_105",
     "room_id": "105",
-    "objective": "Return to Barry in Dining",
+    "objective": "Enter Dining after Kenneth, still holding First Aid Spray",
     "action_type": "navigate",
-    "required_items": [],
+    "required_items": [
+      "first_aid_spray_alt"
+    ],
     "items_gained": [],
     "success_condition": {
       "type": "all_of",
@@ -71,13 +58,16 @@
         },
         {
           "type": "observed_cutscene",
-          "prefix": "105:2:s1"
+          "prefix": "104:"
         },
         {
-          "type": "in_control_steps_since_cutscene",
-          "prefix": "105:2:s1",
-          "room_id": "105",
-          "min_steps": 60
+          "type": "has_item",
+          "item": "first_aid_spray_alt"
+        },
+        {
+          "type": "inventory_ammo_exact",
+          "weapon": "beretta",
+          "qty": 15
         }
       ]
     }
@@ -100,12 +90,6 @@
         {
           "type": "observed_cutscene",
           "prefix": "106:"
-        },
-        {
-          "type": "in_control_steps_since_cutscene",
-          "prefix": "106:",
-          "room_id": "106",
-          "min_steps": 45
         }
       ]
     }
@@ -119,18 +103,8 @@
     "required_items": [],
     "items_gained": [],
     "success_condition": {
-      "type": "all_of",
-      "conditions": [
-        {
-          "type": "room_enter",
-          "room_id": "203"
-        },
-        {
-          "type": "in_control_steps_in_room",
-          "room_id": "203",
-          "min_steps": 30
-        }
-      ]
+      "type": "room_enter",
+      "room_id": "203"
     }
   },
   {
@@ -142,20 +116,10 @@
     "required_items": [],
     "items_gained": [],
     "success_condition": {
-      "type": "all_of",
-      "conditions": [
-        {
-          "type": "room_enter_from",
-          "room_id": "106",
-          "from_room_ids": [
-            "203"
-          ]
-        },
-        {
-          "type": "in_control_steps_in_room",
-          "room_id": "106",
-          "min_steps": 30
-        }
+      "type": "room_enter_from",
+      "room_id": "106",
+      "from_room_ids": [
+        "203"
       ]
     }
   },

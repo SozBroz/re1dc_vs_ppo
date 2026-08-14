@@ -813,7 +813,12 @@ def _actor_process(
                 # Chosen before action; fixed until episode done.
                 req["mod_drop_mask"] = mod_drop_state.masks[0].copy()
             _diag_env = getattr(getattr(env, "unwrapped", env), "_step_diag", None)
-            if memlog_telemetry is not None or _diag_env is not None:
+            _footage_env = getattr(getattr(env, "unwrapped", env), "_footage_trace", None)
+            if (
+                memlog_telemetry is not None
+                or _diag_env is not None
+                or _footage_env is not None
+            ):
                 req["want_policy_diagnostics"] = True
             conn.send(req)
             msg = conn.recv()
@@ -842,6 +847,19 @@ def _actor_process(
             except (AttributeError, TypeError, ValueError):
                 pass
             obs, rew, done, trunc, info = env.step(action)
+            if _footage_env is not None:
+                try:
+                    _footage_env.append(
+                        action=action,
+                        action_mask=masks_before
+                        if masks_before is not None
+                        else np.ones(int(env.action_space.n), dtype=bool),
+                        masked_probs=msg.get("masked_probs"),
+                        policy_version=int(msg.get("policy_version", 0) or 0),
+                        n_actions=int(env.action_space.n),
+                    )
+                except (TypeError, ValueError, AttributeError):
+                    pass
             if memlog_telemetry is not None and memlog_control is not None:
                 telemetry_mask = masks_before
                 if telemetry_mask is None:

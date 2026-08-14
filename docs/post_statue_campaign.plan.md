@@ -107,9 +107,7 @@ No slots left for **ammo stacks** unless something is deposited.
 |----------|-------------------|--------------------|------------------------|-------------|---------------------------|----------------------|---------|
 | **cp18** | `l_passage_enter_108` → `ammo_108` | Clear L Passage; **cp19 picks up +15 clip** | **~10** | **+5** | **−4** | **+9 overspend** | Fixable — should be a small net gain, not a loss |
 | **cp26** | `back_passage_10A` → `crow_gallery_enter_117` | Kill **2** hallway zombies | **14** (2×7) | **−14** | **−6** | Bogus — **killed neither zombie**; cliff is noise | **Recapture / ignore**; do not trust ripple from here |
-| **cp36** | `back_passage_return_10A` → `courtyard_enter_11A` | (nav after crest) — only a fight if cp26 stretch was real | — | — | **−6** | — | **Should not be a fight anchor** (cp26 bogus) |
 | **cp37** | `courtyard_enter_11A` → `crest_gate_11A` | Handgun cleanup entering courtyard | **~5** | **−5** | **−31** | **~+26 overspend** | Major handgun spray |
-| **cp39** | `back_passage_post_crest_10A` → `east_stairs_101` | Return through 10A after gate | modest | modest | **−14** | — | **Should not be a fight anchor** (cp26 bogus) |
 | **cp40** | `east_stairs_101` → `storeroom_enter_118` | **1 zombie** en route to storeroom | **7** | **−7** | — | — | New fight anchor |
 | **cp44** | `east_stairs_201` → `c_passage_204` | **2 zombies** on stairwell threat | **14** (2×7) | **−14** | **−31** | **~+17 overspend** | Using **31 beretta**, not 2×7 |
 | **cp45** | `c_passage_204` → `upper_hall_enter_203` | **2 zombies** — starved but doable | **14** (2×7) | **−14** | **−22** | **~+8 overspend** | Burning **22 beretta** instead of 14 |

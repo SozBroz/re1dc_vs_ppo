@@ -22,6 +22,7 @@ from re1_rl.item_box_ui_macro import (
 )
 from re1_rl.yawn_box_prep_checkpoint import (
     WIND_CREST_ITEM_ID,
+    YAWN_BOX_PREP_CHECKPOINT_ID,
     yawn_box_prep_capture_ready,
 )
 
@@ -180,11 +181,27 @@ def test_u5_118_full_pack_only_crest_depositable() -> None:
         6: SHOTGUN_SHELLS_ID,
     }
     for slot, iid in illegal.items():
-        assert not is_deposit_allowed_item(iid, "118")
-        ok, reason = can_deposit(inv, box, slot, room_id="118", enforce_allowlist=True)
+        assert not is_deposit_allowed_item(
+            iid, "118", checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID
+        )
+        ok, reason = can_deposit(
+            inv,
+            box,
+            slot,
+            room_id="118",
+            checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID,
+            enforce_allowlist=True,
+        )
         assert not ok, f"slot {slot} id=0x{iid:02x} should be illegal"
         assert reason in {"not_allowlisted", "key_item"}
-    ok7, why7 = can_deposit(inv, box, 7, room_id="118", enforce_allowlist=True)
+    ok7, why7 = can_deposit(
+        inv,
+        box,
+        7,
+        room_id="118",
+        checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID,
+        enforce_allowlist=True,
+    )
     assert ok7 and why7 == ""
 
 

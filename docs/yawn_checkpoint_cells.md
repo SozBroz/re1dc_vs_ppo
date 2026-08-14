@@ -11,8 +11,8 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | Cell | Seq | Checkpoint ID | Room | Action | Objective |
 |------|-----|---------------|------|--------|-----------|
 | `cp00` | 1 | `emblem_105` | `105` | pickup | Pick up the wooden emblem |
-| `cp01` | 2 | `kenneth_104` | `104` | navigate | Reach the Tea Room and trigger Kenneth |
-| `cp02` | 3 | `barry_return_105` | `105` | navigate | Return to Barry in Dining |
+| `cp01` | 2 | `kenneth_104` | `104` | navigate | Enter the Tea Room |
+| `cp02` | 3 | `barry_return_105` | `105` | navigate | Enter Dining after Kenneth, still holding First Aid Spray |
 | `cp03` | 4 | `main_hall_106` | `106` | navigate | Reach Main Hall after Kenneth |
 | `cp04` | 5 | `upper_hall_203` | `203` | navigate | Climb to Main Hall 2F |
 | `cp05` | 6 | `barry_hall_return_106` | `106` | navigate | Return from Main Hall 2F (203) back to Main Hall 1F (106) |
@@ -99,7 +99,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp86` | 87 | `east_stairs_201_post_richard` | `207` | navigate | Reach East Stairway 2F after Richard |
 | `cp87` | 88 | `east_stairs_101_post_richard` | `10B` | navigate | Descend East Stairway after Richard |
 | `cp88` | 89 | `yawn_box_enter_118` | `118` | navigate | Enter the storeroom for Yawn box prep |
-| `cp89` | 90 | `yawn_box_prep_118` | `118` | navigate | Deposit wind crest, withdraw guns/ammo, leave 118 to 10B |
+| `cp89` | 90 | `yawn_box_prep_118` | `118` | navigate | Deposit wind crest, withdraw guns/ammo from the box, then leave to East Stairway |
 | `cp90` | 91 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
 | `cp91` | 92 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
 | `cp92` | 93 | `moon_hall_enter_20D` | `20D` | navigate | Enter the east wing hallway for attic ammo |
@@ -127,29 +127,27 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `104` (TEA ROOM)
 - **Action:** `navigate`
-- **Objective:** Reach the Tea Room and trigger Kenneth
+- **Objective:** Enter the Tea Room
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **104**. Navigate until the success condition fires.
 - **Success condition:**
-- **all of:**
-  - Enter room `104`
-  - Observe cutscene with prefix `104:`
-  - Stay in-control in `104` for **45** steps **after** cutscene `104:`
+- Enter room `104`
 
 ### `cp02` — `barry_return_105` (seq 3)
 
 - **Room:** `105` (DINING ROOM)
 - **Action:** `navigate`
-- **Objective:** Return to Barry in Dining
-- **Required items:** _(none)_
+- **Objective:** Enter Dining after Kenneth, still holding First Aid Spray
+- **Required items:** `first_aid_spray_alt`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **105**. Navigate until the success condition fires.
+- **How to achieve:** Be in / reach **105**. Hold: `first_aid_spray_alt`. Beretta fireable ammo (clip + spare) must be exactly **15**. Navigate until the success condition fires.
 - **Success condition:**
 - **all of:**
   - Enter room `105` from `104`
-  - Observe cutscene with prefix `105:2:s1`
-  - Stay in-control in `105` for **60** steps **after** cutscene `105:2:s1`
+  - Observe cutscene with prefix `104:`
+  - Have item `first_aid_spray_alt` in inventory
+  - Inventory beretta ammo exactly 15
 
 ### `cp03` — `main_hall_106` (seq 4)
 
@@ -163,7 +161,6 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **all of:**
   - Enter room `106`
   - Observe cutscene with prefix `106:`
-  - Stay in-control in `106` for **45** steps **after** cutscene `106:`
 
 ### `cp04` — `upper_hall_203` (seq 5)
 
@@ -174,9 +171,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
 - **Success condition:**
-- **all of:**
-  - Enter room `203`
-  - Stay in-control in `203` for **30** steps
+- Enter room `203`
 
 ### `cp05` — `barry_hall_return_106` (seq 6)
 
@@ -187,9 +182,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **106**. Navigate until the success condition fires.
 - **Success condition:**
-- **all of:**
-  - Enter room `106` from `203`
-  - Stay in-control in `106` for **30** steps
+- Enter room `106` from `203`
 
 ### `cp06` — `dining_return_105` (seq 7)
 
@@ -1148,15 +1141,12 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `118` (STAIRS UNDER ROOM)
 - **Action:** `navigate`
-- **Objective:** Deposit `wind_crest`, withdraw guns/ammo from the item box (knife ok), then leave to East Stairway `10B`
+- **Objective:** Deposit wind crest, withdraw guns/ammo from the box, then leave to East Stairway
 - **Required items:** `shield_key`, `shotgun`
 - **Items gained:** _(none)_
-- **Consume before gain:** `wind_crest` (must be deposited in the item box, not on person)
-- **How to achieve:** Be in **118**. Hold: `shield_key`, `shotgun`. Use the item box to deposit `wind_crest` and withdraw guns/ammo. Leave to **10B** with the box clean.
+- **How to achieve:** Be in / reach **118**. Hold: `shield_key`, `shotgun`. Navigate until the success condition fires.
 - **Success condition:**
-- `yawn_box_prep_exit`: leave `118` into `10B` holding `armor_key` + `shield_key` and the guns/ammo (`beretta`, `shotgun`, `bazooka_acid`, `handgun_bullets`, `shotgun_shells`, `acid_rounds`); `wind_crest` in the box (not on person); no guns/ammo in the box (knife allowed). Lab timer is not a gate.
-- Leaving `118` without those box conditions still ends the episode as `wrong_room`
-- Captured cell sits in `10B`. Next checkpoint is climb to `207` (`east_stairs_201_to_yawn`). There is no second enter-`10B` step.
+- (yawn_box_prep_exit) `{"type": "yawn_box_prep_exit"}`
 
 ### `cp90` — `east_stairs_201_to_yawn` (seq 91)
 

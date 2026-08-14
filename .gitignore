@@ -21,6 +21,9 @@ recordings/
 states/*.state
 states/checkpoints/*.State
 
+# YouTube / research footage traces (obs + policy + audio)
+data/footage/
+
 # Checkpoints & training artifacts (never commit weights)
 data/checkpoints/
 data/*.zip

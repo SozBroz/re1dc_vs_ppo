@@ -185,7 +185,14 @@ def cell_slot_dir(root: Path | str, checkpoint_index: int) -> Path:
 
 
 def _existing_cell_quality(root: Path, checkpoint_index: int) -> tuple[int, ...] | None:
-    """Best-effort quality for an installed cell (manifest row, else meta)."""
+    """Quality for a cell listed in the store or manifest.
+
+    Leftover ``cpNN/meta.json`` with no store/manifest row is not an incumbent.
+    Those orphans used to make every later capture ``LOSE_TO_INCUMBENT`` without
+    ever being sampled.
+    """
+    idx = int(checkpoint_index)
+    listed = False
     man_p = Path(root) / MANIFEST_FILENAME
     if man_p.is_file():
         try:
@@ -198,13 +205,41 @@ def _existing_cell_quality(root: Path, checkpoint_index: int) -> tuple[int, ...]
             if not isinstance(row, dict):
                 continue
             try:
-                if int(row["checkpoint_index"]) != int(checkpoint_index):
+                if int(row["checkpoint_index"]) != idx:
                     continue
             except (KeyError, TypeError, ValueError):
                 continue
+            listed = True
             q = _as_quality(row.get("quality"))
             if q is not None:
                 return q
+            break
+    store_p = Path(root) / STORE_FILENAME
+    if store_p.is_file():
+        try:
+            raw = json.loads(store_p.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError):
+            raw = {}
+        cells = raw.get("cells") or {}
+        row = None
+        if isinstance(cells, dict):
+            row = cells.get(str(idx), cells.get(idx))
+        elif isinstance(cells, list):
+            for item in cells:
+                if isinstance(item, dict):
+                    try:
+                        if int(item.get("checkpoint_index", -1)) == idx:
+                            row = item
+                            break
+                    except (TypeError, ValueError):
+                        continue
+        if isinstance(row, dict):
+            listed = True
+            q = _as_quality(row.get("quality"))
+            if q is not None:
+                return q
+    if not listed:
+        return None
     meta_p = cell_slot_dir(root, checkpoint_index) / CELL_META_NAME
     if meta_p.is_file():
         try:
@@ -382,22 +417,6 @@ def try_install_yawn_cell(
             shutil.rmtree(incoming, ignore_errors=True)
             return False
 
-        man_p = root / MANIFEST_FILENAME
-        if man_p.is_file():
-            try:
-                from re1_rl.win_fs_retry import read_text_retry
-
-                man = json.loads(read_text_retry(man_p, encoding="utf-8-sig"))
-            except (OSError, json.JSONDecodeError):
-                man = {"schema_version": 1, "cells": []}
-        else:
-            man = {"schema_version": 1, "cells": []}
-        cells = [
-            old
-            for old in (man.get("cells") or [])
-            if isinstance(old, dict)
-            and int(old.get("checkpoint_index", -999)) != idx
-        ]
         install_row = dict(row)
         install_row["checkpoint_index"] = idx
         install_row["quality"] = list(new_q)
@@ -409,16 +428,12 @@ def try_install_yawn_cell(
             "sidecar_path",
             f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}",
         )
-        cells.append(install_row)
-        man["cells"] = sorted(cells, key=lambda x: int(x["checkpoint_index"]))
+        store = YawnRailsCellStore(root)
+        store.cells[idx] = dict(install_row)
         if install_row.get("route_id"):
-            man["route_id"] = install_row["route_id"]
-        man["archive_version"] = int(man.get("archive_version", 0) or 0) + 1
-        tmp = man_p.with_suffix(f".{os.getpid()}.tmp")
-        tmp.write_text(json.dumps(man, indent=2) + "\n", encoding="utf-8")
-        from re1_rl.win_fs_retry import replace_retry
-
-        replace_retry(tmp, man_p)
+            store.route_id = str(install_row["route_id"])
+        store.archive_version = int(store.archive_version or 0) + 1
+        store._persist_unlocked()
         try:
             from re1_rl.yawn_rails_payforward import notify_payforward_install
 
@@ -426,10 +441,9 @@ def try_install_yawn_cell(
                 Path(project_root),
                 installed_index=idx,
                 cells=[
-                    r
-                    for r in (man.get("cells") or [])
-                    if isinstance(r, dict)
-                    and int(r.get("checkpoint_index", -1)) >= 18
+                    dict(r, checkpoint_index=i)
+                    for i, r in store.cells.items()
+                    if int(i) >= 18
                 ],
             )
         except (OSError, ValueError, TypeError, KeyError):

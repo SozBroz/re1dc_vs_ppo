@@ -362,6 +362,7 @@ _RESET_PIN_RANGE_ENV = "RE1_YAWN_RESET_PIN_RANGE"
 _RESET_PIN_SET_ENV = "RE1_YAWN_RESET_PIN_SET"
 _RESET_PIN_SET_WEIGHT_ENV = "RE1_YAWN_RESET_PIN_SET_WEIGHT"
 _RESET_PIN_WEIGHTS_ENV = "RE1_YAWN_RESET_PIN_WEIGHTS"
+_RESET_PIN_INCLUDE_FRESH_ENV = "RE1_YAWN_RESET_PIN_INCLUDE_FRESH"
 _RESET_PIN_FILE_ENV = "RE1_YAWN_RESET_PIN_FILE"
 _DEFAULT_PIN_FILE = "data/yawn_reset_pin.env"
 _RESET_FRONTIER_FIGHT_ENV = "RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY"
@@ -464,6 +465,16 @@ def reset_pin_range_from_env(
     if hi < lo:
         lo, hi = hi, lo
     return lo, hi
+
+
+def reset_pin_include_fresh_from_env(
+    project_root: Path | str | None = None,
+) -> bool:
+    """``RE1_YAWN_RESET_PIN_INCLUDE_FRESH=1`` — add a dining-room init slot to a pin range."""
+    raw = _pin_env_raw(_RESET_PIN_INCLUDE_FRESH_ENV, project_root)
+    if not raw:
+        return False
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def reset_pin_set_from_env(
@@ -719,7 +730,7 @@ def _playthrough_leg_span(stage: dict[str, Any], start_index: int) -> int:
 
 
 def _fresh_start_options(stage: dict[str, Any]) -> dict[str, Any]:
-    """Dining init savestate, hunting seq 1 (emblem). Not the same as loading cp00."""
+    """Dining init savestate hunting cp00 (emblem). Same planner index as any other CP."""
     return {
         "route_start_index": 0,
         "leg_span": _playthrough_leg_span(stage, 0),
@@ -784,7 +795,9 @@ def sample_one_leg_options(
     ``RE1_YAWN_RESET_PIN_INDEX=N`` forces curated cell ``cpNN`` (overrides mix).
     ``RE1_YAWN_RESET_PIN_RANGE=LO-HI`` uniform over loadable cells in that range
     (overridden by a single pin index when both are set). Pin ranges do not
-    include the fresh start.
+    include the fresh start unless ``RE1_YAWN_RESET_PIN_INCLUDE_FRESH=1``, which
+    adds a dining-room init slot equal to each loadable cell in range (and is
+    100% fresh when the range is empty).
     ``RE1_YAWN_RESET_PIN_WEIGHTS=latest:50`` with a pin range: ``latest_weight`` on
     the newest loadable cell in range, remainder uniform over that range.
     Other ``RE1_YAWN_RESET_PIN_WEIGHTS`` entries sample by explicit per-cell
@@ -839,9 +852,17 @@ def sample_one_leg_options(
     if pin_range is not None:
         lo, hi = pin_range
         ranged = _cells_in_pin_range(all_cells, lo, hi)
-        if not ranged:
+        include_fresh = reset_pin_include_fresh_from_env(project_root)
+        if not ranged and not include_fresh:
             raise ValueError(
                 f"RE1_YAWN_RESET_PIN_RANGE={lo}-{hi} but no loadable cells in range"
+            )
+        if include_fresh:
+            slot = rng.randrange(len(ranged) + 1)
+            if slot == 0:
+                return _fresh_start_options(stage)
+            return _options_from_cell(
+                ranged[slot - 1], stage, reset_source="route_cell_pin_range"
             )
         chosen = ranged[rng.randrange(len(ranged))]
         return _options_from_cell(chosen, stage, reset_source="route_cell_pin_range")
@@ -1164,11 +1185,8 @@ def capture_successor_cell(
     ):
         _mark_capture_ineligible(env, "cutscene_gate")
         return None
-    if cid == "kenneth_104" and not any(str(k).startswith("104:") for k in ledgers):
-        _mark_capture_ineligible(env, "cutscene_gate")
-        return None
     if cid == "barry_return_105" and not any(
-        str(k).startswith("105:2:s1") for k in ledgers
+        str(k).startswith("104:") for k in ledgers
     ):
         _mark_capture_ineligible(env, "cutscene_gate")
         return None

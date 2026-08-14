@@ -13,6 +13,7 @@ from re1_rl.item_box import (
 )
 from re1_rl.yawn_box_prep_checkpoint import (
     WIND_CREST_ITEM_ID,
+    YAWN_BOX_PREP_CHECKPOINT_ID,
     yawn_box_prep_box_pollution_reason,
     yawn_box_prep_capture_ready,
     yawn_box_prep_capture_room_ok,
@@ -39,6 +40,28 @@ def test_can_deposit_wind_crest_at_118() -> None:
     assert ok and reason == ""
 
 
+def test_early_118_allows_ammo_yawn_prep_does_not() -> None:
+    inv = [(0x0B, 15), (0x02, 1)] + [(0, 0)] * 6
+    box = [(0, 0)] * BOX_SLOTS
+    ok_ammo, why_ammo = can_deposit(inv, box, 0, room_id="118", enforce_allowlist=True)
+    assert ok_ammo and why_ammo == ""
+    ok_gun, why_gun = can_deposit(inv, box, 1, room_id="118", enforce_allowlist=True)
+    assert not ok_gun and why_gun == "not_allowlisted"
+    ok_prep, why_prep = can_deposit(
+        inv,
+        box,
+        0,
+        room_id="118",
+        checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID,
+        enforce_allowlist=True,
+    )
+    assert not ok_prep and why_prep == "not_allowlisted"
+    assert is_deposit_allowed_item(0x0B, "118")
+    assert not is_deposit_allowed_item(
+        0x0B, "118", checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID
+    )
+
+
 def test_full_pack_select_slot_7_deposit_masked() -> None:
     from re1_rl.action_mask import (
         BOX_DEPOSIT_ACTION,
@@ -62,14 +85,34 @@ def test_full_pack_select_slot_7_deposit_masked() -> None:
     box = [(0, 0)] * BOX_SLOTS
     box[1] = (0x01, 0)
     box[2] = (0x07, 4)
-    assert not is_deposit_allowed_item(0x0C, "118")  # shotgun_shells
-    assert not is_deposit_allowed_item(0x0B, "118")  # handgun_bullets
-    assert not is_deposit_allowed_item(0x11, "118")  # acid_rounds
+    assert not is_deposit_allowed_item(
+        0x0C, "118", checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID
+    )  # shotgun_shells
+    assert not is_deposit_allowed_item(
+        0x0B, "118", checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID
+    )  # handgun_bullets
+    assert not is_deposit_allowed_item(
+        0x11, "118", checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID
+    )  # acid_rounds
     assert is_deposit_allowed_item(WIND_CREST_ITEM_ID, "118")
     assert box_deposit_slot_reachable(inv, 6, from_slot=0)
     assert box_deposit_slot_reachable(inv, 7, from_slot=0)
-    ok6, why6 = can_deposit(inv, box, 6, room_id="118", enforce_allowlist=True)
-    ok7, _ = can_deposit(inv, box, 7, room_id="118", enforce_allowlist=True)
+    ok6, why6 = can_deposit(
+        inv,
+        box,
+        6,
+        room_id="118",
+        checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID,
+        enforce_allowlist=True,
+    )
+    ok7, _ = can_deposit(
+        inv,
+        box,
+        7,
+        room_id="118",
+        checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID,
+        enforce_allowlist=True,
+    )
     assert not ok6 and why6 == "not_allowlisted"
     assert ok7
 
@@ -82,6 +125,7 @@ def test_full_pack_select_slot_7_deposit_masked() -> None:
         box_ui_open=True,
         box_phase=BOX_PHASE_DEPOSIT_SLOT,
         room_id="118",
+        checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID,
     )
     assert not mask[SELECT_SLOT_BASE + 6]
     assert mask[SELECT_SLOT_BASE + 7]
@@ -93,6 +137,7 @@ def test_full_pack_select_slot_7_deposit_masked() -> None:
         box_ui_open=True,
         box_phase=0,
         room_id="118",
+        checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID,
     )
     assert choose[BOX_DEPOSIT_ACTION]
 
@@ -112,7 +157,14 @@ def test_deposit_crest_then_withdraw_bazooka() -> None:
     box[1] = (0x01, 0)
     box[2] = (0x07, 4)
     assert box_pollution_reason(box, room_id="118") is None
-    ok_dep, why_dep = can_deposit(inv, box, 7, room_id="118", enforce_allowlist=True)
+    ok_dep, why_dep = can_deposit(
+        inv,
+        box,
+        7,
+        room_id="118",
+        checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID,
+        enforce_allowlist=True,
+    )
     assert ok_dep and why_dep == ""
     ok_wd0, why_wd0 = can_withdraw(inv, box, 2)
     assert not ok_wd0 and why_wd0 == "inventory_full"

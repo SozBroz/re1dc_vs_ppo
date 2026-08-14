@@ -8,6 +8,10 @@ Discrete actions (env):
 Weapon paths:
   - **knife** — standing R1 (neutral), R1+Up (high), crouch R1+Down via ``execute_knife_macro``
   - **guns**  — standing R1 (neutral), R1+Up (high), R1+Down floor-aim (down)
+
+After a ranged shot, the macro turns back to the pre-R1 heading with
+left/right only. RE1 auto-aim otherwise leaves Jill on a pose-dependent
+bearing and the next walk line diverges. No facing RAM writes.
 """
 
 from __future__ import annotations
@@ -37,6 +41,7 @@ from re1_rl.memory_map import (
     INVENTORY_BASE,
     INVENTORY_SLOTS,
     ITEM_IDS,
+    PLAYER_FACING,
     WEAPON_ITEM_IDS,
 )
 from re1_rl.sticky_input import STICKY_KEYS
@@ -1035,6 +1040,154 @@ for _wid in WEAPON_ITEM_IDS:
         _WEAPON_ATTACK_HANDLERS[_wid] = _execute_ranged_attack_macro
 
 
+FACING_CIRCLE = 4096
+# ~5.6°. One coarse standing-turn quantum; not a nav snap.
+FACING_RESTORE_TOL = 64
+FACING_RESTORE_MAX_FRAMES = 90
+FACING_RESTORE_NEUTRAL_FRAMES = 4
+
+
+def facing_signed_delta(current: int, target: int) -> int:
+    """Shortest signed turn. Negative = left (PLAYER_FACING decreases)."""
+    diff = (int(target) - int(current)) & 0xFFF
+    if diff > 2048:
+        diff -= FACING_CIRCLE
+    return diff
+
+
+def _read_equipped_and_facing(bridge: Any) -> tuple[int, int | None]:
+    """One RAM read so mocks that only return equipped_weapon_id stay intact."""
+    try:
+        ram = bridge.read_ram(
+            [
+                ("equipped_weapon_id", EQUIPPED_WEAPON_ID, "u8"),
+                ("player_facing", PLAYER_FACING, "u16"),
+            ]
+        )
+        weapon_id = int(ram["equipped_weapon_id"])
+    except (OSError, RuntimeError, ValueError, TypeError, AttributeError, KeyError):
+        return read_equipped_weapon(bridge), None
+    facing: int | None = None
+    try:
+        if "player_facing" in ram:
+            facing = int(ram["player_facing"]) & 0xFFF
+    except (TypeError, ValueError):
+        facing = None
+    return weapon_id, facing
+
+
+def _read_player_facing(bridge: Any) -> int | None:
+    """Live heading. RE1 auto-aim rotates Jill while R1 is held."""
+    try:
+        ram = bridge.read_ram([("player_facing", PLAYER_FACING, "u16")])
+        return int(ram["player_facing"]) & 0xFFF
+    except (OSError, RuntimeError, ValueError, TypeError, AttributeError, KeyError):
+        return None
+
+
+def _restore_entry_facing(
+    bridge: Any,
+    empty_sticky: dict[str, bool],
+    *,
+    facing_before: int | None,
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int, dict[str, Any]]:
+    """Joypad-only return to pre-aim heading. No RAM writes, no walk."""
+    info: dict[str, Any] = {
+        "facing_before": facing_before,
+        "entry_facing": facing_before,
+        "facing_after_aim": None,
+        "autoaim_facing": None,
+        "facing_final": None,
+        "final_facing": None,
+        "facing_restored": False,
+        "facing_restore_frames": 0,
+    }
+    if facing_before is None:
+        return False, 0, info
+    current = _read_player_facing(bridge)
+    info["facing_after_aim"] = current
+    info["autoaim_facing"] = current
+    if current is None:
+        return False, 0, info
+    frames = 0
+    died = False
+    while frames < FACING_RESTORE_MAX_FRAMES:
+        current = _read_player_facing(bridge)
+        if current is None:
+            break
+        delta = facing_signed_delta(current, facing_before)
+        if abs(delta) <= FACING_RESTORE_TOL:
+            break
+        buttons = {"left": True} if delta < 0 else {"right": True}
+        if _step_one_frame(
+            bridge,
+            buttons,
+            empty_sticky=empty_sticky,
+            echo_joypad=False,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        ):
+            died = True
+            frames += 1
+            break
+        frames += 1
+    if not died:
+        for _ in range(FACING_RESTORE_NEUTRAL_FRAMES):
+            if _step_one_frame(
+                bridge,
+                {},
+                empty_sticky=empty_sticky,
+                echo_joypad=False,
+                prev_hp=prev_hp,
+                episode_start_hp=episode_start_hp,
+            ):
+                died = True
+                frames += 1
+                break
+            frames += 1
+    final = _read_player_facing(bridge)
+    info["facing_final"] = final
+    info["final_facing"] = final
+    info["facing_restore_frames"] = frames
+    if final is not None:
+        info["facing_restored"] = (
+            abs(facing_signed_delta(final, facing_before)) <= FACING_RESTORE_TOL
+        )
+    return died, frames, info
+
+
+def _finish_attack_with_facing(
+    bridge: Any,
+    empty_sticky: dict[str, bool],
+    facing_before: int | None,
+    died: bool,
+    frames: int,
+    report: dict[str, Any],
+    *,
+    prev_hp: int,
+    episode_start_hp: int,
+) -> tuple[bool, int, dict[str, Any]]:
+    if died or int(report.get("weapon_id") or 0) == KNIFE_WEAPON_ID:
+        report["facing_before"] = facing_before
+        report["entry_facing"] = facing_before
+        report["facing_restored"] = False
+        report["facing_restore_frames"] = 0
+        return died, frames, report
+    restore_died, restore_frames, restore_info = _restore_entry_facing(
+        bridge,
+        empty_sticky,
+        facing_before=facing_before,
+        prev_hp=prev_hp,
+        episode_start_hp=episode_start_hp,
+    )
+    report.update(restore_info)
+    frames = int(frames) + int(restore_frames)
+    report["frames"] = int(report.get("frames") or 0) + int(restore_frames)
+    return restore_died, frames, report
+
+
 def execute_attack_macro(
     bridge: Any,
     *,
@@ -1052,7 +1205,7 @@ def execute_attack_macro(
     if pins is not None and _bridge_uses_frame_ring(bridge):
         pins.begin(bridge)
     try:
-        weapon_id = read_equipped_weapon(bridge)
+        weapon_id, facing_before = _read_equipped_and_facing(bridge)
         weapon = equipped_weapon_name(weapon_id)
         if weapon is None or weapon_id not in WEAPON_ITEM_IDS:
             report = _empty_report(weapon_id, weapon)
@@ -1075,7 +1228,16 @@ def execute_attack_macro(
             weapon=weapon,
         )
         report.setdefault("aim_mode", "neutral")
-        return died, frames, report
+        return _finish_attack_with_facing(
+            bridge,
+            empty_sticky,
+            facing_before,
+            died,
+            frames,
+            report,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
+        )
     finally:
         if pins is not None and pins.active:
             pins.finish(bridge)
@@ -1098,7 +1260,7 @@ def execute_attack_up_macro(
     if pins is not None and _bridge_uses_frame_ring(bridge):
         pins.begin(bridge)
     try:
-        weapon_id = read_equipped_weapon(bridge)
+        weapon_id, facing_before = _read_equipped_and_facing(bridge)
         weapon = equipped_weapon_name(weapon_id)
         if weapon is None or weapon_id not in WEAPON_ITEM_IDS:
             report = _empty_report(weapon_id, weapon)
@@ -1116,13 +1278,23 @@ def execute_attack_up_macro(
             handler = _execute_bazooka_attack_up_macro
         else:
             handler = _execute_ranged_attack_up_macro
-        return handler(
+        died, frames, report = handler(
             bridge,
             empty_sticky=empty_sticky,
             prev_hp=prev_hp,
             episode_start_hp=episode_start_hp,
             weapon_id=weapon_id,
             weapon=weapon,
+        )
+        return _finish_attack_with_facing(
+            bridge,
+            empty_sticky,
+            facing_before,
+            died,
+            frames,
+            report,
+            prev_hp=prev_hp,
+            episode_start_hp=episode_start_hp,
         )
     finally:
         if pins is not None and pins.active:
@@ -1146,7 +1318,7 @@ def execute_attack_down_macro(
     if pins is not None and _bridge_uses_frame_ring(bridge):
         pins.begin(bridge)
     try:
-        weapon_id = read_equipped_weapon(bridge)
+        weapon_id, facing_before = _read_equipped_and_facing(bridge)
         weapon = equipped_weapon_name(weapon_id)
         if weapon is None or weapon_id not in WEAPON_ITEM_IDS:
             report = _empty_report(weapon_id, weapon)
@@ -1159,13 +1331,7 @@ def execute_attack_down_macro(
             report["aim_mode"] = "down"
             return False, 0, report
         if weapon_id == KNIFE_WEAPON_ID:
-            handler = _execute_knife_attack_crouch_macro
-        elif weapon_id in BAZOOKA_WEAPON_IDS:
-            handler = _execute_bazooka_attack_down_macro
-        else:
-            handler = _execute_ranged_attack_down_macro
-        if weapon_id == KNIFE_WEAPON_ID:
-            return handler(
+            died, frames, report = _execute_knife_attack_crouch_macro(
                 bridge,
                 empty_sticky=empty_sticky,
                 prev_hp=prev_hp,
@@ -1177,13 +1343,33 @@ def execute_attack_down_macro(
                 knife_echo_joypad=knife_echo_joypad,
                 knife_use_ram_gates=knife_use_ram_gates,
             )
-        return handler(
+        elif weapon_id in BAZOOKA_WEAPON_IDS:
+            died, frames, report = _execute_bazooka_attack_down_macro(
+                bridge,
+                empty_sticky=empty_sticky,
+                prev_hp=prev_hp,
+                episode_start_hp=episode_start_hp,
+                weapon_id=weapon_id,
+                weapon=weapon,
+            )
+        else:
+            died, frames, report = _execute_ranged_attack_down_macro(
+                bridge,
+                empty_sticky=empty_sticky,
+                prev_hp=prev_hp,
+                episode_start_hp=episode_start_hp,
+                weapon_id=weapon_id,
+                weapon=weapon,
+            )
+        return _finish_attack_with_facing(
             bridge,
-            empty_sticky=empty_sticky,
+            empty_sticky,
+            facing_before,
+            died,
+            frames,
+            report,
             prev_hp=prev_hp,
             episode_start_hp=episode_start_hp,
-            weapon_id=weapon_id,
-            weapon=weapon,
         )
     finally:
         if pins is not None and pins.active:

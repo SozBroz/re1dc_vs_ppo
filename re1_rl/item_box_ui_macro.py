@@ -1034,6 +1034,7 @@ def execute_box_deposit_ui(
     room_id: str | None = None,
     trust_inv_cursor: bool = False,
     expected_item_id: int | None = None,
+    checkpoint_id: str | None = None,
 ) -> tuple[bool, int, dict[str, Any]]:
     """Deposit ``inv_slot`` via occupied inv → Cross → empty box → Cross.
 
@@ -1076,6 +1077,7 @@ def execute_box_deposit_ui(
         box_before,
         slot,
         room_id=room_id,
+        checkpoint_id=checkpoint_id,
         enforce_allowlist=True,
     )
     if not ok:
@@ -1085,7 +1087,9 @@ def execute_box_deposit_ui(
     from re1_rl.item_box import is_key_item_id, is_deposit_allowed_item
 
     item_id, qty_before = inv_before[slot]
-    if not is_deposit_allowed_item(int(item_id), room_id):
+    if not is_deposit_allowed_item(
+        int(item_id), room_id, checkpoint_id=checkpoint_id
+    ):
         report["reason"] = "key_item" if is_key_item_id(int(item_id)) else "not_allowlisted"
         return False, 0, report
 

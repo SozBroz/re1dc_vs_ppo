@@ -15,10 +15,12 @@ from re1_rl.go_explore_archive import (
 from re1_rl.go_explore_capture import quality_replace_significant
 from re1_rl.go_explore_merge import CELL_REPLAY_NAME
 from re1_rl.leg_replay import (
+    HEADING_RESTORE_VERSION,
     LegReplayBuffer,
     build_leg_replay_payload,
     new_leg_replay_buffer,
     should_write_leg_replay,
+    tape_is_combat,
     write_leg_replay_json,
 )
 from re1_rl.yawn_cell_quality import seed_cell_leg_frames_sentinel, seed_leg_frames_sentinel
@@ -52,6 +54,11 @@ def test_single_leg_gate() -> None:
     env._route_start_index = 18
     env._leg_replay = LegReplayBuffer()
     assert not should_write_leg_replay(env, 18)
+    env._route_start_index = 0
+    env._leg_replay = buf
+    assert should_write_leg_replay(env, 0)
+    env._route_start_index = 1
+    assert not should_write_leg_replay(env, 0)
 
 
 def test_payload_schema_and_write(tmp_path: Path) -> None:
@@ -85,12 +92,106 @@ def test_payload_schema_and_write(tmp_path: Path) -> None:
     assert payload["contract"]["frame_skip"] == 8
     assert payload["contract"]["async_cutscene_skip"] is True
     assert payload["contract"]["joypad_tape"] is False
+    assert payload["contract"]["heading_restore"] == HEADING_RESTORE_VERSION
+    assert payload["contract"]["combat_leg"] is True
     assert "joypad_bits" not in payload
     assert payload["end"]["quality"][7] == -26
     dest = tmp_path / CELL_REPLAY_NAME
     write_leg_replay_json(dest, payload)
     loaded = json.loads(dest.read_text(encoding="utf-8"))
     assert loaded["leg_steps"] == 2
+
+
+def test_fresh_cp00_tape_uses_init_savestate(tmp_path: Path) -> None:
+    import hashlib
+
+    init = tmp_path / "states" / "jill_control_fresh.State"
+    init.parent.mkdir(parents=True)
+    init.write_bytes(b"FRESH-INIT")
+    buf = LegReplayBuffer()
+    buf.append(9, 8)
+    buf.append(1, 8)
+    env = SimpleNamespace(
+        _route_start_index=0,
+        _leg_replay=buf,
+        _async_cutscene_skip=True,
+        frame_skip=8,
+        project_root=tmp_path,
+        action_space=SimpleNamespace(n=45),
+        _progress=None,
+        _reset_options={},
+        _stage={"init_savestate": "states/jill_control_fresh.State"},
+    )
+    quality = attach_leg_frames((96, 45, 100, 4, 1, 0, -30), 16)
+    payload = build_leg_replay_payload(
+        env,
+        completed_index=0,
+        completed_id="emblem_105",
+        settled=True,
+        live_state={
+            "room_id": "105",
+            "x": 1,
+            "z": 2,
+            "facing": 3,
+            "hp": 96,
+            "in_control": True,
+        },
+        quality=quality,
+        to_state_sha256="to-sha",
+    )
+    assert payload is not None
+    assert payload["from_checkpoint_index"] == -1
+    assert payload["from_checkpoint_id"] == "route_initial"
+    assert payload["from_state_sha256"] == hashlib.sha256(b"FRESH-INIT").hexdigest()
+    assert payload["to_checkpoint_index"] == 0
+    assert payload["to_checkpoint_id"] == "emblem_105"
+    assert payload["end"]["quality"][7] == -16
+    assert payload["actions"] == [9, 1]
+
+
+def test_tape_is_combat_from_kills_or_attacks() -> None:
+    assert tape_is_combat({"end": {"leg_kills_by_room": {"11A": 1}}})
+    assert tape_is_combat({"actions": [1, 7, 1]})
+    assert tape_is_combat({"contract": {"combat_leg": True}})
+    assert not tape_is_combat({"actions": [1, 2, 9], "end": {"leg_kills_by_room": {}}})
+
+
+def test_payload_from_sha_hashes_predecessor_state(tmp_path: Path) -> None:
+    import hashlib
+
+    pred = tmp_path / "pred"
+    pred.mkdir()
+    state = pred / CELL_STATE_NAME
+    state.write_bytes(b"PRED-STATE")
+    buf = LegReplayBuffer()
+    buf.append(1, 8)
+    env = SimpleNamespace(
+        _route_start_index=18,
+        _leg_replay=buf,
+        _async_cutscene_skip=True,
+        frame_skip=8,
+        project_root=tmp_path,
+        action_space=SimpleNamespace(n=45),
+        _progress=None,
+        _reset_options={
+            "pb_bundle": {
+                "state_path": str(state),
+                "sidecar_path": str(pred / "sidecar.json"),
+            }
+        },
+    )
+    payload = build_leg_replay_payload(
+        env,
+        completed_index=18,
+        completed_id="l_passage_enter_108",
+        settled=True,
+        live_state={"room_id": "108", "x": 1, "z": 2, "facing": 3, "hp": 96},
+        quality=(96, 40, 0, 8, 1, 0, 0, -8),
+        to_state_sha256="abc",
+    )
+    assert payload is not None
+    assert payload["from_state_sha256"] == hashlib.sha256(b"PRED-STATE").hexdigest()
+    assert payload["contract"]["combat_leg"] is False
 
 
 def test_try_install_copies_replay_tape(tmp_path: Path) -> None:
@@ -121,6 +222,9 @@ def test_try_install_copies_replay_tape(tmp_path: Path) -> None:
     installed = yr / "cells" / "cp18" / CELL_REPLAY_NAME
     assert installed.is_file()
     assert json.loads(installed.read_text(encoding="utf-8"))["actions"] == [1]
+    store = json.loads((yr / "store.json").read_text(encoding="utf-8"))
+    assert "18" in store["cells"]
+    assert store["cells"]["18"]["checkpoint_id"] == "l_passage_enter_108"
 
 
 def test_seed_leg_frames_sentinel_overwrites_speed(tmp_path: Path) -> None:

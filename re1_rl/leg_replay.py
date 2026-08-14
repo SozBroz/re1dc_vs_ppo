@@ -7,12 +7,13 @@ Stored as ``states/yawn_rails/cells/cpNN/leg_replay.json`` — sibling to
 from __future__ import annotations
 
 import array
+import hashlib
 import json
 import subprocess
 from pathlib import Path
 from typing import Any
 
-from re1_rl.go_explore_merge import CELL_META_NAME, CELL_REPLAY_NAME
+from re1_rl.go_explore_merge import CELL_META_NAME, CELL_REPLAY_NAME, CELL_STATE_NAME
 
 ACTION_MAP_VERSION = 1
 SCHEMA_VERSION = 1
@@ -95,7 +96,62 @@ def _meta_field(path: Path, key: str) -> str:
     return str(val) if val is not None else ""
 
 
+ATTACK_ACTION_IDS = frozenset({6, 7, 8})
+HEADING_RESTORE_VERSION = 1
+
+
+def tape_is_combat(tape: dict[str, Any]) -> bool:
+    """True when the tape recorded attacks or room kills."""
+    if bool(tape.get("combat_leg")):
+        return True
+    contract = tape.get("contract") or {}
+    if bool(contract.get("combat_leg")):
+        return True
+    kills = (tape.get("end") or {}).get("leg_kills_by_room") or {}
+    try:
+        if any(int(v or 0) > 0 for v in kills.values()):
+            return True
+    except (TypeError, ValueError):
+        pass
+    try:
+        return any(int(a) in ATTACK_ACTION_IDS for a in tape.get("actions") or [])
+    except (TypeError, ValueError):
+        return False
+
+
+def _file_sha256(path: Path | None) -> str:
+    if path is None or not path.is_file():
+        return ""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def init_savestate_path(env: Any) -> Path | None:
+    """Dining-room fresh start State (predecessor of cp00)."""
+    stage = getattr(env, "_stage", None)
+    raw = ""
+    if isinstance(stage, dict):
+        raw = str(stage.get("init_savestate") or "")
+    if not raw:
+        return None
+    path = Path(raw)
+    if not path.is_absolute():
+        root = Path(getattr(env, "project_root", ".") or ".")
+        path = root / path
+    return path
+
+
+def predecessor_state_path(env: Any, from_index: int) -> Path | None:
+    if int(from_index) < 0:
+        return init_savestate_path(env)
+    meta = predecessor_meta_path(env, from_index)
+    if meta is None:
+        return None
+    return meta.parent / CELL_STATE_NAME
+
+
 def predecessor_meta_path(env: Any, from_index: int) -> Path | None:
+    if int(from_index) < 0:
+        return None
     pb = None
     reset_opts = getattr(env, "_reset_options", None)
     if isinstance(reset_opts, dict):
@@ -119,13 +175,13 @@ def predecessor_meta_path(env: Any, from_index: int) -> Path | None:
 
 
 def should_write_leg_replay(env: Any, completed_index: int) -> bool:
-    """Single-leg only: episode loaded the adjacent predecessor."""
+    """Single-leg only: fresh→cp00 or episode loaded the adjacent predecessor."""
     try:
         start = int(getattr(env, "_route_start_index", -1))
         completed = int(completed_index)
     except (TypeError, ValueError):
         return False
-    if completed < 1:
+    if completed < 0:
         return False
     if start != completed:
         return False
@@ -148,9 +204,15 @@ def build_leg_replay_payload(
     buf: LegReplayBuffer = env._leg_replay
     actions, emu_frames = buf.as_lists()
     from_index = int(completed_index) - 1
-    meta_p = predecessor_meta_path(env, from_index)
-    from_id = _meta_field(meta_p, "checkpoint_id") if meta_p else ""
-    from_sha = _meta_field(meta_p, "state_sha256") if meta_p else ""
+    if from_index < 0:
+        from_id = "route_initial"
+        from_sha = _file_sha256(init_savestate_path(env))
+    else:
+        meta_p = predecessor_meta_path(env, from_index)
+        from_id = _meta_field(meta_p, "checkpoint_id") if meta_p else ""
+        from_sha = _file_sha256(predecessor_state_path(env, from_index))
+        if not from_sha:
+            from_sha = _meta_field(meta_p, "state_sha256") if meta_p else ""
     progress = getattr(env, "_progress", None)
     kills: dict[str, int] = {}
     if progress is not None and hasattr(progress, "leg_kills_for_capture"):
@@ -192,6 +254,9 @@ def build_leg_replay_payload(
             "code_commit": _git_commit(root),
             "action_map_version": ACTION_MAP_VERSION,
             "joypad_tape": bool(joypad_bits),
+            "heading_restore": HEADING_RESTORE_VERSION,
+            "combat_leg": any(int(v or 0) > 0 for v in kills.values())
+            or any(int(a) in ATTACK_ACTION_IDS for a in actions),
         },
         "actions": actions,
         "emu_frames_per_step": emu_frames,

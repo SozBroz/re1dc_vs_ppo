@@ -23,6 +23,8 @@ from re1_rl.bizhawk_bridge import BizHawkClient
 from re1_rl.bizhawk_paths import EMUHAWK, assert_rom_present, emuhawk_argv
 from re1_rl.env import ACTION_NAMES, RE1Env
 from re1_rl.go_explore_merge import CELL_REPLAY_NAME, CELL_SIDECAR_NAME, CELL_STATE_NAME
+from re1_rl.attack_macro import FACING_RESTORE_TOL, facing_signed_delta
+from re1_rl.leg_replay import tape_is_combat
 from re1_rl.yawn_rails import _settle_state_for_capture
 from re1_rl.yawn_rails_sync import cell_dir_name, yawn_rails_root
 from scripts.play_human import configure_ram_skip, wait_for_emuhawk
@@ -156,6 +158,13 @@ def _end_failures(
         w = int(end.get(axis, 0) or 0)
         if abs(g - w) > 256:
             fail.append(f"{axis} {g} != {w} (±256)")
+    want_facing = int(end.get("facing", 0) or 0)
+    if want_facing:
+        got_facing = int(last_state.get("facing", 0) or 0)
+        if abs(facing_signed_delta(got_facing, want_facing)) > FACING_RESTORE_TOL:
+            fail.append(
+                f"facing {got_facing} != {want_facing} (±{FACING_RESTORE_TOL})"
+            )
     frame_i = _mismatch_frames(got_frames, want_frames)
     if frame_i is not None:
         g = got_frames[frame_i] if frame_i < len(got_frames) else None
@@ -183,6 +192,16 @@ def main() -> int:
         choices=("auto", "joypad", "actions"),
         default="auto",
         help="auto uses joypad_bits when every tape has them",
+    )
+    ap.add_argument(
+        "--force-stale",
+        action="store_true",
+        help="play even when predecessor State SHA != tape from_state_sha256",
+    )
+    ap.add_argument(
+        "--keep-open",
+        action="store_true",
+        help="Leave EmuHawk running after the tape so you can watch the end pose.",
     )
     args = ap.parse_args()
 
@@ -224,10 +243,6 @@ def main() -> int:
     pred_sha = _sha256(state_path)
     want_sha = str(first.get("from_state_sha256") or "")
     if want_sha and pred_sha != want_sha:
-        print(
-            f"WARN: predecessor State sha {pred_sha[:12]} != tape {want_sha[:12]}",
-            flush=True,
-        )
         dest_cell = yawn_rails_root(ROOT) / "cells" / cell_dir_name(
             int(first["to_checkpoint_index"])
         )
@@ -235,10 +250,20 @@ def main() -> int:
         dest_side = dest_cell / CELL_SIDECAR_NAME
         dest_sha = _sha256(dest_state) if dest_state.is_file() else ""
         want_to = str(first.get("to_state_sha256") or "")
-        if dest_sha and want_to and dest_sha == want_to and len(loaded) > 1:
+        skip_stale_combat = (
+            tape_is_combat(first)
+            and dest_sha
+            and want_to
+            and dest_sha == want_to
+            and len(loaded) > 1
+        )
+        if skip_stale_combat:
             print(
-                f"[replay] cp{int(first['to_checkpoint_index']):02d} matches "
-                f"tape end — start there and skip the stale first tape",
+                f"[replay] skip stale combat tape cp"
+                f"{int(first['from_checkpoint_index']):02d}->"
+                f"{int(first['to_checkpoint_index']):02d} "
+                f"(pred sha {pred_sha[:12]} != tape {want_sha[:12]}); "
+                f"load captured fight State and play the next tape",
                 flush=True,
             )
             loaded = loaded[1:]
@@ -250,6 +275,29 @@ def main() -> int:
             pred_sha = dest_sha
             want_sha = str(first.get("from_state_sha256") or "")
             contract = first.get("contract") or {}
+        elif args.force_stale:
+            print(
+                f"WARN: predecessor State sha {pred_sha[:12]} != tape "
+                f"{want_sha[:12]} (--force-stale)",
+                flush=True,
+            )
+        else:
+            kind = "combat" if tape_is_combat(first) else "nav"
+            print(
+                f"ERROR: {kind} tape requires exact predecessor State "
+                f"(disk {pred_sha[:12]} != tape {want_sha[:12]}). "
+                f"Recapture from the current pred, or pass --force-stale.",
+                file=sys.stderr,
+            )
+            return 1
+        if want_sha and pred_sha != want_sha and not args.force_stale:
+            print(
+                f"ERROR: next tape also stale "
+                f"(disk {pred_sha[:12]} != tape {want_sha[:12]}). "
+                f"Recapture the post-fight cell, or pass --force-stale.",
+                file=sys.stderr,
+            )
+            return 1
 
     frame_skip = int(contract.get("frame_skip") or 8)
     async_skip = bool(contract.get("async_cutscene_skip", True))
@@ -387,11 +435,13 @@ def main() -> int:
             env.close()
         except (OSError, RuntimeError):
             pass
-        if proc is not None:
+        if proc is not None and not args.keep_open:
             try:
                 proc.terminate()
             except OSError:
                 pass
+        elif proc is not None:
+            print("[replay] EmuHawk left open — close the window when you are done", flush=True)
 
     if all_fail:
         print("[replay] FAIL")

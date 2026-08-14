@@ -196,6 +196,7 @@ def _mask_box_ui_session(
     inventory: list[tuple[int, int]] | None,
     box: list[tuple[int, int]] | None,
     room_id: str | None = None,
+    checkpoint_id: str | None = None,
     box_inv_cursor: int = 0,
 ) -> np.ndarray:
     """Legal actions while the item-box UI is open (in_control is false)."""
@@ -222,7 +223,9 @@ def _mask_box_ui_session(
     def _deposit_ok(slot: int) -> bool:
         if inventory is None or box is None:
             return False
-        ok, _ = can_deposit(inventory, box, slot, room_id=room_id)
+        ok, _ = can_deposit(
+            inventory, box, slot, room_id=room_id, checkpoint_id=checkpoint_id
+        )
         return bool(ok)
 
     if phase == BOX_PHASE_WITHDRAW_SLOT:
@@ -318,6 +321,7 @@ def action_mask(
     document_examine_open: bool = False,
     equip_switch_cooldown: int = 0,
     box_inv_cursor: int = 0,
+    checkpoint_id: str | None = None,
 ) -> np.ndarray:
     """Return bool mask (True = legal) for MaskablePPO / ActionMasker."""
     del prev_action
@@ -343,6 +347,7 @@ def action_mask(
             inventory=inventory,
             box=box,
             room_id=room_id,
+            checkpoint_id=checkpoint_id,
             box_inv_cursor=box_inv_cursor,
         )
     if not in_control:

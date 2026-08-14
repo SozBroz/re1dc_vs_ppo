@@ -84,11 +84,11 @@ GOAL_FIELDS: list[tuple[str, str]] = [
     ("waypoints_remaining", "route steps left / total"),
     ("route_hop_distance", "BFS door-hops to goal room / 20"),
     ("in_target_room", "1 = already in the goal room"),
-    ("door_delta_x", "(target_x - player_x) / 4096; exit door or statue drop line"),
-    ("door_delta_z", "(target_z - player_z) / 4096; exit door or statue drop line"),
-    ("door_distance", "euclidean distance to exit door / statue drop / 4096"),
-    ("door_bearing_sin", "sin(angle to door/statue-drop - facing); + = left"),
-    ("door_bearing_cos", "cos(angle to door/statue-drop - facing); 1 = ahead"),
+    ("door_delta_x", "(target_x - player_x) / 4096; door, statue, or in-room pickup/use"),
+    ("door_delta_z", "(target_z - player_z) / 4096; door, statue, or in-room pickup/use"),
+    ("door_distance", "euclidean distance to door / statue / in-room objective / 4096"),
+    ("door_bearing_sin", "sin(angle to wayfinder target - facing); + = left"),
+    ("door_bearing_cos", "cos(angle to wayfinder target - facing); 1 = ahead"),
     ("obj_navigate", "objective one-hot: navigate"),
     ("obj_pickup", "objective one-hot: pick up item"),
     ("obj_use_item", "objective one-hot: use item"),
@@ -251,6 +251,64 @@ class ObsEncoder:
                 v[idx] = 1.0
         return v
 
+    def _compass_to_xz(
+        self, state: dict[str, Any], tx: float, tz: float
+    ) -> np.ndarray:
+        """Egocentric 5-slot compass used by the door / statue / pickup wayfinder."""
+        dx = float(tx) - float(state.get("x", 0))
+        dz = float(tz) - float(state.get("z", 0))
+        distance = math.hypot(dx, dz)
+        facing = 2.0 * math.pi * float(state.get("facing", 0)) / FACING_FULL_CIRCLE
+        relative = math.atan2(dz, dx) - facing
+        return np.asarray(
+            [
+                float(np.clip(dx / DIST_NORM, -2.0, 2.0)),
+                float(np.clip(dz / DIST_NORM, -2.0, 2.0)),
+                min(distance / DIST_NORM, 2.0),
+                math.sin(relative),
+                math.cos(relative),
+            ],
+            dtype=np.float32,
+        )
+
+    def _in_room_objective_xz(
+        self, state: dict[str, Any], planner: WaypointPlanner
+    ) -> tuple[float, float] | None:
+        """Pickup / USE world XZ when Jill is already in the checkpoint room."""
+        room = str(state.get("room_id", ""))
+        goal = planner.next_waypoint_room()
+        if not room or goal is None or room != str(goal):
+            return None
+        step = planner.current_objective() or {}
+        atype = planner.objective_type()
+        if atype == "pickup":
+            from re1_rl.spatial_encoder import ItemPositions
+
+            positions = getattr(self, "_item_positions", None)
+            if positions is None:
+                positions = ItemPositions(
+                    Path(__file__).resolve().parents[1] / "data" / "item_positions.json"
+                )
+                self._item_positions = positions
+            for name in step.get("items_gained") or []:
+                pos = positions.get(room, str(name))
+                if pos is not None:
+                    return pos
+            return None
+        if atype == "use_item":
+            from re1_rl.story_item_use import load_story_use_sites
+
+            required = {
+                canonical_item(str(x)) for x in (step.get("required_items") or [])
+            }
+            for site in load_story_use_sites():
+                if str(site.get("room") or "") != room:
+                    continue
+                if canonical_item(str(site.get("item") or "")) not in required:
+                    continue
+                return (float(site["x"]), float(site["z"]))
+        return None
+
     def encode_goal(
         self,
         state: dict[str, Any],
@@ -286,19 +344,15 @@ class ObsEncoder:
         else:
             door = self.graph.exit_toward(room, goal)
             if door is not None:
-                dx = float(door.x) - float(state.get("x", 0))
-                dz = float(door.z) - float(state.get("z", 0))
-                distance = math.hypot(dx, dz)
-                facing = (
-                    2.0 * math.pi * float(state.get("facing", 0)) / FACING_FULL_CIRCLE
-                )
-                relative = math.atan2(dz, dx) - facing
-                v[5] = float(np.clip(dx / DIST_NORM, -2.0, 2.0))
-                v[6] = float(np.clip(dz / DIST_NORM, -2.0, 2.0))
-                v[7] = min(distance / DIST_NORM, 2.0)
-                v[8] = math.sin(relative)
-                v[9] = math.cos(relative)
+                v[5:10] = self._compass_to_xz(state, float(door.x), float(door.z))
                 v[21] = 1.0
+            else:
+                # Already in the checkpoint room: point at the pickup / USE site
+                # (fresh→emblem, in-room music notes, fireplace, …).
+                target = self._in_room_objective_xz(state, planner)
+                if target is not None:
+                    v[5:10] = self._compass_to_xz(state, target[0], target[1])
+                    v[21] = 1.0
 
         v[10:15] = planner.objective_one_hot()
         v[15] = min(max(self.curriculum_stage_index / 10.0, 0.0), 1.0)

@@ -89,6 +89,16 @@ BAZOOKA_AMMO_IDS = frozenset(
 )
 ROOM_100_EXTRA_DEPOSIT_IDS = BAZOOKA_WEAPON_IDS | BAZOOKA_AMMO_IDS
 BOX_BAZOOKA_DEPOSIT_ROOMS = frozenset({"100"})
+# First 118 visit (chemical): ammo bank is legal. Guns-on-person is Yawn prep only.
+ROOM_118_EARLY_AMMO_IDS = frozenset(
+    {
+        0x0B,  # handgun_bullets
+        0x0C,  # shotgun_shells
+        0x0D,  # dumdum_rounds
+        0x0E,  # magnum_rounds
+        0x0F,  # flamethrower_fuel
+    }
+)
 
 # Env must leave these False — magic writes scuffed post-cp41 states.
 # When False, ``apply_deposit`` / ``apply_withdraw`` are no-ops (no write_ram).
@@ -103,26 +113,36 @@ BOX_DEPOSIT_ROOMS = BOX_ROOMS
 
 # Knife/heals (deposit bank) plus ammo stacks normally kept in the box,
 # plus room-100 bazooka bank items (weapons + packs).
-BOX_STORABLE_ITEM_IDS = DEPOSIT_ITEM_ALLOWLIST | ROOM_100_EXTRA_DEPOSIT_IDS | frozenset(
-    {
-        0x0B,  # handgun_bullets
-        0x0C,  # shotgun_shells
-        0x0D,  # dumdum_rounds
-        0x0E,  # magnum_rounds
-        0x0F,  # flamethrower_fuel
-    }
+BOX_STORABLE_ITEM_IDS = (
+    DEPOSIT_ITEM_ALLOWLIST | ROOM_100_EXTRA_DEPOSIT_IDS | ROOM_118_EARLY_AMMO_IDS
 )
 
 
-def deposit_allowlist_for_room(room_id: str | None) -> frozenset[int]:
-    """Base knife/heal bank; room 100 also allows bazooka variants + packs."""
-    from re1_rl.yawn_box_prep_checkpoint import WIND_CREST_ITEM_ID, YAWN_BOX_PREP_ROOM
+def deposit_allowlist_for_room(
+    room_id: str | None,
+    *,
+    checkpoint_id: str | None = None,
+) -> frozenset[int]:
+    """Knife/heal bank by default.
+
+    Room 100 also allows bazooka variants + packs. Room 118 ammo-bank is legal
+    on the first storeroom visit; the Yawn prep cell (``yawn_box_prep_118``)
+    forbids guns/ammo deposits so Jill leaves holding firepower.
+    """
+    from re1_rl.yawn_box_prep_checkpoint import (
+        WIND_CREST_ITEM_ID,
+        YAWN_BOX_PREP_CHECKPOINT_ID,
+        YAWN_BOX_PREP_ROOM,
+    )
 
     rid = str(room_id or "").strip().upper()
+    cid = str(checkpoint_id or "").strip()
     if rid in BOX_BAZOOKA_DEPOSIT_ROOMS:
         return DEPOSIT_ITEM_ALLOWLIST | ROOM_100_EXTRA_DEPOSIT_IDS
     if rid == YAWN_BOX_PREP_ROOM:
-        return DEPOSIT_ITEM_ALLOWLIST | {WIND_CREST_ITEM_ID}
+        if cid == YAWN_BOX_PREP_CHECKPOINT_ID:
+            return DEPOSIT_ITEM_ALLOWLIST | {WIND_CREST_ITEM_ID}
+        return DEPOSIT_ITEM_ALLOWLIST | ROOM_118_EARLY_AMMO_IDS | {WIND_CREST_ITEM_ID}
     return DEPOSIT_ITEM_ALLOWLIST
 
 
@@ -136,7 +156,12 @@ def is_key_item_id(item_id: int) -> bool:
     return bool(name) and name in KEY_ITEM_NAMES
 
 
-def is_deposit_allowed_item(item_id: int, room_id: str | None = None) -> bool:
+def is_deposit_allowed_item(
+    item_id: int,
+    room_id: str | None = None,
+    *,
+    checkpoint_id: str | None = None,
+) -> bool:
     """Allowlist gate used by masks + macros (keys always False)."""
     from re1_rl.yawn_box_prep_checkpoint import wind_crest_deposit_allowed
 
@@ -145,7 +170,7 @@ def is_deposit_allowed_item(item_id: int, room_id: str | None = None) -> bool:
         return True
     if iid == 0 or is_key_item_id(iid):
         return False
-    return iid in deposit_allowlist_for_room(room_id)
+    return iid in deposit_allowlist_for_room(room_id, checkpoint_id=checkpoint_id)
 
 
 def _typewriter_or_box_rooms() -> frozenset[str]:
@@ -268,6 +293,7 @@ def can_deposit(
     inv_slot: int,
     *,
     room_id: str | None = None,
+    checkpoint_id: str | None = None,
     enforce_allowlist: bool | None = None,
 ) -> tuple[bool, str]:
     """Legal iff source occupied, allowlisted, and modeled box has a free slot.
@@ -297,7 +323,9 @@ def can_deposit(
         else bool(enforce_allowlist)
     )
     # Live macros always pass enforce_allowlist=True. Keys already refused above.
-    if use_allowlist and int(item_id) not in deposit_allowlist_for_room(room_id):
+    if use_allowlist and int(item_id) not in deposit_allowlist_for_room(
+        room_id, checkpoint_id=checkpoint_id
+    ):
         return False, "not_allowlisted"
     modeled = list(box)[:BOX_SLOTS]
     if _first_empty_slot(modeled) is None:
@@ -385,6 +413,7 @@ def apply_deposit(
     *,
     equipped_weapon_id: int,
     room_id: str | None = None,
+    checkpoint_id: str | None = None,
 ) -> dict[str, Any]:
     """Validate, plan, write inventory + box; unequip if depositing equipped weapon.
 
@@ -399,7 +428,13 @@ def apply_deposit(
         }
     inventory = read_inventory(bridge)
     box = read_box(bridge)
-    ok, reason = can_deposit(inventory, box, inv_slot, room_id=room_id)
+    ok, reason = can_deposit(
+        inventory,
+        box,
+        inv_slot,
+        room_id=room_id,
+        checkpoint_id=checkpoint_id,
+    )
     if not ok:
         return {"ok": False, "reason": reason, "moved": None, "unequipped": False}
 
