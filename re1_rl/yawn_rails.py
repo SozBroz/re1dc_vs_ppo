@@ -113,16 +113,22 @@ def apply_logistics_feasibility_mask(
         pressure += len(row.get("items_gained", []))
         peak = max(peak, pressure)
     required_headroom = min(INVENTORY_SLOTS, max(0, peak))
-    from re1_rl.yawn_box_prep_checkpoint import yawn_box_forbidden_weapon_ammo_ids
+    from re1_rl.yawn_box_prep_checkpoint import (
+        YAWN_BOX_PREP_CHECKPOINT_ID,
+        yawn_box_forbidden_weapon_ammo_ids,
+    )
 
-    guns_ammo = yawn_box_forbidden_weapon_ammo_ids()
+    obj = planner.current_objective() if planner is not None else None
+    on_yawn_prep = (
+        str((obj or {}).get("checkpoint_id") or "") == YAWN_BOX_PREP_CHECKPOINT_ID
+    )
+    guns_ammo = yawn_box_forbidden_weapon_ammo_ids() if on_yawn_prep else frozenset()
     for slot in range(min(N_WITHDRAW_ACTIONS, len(box))):
         action = WITHDRAW_ACTION_BASE + slot
         if action >= len(mask) or not mask[action]:
             continue
-        # Never block taking guns/ammo back out of the box. Yawn 118 prep
-        # cannot succeed with bazooka banked; the headroom guard was leaving
-        # only Close legal after Withdraw-open.
+        # Yawn 118 prep cannot succeed with bazooka banked — never block
+        # taking guns/ammo back out on that cell only.
         if int(box[slot][0]) & 0xFF in guns_ammo:
             continue
         _new_box, new_inventory, moved = plan_withdraw(inventory, box, slot)
@@ -702,12 +708,14 @@ def eligible_reset_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _playthrough_leg_span(stage: dict[str, Any], start_index: int) -> int:
-    """Remaining route cells from this start through the Yawn fight (cp96)."""
-    route_steps = list(stage.get("route_steps", []))
-    start = max(0, int(start_index))
-    if route_steps:
-        return max(1, len(route_steps) - start)
-    return max(1, int(stage.get("legs_per_episode", 1)))
+    """Legs to play from this start. Default: one cell, then the episode ends."""
+    if str(stage.get("episode_mode") or "") == "play_through":
+        route_steps = list(stage.get("route_steps", []))
+        start = max(0, int(start_index))
+        if route_steps:
+            return max(1, len(route_steps) - start)
+        return max(1, int(stage.get("legs_per_episode", 1)))
+    return 1
 
 
 def _fresh_start_options(stage: dict[str, Any]) -> dict[str, Any]:
@@ -764,12 +772,11 @@ def sample_one_leg_options(
     *,
     rng: random.Random,
 ) -> dict[str, Any]:
-    """Choose a start cell and a play-through span to the Yawn fight.
+    """Choose a start cell. Default: one successor cell, then the episode ends.
 
-    Default: equal chance of a true fresh start (init savestate) or any
-    loadable cell in cp00–cp95. Completing cp96 ends the episode; the agent
-    otherwise keeps playing until a punishment terminal (death, wrong room,
-    invalid capture, …). Each completed cell still captures a successor.
+    Default mix: equal chance of a true fresh start (init savestate) or any
+    loadable cell in cp00–cp95. Completing the hunted cell ends the episode
+    and captures a successor. ``episode_mode=play_through`` still runs to Yawn.
     ``RE1_YAWN_PAYFORWARD_RIPPLE=1`` enables fight-progression mix instead:
     40% frontier fight cell, 60% uniform over all loadable cells from cp00.
     ``RE1_YAWN_RESET_LATEST_ONLY=1`` forces the newest cell.
@@ -1193,6 +1200,13 @@ def capture_successor_cell(
             )
             _mark_capture_ineligible(env, "leg_kills")
             return None
+        if bool(getattr(env, "_heading_restore_failed", False)):
+            print(
+                f"[yawn_capture] reject heading_restore cp={cid}",
+                flush=True,
+            )
+            _mark_capture_ineligible(env, "heading_restore")
+            return None
         progress.restore_claimed_leg_kills_for_sidecar()
     # First climb to 203 has no cinema at this story beat — do not require 203:.
     next_checkpoint = planner.step_by_seq(completed + 2)
@@ -1395,6 +1409,9 @@ def capture_successor_cell(
             quality=quality,
             to_state_sha256=to_state_sha,
         )
+        from re1_rl.footage_trace import maybe_write_footage_trace
+
+        maybe_write_footage_trace(env, staging, completed_index=completed)
         _log_capture_quality_vs_incumbent(
             root,
             checkpoint_index=completed,

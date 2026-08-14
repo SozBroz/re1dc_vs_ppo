@@ -849,12 +849,12 @@ def test_default_mix_equal_fresh_and_each_loadable_cell(tmp_path: Path) -> None:
             counts["fresh"] += 1
             assert opts["route_start_index"] == 0
             assert "pb_bundle" not in opts
-            assert opts["leg_span"] == 97
+            assert opts["leg_span"] == 1
         else:
             start = int(opts["route_start_index"])
             cell = start - 1
             counts[f"cp{cell:02d}"] += 1
-            assert opts["leg_span"] == 97 - start
+            assert opts["leg_span"] == 1
     total = sum(counts.values())
     assert total == 8000
     for key, n in counts.items():
@@ -1356,6 +1356,7 @@ def test_playthrough_curriculum_spans_remaining_route(tmp_path: Path) -> None:
         "cells_manifest": "manifest.json",
         "route_steps": list(range(1, 30)),
         "legs_per_episode": 6,
+        "episode_mode": "play_through",
     }
     cell_opts = None
     for seed in range(40):
@@ -1376,8 +1377,8 @@ def test_playthrough_curriculum_spans_remaining_route(tmp_path: Path) -> None:
     assert chaining["episode_mode"] == "multi_leg"
     assert chaining["route_id"] == "yawn_quest_v2"
     assert chaining["route_steps"][-1] == _ROUTE_N
-    assert one_leg["episode_mode"] == "play_through"
-    assert one_leg["legs_per_episode"] == _ROUTE_N
+    assert one_leg["episode_mode"] == "one_leg"
+    assert one_leg["legs_per_episode"] == 1
     assert one_leg["route_id"] == "yawn_quest_v2"
     assert one_leg["route_steps"][-1] == _ROUTE_N
 
