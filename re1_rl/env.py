@@ -2074,10 +2074,8 @@ class RE1Env(gym.Env):
         # against the destination room — same as play_human mid-chunk credit.
         self._cutscene_skip_entry_prev = dict(crossing)
         self._last_skip_frames = 0
-        try:
-            self._ram_skip.clear_skip_script_peaks()
-        except AttributeError:
-            pass
+        # Keep mid-skip scene peaks (Kenneth 0x84). Clearing here dropped the
+        # only evidence when the 105→104 door and cinema share one skip.
 
     def _illegal_main_hall_transition(
         self,
@@ -2242,12 +2240,14 @@ class RE1Env(gym.Env):
         if inv_after is not None:
             state["inventory"] = policy_inventory_to_names(inv_after)
         from re1_rl.barry_rescue_checkpoint import note_barry_rescue_skip_settle
+        from re1_rl.barry_return_checkpoint import note_kenneth_cutscene_skip_settle
         from re1_rl.richard_cutscene_checkpoint import (
             note_richard_cutscene_skip_settle,
         )
 
         skip_entry = skip_trap_entry or entry_prev
         skip_frames = int(getattr(self, "_skip_session_frames", 0) or 0)
+        ram_skip = getattr(self, "_ram_skip", None)
         note_barry_rescue_skip_settle(
             self._planner,
             self._progress,
@@ -2261,6 +2261,13 @@ class RE1Env(gym.Env):
             skip_entry,
             state,
             skip_frames=skip_frames,
+        )
+        note_kenneth_cutscene_skip_settle(
+            self._progress,
+            skip_entry,
+            state,
+            skip_frames=skip_frames,
+            peak_scene_flag=getattr(ram_skip, "last_skip_peak_scene_flag", None),
         )
         # Reward qualification is duration-based with explicit exclusions (menu,
         # pickup, death, opening, pre-Kenneth hall, message-box text). Door

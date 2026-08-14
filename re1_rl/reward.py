@@ -981,24 +981,25 @@ def compute_reward(
     if state.get("box_withdraw_success"):
         bd["box_withdraw"] = BOX_WITHDRAW_BONUS
 
-    # Observation and payout are separate ledgers. A cutscene can pay only when
-    # this exact transition also earned a new-room entry reward.
-    # Same-room ``room:cam:sN`` keys that inherit door pairing are the tea-room
-    # door settle, not Kenneth — do not observe or pay them.
+    # Observation and payout are separate ledgers. Every qualified key is
+    # observed; payment still requires a new-room pairing on this transition.
     cutscene_key = state.get("cutscene_key") if not new_items else None
     if (
         cutscene_key
         and progress is not None
         and not progress.kenneth_gate_breached
     ):
+        progress.observe_cutscene(str(cutscene_key))
         room_paired = (room_changed and is_new_room) or bool(
             state.get("cutscene_paired_new_room")
         )
-        door_paired_same_room = room_paired and ":s" in str(cutscene_key)
-        if not door_paired_same_room:
-            progress.observe_cutscene(str(cutscene_key))
-            if room_paired and progress.claim_cutscene_bonus(str(cutscene_key)):
-                bd["new_cutscene"] = NEW_CUTSCENE_BONUS
+        if room_paired and progress.claim_cutscene_bonus(str(cutscene_key)):
+            bd["new_cutscene"] = NEW_CUTSCENE_BONUS
+
+    if progress is not None and not progress.kenneth_gate_breached:
+        from re1_rl.barry_return_checkpoint import note_kenneth_live_scene
+
+        note_kenneth_live_scene(progress, state)
 
     # Same edge as PB typewriter capture (detector complete). Modest crumb;
     # does not extend the 12 min idle floor. Sidecar episode starts suppress

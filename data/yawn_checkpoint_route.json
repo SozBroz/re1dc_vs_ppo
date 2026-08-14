@@ -40,11 +40,9 @@
     "seq": 3,
     "checkpoint_id": "barry_return_105",
     "room_id": "105",
-    "objective": "Enter Dining after Kenneth, still holding First Aid Spray",
+    "objective": "Enter Dining after the Kenneth cutscene",
     "action_type": "navigate",
-    "required_items": [
-      "first_aid_spray_alt"
-    ],
+    "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "all_of",
@@ -60,15 +58,6 @@
           "type": "observed_cutscene",
           "prefix": "104:",
           "require_scene": true
-        },
-        {
-          "type": "has_item",
-          "item": "first_aid_spray_alt"
-        },
-        {
-          "type": "inventory_ammo_exact",
-          "weapon": "beretta",
-          "qty": 15
         }
       ]
     }

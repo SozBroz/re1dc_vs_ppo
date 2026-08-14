@@ -12,7 +12,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 |------|-----|---------------|------|--------|-----------|
 | `cp00` | 1 | `emblem_105` | `105` | pickup | Pick up the wooden emblem |
 | `cp01` | 2 | `kenneth_104` | `104` | navigate | Enter the Tea Room |
-| `cp02` | 3 | `barry_return_105` | `105` | navigate | Enter Dining after Kenneth, still holding First Aid Spray |
+| `cp02` | 3 | `barry_return_105` | `105` | navigate | Enter Dining after the Kenneth cutscene |
 | `cp03` | 4 | `main_hall_106` | `106` | navigate | Reach Main Hall after Kenneth |
 | `cp04` | 5 | `upper_hall_203` | `203` | navigate | Climb to Main Hall 2F |
 | `cp05` | 6 | `barry_hall_return_106` | `106` | navigate | Return from Main Hall 2F (203) back to Main Hall 1F (106) |
@@ -138,16 +138,14 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `105` (DINING ROOM)
 - **Action:** `navigate`
-- **Objective:** Enter Dining after Kenneth, still holding First Aid Spray
-- **Required items:** `first_aid_spray_alt`
+- **Objective:** Enter Dining after the Kenneth cutscene
+- **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **105**. Hold: `first_aid_spray_alt`. `beretta` fireable ammo must be exactly **15**. Navigate until the success condition fires.
+- **How to achieve:** Be in / reach **105**. Navigate until the success condition fires.
 - **Success condition:**
 - **all of:**
   - Enter room `105` from `104`
   - Observe cutscene with prefix `104:` (``:s`` scene key, not a door load)
-  - Have item `first_aid_spray_alt` in inventory
-  - Inventory `beretta` ammo exactly 15
 
 ### `cp03` — `main_hall_106` (seq 4)
 

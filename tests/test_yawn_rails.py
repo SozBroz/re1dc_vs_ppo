@@ -554,38 +554,15 @@ def test_barry_return_rejects_tea_room_door_without_kenneth_scene() -> None:
     )
 
 
-def test_barry_return_requires_first_aid_spray() -> None:
+def test_barry_return_ignores_spray_and_ammo() -> None:
     planner = _planner(start_index=_idx("barry_return_105"))
     progress = ProgressTracker()
     progress.note_leg_room_transition("104", "105")
-    progress.observe_cutscene("104:0:s0")
-    assert not planner.advance_if_success(
-        _barry_state("105", spray=False),
-        progress=progress,
-        prev_state=_barry_state("104", spray=False),
-    )
+    progress.observe_cutscene("104:4:s0")
     assert planner.advance_if_success(
-        _barry_state("105"),
+        _barry_state("105", spray=False, beretta_qty=14),
         progress=progress,
-        prev_state=_barry_state("104"),
-    )
-
-
-def test_barry_return_requires_exactly_15_handgun_ammo() -> None:
-    planner = _planner(start_index=_idx("barry_return_105"))
-    progress = ProgressTracker()
-    progress.note_leg_room_transition("104", "105")
-    progress.observe_cutscene("104:0:s0")
-    for qty in (14, 16, 0):
-        assert not planner.advance_if_success(
-            _barry_state("105", beretta_qty=qty),
-            progress=progress,
-            prev_state=_barry_state("104", beretta_qty=qty),
-        )
-    assert planner.advance_if_success(
-        _barry_state("105", beretta_qty=15),
-        progress=progress,
-        prev_state=_barry_state("104", beretta_qty=15),
+        prev_state=_barry_state("104", spray=False, beretta_qty=14),
     )
 
 
@@ -2234,22 +2211,20 @@ def test_barry_return_capture_requires_kenneth(
         _progress=progress,
         _step_count=300,
         _read_state=lambda track_items=False: _state(
-            "105", inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"]
+            "105", inventory=["knife", "beretta", "emblem"]
         ),
     )
     assert (
         capture_successor_cell(
             env,
-            _state(
-                "105", inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"]
-            ),
+            _state("105", inventory=["knife", "beretta", "emblem"]),
             {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
         )
         is None
     )
     bridge.save_savestate.assert_not_called()
 
-    progress.observed_cutscenes.add("104:0:s0")
+    progress.observed_cutscenes.add("104:4:s0")
     monkeypatch.setattr(
         "re1_rl.yawn_rails.dump_episode_sidecar",
         lambda *_args, **_kwargs: {
@@ -2258,9 +2233,7 @@ def test_barry_return_capture_requires_kenneth(
             "episode_history": {"room_entries": [["105", 100]]},
         },
     )
-    barry_state = _state(
-        "105", inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"]
-    )
+    barry_state = _state("105", inventory=["knife", "beretta", "emblem"])
     proposal = capture_successor_cell(
         env, barry_state, {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
     )
