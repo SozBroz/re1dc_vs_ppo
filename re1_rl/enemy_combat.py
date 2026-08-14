@@ -50,6 +50,9 @@ BLACK_TIGER_RAM_TYPE_ID = 0x14
 PLANT42_RAM_TYPE_ID = 0x10
 # Live Tyrant ~220; dogs / translated Yawn sit at or below CERBERUS_HP_MAX.
 TYRANT_HP_MIN = 200
+# Dead courtyard dog (cp36 QS vs official cell): hp@0 collapses to 0xFFF7/0xFFFF
+# while type_id stays 0x0F. Tyrant (~220) and raw Yawn (~3050) stay below this.
+CERBERUS_DEAD_HP_MIN = 0xFFF0
 
 # Ordinary mansion zombies (test_enemy_combat + RDT model map).
 ZOMBIE_RAM_TYPE_IDS: frozenset[int] = frozenset({0x01, 0x02})
@@ -146,6 +149,30 @@ def _stacked_inactive_corpse_coords(
     return frozenset(corpse)
 
 
+def is_dead_cerberus_enemy(ent: dict[str, Any]) -> bool:
+    """True when a dog slot has collapsed to the death sentinel (not Tyrant/Yawn)."""
+    tid = ent.get("type_id")
+    if tid is None or int(tid) != CERBERUS_RAM_TYPE_ID:
+        return False
+    hp = _combat_hp(ent)
+    return hp <= 0 or hp >= CERBERUS_DEAD_HP_MIN
+
+
+def is_inactive_kind_for_attack_mask(ent: dict[str, Any]) -> bool:
+    """Parked kind 0x0D rows (inactive hunter / bleed) keep guns legal after a kill.
+
+    Courtyard 11A: official cp36 live dog is type 0x0F hp=99. After the dog dies
+    (QS / cp37) that slot goes hp=65527 and drops out of decode, but two type
+    0x0D rows stay at the spawn tile with active_byte=0 and combat_near=1.
+    They never change until something actually activates (landmine/hunter EC
+    0x2C/0x44/0x90). Skip only the inactive park — live dogs stay legal.
+    """
+    if int(ent.get("active_byte", 0)) != 0:
+        return False
+    tid = ent.get("type_id")
+    return tid is not None and int(tid) == GALLERY_CROW_RAM_TYPE_ID
+
+
 def _skip_for_attack_mask(
     ent: dict[str, Any],
     *,
@@ -153,6 +180,10 @@ def _skip_for_attack_mask(
     corpse_coords: frozenset[tuple[int, int]] | None = None,
 ) -> bool:
     if mask_attack_pool_ghosts_enabled() and is_pool_ghost_enemy(ent):
+        return True
+    if is_dead_cerberus_enemy(ent):
+        return True
+    if is_inactive_kind_for_attack_mask(ent):
         return True
     if not mask_attack_corpse_stacks_enabled():
         return False

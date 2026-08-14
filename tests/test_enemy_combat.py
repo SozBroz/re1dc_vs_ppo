@@ -22,6 +22,8 @@ from re1_rl.enemy_combat import (
     is_boss_combat_entity,
     is_crow_combat_entity,
     is_crow_enemy,
+    is_dead_cerberus_enemy,
+    is_inactive_kind_for_attack_mask,
     is_passive_crow_enemy,
     is_pool_ghost_coordinate,
     is_pool_ghost_enemy,
@@ -1088,3 +1090,85 @@ def test_attack_mask_keeps_active_landmine_and_cerberus(monkeypatch) -> None:
     }
     assert combat_enemy_count([landmine], for_attack_mask=True) == 1
     assert combat_enemy_count([dog], for_attack_mask=True) == 1
+
+
+def _courtyard_11a_live_dog() -> dict:
+    """Official cp36 cell.State slot 0 — dog alive, not yet aggroed (EC=0)."""
+    return {
+        "slot": 0,
+        "hp": 99,
+        "type_id": 0x0F,
+        "active_byte": 0,
+        "x": 3147,
+        "z": 10645,
+        "alive": 1,
+        "in_room": 1,
+        "combat_near": 1,
+        "knife_near": 0,
+    }
+
+
+def _courtyard_11a_parked_kind() -> list[dict]:
+    """11A slots 1-2: identical on live-dog cp36, dead-dog QS, and post-crest cp37."""
+    return [
+        {
+            "slot": 1,
+            "hp": 40,
+            "type_id": 0x0D,
+            "active_byte": 0,
+            "x": 3147,
+            "z": 10645,
+            "alive": 1,
+            "in_room": 1,
+            "combat_near": 1,
+            "knife_near": 0,
+        },
+        {
+            "slot": 2,
+            "hp": 42,
+            "type_id": 0x0D,
+            "active_byte": 0,
+            "x": 3378,
+            "z": 10838,
+            "alive": 1,
+            "in_room": 1,
+            "combat_near": 1,
+            "knife_near": 0,
+        },
+    ]
+
+
+def test_courtyard_live_dog_keeps_attack_mask() -> None:
+    dog = _courtyard_11a_live_dog()
+    parked = _courtyard_11a_parked_kind()
+    assert not is_dead_cerberus_enemy(dog)
+    assert is_inactive_kind_for_attack_mask(parked[0])
+    assert is_inactive_kind_for_attack_mask(parked[1])
+    enemies = [dog, *parked]
+    assert paid_combat_enemy_count(enemies, room_id="11A", for_attack_mask=True) == 1
+    assert combat_enemy_count(enemies, for_attack_mask=True) == 1
+    assert combat_enemy_count(enemies) == 3
+
+
+def test_courtyard_dead_dog_masks_until_hunter_active() -> None:
+    """QS1 / cp37: dog hp=65527 drops out; parked 0x0D EC=0 must not keep guns legal."""
+    dead = {
+        "slot": 0,
+        "hp": 65527,
+        "type_id": 0x0F,
+        "active_byte": 0x2C,
+        "x": 3307,
+        "z": 10818,
+        "alive": 1,
+        "in_room": 1,
+        "combat_near": 1,
+        "knife_near": 0,
+    }
+    parked = _courtyard_11a_parked_kind()
+    assert is_dead_cerberus_enemy(dead)
+    assert paid_combat_enemy_count([dead, *parked], room_id="11A", for_attack_mask=True) == 0
+    hunter = {**parked[0], "active_byte": 0x90}
+    assert not is_inactive_kind_for_attack_mask(hunter)
+    assert paid_combat_enemy_count(
+        [dead, hunter, parked[1]], room_id="11A", for_attack_mask=True
+    ) == 1
