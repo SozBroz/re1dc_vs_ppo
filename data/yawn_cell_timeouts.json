@@ -4,7 +4,7 @@
   "default_multiplier": 2.0,
   "hard_multiplier": 4.0,
   "cutscene_multiplier": 1.5,
-  "notes": "Human 1x playthrough times for the leg that creates each cpNN. Agent budget is frames at 60 fps times the multiplier. Hard CPs use 4x (2x the 2x buffer); cutscene legs use 1.5x; others 2x. Optional per-row multiplier overrides those (cp19 is 5x = 2.5x the buffer). Clamp to 12 min (43200 frames).",
+  "notes": "Human 1x playthrough times for the leg that creates each cpNN. Agent budget is frames at 60 fps times the multiplier. Hard CPs use 4x (2x the 2x buffer); cutscene legs use 1.5x; others 2x. Optional per-row multiplier overrides those (2.5x buffer = 5x). Optional frames skips the time math (cp45 is a flat 8 min). Clamp to 12 min (43200 frames).",
   "cells": {
     "0": {"time": "49.57"},
     "1": {"time": "17.93"},
@@ -40,6 +40,17 @@
     "31": {"time": "46.69"},
     "32": {"time": "15.97"},
     "33": {"time": "19.56"},
-    "34": {"time": "35.28"}
+    "34": {"time": "35.28"},
+    "35": {"time": "24.50"},
+    "36": {"time": "26.09"},
+    "37": {"time": "32.6", "multiplier": 5.0},
+    "38": {"time": "15.25"},
+    "39": {"time": "23.13"},
+    "40": {"time": "45.30", "hard": true},
+    "41": {"time": "1:20.35"},
+    "42": {"time": "1:20.35"},
+    "43": {"time": "18.48"},
+    "44": {"time": "1:04.29", "hard": true},
+    "45": {"time": "4:20.72", "frames": 28800}
   }
 }

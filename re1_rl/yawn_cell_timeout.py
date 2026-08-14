@@ -112,11 +112,13 @@ def cell_timeout_frames(
     row = cells.get(str(int(created_index)))
     if not isinstance(row, dict):
         return 0
+    fps = int(table.get("fps") or _FPS)
+    cap = int(table.get("cap_frames") or _CAP_FRAMES)
+    if row.get("frames") is not None:
+        return min(cap, max(0, int(row["frames"])))
     raw = row.get("time")
     if raw is None or str(raw).strip() == "":
         return 0
-    fps = int(table.get("fps") or _FPS)
-    cap = int(table.get("cap_frames") or _CAP_FRAMES)
     if row.get("multiplier") is not None:
         mult = float(row["multiplier"])
     elif bool(row.get("hard")):
