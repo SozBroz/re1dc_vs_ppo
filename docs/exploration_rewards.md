@@ -141,8 +141,8 @@ least 450 frames may pay. This is an intentional simplicity tradeoff.
 
 | Event | Magnitude | Notes |
 |-------|-----------|-------|
-| Open-box withdraw | **0** | No transfer reward. |
-| Open-box deposit | **0** | No transfer reward. |
+| Open-box withdraw | **0** | No transfer reward. Inventory deltas from the transfer do not pay pickup / ammo / key / weapon and do not reset idle. |
+| Open-box deposit | **0** | No transfer reward. Same unpaid inventory-delta rule. |
 
 ### Not yet validated
 

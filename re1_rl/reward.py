@@ -44,7 +44,8 @@ WAYPOINT_ROOM_BONUS = 4.0
 ITEM_PICKUP_BONUS = 0.15
 # Ammunition stacks (handgun bullets, shells, launcher packs, …).
 AMMO_PICKUP_BONUS = 2.0
-# Box withdraw/deposit: no transfer reward (imperator 2026-08-13).
+# Box withdraw/deposit: no transfer reward and no pickup-channel pay
+# (imperator 2026-08-13).
 BOX_WITHDRAW_BONUS = 0.0
 # Completed typewriter save (ink-ribbon consume + save cinema + stable control).
 TYPEWRITER_SAVE_BONUS = 0.3
@@ -541,6 +542,17 @@ def _wrong_room_terminal_active(planner: Any) -> bool:
         return False
 
 
+def _box_inventory_unpaid(state: dict[str, Any]) -> bool:
+    """True when inventory deltas this step are a box withdraw/deposit."""
+    transfer = str(state.get("box_transfer") or "").strip().lower()
+    return bool(
+        state.get("box_withdraw_success")
+        or state.get("box_deposit_success")
+        or state.get("box_ui_step")
+        or transfer in {"withdraw", "deposit"}
+    )
+
+
 def _key_item_return_blocked(
     *,
     state: dict[str, Any],
@@ -914,6 +926,7 @@ def compute_reward(
     # count as exploration progress — blocks idle-clock / extension farms.
     weapon_progress = False
     ammo_progress = False
+    box_unpaid = _box_inventory_unpaid(state)
     for raw in new_items:
         name = canonical_item(str(raw))
         if (
@@ -927,8 +940,9 @@ def compute_reward(
             progress.note_leg_acquired(name)
         if name in _KEY_ITEM_NAME_SET:
             if progress is None or progress.claim_key_item_bonus(name):
-                bd["key_item"] += KEY_ITEM_PICKUP_BONUS
-                acquired_key_or_weapon = True
+                if not box_unpaid:
+                    bd["key_item"] += KEY_ITEM_PICKUP_BONUS
+                    acquired_key_or_weapon = True
         elif name in _WEAPON_NAME_SET:
             first_weapon = (
                 progress is not None and progress.claim_weapon_progress(name)
@@ -940,16 +954,24 @@ def compute_reward(
                 and not first_weapon
             )
             if progress is None or first_weapon or shotgun_retake:
-                bd["new_weapon"] += NEW_WEAPON_PICKUP_BONUS
-                if first_weapon:
-                    acquired_key_or_weapon = True
-                    weapon_progress = True
+                if not box_unpaid:
+                    bd["new_weapon"] += NEW_WEAPON_PICKUP_BONUS
+                    if first_weapon:
+                        acquired_key_or_weapon = True
+                        weapon_progress = True
         elif name in AMMO_ITEM_NAMES:
-            bd["ammo_pickup"] += AMMO_PICKUP_BONUS
-            ammo_progress = True
+            if not box_unpaid:
+                bd["ammo_pickup"] += AMMO_PICKUP_BONUS
+                ammo_progress = True
         else:
-            if name not in HEALTH_RESOURCE_ITEMS or _health_pickup_adds_resource(
-                name, prev_state=prev_state, state=state
+            if (
+                not box_unpaid
+                and (
+                    name not in HEALTH_RESOURCE_ITEMS
+                    or _health_pickup_adds_resource(
+                        name, prev_state=prev_state, state=state
+                    )
+                )
             ):
                 bd["item"] += ITEM_PICKUP_BONUS
 

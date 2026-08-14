@@ -418,8 +418,6 @@ def test_typewriter_or_box_rooms():
 
 
 def test_box_withdraw_success_pays_nothing() -> None:
-    import pytest
-
     from re1_rl.progress import ProgressTracker
     from re1_rl.reward import BOX_WITHDRAW_BONUS, compute_reward
     from tests.test_scaffolding import make_planner, make_state
@@ -438,6 +436,69 @@ def test_box_withdraw_success_pays_nothing() -> None:
     )
     assert bd["box_withdraw"] == pytest.approx(0.0)
     assert BOX_WITHDRAW_BONUS == pytest.approx(0.0)
+
+
+def test_box_transfer_does_not_pay_pickup_channels() -> None:
+    from re1_rl.progress import ProgressTracker
+    from re1_rl.reward import (
+        AMMO_PICKUP_BONUS,
+        SOFTLOCK_PRE_KENNETH_FRAMES,
+        compute_reward,
+        softlock_frame_threshold,
+    )
+    from tests.test_scaffolding import make_planner, make_state
+
+    planner = make_planner()
+    flags = (
+        {"box_withdraw_success": True},
+        {"box_deposit_success": True},
+        {"box_ui_step": True},
+        {"box_transfer": "withdraw"},
+        {"box_transfer": "deposit"},
+    )
+    items = ["handgun_bullets", "green_herb", "emblem", "beretta"]
+    for flag in flags:
+        progress = ProgressTracker()
+        progress.note_stagnation_step(made_progress=False, step_frames=20)
+        prev = make_state(hp=96, step=1, room_id="118")
+        cur = make_state(
+            hp=96,
+            step=2,
+            room_id="118",
+            new_items=items,
+            in_control=True,
+        )
+        cur.update(flag)
+        _total, bd = compute_reward(
+            prev,
+            cur,
+            planner,
+            progress=progress,
+            rails_mode=True,
+            return_breakdown=True,
+        )
+        assert bd["box_withdraw"] == pytest.approx(0.0), flag
+        assert bd["ammo_pickup"] == pytest.approx(0.0), flag
+        assert bd["item"] == pytest.approx(0.0), flag
+        assert bd["key_item"] == pytest.approx(0.0), flag
+        assert bd["new_weapon"] == pytest.approx(0.0), flag
+        assert progress.softlock_cap_frames == 0, flag
+        assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES
+
+    progress = ProgressTracker()
+    prev = make_state(hp=96, step=1, room_id="118")
+    cur = make_state(
+        hp=96, step=2, room_id="118", new_items=["handgun_bullets"]
+    )
+    _total, bd = compute_reward(
+        prev,
+        cur,
+        planner,
+        progress=progress,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["ammo_pickup"] == pytest.approx(AMMO_PICKUP_BONUS)
 
 
 if __name__ == "__main__":

@@ -399,6 +399,7 @@ class RE1Env(gym.Env):
         self._box_cache: list[tuple[int, int]] | None = None
         self._box_departure_snapshot: list[float] | None = None
         self._box_ui_open = False
+        self._box_ui_step_pending = False
         self._box_phase = BOX_PHASE_CHOOSE
         self._box_inv_cursor = 0
         self._box_list_cursor = 0
@@ -1730,6 +1731,7 @@ class RE1Env(gym.Env):
         self._combine_phase = 0
         self._combine_slot_a = None
         self._box_ui_open = False
+        self._box_ui_step_pending = False
         self._box_phase = BOX_PHASE_CHOOSE
         self._box_inv_cursor = 0
         self._box_list_cursor = 0
@@ -2904,6 +2906,7 @@ class RE1Env(gym.Env):
 
         if not self._box_ui_open:
             return None
+        self._box_ui_step_pending = True
         a = int(action)
         prev_hp = int(getattr(self, "_prev_hp", 0) or 0)
         episode_start_hp = int(getattr(self, "_episode_start_hp", 0) or 0)
@@ -3194,6 +3197,7 @@ class RE1Env(gym.Env):
                 died=bool(died),
             )
 
+        self._box_ui_step_pending = False
         return None
 
     def _handle_use_action(
@@ -3566,12 +3570,24 @@ class RE1Env(gym.Env):
         state["step_emulated_frames"] = int(step_emulated_frames)
         state["reference_step_frames"] = self.frame_skip
         report_pre = magic_report or {}
+        if bool(getattr(self, "_box_ui_step_pending", False)):
+            state["box_ui_step"] = True
+            self._box_ui_step_pending = False
+        transfer = str(report_pre.get("box_transfer") or "").strip().lower()
+        if transfer in {"withdraw", "deposit"}:
+            state["box_transfer"] = transfer
         if (
             report_pre.get("ok")
-            and report_pre.get("box_transfer") == "withdraw"
+            and transfer == "withdraw"
             and report_pre.get("moved") is not None
         ):
             state["box_withdraw_success"] = True
+        if (
+            report_pre.get("ok")
+            and transfer == "deposit"
+            and report_pre.get("moved") is not None
+        ):
+            state["box_deposit_success"] = True
         inv_before = getattr(self, "_inventory_before_use", None)
         if inv_before is not None:
             from re1_rl.item_box import read_inventory
