@@ -499,7 +499,7 @@ def _barry_state(room: str, *, beretta_qty: int = 15, spray: bool = True) -> dic
 
 
 def test_pre_cutscene_room_dwell_does_not_satisfy_post_cutscene_settle() -> None:
-    """Barry return still needs Kenneth; walk-up dwell alone does not complete."""
+    """Barry return still needs Kenneth ``104:*:sN``; walk-up dwell alone does not complete."""
     planner = _planner(start_index=_idx("barry_return_105"))
     progress = ProgressTracker()
     progress.note_leg_room_transition("104", "105")
@@ -521,6 +521,26 @@ def test_barry_return_requires_kenneth_cutscene() -> None:
     planner = _planner(start_index=_idx("barry_return_105"))
     progress = ProgressTracker()
     progress.note_leg_room_transition("104", "105")
+    assert not planner.advance_if_success(
+        _barry_state("105"),
+        progress=progress,
+        prev_state=_barry_state("104"),
+    )
+    progress.observe_cutscene("104:0:s0")
+    assert planner.advance_if_success(
+        _barry_state("105"),
+        progress=progress,
+        prev_state=_barry_state("104"),
+    )
+
+
+def test_barry_return_rejects_tea_room_door_without_kenneth_scene() -> None:
+    """Door key ``104:0`` is not Kenneth; ``104:0:s0`` is."""
+    planner = _planner(start_index=_idx("barry_return_105"))
+    progress = ProgressTracker()
+    progress.note_leg_room_transition("104", "105")
+    progress.observe_cutscene("104:0")
+    progress.observe_cutscene("105:barry_return")
     assert not planner.advance_if_success(
         _barry_state("105"),
         progress=progress,
@@ -2199,7 +2219,8 @@ def test_barry_return_capture_requires_kenneth(
     )
     planner = _planner(start_index=_idx("barry_return_105") + 1)
     progress = ProgressTracker()
-    progress.observed_cutscenes.add("105:2:s1")  # Barry beat only — missing Kenneth
+    progress.observed_cutscenes.add("105:2:s1")  # generic dining cam, not Kenneth
+    progress.observed_cutscenes.add("105:barry_return")  # fake door mint is not Kenneth
     env = SimpleNamespace(
         project_root=tmp_path,
         _stage={

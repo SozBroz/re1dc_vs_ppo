@@ -141,13 +141,13 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Objective:** Enter Dining after Kenneth, still holding First Aid Spray
 - **Required items:** `first_aid_spray_alt`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **105**. Hold: `first_aid_spray_alt`. Beretta fireable ammo (clip + spare) must be exactly **15**. Navigate until the success condition fires.
+- **How to achieve:** Be in / reach **105**. Hold: `first_aid_spray_alt`. `beretta` fireable ammo must be exactly **15**. Navigate until the success condition fires.
 - **Success condition:**
 - **all of:**
   - Enter room `105` from `104`
-  - Observe cutscene with prefix `104:`
+  - Observe cutscene with prefix `104:` (``:s`` scene key, not a door load)
   - Have item `first_aid_spray_alt` in inventory
-  - Inventory beretta ammo exactly 15
+  - Inventory `beretta` ammo exactly 15
 
 ### `cp03` — `main_hall_106` (seq 4)
 

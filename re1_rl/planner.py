@@ -24,6 +24,20 @@ _WEAPON_NAME_SET: frozenset[str] = frozenset(
 def _is_key_or_weapon(name: str) -> bool:
     return name in _KEY_ITEM_NAME_SET or name in _WEAPON_NAME_SET
 
+
+def _observed_cutscene_met(cond: dict[str, Any], progress: ProgressTracker | None) -> bool:
+    """True when a ledger key matches ``prefix`` (optional ``require_scene`` → ``:s``)."""
+    if progress is None:
+        return False
+    prefix = str(cond.get("prefix", ""))
+    if not prefix:
+        return False
+    require_scene = bool(cond.get("require_scene"))
+    return any(
+        str(key).startswith(prefix) and (not require_scene or ":s" in str(key))
+        for key in progress.observed_cutscenes
+    )
+
 # Order matters: index in this tuple = position in the objective one-hot.
 OBJECTIVE_TYPES = ("navigate", "pickup", "use_item", "fight", "scripted_macro")
 
@@ -264,12 +278,7 @@ class WaypointPlanner:
             )
 
         if cond_type == "observed_cutscene":
-            if progress is None:
-                return False
-            prefix = str(cond.get("prefix", ""))
-            return bool(prefix) and any(
-                str(key).startswith(prefix) for key in progress.observed_cutscenes
-            )
+            return _observed_cutscene_met(cond, progress)
 
         if cond_type == "yawn_box_prep_exit":
             from re1_rl.yawn_box_prep_checkpoint import yawn_box_prep_exit_met
@@ -393,12 +402,7 @@ class WaypointPlanner:
             site = str(cond.get("site_id", ""))
             return bool(site) and site in progress.rewarded_story_uses
         if cond_type == "observed_cutscene":
-            if progress is None:
-                return False
-            prefix = str(cond.get("prefix", ""))
-            return bool(prefix) and any(
-                str(key).startswith(prefix) for key in progress.observed_cutscenes
-            )
+            return _observed_cutscene_met(cond, progress)
         if cond_type == "typewriter_save":
             return bool(state.get("typewriter_save_complete"))
         if cond_type == "state_flag":

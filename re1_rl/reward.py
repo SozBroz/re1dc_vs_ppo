@@ -1116,6 +1116,16 @@ def compute_reward(
                             planner, progress.timeout_table_root
                         )
                     )
+        if progress is not None and not bd["checkpoint_success"]:
+            from re1_rl.barry_return_checkpoint import fail_barry_return_if_unmet
+
+            fail_barry_return_if_unmet(
+                planner,
+                progress,
+                bd,
+                RAILS_CAPTURE_INELIGIBLE_PENALTY,
+                room_id=room,
+            )
 
     if (
         rails_mode
@@ -1216,6 +1226,7 @@ def compute_reward(
         or progress.wrong_room_breached
         or progress.forbidden_item_breached
         or progress.cell_timeout_breached
+        or progress.capture_ineligible_breached
     ):
         for term, value in bd.items():
             if value > 0.0:

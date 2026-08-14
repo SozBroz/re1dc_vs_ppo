@@ -48,12 +48,22 @@ def _render_condition(cond: Any, *, indent: int = 0) -> list[str]:
         return [f"{pad}- Acquire item `{cond.get('item', '?')}`"]
     if ctype == "has_item":
         return [f"{pad}- Have item `{cond.get('item', '?')}` in inventory"]
+    if ctype == "inventory_ammo_exact":
+        weapon = cond.get("weapon") or cond.get("item") or "beretta"
+        return [
+            f"{pad}- Inventory `{weapon}` ammo exactly {int(cond.get('qty', 0))}"
+        ]
     if ctype == "lacks_item":
         return [f"{pad}- Lack item `{cond.get('item', '?')}` in inventory"]
     if ctype == "story_use":
         return [f"{pad}- Story USE at `{cond.get('site_id', '?')}`"]
     if ctype == "observed_cutscene":
-        return [f"{pad}- Observe cutscene with prefix `{cond.get('prefix', '?')}`"]
+        extra = (
+            " (``:s`` scene key, not a door load)" if cond.get("require_scene") else ""
+        )
+        return [
+            f"{pad}- Observe cutscene with prefix `{cond.get('prefix', '?')}`{extra}"
+        ]
     if ctype == "in_control_steps_in_room":
         return [
             f"{pad}- Stay in-control in `{cond.get('room_id', '?')}` for "
@@ -87,6 +97,19 @@ def _render_condition(cond: Any, *, indent: int = 0) -> list[str]:
     return [f"{pad}- ({ctype}) `{json.dumps(cond, sort_keys=True)}`"]
 
 
+def _ammo_exact_from_success(cond: Any) -> tuple[str, int] | None:
+    if not isinstance(cond, dict):
+        return None
+    if cond.get("type") == "inventory_ammo_exact":
+        weapon = str(cond.get("weapon") or cond.get("item") or "beretta")
+        return weapon, int(cond.get("qty", 0))
+    for sub in cond.get("conditions") or []:
+        found = _ammo_exact_from_success(sub)
+        if found is not None:
+            return found
+    return None
+
+
 def _how_to_achieve(cp: dict[str, Any]) -> str:
     room = cp.get("room_id", "?")
     action = str(cp.get("action_type", "navigate"))
@@ -96,6 +119,10 @@ def _how_to_achieve(cp: dict[str, Any]) -> str:
     parts = [f"Be in / reach **{room}**."]
     if req:
         parts.append(f"Hold: {_fmt_list(req)}.")
+    ammo = _ammo_exact_from_success(cp.get("success_condition"))
+    if ammo is not None:
+        weapon, qty = ammo
+        parts.append(f"`{weapon}` fireable ammo must be exactly **{qty}**.")
     if action == "pickup" and gained:
         parts.append(f"Pick up {_fmt_list(gained)}.")
     elif action == "use_item":

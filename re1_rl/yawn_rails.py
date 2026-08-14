@@ -1185,11 +1185,12 @@ def capture_successor_cell(
     ):
         _mark_capture_ineligible(env, "cutscene_gate")
         return None
-    if cid == "barry_return_105" and not any(
-        str(k).startswith("104:") for k in ledgers
-    ):
-        _mark_capture_ineligible(env, "cutscene_gate")
-        return None
+    if cid == "barry_return_105":
+        from re1_rl.cutscene_reward import kenneth_cutscene_seen
+
+        if not kenneth_cutscene_seen(ledgers):
+            _mark_capture_ineligible(env, "cutscene_gate")
+            return None
     if cid == "main_hall_106" and not any(str(k).startswith("106:") for k in ledgers):
         _mark_capture_ineligible(env, "cutscene_gate")
         return None

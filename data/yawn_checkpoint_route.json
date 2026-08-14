@@ -58,7 +58,8 @@
         },
         {
           "type": "observed_cutscene",
-          "prefix": "104:"
+          "prefix": "104:",
+          "require_scene": true
         },
         {
           "type": "has_item",
