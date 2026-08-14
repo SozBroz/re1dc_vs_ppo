@@ -483,6 +483,8 @@ RAILS_CHECKPOINT_REWARD = 8.0
 # Hard capture gate failure (inventory headroom, leg kills, unsettled state, etc.).
 # Distinct from quality compare (LOSE_TO_INCUMBENT) — not worth filing at all.
 RAILS_CAPTURE_INELIGIBLE_PENALTY = -4.0
+# Per-CP emulated-frame wall expired without satisfying the cell.
+RAILS_CELL_TIMEOUT_PENALTY = -4.0
 # Navigation milestones keep full exploration magnitudes on rails (+4 / +2 ammo).
 RAILS_NAV_POSITIVE_SCALE = 1.0
 RAILS_NAV_POSITIVE_TERMS: frozenset[str] = frozenset({
@@ -796,6 +798,7 @@ def compute_reward(
         "new_weapon": 0.0,
         "checkpoint_success": 0.0,
         "checkpoint_capture_ineligible": 0.0,
+        "checkpoint_timeout": 0.0,
         "success_room": 0.0,
         "hp": 0.0,
         "death": 0.0,
@@ -980,18 +983,22 @@ def compute_reward(
 
     # Observation and payout are separate ledgers. A cutscene can pay only when
     # this exact transition also earned a new-room entry reward.
+    # Same-room ``room:cam:sN`` keys that inherit door pairing are the tea-room
+    # door settle, not Kenneth — do not observe or pay them.
     cutscene_key = state.get("cutscene_key") if not new_items else None
     if (
         cutscene_key
         and progress is not None
         and not progress.kenneth_gate_breached
     ):
-        progress.observe_cutscene(str(cutscene_key))
         room_paired = (room_changed and is_new_room) or bool(
             state.get("cutscene_paired_new_room")
         )
-        if room_paired and progress.claim_cutscene_bonus(str(cutscene_key)):
-            bd["new_cutscene"] = NEW_CUTSCENE_BONUS
+        door_paired_same_room = room_paired and ":s" in str(cutscene_key)
+        if not door_paired_same_room:
+            progress.observe_cutscene(str(cutscene_key))
+            if room_paired and progress.claim_cutscene_bonus(str(cutscene_key)):
+                bd["new_cutscene"] = NEW_CUTSCENE_BONUS
 
     # Same edge as PB typewriter capture (detector complete). Modest crumb;
     # does not extend the 12 min idle floor. Sidecar episode starts suppress
@@ -1101,6 +1108,32 @@ def compute_reward(
                 )
                 # Legacy telemetry alias remains zero; checkpoint_success is
                 # intentionally explicit in rollout accounting.
+                if progress is not None and not progress.checkpoint_success:
+                    from re1_rl.yawn_cell_timeout import cell_timeout_frames_for_planner
+
+                    progress.arm_cell_timeout(
+                        cell_timeout_frames_for_planner(
+                            planner, progress.timeout_table_root
+                        )
+                    )
+
+    if (
+        rails_mode
+        and progress is not None
+        and "step_emulated_frames" in state
+        and not bd["checkpoint_success"]
+        and not progress.kenneth_gate_breached
+        and not progress.wrong_room_breached
+        and not progress.forbidden_item_breached
+        and not progress.cell_timeout_breached
+    ):
+        progress.note_leg_frames(int(state.get("step_emulated_frames") or 0))
+        if (
+            progress.cell_timeout_frames > 0
+            and progress.leg_emulated_frames >= progress.cell_timeout_frames
+            and progress.breach_cell_timeout()
+        ):
+            bd["checkpoint_timeout"] = RAILS_CELL_TIMEOUT_PENALTY
 
     if state.get("gold_emblem_return"):
         bd["gold_emblem_return"] = GOLD_EMBLEM_RETURN_PENALTY
@@ -1182,6 +1215,7 @@ def compute_reward(
         progress.kenneth_gate_breached
         or progress.wrong_room_breached
         or progress.forbidden_item_breached
+        or progress.cell_timeout_breached
     ):
         for term, value in bd.items():
             if value > 0.0:

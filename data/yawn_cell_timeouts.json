@@ -1,0 +1,29 @@
+{
+  "fps": 60,
+  "cap_frames": 43200,
+  "default_multiplier": 2.0,
+  "hard_multiplier": 4.0,
+  "cutscene_multiplier": 1.5,
+  "notes": "Human 1x playthrough times for the leg that creates each cpNN. Agent budget is frames at 60 fps times the multiplier. Hard CPs use 4x; cutscene legs use 1.5x; others 2x. Clamp to 12 min (43200 frames).",
+  "cells": {
+    "0": {"time": "49.57"},
+    "1": {"time": "17.93"},
+    "2": {"time": "2:00", "cutscene": true},
+    "3": {"time": "55.55", "cutscene": true},
+    "4": {"time": "15.54"},
+    "5": {"time": "3:21.61", "cutscene": true},
+    "6": {"time": "20.58"},
+    "7": {"time": "1:04.41"},
+    "8": {"time": "25.73", "hard": true},
+    "9": {"time": "1:47.00", "hard": true},
+    "10": {"time": "34.46", "hard": true},
+    "11": {"time": "15.19", "hard": true},
+    "12": {"time": "23.00"},
+    "13": {"time": "16.52"},
+    "14": {"time": "29.01", "hard": true},
+    "15": {"time": "19.67"},
+    "16": {"time": "16.12"},
+    "17": {"time": "22.31"},
+    "18": {"time": "20.94"}
+  }
+}

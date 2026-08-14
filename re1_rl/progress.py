@@ -68,6 +68,11 @@ class ProgressTracker:
     forbidden_item_breached: bool = False
     # Checkpoint nav succeeded but successor capture was hard-ineligible.
     capture_ineligible_breached: bool = False
+    # Per-CP emulated-frame wall for the current hunt (0 = no per-cell timeout).
+    cell_timeout_frames: int = 0
+    leg_emulated_frames: int = 0
+    cell_timeout_breached: bool = False
+    timeout_table_root: str | None = None
     # Spawn room (usually dining 105): visited at reset; no +new_room payout —
     # fresh start matches archive/PB sidecars that already carry spawn credit.
     spawn_room_id: str | None = None
@@ -326,6 +331,26 @@ class ProgressTracker:
             return False
         self.capture_ineligible_breached = True
         self.checkpoint_success = False
+        self.softlock_cap_frames = 0
+        return True
+
+    def arm_cell_timeout(self, frames: int) -> None:
+        """Start a fresh per-cell emulated-frame budget (0 disables the wall)."""
+        self.cell_timeout_frames = max(0, int(frames))
+        self.leg_emulated_frames = 0
+        self.cell_timeout_breached = False
+
+    def note_leg_frames(self, frames: int) -> None:
+        """Accumulate emulated frames for the current cell attempt."""
+        if self.cell_timeout_breached:
+            return
+        self.leg_emulated_frames = int(self.leg_emulated_frames) + max(0, int(frames))
+
+    def breach_cell_timeout(self) -> bool:
+        """Mark per-cell frame-budget expiry as terminal; true only on first breach."""
+        if self.cell_timeout_breached:
+            return False
+        self.cell_timeout_breached = True
         self.softlock_cap_frames = 0
         return True
 

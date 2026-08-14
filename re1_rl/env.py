@@ -139,6 +139,7 @@ from re1_rl.action_mask import (
     action_mask as build_action_mask,
 )
 from re1_rl.attack_macro import (
+    KNIFE_WEAPON_ID,
     execute_attack_down_macro,
     execute_attack_macro,
     execute_attack_up_macro,
@@ -416,6 +417,7 @@ class RE1Env(gym.Env):
         self._stage: dict[str, Any] = {}
         self._step_count = 0
         self._leg_replay = None
+        self._footage_trace = None
         self._checkpoint_freeze_pending = False
         self._checkpoint_captured = False
         self._prev_state: dict[str, Any] = {}
@@ -432,6 +434,7 @@ class RE1Env(gym.Env):
         # worker must not start a fast_forward (which mashes cross and stomps
         # joypad) while this is set.
         self._macro_active = False
+        self._heading_restore_failed = False
         if camera_whiten is None:
             from re1_rl.camera_whiten import whitened_enabled_from_env
 
@@ -815,6 +818,16 @@ class RE1Env(gym.Env):
             weapon_state_valid=bool(valid),
         )
 
+    def _note_heading_restore(self, attack_report: dict[str, Any] | None) -> None:
+        """Sticky fail if a ranged attack did not return to pre-aim heading."""
+        if not attack_report:
+            return
+        if attack_report.get("facing_before") is None:
+            return
+        if int(attack_report.get("weapon_id") or 0) == KNIFE_WEAPON_ID:
+            return
+        self._heading_restore_failed = not bool(attack_report.get("facing_restored"))
+
     def _combat_audit(
         self,
         state: dict[str, Any],
@@ -954,6 +967,7 @@ class RE1Env(gym.Env):
         forbidden_item_failure = self._progress.forbidden_item_breached
         gallery_wrong_failure = self._progress.gallery_wrong_breached
         capture_ineligible_failure = self._progress.capture_ineligible_breached
+        cell_timeout_failure = self._progress.cell_timeout_breached
         box_pollution = getattr(self, "_episode_failure_override", None)
         checkpoint_success = (
             self._stage.get("mode") == "yawn_rails"
@@ -968,6 +982,7 @@ class RE1Env(gym.Env):
             or gallery_wrong_failure
             or bool(box_pollution)
             or capture_ineligible_failure
+            or cell_timeout_failure
             or checkpoint_success
         )
         truncated = (
@@ -979,6 +994,7 @@ class RE1Env(gym.Env):
                 or gallery_wrong_failure
                 or box_pollution
                 or capture_ineligible_failure
+                or cell_timeout_failure
             )
             else self._episode_truncated()
         )
@@ -994,6 +1010,8 @@ class RE1Env(gym.Env):
             reason = str(box_pollution)
         elif capture_ineligible_failure:
             reason = "checkpoint_capture_ineligible"
+        elif cell_timeout_failure:
+            reason = "checkpoint_timeout"
         elif checkpoint_success:
             reason = "checkpoint_success"
         else:
@@ -1263,13 +1281,16 @@ class RE1Env(gym.Env):
                 self._yawn_rails_capture_pending = []
                 pending_yr = self._yawn_rails_capture_pending
             pending_yr.append(yr_prop)
+            from re1_rl.yawn_rails_immediate_ingest import offer_immediate_yawn_ingest
+
+            offer_immediate_yawn_ingest(yr_prop)
         self._apply_yawn_capture_ineligibility_penalty(breakdown)
         self._checkpoint_freeze_pending = False
         ineligible = bool(
             getattr(self._progress, "capture_ineligible_breached", False)
         )
-        # Last remaining cell (cp96 / configured leg_span) ends the episode
-        # after capture. Intermediate cells keep playing from here.
+        # One-leg: checkpoint_success is true after the hunted cell, so the
+        # episode ends here. play_through (leg_span>1) keeps going.
         self._checkpoint_captured = (
             not ineligible and bool(self._progress.checkpoint_success)
         )
@@ -1723,6 +1744,7 @@ class RE1Env(gym.Env):
         self._prev_action = None
         self.bridge.clear_latched_input()
         self._grab_escape_pending = False
+        self._heading_restore_failed = False
         self._forward_collision_stall = False
         self._use_phase = 0
         self._inventory_before_use = None
@@ -1748,6 +1770,7 @@ class RE1Env(gym.Env):
 
         self._step_count = 0
         self._leg_replay = None
+        self._footage_trace = None
         self._checkpoint_freeze_pending = False
         self._checkpoint_captured = False
         if str(self._stage.get("mode") or "") == "yawn_rails":
@@ -1759,6 +1782,9 @@ class RE1Env(gym.Env):
                 self.bridge.tape_enable(True)
             except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
                 pass
+            from re1_rl.footage_trace import new_footage_trace_buffer
+
+            self._footage_trace = new_footage_trace_buffer()
         self._frame_stack = []
         self.bridge.frame_ring.clear()
         self.bridge.attack_pins.clear()
@@ -1845,6 +1871,7 @@ class RE1Env(gym.Env):
                 f"next={self._planner.next_waypoint_room()!r}",
                 flush=True,
             )
+        self._arm_cell_timeout()
         if getattr(self, "_typewriter_save_detector", None) is not None:
             # Sidecar/PB starts hold off save detect until control+ribbons stable.
             self._typewriter_save_detector.begin_episode(
@@ -1869,6 +1896,15 @@ class RE1Env(gym.Env):
         hp = int(state.get("hp", 0))
         self._episode_start_hp = hp if hp > 0 else 0
         self._episode_min_hp = self._episode_start_hp
+
+    def _arm_cell_timeout(self) -> None:
+        """Start the per-CP emulated-frame wall for the current hunt."""
+        from re1_rl.yawn_cell_timeout import cell_timeout_frames_for_planner
+
+        self._progress.timeout_table_root = str(self.project_root)
+        self._progress.arm_cell_timeout(
+            cell_timeout_frames_for_planner(self._planner, self.project_root)
+        )
 
     def _seed_episode_progress(self, state: dict[str, Any]) -> None:
         """Mark spawn room visited (no ``new_room`` payout on fresh start)."""
@@ -3137,6 +3173,13 @@ class RE1Env(gym.Env):
                 prev_st = getattr(self, "_prev_state", None) or {}
                 if isinstance(prev_st, dict):
                     room_id = prev_st.get("room_id")
+                planner = getattr(self, "_planner", None)
+                checkpoint_id = None
+                if planner is not None:
+                    checkpoint_id = str(
+                        (planner.current_objective() or {}).get("checkpoint_id")
+                        or ""
+                    ) or None
                 from re1_rl.item_box import read_inventory
 
                 inv_before = read_inventory(self.bridge)
@@ -3155,6 +3198,7 @@ class RE1Env(gym.Env):
                     room_id=str(room_id) if room_id is not None else None,
                     trust_inv_cursor=False,
                     expected_item_id=expected_id,
+                    checkpoint_id=checkpoint_id,
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, 0
@@ -3860,6 +3904,12 @@ class RE1Env(gym.Env):
                 box = read_box(bridge)
             except (OSError, RuntimeError, AttributeError, TypeError, ValueError):
                 pass
+        planner = getattr(self, "_planner", None)
+        checkpoint_id = None
+        if planner is not None:
+            checkpoint_id = str(
+                (planner.current_objective() or {}).get("checkpoint_id") or ""
+            ) or None
         mask = build_action_mask(
             int(self.action_space.n),
             self._prev_action,
@@ -3899,6 +3949,7 @@ class RE1Env(gym.Env):
                 getattr(self, "_equip_switch_cooldown", 0)
             ),
             box_inv_cursor=int(getattr(self, "_box_inv_cursor", 0) or 0),
+            checkpoint_id=checkpoint_id,
         )
         if (
             box_ui_open
@@ -3907,12 +3958,12 @@ class RE1Env(gym.Env):
             and inventory is not None
             and box is not None
             and getattr(self, "_stage", {}).get("mode") == "yawn_rails"
-            and getattr(self, "_planner", None) is not None
+            and planner is not None
         ):
             from re1_rl.yawn_rails import apply_logistics_feasibility_mask
 
             apply_logistics_feasibility_mask(
-                mask, inventory, box, self._planner
+                mask, inventory, box, planner
             )
         return mask
 
@@ -4165,6 +4216,7 @@ class RE1Env(gym.Env):
                     )
                 finally:
                     self._macro_active = False
+                    self._sticky_input.reset()
         elif magic:
             magic_report = self._apply_magic_action(int(action))
             sticky, pulse, pulse_hold = self._sticky_input.apply(
@@ -4294,6 +4346,7 @@ class RE1Env(gym.Env):
             outcome = str(attack_report.get("outcome", "") or "")
             state["attack_macro_failure"] = outcome not in ("", "ok", "dry_fire")
             state["attack_dry_fire"] = outcome == "dry_fire"
+            self._note_heading_restore(attack_report)
         wid_for_pending = int(
             (attack_report or {}).get("weapon_id")
             or state.get("equipped_weapon_id")
