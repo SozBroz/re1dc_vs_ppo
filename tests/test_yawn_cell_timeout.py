@@ -12,7 +12,13 @@ sys.path.insert(0, str(ROOT))
 
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
-from re1_rl.reward import RAILS_CELL_TIMEOUT_PENALTY, compute_reward
+from re1_rl.reward import (
+    RAILS_CELL_TIMEOUT_PENALTY,
+    RAILS_CHECKPOINT_REWARD,
+    RAILS_CHECKPOINT_REWARD_MIN,
+    compute_reward,
+    rails_checkpoint_success_reward,
+)
 from re1_rl.yawn_cell_timeout import (
     cell_timeout_frames,
     created_checkpoint_index,
@@ -124,6 +130,60 @@ def test_same_step_checkpoint_success_does_not_timeout() -> None:
     assert bd["checkpoint_success"] > 0.0
     assert bd["checkpoint_timeout"] == 0.0
     assert progress.cell_timeout_breached is False
+
+
+def test_cell_timeout_remaining_frac_clips_and_counts_extra() -> None:
+    progress = ProgressTracker()
+    assert progress.cell_timeout_remaining_frac() == 1.0
+    progress.arm_cell_timeout(1000)
+    assert progress.cell_timeout_remaining_frac() == pytest.approx(1.0)
+    progress.note_leg_frames(250)
+    assert progress.cell_timeout_remaining_frac() == pytest.approx(0.75)
+    assert progress.cell_timeout_remaining_frac(250) == pytest.approx(0.50)
+    progress.note_leg_frames(750)
+    assert progress.cell_timeout_remaining_frac() == 0.0
+    assert progress.cell_timeout_remaining_frac(8) == 0.0
+
+
+def test_checkpoint_success_scales_with_remaining_timeout() -> None:
+    assert rails_checkpoint_success_reward(None) == RAILS_CHECKPOINT_REWARD
+    untimed = ProgressTracker()
+    assert rails_checkpoint_success_reward(untimed) == RAILS_CHECKPOINT_REWARD
+
+    progress = ProgressTracker()
+    progress.arm_cell_timeout(1000)
+    assert rails_checkpoint_success_reward(progress) == pytest.approx(
+        RAILS_CHECKPOINT_REWARD
+    )
+    progress.note_leg_frames(500)
+    assert rails_checkpoint_success_reward(progress) == pytest.approx(6.0)
+    progress.note_leg_frames(500)
+    assert rails_checkpoint_success_reward(progress) == pytest.approx(
+        RAILS_CHECKPOINT_REWARD_MIN
+    )
+
+
+def test_live_checkpoint_success_uses_leftover_budget() -> None:
+    planner = WaypointPlanner(
+        YAWN_ROUTE,
+        route_steps=[2],
+        start_index=0,
+    )
+    progress = ProgressTracker()
+    progress.seed_spawn_room("105")
+    progress.arm_cell_timeout(1000)
+    progress.note_leg_frames(250)
+    _, bd = compute_reward(
+        make_state("105", step=1),
+        make_state("104", step=2, step_emulated_frames=250, in_control=True),
+        planner,
+        progress=progress,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    # used = 250 noted + 250 this step → leftover 0.50 → 4 + 4*0.50 = 6
+    assert bd["checkpoint_success"] == pytest.approx(6.0)
+    assert bd["checkpoint_timeout"] == 0.0
 
 
 def test_synthetic_reward_calls_without_step_frames_do_not_tick() -> None:

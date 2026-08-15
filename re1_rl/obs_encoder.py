@@ -107,8 +107,12 @@ GOAL_FIELDS: list[tuple[str, str]] = [
     ("gallery_distance", "distance to next Gallery portrait / 4096"),
     ("gallery_progress", "correct Gallery switches / 6"),
     ("dining_statue_knocked", "1 = dining 2F statue pushed off balcony"),
+    ("cell_time_remaining", "1 = full per-cell timeout left; 0 = expired (Pardo)"),
 ]
 GOAL_BASE_DIM = len(GOAL_FIELDS)
+CELL_TIME_REMAINING_INDEX = next(
+    i for i, (name, _) in enumerate(GOAL_FIELDS) if name == "cell_time_remaining"
+)
 
 GOAL_LOOKAHEAD_SLOTS = 6
 GOAL_LOOKAHEAD_SLOT_FIELDS: list[tuple[str, str]] = [
@@ -315,6 +319,7 @@ class ObsEncoder:
         planner: WaypointPlanner,
         item_tracker: ItemTracker | None = None,
         room_items: RoomItems | None = None,
+        cell_time_remaining: float | None = None,
     ) -> np.ndarray:
         """Encode the live checkpoint objective and egocentric exit compass."""
         from re1_rl.dining_statue_puzzle import (
@@ -371,6 +376,8 @@ class ObsEncoder:
         v[20] = 1.0 if goal is not None and room != str(goal) and hops is None else 0.0
         v[23:27] = encode_gallery_hint(state)
         v[27] = encode_dining_statue_goal(state)
+        remaining = 1.0 if cell_time_remaining is None else float(cell_time_remaining)
+        v[CELL_TIME_REMAINING_INDEX] = float(np.clip(remaining, 0.0, 1.0))
         self._encode_goal_lookahead(v, state, planner)
         return v
 

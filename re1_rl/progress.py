@@ -357,6 +357,23 @@ class ProgressTracker:
             return
         self.leg_emulated_frames = int(self.leg_emulated_frames) + max(0, int(frames))
 
+    def cell_timeout_remaining_frac(self, extra_frames: int = 0) -> float:
+        """Fraction of the armed per-cell budget still unused, clipped to [0, 1].
+
+        ``extra_frames`` covers the current step when ``note_leg_frames`` has
+        not run yet (checkpoint-success steps skip the tick).
+        """
+        budget = int(self.cell_timeout_frames)
+        if budget <= 0:
+            return 1.0
+        used = int(self.leg_emulated_frames) + max(0, int(extra_frames))
+        leftover = budget - used
+        if leftover <= 0:
+            return 0.0
+        if leftover >= budget:
+            return 1.0
+        return leftover / float(budget)
+
     def breach_cell_timeout(self) -> bool:
         """Mark per-cell frame-budget expiry as terminal; true only on first breach."""
         if self.cell_timeout_breached:

@@ -1113,6 +1113,7 @@ class RE1Env(gym.Env):
             "goal": self._encoder.encode_goal(
                 goal_state, self._planner,
                 item_tracker=self._items, room_items=self.room_items,
+                cell_time_remaining=self._progress.cell_timeout_remaining_frac(),
             ),
             "spatial": self._spatial.encode(
                 state, room_items=self.room_items, item_tracker=self._items,

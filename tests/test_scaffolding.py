@@ -81,6 +81,19 @@ def test_goal_vector_encodes_live_compass():
     assert goal[GOAL_IDX["goal_room_index"]] == enc._room_idx_norm("106")
 
 
+def test_goal_encodes_cell_time_remaining():
+    g = RoomGraph(DOORS)
+    enc = ObsEncoder(ROOMS, g)
+    planner = make_planner()
+    s = make_state()
+    default = enc.encode_goal(s, planner)
+    assert default[GOAL_IDX["cell_time_remaining"]] == pytest.approx(1.0)
+    late = enc.encode_goal(s, planner, cell_time_remaining=0.25)
+    assert late[GOAL_IDX["cell_time_remaining"]] == pytest.approx(0.25)
+    clipped = enc.encode_goal(s, planner, cell_time_remaining=1.5)
+    assert clipped[GOAL_IDX["cell_time_remaining"]] == pytest.approx(1.0)
+
+
 def test_new_room_bonus_once_per_episode():
     g = RoomGraph(DOORS)
     planner = make_planner()

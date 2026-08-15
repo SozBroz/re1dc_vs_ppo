@@ -492,7 +492,28 @@ SHAPING_GAMMA = 1.0
 UNKNOWN_HOPS = 8.0
 DIST_NORM = 4096.0
 # Dominant terminal pulse on one-leg rails (unscaled; exploration uses CHECKPOINT_REWARD).
+# Timed cells pay leftover-budget scale: last-frame complete still gets the floor.
 RAILS_CHECKPOINT_REWARD = 8.0
+RAILS_CHECKPOINT_REWARD_MIN = 4.0
+
+
+def rails_checkpoint_success_reward(
+    progress: "ProgressTracker | None",
+    *,
+    extra_frames: int = 0,
+) -> float:
+    """Scale the +8 cell pulse by leftover timeout; untimed cells keep +8.
+
+    Timed cells pay ``MIN + (8-MIN) * leftover_frac`` so a last-frame
+    complete is still +4 (timeout remains -4). Incumbent PB is not used.
+    """
+    if progress is None or int(progress.cell_timeout_frames) <= 0:
+        return RAILS_CHECKPOINT_REWARD
+    frac = progress.cell_timeout_remaining_frac(extra_frames)
+    span = RAILS_CHECKPOINT_REWARD - RAILS_CHECKPOINT_REWARD_MIN
+    return RAILS_CHECKPOINT_REWARD_MIN + span * frac
+
+
 # Hard capture gate failure (inventory headroom, leg kills, unsettled state, etc.).
 # Distinct from quality compare (LOSE_TO_INCUMBENT) — not worth filing at all.
 RAILS_CAPTURE_INELIGIBLE_PENALTY = -4.0
@@ -1120,8 +1141,11 @@ def compute_reward(
             else:
                 claimed = True
             if claimed:
+                extra = int(state.get("step_emulated_frames") or 0)
                 bd["checkpoint_success"] = (
-                    RAILS_CHECKPOINT_REWARD if rails_mode else CHECKPOINT_REWARD
+                    rails_checkpoint_success_reward(progress, extra_frames=extra)
+                    if rails_mode
+                    else CHECKPOINT_REWARD
                 )
                 # Legacy telemetry alias remains zero; checkpoint_success is
                 # intentionally explicit in rollout accounting.

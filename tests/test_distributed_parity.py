@@ -161,6 +161,33 @@ def test_legacy_action_head_transplant_clones_attack_with_low_prior() -> None:
     )
 
 
+def test_goal_mlp_transplant_zero_pads_new_cell_time_column() -> None:
+    class Extractor(nn.Module):
+        def __init__(self, in_features: int) -> None:
+            super().__init__()
+            self.goal_mlp = nn.Sequential(nn.Linear(in_features, 4), nn.ReLU())
+
+    class Policy(nn.Module):
+        def __init__(self, in_features: int) -> None:
+            super().__init__()
+            self.features_extractor = Extractor(in_features)
+
+    old = Policy(28)
+    new = Policy(29)
+    with torch.no_grad():
+        old.features_extractor.goal_mlp[0].weight.fill_(3.0)
+        old.features_extractor.goal_mlp[0].bias.fill_(4.0)
+    _copy_compatible_policy_weights(old, new)
+    weight = new.features_extractor.goal_mlp[0].weight
+    assert weight.shape == (4, 29)
+    assert torch.equal(weight[:, :28], old.features_extractor.goal_mlp[0].weight)
+    assert torch.equal(weight[:, 28], torch.zeros(4))
+    assert torch.equal(
+        new.features_extractor.goal_mlp[0].bias,
+        old.features_extractor.goal_mlp[0].bias,
+    )
+
+
 def test_goal_lookahead_transplant_preserves_legacy_goal_tower() -> None:
     class Extractor(nn.Module):
         def __init__(self, *, with_lookahead: bool) -> None:
