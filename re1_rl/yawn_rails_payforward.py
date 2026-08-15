@@ -164,6 +164,11 @@ _ONE_ZOMBIE_MIN_DROP = zombie_fight_spend(1)[0]
 
 
 FIGHT_LEG_RULES: dict[str, FightLegRule] = {
+    # cp19: L Passage ammo — both window dogs before the pickup cell installs.
+    "ammo_108": FightLegRule(
+        min_kills_room="108",
+        min_kills=2,
+    ),
     # cp26: Back Passage — 2 zombies @ 7 beretta each before gallery.
     "back_passage_10A": FightLegRule(
         min_ammo_drop=_TWO_ZOMBIE_MIN_DROP,

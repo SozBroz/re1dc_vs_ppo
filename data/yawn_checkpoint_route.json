@@ -382,15 +382,25 @@
     "seq": 20,
     "checkpoint_id": "ammo_108",
     "room_id": "108",
-    "objective": "Collect the L Passage handgun bullets (already in hallway)",
+    "objective": "Collect the L Passage handgun bullets after killing both hallway dogs",
     "action_type": "pickup",
     "required_items": [],
     "items_gained": [
       "handgun_bullets"
     ],
     "success_condition": {
-      "type": "acquired_item",
-      "item": "handgun_bullets"
+      "type": "all_of",
+      "conditions": [
+        {
+          "type": "acquired_item",
+          "item": "handgun_bullets"
+        },
+        {
+          "type": "leg_kills_in_room",
+          "room_id": "108",
+          "min_kills": 2
+        }
+      ]
     }
   },
   {

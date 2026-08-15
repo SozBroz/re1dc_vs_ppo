@@ -126,8 +126,11 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
     assert ammo_108["action_type"] == "pickup"
     assert ammo_108["items_gained"] == ["handgun_bullets"]
     assert ammo_108["success_condition"] == {
-        "type": "acquired_item",
-        "item": "handgun_bullets",
+        "type": "all_of",
+        "conditions": [
+            {"type": "acquired_item", "item": "handgun_bullets"},
+            {"type": "leg_kills_in_room", "room_id": "108", "min_kills": 2},
+        ],
     }
     l_idx = next(
         i for i, cp in enumerate(route) if cp["checkpoint_id"] == "l_passage_enter_108"
@@ -592,9 +595,14 @@ def test_l_passage_enter_then_ammo_are_separate_legs() -> None:
 
     ammo = _planner(start_index=_idx("ammo_108"))
     progress = ProgressTracker()
-    # Already in the L Passage: pickup completes without re-checking the door.
+    # Already in the L Passage: pickup + both hallway kills, no door re-check.
     assert not ammo.advance_if_success(_state("108"), progress=progress)
     progress.note_leg_acquired("handgun_bullets")
+    assert not ammo.advance_if_success(
+        _state("108", inventory=["handgun_bullets"]),
+        progress=progress,
+    )
+    progress.note_leg_kills("108", 2)
     assert ammo.advance_if_success(
         _state("108", inventory=["handgun_bullets"]),
         progress=progress,

@@ -1199,6 +1199,7 @@ def capture_successor_cell(
         "crest_gate_11A",
         "upper_hall_enter_203",
         "storeroom_enter_118",
+        "ammo_108",
     ) and progress is not None:
         # claim_checkpoint_success clears live kills before capture runs; use
         # the claim-time snapshot (falls back to live for unit tests).
@@ -1207,6 +1208,7 @@ def capture_successor_cell(
             "crest_gate_11A": ("11A", 1),
             "upper_hall_enter_203": ("204", 2),
             "storeroom_enter_118": ("10B", 1),
+            "ammo_108": ("108", 2),
         }
         room_key, need = leg_kill_gates[cid]
         kills_map = progress.leg_kills_for_capture()
