@@ -167,6 +167,17 @@ MISS_TAX_CLIP_SIZE: dict[int, int] = {
 REWARD_SCALE = 1.0
 
 
+def step_penalty_for_frames(
+    frames: int,
+    *,
+    ref_frames: int = REFERENCE_STEP_FRAMES,
+) -> float:
+    """Living-cost step contempt scaled by emulated frames (pre-REWARD_SCALE)."""
+    step_frames = max(int(frames), 0)
+    ref = max(int(ref_frames), 1)
+    return STEP_PENALTY * (step_frames / ref)
+
+
 def _load_ammo_item_names() -> frozenset[str]:
     names: set[str] = set()
     try:

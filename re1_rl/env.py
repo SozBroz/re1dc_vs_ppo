@@ -464,6 +464,8 @@ class RE1Env(gym.Env):
         # room-crossing segment. Unlike _last_skip_frames, this never resets at
         # a door and is the sole duration used for cutscene reward qualification.
         self._skip_session_frames = 0
+        # Emulated frames already billed for step contempt this skip session.
+        self._skip_frames_charged = 0
         # (entry_prev, crossing_state) queued by bg skip; credited on main thread.
         self._pending_skip_room_crossings: list[
             tuple[dict[str, Any], dict[str, Any]]
@@ -1630,6 +1632,7 @@ class RE1Env(gym.Env):
         self._cutscene_skip_entry_prev = None
         self._cutscene_skip_origin_prev = None
         self._skip_session_frames = 0
+        self._skip_frames_charged = 0
         self._pending_skip_room_crossings = []
         self._pending_episode_failure = None
         # Flush PPO/sticky carry before any post-load frames advance. Worker
@@ -1953,6 +1956,7 @@ class RE1Env(gym.Env):
             if not self._skipping_flag:
                 self._last_skip_frames = 0
                 self._skip_session_frames = 0
+                self._skip_frames_charged = 0
                 # Live skip-entry pose (harness parity). Stale _prev_state can be
                 # idle while Kenneth scene_flag is already 0x84.
                 try:
@@ -2304,6 +2308,9 @@ class RE1Env(gym.Env):
             entry_prev or {}, state, bd, typewriter_save_complete=save_complete
         )
         self._merge_post_skip_breakdown(float(reward), dict(bd))
+        skip_reward, skip_bd, _ = self._bill_async_skip_step_penalty()
+        if skip_bd:
+            self._merge_post_skip_breakdown(skip_reward, skip_bd)
         self._prev_state = state
         self._queue_kenneth_gate_failure_if_needed()
         self._cutscene_skip_entry_prev = None
@@ -2322,6 +2329,7 @@ class RE1Env(gym.Env):
         self._last_settled_skip_kind = skip_session_kind(entry_prev, state)
         self._last_skip_frames = 0
         self._skip_session_frames = 0
+        self._skip_frames_charged = 0
         if state["hp"] > 0:
             self._prev_hp = state["hp"]
         hp_now = int(state["hp"])
@@ -2452,6 +2460,21 @@ class RE1Env(gym.Env):
         except (TypeError, ValueError, OverflowError):
             return
 
+    def _bill_async_skip_step_penalty(
+        self,
+    ) -> tuple[float, dict[str, float], int]:
+        """Charge step contempt for newly burned async-skip frames since last bill."""
+        from re1_rl.reward import step_penalty_for_frames
+
+        session = int(getattr(self, "_skip_session_frames", 0) or 0)
+        charged = int(getattr(self, "_skip_frames_charged", 0) or 0)
+        delta = max(0, session - charged)
+        if delta <= 0:
+            return 0.0, {}, 0
+        self._skip_frames_charged = charged + delta
+        step = step_penalty_for_frames(delta, ref_frames=self.frame_skip)
+        return float(step * REWARD_SCALE), {"step": step}, delta
+
     def _fast_cutscene_step(
         self, action: int
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
@@ -2465,8 +2488,9 @@ class RE1Env(gym.Env):
         pending = self._flush_pending_episode_failure(action)
         if pending is not None:
             return pending
+        skip_reward, skip_bd, skip_frames = self._bill_async_skip_step_penalty()
         self._step_count += 1
-        self._record_leg_replay_step(action, 0)
+        self._record_leg_replay_step(action, int(skip_frames))
         # Main-thread flush of door crossings noted by the bg skip worker.
         try:
             self._credit_async_skip_room_crossing()
@@ -2487,14 +2511,23 @@ class RE1Env(gym.Env):
                 self._prev_state or {"hp": 0, "room_id": "", "x": 0, "z": 0, "facing": 0},
             )
         truncated = self._skip_cache_truncated
-        info = {
+        info: dict[str, Any] = {
             "room_id": self._prev_state.get("room_id"),
             "cutscene_skip": True,
-            "action_name": ACTION_NAMES[int(action)],
+            "action_name": ACTION_NAMES[int(action)]
+            if 0 <= int(action) < len(ACTION_NAMES)
+            else str(action),
             "bridge_port": getattr(self.bridge, "port", None),
         }
-        self._record_leg_replay_reward(0.0, None)
-        return obs, 0.0, False, truncated, info
+        if skip_bd:
+            info["reward_breakdown"] = dict(skip_bd)
+            info["skip_step_frames_billed"] = int(skip_frames)
+        progress = getattr(self, "_progress", None)
+        if progress is not None:
+            info["visited_rooms"] = sorted(progress.visited_rooms)
+            info["n_rooms_visited"] = len(progress.visited_rooms)
+        self._record_leg_replay_reward(skip_reward, skip_bd or None)
+        return obs, float(skip_reward), False, truncated, info
 
     def _death_penalty(self) -> tuple[float, dict[str, float]]:
         breakdown = {"death": DEATH_PENALTY}

@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -54,6 +55,7 @@ def _stub_env(async_cutscene_skip: bool) -> RE1Env:
     env._cutscene_skip_entry_prev = None
     env._last_skip_frames = 0
     env._skip_session_frames = 0
+    env._skip_frames_charged = 0
     env._enemy_fields = []
     env.bridge = MagicMock()
     env.frame_skip = 8
@@ -98,6 +100,55 @@ def test_fast_cutscene_step_returns_immediately() -> None:
     assert not terminated
     assert info["cutscene_skip"] is True
     assert "frame" in obs
+
+
+def test_fast_cutscene_step_charges_step_penalty_for_skip_frames() -> None:
+    from re1_rl.reward import step_penalty_for_frames
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    env._skip_session_frames = 120
+    env.bridge.read_ram.return_value = {"player_hp": 96}
+    _, reward, _, _, info = env._fast_cutscene_step(9)
+    expected = step_penalty_for_frames(120, ref_frames=env.frame_skip)
+    assert reward == pytest.approx(expected)
+    assert info["reward_breakdown"]["step"] == pytest.approx(expected)
+    assert info["skip_step_frames_billed"] == 120
+    assert env._skip_frames_charged == 120
+
+
+def test_async_skip_step_penalty_distributes_across_fast_steps() -> None:
+    from re1_rl.reward import step_penalty_for_frames
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    env._skip_session_frames = 100
+    env.bridge.read_ram.return_value = {"player_hp": 96}
+    _, r1, _, _, info1 = env._fast_cutscene_step(9)
+    env._skip_session_frames = 250
+    _, r2, _, _, info2 = env._fast_cutscene_step(9)
+    assert info1["skip_step_frames_billed"] == 100
+    assert info2["skip_step_frames_billed"] == 150
+    assert r1 == pytest.approx(step_penalty_for_frames(100, ref_frames=8))
+    assert r2 == pytest.approx(step_penalty_for_frames(150, ref_frames=8))
+    assert env._skip_frames_charged == 250
+
+
+def test_bill_async_skip_step_penalty_flushes_remainder() -> None:
+    from re1_rl.reward import step_penalty_for_frames
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skip_session_frames = 80
+    env._skip_frames_charged = 50
+    reward, bd, delta = env._bill_async_skip_step_penalty()
+    assert delta == 30
+    assert reward == pytest.approx(step_penalty_for_frames(30, ref_frames=8))
+    assert bd["step"] == pytest.approx(step_penalty_for_frames(30, ref_frames=8))
+    assert env._skip_frames_charged == 80
+    reward2, bd2, delta2 = env._bill_async_skip_step_penalty()
+    assert delta2 == 0
+    assert reward2 == 0.0
+    assert bd2 == {}
 
 
 def test_fast_cutscene_step_terminates_on_zero_hp() -> None:

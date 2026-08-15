@@ -18,6 +18,7 @@ from re1_rl.reward import (
     STEP_PENALTY,
     KNIFE_MISS_PENALTY,
     compute_reward,
+    step_penalty_for_frames,
 )
 from tests.test_scaffolding import make_planner, make_state
 
@@ -26,6 +27,14 @@ def test_step_penalty_constant() -> None:
     assert STEP_PENALTY == pytest.approx(-0.00024)
     assert ENEMY_DAMAGE_REWARD == pytest.approx(0.014)
     assert ENEMY_KILL_REWARD == pytest.approx(2.0)
+
+
+def test_step_penalty_for_frames_scales_with_emulated_length() -> None:
+    assert step_penalty_for_frames(8, ref_frames=8) == pytest.approx(STEP_PENALTY)
+    assert step_penalty_for_frames(18, ref_frames=8) == pytest.approx(
+        STEP_PENALTY * (18 / 8)
+    )
+    assert step_penalty_for_frames(0, ref_frames=8) == 0.0
 
 
 def test_enemy_damage_and_kill_rewards() -> None:
