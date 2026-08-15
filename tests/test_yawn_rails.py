@@ -1244,6 +1244,43 @@ def test_reset_pin_range_include_fresh_empty_range_is_fresh_only(
         assert "pb_bundle" not in opts
 
 
+def test_reset_pin_set_include_fresh_is_exclusive_mix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in (0, 2, 6, 18, 40)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 45)),
+    }
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_INDEX", raising=False)
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_RANGE", raising=False)
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_WEIGHTS", raising=False)
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_SET", "0,2,6")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_SET_WEIGHT", "1")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_INCLUDE_FRESH", "1")
+    counts: dict[str, int] = {"fresh": 0, "cp00": 0, "cp02": 0, "cp06": 0, "other": 0}
+    for seed in range(4000):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        if opts["reset_source"] == "route_initial":
+            counts["fresh"] += 1
+            assert opts["route_start_index"] == 0
+            assert "pb_bundle" not in opts
+        else:
+            cell = int(opts["route_start_index"]) - 1
+            key = f"cp{cell:02d}"
+            counts[key if key in counts else "other"] += 1
+    assert counts["other"] == 0
+    total = sum(counts.values())
+    for key in ("fresh", "cp00", "cp02", "cp06"):
+        assert counts[key] / total == pytest.approx(0.25, abs=0.04), f"{key}={counts[key]}"
+
+
 def test_reset_pin_range_latest_mix_samples_floor_and_latest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

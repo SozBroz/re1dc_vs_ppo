@@ -805,6 +805,8 @@ def sample_one_leg_options(
     newest loadable cell with fixed indices. Overrides plain pin range/set.
     ``RE1_YAWN_RESET_PIN_SET=37,40,44`` with optional
     ``RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5`` blends pin-set vs normal mix.
+    ``RE1_YAWN_RESET_PIN_INCLUDE_FRESH=1`` with a pin set (and no range) is
+    exclusive: one fresh-start slot plus each listed loadable cell.
     ``RE1_YAWN_FIGHT_BIAS_INDEX`` / ``RE1_YAWN_FIGHT_BIAS_WEIGHT`` override the
     payforward fight cell and its share (workhorse grind without fleet restart).
     ``data/yawn_reset_pin.env`` (or ``RE1_YAWN_RESET_PIN_FILE``) overrides the
@@ -869,13 +871,19 @@ def sample_one_leg_options(
     pin_set_cfg = reset_pin_set_from_env(project_root)
     if pin_set_cfg is not None:
         indices, weight = pin_set_cfg
-        if weight > 0.0 and rng.random() < weight:
-            pinned = _cells_in_pin_set(all_cells, indices)
-            if pinned:
-                chosen = pinned[rng.randrange(len(pinned))]
-                return _options_from_cell(
-                    chosen, stage, reset_source="route_cell_pin_set"
-                )
+        pinned = _cells_in_pin_set(all_cells, indices)
+        if reset_pin_include_fresh_from_env(project_root):
+            slot = rng.randrange(len(pinned) + 1)
+            if slot == 0 or not pinned:
+                return _fresh_start_options(stage)
+            return _options_from_cell(
+                pinned[slot - 1], stage, reset_source="route_cell_pin_set"
+            )
+        if weight > 0.0 and rng.random() < weight and pinned:
+            chosen = pinned[rng.randrange(len(pinned))]
+            return _options_from_cell(
+                chosen, stage, reset_source="route_cell_pin_set"
+            )
     if reset_frontier_fight_only_from_env():
         from re1_rl.yawn_rails_payforward import sample_frontier_fight_options
 
