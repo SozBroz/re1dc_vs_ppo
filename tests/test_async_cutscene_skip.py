@@ -96,10 +96,26 @@ def test_fast_cutscene_step_returns_immediately() -> None:
     obs, reward, terminated, truncated, info = env._fast_cutscene_step(0)
     elapsed = time.perf_counter() - t0
     assert elapsed < 0.05
-    assert reward == 0.0
+    from re1_rl.reward import STEP_PENALTY
+
+    assert reward == pytest.approx(STEP_PENALTY)
     assert not terminated
     assert info["cutscene_skip"] is True
+    assert info["skip_step_frames_billed"] == env.frame_skip
     assert "frame" in obs
+
+
+def test_fast_cutscene_step_charges_min_decision_when_chunk_not_landed() -> None:
+    from re1_rl.reward import STEP_PENALTY
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    env._skip_session_frames = 0
+    env.bridge.read_ram.return_value = {"player_hp": 96}
+    _, reward, _, _, info = env._fast_cutscene_step(9)
+    assert reward == pytest.approx(STEP_PENALTY)
+    assert info["skip_step_frames_billed"] == 8
+    assert env._skip_frames_charged == 8
 
 
 def test_fast_cutscene_step_charges_step_penalty_for_skip_frames() -> None:
@@ -149,6 +165,11 @@ def test_bill_async_skip_step_penalty_flushes_remainder() -> None:
     assert delta2 == 0
     assert reward2 == 0.0
     assert bd2 == {}
+    min_reward, min_bd, min_delta = env._bill_async_skip_step_penalty(min_frames=8)
+    assert min_delta == 8
+    assert min_reward == pytest.approx(step_penalty_for_frames(8, ref_frames=8))
+    assert min_bd["step"] == pytest.approx(step_penalty_for_frames(8, ref_frames=8))
+    assert env._skip_frames_charged == 88
 
 
 def test_fast_cutscene_step_terminates_on_zero_hp() -> None:

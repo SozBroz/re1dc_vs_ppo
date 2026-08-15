@@ -2462,18 +2462,28 @@ class RE1Env(gym.Env):
 
     def _bill_async_skip_step_penalty(
         self,
+        *,
+        min_frames: int = 0,
     ) -> tuple[float, dict[str, float], int]:
-        """Charge step contempt for newly burned async-skip frames since last bill."""
+        """Charge step contempt for newly burned async-skip frames since last bill.
+
+        ``min_frames`` covers the common case where the bg skip worker is still
+        inside a chunk and ``_skip_session_frames`` has not moved yet — every
+        policy decision during skip still pays at least one reference step.
+        Extra skip frames are billed when the chunk lands; settle flushes the
+        remainder without a min so we do not invent frames after the skip ends.
+        """
         from re1_rl.reward import step_penalty_for_frames
 
         session = int(getattr(self, "_skip_session_frames", 0) or 0)
         charged = int(getattr(self, "_skip_frames_charged", 0) or 0)
         delta = max(0, session - charged)
-        if delta <= 0:
+        bill = max(delta, max(0, int(min_frames)))
+        if bill <= 0:
             return 0.0, {}, 0
-        self._skip_frames_charged = charged + delta
-        step = step_penalty_for_frames(delta, ref_frames=self.frame_skip)
-        return float(step * REWARD_SCALE), {"step": step}, delta
+        self._skip_frames_charged = charged + bill
+        step = step_penalty_for_frames(bill, ref_frames=self.frame_skip)
+        return float(step * REWARD_SCALE), {"step": step}, bill
 
     def _fast_cutscene_step(
         self, action: int
@@ -2488,7 +2498,9 @@ class RE1Env(gym.Env):
         pending = self._flush_pending_episode_failure(action)
         if pending is not None:
             return pending
-        skip_reward, skip_bd, skip_frames = self._bill_async_skip_step_penalty()
+        skip_reward, skip_bd, skip_frames = self._bill_async_skip_step_penalty(
+            min_frames=self.frame_skip
+        )
         self._step_count += 1
         self._record_leg_replay_step(action, int(skip_frames))
         # Main-thread flush of door crossings noted by the bg skip worker.
@@ -4346,6 +4358,11 @@ class RE1Env(gym.Env):
         if self._async_cutscene_skip and self._probe_needs_skip():
             self._skipping_flag = True
             self._skip_cache_obs = None
+            # The hold that opened the skip already burned emu frames; count
+            # them before the bg worker's first chunk lands.
+            self._skip_session_frames = int(
+                getattr(self, "_skip_session_frames", 0) or 0
+            ) + max(0, int(step_emulated_frames))
             return self._fast_cutscene_step(action)
 
         skipped, died_during_skip = 0, False
