@@ -965,6 +965,7 @@ class RE1Env(gym.Env):
         kenneth_gate_failure = self._progress.kenneth_gate_breached
         wrong_room_failure = self._progress.wrong_room_breached
         forbidden_item_failure = self._progress.forbidden_item_breached
+        shotgun_return_failure = self._progress.shotgun_return_breached
         gallery_wrong_failure = self._progress.gallery_wrong_breached
         capture_ineligible_failure = self._progress.capture_ineligible_breached
         cell_timeout_failure = self._progress.cell_timeout_breached
@@ -979,6 +980,7 @@ class RE1Env(gym.Env):
             or kenneth_gate_failure
             or wrong_room_failure
             or forbidden_item_failure
+            or shotgun_return_failure
             or gallery_wrong_failure
             or bool(box_pollution)
             or capture_ineligible_failure
@@ -991,6 +993,7 @@ class RE1Env(gym.Env):
                 kenneth_gate_failure
                 or wrong_room_failure
                 or forbidden_item_failure
+                or shotgun_return_failure
                 or gallery_wrong_failure
                 or box_pollution
                 or capture_ineligible_failure
@@ -1004,6 +1007,8 @@ class RE1Env(gym.Env):
             reason = "wrong_room"
         elif forbidden_item_failure:
             reason = "forbidden_item"
+        elif shotgun_return_failure:
+            reason = "shotgun_return"
         elif gallery_wrong_failure:
             reason = "gallery_wrong_portrait"
         elif box_pollution:
@@ -1358,6 +1363,7 @@ class RE1Env(gym.Env):
             and int(state.get("hp", 0) or 0) > 0
         ):
             gate = {"checkpoint_success": 1.0}
+            self._record_leg_replay_reward(0.0, None)
             self._finish_checkpoint_capture(state, gate)
             return self._checkpoint_freeze_obs(action, state, gate)
         obs = self._checkpoint_live_obs(state)
@@ -1369,6 +1375,7 @@ class RE1Env(gym.Env):
             else str(action),
             "bridge_port": getattr(self.bridge, "port", None),
         }
+        self._record_leg_replay_reward(0.0, None)
         return obs, 0.0, False, self._episode_truncated(), info
 
     def _checkpoint_live_obs(self, state: dict[str, Any]) -> dict[str, Any]:
@@ -2433,6 +2440,18 @@ class RE1Env(gym.Env):
         except (TypeError, ValueError, OverflowError):
             return
 
+    def _record_leg_replay_reward(
+        self, reward: float, breakdown: dict[str, Any] | None = None
+    ) -> None:
+        buf = getattr(self, "_leg_replay", None)
+        append = getattr(buf, "append_reward", None)
+        if not callable(append):
+            return
+        try:
+            append(float(reward), breakdown)
+        except (TypeError, ValueError, OverflowError):
+            return
+
     def _fast_cutscene_step(
         self, action: int
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
@@ -2474,6 +2493,7 @@ class RE1Env(gym.Env):
             "action_name": ACTION_NAMES[int(action)],
             "bridge_port": getattr(self.bridge, "port", None),
         }
+        self._record_leg_replay_reward(0.0, None)
         return obs, 0.0, False, truncated, info
 
     def _death_penalty(self) -> tuple[float, dict[str, float]]:
@@ -2600,6 +2620,7 @@ class RE1Env(gym.Env):
         loadout_sample = self._progress.pop_loadout_sample()
         if loadout_sample is not None:
             info["logistics_sample"] = loadout_sample
+        self._record_leg_replay_reward(reward, breakdown)
         return obs, reward, True, False, info
 
     def _death_step(
@@ -2701,6 +2722,7 @@ class RE1Env(gym.Env):
             "visited_rooms": sorted(self._progress.visited_rooms),
             "n_rooms_visited": len(self._progress.visited_rooms),
         }
+        self._record_leg_replay_reward(0.0, None)
         return obs, 0.0, False, False, info
 
     def _inventory_macro_owns_item_menu(self, action: int) -> bool:
@@ -3734,6 +3756,7 @@ class RE1Env(gym.Env):
         self._prev_state = state
         if state["hp"] > 0:
             self._prev_hp = state["hp"]
+        self._record_leg_replay_reward(reward, breakdown)
         return obs, reward, terminated, truncated, info
 
     def _apply_magic_action(self, action: int) -> dict[str, Any]:
@@ -4543,6 +4566,7 @@ class RE1Env(gym.Env):
         self._prev_state = state
         if state["hp"] > 0:
             self._prev_hp = state["hp"]
+        self._record_leg_replay_reward(reward, breakdown)
         return obs, reward, terminated, truncated, info
 
     def render(self):

@@ -233,16 +233,47 @@ def main() -> int:
     first = loaded[0][0]
     from_idx = int(first["from_checkpoint_index"])
     contract = first.get("contract") or {}
+    fresh_start = from_idx < 0
+    sidecar_path: Path | None = None
 
-    pred = yawn_rails_root(ROOT) / "cells" / cell_dir_name(from_idx)
-    state_path = pred / CELL_STATE_NAME
-    sidecar_path = pred / CELL_SIDECAR_NAME
-    if not state_path.is_file() or not sidecar_path.is_file():
-        print(f"ERROR: missing predecessor bundle {pred}", file=sys.stderr)
-        return 1
-    pred_sha = _sha256(state_path)
-    want_sha = str(first.get("from_state_sha256") or "")
-    if want_sha and pred_sha != want_sha:
+    if fresh_start:
+        stage = json.loads(CURRICULUM.read_text(encoding="utf-8"))
+        init_rel = str(stage.get("init_savestate") or "states/jill_control_fresh.State")
+        state_path = (ROOT / init_rel).resolve()
+        if not state_path.is_file():
+            print(f"ERROR: missing init savestate {state_path}", file=sys.stderr)
+            return 1
+        pred_sha = _sha256(state_path)
+        want_sha = str(first.get("from_state_sha256") or "")
+        if want_sha and pred_sha != want_sha:
+            if args.force_stale:
+                print(
+                    f"WARN: init State sha {pred_sha[:12]} != tape "
+                    f"{want_sha[:12]} (--force-stale)",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"ERROR: fresh-start tape requires exact init State "
+                    f"(disk {pred_sha[:12]} != tape {want_sha[:12]}). "
+                    f"Recapture from the current init, or pass --force-stale.",
+                    file=sys.stderr,
+                )
+                return 1
+        print(
+            f"[replay] fresh start init={state_path.name} sha={pred_sha[:12]}",
+            flush=True,
+        )
+    else:
+        pred = yawn_rails_root(ROOT) / "cells" / cell_dir_name(from_idx)
+        state_path = pred / CELL_STATE_NAME
+        sidecar_path = pred / CELL_SIDECAR_NAME
+        if not state_path.is_file() or not sidecar_path.is_file():
+            print(f"ERROR: missing predecessor bundle {pred}", file=sys.stderr)
+            return 1
+        pred_sha = _sha256(state_path)
+        want_sha = str(first.get("from_state_sha256") or "")
+    if not fresh_start and want_sha and pred_sha != want_sha:
         dest_cell = yawn_rails_root(ROOT) / "cells" / cell_dir_name(
             int(first["to_checkpoint_index"])
         )
@@ -302,14 +333,15 @@ def main() -> int:
     frame_skip = int(contract.get("frame_skip") or 8)
     async_skip = bool(contract.get("async_cutscene_skip", True))
     reset_options: dict[str, Any] = {
-        "pb_bundle": {
-            "state_path": str(state_path.resolve()),
-            "sidecar_path": str(sidecar_path.resolve()),
-            "source": "yawn_rails",
-        },
         "route_start_index": int(first["to_checkpoint_index"]),
         "leg_span": len(loaded),
     }
+    if sidecar_path is not None:
+        reset_options["pb_bundle"] = {
+            "state_path": str(state_path.resolve()),
+            "sidecar_path": str(sidecar_path.resolve()),
+            "source": "yawn_rails",
+        }
 
     port = int(args.port)
     bridge = BizHawkClient(port=port, timeout=300.0)
@@ -369,6 +401,16 @@ def main() -> int:
             f"frames={tape.get('leg_frames')}",
             flush=True,
         )
+        by_channel = tape.get("reward_by_channel")
+        if isinstance(by_channel, dict) and by_channel:
+            parts = " ".join(
+                f"{k}={by_channel[k]}"
+                for k in sorted(by_channel, key=lambda k: -abs(float(by_channel[k] or 0)))
+            )
+            print(
+                f"[replay] rewards total={tape.get('reward_total')} {parts}",
+                flush=True,
+            )
     # Reset's _skip_uncontrolled would burn the same cinema the tape
     # recorded as 0-frame steps and desync playback.
     _skip = env._skip_uncontrolled

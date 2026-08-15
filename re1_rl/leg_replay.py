@@ -37,20 +37,53 @@ JOYPAD_BUTTON_ORDER = (
 )
 
 
-class LegReplayBuffer:
-    """In-memory action + emu-frame tape. ~3 bytes/step."""
+def _json_float(value: float) -> float:
+    return round(float(value), 6)
 
-    __slots__ = ("actions", "emu_frames")
+
+def sparse_reward_events(breakdown: dict[str, Any] | None) -> dict[str, float]:
+    """Keep nonzero channels so a later audit can replay the payout mix."""
+    if not isinstance(breakdown, dict):
+        return {}
+    out: dict[str, float] = {}
+    for key, raw in breakdown.items():
+        try:
+            number = _json_float(raw)
+        except (TypeError, ValueError):
+            continue
+        if number != 0.0:
+            out[str(key)] = number
+    return out
+
+
+class LegReplayBuffer:
+    """In-memory action + emu-frame + stepwise-reward tape."""
+
+    __slots__ = ("actions", "emu_frames", "rewards", "reward_events")
 
     def __init__(self) -> None:
         self.actions = bytearray()
         self.emu_frames = array.array("H")
+        self.rewards = array.array("d")
+        self.reward_events: list[dict[str, float]] = []
 
     def append(self, action: int, emu_frames: int) -> None:
         a = max(0, min(255, int(action)))
         frames = max(0, min(_UINT16_MAX, int(emu_frames)))
         self.actions.append(a)
         self.emu_frames.append(frames)
+
+    def append_reward(
+        self, reward: float, breakdown: dict[str, Any] | None = None
+    ) -> None:
+        """Attach the just-computed payout to the latest unmatched action."""
+        if len(self.rewards) >= len(self.actions):
+            return
+        while len(self.rewards) < len(self.actions) - 1:
+            self.rewards.append(0.0)
+            self.reward_events.append({})
+        self.rewards.append(float(reward))
+        self.reward_events.append(sparse_reward_events(breakdown))
 
     def __len__(self) -> int:
         return len(self.actions)
@@ -61,6 +94,15 @@ class LegReplayBuffer:
 
     def as_lists(self) -> tuple[list[int], list[int]]:
         return list(self.actions), list(self.emu_frames)
+
+    def aligned_rewards(self) -> tuple[list[float], list[dict[str, float]]]:
+        n = len(self.actions)
+        rewards = [_json_float(x) for x in self.rewards]
+        events = [dict(item) for item in self.reward_events]
+        while len(rewards) < n:
+            rewards.append(0.0)
+            events.append({})
+        return rewards[:n], events[:n]
 
 
 def new_leg_replay_buffer() -> LegReplayBuffer:
@@ -278,6 +320,19 @@ def build_leg_replay_payload(
     if joypad_bits:
         payload["joypad_bits"] = joypad_bits
         payload["joypad_frames"] = len(joypad_bits)
+    if len(buf.rewards) > 0:
+        rewards, events = buf.aligned_rewards()
+        by_channel: dict[str, float] = {}
+        compact: list[list[Any]] = []
+        for i, step_events in enumerate(events):
+            if step_events:
+                compact.append([i, step_events])
+                for key, value in step_events.items():
+                    by_channel[key] = _json_float(by_channel.get(key, 0.0) + value)
+        payload["rewards"] = rewards
+        payload["reward_events"] = compact
+        payload["reward_total"] = _json_float(sum(rewards))
+        payload["reward_by_channel"] = by_channel
     return payload
 
 

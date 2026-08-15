@@ -44,6 +44,21 @@ def test_buffer_leg_frames_sum() -> None:
     assert frames == [18, 8, 54]
 
 
+def test_buffer_append_reward_pads_and_ignores_extra() -> None:
+    buf = new_leg_replay_buffer()
+    buf.append(9, 18)
+    buf.append(1, 8)
+    buf.append(5, 8)
+    buf.append_reward(4.0, {"new_room": 4.0, "step": 0.0})
+    rewards, events = buf.aligned_rewards()
+    assert rewards == [0.0, 0.0, 4.0]
+    assert events == [{}, {}, {"new_room": 4.0}]
+    buf.append_reward(1.2, {"new_cutscene": 1.2})
+    rewards, events = buf.aligned_rewards()
+    assert rewards == [0.0, 0.0, 4.0]
+    assert events[2] == {"new_room": 4.0}
+
+
 def test_single_leg_gate() -> None:
     buf = LegReplayBuffer()
     buf.append(1, 8)
@@ -96,6 +111,7 @@ def test_payload_schema_and_write(tmp_path: Path) -> None:
     assert payload["contract"]["combat_leg"] is True
     assert "joypad_bits" not in payload
     assert payload["end"]["quality"][7] == -26
+    assert "rewards" not in payload
     dest = tmp_path / CELL_REPLAY_NAME
     write_leg_replay_json(dest, payload)
     loaded = json.loads(dest.read_text(encoding="utf-8"))
@@ -308,6 +324,48 @@ def test_payload_includes_joypad_bits_when_bridge_dumps() -> None:
     assert payload["contract"]["joypad_tape"] is True
     assert payload["joypad_bits"] == [1, 0, 4]
     assert payload["joypad_frames"] == 3
+
+
+def test_payload_includes_stepwise_rewards(tmp_path: Path) -> None:
+    buf = LegReplayBuffer()
+    buf.append(9, 18)
+    buf.append_reward(0.0, {})
+    buf.append(1, 8)
+    buf.append_reward(4.0, {"new_room": 4.0})
+    buf.append(5, 8)
+    buf.append_reward(13.2, {"new_cutscene": 1.2, "checkpoint_success": 12.0})
+    env = SimpleNamespace(
+        _route_start_index=0,
+        _leg_replay=buf,
+        _async_cutscene_skip=True,
+        frame_skip=8,
+        project_root=tmp_path,
+        action_space=SimpleNamespace(n=45),
+        _progress=None,
+        _reset_options={},
+        _stage={"init_savestate": "missing.State"},
+    )
+    payload = build_leg_replay_payload(
+        env,
+        completed_index=0,
+        completed_id="emblem_105",
+        settled=False,
+        live_state={"room_id": "105", "x": 1, "z": 2, "facing": 3, "hp": 96},
+        quality=(96, 45, 100, 4, 1, 0, -30, -34),
+        to_state_sha256="to",
+    )
+    assert payload is not None
+    assert payload["rewards"] == [0.0, 4.0, 13.2]
+    assert payload["reward_total"] == 17.2
+    assert payload["reward_events"] == [
+        [1, {"new_room": 4.0}],
+        [2, {"new_cutscene": 1.2, "checkpoint_success": 12.0}],
+    ]
+    assert payload["reward_by_channel"] == {
+        "new_room": 4.0,
+        "new_cutscene": 1.2,
+        "checkpoint_success": 12.0,
+    }
 
 
 def test_joypad_replay_keeps_engine_patches_and_skip_turbo() -> None:

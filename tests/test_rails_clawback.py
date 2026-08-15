@@ -71,8 +71,21 @@ def test_rails_shotgun_take_return_is_net_zero():
 
     scaled_weapon = NEW_WEAPON_PICKUP_BONUS * RAILS_NAV_POSITIVE_SCALE
     assert pickup["new_weapon"] == scaled_weapon
-    assert ret["shotgun_return"] == SHOTGUN_RETURN_PENALTY * RAILS_NAV_POSITIVE_SCALE
+    assert ret["shotgun_return"] == SHOTGUN_RETURN_PENALTY
     assert pickup["new_weapon"] + ret["shotgun_return"] == 0.0
+    assert progress.shotgun_return_breached
+
+
+def test_rails_shotgun_return_zeros_same_step_positives():
+    progress = ProgressTracker()
+    progress.first_visit("115")
+    held = make_state("115", inventory=["shotgun"])
+    left = make_state("116", step=2, inventory=[])
+
+    bd = _reward(held, left, rails=True, progress=progress)
+    assert bd["shotgun_return"] == SHOTGUN_RETURN_PENALTY
+    assert progress.shotgun_return_breached
+    assert bd["new_room"] == 0.0
 
 
 def test_exploration_shotgun_take_return_still_full_magnitude():
@@ -87,6 +100,7 @@ def test_exploration_shotgun_take_return_still_full_magnitude():
     assert pickup["new_weapon"] == NEW_WEAPON_PICKUP_BONUS
     assert ret["shotgun_return"] == SHOTGUN_RETURN_PENALTY
     assert pickup["new_weapon"] + ret["shotgun_return"] == 0.0
+    assert not progress.shotgun_return_breached
 
 
 def test_rails_key_item_take_return_is_net_zero():

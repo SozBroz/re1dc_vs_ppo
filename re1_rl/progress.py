@@ -66,6 +66,8 @@ class ProgressTracker:
     yawn_retreated: bool = False
     # Yawn route: forbidden pickups (e.g. broken_shotgun in Vacant Room detour).
     forbidden_item_breached: bool = False
+    # Rails: wall-shotgun put-back is a cell-fail terminal (same family as timeout).
+    shotgun_return_breached: bool = False
     # Checkpoint nav succeeded but successor capture was hard-ineligible.
     capture_ineligible_breached: bool = False
     # Per-CP emulated-frame wall for the current hunt (0 = no per-cell timeout).
@@ -322,6 +324,15 @@ class ProgressTracker:
         if self.forbidden_item_breached:
             return False
         self.forbidden_item_breached = True
+        self.softlock_cap_frames = 0
+        return True
+
+    def breach_shotgun_return(self) -> bool:
+        """Mark wall-shotgun put-back as a rails cell-fail; true only on first breach."""
+        if self.shotgun_return_breached:
+            return False
+        self.shotgun_return_breached = True
+        self.checkpoint_success = False
         self.softlock_cap_frames = 0
         return True
 

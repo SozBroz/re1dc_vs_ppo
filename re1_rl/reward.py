@@ -65,9 +65,11 @@ DINING_STATUE_PROGRESS_BUDGET = 10.0
 GOLD_EMBLEM_RETURN_PENALTY = -4.0
 # Every physical pickup of a gun/knife-class weapon (not ammo).
 NEW_WEAPON_PICKUP_BONUS = 4.0
-# The wall rack can toggle forever: taking the shotgun pays; replacing it
-# removes exactly that reward. Repeating the loop is net zero before step cost.
-# Re-takes after a return still claw ±NEW_WEAPON but do not re-extend idle.
+# The wall rack can toggle forever off-rails: taking the shotgun pays; replacing
+# it removes exactly that reward. On yawn rails, put-back is a cell-fail
+# terminal (−4, zero same-step positives, end episode) so a later CP cannot
+# file without the gun. Re-takes after a return still claw ±NEW_WEAPON but do
+# not re-extend idle.
 SHOTGUN_RETURN_PENALTY = -4.0
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
 # Idle contempt: no new room / document / cutscene / key / weapon / story / gallery.
@@ -511,7 +513,6 @@ RAILS_UNSCALED_COMBAT_TERMS: frozenset[str] = frozenset({
 # Rails clawbacks mirror nav pickup crumbs (+4 room/key/story/gallery → −4 returns).
 RAILS_SCALED_CLAWBACK_TERMS: frozenset[str] = frozenset({
     "gallery",
-    "shotgun_return",
     "gold_emblem_return",
     "key_item_return",
 })
@@ -1068,6 +1069,8 @@ def compute_reward(
         bd["shotgun_return"] = SHOTGUN_RETURN_PENALTY
         if progress is not None:
             progress._shotgun_return_armed = False
+            if rails_mode:
+                progress.breach_shotgun_return()
 
     if (
         progress is not None
@@ -1098,7 +1101,9 @@ def compute_reward(
             )
         )
         if advanced:
-            if progress is not None:
+            if progress is not None and progress.shotgun_return_breached:
+                claimed = False
+            elif progress is not None:
                 progress.on_waypoint_advanced()
                 claimed = progress.claim_checkpoint_success()
             else:
@@ -1137,6 +1142,7 @@ def compute_reward(
         and not progress.wrong_room_breached
         and not progress.forbidden_item_breached
         and not progress.cell_timeout_breached
+        and not progress.shotgun_return_breached
     ):
         progress.note_leg_frames(int(state.get("step_emulated_frames") or 0))
         if (
@@ -1228,6 +1234,7 @@ def compute_reward(
         or progress.forbidden_item_breached
         or progress.cell_timeout_breached
         or progress.capture_ineligible_breached
+        or progress.shotgun_return_breached
     ):
         for term, value in bd.items():
             if value > 0.0:
