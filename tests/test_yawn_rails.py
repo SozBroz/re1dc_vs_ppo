@@ -305,7 +305,7 @@ def test_rails_nav_crumbs_keep_full_exploration_magnitudes() -> None:
         rails_mode=True,
         return_breakdown=True,
     )
-    assert bd["new_room"] == pytest.approx(4.0)
+    assert bd["new_room"] == pytest.approx(0.0)
     assert bd["wrong_room"] == 0.0
     assert bd["checkpoint_success"] == pytest.approx(RAILS_CHECKPOINT_REWARD)
 
@@ -501,28 +501,16 @@ def _barry_state(room: str, *, beretta_qty: int = 15, spray: bool = True) -> dic
     return _state(room, inventory=[n for n, _ in slots], inventory_slots=slots)
 
 
-def test_pre_cutscene_room_dwell_does_not_satisfy_post_cutscene_settle() -> None:
-    """Barry return still needs Kenneth ``104:*:sN``; walk-up dwell alone does not complete."""
+def test_barry_return_needs_kenneth_then_104_to_105() -> None:
+    """104→105 before Kenneth does not complete cp02; after the flag it does."""
     planner = _planner(start_index=_idx("barry_return_105"))
     progress = ProgressTracker()
-    progress.note_leg_room_transition("104", "105")
     _settle(progress, "105", steps=90)
     assert not planner.advance_if_success(
         _barry_state("105"),
         progress=progress,
-        prev_state=_barry_state("104"),
+        prev_state=_barry_state("105"),
     )
-    progress.observe_cutscene("104:0:s0")
-    assert planner.advance_if_success(
-        _barry_state("105"),
-        progress=progress,
-        prev_state=_barry_state("104"),
-    )
-
-
-def test_barry_return_requires_kenneth_cutscene() -> None:
-    planner = _planner(start_index=_idx("barry_return_105"))
-    progress = ProgressTracker()
     progress.note_leg_room_transition("104", "105")
     assert not planner.advance_if_success(
         _barry_state("105"),
@@ -537,8 +525,8 @@ def test_barry_return_requires_kenneth_cutscene() -> None:
     )
 
 
-def test_barry_return_rejects_tea_room_door_without_kenneth_scene() -> None:
-    """Door key ``104:0`` is not Kenneth; ``104:0:s0`` is."""
+def test_barry_return_door_mint_is_not_kenneth() -> None:
+    """Door key ``104:0`` / dining mint are not Kenneth; ``104:0:s0`` is."""
     planner = _planner(start_index=_idx("barry_return_105"))
     progress = ProgressTracker()
     progress.note_leg_room_transition("104", "105")
@@ -575,15 +563,11 @@ def test_upper_hall_203_is_room_enter_settle_without_cutscene() -> None:
     assert planner.advance_if_success(_state("203"), progress=ProgressTracker())
 
 
-def test_main_hall_rejects_room_spoof_without_106_cutscene() -> None:
+def test_main_hall_completes_on_room_enter_without_cutscene_key() -> None:
     planner = _planner(start_index=_idx("main_hall_106"))
     spoof = ProgressTracker()
     _settle(spoof, "106", steps=2)
-    assert not planner.advance_if_success(_state("106"), progress=spoof)
-
-    ok = ProgressTracker()
-    ok.observe_cutscene("106:1:s0")
-    assert planner.advance_if_success(_state("106"), progress=ok)
+    assert planner.advance_if_success(_state("106"), progress=spoof)
 
 
 def test_l_passage_enter_then_ammo_are_separate_legs() -> None:
@@ -656,7 +640,7 @@ def test_save_100_checkpoint_is_room_enter_only() -> None:
     assert planner.advance_if_success(_state("100"), progress=ProgressTracker())
 
 
-def test_shotgun_rescue_requires_reentry_shotgun_and_ceiling_cutscene() -> None:
+def test_shotgun_rescue_requires_reentry_and_shotgun_not_cutscene() -> None:
     prev = _state("116", inventory=["shotgun"])
     state = _state("115", inventory=["shotgun"])
 
@@ -670,7 +654,7 @@ def test_shotgun_rescue_requires_reentry_shotgun_and_ceiling_cutscene() -> None:
     assert reenter.current_objective()["checkpoint_id"] == "barry_rescue_115"
 
     no_cutscene = _planner(start_index=_idx("barry_rescue_115"))
-    assert not no_cutscene.advance_if_success(
+    assert no_cutscene.advance_if_success(
         state,
         progress=ProgressTracker(),
         prev_state=prev,
@@ -868,7 +852,6 @@ def test_spawn_in_exit_room_skips_tautological_room_enter() -> None:
 def test_richard_checkpoint_accepts_forced_settle_in_204() -> None:
     planner = _planner(start_index=_idx("richard_cutscene_20D"))
     progress = ProgressTracker()
-    progress.observe_cutscene("20D:richard")
     settled = _state("204")
     assert planner.advance_if_success(settled, progress=progress)
     assert planner.current_objective()["checkpoint_id"] == "richard_forced_return_204"
@@ -1884,41 +1867,6 @@ def test_local_cas_installs_better_and_rejects_worse(
     assert man["cells"][0]["quality"][:2] == [96, 60]
 
 
-def test_story_progress_allows_overwrite_blocks_cutscene_regression() -> None:
-    from re1_rl.yawn_rails_sync import story_progress_allows_overwrite
-
-    old = {
-        "progress": {"observed_cutscenes": ["104:0:s0", "105:2:s1"]},
-        "captured_room_id": "105",
-        "capture_step": 400,
-        "episode_history": {"room_entries": [["105", 100]]},
-    }
-    thin = {
-        "progress": {"observed_cutscenes": ["104:0:s0"]},
-        "captured_room_id": "105",
-        "capture_step": 120,
-        "episode_history": {"room_entries": [["105", 100]]},
-    }
-    settled = {
-        "progress": {
-            "observed_cutscenes": ["104:0:s0", "105:2:s1", "105:2:s0"]
-        },
-        "captured_room_id": "105",
-        "capture_step": 500,
-        "episode_history": {"room_entries": [["105", 100]]},
-    }
-    assert not story_progress_allows_overwrite(thin, old, room_id="105")
-    assert story_progress_allows_overwrite(settled, old, room_id="105")
-    # Shorter dwell must not block pay-forward when cutscenes are preserved.
-    fast = {
-        "progress": {"observed_cutscenes": ["104:0:s0", "105:2:s1"]},
-        "captured_room_id": "105",
-        "capture_step": 50,
-        "episode_history": {"room_entries": [["105", 0]]},
-    }
-    assert story_progress_allows_overwrite(fast, old, room_id="105")
-
-
 def test_pay_forward_ammo_beats_despite_shorter_dwell(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1999,7 +1947,7 @@ def test_pay_forward_ammo_beats_despite_shorter_dwell(
     assert cp15["quality"][:2] == [96, 30]
 
 
-def test_local_cas_rejects_story_regress_despite_better_hp(
+def test_local_cas_quality_beats_installs_regardless_of_sidecar_cutscenes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
@@ -2060,14 +2008,14 @@ def test_local_cas_rejects_story_regress_despite_better_hp(
         ),
         encoding="utf-8",
     )
-    assert not try_install_yawn_cell(
+    assert try_install_yawn_cell(
         tmp_path,
         checkpoint_index=2,
         staged_dir=healthier,
         quality=[96, 60, 0, 4, 1, 0],
         row={"checkpoint_id": "barry_return_105", "room_id": "105"},
     )
-    assert (good / CELL_STATE_NAME).read_bytes() == b"STORY"
+    assert (good / CELL_STATE_NAME).read_bytes() == b"THIN"
 
 
 def test_capture_settles_cutscene_before_savestate(
@@ -2229,7 +2177,7 @@ def test_capture_settles_item_menu_before_skip(
     assert "shotgun_116" in out
 
 
-def test_barry_return_capture_requires_kenneth(
+def test_barry_return_capture_ignores_kenneth(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
@@ -2259,17 +2207,6 @@ def test_barry_return_capture_requires_kenneth(
             "105", inventory=["knife", "beretta", "emblem"]
         ),
     )
-    assert (
-        capture_successor_cell(
-            env,
-            _state("105", inventory=["knife", "beretta", "emblem"]),
-            {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
-        )
-        is None
-    )
-    bridge.save_savestate.assert_not_called()
-
-    progress.observed_cutscenes.add("104:4:s0")
     monkeypatch.setattr(
         "re1_rl.yawn_rails.dump_episode_sidecar",
         lambda *_args, **_kwargs: {

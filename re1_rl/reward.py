@@ -32,10 +32,13 @@ REFERENCE_STEP_FRAMES = 8
 
 # Progress payouts (imperator 2026-07-20 delinked table).
 # Each signal owns its float; not scaled from CHECKPOINT_REWARD.
-NEW_ROOM_BONUS = 4.0
-NEW_CUTSCENE_BONUS = 1.2
-# Document/file examine UI (gs=0x40808100): same +4 / 12m floor as new room.
-NEW_DOCUMENT_EXAMINE_BONUS = 4.0
+# Disabled 2026-08-16: CP already pays the cell.
+NEW_ROOM_BONUS = 0.0
+# Disabled 2026-08-16: interact/cutscene farm. Observation + claim still run
+# (Kenneth / ledger). Pay and idle-extend / stagnation-reset are off.
+NEW_CUTSCENE_BONUS = 0.0
+# Disabled 2026-08-16: interact examine farm (+4 / +12m was the live spam).
+NEW_DOCUMENT_EXAMINE_BONUS = 0.0
 
 # Legacy aliases kept for tests / telemetry that import old names.
 WAYPOINT_ROOM_BONUS = 4.0
@@ -49,22 +52,22 @@ AMMO_PICKUP_BONUS = 2.0
 BOX_WITHDRAW_BONUS = 0.0
 # Completed typewriter save (ink-ribbon consume + save cinema + stable control).
 TYPEWRITER_SAVE_BONUS = 0.3
-# Keys / emblems / crests (room_items.json key_item=true).
-KEY_ITEM_PICKUP_BONUS = 4.0
+# Keys / emblems / crests — disabled 2026-08-16 (CP already pays the cell).
+KEY_ITEM_PICKUP_BONUS = 0.0
 # Leaving inventory after a paid key pickup (not story USE / box deposit).
 KEY_ITEM_RETURN_PENALTY = -KEY_ITEM_PICKUP_BONUS
-# Story inventory USE at a curated site (piano, fireplace, …).
-STORY_ITEM_USE_BONUS = 4.0
-# Dining 2F balcony statue knocked (blue jewel puzzle).
-DINING_STATUE_BONUS = 4.0
+# Story inventory USE — disabled 2026-08-16 (CP already pays the cell).
+STORY_ITEM_USE_BONUS = 0.0
+# Dining 2F balcony statue knocked — disabled 2026-08-16 (CP already pays).
+DINING_STATUE_BONUS = 0.0
 # Dense statue→drop/final distance shaping (clipped ±0.5/step, ~+10 full shove).
 DINING_STATUE_PROGRESS_STEP = 0.5
 DINING_STATUE_PROGRESS_BUDGET = 10.0
 # 10F alcove: put gold_emblem back without leaving the wooden emblem (anti-hack).
 # Intended path is USE wooden emblem → +4 story use.
 GOLD_EMBLEM_RETURN_PENALTY = -4.0
-# Every physical pickup of a gun/knife-class weapon (not ammo).
-NEW_WEAPON_PICKUP_BONUS = 4.0
+# Weapon pickup — disabled 2026-08-16 (CP already pays). Claim still tracks.
+NEW_WEAPON_PICKUP_BONUS = 0.0
 # The wall rack can toggle forever off-rails: taking the shotgun pays; replacing
 # it removes exactly that reward. On yawn rails, put-back is a cell-fail
 # terminal (−4, zero same-step positives, end episode) so a later CP cannot
@@ -72,7 +75,9 @@ NEW_WEAPON_PICKUP_BONUS = 4.0
 # not re-extend idle.
 SHOTGUN_RETURN_PENALTY = -4.0
 SHOTGUN_RACK_ROOMS: frozenset[str] = frozenset({"115", "116"})
-# Idle contempt: no new room / document / cutscene / key / weapon / story / gallery.
+# Idle contempt: ammo / gallery / statue-progress / rails checkpoint still
+# reset or extend. Room / weapon / statue-knock / cutscene / document / key /
+# story-use do not (2026-08-16).
 # Start budget and progress extensions: 12 min. Grace 3 min then ramp to cap.
 # Frames @ 60 emulated fps (PS1 NTSC / BizHawk).
 SOFTLOCK_PRE_KENNETH_FRAMES = 12 * 60 * 60
@@ -957,10 +962,8 @@ def compute_reward(
     else:
         new_items = set(state.get("inventory", [])) - set(prev_state.get("inventory", []))
     acquired_key_or_weapon = False
-    # First acquire of a weapon type this episode: 12m idle floor + stagnation reset.
-    # Shotgun rack re-takes still pay NEW_WEAPON (clawed back on return) but do not
-    # count as exploration progress — blocks idle-clock / extension farms.
-    weapon_progress = False
+    # First acquire still claims weapons_progressed (anti-farm / planner).
+    # Pay and idle-extend are off (2026-08-16). Shotgun re-takes still claw return.
     ammo_progress = False
     box_unpaid = _box_inventory_unpaid(state)
     for raw in new_items:
@@ -994,7 +997,6 @@ def compute_reward(
                     bd["new_weapon"] += NEW_WEAPON_PICKUP_BONUS
                     if first_weapon:
                         acquired_key_or_weapon = True
-                        weapon_progress = True
         elif name in AMMO_ITEM_NAMES:
             if not box_unpaid:
                 bd["ammo_pickup"] += AMMO_PICKUP_BONUS
@@ -1290,15 +1292,10 @@ def compute_reward(
                 bd[term] = value * RAILS_NAV_POSITIVE_SCALE
 
     if progress is not None and not state.get("dead"):
-        # Room / document / key / story / weapon / rails checkpoint → 12 min idle.
+        # Ammo / rails checkpoint → 12 min idle. Room / weapon / statue-knock
+        # / cutscene / document / key / story-use do not extend (2026-08-16).
         if (
-            bd["new_room"] != 0.0
-            or bd["document_examine"] != 0.0
-            or bd["key_item"] != 0.0
-            or bd["story_use"] != 0.0
-            or bd["dining_statue"] != 0.0
-            or bd["checkpoint_success"] != 0.0
-            or weapon_progress
+            bd["checkpoint_success"] != 0.0
             or ammo_progress
         ):
             progress.note_softlock_extension(SOFTLOCK_EXTENSION_FRAMES)
@@ -1306,15 +1303,8 @@ def compute_reward(
         if bd["checkpoint_success"] != 0.0:
             progress.note_max_steps_extension(CHECKPOINT_MAX_STEPS_EXTENSION)
         made_progress = (
-            bd["new_room"] != 0.0
-            or bd["document_examine"] != 0.0
-            or bd["new_cutscene"] != 0.0
-            or bd["key_item"] != 0.0
-            or bd["story_use"] != 0.0
-            or bd["gallery"] > 0.0
-            or bd["dining_statue"] > 0.0
+            bd["gallery"] > 0.0
             or bd["dining_statue_progress"] > 0.0
-            or weapon_progress
         )
         # Pause idle clock during cutscenes / doors (not in_control).
         frames_before = progress.stagnation_frames

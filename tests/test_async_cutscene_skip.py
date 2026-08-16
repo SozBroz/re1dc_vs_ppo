@@ -58,6 +58,9 @@ def _stub_env(async_cutscene_skip: bool) -> RE1Env:
     env._skip_frames_charged = 0
     env._enemy_fields = []
     env.bridge = MagicMock()
+    env.project_root = Path(__file__).resolve().parents[1]
+    env._enemy_motion = MagicMock()
+    env._enemy_motion.update.side_effect = lambda enemies, *a, **k: enemies
     env.frame_skip = 8
     env._ram_skip = MagicMock()
     env._sticky_input = MagicMock()
@@ -330,7 +333,6 @@ def test_post_skip_sync_pays_cutscene_bonus_when_frames_recorded() -> None:
 
 def test_post_skip_sync_message_text_no_cutscene() -> None:
     from re1_rl.progress import ProgressTracker
-    from re1_rl.reward import NEW_CUTSCENE_BONUS
 
     env = _stub_env(async_cutscene_skip=True)
     env._skip_session_frames = 450
@@ -377,12 +379,11 @@ def test_post_skip_sync_message_text_no_cutscene() -> None:
     )
     env._apply_post_skip_sync()
     assert env._post_skip_bd.get("new_cutscene", 0.0) == 0.0
-    assert env._post_skip_bd.get("new_cutscene", 0.0) != NEW_CUTSCENE_BONUS
 
 
 def test_post_skip_door_crossing_pays_new_room_not_cutscene() -> None:
     from re1_rl.progress import ProgressTracker
-    from re1_rl.reward import NEW_CUTSCENE_BONUS, NEW_ROOM_BONUS
+    from re1_rl.reward import NEW_ROOM_BONUS
 
     env = _stub_env(async_cutscene_skip=True)
     env._last_skip_frames = 80
@@ -430,7 +431,6 @@ def test_post_skip_door_crossing_pays_new_room_not_cutscene() -> None:
     env._apply_post_skip_sync()
     assert env._post_skip_bd.get("new_room") == NEW_ROOM_BONUS
     assert env._post_skip_bd.get("new_cutscene", 0.0) == 0.0
-    assert env._post_skip_bd.get("new_cutscene", 0.0) != NEW_CUTSCENE_BONUS
 
 
 def test_room_cross_preserves_full_skip_session_duration() -> None:

@@ -277,8 +277,8 @@ def test_damage_and_death_calibrated_to_waypoint():
     planner = make_planner()
     progress = ProgressTracker()
     # Independent statics (not derived from CHECKPOINT_REWARD).
-    assert NEW_ROOM_BONUS == pytest.approx(4.0)
-    assert NEW_CUTSCENE_BONUS == pytest.approx(1.2)
+    assert NEW_ROOM_BONUS == pytest.approx(0.0)
+    assert NEW_CUTSCENE_BONUS == pytest.approx(0.0)
     assert WAYPOINT_ROOM_BONUS == pytest.approx(4.0)
     assert STEP_PENALTY * REWARD_SCALE == pytest.approx(-0.00024)
     assert SURVIVAL_BUDGET_SCALED == pytest.approx(4.0)

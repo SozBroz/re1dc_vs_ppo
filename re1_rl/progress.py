@@ -227,10 +227,10 @@ class ProgressTracker:
     ) -> None:
         """Advance idle clock when no exploration progress this step.
 
-        Progress is defined in ``compute_reward``: new room, document examine,
-        new cutscene, new key item, first weapon acquire this episode, story
-        use, or gallery, or dining statue knocked. Revisiting rooms, reopening a paid document room,
-        junk pickups, and shotgun rack re-takes do not reset.
+        Progress is defined in ``compute_reward``: gallery or dining-statue
+        distance crumbs. Room / weapon / statue-knock / cutscene / document /
+        key / story-use no longer reset (2026-08-16). Revisiting rooms, junk
+        pickups, and shotgun rack re-takes do not reset.
         Each env step advances stagnation by ``step_frames`` (macro steps count more).
         """
         if made_progress:

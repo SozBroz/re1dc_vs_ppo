@@ -26,17 +26,23 @@ def _is_key_or_weapon(name: str) -> bool:
 
 
 def _observed_cutscene_met(cond: dict[str, Any], progress: ProgressTracker | None) -> bool:
-    """True when a ledger key matches ``prefix`` (optional ``require_scene`` → ``:s``)."""
-    if progress is None:
-        return False
+    """Generic cutscene keys do not gate CP success (2026-08-16).
+
+    Exception: Kenneth ``104:*:sN`` still blocks 104→105 before the cinema so
+    that return can fail the episode instead of minting cp02.
+    """
     prefix = str(cond.get("prefix", ""))
-    if not prefix:
-        return False
     require_scene = bool(cond.get("require_scene"))
-    return any(
-        str(key).startswith(prefix) and (not require_scene or ":s" in str(key))
-        for key in progress.observed_cutscenes
-    )
+    if prefix.startswith("104:") and require_scene:
+        if progress is None:
+            return False
+        from re1_rl.cutscene_reward import kenneth_cutscene_seen
+
+        return kenneth_cutscene_seen(
+            set(progress.observed_cutscenes or ())
+            | set(progress.rewarded_cutscenes or ())
+        )
+    return True
 
 # Order matters: index in this tuple = position in the objective one-hot.
 OBJECTIVE_TYPES = ("navigate", "pickup", "use_item", "fight", "scripted_macro")
@@ -417,16 +423,8 @@ class WaypointPlanner:
             min_steps = int(cond.get("min_steps", 1))
             return progress.in_control_steps_in_room(target_room) >= min_steps
         if cond_type == "in_control_steps_since_cutscene":
-            if progress is None:
-                return False
-            prefix = str(cond.get("prefix", ""))
-            min_steps = int(cond.get("min_steps", 1))
-            target_room = str(cond.get("room_id", wp_room) or wp_room)
-            if target_room and str(state.get("room_id", "")) != target_room:
-                return False
-            return bool(prefix) and (
-                progress.in_control_steps_since_cutscene(prefix) >= min_steps
-            )
+            # Logged only — does not gate CP success (2026-08-16).
+            return True
         if cond_type == "gallery_progress":
             from re1_rl.gallery_puzzle import completed_steps
 

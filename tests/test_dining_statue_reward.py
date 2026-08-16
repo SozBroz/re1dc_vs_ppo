@@ -16,7 +16,6 @@ from re1_rl.dining_statue_puzzle import (
     DINING_STATUE_FINAL_PUSH_XZ,
     DINING_STATUE_PROGRESS_BUDGET,
     DINING_STATUE_PROGRESS_STEP,
-    DINING_STATUE_REWARD,
     dining_statue_knocked_from_state,
     dining_statue_nav_target,
     dining_statue_progress_reward,
@@ -25,7 +24,7 @@ from re1_rl.dining_statue_puzzle import (
 from re1_rl.obs_encoder import GOAL_DIM, GOAL_FIELDS, ObsEncoder
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
-from re1_rl.reward import DINING_STATUE_BONUS, SOFTLOCK_EXTENSION_FRAMES, compute_reward
+from re1_rl.reward import DINING_STATUE_BONUS, compute_reward
 from re1_rl.room_graph import RoomGraph
 from tests.test_scaffolding import DOORS, ROOMS, make_planner, make_state
 
@@ -72,11 +71,12 @@ def test_dining_statue_rising_edge_pays_and_extends() -> None:
     prev = make_state(room="202", dining_statue_flag=0)
     knocked = make_state(room="202", dining_statue_flag=0x10)
 
-    total, bd = _reward(progress, prev, knocked)
+    _total, bd = _reward(progress, prev, knocked)
     assert bd["dining_statue"] == pytest.approx(DINING_STATUE_BONUS)
-    assert bd["dining_statue"] == pytest.approx(DINING_STATUE_REWARD)
+    assert bd["dining_statue"] == pytest.approx(0.0)
     assert progress.dining_statue_rewarded is True
-    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
+    assert progress.softlock_cap_frames == 0
+    assert progress.stagnation_frames >= 500
 
     _, bd2 = _reward(progress, knocked, knocked)
     assert bd2["dining_statue"] == 0.0

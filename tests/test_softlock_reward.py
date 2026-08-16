@@ -83,8 +83,8 @@ def test_new_room_floors_softlock_cap_at_twelve_minutes():
     cur = make_state(room="104", step=1)
     _, bd = _step(progress, prev, cur)
     assert bd["new_room"] == NEW_ROOM_BONUS
-    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
-    assert softlock_frame_threshold(progress) == SOFTLOCK_EXTENSION_FRAMES
+    assert progress.softlock_cap_frames == 0
+    assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES
 
 
 def test_kenneth_gate_breach_revokes_and_blocks_softlock_extensions():
@@ -228,17 +228,18 @@ def test_progress_resets_ramp():
         )
         > 0.0
     )
-    cur = make_state(room="106", step=1)
+    cur = make_state(room="105", step=1, new_items=["handgun_bullets"])
     _, bd = _step(progress, prev, cur, step_frames=REFERENCE_STEP_FRAMES)
-    assert bd["new_room"] == NEW_ROOM_BONUS
+    assert bd["ammo_pickup"] == AMMO_PICKUP_BONUS
     assert bd["softlock"] == 0.0
-    assert progress.stagnation_frames == 0
+    # Extension clears the clock, then this in-control step ticks forward.
+    assert progress.stagnation_frames == REFERENCE_STEP_FRAMES
     # Fresh grace after reset.
     prev = cur
-    cur = make_state(room="106", step=2)
+    cur = make_state(room="105", step=2)
     _, bd = _step(progress, prev, cur, step_frames=REFERENCE_STEP_FRAMES)
     assert bd["softlock"] == 0.0
-    assert progress.stagnation_frames == REFERENCE_STEP_FRAMES
+    assert progress.stagnation_frames == 2 * REFERENCE_STEP_FRAMES
 
 
 def test_room_loop_without_new_visits_accumulates_stagnation():
@@ -399,12 +400,13 @@ def test_weapon_pickup_resets_idle_timer_and_raises_six_minute_cap():
     cur = make_state(room="115", step=4, new_items=["colt_python"])
     _, bd = _step(progress, prev, cur, step_frames=4)
 
-    assert bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 4.0
+    assert bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 0.0
     assert bd["item"] == 0.0
     assert bd["key_item"] == 0.0
-    assert progress.stagnation_frames == 0
-    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
-    assert softlock_frame_threshold(progress) == SOFTLOCK_EXTENSION_FRAMES
+    assert "colt_python" in progress.weapons_progressed
+    assert progress.stagnation_frames == 16
+    assert progress.softlock_cap_frames == 0
+    assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES
 
 
 def test_beretta_inventory_flicker_does_not_repay_weapon():
@@ -459,7 +461,7 @@ def test_bazooka_ammo_swap_does_not_repay_new_weapon():
         new_items=["bazooka_acid"],
     )
     _, first_bd = _step(fresh, empty, first, step_frames=4)
-    assert first_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 4.0
+    assert first_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 0.0
     assert "bazooka" in fresh.weapons_progressed
 
 
@@ -499,11 +501,11 @@ def test_shotgun_wall_loop_is_zero_sum_and_retake_does_not_refarm_idle():
     pickup_reward, pickup_bd = _step(
         progress, empty, held, step_frames=0
     )
-    assert pickup_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 4.0
+    assert pickup_bd["new_weapon"] == NEW_WEAPON_PICKUP_BONUS == 0.0
     assert pickup_bd["shotgun_return"] == 0.0
-    assert progress.stagnation_frames == 0
-    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
-    assert SHOTGUN_RETURN_PENALTY == -NEW_WEAPON_PICKUP_BONUS == -4.0
+    assert progress.stagnation_frames == 1234
+    assert progress.softlock_cap_frames == 0
+    assert SHOTGUN_RETURN_PENALTY == -4.0
 
     returned = make_state(room="115", step=2, inventory=[], new_items=[])
     return_reward, return_bd = _step(
@@ -511,7 +513,7 @@ def test_shotgun_wall_loop_is_zero_sum_and_retake_does_not_refarm_idle():
     )
     assert return_bd["new_weapon"] == 0.0
     assert return_bd["shotgun_return"] == SHOTGUN_RETURN_PENALTY
-    assert pickup_reward + return_reward == 0.0
+    assert pickup_reward + return_reward == SHOTGUN_RETURN_PENALTY
     # Async post-skip can replay the same held->empty transition next step.
     duplicate_return, duplicate_bd = _step(
         progress, held, returned, step_frames=0
@@ -530,7 +532,7 @@ def test_shotgun_wall_loop_is_zero_sum_and_retake_does_not_refarm_idle():
         progress, held, returned, step_frames=0
     )
     assert return2_bd["shotgun_return"] == SHOTGUN_RETURN_PENALTY
-    assert pickup2 + return2 == 0.0
+    assert pickup2 + return2 == SHOTGUN_RETURN_PENALTY
     # A live step after the loop still advances the idle clock (no free reset).
     _, _ = _step(progress, returned, returned, step_frames=8)
     assert progress.stagnation_frames == 408
@@ -556,8 +558,9 @@ def test_key_item_pickup_resets_idle_timer():
     assert progress.stagnation_frames == 12
     cur = make_state(room="105", step=4, new_items=["emblem"])
     _, bd = _step(progress, prev, cur, step_frames=4)
-    assert bd["key_item"] > 0.0
-    assert progress.stagnation_frames == 0
+    assert bd["key_item"] == 0.0
+    assert "emblem" in progress.key_items_rewarded
+    assert progress.stagnation_frames == 16
 
 
 def test_first_visits_reset_idle_timer():
@@ -573,7 +576,7 @@ def test_first_visits_reset_idle_timer():
         assert bd["new_room"] == NEW_ROOM_BONUS
         assert bd["death"] == 0.0
         prev = cur
-    assert progress.stagnation_frames == 0
+    assert progress.stagnation_frames == 12
 
 
 def test_long_step_advances_stagnation_proportionally():

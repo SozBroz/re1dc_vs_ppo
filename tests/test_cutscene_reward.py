@@ -257,7 +257,7 @@ def test_room_paired_cutscene_pays_once() -> None:
     _, first = compute_reward(
         prev, cur, make_planner(), progress=progress, return_breakdown=True
     )
-    assert first["new_room"] > 0.0
+    assert first["new_room"] == 0.0
     assert first["new_cutscene"] == NEW_CUTSCENE_BONUS
     assert "105:2" in progress.observed_cutscenes
     assert "105:2" in progress.rewarded_cutscenes
@@ -278,7 +278,7 @@ def test_door_paired_tea_room_scene_key_is_kenneth() -> None:
     _, bd = compute_reward(
         prev, cur, make_planner(), progress=progress, return_breakdown=True
     )
-    assert bd["new_room"] > 0.0
+    assert bd["new_room"] == 0.0
     assert "104:4:s0" in progress.observed_cutscenes
     assert kenneth_cutscene_seen(progress.observed_cutscenes | progress.rewarded_cutscenes)
 

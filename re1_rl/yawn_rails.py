@@ -1178,30 +1178,7 @@ def capture_successor_cell(
             _mark_capture_ineligible(env, "room_mismatch")
             return None
     progress = getattr(env, "_progress", None)
-    ledgers: set[str] = set()
-    if progress is not None:
-        ledgers = set(progress.observed_cutscenes or ()) | set(
-            progress.rewarded_cutscenes or ()
-        )
-    if cid == "barry_rescue_115" and not any(
-        str(k).startswith("115:") for k in ledgers
-    ):
-        _mark_capture_ineligible(env, "cutscene_gate")
-        return None
-    if cid == "richard_cutscene_20D" and not any(
-        str(k).startswith("20D:") for k in ledgers
-    ):
-        _mark_capture_ineligible(env, "cutscene_gate")
-        return None
-    if cid == "barry_return_105":
-        from re1_rl.cutscene_reward import kenneth_cutscene_seen
-
-        if not kenneth_cutscene_seen(ledgers):
-            _mark_capture_ineligible(env, "cutscene_gate")
-            return None
-    if cid == "main_hall_106" and not any(str(k).startswith("106:") for k in ledgers):
-        _mark_capture_ineligible(env, "cutscene_gate")
-        return None
+    # Cutscene keys stay on the sidecar but do not gate capture (2026-08-16).
     if cid in (
         "crow_gallery_enter_117",
         "crest_gate_11A",

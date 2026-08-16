@@ -145,7 +145,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - **all of:**
   - Enter room `105` from `104`
-  - Observe cutscene with prefix `104:` (``:s`` scene key, not a door load)
+  - Kenneth ``104:*:sN`` already on the ledger (dining-from-tea before Kenneth still fails the episode). Other cutscene keys are logged only.
 
 ### `cp03` — `main_hall_106` (seq 4)
 
@@ -156,9 +156,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **106**. Navigate until the success condition fires.
 - **Success condition:**
-- **all of:**
-  - Enter room `106`
-  - Observe cutscene with prefix `106:`
+- Enter room `106` (cutscene keys are logged only; they do not create this cell)
 
 ### `cp04` — `upper_hall_203` (seq 5)
 
@@ -416,9 +414,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **115**. Hold: `shotgun`. Navigate until the success condition fires.
 - **Success condition:**
-- **all of:**
-  - Have item `shotgun` in inventory
-  - Observe cutscene with prefix `115:`
+- Have item `shotgun` in inventory (cutscene keys are logged only; they do not create this cell)
 
 ### `cp26` — `back_passage_10A` (seq 27)
 
@@ -1089,7 +1085,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **20D**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
-- Observe cutscene with prefix `20D:`
+- Cutscene keys are logged only; they do not create this cell (route still lists ``20D:`` observe, planner ignores it)
 
 ### `cp85` — `richard_forced_return_204` (seq 86)
 

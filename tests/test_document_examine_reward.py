@@ -1,4 +1,4 @@
-"""Document/file examine UI: +3 on rising edge, once per room, extends idle."""
+"""Document/file examine UI: claim-only; pay and idle-extend disabled."""
 
 from __future__ import annotations
 
@@ -17,8 +17,6 @@ from re1_rl.memory_map import (
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
     NEW_DOCUMENT_EXAMINE_BONUS,
-    NEW_ROOM_BONUS,
-    SOFTLOCK_EXTENSION_FRAMES,
     compute_reward,
 )
 from tests.test_scaffolding import make_planner, make_state
@@ -53,8 +51,8 @@ def _step(progress, prev, cur):
     )
 
 
-def test_first_edge_into_document_pays_plus_three_and_extends():
-    """Rising edge into gs=0x40808100 pays +3 and floors idle cap at 12 min."""
+def test_first_edge_into_document_is_tracked_but_unpaid():
+    """Rising edge still claims the room; pay and idle-extend are disabled."""
     progress = ProgressTracker()
     progress.first_visit("105")
     progress.claim_spawn_room_bonus()  # consume spawn credit
@@ -62,10 +60,9 @@ def test_first_edge_into_document_pays_plus_three_and_extends():
     cur = _document(room="105", step=1)
     _, bd = _step(progress, prev, cur)
     assert bd["document_examine"] == NEW_DOCUMENT_EXAMINE_BONUS
-    assert bd["document_examine"] == pytest.approx(4.0)
+    assert bd["document_examine"] == pytest.approx(0.0)
     assert bd["new_room"] == 0.0
-    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
-    assert progress.stagnation_frames == 0
+    assert progress.softlock_cap_frames == 0
     assert "105" in progress.rewarded_document_rooms
 
 
@@ -81,7 +78,7 @@ def test_staying_in_document_ui_does_not_repay():
     still = _document(room="105", step=2)
     _, bd1 = _step(progress, open_ui, still)
     assert bd1["document_examine"] == 0.0
-    assert progress.softlock_cap_frames == SOFTLOCK_EXTENSION_FRAMES
+    assert progress.softlock_cap_frames == 0
 
 
 def test_leave_and_reenter_same_room_does_not_repay():
@@ -138,4 +135,4 @@ def test_item_grid_is_not_document_examine():
     )
     _, bd = _step(progress, prev, item)
     assert bd["document_examine"] == 0.0
-    assert NEW_DOCUMENT_EXAMINE_BONUS == NEW_ROOM_BONUS
+    assert NEW_DOCUMENT_EXAMINE_BONUS == pytest.approx(0.0)

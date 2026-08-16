@@ -459,12 +459,12 @@ def test_story_use_reward_and_stagnation_reset() -> None:
         "step_emulated_frames": 8,
         "reference_step_frames": 8,
     }
-    rew, bd = compute_reward(prev, cur, planner=None, progress=progress, return_breakdown=True)
+    _rew, bd = compute_reward(prev, cur, planner=None, progress=progress, return_breakdown=True)
     assert bd["story_use"] == STORY_ITEM_USE_BONUS
-    assert rew > 0.9
-    assert progress.stagnation_frames == 0
+    assert bd["story_use"] == 0.0
+    assert progress.stagnation_frames == 50008
     assert not progress.claim_story_use_bonus("music_notes@10F_piano")
-    rew2, bd2 = compute_reward(prev, cur, planner=None, progress=progress, return_breakdown=True)
+    _rew2, bd2 = compute_reward(prev, cur, planner=None, progress=progress, return_breakdown=True)
     assert bd2["story_use"] == 0.0
 
 
@@ -655,7 +655,7 @@ def test_annotate_emblem_alcove_pays_story_use() -> None:
     assert not out.get("gold_emblem_return")
 
     progress = ProgressTracker()
-    rew, bd = compute_reward(
+    _rew, bd = compute_reward(
         {"room_id": "10F", "hp": 96},
         {
             "room_id": "10F",
@@ -671,7 +671,7 @@ def test_annotate_emblem_alcove_pays_story_use() -> None:
     )
     assert bd["story_use"] == STORY_ITEM_USE_BONUS
     assert bd["gold_emblem_return"] == 0.0
-    assert rew > 0.9
+    assert bd["story_use"] == 0.0
 
 
 def test_gold_only_put_back_pays_penalty() -> None:

@@ -1,8 +1,10 @@
 """Surgical cp02 (``barry_return_105``): Kenneth flag, then dining.
 
-CP02 success is the tea-room Kenneth ledger (``104:*:sN``) plus a 104→105
-return. Entering dining without that flag fails the episode. Timeout is the
-other fail. Spray, ammo, and Barry-dialogue mints are not part of this cell.
+CP02 success is 104→105 after the tea-room Kenneth ledger (``104:*:sN``).
+Entering dining from the tea room before that flag fails the episode.
+Generic cutscene keys still do not gate capture or overwrite. Timeout is
+the other fail. Spray, ammo, and Barry-dialogue mints are not part of this
+cell.
 """
 
 from __future__ import annotations

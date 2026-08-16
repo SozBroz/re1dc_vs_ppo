@@ -56,7 +56,7 @@ def test_no_waypoint_or_wrong_room_shaping():
     )
     assert bd["waypoint"] == 0.0
     assert bd["wrong_room"] == 0.0
-    assert bd["new_room"] > 0.0
+    assert bd["new_room"] == 0.0
 
 
 def test_unmapped_goal_does_not_fine():
@@ -87,7 +87,7 @@ def test_offroute_room_only_pays_exploration_bonus():
         return_breakdown=True,
     )
     assert bd["wrong_room"] == 0.0
-    assert bd["new_room"] > 0.0
+    assert bd["new_room"] == 0.0
 
 
 def test_rails_connected_detour_is_terminal_minus_four():

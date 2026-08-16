@@ -252,17 +252,6 @@ def _existing_cell_quality(root: Path, checkpoint_index: int) -> tuple[int, ...]
     return None
 
 
-def _sidecar_story_keys(sidecar: dict[str, Any]) -> set[str]:
-    """Cutscene ledger keys recorded in a cell sidecar (observed ∪ rewarded)."""
-    prog = sidecar.get("progress") or {}
-    keys: set[str] = set()
-    for field in ("observed_cutscenes", "rewarded_cutscenes"):
-        raw = prog.get(field) or []
-        if isinstance(raw, (list, tuple, set, frozenset)):
-            keys.update(str(x) for x in raw)
-    return keys
-
-
 def _room_dwell_frames(sidecar: dict[str, Any], room_id: str) -> int:
     """Approx dwell frames in ``room_id`` from room_entries enter steps.
 
@@ -301,28 +290,6 @@ def _room_dwell_frames(sidecar: dict[str, Any], room_id: str) -> int:
     return total
 
 
-def story_progress_allows_overwrite(
-    new_side: dict[str, Any],
-    old_side: dict[str, Any],
-    *,
-    room_id: str = "",
-) -> bool:
-    """True if new sidecar does not regress story vs an existing curated cell.
-
-    Pay-forward installs compare survival quality (``quality_beats``) first.
-    This gate only blocks door-threshold / cutscene-spoof captures: the new
-    sidecar must retain every old observed/rewarded cutscene key. Room dwell
-    is intentionally **not** compared — shorter legs with better ammo/HP win.
-    """
-    _ = room_id  # kept for call-site compatibility
-    old_keys = _sidecar_story_keys(old_side)
-    new_keys = _sidecar_story_keys(new_side)
-    missing = old_keys - new_keys
-    if missing:
-        return False
-    return True
-
-
 def try_install_yawn_cell(
     project_root: Path | str,
     *,
@@ -336,7 +303,7 @@ def try_install_yawn_cell(
 
     Pay-forward model: completing checkpoint *N* proposes cell cpNN; install
     when new quality strictly beats the incumbent (``quality_beats`` +
-    ``quality_replace_significant``), and cutscene keys are not regressed.
+    ``quality_replace_significant``). Cutscene keys are not compared.
     Returns True when the curated slot was updated.
     """
     from re1_rl.go_explore_capture import quality_replace_significant
@@ -363,30 +330,6 @@ def try_install_yawn_cell(
                 return False
             if not quality_replace_significant(new_q, old_q):
                 return False
-            # Cutscene-spoof captures must not clobber a more progressed cell.
-            old_side_p = dest / CELL_SIDECAR_NAME
-            if old_side_p.is_file():
-                try:
-                    old_side = json.loads(old_side_p.read_text(encoding="utf-8-sig"))
-                except (OSError, json.JSONDecodeError):
-                    old_side = {}
-                room = str(
-                    row.get("room_id")
-                    or new_side.get("captured_room_id")
-                    or old_side.get("captured_room_id")
-                    or ""
-                )
-                if not story_progress_allows_overwrite(
-                    new_side, old_side, room_id=room
-                ):
-                    print(
-                        f"[yawn_capture] reject cutscene-regress overwrite "
-                        f"cp{idx:02d} room={room} "
-                        f"old_keys={len(_sidecar_story_keys(old_side))} "
-                        f"new_keys={len(_sidecar_story_keys(new_side))}",
-                        flush=True,
-                    )
-                    return False
 
         incoming = dest.parent / f".incoming_{cell_dir_name(idx)}"
         if incoming.exists():
@@ -831,38 +774,6 @@ class YawnRailsCellStore:
         if not ok:
             self.rejected += 1
             return None
-
-        # Story-regress gate (same as local try_install) before curated write.
-        if existing is not None and not capacity_upgrade:
-            try:
-                with zipfile.ZipFile(io.BytesIO(bundle_bytes)) as zf:
-                    new_side = json.loads(zf.read(CELL_SIDECAR_NAME).decode("utf-8"))
-            except (OSError, zipfile.BadZipFile, json.JSONDecodeError, KeyError, UnicodeDecodeError):
-                self.rejected += 1
-                return None
-            old_side: dict[str, Any] = {}
-            old_side_p = cell_slot_dir(self.root, idx) / CELL_SIDECAR_NAME
-            if old_side_p.is_file():
-                try:
-                    old_side = json.loads(old_side_p.read_text(encoding="utf-8-sig"))
-                except (OSError, json.JSONDecodeError):
-                    old_side = {}
-            room = str(
-                prop.get("room_id")
-                or new_side.get("captured_room_id")
-                or old_side.get("captured_room_id")
-                or ""
-            )
-            if old_side and not story_progress_allows_overwrite(
-                new_side, old_side, room_id=room
-            ):
-                print(
-                    f"[yawn_ingest] reject cutscene-regress overwrite "
-                    f"cp{idx:02d} room={room}",
-                    flush=True,
-                )
-                self.rejected += 1
-                return None
 
         bundle_sha = _sha256_bytes(bundle_bytes)
         self._write_bundle_unlocked(idx, bundle_bytes, prop, bundle_sha)
