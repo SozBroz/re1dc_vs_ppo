@@ -7,8 +7,7 @@ set RE1_GO_EXPLORE_ARCHIVE=data\go_explore\archive.json
 REM Yawn rails: learner-authoritative cell sync (proposals → ingest → worker poll).
 REM Go-Explore mirror stays off.
 set RE1_GO_EXPLORE_SYNC=0
-REM pking-only cp37 recapture: keep SYNC off so WH2 cannot reinstall the old cell.
-set RE1_YAWN_RAILS_SYNC=0
+set RE1_YAWN_RAILS_SYNC=1
 set RE1_YAWN_RAILS_ROOT=states\yawn_rails
 set RE1_YAWN_RAILS_MANIFEST_POLL_S=60
 REM Pins live in data/yawn_reset_pin.env (pking) and data/workhorse_reset_pin.env.
