@@ -19,6 +19,8 @@ from re1_rl.leg_replay import (
     LegReplayBuffer,
     build_leg_replay_payload,
     new_leg_replay_buffer,
+    policy_leg_frames_from_tape,
+    reclassify_contaminated_async_skip_tape,
     should_write_leg_replay,
     tape_is_combat,
     write_leg_replay_json,
@@ -39,9 +41,27 @@ def test_buffer_leg_frames_sum() -> None:
     buf.append(7, 54)
     assert len(buf) == 3
     assert buf.leg_frames == 80
+    assert buf.policy_leg_frames == 80
+    assert buf.skip_leg_frames == 0
     actions, frames = buf.as_lists()
     assert actions == [7, 1, 7]
     assert frames == [18, 8, 54]
+
+
+def test_buffer_frame_channels_split_policy_from_skip() -> None:
+    buf = new_leg_replay_buffer()
+    buf.append(9, policy_frames=18)
+    buf.append(0, policy_frames=0, skip_frames=1200, reward_only_frames=0)
+    buf.append(0, policy_frames=0, skip_frames=0, reward_only_frames=8)
+    assert buf.policy_leg_frames == 18
+    assert buf.skip_leg_frames == 1200
+    assert buf.reward_only_leg_frames == 8
+    assert buf.leg_frames == 1218
+    actions, policy, skip, reward_only = buf.as_channel_lists()
+    assert actions == [9, 0, 0]
+    assert policy == [18, 0, 0]
+    assert skip == [0, 1200, 0]
+    assert reward_only == [0, 0, 8]
 
 
 def test_buffer_append_reward_pads_and_ignores_extra() -> None:
@@ -103,9 +123,13 @@ def test_payload_schema_and_write(tmp_path: Path) -> None:
     assert payload is not None
     assert payload["actions"] == [7, 1]
     assert payload["emu_frames_per_step"] == [18, 8]
+    assert payload["policy_frames_per_step"] == [18, 8]
+    assert payload["skip_frames_per_step"] == [0, 0]
     assert payload["leg_frames"] == 26
+    assert payload["policy_leg_frames"] == 26
     assert payload["contract"]["frame_skip"] == 8
     assert payload["contract"]["async_cutscene_skip"] is True
+    assert payload["contract"]["frame_channels"] is True
     assert payload["contract"]["joypad_tape"] is False
     assert payload["contract"]["heading_restore"] == HEADING_RESTORE_VERSION
     assert payload["contract"]["combat_leg"] is True
@@ -116,6 +140,62 @@ def test_payload_schema_and_write(tmp_path: Path) -> None:
     write_leg_replay_json(dest, payload)
     loaded = json.loads(dest.read_text(encoding="utf-8"))
     assert loaded["leg_steps"] == 2
+
+
+def test_payload_uses_policy_frames_for_quality_speed(tmp_path: Path) -> None:
+    buf = LegReplayBuffer()
+    buf.append(9, policy_frames=18)
+    buf.append(0, policy_frames=0, skip_frames=1200)
+    buf.append(0, reward_only_frames=8)
+    env = SimpleNamespace(
+        _route_start_index=0,
+        _leg_replay=buf,
+        _async_cutscene_skip=True,
+        frame_skip=8,
+        project_root=tmp_path,
+        action_space=SimpleNamespace(n=45),
+        _progress=None,
+        _reset_options={},
+        _stage={"init_savestate": "missing.State"},
+    )
+    quality = attach_leg_frames((96, 45, 100, 4, 1, 0, -30), buf.policy_leg_frames)
+    payload = build_leg_replay_payload(
+        env,
+        completed_index=0,
+        completed_id="emblem_105",
+        settled=False,
+        live_state={"room_id": "105", "x": 1, "z": 2, "facing": 3, "hp": 96},
+        quality=quality,
+        to_state_sha256="to",
+    )
+    assert payload is not None
+    assert payload["policy_leg_frames"] == 18
+    assert payload["skip_leg_frames"] == 1200
+    assert payload["reward_only_leg_frames"] == 8
+    assert payload["leg_frames"] == 1218
+    assert payload["end"]["quality"][7] == -18
+
+
+def test_reclassify_contaminated_async_skip_tape_splits_chunk_and_min_bills() -> None:
+    tape = {
+        "schema_version": 1,
+        "actions": [9, 5, 0, 0, 0, 1],
+        "emu_frames_per_step": [18, 8, 1200, 8, 25, 8],
+        "leg_frames": 1267,
+        "contract": {"frame_skip": 8, "async_cutscene_skip": True},
+        "end": {"quality": [96, 45, 100, 4, 1, 0, -30, -1267]},
+    }
+    fixed = reclassify_contaminated_async_skip_tape(tape, frame_skip=8, skip_chunk=600)
+    assert fixed["policy_frames_per_step"] == [18, 8, 0, 0, 0, 8]
+    assert fixed["skip_frames_per_step"] == [0, 0, 1200, 0, 25, 0]
+    assert fixed["reward_only_frames_per_step"] == [0, 0, 0, 8, 0, 0]
+    assert fixed["policy_leg_frames"] == 34
+    assert fixed["skip_leg_frames"] == 1225
+    assert fixed["reward_only_leg_frames"] == 8
+    assert fixed["leg_frames"] == 1259
+    assert fixed["end"]["quality"][7] == -34
+    assert policy_leg_frames_from_tape(fixed) == 34
+    assert policy_leg_frames_from_tape(tape) == 1267
 
 
 def test_fresh_cp00_tape_uses_init_savestate(tmp_path: Path) -> None:

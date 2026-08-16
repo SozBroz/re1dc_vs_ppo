@@ -16,7 +16,7 @@ from typing import Any
 from re1_rl.go_explore_merge import CELL_META_NAME, CELL_REPLAY_NAME, CELL_STATE_NAME
 
 ACTION_MAP_VERSION = 1
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 _UINT16_MAX = 65535
 # Packed LSB-first; must match lua/re1_client.lua TAPE_BUTTON_ORDER.
 JOYPAD_BUTTON_ORDER = (
@@ -41,6 +41,10 @@ def _json_float(value: float) -> float:
     return round(float(value), 6)
 
 
+def _clamp_u16(value: int) -> int:
+    return max(0, min(_UINT16_MAX, int(value)))
+
+
 def sparse_reward_events(breakdown: dict[str, Any] | None) -> dict[str, float]:
     """Keep nonzero channels so a later audit can replay the payout mix."""
     if not isinstance(breakdown, dict):
@@ -57,21 +61,56 @@ def sparse_reward_events(breakdown: dict[str, Any] | None) -> dict[str, float]:
 
 
 class LegReplayBuffer:
-    """In-memory action + emu-frame + stepwise-reward tape."""
+    """In-memory action + per-channel frame + stepwise-reward tape.
 
-    __slots__ = ("actions", "emu_frames", "rewards", "reward_events")
+    Frame channels:
+    - ``policy_frames``: agent-controlled hold / macro time (cell speed)
+    - ``skip_frames``: automatic async cutscene/door turbo burn
+    - ``reward_only_frames``: synthetic living-cost min bills (not emu time)
+    """
+
+    __slots__ = (
+        "actions",
+        "policy_frames",
+        "skip_frames",
+        "reward_only_frames",
+        "rewards",
+        "reward_events",
+    )
 
     def __init__(self) -> None:
         self.actions = bytearray()
-        self.emu_frames = array.array("H")
+        self.policy_frames = array.array("H")
+        self.skip_frames = array.array("H")
+        self.reward_only_frames = array.array("H")
         self.rewards = array.array("d")
         self.reward_events: list[dict[str, float]] = []
 
-    def append(self, action: int, emu_frames: int) -> None:
+    def append(
+        self,
+        action: int,
+        emu_frames: int | None = None,
+        *,
+        policy_frames: int | None = None,
+        skip_frames: int = 0,
+        reward_only_frames: int = 0,
+    ) -> None:
+        """Record one policy decision.
+
+        Backward-compatible call ``append(action, emu_frames)`` treats the
+        second positional arg as policy-controlled frames.
+        """
         a = max(0, min(255, int(action)))
-        frames = max(0, min(_UINT16_MAX, int(emu_frames)))
+        if policy_frames is None:
+            policy = _clamp_u16(0 if emu_frames is None else emu_frames)
+        else:
+            policy = _clamp_u16(policy_frames)
+        skip = _clamp_u16(skip_frames)
+        reward_only = _clamp_u16(reward_only_frames)
         self.actions.append(a)
-        self.emu_frames.append(frames)
+        self.policy_frames.append(policy)
+        self.skip_frames.append(skip)
+        self.reward_only_frames.append(reward_only)
 
     def append_reward(
         self, reward: float, breakdown: dict[str, Any] | None = None
@@ -89,11 +128,43 @@ class LegReplayBuffer:
         return len(self.actions)
 
     @property
+    def policy_leg_frames(self) -> int:
+        """Agent-controlled frames only — used for cell speed quality."""
+        return int(sum(self.policy_frames))
+
+    @property
+    def skip_leg_frames(self) -> int:
+        return int(sum(self.skip_frames))
+
+    @property
+    def reward_only_leg_frames(self) -> int:
+        return int(sum(self.reward_only_frames))
+
+    @property
     def leg_frames(self) -> int:
-        return int(sum(self.emu_frames))
+        """Real emulated frames (policy + automatic skip)."""
+        return self.policy_leg_frames + self.skip_leg_frames
+
+    @property
+    def emu_frames(self) -> array.array:
+        """Compat view: policy + skip per step (excludes reward-only)."""
+        out = array.array("H")
+        for policy, skip in zip(self.policy_frames, self.skip_frames):
+            out.append(_clamp_u16(int(policy) + int(skip)))
+        return out
 
     def as_lists(self) -> tuple[list[int], list[int]]:
-        return list(self.actions), list(self.emu_frames)
+        return list(self.actions), [int(p) + int(s) for p, s in zip(self.policy_frames, self.skip_frames)]
+
+    def as_channel_lists(
+        self,
+    ) -> tuple[list[int], list[int], list[int], list[int]]:
+        return (
+            list(self.actions),
+            list(self.policy_frames),
+            list(self.skip_frames),
+            list(self.reward_only_frames),
+        )
 
     def aligned_rewards(self) -> tuple[list[float], list[dict[str, float]]]:
         n = len(self.actions)
@@ -244,7 +315,8 @@ def build_leg_replay_payload(
     if not should_write_leg_replay(env, completed_index):
         return None
     buf: LegReplayBuffer = env._leg_replay
-    actions, emu_frames = buf.as_lists()
+    actions, policy, skip, reward_only = buf.as_channel_lists()
+    emu_frames = [int(p) + int(s) for p, s in zip(policy, skip)]
     from_index = int(completed_index) - 1
     if from_index < 0:
         from_id = "route_initial"
@@ -299,11 +371,18 @@ def build_leg_replay_payload(
             "heading_restore": HEADING_RESTORE_VERSION,
             "combat_leg": any(int(v or 0) > 0 for v in kills.values())
             or any(int(a) in ATTACK_ACTION_IDS for a in actions),
+            "frame_channels": True,
         },
         "actions": actions,
         "emu_frames_per_step": emu_frames,
+        "policy_frames_per_step": policy,
+        "skip_frames_per_step": skip,
+        "reward_only_frames_per_step": reward_only,
         "leg_steps": len(actions),
         "leg_frames": int(sum(emu_frames)),
+        "policy_leg_frames": int(sum(policy)),
+        "skip_leg_frames": int(sum(skip)),
+        "reward_only_leg_frames": int(sum(reward_only)),
         "settled": bool(settled),
         "end": {
             "room_id": str(live_state.get("room_id", "") or ""),
@@ -363,6 +442,109 @@ def write_leg_replay_json(path: Path, payload: dict[str, Any]) -> None:
     )
 
 
+def policy_leg_frames_from_tape(tape: dict[str, Any] | None) -> int | None:
+    """Prefer explicit policy channel; fall back to total emu for old tapes."""
+    if not isinstance(tape, dict):
+        return None
+    if "policy_leg_frames" in tape:
+        try:
+            return max(0, int(tape["policy_leg_frames"]))
+        except (TypeError, ValueError):
+            return None
+    policy_steps = tape.get("policy_frames_per_step")
+    if isinstance(policy_steps, list) and policy_steps:
+        try:
+            return max(0, int(sum(int(x) for x in policy_steps)))
+        except (TypeError, ValueError):
+            return None
+    if "leg_frames" in tape:
+        try:
+            return max(0, int(tape["leg_frames"]))
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def reclassify_contaminated_async_skip_tape(
+    tape: dict[str, Any],
+    *,
+    frame_skip: int = 8,
+    skip_chunk: int = 600,
+) -> dict[str, Any]:
+    """Split legacy async-skip contamination out of ``emu_frames_per_step``.
+
+    Pre-channel tapes billed whole bg skip chunks (often 600/1200) onto a
+    single noop/interact policy row, and charged synthetic ``frame_skip``
+    mins while waiting for the next chunk. Those inflate quality speed.
+    """
+    out = dict(tape)
+    actions = [int(a) for a in (out.get("actions") or [])]
+    emu = [int(f) for f in (out.get("emu_frames_per_step") or [])]
+    if len(emu) != len(actions):
+        raise ValueError("actions / emu_frames_per_step length mismatch")
+    if isinstance(out.get("policy_frames_per_step"), list) and out.get(
+        "contract", {}
+    ).get("frame_channels"):
+        return out
+
+    policy: list[int] = []
+    skip: list[int] = []
+    reward_only: list[int] = []
+    fs = max(1, int(frame_skip))
+    chunk = max(fs, int(skip_chunk))
+    i = 0
+    n = len(actions)
+    while i < n:
+        action = int(actions[i])
+        f = max(0, int(emu[i]))
+        # Full skip-chunk multiples on a cutscene decision are automatic burn.
+        if f >= chunk and f % chunk == 0:
+            policy.append(0)
+            skip.append(f)
+            reward_only.append(0)
+            i += 1
+            # Trailing noops after a chunk are still skip-session accounting:
+            # frame_skip mins are synthetic living-cost; any other size is the
+            # real leftover burn from the bg worker.
+            while i < n and int(actions[i]) == 0:
+                trail = max(0, int(emu[i]))
+                if trail == fs:
+                    policy.append(0)
+                    skip.append(0)
+                    reward_only.append(fs)
+                else:
+                    policy.append(0)
+                    skip.append(trail)
+                    reward_only.append(0)
+                i += 1
+            continue
+        policy.append(f)
+        skip.append(0)
+        reward_only.append(0)
+        i += 1
+
+    out["schema_version"] = SCHEMA_VERSION
+    out["policy_frames_per_step"] = policy
+    out["skip_frames_per_step"] = skip
+    out["reward_only_frames_per_step"] = reward_only
+    out["emu_frames_per_step"] = [int(p) + int(s) for p, s in zip(policy, skip)]
+    out["policy_leg_frames"] = int(sum(policy))
+    out["skip_leg_frames"] = int(sum(skip))
+    out["reward_only_leg_frames"] = int(sum(reward_only))
+    out["leg_frames"] = int(sum(out["emu_frames_per_step"]))
+    contract = dict(out.get("contract") or {})
+    contract["frame_channels"] = True
+    out["contract"] = contract
+    end = dict(out.get("end") or {})
+    quality = list(end.get("quality") or [])
+    if len(quality) >= 8:
+        from re1_rl.go_explore_archive import attach_leg_frames
+
+        end["quality"] = list(attach_leg_frames(quality[:7], out["policy_leg_frames"]))
+        out["end"] = end
+    return out
+
+
 def maybe_write_capture_tape(
     env: Any,
     staging: Path,
@@ -374,7 +556,7 @@ def maybe_write_capture_tape(
     quality: list[int] | tuple[int, ...],
     to_state_sha256: str,
 ) -> int | None:
-    """Write ``leg_replay.json`` into staging. Returns ``leg_frames`` or None."""
+    """Write ``leg_replay.json`` into staging. Returns ``policy_leg_frames`` or None."""
     payload = build_leg_replay_payload(
         env,
         completed_index=completed_index,
@@ -387,4 +569,4 @@ def maybe_write_capture_tape(
     if payload is None:
         return None
     write_leg_replay_json(staging / CELL_REPLAY_NAME, payload)
-    return int(payload["leg_frames"])
+    return int(payload["policy_leg_frames"])

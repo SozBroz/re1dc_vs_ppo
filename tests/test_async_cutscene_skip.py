@@ -110,30 +110,77 @@ def test_fast_cutscene_step_returns_immediately() -> None:
 
 def test_fast_cutscene_step_charges_min_decision_when_chunk_not_landed() -> None:
     from re1_rl.reward import STEP_PENALTY
+    from re1_rl.leg_replay import new_leg_replay_buffer
 
     env = _stub_env(async_cutscene_skip=True)
     env._skipping_flag = True
     env._skip_session_frames = 0
+    env._leg_replay = new_leg_replay_buffer()
     env.bridge.read_ram.return_value = {"player_hp": 96}
     _, reward, _, _, info = env._fast_cutscene_step(9)
     assert reward == pytest.approx(STEP_PENALTY)
     assert info["skip_step_frames_billed"] == 8
+    assert info["policy_frames"] == 0
+    assert info["skip_frames"] == 0
+    assert info["reward_only_frames"] == 8
     assert env._skip_frames_charged == 8
+    assert env._leg_replay.policy_leg_frames == 0
+    assert env._leg_replay.skip_leg_frames == 0
+    assert env._leg_replay.reward_only_leg_frames == 8
 
 
 def test_fast_cutscene_step_charges_step_penalty_for_skip_frames() -> None:
     from re1_rl.reward import step_penalty_for_frames
+    from re1_rl.leg_replay import new_leg_replay_buffer
 
     env = _stub_env(async_cutscene_skip=True)
     env._skipping_flag = True
     env._skip_session_frames = 120
+    env._leg_replay = new_leg_replay_buffer()
     env.bridge.read_ram.return_value = {"player_hp": 96}
     _, reward, _, _, info = env._fast_cutscene_step(9)
     expected = step_penalty_for_frames(120, ref_frames=env.frame_skip)
     assert reward == pytest.approx(expected)
     assert info["reward_breakdown"]["step"] == pytest.approx(expected)
     assert info["skip_step_frames_billed"] == 120
+    assert info["policy_frames"] == 0
+    assert info["skip_frames"] == 120
+    assert info["reward_only_frames"] == 0
     assert env._skip_frames_charged == 120
+    assert env._leg_replay.policy_leg_frames == 0
+    assert env._leg_replay.skip_leg_frames == 120
+
+
+def test_fast_cutscene_opening_hold_is_policy_not_skip() -> None:
+    from re1_rl.leg_replay import new_leg_replay_buffer
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    env._skip_session_frames = 18
+    env._leg_replay = new_leg_replay_buffer()
+    env.bridge.read_ram.return_value = {"player_hp": 96}
+    _, _, _, _, info = env._fast_cutscene_step(9, opening_policy_frames=18)
+    assert info["policy_frames"] == 18
+    assert info["skip_frames"] == 0
+    assert info["reward_only_frames"] == 0
+    assert env._leg_replay.policy_leg_frames == 18
+    assert env._leg_replay.skip_leg_frames == 0
+
+
+def test_fast_cutscene_opening_plus_skip_chunk_splits_channels() -> None:
+    from re1_rl.leg_replay import new_leg_replay_buffer
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    env._skip_session_frames = 618
+    env._leg_replay = new_leg_replay_buffer()
+    env.bridge.read_ram.return_value = {"player_hp": 96}
+    _, _, _, _, info = env._fast_cutscene_step(9, opening_policy_frames=18)
+    assert info["policy_frames"] == 18
+    assert info["skip_frames"] == 600
+    assert info["reward_only_frames"] == 0
+    assert env._leg_replay.policy_leg_frames == 18
+    assert env._leg_replay.skip_leg_frames == 600
 
 
 def test_async_skip_step_penalty_distributes_across_fast_steps() -> None:
@@ -264,6 +311,8 @@ def test_fast_cutscene_step_polls_hp_when_cache_stale() -> None:
     env._skipping_flag = True
     env._skip_cache_state = None
     env.bridge.read_ram.return_value = {"player_hp": 0}
+    env._read_state = MagicMock(return_value={"hp": 0, "room_id": "105"})
+    env._revive_zero_hp_under_yawn_floor = MagicMock(side_effect=lambda hp: hp)
     env._death_step = MagicMock(
         return_value=(
             {"frame": np.zeros((63, 84, 4), dtype=np.uint8)},

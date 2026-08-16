@@ -91,7 +91,11 @@ def attach_leg_frames(
     raw: Quality | list[int] | tuple[int, ...] | None,
     leg_frames: int | None,
 ) -> Quality:
-    """Set quality[7] = ``-leg_frames`` (fewer frames wins). None → sentinel."""
+    """Set quality[7] = ``-leg_frames`` (fewer frames wins). None → sentinel.
+
+    ``leg_frames`` must be policy-controlled time only — automatic async
+    cutscene skip and synthetic reward-min bills are excluded.
+    """
     q = list(normalize_quality(raw))
     if leg_frames is None:
         q[LEG_FRAMES_QUALITY_INDEX] = -LEG_FRAMES_SENTINEL

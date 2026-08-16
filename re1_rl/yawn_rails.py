@@ -1403,7 +1403,9 @@ def capture_successor_cell(
         if should_write_leg_replay(env, completed):
             buf = getattr(env, "_leg_replay", None)
             if buf is not None:
-                leg_frames = int(buf.leg_frames)
+                # Cell speed = agent-controlled frames only; auto-skip / synthetic
+                # living-cost frames must not pollute quality dim 7.
+                leg_frames = int(getattr(buf, "policy_leg_frames", buf.leg_frames))
         quality = attach_leg_frames(quality, leg_frames)
         maybe_write_capture_tape(
             env,

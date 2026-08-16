@@ -2440,12 +2440,28 @@ class RE1Env(gym.Env):
         max_ep_steps = int(self._stage.get("max_steps", 3000))
         self._skip_cache_truncated = self._episode_truncated()
 
-    def _record_leg_replay_step(self, action: int, emu_frames: int) -> None:
+    def _record_leg_replay_step(
+        self,
+        action: int,
+        emu_frames: int | None = None,
+        *,
+        policy_frames: int | None = None,
+        skip_frames: int = 0,
+        reward_only_frames: int = 0,
+    ) -> None:
         buf = getattr(self, "_leg_replay", None)
         if buf is None:
             return
         try:
-            buf.append(int(action), max(0, int(emu_frames)))
+            buf.append(
+                int(action),
+                None if emu_frames is None else max(0, int(emu_frames)),
+                policy_frames=(
+                    None if policy_frames is None else max(0, int(policy_frames))
+                ),
+                skip_frames=max(0, int(skip_frames)),
+                reward_only_frames=max(0, int(reward_only_frames)),
+            )
         except (TypeError, ValueError, OverflowError):
             return
 
@@ -2473,6 +2489,10 @@ class RE1Env(gym.Env):
         policy decision during skip still pays at least one reference step.
         Extra skip frames are billed when the chunk lands; settle flushes the
         remainder without a min so we do not invent frames after the skip ends.
+
+        The returned bill may include synthetic frames for living cost. Callers
+        that record leg speed must split real session delta from that synthetic
+        remainder — only real emu belongs in policy/skip channels.
         """
         from re1_rl.reward import step_penalty_for_frames
 
@@ -2487,7 +2507,10 @@ class RE1Env(gym.Env):
         return float(step * REWARD_SCALE), {"step": step}, bill
 
     def _fast_cutscene_step(
-        self, action: int
+        self,
+        action: int,
+        *,
+        opening_policy_frames: int = 0,
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
         if self._poll_death_during_skip():
             death = self._death_step(
@@ -2499,11 +2522,23 @@ class RE1Env(gym.Env):
         pending = self._flush_pending_episode_failure(action)
         if pending is not None:
             return pending
+        charged_before = int(getattr(self, "_skip_frames_charged", 0) or 0)
+        session = int(getattr(self, "_skip_session_frames", 0) or 0)
+        real_delta = max(0, session - charged_before)
         skip_reward, skip_bd, skip_frames = self._bill_async_skip_step_penalty(
             min_frames=self.frame_skip
         )
+        synthetic = max(0, int(skip_frames) - real_delta)
+        opening = max(0, int(opening_policy_frames))
+        policy = min(opening, real_delta)
+        skip_real = max(0, real_delta - policy)
         self._step_count += 1
-        self._record_leg_replay_step(action, int(skip_frames))
+        self._record_leg_replay_step(
+            action,
+            policy_frames=policy,
+            skip_frames=skip_real,
+            reward_only_frames=synthetic,
+        )
         # Main-thread flush of door crossings noted by the bg skip worker.
         try:
             self._credit_async_skip_room_crossing()
@@ -2531,6 +2566,9 @@ class RE1Env(gym.Env):
             if 0 <= int(action) < len(ACTION_NAMES)
             else str(action),
             "bridge_port": getattr(self.bridge, "port", None),
+            "policy_frames": int(policy),
+            "skip_frames": int(skip_real),
+            "reward_only_frames": int(synthetic),
         }
         if skip_bd:
             info["reward_breakdown"] = dict(skip_bd)
@@ -4360,11 +4398,14 @@ class RE1Env(gym.Env):
             self._skipping_flag = True
             self._skip_cache_obs = None
             # The hold that opened the skip already burned emu frames; count
-            # them before the bg worker's first chunk lands.
+            # them before the bg worker's first chunk lands. Leg speed treats
+            # that hold as policy time via opening_policy_frames.
             self._skip_session_frames = int(
                 getattr(self, "_skip_session_frames", 0) or 0
             ) + max(0, int(step_emulated_frames))
-            return self._fast_cutscene_step(action)
+            return self._fast_cutscene_step(
+                action, opening_policy_frames=max(0, int(step_emulated_frames))
+            )
 
         skipped, died_during_skip = 0, False
         if not self._async_cutscene_skip:
