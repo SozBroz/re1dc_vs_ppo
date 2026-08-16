@@ -24,7 +24,7 @@ from re1_rl.bizhawk_paths import EMUHAWK, assert_rom_present, emuhawk_argv
 from re1_rl.env import ACTION_NAMES, RE1Env
 from re1_rl.go_explore_merge import CELL_REPLAY_NAME, CELL_SIDECAR_NAME, CELL_STATE_NAME
 from re1_rl.attack_macro import FACING_RESTORE_TOL, facing_signed_delta
-from re1_rl.leg_replay import tape_is_combat
+from re1_rl.leg_replay import joypad_replay_spans, tape_is_combat
 from re1_rl.yawn_rails import _settle_state_for_capture
 from re1_rl.yawn_rails_sync import cell_dir_name, yawn_rails_root
 from scripts.play_human import configure_ram_skip, wait_for_emuhawk
@@ -75,29 +75,75 @@ def _mismatch_frames(got: list[int], want: list[int]) -> int | None:
 
 
 def _play_joypad(
-    env: RE1Env, bits: list[int], *, label: str
+    env: RE1Env,
+    spans: list[tuple[list[int], str]],
+    *,
+    label: str,
+    want_end: dict[str, Any] | None = None,
+    stop_at_end_pose: bool = False,
+    billed_frames: int | None = None,
+    tape_frames: int | None = None,
 ) -> dict[str, Any]:
     """TAS replay: apply recorded pad bits, no env.step / capture / skip."""
     chunk = 120
     last_state: dict[str, Any] = dict(getattr(env, "_prev_state") or {})
-    n = len(bits)
+    total = sum(len(bits) for bits, _mode in spans)
+    if billed_frames is not None and tape_frames is not None and tape_frames > billed_frames:
+        print(
+            f"[replay] {label} drop unbilled joypad suffix "
+            f"{tape_frames - billed_frames} (billed={billed_frames} tape={tape_frames})",
+            flush=True,
+        )
     played = 0
-    for start in range(0, n, chunk):
-        sl = bits[start : start + chunk]
-        got = env.bridge.tape_play(sl)
-        played += int(got)
-        try:
-            last_state = dict(env._read_state(track_items=False))
-        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
-            last_state = dict(getattr(env, "_prev_state") or {})
-        done = min(start + chunk, n)
-        if done == n or start == 0 or done % 360 == 0:
-            print(
-                f"[replay] {label} joypad {done}/{n} played={played} "
-                f"room={last_state.get('room_id')} hp={last_state.get('hp')} "
-                f"pos=({last_state.get('x')},{last_state.get('z')})",
-                flush=True,
-            )
+    hit_end_at: int | None = None
+    want = want_end or {}
+    want_room = str(want.get("room_id", "") or "")
+    want_x = int(want.get("x", 0) or 0)
+    want_z = int(want.get("z", 0) or 0)
+    n = total
+    for span_bits, patch_mode in spans:
+        print(
+            f"[replay] {label} span {len(span_bits)} frames patch_mode={patch_mode} "
+            f"at {played}/{n}",
+            flush=True,
+        )
+        for start in range(0, len(span_bits), chunk):
+            sl = span_bits[start : start + chunk]
+            got = env.bridge.tape_play(sl, patch_mode=patch_mode)
+            played += int(got)
+            try:
+                last_state = dict(env._read_state(track_items=False))
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                last_state = dict(getattr(env, "_prev_state") or {})
+            want_hp = int(want.get("hp", 0) or 0)
+            if (
+                hit_end_at is None
+                and want_room
+                and str(last_state.get("room_id", "") or "").upper() == want_room.upper()
+                and abs(int(last_state.get("x", 0) or 0) - want_x) <= 256
+                and abs(int(last_state.get("z", 0) or 0) - want_z) <= 256
+                and (not want_hp or abs(int(last_state.get("hp", 0) or 0) - want_hp) <= 12)
+            ):
+                hit_end_at = played
+                print(
+                    f"[replay] {label} first end-pose hit at joypad {played}/{n} "
+                    f"hp={last_state.get('hp')} pos=({last_state.get('x')},"
+                    f"{last_state.get('z')}) facing={last_state.get('facing')}",
+                    flush=True,
+                )
+                if stop_at_end_pose:
+                    print(
+                        f"[replay] {label} stop at end pose; leftover={n - played}",
+                        flush=True,
+                    )
+                    return last_state
+            if played == n or played % 360 == 0 or start == 0:
+                print(
+                    f"[replay] {label} joypad {played}/{n} "
+                    f"room={last_state.get('room_id')} hp={last_state.get('hp')} "
+                    f"pos=({last_state.get('x')},{last_state.get('z')})",
+                    flush=True,
+                )
     return last_state
 
 
@@ -197,6 +243,12 @@ def main() -> int:
         "--force-stale",
         action="store_true",
         help="play even when predecessor State SHA != tape from_state_sha256",
+    )
+    ap.add_argument(
+        "--joypad-patch",
+        choices=("auto", "step", "force", "off", "skip"),
+        default="auto",
+        help="auto classifies Cross-mash as force turbo; others apply one patch mode",
     )
     ap.add_argument(
         "--keep-open",
@@ -398,9 +450,28 @@ def main() -> int:
             f"cp{int(tape['from_checkpoint_index']):02d}"
             f"->{int(tape['to_checkpoint_index']):02d} "
             f"steps={len(tape.get('actions') or [])} "
-            f"frames={tape.get('leg_frames')}",
+            f"frames={tape.get('leg_frames')} "
+            f"joypad={tape.get('joypad_frames')} "
+            f"policy={tape.get('policy_leg_frames')} "
+            f"skip={tape.get('skip_leg_frames')}",
             flush=True,
         )
+        joy_n = int(tape.get("joypad_frames") or 0)
+        billed = int(tape.get("policy_leg_frames") or 0) + int(
+            tape.get("skip_leg_frames") or 0
+        )
+        if joy_n > billed + 8:
+            print(
+                f"[replay] WARN unbilled joypad extra={joy_n - billed} "
+                f"(bg skip interleaved; skip_frames_per_step is not a TAS map)",
+                flush=True,
+            )
+        if joy_n and not (tape.get("joypad_turbo") or []):
+            print(
+                "[replay] WARN tape has no joypad_turbo; recapture after Lua "
+                "reload — this pad stream cannot TAS-replay combat skip",
+                flush=True,
+            )
         by_channel = tape.get("reward_by_channel")
         if isinstance(by_channel, dict) and by_channel:
             parts = " ".join(
@@ -411,14 +482,28 @@ def main() -> int:
                 f"[replay] rewards total={tape.get('reward_total')} {parts}",
                 flush=True,
             )
-    # Reset's _skip_uncontrolled would burn the same cinema the tape
-    # recorded as 0-frame steps and desync playback.
-    _skip = env._skip_uncontrolled
-    env._skip_uncontrolled = lambda *a, **k: (0, False)  # type: ignore[method-assign]
-    try:
+    # Action-mode tapes can store cinema as 0-frame rows. Burning that same
+    # cinema on reset would double-skip. Joypad tapes already contain those
+    # frames as pad bits, but capture itself *did* skip on reset before the
+    # recorder started — replay must match that start state.
+    if not use_joypad:
+        _skip = env._skip_uncontrolled
+        env._skip_uncontrolled = lambda *a, **k: (0, False)  # type: ignore[method-assign]
+        try:
+            env.reset(options=reset_options)
+        finally:
+            env._skip_uncontrolled = _skip
+    else:
         env.reset(options=reset_options)
-    finally:
-        env._skip_uncontrolled = _skip
+    st = getattr(env, "_prev_state", {}) or {}
+    print(
+        f"[replay] after reset skip_frames={getattr(env, '_last_skip_frames', 0)} "
+        f"room={st.get('room_id')} "
+        f"pos=({st.get('x')},{st.get('z')}) "
+        f"in_control={st.get('in_control')} "
+        f"hp={st.get('hp')} equipped=0x{int(st.get('equipped_weapon_id') or 0):02X}",
+        flush=True,
+    )
     # Capture freeze would hitch (and rewrite cells) at each CP success.
     env._arm_checkpoint_freeze = lambda: None  # type: ignore[method-assign]
     if use_joypad:
@@ -439,7 +524,20 @@ def main() -> int:
             got_frames: list[int] = []
             if use_joypad:
                 bits = [int(b) for b in (tape.get("joypad_bits") or [])]
-                last_state = _play_joypad(env, bits, label=label)
+                if args.joypad_patch == "auto":
+                    spans = joypad_replay_spans(tape)
+                else:
+                    spans = [(bits, str(args.joypad_patch))]
+                billed = sum(len(s[0]) for s in spans)
+                last_state = _play_joypad(
+                    env,
+                    spans,
+                    label=label,
+                    want_end=tape.get("end") or {},
+                    stop_at_end_pose=True,
+                    billed_frames=billed,
+                    tape_frames=len(bits),
+                )
             else:
                 last_state, got_frames, term, trunc = _play_actions(
                     env,

@@ -1122,6 +1122,12 @@ def capture_successor_cell(
     """
     if float(breakdown.get("checkpoint_success", 0.0)) <= 0.0:
         return None
+    # Stop the joypad recorder before settle / bg-skip can append frames
+    # after the success pose. Dump still reads the buffer later.
+    try:
+        env.bridge.tape_enable(False)
+    except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+        pass
     _clear_capture_ineligible(env)
     stage = getattr(env, "_stage", {})
     if stage.get("mode") != "yawn_rails":

@@ -18,6 +18,7 @@ from re1_rl.leg_replay import (
     HEADING_RESTORE_VERSION,
     LegReplayBuffer,
     build_leg_replay_payload,
+    joypad_replay_spans,
     new_leg_replay_buffer,
     policy_leg_frames_from_tape,
     reclassify_contaminated_async_skip_tape,
@@ -404,6 +405,36 @@ def test_payload_includes_joypad_bits_when_bridge_dumps() -> None:
     assert payload["contract"]["joypad_tape"] is True
     assert payload["joypad_bits"] == [1, 0, 4]
     assert payload["joypad_frames"] == 3
+    assert "joypad_turbo" not in payload
+
+
+def test_payload_includes_joypad_turbo_when_dump_full() -> None:
+    buf = LegReplayBuffer()
+    buf.append(1, 8)
+    env = SimpleNamespace(
+        _route_start_index=19,
+        _leg_replay=buf,
+        _async_cutscene_skip=False,
+        frame_skip=8,
+        project_root=".",
+        action_space=SimpleNamespace(n=45),
+        _progress=SimpleNamespace(leg_kills_for_capture=lambda: {}),
+        _reset_options={"pb_bundle": {}},
+        bridge=SimpleNamespace(tape_dump_full=lambda: ([1, 0, 4], [0, 1, 0])),
+    )
+    quality = attach_leg_frames((96, 40, 0, 8, 1, 0, 0), 8)
+    payload = build_leg_replay_payload(
+        env,
+        completed_index=19,
+        completed_id="ammo_108",
+        settled=False,
+        live_state={"room_id": "108", "x": 1, "z": 2, "facing": 3, "hp": 96, "in_control": True},
+        quality=quality,
+        to_state_sha256="abc",
+    )
+    assert payload is not None
+    assert payload["contract"]["joypad_turbo"] is True
+    assert payload["joypad_turbo"] == [0, 1, 0]
 
 
 def test_payload_includes_stepwise_rewards(tmp_path: Path) -> None:
@@ -455,7 +486,50 @@ def test_joypad_replay_keeps_engine_patches_and_skip_turbo() -> None:
     replay = (root / "scripts" / "replay_leg.py").read_text(encoding="utf-8")
     assert "apply_patches(tape_skip_force_turbo())" in lua
     assert "TAPE_SCENE_FLAG = 0x800C3002" in lua
+    assert 'force_turbo == "off"' in lua
+    assert 'patch_mode == "step"' in lua
+    assert 'patch_mode == "force"' in lua
+    assert "TAPE_TURBO" in lua
+    assert "LAST_TURBO" in lua
     assert "turbo_patches=True" in replay
+    assert "joypad_replay_spans" in replay
+
+
+def test_joypad_replay_spans_policy_1x_skip_force_drops_suffix() -> None:
+    tape = {
+        "joypad_bits": [1, 1, 1, 2, 2, 3, 3, 3, 9, 9],
+        "policy_frames_per_step": [3, 0, 3],
+        "skip_frames_per_step": [0, 2, 0],
+        "skip_leg_frames": 2,
+    }
+    # No Cross-mash on this pad stream — billed skip is ignored; all step.
+    assert joypad_replay_spans(tape) == [([1, 1, 1, 2, 2, 3, 3, 3, 9, 9], "step")]
+    consecutive = {
+        "joypad_bits": [1, 1, 2, 2, 3, 3],
+        "policy_frames_per_step": [2, 2, 2],
+        "skip_frames_per_step": [0, 0, 0],
+    }
+    assert joypad_replay_spans(consecutive) == [([1, 1, 2, 2, 3, 3], "step")]
+    mash = ([16] * 4 + [0] * 8) * 3
+    mixed = {
+        "joypad_bits": [65] * 8 + mash + [65] * 8,
+        "policy_frames_per_step": [8, 0, 8],
+        "skip_frames_per_step": [0, 36, 0],
+    }
+    assert joypad_replay_spans(mixed) == [
+        ([65] * 8, "step"),
+        (mash, "force"),
+        ([65] * 8, "step"),
+    ]
+    stamped = {
+        "joypad_bits": [65, 65, 16, 16, 0, 0, 65],
+        "joypad_turbo": [0, 0, 1, 1, 1, 1, 0],
+    }
+    assert joypad_replay_spans(stamped) == [
+        ([65, 65], "off"),
+        ([16, 16, 0, 0], "force"),
+        ([65], "off"),
+    ]
 
 
 def test_normalize_pads_missing_speed_with_sentinel() -> None:

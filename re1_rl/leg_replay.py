@@ -213,6 +213,86 @@ ATTACK_ACTION_IDS = frozenset({6, 7, 8})
 HEADING_RESTORE_VERSION = 1
 
 
+_SKIP_MASH_MIN_LEN = 24
+_SKIP_MASH_RATIO_MIN = 0.22
+_SKIP_MASH_RATIO_MAX = 0.45
+_SKIP_MASH_CROSS_BITS = 16  # TAPE_BUTTON_ORDER index 4 = cross
+
+
+def _merge_joypad_spans(
+    spans: list[tuple[list[int], str]],
+) -> list[tuple[list[int], str]]:
+    merged: list[tuple[list[int], str]] = []
+    for bits_span, mode in spans:
+        if not bits_span:
+            continue
+        if merged and merged[-1][1] == mode:
+            merged[-1][0].extend(bits_span)
+        else:
+            merged.append((list(bits_span), mode))
+    return merged
+
+
+def _is_skip_mash_run(frames: list[int]) -> bool:
+    """True for async fast_forward's 4-on/8-off Cross mash (ratio ~1/3)."""
+    n = len(frames)
+    if n < _SKIP_MASH_MIN_LEN:
+        return False
+    cross = 0
+    for raw in frames:
+        bits = int(raw)
+        if bits == _SKIP_MASH_CROSS_BITS:
+            cross += 1
+        elif bits != 0:
+            return False
+    ratio = cross / n
+    return _SKIP_MASH_RATIO_MIN <= ratio <= _SKIP_MASH_RATIO_MAX
+
+
+def joypad_replay_spans(tape: dict[str, Any]) -> list[tuple[list[int], str]]:
+    """Split joypad bits into ``(frames, patch_mode)`` TAS spans.
+
+    New tapes stamp ``joypad_turbo`` (1 = cutscene turbo poke was on). Replay
+    those bits with ``force`` / ``off`` so grab skip and cinema match capture.
+    Old tapes without the channel fall back to Cross-mash detection.
+    """
+    bits = [int(b) for b in (tape.get("joypad_bits") or [])]
+    if not bits:
+        return []
+    turbo_raw = tape.get("joypad_turbo")
+    if isinstance(turbo_raw, list) and len(turbo_raw) == len(bits):
+        spans: list[tuple[list[int], str]] = []
+        i = 0
+        n = len(bits)
+        while i < n:
+            on = int(turbo_raw[i] or 0) != 0
+            j = i + 1
+            while j < n and (int(turbo_raw[j] or 0) != 0) == on:
+                j += 1
+            spans.append((bits[i:j], "force" if on else "off"))
+            i = j
+        return _merge_joypad_spans(spans)
+    spans = []
+    i = 0
+    n = len(bits)
+    while i < n:
+        if bits[i] in (0, _SKIP_MASH_CROSS_BITS):
+            j = i + 1
+            while j < n and bits[j] in (0, _SKIP_MASH_CROSS_BITS):
+                j += 1
+            run = bits[i:j]
+            mode = "force" if _is_skip_mash_run(run) else "step"
+            spans.append((run, mode))
+            i = j
+        else:
+            j = i + 1
+            while j < n and bits[j] not in (0, _SKIP_MASH_CROSS_BITS):
+                j += 1
+            spans.append((bits[i:j], "step"))
+            i = j
+    return _merge_joypad_spans(spans)
+
+
 def tape_is_combat(tape: dict[str, Any]) -> bool:
     """True when the tape recorded attacks or room kills."""
     if bool(tape.get("combat_leg")):
@@ -352,7 +432,7 @@ def build_leg_replay_payload(
         ]
     root = getattr(env, "project_root", None)
     n_actions = int(getattr(getattr(env, "action_space", None), "n", 45) or 45)
-    joypad_bits = _joypad_bits_from_env(env)
+    joypad_bits, joypad_turbo = _joypad_tape_from_env(env)
     payload = {
         "schema_version": SCHEMA_VERSION,
         "from_checkpoint_index": from_index,
@@ -368,6 +448,7 @@ def build_leg_replay_payload(
             "code_commit": _git_commit(root),
             "action_map_version": ACTION_MAP_VERSION,
             "joypad_tape": bool(joypad_bits),
+            "joypad_turbo": bool(joypad_turbo),
             "heading_restore": HEADING_RESTORE_VERSION,
             "combat_leg": any(int(v or 0) > 0 for v in kills.values())
             or any(int(a) in ATTACK_ACTION_IDS for a in actions),
@@ -399,6 +480,8 @@ def build_leg_replay_payload(
     if joypad_bits:
         payload["joypad_bits"] = joypad_bits
         payload["joypad_frames"] = len(joypad_bits)
+        if joypad_turbo:
+            payload["joypad_turbo"] = joypad_turbo
     if len(buf.rewards) > 0:
         rewards, events = buf.aligned_rewards()
         by_channel: dict[str, float] = {}
@@ -415,24 +498,44 @@ def build_leg_replay_payload(
     return payload
 
 
-def _joypad_bits_from_env(env: Any) -> list[int] | None:
+def _joypad_tape_from_env(env: Any) -> tuple[list[int], list[int]]:
     bridge = getattr(env, "bridge", None)
+    dump_full = getattr(bridge, "tape_dump_full", None)
     dump = getattr(bridge, "tape_dump", None)
-    if not callable(dump):
-        return None
+    frames: list[int] = []
+    turbo: list[int] = []
     try:
-        frames = dump()
+        if callable(dump_full):
+            raw_frames, raw_turbo = dump_full()
+            frames = list(raw_frames or [])
+            turbo = list(raw_turbo or [])
+        elif callable(dump):
+            raw = dump()
+            if isinstance(raw, list):
+                frames = list(raw)
     except (OSError, RuntimeError, ValueError, TypeError, AttributeError):
-        return None
-    if not isinstance(frames, list) or not frames:
-        return None
+        return [], []
     out: list[int] = []
     for item in frames:
         try:
             out.append(max(0, int(item)) & 0xFFFF)
         except (TypeError, ValueError):
-            return None
-    return out
+            return [], []
+    if not out:
+        return [], []
+    flags: list[int] = []
+    if len(turbo) == len(out):
+        for item in turbo:
+            try:
+                flags.append(1 if int(item) else 0)
+            except (TypeError, ValueError):
+                flags.append(0)
+    return out, flags
+
+
+def _joypad_bits_from_env(env: Any) -> list[int] | None:
+    bits, _turbo = _joypad_tape_from_env(env)
+    return bits or None
 
 
 def write_leg_replay_json(path: Path, payload: dict[str, Any]) -> None:

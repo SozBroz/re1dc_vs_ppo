@@ -508,25 +508,51 @@ class BizHawkClient:
     def tape_clear(self) -> None:
         self._request({"cmd": "tape_clear"})
 
-    def tape_play(self, frames: list[int]) -> int:
+    def tape_play(
+        self,
+        frames: list[int],
+        *,
+        no_cutscene_turbo: bool = False,
+        patch_mode: str | None = None,
+    ) -> int:
         bits = [max(0, int(b)) & 0xFFFF for b in frames]
         if not bits:
             return 0
-        resp = self._request({"cmd": "tape_play", "frames": bits})
+        payload: dict[str, Any] = {"cmd": "tape_play", "frames": bits}
+        mode = str(patch_mode or "").strip().lower()
+        if mode in ("off", "step", "force", "skip"):
+            payload["patch_mode"] = mode
+        elif no_cutscene_turbo:
+            payload["no_cutscene_turbo"] = True
+        resp = self._request(payload)
         return int(resp.get("n") or 0)
 
     def tape_dump(self) -> list[int]:
+        frames, _turbo = self.tape_dump_full()
+        return frames
+
+    def tape_dump_full(self) -> tuple[list[int], list[int]]:
         resp = self._request({"cmd": "tape_dump"})
         raw = resp.get("frames") or []
+        turbo_raw = resp.get("turbo") or []
         if not isinstance(raw, list):
-            return []
+            return [], []
         out: list[int] = []
         for item in raw:
             try:
                 out.append(int(item))
             except (TypeError, ValueError):
                 continue
-        return out
+        turbo: list[int] = []
+        if isinstance(turbo_raw, list):
+            for item in turbo_raw:
+                try:
+                    turbo.append(1 if int(item) else 0)
+                except (TypeError, ValueError):
+                    turbo.append(0)
+        if len(turbo) != len(out):
+            turbo = []
+        return out, turbo
 
     def set_invisible(self, on: bool) -> None:
         """Toggle BizHawk invisible emulation (no rendering; max speed)."""

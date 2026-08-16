@@ -213,6 +213,7 @@ end
             while (u8@mode_addr & mask) == 0 (cutscene), else off_value
 ]]
 local PATCHES = { always = {}, turbo = nil }
+local LAST_TURBO = false
 
 -- force_turbo: write on_value regardless of the in-control bit (used by
 -- fast_forward, which already guarantees we are inside an uncontrolled span).
@@ -226,11 +227,25 @@ local function apply_patches(force_turbo)
         -- (mode & mask) ~= 0 without the bit library (Lua 5.4 safe);
         -- mask is a power of two.
         local in_control = math.floor(mode / t.mask) % 2 == 1
-        if in_control and not force_turbo then
-            memory.write_u16_le(ps1_to_mainram(t.addr), t.off_value, "MainRAM")
+        -- force_turbo == "off": never write the cutscene turbo halfword.
+        -- 1x combat/grab tapes record scene_flag spans as policy holds;
+        -- forcing turbo on replay shortens them and desyncs HP.
+        local turbo_on
+        if force_turbo == "off" then
+            turbo_on = false
+        elseif force_turbo then
+            turbo_on = true
         else
-            memory.write_u16_le(ps1_to_mainram(t.addr), t.on_value, "MainRAM")
+            turbo_on = not in_control
         end
+        if turbo_on then
+            memory.write_u16_le(ps1_to_mainram(t.addr), t.on_value, "MainRAM")
+        else
+            memory.write_u16_le(ps1_to_mainram(t.addr), t.off_value, "MainRAM")
+        end
+        LAST_TURBO = turbo_on == true
+    else
+        LAST_TURBO = false
     end
 end
 
@@ -300,6 +315,7 @@ local BUTTON_MAP = {
 -- start, select, r1, l1, r2, l2. Must match re1_rl.leg_replay.JOYPAD_BUTTON_ORDER.
 local TAPE_ON = false
 local TAPE_FRAMES = {}
+local TAPE_TURBO = {}
 local LAST_BTN = {}
 local TAPE_BUTTON_ORDER = {
     "up", "down", "left", "right",
@@ -325,6 +341,7 @@ local function tape_record(btn)
         return
     end
     TAPE_FRAMES[#TAPE_FRAMES + 1] = pack_buttons(btn)
+    TAPE_TURBO[#TAPE_TURBO + 1] = LAST_TURBO and 1 or 0
 end
 
 local function emu_advance()
@@ -940,6 +957,7 @@ local function handle_command(cmd)
 
     elseif op == "tape_clear" then
         TAPE_FRAMES = {}
+        TAPE_TURBO = {}
         return { ok = true, n = 0 }
 
     elseif op == "tape_dump" then
@@ -947,11 +965,24 @@ local function handle_command(cmd)
             ok = true,
             n = #TAPE_FRAMES,
             frames = setmetatable(TAPE_FRAMES, { __jsontype = "array" }),
+            turbo = setmetatable(TAPE_TURBO, { __jsontype = "array" }),
         }
 
     elseif op == "tape_play" then
         local frames = cmd.frames or {}
         local n = #frames
+        -- Policy holds must match env.step (apply_patches()): turbo only when
+        -- not in_control. Scene-flag turbo here shortens in-control grab/hitstun
+        -- that recording billed as skip=0. Skip spans use force turbo, matching
+        -- fast_forward's apply_patches(true).
+        local patch_mode = cmd.patch_mode
+        if patch_mode == nil or patch_mode == "" then
+            if cmd.no_cutscene_turbo == true then
+                patch_mode = "step"
+            else
+                patch_mode = "skip"
+            end
+        end
         for i = 1, n do
             local bits = tonumber(frames[i]) or 0
             local btn = {}
@@ -963,7 +994,15 @@ local function handle_command(cmd)
                 p = p * 2
             end
             apply_buttons(btn)
-            apply_patches(tape_skip_force_turbo())
+            if patch_mode == "off" then
+                apply_patches("off")
+            elseif patch_mode == "step" then
+                apply_patches()
+            elseif patch_mode == "force" then
+                apply_patches(true)
+            else
+                apply_patches(tape_skip_force_turbo())
+            end
             emu_advance()
         end
         return { ok = true, n = n, frame = emu.framecount() }
