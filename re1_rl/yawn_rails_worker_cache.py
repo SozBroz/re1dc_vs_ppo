@@ -17,6 +17,9 @@ from re1_rl.yawn_rails_sync import (
     MANIFEST_FILENAME,
     cell_dir_name,
     cell_slot_dir,
+    promote_cell_files,
+    slot_content_shas,
+    slot_matches_content,
     yawn_cells_locked,
     yawn_rails_root,
     yawn_rails_sync_enabled,
@@ -73,40 +76,28 @@ def save_local_yawn_manifest(project_root: Path | str, manifest: dict[str, Any])
     os.replace(tmp, path)
 
 
-def _local_meta_sha(slot: Path) -> str | None:
-    meta_p = slot / CELL_META_NAME
-    if not meta_p.is_file():
-        return None
-    try:
-        meta = json.loads(meta_p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    sha = meta.get("bundle_sha256")
-    return str(sha) if sha else None
-
-
 def ensure_yawn_bundle_cached(
     client: _YawnRailsClient,
     checkpoint_index: int,
     project_root: Path | str,
     *,
-    expected_sha256: str | None = None,
+    expected_state_sha256: str | None = None,
+    expected_sidecar_sha256: str | None = None,
 ) -> Path | None:
-    """Eager-fetch ``cpNN`` into ``states/yawn_rails/cells/``. Returns cell dir."""
+    """Eager-fetch ``cpNN`` into ``states/yawn_rails/cells/``. Returns cell dir.
+
+    Cache hit requires on-disk ``cell.State`` bytes to match ``expected_state_sha256``.
+    Matching ``meta.json`` tokens alone is not a hit.
+    """
     root = yawn_rails_root(project_root)
     idx = int(checkpoint_index)
     dest = cell_slot_dir(root, idx)
-    state_p = dest / CELL_STATE_NAME
-    side_p = dest / CELL_SIDECAR_NAME
-    if state_p.is_file() and side_p.is_file():
-        if expected_sha256:
-            local_sha = _local_meta_sha(dest)
-            # Missing meta sha used to count as a hit and let poll adopt remote
-            # quality while keeping a locally overwritten State — ammo desync.
-            if local_sha is not None and local_sha == str(expected_sha256):
-                return dest
-        else:
-            return dest
+    if slot_matches_content(
+        dest,
+        state_sha256=expected_state_sha256,
+        sidecar_sha256=expected_sidecar_sha256,
+    ):
+        return dest
 
     cell_id = cell_dir_name(idx)
     try:
@@ -116,43 +107,48 @@ def ensure_yawn_bundle_cached(
     if not blob:
         return None
 
-    incoming = dest.parent / f".incoming_{cell_id}"
+    incoming = dest.parent / f".incoming_{cell_id}_{os.getpid()}"
     if incoming.exists():
         shutil.rmtree(incoming, ignore_errors=True)
     incoming.mkdir(parents=True, exist_ok=True)
     try:
         with zipfile.ZipFile(BytesIO(blob)) as zf:
             zf.extractall(incoming)
-        if not (incoming / CELL_STATE_NAME).is_file():
+        got = slot_content_shas(incoming)
+        if got is None:
             shutil.rmtree(incoming, ignore_errors=True)
             return None
-        if not (incoming / CELL_SIDECAR_NAME).is_file():
+        got_state, got_side = got
+        want_state = str(expected_state_sha256 or "").strip()
+        if want_state and got_state != want_state:
+            shutil.rmtree(incoming, ignore_errors=True)
+            return None
+        want_side = str(expected_sidecar_sha256 or "").strip()
+        if want_side and got_side != want_side:
             shutil.rmtree(incoming, ignore_errors=True)
             return None
         meta_p = incoming / CELL_META_NAME
-        if not meta_p.is_file():
-            import hashlib
-
-            meta = {
-                "checkpoint_index": idx,
-                "bundle_sha256": (
-                    str(expected_sha256)
-                    if expected_sha256
-                    else hashlib.sha256(blob).hexdigest()
-                ),
-                "bytes": len(blob),
-            }
-            meta_p.write_text(
-                json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
+        meta: dict[str, Any] = {}
+        if meta_p.is_file():
+            try:
+                loaded = json.loads(meta_p.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                loaded = {}
+            if isinstance(loaded, dict):
+                meta = loaded
+        meta["checkpoint_index"] = idx
+        meta["state_sha256"] = got_state
+        meta["sidecar_sha256"] = got_side
+        meta_p.write_text(
+            json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         dest.parent.mkdir(parents=True, exist_ok=True)
         with yawn_cells_locked(root, holder="yawn_poll_install"):
-            if dest.exists():
-                shutil.rmtree(dest, ignore_errors=True)
-            os.replace(str(incoming), str(dest))
+            promote_cell_files(incoming, dest)
     except Exception:
         shutil.rmtree(incoming, ignore_errors=True)
         return None
+    shutil.rmtree(incoming, ignore_errors=True)
     return dest
 
 
@@ -177,6 +173,29 @@ def prune_stale_yawn_cells(
             shutil.rmtree(p, ignore_errors=True)
             removed += 1
     return removed
+
+
+def _local_content_drift(project_root: Path | str, local: dict[str, Any]) -> bool:
+    """True when a catalog row's files no longer match its advertised hashes."""
+    root = yawn_rails_root(project_root)
+    for row in local.get("cells") or []:
+        if not isinstance(row, dict):
+            continue
+        try:
+            idx = int(row["checkpoint_index"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        want_state = str(row.get("state_sha256") or "").strip() or None
+        if not want_state:
+            continue
+        slot = cell_slot_dir(root, idx)
+        if not slot_matches_content(
+            slot,
+            state_sha256=want_state,
+            sidecar_sha256=str(row.get("sidecar_sha256") or "") or None,
+        ):
+            return True
+    return False
 
 
 def poll_yawn_rails_manifest(
@@ -212,28 +231,34 @@ def poll_yawn_rails_manifest(
                 idx = int(row["checkpoint_index"])
             except (KeyError, TypeError, ValueError):
                 continue
-            sha = str(row.get("bundle_sha256") or "") or None
+            want_state = str(row.get("state_sha256") or "") or None
+            want_side = str(row.get("sidecar_sha256") or "") or None
+            slot = cell_slot_dir(yawn_rails_root(project_root), idx)
+            was_hit = slot_matches_content(
+                slot, state_sha256=want_state, sidecar_sha256=want_side
+            )
             cached = ensure_yawn_bundle_cached(
-                client, idx, project_root, expected_sha256=sha
+                client,
+                idx,
+                project_root,
+                expected_state_sha256=want_state,
+                expected_sidecar_sha256=want_side,
             )
             if cached is None:
-                # Keep prior row only if local files still match that row's sha.
-                # Otherwise drop the slot so reset cannot pair remote quality
-                # with a rejected local overwrite while fetch is failing.
+                # Keep prior row only if local files still match that row's hashes.
                 prev = prev_by_idx.get(idx)
                 if prev is not None:
-                    prev_sha = str(prev.get("bundle_sha256") or "") or None
-                    slot = cell_slot_dir(yawn_rails_root(project_root), idx)
-                    if (
-                        prev_sha
-                        and _local_meta_sha(slot) == prev_sha
-                        and (slot / CELL_STATE_NAME).is_file()
-                        and (slot / CELL_SIDECAR_NAME).is_file()
+                    prev_state = str(prev.get("state_sha256") or "") or None
+                    if slot_matches_content(
+                        slot,
+                        state_sha256=prev_state,
+                        sidecar_sha256=str(prev.get("sidecar_sha256") or "") or None,
                     ):
                         rows.append(dict(prev))
                         valid.add(idx)
                 continue
-            fetched += 1
+            if not was_hit:
+                fetched += 1
             valid.add(idx)
             out_row = {
                 "checkpoint_index": idx,
@@ -241,6 +266,8 @@ def poll_yawn_rails_manifest(
                 "room_id": row.get("room_id", ""),
                 "quality": list(row.get("quality") or []),
                 "bundle_sha256": row.get("bundle_sha256", ""),
+                "state_sha256": row.get("state_sha256", ""),
+                "sidecar_sha256": row.get("sidecar_sha256", ""),
                 "bytes": int(row.get("bytes") or 0),
                 "state_path": (
                     row.get("state_path")
@@ -273,6 +300,10 @@ def poll_yawn_rails_manifest(
     elif remote_cell_count is not None:
         local_count = len(local.get("cells") or [])
         if int(remote_cell_count) != local_count and int(since_version) != 0:
+            return poll_yawn_rails_manifest(
+                client, project_root, since_version=0
+            )
+        if int(since_version) != 0 and _local_content_drift(project_root, local):
             return poll_yawn_rails_manifest(
                 client, project_root, since_version=0
             )

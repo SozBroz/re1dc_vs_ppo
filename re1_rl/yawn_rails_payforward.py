@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from re1_rl.go_explore_archive import Quality, normalize_quality, quality_beats
+from re1_rl.yawn_rails_sync import yawn_cell_pb_bundle
 
 _SCHEMA = 1
 _PAYFORWARD_ENV = "RE1_YAWN_PAYFORWARD_RIPPLE"
@@ -970,11 +971,7 @@ def sample_payforward_options(
             "route_start_index": start_index,
             "leg_span": remaining,
             "reset_source": "route_cell",
-            "pb_bundle": {
-                "state_path": str(chosen["state_path"]),
-                "sidecar_path": str(chosen["sidecar_path"]),
-                "source": "yawn_rails",
-            },
+            "pb_bundle": yawn_cell_pb_bundle(chosen),
             "payforward_fight_progression": True,
             "payforward_frontier_fight": frontier_fight_index(by_idx, project_root=project_root),
         }
@@ -999,11 +996,7 @@ def sample_frontier_fight_options(
         "route_start_index": start_index,
         "leg_span": remaining,
         "reset_source": "route_cell_frontier_fight",
-        "pb_bundle": {
-            "state_path": str(chosen["state_path"]),
-            "sidecar_path": str(chosen["sidecar_path"]),
-            "source": "yawn_rails",
-        },
+        "pb_bundle": yawn_cell_pb_bundle(chosen),
         "payforward_frontier_fight": int(chosen["checkpoint_index"]),
         "payforward_frontier_index": frontier_fight_index(
             by_idx, project_root=project_root

@@ -1,16 +1,18 @@
-"""Surgical cp02 (``barry_return_105``): Kenneth flag, then dining.
+"""Surgical cp02 (``barry_return_105``): Kenneth flag, heal spray, then dining.
 
-CP02 success is 104→105 after the tea-room Kenneth ledger (``104:*:sN``).
-Entering dining from the tea room before that flag fails the episode.
-Generic cutscene keys still do not gate capture or overwrite. Timeout is
-the other fail. Spray, ammo, and Barry-dialogue mints are not part of this
-cell.
+CP02 success is 104→105 after the tea-room Kenneth ledger (``104:*:sN``)
+while still holding the Jill start heal spray (``first_aid_spray_alt`` from
+cp01 — already in inventory, must not be used). Entering dining from the tea
+room before Kenneth, or without the spray after Kenneth, fails the episode.
+Generic cutscene keys still do not gate capture or overwrite. Timeout is the
+other fail. Ammo and Barry-dialogue mints are not part of this cell.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from re1_rl.item_todo import canonical_item
 from re1_rl.cutscene_reward import (
     MAX_SAME_ROOM_CUTSCENE_INDEX,
     TEA_ROOM,
@@ -22,6 +24,21 @@ from re1_rl.cutscene_reward import (
 BARRY_RETURN_CHECKPOINT_ID = "barry_return_105"
 BARRY_RETURN_ROOM = "105"
 BARRY_RETURN_FROM_ROOM = "104"
+BARRY_RETURN_HEAL_SPRAY = "first_aid_spray_alt"
+
+
+def heal_spray_in_inventory(state: dict[str, Any] | None) -> bool:
+    """True when Jill still holds the cp01 start heal spray (id 0x41)."""
+    inv = {
+        canonical_item(str(x))
+        for x in (state or {}).get("inventory", []) or []
+        if str(x).strip()
+    }
+    return BARRY_RETURN_HEAL_SPRAY in inv
+
+
+def barry_return_capture_inventory_ok(state: dict[str, Any] | None) -> bool:
+    return heal_spray_in_inventory(state)
 
 
 def _on_barry_return_leg(planner: Any) -> bool:
@@ -33,6 +50,10 @@ def _ledgers(progress: Any) -> set[str]:
     return set(progress.observed_cutscenes or ()) | set(
         progress.rewarded_cutscenes or ()
     )
+
+
+def _leg_kenneth_seen(progress: Any) -> bool:
+    return kenneth_cutscene_seen(set(progress.leg_observed_cutscenes or ()))
 
 
 def kenneth_skip_settled(
@@ -80,9 +101,6 @@ def note_kenneth_cutscene_skip_settle(
     """Write the Kenneth flag ID (``104:{settle_cam}:sN``) when the cinema plays."""
     if progress is None:
         return None
-    ledgers = _ledgers(progress)
-    if kenneth_cutscene_seen(ledgers):
-        return None
     if not kenneth_skip_settled(
         entry_prev,
         new_state,
@@ -90,7 +108,12 @@ def note_kenneth_cutscene_skip_settle(
         peak_scene_flag=peak_scene_flag,
     ):
         return None
+    ledgers = _ledgers(progress)
     cam = int((new_state or {}).get("cam_id", 0) or 0)
+    leg_key = f"{TEA_ROOM}:{cam}:s0"
+    progress.note_leg_cutscene(leg_key)
+    if kenneth_cutscene_seen(ledgers):
+        return None
     n = same_room_cutscene_index(TEA_ROOM, cam, ledgers)
     if n >= MAX_SAME_ROOM_CUTSCENE_INDEX:
         return None
@@ -107,8 +130,9 @@ def fail_barry_return_if_unmet(
     penalty: float,
     *,
     room_id: str = "",
+    state: dict[str, Any] | None = None,
 ) -> bool:
-    """Dining from the tea room without the Kenneth flag kills the episode."""
+    """Dining from the tea room without Kenneth or heal spray kills the episode."""
     if progress is None or planner is None:
         return False
     if not _on_barry_return_leg(planner):
@@ -119,7 +143,11 @@ def fail_barry_return_if_unmet(
         return False
     if not progress.leg_entered_from(BARRY_RETURN_ROOM, {BARRY_RETURN_FROM_ROOM}):
         return False
-    if kenneth_cutscene_seen(_ledgers(progress)):
+    if _leg_kenneth_seen(progress):
+        should_fail = not heal_spray_in_inventory(state)
+    else:
+        should_fail = True
+    if not should_fail:
         return False
     if not progress.breach_capture_ineligible():
         return False

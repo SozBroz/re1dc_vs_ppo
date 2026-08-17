@@ -29,7 +29,8 @@ def _observed_cutscene_met(cond: dict[str, Any], progress: ProgressTracker | Non
     """Generic cutscene keys do not gate CP success (2026-08-16).
 
     Exception: Kenneth ``104:*:sN`` still blocks 104→105 before the cinema so
-    that return can fail the episode instead of minting cp02.
+    that return can fail the episode instead of minting cp02. Heal spray
+    ``first_aid_spray_alt`` is also required on that leg (cp01 start item).
     """
     prefix = str(cond.get("prefix", ""))
     require_scene = bool(cond.get("require_scene"))
@@ -38,10 +39,7 @@ def _observed_cutscene_met(cond: dict[str, Any], progress: ProgressTracker | Non
             return False
         from re1_rl.cutscene_reward import kenneth_cutscene_seen
 
-        return kenneth_cutscene_seen(
-            set(progress.observed_cutscenes or ())
-            | set(progress.rewarded_cutscenes or ())
-        )
+        return kenneth_cutscene_seen(set(progress.leg_observed_cutscenes or ()))
     return True
 
 # Order matters: index in this tuple = position in the objective one-hot.

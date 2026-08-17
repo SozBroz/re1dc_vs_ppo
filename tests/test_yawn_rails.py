@@ -518,6 +518,7 @@ def test_barry_return_needs_kenneth_then_104_to_105() -> None:
         prev_state=_barry_state("104"),
     )
     progress.observe_cutscene("104:0:s0")
+    progress.note_leg_cutscene("104:0:s0")
     assert planner.advance_if_success(
         _barry_state("105"),
         progress=progress,
@@ -538,6 +539,7 @@ def test_barry_return_door_mint_is_not_kenneth() -> None:
         prev_state=_barry_state("104"),
     )
     progress.observe_cutscene("104:0:s0")
+    progress.note_leg_cutscene("104:0:s0")
     assert planner.advance_if_success(
         _barry_state("105"),
         progress=progress,
@@ -545,15 +547,29 @@ def test_barry_return_door_mint_is_not_kenneth() -> None:
     )
 
 
-def test_barry_return_ignores_spray_and_ammo() -> None:
+def test_barry_return_requires_heal_spray() -> None:
     planner = _planner(start_index=_idx("barry_return_105"))
     progress = ProgressTracker()
     progress.note_leg_room_transition("104", "105")
     progress.observe_cutscene("104:4:s0")
-    assert planner.advance_if_success(
+    progress.note_leg_cutscene("104:4:s0")
+    assert not planner.advance_if_success(
         _barry_state("105", spray=False, beretta_qty=14),
         progress=progress,
         prev_state=_barry_state("104", spray=False, beretta_qty=14),
+    )
+
+
+def test_barry_return_ignores_ammo_without_using_spray() -> None:
+    planner = _planner(start_index=_idx("barry_return_105"))
+    progress = ProgressTracker()
+    progress.note_leg_room_transition("104", "105")
+    progress.observe_cutscene("104:4:s0")
+    progress.note_leg_cutscene("104:4:s0")
+    assert planner.advance_if_success(
+        _barry_state("105", beretta_qty=14),
+        progress=progress,
+        prev_state=_barry_state("104", beretta_qty=14),
     )
 
 
@@ -1867,6 +1883,59 @@ def test_local_cas_installs_better_and_rejects_worse(
     assert man["cells"][0]["quality"][:2] == [96, 60]
 
 
+def test_force_install_replaces_stronger_incumbent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
+    from re1_rl.yawn_rails_sync import (
+        CELL_SIDECAR_NAME,
+        CELL_STATE_NAME,
+        try_install_yawn_cell,
+        yawn_rails_root,
+    )
+
+    yr = yawn_rails_root(tmp_path)
+    good = yr / "cells" / "cp00"
+    good.mkdir(parents=True)
+    (good / CELL_STATE_NAME).write_bytes(b"STRONG")
+    (good / CELL_SIDECAR_NAME).write_text("{}", encoding="utf-8")
+    (yr / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "cells": [
+                    {
+                        "checkpoint_index": 0,
+                        "quality": [96, 80, 0, 4, 1, 0],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    weak = yr / ".staging" / "pin"
+    weak.mkdir(parents=True)
+    (weak / CELL_STATE_NAME).write_bytes(b"PINNED")
+    (weak / CELL_SIDECAR_NAME).write_text("{}", encoding="utf-8")
+    assert not try_install_yawn_cell(
+        tmp_path,
+        checkpoint_index=0,
+        staged_dir=weak,
+        quality=[48, 10, 0, 4, 1, 0],
+        row={"checkpoint_id": "emblem_105", "quality": [48, 10, 0, 4, 1, 0]},
+    )
+    assert (good / CELL_STATE_NAME).read_bytes() == b"STRONG"
+    assert try_install_yawn_cell(
+        tmp_path,
+        checkpoint_index=0,
+        staged_dir=weak,
+        quality=[48, 10, 0, 4, 1, 0],
+        row={"checkpoint_id": "emblem_105", "quality": [48, 10, 0, 4, 1, 0]},
+        force=True,
+    )
+    assert (yr / "cells" / "cp00" / CELL_STATE_NAME).read_bytes() == b"PINNED"
+
+
 def test_pay_forward_ammo_beats_despite_shorter_dwell(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -2204,7 +2273,14 @@ def test_barry_return_capture_ignores_kenneth(
         _progress=progress,
         _step_count=300,
         _read_state=lambda track_items=False: _state(
-            "105", inventory=["knife", "beretta", "emblem"]
+            "105",
+            inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"],
+            inventory_slots=[
+                ("knife", 1),
+                ("beretta", 15),
+                ("first_aid_spray_alt", 1),
+                ("emblem", 1),
+            ],
         ),
     )
     monkeypatch.setattr(
@@ -2215,12 +2291,57 @@ def test_barry_return_capture_ignores_kenneth(
             "episode_history": {"room_entries": [["105", 100]]},
         },
     )
-    barry_state = _state("105", inventory=["knife", "beretta", "emblem"])
+    barry_state = _state(
+        "105",
+        inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"],
+        inventory_slots=[
+            ("knife", 1),
+            ("beretta", 15),
+            ("first_aid_spray_alt", 1),
+            ("emblem", 1),
+        ],
+    )
     proposal = capture_successor_cell(
         env, barry_state, {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
     )
     assert proposal is not None
     assert proposal["checkpoint_id"] == "barry_return_105"
+
+
+def test_barry_return_capture_rejects_missing_heal_spray(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
+    bridge = MagicMock()
+    bridge.save_savestate.side_effect = (
+        lambda path: Path(path).write_bytes(b"state")
+    )
+    planner = _planner(start_index=_idx("barry_return_105") + 1)
+    progress = ProgressTracker()
+    progress.observed_cutscenes.add("104:0:s0")
+    env = SimpleNamespace(
+        project_root=tmp_path,
+        _stage={
+            "mode": "yawn_rails",
+            "cells_manifest": "states/yawn_rails/manifest.json",
+            "route_id": "test",
+        },
+        _planner=planner,
+        bridge=bridge,
+        _macro_active=False,
+        _progress=progress,
+        _step_count=300,
+        _read_state=lambda track_items=False: _state(
+            "105", inventory=["knife", "beretta", "emblem"]
+        ),
+    )
+    proposal = capture_successor_cell(
+        env,
+        _state("105", inventory=["knife", "beretta", "emblem"]),
+        {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
+    )
+    assert proposal is None
+    assert yawn_capture_ineligible_reason(env) == "missing_heal_spray"
 
 
 def test_east_stairs_post_storeroom_capture_requires_two_free_slots(

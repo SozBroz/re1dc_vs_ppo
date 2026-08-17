@@ -1,4 +1,4 @@
-"""Surgical cp02: Kenneth ``104:*:sN`` flag, then dining. No spray/ammo."""
+"""Surgical cp02: Kenneth ``104:*:sN`` flag, heal spray held, then dining."""
 
 from __future__ import annotations
 
@@ -75,6 +75,7 @@ def test_kenneth_then_dining_return_creates_checkpoint() -> None:
     planner = _planner("barry_return_105")
     progress = ProgressTracker()
     progress.observe_cutscene("104:0:s0")
+    progress.note_leg_cutscene("104:0:s0")
     _, bd = compute_reward(
         _state("104"),
         _state("105"),
@@ -88,16 +89,18 @@ def test_kenneth_then_dining_return_creates_checkpoint() -> None:
     assert not progress.capture_ineligible_breached
 
 
-def test_kenneth_then_dining_return_ignores_ammo_and_spray() -> None:
+def test_kenneth_then_dining_return_ignores_ammo_when_spray_held() -> None:
     planner = _planner("barry_return_105")
     progress = ProgressTracker()
     progress.observe_cutscene("104:4:s0")
+    progress.note_leg_cutscene("104:4:s0")
     bare = _state(
         "105",
-        inventory=["knife", "beretta", "emblem"],
+        inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"],
         inventory_slots=[
             ("knife", 1),
             ("beretta", 14),
+            ("first_aid_spray_alt", 1),
             ("emblem", 1),
         ],
     )
@@ -114,6 +117,50 @@ def test_kenneth_then_dining_return_ignores_ammo_and_spray() -> None:
     assert not progress.capture_ineligible_breached
 
 
+def test_dining_without_heal_spray_after_kenneth_kills_episode() -> None:
+    planner = _planner("barry_return_105")
+    progress = ProgressTracker()
+    progress.observe_cutscene("104:0:s0")
+    progress.note_leg_cutscene("104:0:s0")
+    progress.note_leg_room_transition("104", "105")
+    _, bd = compute_reward(
+        _state("104"),
+        _state(
+            "105",
+            inventory=["knife", "beretta", "emblem"],
+            inventory_slots=[
+                ("knife", 1),
+                ("beretta", 15),
+                ("emblem", 1),
+            ],
+        ),
+        planner,
+        progress=progress,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["checkpoint_success"] == 0.0
+    assert bd["checkpoint_capture_ineligible"] == RAILS_CAPTURE_INELIGIBLE_PENALTY
+    assert progress.capture_ineligible_breached
+
+
+def test_inherited_kenneth_flag_does_not_create_checkpoint() -> None:
+    planner = _planner("barry_return_105")
+    progress = ProgressTracker()
+    progress.observe_cutscene("104:0:s0")
+    _, bd = compute_reward(
+        _state("104"),
+        _state("105"),
+        planner,
+        progress=progress,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["checkpoint_success"] == 0.0
+    assert bd["checkpoint_capture_ineligible"] == RAILS_CAPTURE_INELIGIBLE_PENALTY
+    assert progress.capture_ineligible_breached
+
+
 def test_kenneth_still_in_tea_room_does_not_fail() -> None:
     planner = _planner("barry_return_105")
     progress = ProgressTracker()
@@ -125,6 +172,7 @@ def test_kenneth_still_in_tea_room_does_not_fail() -> None:
         bd,
         RAILS_CAPTURE_INELIGIBLE_PENALTY,
         room_id="104",
+        state=_state("104"),
     )
     assert bd["checkpoint_success"] == 0.0
     assert "checkpoint_capture_ineligible" not in bd
@@ -142,6 +190,7 @@ def test_note_kenneth_skip_settle_from_dining_door() -> None:
         == "104:4:s0"
     )
     assert "104:4:s0" in progress.observed_cutscenes
+    assert "104:4:s0" in progress.leg_observed_cutscenes
     assert (
         note_kenneth_cutscene_skip_settle(
             progress, entry, settle, skip_frames=880, peak_scene_flag=0x84

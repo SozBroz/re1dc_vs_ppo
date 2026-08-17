@@ -130,64 +130,64 @@ def compute_quality_from_cell(
 def refresh_yawn_quality_metadata(project_root: Path | str) -> list[dict[str, Any]]:
     """Update manifest, store.json, and meta.json quality fields in place."""
     from re1_rl.go_explore_archive import quality_beats
-    from re1_rl.yawn_rails_sync import MANIFEST_FILENAME, cell_dir_name, yawn_rails_root
+    from re1_rl.yawn_rails_sync import (
+        YawnRailsCellStore,
+        cell_dir_name,
+        yawn_cells_locked,
+        yawn_rails_root,
+    )
 
     root = Path(project_root)
     yroot = yawn_rails_root(root)
-    man_path = yroot / MANIFEST_FILENAME
-    store_path = yroot / "store.json"
-    man = json.loads(man_path.read_text(encoding="utf-8-sig"))
-    rows = list(man.get("cells") or [])
+    store = YawnRailsCellStore(yroot)
     changes: list[dict[str, Any]] = []
 
-    for row in sorted(rows, key=lambda r: int(r["checkpoint_index"])):
-        idx = int(row["checkpoint_index"])
-        cell_dir = yroot / "cells" / cell_dir_name(idx)
-        state_p = cell_dir / "cell.State"
-        side_p = cell_dir / "cell.sidecar.json"
-        meta_p = cell_dir / "meta.json"
-        if not state_p.is_file() or not side_p.is_file():
-            changes.append({"idx": idx, "error": "missing bundle"})
-            continue
-        sidecar = json.loads(side_p.read_text(encoding="utf-8-sig"))
-        info = compute_quality_from_cell(state_p, sidecar)
-        if not info.get("ok"):
-            changes.append({"idx": idx, "error": info.get("error")})
-            continue
-        old_q = list(row.get("quality") or [])
-        new_q = list(info["quality"])
-        row["quality"] = new_q
-        if meta_p.is_file():
-            meta = json.loads(meta_p.read_text(encoding="utf-8-sig"))
-            meta["quality"] = new_q
-            meta_p.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
-        changes.append(
-            {
-                "idx": idx,
-                "checkpoint_id": row.get("checkpoint_id"),
-                "old_ammo": old_q[1] if len(old_q) > 1 else None,
-                "new_ammo": new_q[1],
-                "old_q": old_q,
-                "new_q": new_q,
-                "beats_self": quality_beats(new_q, old_q),
-                "old_beats_new": quality_beats(old_q, new_q),
-            }
-        )
-
-    man_path.write_text(json.dumps(man, indent=2) + "\n", encoding="utf-8")
-
-    if store_path.is_file():
-        store = json.loads(store_path.read_text(encoding="utf-8-sig"))
-        by_idx = {int(r["checkpoint_index"]): r for r in rows}
-        for key, cell in (store.get("cells") or {}).items():
-            try:
-                idx = int(key)
-            except ValueError:
-                continue
-            row = by_idx.get(idx)
-            if row and row.get("quality"):
-                cell["quality"] = list(row["quality"])
-        store_path.write_text(json.dumps(store, indent=2) + "\n", encoding="utf-8")
+    with store._lock:
+        with yawn_cells_locked(yroot, holder="yawn_quality_refresh"):
+            store._load()
+            for idx in sorted(store.cells):
+                row = store.cells[idx]
+                if not isinstance(row, dict):
+                    continue
+                cell_dir = yroot / "cells" / cell_dir_name(idx)
+                state_p = cell_dir / "cell.State"
+                side_p = cell_dir / "cell.sidecar.json"
+                meta_p = cell_dir / "meta.json"
+                if not state_p.is_file() or not side_p.is_file():
+                    changes.append({"idx": idx, "error": "missing bundle"})
+                    continue
+                sidecar = json.loads(side_p.read_text(encoding="utf-8-sig"))
+                info = compute_quality_from_cell(state_p, sidecar)
+                if not info.get("ok"):
+                    changes.append({"idx": idx, "error": info.get("error")})
+                    continue
+                old_q = list(row.get("quality") or [])
+                new_q = list(info["quality"])
+                row["quality"] = new_q
+                if meta_p.is_file():
+                    try:
+                        meta = json.loads(meta_p.read_text(encoding="utf-8-sig"))
+                    except (OSError, json.JSONDecodeError):
+                        meta = {}
+                    if isinstance(meta, dict):
+                        meta["quality"] = new_q
+                        meta_p.write_text(
+                            json.dumps(meta, indent=2) + "\n", encoding="utf-8"
+                        )
+                changes.append(
+                    {
+                        "idx": idx,
+                        "checkpoint_id": row.get("checkpoint_id"),
+                        "old_ammo": old_q[1] if len(old_q) > 1 else None,
+                        "new_ammo": new_q[1],
+                        "old_q": old_q,
+                        "new_q": new_q,
+                        "beats_self": quality_beats(new_q, old_q),
+                        "old_beats_new": quality_beats(old_q, new_q),
+                    }
+                )
+            store.archive_version = int(store.archive_version or 0) + 1
+            store._persist_unlocked()
 
     return changes
 
@@ -233,6 +233,7 @@ def seed_cell_leg_frames_sentinel(
         break
     if not found or quality is None:
         return False
+    man["archive_version"] = int(man.get("archive_version") or 0) + 1
     man_path.write_text(json.dumps(man, indent=2) + "\n", encoding="utf-8")
     meta_p = yroot / "cells" / cell_dir_name(idx) / "meta.json"
     if meta_p.is_file():
@@ -260,6 +261,7 @@ def seed_cell_leg_frames_sentinel(
                 except (TypeError, ValueError):
                     continue
                 cell["quality"] = quality
+            store["archive_version"] = int(store.get("archive_version") or 0) + 1
             store_path.write_text(
                 json.dumps(store, indent=2) + "\n", encoding="utf-8"
             )
@@ -314,6 +316,7 @@ def seed_leg_frames_sentinel(project_root: Path | str) -> int:
                     continue
                 meta["quality"] = q
                 meta_p.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+        man["archive_version"] = int(man.get("archive_version") or 0) + 1
         man_path.write_text(json.dumps(man, indent=2) + "\n", encoding="utf-8")
 
     if store_path.is_file():
@@ -327,5 +330,6 @@ def seed_leg_frames_sentinel(project_root: Path | str) -> int:
                 if q is None:
                     continue
                 cell["quality"] = q
+        store["archive_version"] = int(store.get("archive_version") or 0) + 1
         store_path.write_text(json.dumps(store, indent=2) + "\n", encoding="utf-8")
     return updated

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from re1_rl.training_metrics_log import append_training_record
+from re1_rl.yawn_rails_sync import yawn_cell_pb_bundle
 
 EVAL_SCHEMA = "re1_yawn_rails_cell_eval_v1"
 DEFAULT_EPISODES_PER_CELL = 4
@@ -159,6 +160,8 @@ def equal_weight_eval_schedule(
                 "held_out_eval": True,
                 "state_path": cell.get("state_path"),
                 "sidecar_path": cell.get("sidecar_path"),
+                "state_sha256": cell.get("state_sha256"),
+                "sidecar_sha256": cell.get("sidecar_sha256"),
             })
     return schedule
 
@@ -174,11 +177,7 @@ def reset_options_for_eval_slot(
         "held_out_eval": True,
     }
     if opts["route_start_index"] > 0 and slot.get("state_path") and slot.get("sidecar_path"):
-        opts["pb_bundle"] = {
-            "state_path": str(slot["state_path"]),
-            "sidecar_path": str(slot["sidecar_path"]),
-            "source": "yawn_rails",
-        }
+        opts["pb_bundle"] = yawn_cell_pb_bundle(slot)
     return opts
 
 

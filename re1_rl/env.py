@@ -1687,7 +1687,9 @@ class RE1Env(gym.Env):
                 )
                 pb_bundle = None
             elif state_path.name == CELL_STATE_NAME:
-                # Go-Explore cells use cell.State / cell.sidecar.json (not champion.*).
+                # Go-Explore / Yawn cells use cell.State / cell.sidecar.json
+                # (not champion.*). Hash-check Yawn rows when the catalog
+                # published state_sha256 so a dirty local file cannot load.
                 if is_slot_locked(slot_dir):
                     print(
                         f"[pb] refusing locked go-explore cell dir={slot_dir}; "
@@ -1706,6 +1708,23 @@ class RE1Env(gym.Env):
                         flush=True,
                     )
                     pb_bundle = None
+                else:
+                    want_state = str(pb_bundle.get("state_sha256") or "").strip()
+                    if want_state:
+                        from re1_rl.yawn_rails_sync import slot_matches_content
+
+                        want_side = str(pb_bundle.get("sidecar_sha256") or "").strip()
+                        if not slot_matches_content(
+                            slot_dir,
+                            state_sha256=want_state,
+                            sidecar_sha256=want_side or None,
+                        ):
+                            print(
+                                f"[pb] refusing cell State sha mismatch "
+                                f"dir={slot_dir}; falling back to fresh",
+                                flush=True,
+                            )
+                            pb_bundle = None
             else:
                 ok, reason = verify_champion_bundle(slot_dir, require_unlocked=True)
                 if not ok:

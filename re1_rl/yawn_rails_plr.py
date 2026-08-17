@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from re1_rl.yawn_rails_sync import yawn_cell_pb_bundle
+
 LEG_LADDER: tuple[int, ...] = (1, 2, 3, 4, 6)
 DEFAULT_UNIFORM_FLOOR = 0.25
 DEFAULT_WIDEN_SUCCESS = 0.80
@@ -412,11 +414,7 @@ def sample_plr_options(
         "endpoint_max_legs": endpoint_max,
     }
     if start_index > 0:
-        opts["pb_bundle"] = {
-            "state_path": str(chosen["state_path"]),
-            "sidecar_path": str(chosen["sidecar_path"]),
-            "source": "yawn_rails",
-        }
+        opts["pb_bundle"] = yawn_cell_pb_bundle(chosen)
     return opts
 
 

@@ -39,6 +39,9 @@ class ProgressTracker:
     # Every qualified freeze observed this episode, whether or not it paid.
     # Paid cutscenes remain a strict subset in ``rewarded_cutscenes``.
     observed_cutscenes: set[str] = field(default_factory=set)
+    # Qualified cutscenes observed after the current rails cell reset. Unlike
+    # ``observed_cutscenes``, this is not restored from a predecessor sidecar.
+    leg_observed_cutscenes: set[str] = field(default_factory=set)
     rewarded_story_uses: set[str] = field(default_factory=set)
     # First rising edge into document/file examine UI per room this episode.
     # No stable document ID in RAM yet — room key matches new_room anti-farm.
@@ -176,6 +179,7 @@ class ProgressTracker:
         """Reset per-room step counters so repeated hall objectives work."""
         self._in_control_steps.clear()
         self._in_control_since_cutscene.clear()
+        self.leg_observed_cutscenes.clear()
         self.leg_room_transitions.clear()
 
     def note_leg_room_transition(self, from_room: str, to_room: str) -> None:
@@ -398,6 +402,14 @@ class ProgressTracker:
         self.observed_cutscenes.add(key)
         # Start post-cutscene settle clock at 0 (pre-cinema room dwell must not count).
         self._in_control_since_cutscene[key] = 0
+        return True
+
+    def note_leg_cutscene(self, cutscene_key: str) -> bool:
+        """Record cutscene evidence produced during the current rails leg."""
+        key = str(cutscene_key)
+        if not key or key in self.leg_observed_cutscenes:
+            return False
+        self.leg_observed_cutscenes.add(key)
         return True
 
     def note_leg_acquired(self, item_name: str) -> None:

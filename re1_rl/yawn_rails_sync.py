@@ -184,6 +184,98 @@ def cell_slot_dir(root: Path | str, checkpoint_index: int) -> Path:
     return Path(root) / "cells" / cell_dir_name(checkpoint_index)
 
 
+def sha256_file(path: Path | str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def slot_content_shas(slot: Path | str) -> tuple[str, str] | None:
+    dest = Path(slot)
+    state_p = dest / CELL_STATE_NAME
+    side_p = dest / CELL_SIDECAR_NAME
+    if not state_p.is_file() or not side_p.is_file():
+        return None
+    return sha256_file(state_p), sha256_file(side_p)
+
+
+def slot_matches_content(
+    slot: Path | str,
+    *,
+    state_sha256: str | None,
+    sidecar_sha256: str | None = None,
+) -> bool:
+    """True only when on-disk State/sidecar bytes match the advertised hashes."""
+    want_state = str(state_sha256 or "").strip()
+    if not want_state:
+        return False
+    shas = slot_content_shas(slot)
+    if shas is None:
+        return False
+    got_state, got_side = shas
+    if got_state != want_state:
+        return False
+    want_side = str(sidecar_sha256 or "").strip()
+    if want_side and got_side != want_side:
+        return False
+    return True
+
+
+def yawn_cell_pb_bundle(chosen: dict[str, Any]) -> dict[str, Any]:
+    """Reset bundle dict with file hashes so env.reset can fail closed."""
+    out: dict[str, Any] = {
+        "state_path": str(chosen["state_path"]),
+        "sidecar_path": str(chosen["sidecar_path"]),
+        "source": "yawn_rails",
+    }
+    for key in ("state_sha256", "sidecar_sha256"):
+        val = chosen.get(key)
+        if val:
+            out[key] = str(val)
+    return out
+
+
+def promote_cell_files(incoming: Path | str, dest: Path | str) -> None:
+    """Replace live cell files in place. Never ``rmtree`` the destination dir.
+
+    Windows cannot atomically swap a non-empty directory; deleting dest first
+    leaves a missing-slot window and mixed GET /bundle reads. File ``os.replace``
+    is atomic. Payload first, ``meta.json`` last.
+    """
+    from re1_rl.win_fs_retry import replace_retry
+
+    incoming = Path(incoming)
+    dest = Path(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    incoming_names = {p.name for p in incoming.iterdir() if p.is_file()}
+    if CELL_STATE_NAME not in incoming_names or CELL_SIDECAR_NAME not in incoming_names:
+        raise FileNotFoundError(f"incoming cell missing State/sidecar: {incoming}")
+    for name in (
+        CELL_STATE_NAME,
+        CELL_SIDECAR_NAME,
+        CELL_REPLAY_NAME,
+        CELL_POLICY_NAME,
+        CELL_META_NAME,
+    ):
+        src = incoming / name
+        if src.is_file():
+            replace_retry(src, dest / name)
+    for name in (CELL_REPLAY_NAME, CELL_POLICY_NAME):
+        if name in incoming_names:
+            continue
+        stale = dest / name
+        if stale.is_file():
+            try:
+                stale.unlink()
+            except OSError:
+                pass
+
+
 def _existing_cell_quality(root: Path, checkpoint_index: int) -> tuple[int, ...] | None:
     """Quality for a cell listed in the store or manifest.
 
@@ -298,12 +390,14 @@ def try_install_yawn_cell(
     quality: list[int] | tuple[int, ...],
     row: dict[str, Any],
     holder: str = "yawn_capture",
+    force: bool = False,
 ) -> bool:
     """Compare-and-swap install from ``staged_dir`` into curated ``cpNN``.
 
     Pay-forward model: completing checkpoint *N* proposes cell cpNN; install
     when new quality strictly beats the incumbent (``quality_beats`` +
     ``quality_replace_significant``). Cutscene keys are not compared.
+    ``force=True`` skips the quality gate (operator pin / restore).
     Returns True when the curated slot was updated.
     """
     from re1_rl.go_explore_capture import quality_replace_significant
@@ -324,14 +418,15 @@ def try_install_yawn_cell(
 
     with yawn_cells_locked(root, holder=holder):
         dest = cell_slot_dir(root, idx)
-        old_q = _existing_cell_quality(root, idx)
-        if old_q is not None:
-            if not quality_beats(new_q, old_q):
-                return False
-            if not quality_replace_significant(new_q, old_q):
-                return False
+        if not force:
+            old_q = _existing_cell_quality(root, idx)
+            if old_q is not None:
+                if not quality_beats(new_q, old_q):
+                    return False
+                if not quality_replace_significant(new_q, old_q):
+                    return False
 
-        incoming = dest.parent / f".incoming_{cell_dir_name(idx)}"
+        incoming = dest.parent / f".incoming_{cell_dir_name(idx)}_{os.getpid()}"
         if incoming.exists():
             shutil.rmtree(incoming, ignore_errors=True)
         incoming.mkdir(parents=True, exist_ok=True)
@@ -344,25 +439,40 @@ def try_install_yawn_cell(
             policy_src = Path(staged_dir) / CELL_POLICY_NAME
             if policy_src.is_file():
                 shutil.copy2(policy_src, incoming / CELL_POLICY_NAME)
+            shas = slot_content_shas(incoming)
+            if shas is None:
+                shutil.rmtree(incoming, ignore_errors=True)
+                return False
+            state_sha, side_sha = shas
             meta_src = Path(staged_dir) / CELL_META_NAME
             if meta_src.is_file():
-                shutil.copy2(meta_src, incoming / CELL_META_NAME)
+                try:
+                    meta_obj = json.loads(meta_src.read_text(encoding="utf-8-sig"))
+                except (OSError, json.JSONDecodeError):
+                    meta_obj = dict(row)
             else:
-                (incoming / CELL_META_NAME).write_text(
-                    json.dumps(dict(row), indent=2, sort_keys=True) + "\n",
-                    encoding="utf-8",
-                )
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if dest.exists():
-                shutil.rmtree(dest, ignore_errors=True)
-            os.replace(str(incoming), str(dest))
+                meta_obj = dict(row)
+            if not isinstance(meta_obj, dict):
+                meta_obj = dict(row)
+            meta_obj["checkpoint_index"] = idx
+            meta_obj["quality"] = list(new_q)
+            meta_obj["state_sha256"] = state_sha
+            meta_obj["sidecar_sha256"] = side_sha
+            (incoming / CELL_META_NAME).write_text(
+                json.dumps(meta_obj, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            promote_cell_files(incoming, dest)
         except OSError:
             shutil.rmtree(incoming, ignore_errors=True)
             return False
+        shutil.rmtree(incoming, ignore_errors=True)
 
         install_row = dict(row)
         install_row["checkpoint_index"] = idx
         install_row["quality"] = list(new_q)
+        install_row["state_sha256"] = state_sha
+        install_row["sidecar_sha256"] = side_sha
         install_row.setdefault(
             "state_path",
             f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}",
@@ -674,6 +784,23 @@ class YawnRailsCellStore:
 
         replace_retry(tmp, self.manifest_path)
 
+    def _backfill_file_hashes_unlocked(self) -> bool:
+        """Fill missing state/sidecar hashes from files already on disk."""
+        changed = False
+        for idx, row in self.cells.items():
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("state_sha256") or "").strip() and str(
+                row.get("sidecar_sha256") or ""
+            ).strip():
+                continue
+            shas = slot_content_shas(cell_slot_dir(self.root, idx))
+            if shas is None:
+                continue
+            row["state_sha256"], row["sidecar_sha256"] = shas
+            changed = True
+        return changed
+
     def ingest_proposals(self, proposals: list[dict[str, Any]]) -> list[str]:
         """Admit/replace cells. Returns accepted ``cpNN`` ids."""
         accepted: list[str] = []
@@ -682,11 +809,12 @@ class YawnRailsCellStore:
         with self._lock:
             with yawn_cells_locked(self.root, holder="yawn_learner_ingest"):
                 self._load()
+                hashed = self._backfill_file_hashes_unlocked()
                 for prop in proposals:
                     cid = self._ingest_one_unlocked(prop)
                     if cid is not None:
                         accepted.append(cid)
-                if accepted:
+                if accepted or hashed:
                     self.archive_version += 1
                     self._persist_unlocked()
         if accepted:
@@ -770,19 +898,25 @@ class YawnRailsCellStore:
         if bundle_bytes is None:
             self.rejected += 1
             return None
-        ok, _reason = self._validate_bundle_bytes(bundle_bytes, prop)
-        if not ok:
+        ok, _reason, state_sha, side_sha = self._validate_bundle_bytes(
+            bundle_bytes, prop
+        )
+        if not ok or not state_sha or not side_sha:
             self.rejected += 1
             return None
 
         bundle_sha = _sha256_bytes(bundle_bytes)
-        self._write_bundle_unlocked(idx, bundle_bytes, prop, bundle_sha)
+        self._write_bundle_unlocked(
+            idx, bundle_bytes, prop, bundle_sha, state_sha, side_sha
+        )
         row = {
             "checkpoint_index": idx,
             "checkpoint_id": str(prop.get("checkpoint_id") or ""),
             "room_id": str(prop.get("room_id") or ""),
             "quality": list(quality),
             "bundle_sha256": bundle_sha,
+            "state_sha256": state_sha,
+            "sidecar_sha256": side_sha,
             "bytes": len(bundle_bytes),
             "state_path": (
                 f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}"
@@ -817,25 +951,27 @@ class YawnRailsCellStore:
 
     def _validate_bundle_bytes(
         self, data: bytes, prop: dict[str, Any]
-    ) -> tuple[bool, str]:
+    ) -> tuple[bool, str, str | None, str | None]:
         try:
             zf = zipfile.ZipFile(io.BytesIO(data))
         except zipfile.BadZipFile:
-            return False, "bad_zip"
+            return False, "bad_zip", None, None
         names = set(zf.namelist())
         if CELL_STATE_NAME not in names:
-            return False, "missing_state"
+            return False, "missing_state", None, None
         if CELL_SIDECAR_NAME not in names:
-            return False, "missing_sidecar"
+            return False, "missing_sidecar", None, None
         state_bytes = zf.read(CELL_STATE_NAME)
         side_bytes = zf.read(CELL_SIDECAR_NAME)
-        want_state = prop.get("state_sha256")
-        if want_state and _sha256_bytes(state_bytes) != str(want_state):
-            return False, "state_sha_mismatch"
-        want_side = prop.get("sidecar_sha256")
-        if want_side and _sha256_bytes(side_bytes) != str(want_side):
-            return False, "sidecar_sha_mismatch"
-        return True, "ok"
+        state_sha = _sha256_bytes(state_bytes)
+        side_sha = _sha256_bytes(side_bytes)
+        want_state = str(prop.get("state_sha256") or "").strip()
+        if want_state and state_sha != want_state:
+            return False, "state_sha_mismatch", None, None
+        want_side = str(prop.get("sidecar_sha256") or "").strip()
+        if want_side and side_sha != want_side:
+            return False, "sidecar_sha_mismatch", None, None
+        return True, "ok", state_sha, side_sha
 
     def _write_bundle_unlocked(
         self,
@@ -843,10 +979,14 @@ class YawnRailsCellStore:
         bundle_bytes: bytes,
         prop: dict[str, Any],
         bundle_sha: str,
+        state_sha: str,
+        side_sha: str,
     ) -> None:
         dest = cell_slot_dir(self.root, checkpoint_index)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        incoming = dest.parent / f".incoming_{cell_dir_name(checkpoint_index)}"
+        incoming = dest.parent / (
+            f".incoming_{cell_dir_name(checkpoint_index)}_{os.getpid()}"
+        )
         if incoming.exists():
             shutil.rmtree(incoming, ignore_errors=True)
         incoming.mkdir(parents=True, exist_ok=True)
@@ -859,8 +999,8 @@ class YawnRailsCellStore:
                 "room_id": prop.get("room_id"),
                 "quality": list(prop.get("quality") or []),
                 "bundle_sha256": bundle_sha,
-                "state_sha256": prop.get("state_sha256"),
-                "sidecar_sha256": prop.get("sidecar_sha256"),
+                "state_sha256": state_sha,
+                "sidecar_sha256": side_sha,
                 "bytes": len(bundle_bytes),
                 "route_id": prop.get("route_id") or self.route_id,
             }
@@ -877,16 +1017,18 @@ class YawnRailsCellStore:
                 json.dumps(meta, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
-            if dest.exists():
-                shutil.rmtree(dest, ignore_errors=True)
-            os.replace(str(incoming), str(dest))
+            promote_cell_files(incoming, dest)
         except Exception:
             shutil.rmtree(incoming, ignore_errors=True)
             raise
+        shutil.rmtree(incoming, ignore_errors=True)
 
     def build_manifest(self, *, since_version: int = 0) -> dict[str, Any]:
         with self._lock:
             self._load()
+            if self._backfill_file_hashes_unlocked():
+                self.archive_version = int(self.archive_version or 0) + 1
+                self._persist_unlocked()
             ver = int(self.archive_version)
             cell_count = len(self.cells)
             if int(since_version) >= ver:
@@ -906,6 +1048,8 @@ class YawnRailsCellStore:
                         "room_id": row.get("room_id", ""),
                         "quality": list(row.get("quality") or []),
                         "bundle_sha256": str(row.get("bundle_sha256") or ""),
+                        "state_sha256": str(row.get("state_sha256") or ""),
+                        "sidecar_sha256": str(row.get("sidecar_sha256") or ""),
                         "bytes": int(row.get("bytes") or 0),
                         "cell_id": cell_dir_name(idx),
                         "state_path": row.get("state_path"),
@@ -939,25 +1083,26 @@ class YawnRailsCellStore:
             idx = int(cid[2:], 10)
         except ValueError:
             return None
-        d = cell_slot_dir(self.root, idx)
-        state_p = d / CELL_STATE_NAME
-        side_p = d / CELL_SIDECAR_NAME
-        if not state_p.is_file() or not side_p.is_file():
-            return None
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.write(state_p, CELL_STATE_NAME)
-            zf.write(side_p, CELL_SIDECAR_NAME)
-            meta_p = d / CELL_META_NAME
-            if meta_p.is_file():
-                zf.write(meta_p, CELL_META_NAME)
-            replay_p = d / CELL_REPLAY_NAME
-            if replay_p.is_file():
-                zf.write(replay_p, CELL_REPLAY_NAME)
-            policy_p = d / CELL_POLICY_NAME
-            if policy_p.is_file():
-                zf.write(policy_p, CELL_POLICY_NAME)
-        return buf.getvalue()
+        with yawn_cells_locked(self.root, holder="yawn_pack_bundle"):
+            d = cell_slot_dir(self.root, idx)
+            state_p = d / CELL_STATE_NAME
+            side_p = d / CELL_SIDECAR_NAME
+            if not state_p.is_file() or not side_p.is_file():
+                return None
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+                zf.write(state_p, CELL_STATE_NAME)
+                zf.write(side_p, CELL_SIDECAR_NAME)
+                meta_p = d / CELL_META_NAME
+                if meta_p.is_file():
+                    zf.write(meta_p, CELL_META_NAME)
+                replay_p = d / CELL_REPLAY_NAME
+                if replay_p.is_file():
+                    zf.write(replay_p, CELL_REPLAY_NAME)
+                policy_p = d / CELL_POLICY_NAME
+                if policy_p.is_file():
+                    zf.write(policy_p, CELL_POLICY_NAME)
+            return buf.getvalue()
 
 
 def yawn_rails_store_from_env(

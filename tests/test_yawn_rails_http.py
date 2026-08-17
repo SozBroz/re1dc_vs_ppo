@@ -141,6 +141,9 @@ def test_manifest_and_bundle_roundtrip(yawn_http, tmp_path: Path) -> None:
     assert man["cells"][0]["checkpoint_index"] == 0
     assert man["cells"][0]["inventory_free_slots"] == 3
     assert man["cells"][0]["next_checkpoint_id"] == "cp_1"
+    assert man["cells"][0]["state_sha256"]
+    assert man["cells"][0]["sidecar_sha256"]
+    assert len(man["cells"][0]["state_sha256"]) == 64
 
     man2 = client.fetch_yawn_rails_manifest(since_version=1)
     assert man2["cells"] == []
@@ -338,3 +341,75 @@ def test_pack_bundle_sha_stable(tmp_path: Path) -> None:
         meta={"checkpoint_index": 7},
     )
     assert rebuilt[:2] == b"PK"
+
+
+def test_poll_refetches_when_state_dirty_but_meta_bundle_sha_matches(
+    yawn_http, tmp_path: Path
+) -> None:
+    """Matching meta.json token + dirty State must not cache-hit."""
+    store: YawnRailsCellStore = yawn_http["store"]
+    client: WorkerClient = yawn_http["client"]
+    prop = _write_local_cell(tmp_path / "canon4", idx=14, quality=[96, 45, 0, 8, 1])
+    store.ingest_proposals([prop])
+
+    worker_root = tmp_path / "worker_meta_hit"
+    poll_yawn_rails_manifest(client, worker_root, since_version=0)
+    slot = worker_root / "states" / "yawn_rails" / "cells" / "cp14"
+    learner_state = (yawn_http["store_root"] / "cells" / "cp14" / "cell.State").read_bytes()
+    meta = json.loads((slot / "meta.json").read_text(encoding="utf-8"))
+    (slot / "cell.State").write_bytes(b"STATE_cp14_DIRTY_AMMO")
+    (slot / "meta.json").write_text(json.dumps(meta) + "\n", encoding="utf-8")
+
+    local = poll_yawn_rails_manifest(client, worker_root, since_version=0)
+    assert local["cells"][0]["quality"][1] == 45
+    assert (slot / "cell.State").read_bytes() == learner_state
+    assert b"DIRTY" not in (slot / "cell.State").read_bytes()
+
+
+def test_same_version_poll_heals_dirty_state(yawn_http, tmp_path: Path) -> None:
+    """Ordinary since_version=current poll must still repair a silent overwrite."""
+    store: YawnRailsCellStore = yawn_http["store"]
+    client: WorkerClient = yawn_http["client"]
+    prop = _write_local_cell(tmp_path / "canon5", idx=13, quality=[96, 45, 0, 8, 1])
+    store.ingest_proposals([prop])
+
+    worker_root = tmp_path / "worker_same_ver"
+    first = poll_yawn_rails_manifest(client, worker_root, since_version=0)
+    slot = worker_root / "states" / "yawn_rails" / "cells" / "cp13"
+    learner_state = (yawn_http["store_root"] / "cells" / "cp13" / "cell.State").read_bytes()
+    (slot / "cell.State").write_bytes(b"STATE_cp13_SILENT_OVERWRITE")
+
+    local = poll_yawn_rails_manifest(
+        client, worker_root, since_version=int(first["archive_version"])
+    )
+    assert (slot / "cell.State").read_bytes() == learner_state
+    assert b"SILENT" not in (slot / "cell.State").read_bytes()
+    assert local["cells"][0]["state_sha256"] == first["cells"][0]["state_sha256"]
+
+
+def test_reset_skips_cell_when_state_sha_mismatches(tmp_path: Path) -> None:
+    from re1_rl.yawn_rails_sync import slot_matches_content, yawn_cell_pb_bundle
+
+    cell = tmp_path / "states" / "yawn_rails" / "cells" / "cp00"
+    cell.mkdir(parents=True)
+    state = cell / "cell.State"
+    side = cell / "cell.sidecar.json"
+    state.write_bytes(b"GOOD")
+    side.write_text("{}", encoding="utf-8")
+    good_sha = hashlib.sha256(b"GOOD").hexdigest()
+    side_sha = hashlib.sha256(side.read_bytes()).hexdigest()
+    row = {
+        "state_path": "states/yawn_rails/cells/cp00/cell.State",
+        "sidecar_path": "states/yawn_rails/cells/cp00/cell.sidecar.json",
+        "state_sha256": good_sha,
+        "sidecar_sha256": side_sha,
+    }
+    assert slot_matches_content(
+        cell, state_sha256=row["state_sha256"], sidecar_sha256=row["sidecar_sha256"]
+    )
+    state.write_bytes(b"DIRTY")
+    assert not slot_matches_content(
+        cell, state_sha256=row["state_sha256"], sidecar_sha256=row["sidecar_sha256"]
+    )
+    bundle = yawn_cell_pb_bundle(row)
+    assert bundle["state_sha256"] == good_sha

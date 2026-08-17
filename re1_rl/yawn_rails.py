@@ -762,6 +762,8 @@ def _options_from_cell(
     *,
     reset_source: str = "route_cell",
 ) -> dict[str, Any]:
+    from re1_rl.yawn_rails_sync import yawn_cell_pb_bundle
+
     start_index = int(chosen["checkpoint_index"]) + 1
     opts: dict[str, Any] = {
         "route_start_index": start_index,
@@ -769,11 +771,7 @@ def _options_from_cell(
         "reset_source": reset_source if start_index else "route_initial",
     }
     if start_index:
-        opts["pb_bundle"] = {
-            "state_path": str(chosen["state_path"]),
-            "sidecar_path": str(chosen["sidecar_path"]),
-            "source": "yawn_rails",
-        }
+        opts["pb_bundle"] = yawn_cell_pb_bundle(chosen)
     return opts
 
 
@@ -812,7 +810,12 @@ def sample_one_leg_options(
     ``data/yawn_reset_pin.env`` (or ``RE1_YAWN_RESET_PIN_FILE``) overrides the
     above on every reset without restarting the worker — edit the file live.
     Relative pin paths are resolved from ``project_root``, not process cwd.
+    ``RE1_YAWN_PIN_MARCH=1`` advances a single-index pin after ≥15 min wall
+    and a 4×-faster capture, stopping at the L-passage dog fight (pin 18).
     """
+    from re1_rl.yawn_pin_march import maybe_advance_pin
+
+    maybe_advance_pin(project_root)
     all_cells = list(iter_loadable_cells(project_root, stage))
     cells = eligible_reset_cells(all_cells)
     pin_index = reset_pin_index_from_env(project_root)
@@ -1165,8 +1168,20 @@ def capture_successor_cell(
     # Refuse door-threshold / cutscene-spoof captures (Wesker→fake 106, Kenneth
     # at 105→104 entry pose before tea-room settle, etc.).
     from re1_rl.barry_rescue_checkpoint import barry_rescue_capture_room_ok
+    from re1_rl.barry_return_checkpoint import (
+        BARRY_RETURN_CHECKPOINT_ID,
+        barry_return_capture_inventory_ok,
+    )
     from re1_rl.richard_cutscene_checkpoint import richard_cutscene_capture_room_ok
     from re1_rl.yawn_box_prep_checkpoint import yawn_box_prep_capture_room_ok
+
+    if cid == BARRY_RETURN_CHECKPOINT_ID and not barry_return_capture_inventory_ok(state):
+        print(
+            f"[yawn_capture] reject missing_heal_spray cp={cid}",
+            flush=True,
+        )
+        _mark_capture_ineligible(env, "missing_heal_spray")
+        return None
 
     def _scripted_exit_capture_ok(
         completed_cid: str, live_room: str, expect_room: str
@@ -1451,6 +1466,8 @@ def capture_successor_cell(
             "room_id": live_room,
             "quality": list(quality),
             "bundle_sha256": str(proposal.get("bundle_sha256") or ""),
+            "state_sha256": str(proposal.get("state_sha256") or ""),
+            "sidecar_sha256": str(proposal.get("sidecar_sha256") or ""),
             "bytes": int(proposal.get("bytes") or 0),
             **{
                 k: capacity[k]
