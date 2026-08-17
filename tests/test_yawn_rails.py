@@ -1523,6 +1523,52 @@ def test_reset_pin_set_env_blends_with_default(
     assert other["reset_source"] != "route_cell_pin_set"
 
 
+def test_reset_pin_set_weight_blends_with_range_and_fresh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in (0, 3, 8, 18)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 45)),
+    }
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_INDEX", raising=False)
+    monkeypatch.delenv("RE1_YAWN_RESET_PIN_WEIGHTS", raising=False)
+    monkeypatch.delenv("RE1_YAWN_PAYFORWARD_RIPPLE", raising=False)
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_SET", "18")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_SET_WEIGHT", "0.5")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_RANGE", "0-8")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_INCLUDE_FRESH", "1")
+    pin_set = 0
+    remainder = {"fresh": 0, "cp00": 0, "cp03": 0, "cp08": 0, "other": 0}
+    for seed in range(4000):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        if opts["reset_source"] == "route_cell_pin_set":
+            pin_set += 1
+            assert opts["route_start_index"] == 19
+            continue
+        if opts["reset_source"] == "route_initial":
+            remainder["fresh"] += 1
+            assert "pb_bundle" not in opts
+            continue
+        cell = int(opts["route_start_index"]) - 1
+        key = f"cp{cell:02d}"
+        remainder[key if key in remainder else "other"] += 1
+    total = pin_set + sum(remainder.values())
+    assert remainder["other"] == 0
+    assert pin_set / total == pytest.approx(0.5, abs=0.04)
+    rest = sum(remainder.values())
+    for key in ("fresh", "cp00", "cp03", "cp08"):
+        assert remainder[key] / rest == pytest.approx(0.25, abs=0.05), (
+            f"{key}={remainder[key]}"
+        )
+
+
 def test_playthrough_curriculum_spans_remaining_route(tmp_path: Path) -> None:
     manifest = {
         "schema_version": 1,

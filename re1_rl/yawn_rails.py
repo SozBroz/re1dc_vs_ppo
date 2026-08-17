@@ -802,7 +802,8 @@ def sample_one_leg_options(
     weights (percentages or fractions; normalized). ``latest:50,33:50`` mixes the
     newest loadable cell with fixed indices. Overrides plain pin range/set.
     ``RE1_YAWN_RESET_PIN_SET=37,40,44`` with optional
-    ``RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5`` blends pin-set vs normal mix.
+    ``RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5`` blends pin-set vs the remaining mix.
+    With a pin range, the remainder is that range (plus fresh if enabled).
     ``RE1_YAWN_RESET_PIN_INCLUDE_FRESH=1`` with a pin set (and no range) is
     exclusive: one fresh-start slot plus each listed loadable cell.
     ``RE1_YAWN_FIGHT_BIAS_INDEX`` / ``RE1_YAWN_FIGHT_BIAS_WEIGHT`` override the
@@ -854,6 +855,15 @@ def sample_one_leg_options(
     if pin_weights is not None:
         chosen = _sample_cell_from_pin_weights(all_cells, pin_weights, rng=rng)
         return _options_from_cell(chosen, stage, reset_source="route_cell_pin_weights")
+    pin_set_cfg = reset_pin_set_from_env(project_root)
+    if pin_set_cfg is not None and pin_range is not None:
+        indices, weight = pin_set_cfg
+        pinned = _cells_in_pin_set(all_cells, indices)
+        if weight > 0.0 and pinned and rng.random() < weight:
+            chosen = pinned[rng.randrange(len(pinned))]
+            return _options_from_cell(
+                chosen, stage, reset_source="route_cell_pin_set"
+            )
     if pin_range is not None:
         lo, hi = pin_range
         ranged = _cells_in_pin_range(all_cells, lo, hi)
