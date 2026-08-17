@@ -23,7 +23,9 @@ set RE1_PB_DANGER_ROOMS=1
 call "%~dp0go_explore_phase_c.env.cmd"
 call "%~dp0workhorse_reset_cp44.env.cmd"
 REM Half of WH2 env-time on cp18->cp19 (pking is 100% pin 18). WH1 keeps workhorse_reset_pin.env.
-set RE1_YAWN_RESET_PIN_FILE=data\workhorse2_reset_pin.env
+set RE1_YAWN_RESET_PIN_FILE=C:\Users\sshuser\re1_rl\data\workhorse2_reset_pin.env
+set RE1_YAWN_RESET_PIN_SET=18
+set RE1_YAWN_RESET_PIN_SET_WEIGHT=0.5
 if not exist data\go_explore mkdir data\go_explore
 
 if not exist data\logs mkdir data\logs
