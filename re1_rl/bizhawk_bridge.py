@@ -531,8 +531,37 @@ class BizHawkClient:
         frames, _turbo = self.tape_dump_full()
         return frames
 
+    def tape_dump_packed(self) -> dict[str, Any] | None:
+        """Return the compact recorder payload without materializing frame lists."""
+        resp = self._request({"cmd": "tape_dump"})
+        packed = resp.get("packed")
+        encoding = resp.get("encoding")
+        if not isinstance(packed, str) or not packed or not isinstance(encoding, str):
+            return None
+        try:
+            n_frames = int(resp.get("n") or 0)
+        except (TypeError, ValueError):
+            return None
+        if n_frames <= 0:
+            return None
+        return {"packed": packed, "encoding": encoding, "n": n_frames}
+
     def tape_dump_full(self) -> tuple[list[int], list[int]]:
         resp = self._request({"cmd": "tape_dump"})
+        packed = resp.get("packed")
+        if isinstance(packed, str) and packed:
+            from re1_rl.leg_replay import (
+                JOYPAD_PACKED_ENCODING,
+                decode_packed_joypad,
+            )
+
+            if str(resp.get("encoding") or "") != JOYPAD_PACKED_ENCODING:
+                return [], []
+            try:
+                expected = int(resp.get("n") or 0)
+            except (TypeError, ValueError):
+                return [], []
+            return decode_packed_joypad(packed, expected_frames=expected)
         raw = resp.get("frames") or []
         turbo_raw = resp.get("turbo") or []
         if not isinstance(raw, list):

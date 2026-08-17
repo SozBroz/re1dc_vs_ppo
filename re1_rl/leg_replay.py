@@ -16,7 +16,7 @@ from typing import Any
 from re1_rl.go_explore_merge import CELL_META_NAME, CELL_REPLAY_NAME, CELL_STATE_NAME
 
 ACTION_MAP_VERSION = 1
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 _UINT16_MAX = 65535
 # Packed LSB-first; must match lua/re1_client.lua TAPE_BUTTON_ORDER.
 JOYPAD_BUTTON_ORDER = (
@@ -35,6 +35,13 @@ JOYPAD_BUTTON_ORDER = (
     "r2",
     "l2",
 )
+JOYPAD_TURBO_BIT = 1 << len(JOYPAD_BUTTON_ORDER)
+JOYPAD_BUTTON_MASK = JOYPAD_TURBO_BIT - 1
+JOYPAD_PACKED_ENCODING = "b64x3_buttons14_turbo14"
+_JOYPAD_PACKED_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+_JOYPAD_PACKED_DECODE = {
+    char: index for index, char in enumerate(_JOYPAD_PACKED_ALPHABET)
+}
 
 
 def _json_float(value: float) -> float:
@@ -249,6 +256,74 @@ def _is_skip_mash_run(frames: list[int]) -> bool:
     return _SKIP_MASH_RATIO_MIN <= ratio <= _SKIP_MASH_RATIO_MAX
 
 
+def decode_packed_joypad(
+    packed: str, *, expected_frames: int | None = None
+) -> tuple[list[int], list[int]]:
+    """Decode fixed-width frames into legacy-compatible buttons/turbo lists."""
+    if not isinstance(packed, str) or len(packed) % 3:
+        return [], []
+    n_frames = len(packed) // 3
+    if expected_frames is not None and n_frames != int(expected_frames):
+        return [], []
+    bits: list[int] = []
+    turbo: list[int] = []
+    for i in range(0, len(packed), 3):
+        try:
+            word = (
+                _JOYPAD_PACKED_DECODE[packed[i]] * 4096
+                + _JOYPAD_PACKED_DECODE[packed[i + 1]] * 64
+                + _JOYPAD_PACKED_DECODE[packed[i + 2]]
+            )
+        except KeyError:
+            return [], []
+        bits.append(word & JOYPAD_BUTTON_MASK)
+        turbo.append(1 if word & JOYPAD_TURBO_BIT else 0)
+    return bits, turbo
+
+
+def _joypad_lists_from_tape(tape: dict[str, Any]) -> tuple[list[int], list[int]]:
+    packed = tape.get("joypad_packed")
+    encoding = str(tape.get("joypad_encoding") or "")
+    if isinstance(packed, str) and encoding == JOYPAD_PACKED_ENCODING:
+        expected = tape.get("joypad_frames")
+        try:
+            expected_frames = None if expected is None else int(expected)
+        except (TypeError, ValueError):
+            return [], []
+        return decode_packed_joypad(packed, expected_frames=expected_frames)
+    bits = [int(b) for b in (tape.get("joypad_bits") or [])]
+    turbo_raw = tape.get("joypad_turbo")
+    turbo = (
+        [1 if int(flag or 0) else 0 for flag in turbo_raw]
+        if isinstance(turbo_raw, list) and len(turbo_raw) == len(bits)
+        else []
+    )
+    return bits, turbo
+
+
+def tape_has_joypad(tape: dict[str, Any]) -> bool:
+    """True for either preserved legacy arrays or the compact packed stream."""
+    if tape.get("joypad_bits"):
+        return True
+    return bool(
+        tape.get("joypad_packed")
+        and str(tape.get("joypad_encoding") or "") == JOYPAD_PACKED_ENCODING
+        and int(tape.get("joypad_frames") or 0) > 0
+    )
+
+
+def tape_has_joypad_turbo(tape: dict[str, Any]) -> bool:
+    """True when replay has an explicit turbo channel, including all-zero data."""
+    if (
+        tape.get("joypad_packed")
+        and str(tape.get("joypad_encoding") or "") == JOYPAD_PACKED_ENCODING
+    ):
+        return True
+    bits = tape.get("joypad_bits")
+    turbo = tape.get("joypad_turbo")
+    return isinstance(bits, list) and isinstance(turbo, list) and len(turbo) == len(bits)
+
+
 def joypad_replay_spans(tape: dict[str, Any]) -> list[tuple[list[int], str]]:
     """Split joypad bits into ``(frames, patch_mode)`` TAS spans.
 
@@ -256,18 +331,17 @@ def joypad_replay_spans(tape: dict[str, Any]) -> list[tuple[list[int], str]]:
     those bits with ``force`` / ``off`` so grab skip and cinema match capture.
     Old tapes without the channel fall back to Cross-mash detection.
     """
-    bits = [int(b) for b in (tape.get("joypad_bits") or [])]
+    bits, turbo = _joypad_lists_from_tape(tape)
     if not bits:
         return []
-    turbo_raw = tape.get("joypad_turbo")
-    if isinstance(turbo_raw, list) and len(turbo_raw) == len(bits):
+    if len(turbo) == len(bits):
         spans: list[tuple[list[int], str]] = []
         i = 0
         n = len(bits)
         while i < n:
-            on = int(turbo_raw[i] or 0) != 0
+            on = bool(turbo[i])
             j = i + 1
-            while j < n and (int(turbo_raw[j] or 0) != 0) == on:
+            while j < n and bool(turbo[j]) == on:
                 j += 1
             spans.append((bits[i:j], "force" if on else "off"))
             i = j
@@ -316,6 +390,28 @@ def _file_sha256(path: Path | None) -> str:
     if path is None or not path.is_file():
         return ""
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def successor_cell_state_path(
+    project_root: Path | str, tape: dict[str, Any]
+) -> Path | None:
+    """``cell.State`` for the tape's destination checkpoint, if present."""
+    try:
+        to_index = int(tape.get("to_checkpoint_index"))
+    except (TypeError, ValueError):
+        return None
+    from re1_rl.yawn_rails_sync import cell_slot_dir, yawn_rails_root
+
+    path = cell_slot_dir(yawn_rails_root(project_root), to_index) / CELL_STATE_NAME
+    return path if path.is_file() else None
+
+
+def successor_state_sha_ok(path: Path | None, tape: dict[str, Any]) -> bool:
+    """True when disk State is the exact file the tape hashed at capture."""
+    want = str(tape.get("to_state_sha256") or "")
+    if not want or path is None or not path.is_file():
+        return False
+    return _file_sha256(path) == want
 
 
 def init_savestate_path(env: Any) -> Path | None:
@@ -432,7 +528,7 @@ def build_leg_replay_payload(
         ]
     root = getattr(env, "project_root", None)
     n_actions = int(getattr(getattr(env, "action_space", None), "n", 45) or 45)
-    joypad_bits, joypad_turbo = _joypad_tape_from_env(env)
+    joypad_payload = _joypad_payload_from_env(env)
     payload = {
         "schema_version": SCHEMA_VERSION,
         "from_checkpoint_index": from_index,
@@ -447,8 +543,11 @@ def build_leg_replay_payload(
             "async_cutscene_skip": bool(getattr(env, "_async_cutscene_skip", False)),
             "code_commit": _git_commit(root),
             "action_map_version": ACTION_MAP_VERSION,
-            "joypad_tape": bool(joypad_bits),
-            "joypad_turbo": bool(joypad_turbo),
+            "joypad_tape": bool(joypad_payload),
+            "joypad_turbo": bool(
+                joypad_payload.get("joypad_turbo")
+                or joypad_payload.get("joypad_packed")
+            ),
             "heading_restore": HEADING_RESTORE_VERSION,
             "combat_leg": any(int(v or 0) > 0 for v in kills.values())
             or any(int(a) in ATTACK_ACTION_IDS for a in actions),
@@ -477,11 +576,7 @@ def build_leg_replay_payload(
             "leg_kills_by_room": kills,
         },
     }
-    if joypad_bits:
-        payload["joypad_bits"] = joypad_bits
-        payload["joypad_frames"] = len(joypad_bits)
-        if joypad_turbo:
-            payload["joypad_turbo"] = joypad_turbo
+    payload.update(joypad_payload)
     if len(buf.rewards) > 0:
         rewards, events = buf.aligned_rewards()
         by_channel: dict[str, float] = {}
@@ -531,6 +626,40 @@ def _joypad_tape_from_env(env: Any) -> tuple[list[int], list[int]]:
             except (TypeError, ValueError):
                 flags.append(0)
     return out, flags
+
+
+def _joypad_payload_from_env(env: Any) -> dict[str, Any]:
+    """Prefer the bridge's compact stream; retain old-bridge array compatibility."""
+    bridge = getattr(env, "bridge", None)
+    dump_packed = getattr(bridge, "tape_dump_packed", None)
+    if callable(dump_packed):
+        try:
+            packed = dump_packed()
+        except (OSError, RuntimeError, ValueError, TypeError, AttributeError):
+            packed = None
+        if isinstance(packed, dict):
+            encoded = str(packed.get("packed") or "")
+            encoding = str(packed.get("encoding") or "")
+            try:
+                n_frames = int(packed.get("n") or 0)
+            except (TypeError, ValueError):
+                n_frames = 0
+            if encoded and encoding == JOYPAD_PACKED_ENCODING and n_frames > 0:
+                return {
+                    "joypad_encoding": encoding,
+                    "joypad_packed": encoded,
+                    "joypad_frames": n_frames,
+                }
+    bits, turbo = _joypad_tape_from_env(env)
+    if not bits:
+        return {}
+    out: dict[str, Any] = {
+        "joypad_bits": bits,
+        "joypad_frames": len(bits),
+    }
+    if turbo:
+        out["joypad_turbo"] = turbo
+    return out
 
 
 def _joypad_bits_from_env(env: Any) -> list[int] | None:

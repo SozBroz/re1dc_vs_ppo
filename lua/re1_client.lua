@@ -312,10 +312,16 @@ local BUTTON_MAP = {
 
 -- TAS-grade per-frame joypad tape (YouTube / pixel-perfect replay).
 -- Bit 0 = up, then down, left, right, cross, triangle, square, circle,
--- start, select, r1, l1, r2, l2. Must match re1_rl.leg_replay.JOYPAD_BUTTON_ORDER.
+-- start, select, r1, l1, r2, l2; bit 14 records cutscene turbo. Each 15-bit
+-- word is stored as three JSON-safe base64 alphabet characters so long legs do
+-- not retain Lua number tables or pass binary NULs through BizHawk's Lua build.
+-- Must match re1_rl.leg_replay.JOYPAD_BUTTON_ORDER / JOYPAD_TURBO_BIT.
 local TAPE_ON = false
-local TAPE_FRAMES = {}
-local TAPE_TURBO = {}
+local TAPE_CHUNKS = {}
+local TAPE_PENDING = {}
+local TAPE_N = 0
+local TAPE_PENDING_LIMIT = 1024
+local TAPE_TURBO_BIT = 16384
 local LAST_BTN = {}
 local TAPE_BUTTON_ORDER = {
     "up", "down", "left", "right",
@@ -340,8 +346,24 @@ local function tape_record(btn)
     if not TAPE_ON then
         return
     end
-    TAPE_FRAMES[#TAPE_FRAMES + 1] = pack_buttons(btn)
-    TAPE_TURBO[#TAPE_TURBO + 1] = LAST_TURBO and 1 or 0
+    local word = pack_buttons(btn) + (LAST_TURBO and TAPE_TURBO_BIT or 0)
+    TAPE_PENDING[#TAPE_PENDING + 1] =
+        B64:sub(math.floor(word / 4096) + 1, math.floor(word / 4096) + 1)
+        .. B64:sub(math.floor(word / 64) % 64 + 1, math.floor(word / 64) % 64 + 1)
+        .. B64:sub(word % 64 + 1, word % 64 + 1)
+    TAPE_N = TAPE_N + 1
+    if #TAPE_PENDING >= TAPE_PENDING_LIMIT then
+        TAPE_CHUNKS[#TAPE_CHUNKS + 1] = table.concat(TAPE_PENDING)
+        TAPE_PENDING = {}
+    end
+end
+
+local function tape_packed_bytes()
+    if #TAPE_PENDING > 0 then
+        TAPE_CHUNKS[#TAPE_CHUNKS + 1] = table.concat(TAPE_PENDING)
+        TAPE_PENDING = {}
+    end
+    return table.concat(TAPE_CHUNKS)
 end
 
 local function emu_advance()
@@ -953,19 +975,20 @@ local function handle_command(cmd)
 
     elseif op == "tape_enable" then
         TAPE_ON = cmd.on == true
-        return { ok = true, on = TAPE_ON, n = #TAPE_FRAMES }
+        return { ok = true, on = TAPE_ON, n = TAPE_N }
 
     elseif op == "tape_clear" then
-        TAPE_FRAMES = {}
-        TAPE_TURBO = {}
+        TAPE_CHUNKS = {}
+        TAPE_PENDING = {}
+        TAPE_N = 0
         return { ok = true, n = 0 }
 
     elseif op == "tape_dump" then
         return {
             ok = true,
-            n = #TAPE_FRAMES,
-            frames = setmetatable(TAPE_FRAMES, { __jsontype = "array" }),
-            turbo = setmetatable(TAPE_TURBO, { __jsontype = "array" }),
+            n = TAPE_N,
+            encoding = "b64x3_buttons14_turbo14",
+            packed = tape_packed_bytes(),
         }
 
     elseif op == "tape_play" then

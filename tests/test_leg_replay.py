@@ -16,13 +16,20 @@ from re1_rl.go_explore_capture import quality_replace_significant
 from re1_rl.go_explore_merge import CELL_REPLAY_NAME
 from re1_rl.leg_replay import (
     HEADING_RESTORE_VERSION,
+    JOYPAD_PACKED_ENCODING,
+    JOYPAD_TURBO_BIT,
     LegReplayBuffer,
     build_leg_replay_payload,
+    decode_packed_joypad,
     joypad_replay_spans,
     new_leg_replay_buffer,
     policy_leg_frames_from_tape,
     reclassify_contaminated_async_skip_tape,
     should_write_leg_replay,
+    successor_cell_state_path,
+    successor_state_sha_ok,
+    tape_has_joypad,
+    tape_has_joypad_turbo,
     tape_is_combat,
     write_leg_replay_json,
 )
@@ -33,6 +40,16 @@ from re1_rl.yawn_rails_sync import (
     try_install_yawn_cell,
     yawn_rails_root,
 )
+
+
+def _pack_joypad_words(words: list[int]) -> str:
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    return "".join(
+        alphabet[(word // 4096) % 64]
+        + alphabet[(word // 64) % 64]
+        + alphabet[word % 64]
+        for word in words
+    )
 
 
 def test_buffer_leg_frames_sum() -> None:
@@ -489,7 +506,8 @@ def test_joypad_replay_keeps_engine_patches_and_skip_turbo() -> None:
     assert 'force_turbo == "off"' in lua
     assert 'patch_mode == "step"' in lua
     assert 'patch_mode == "force"' in lua
-    assert "TAPE_TURBO" in lua
+    assert 'encoding = "b64x3_buttons14_turbo14"' in lua
+    assert "TAPE_PENDING_LIMIT" in lua
     assert "LAST_TURBO" in lua
     assert "turbo_patches=True" in replay
     assert "joypad_replay_spans" in replay
@@ -530,6 +548,91 @@ def test_joypad_replay_spans_policy_1x_skip_force_drops_suffix() -> None:
         ([16, 16, 0, 0], "force"),
         ([65], "off"),
     ]
+
+
+def test_compact_joypad_stream_matches_legacy_spans() -> None:
+    words = [65, 65, 16 | JOYPAD_TURBO_BIT, JOYPAD_TURBO_BIT, 65]
+    packed = _pack_joypad_words(words)
+    tape = {
+        "joypad_encoding": JOYPAD_PACKED_ENCODING,
+        "joypad_packed": packed,
+        "joypad_frames": len(words),
+    }
+    assert tape_has_joypad(tape)
+    assert tape_has_joypad_turbo(tape)
+    assert decode_packed_joypad(packed, expected_frames=5) == (
+        [65, 65, 16, 0, 65],
+        [0, 0, 1, 1, 0],
+    )
+    assert joypad_replay_spans(tape) == [
+        ([65, 65], "off"),
+        ([16, 0], "force"),
+        ([65], "off"),
+    ]
+    assert decode_packed_joypad(packed, expected_frames=4) == ([], [])
+
+
+def test_payload_prefers_compact_bridge_tape(tmp_path: Path) -> None:
+    words = [1, 16 | JOYPAD_TURBO_BIT]
+    packed = _pack_joypad_words(words)
+    buf = LegReplayBuffer()
+    buf.append(1, 8)
+    env = SimpleNamespace(
+        _route_start_index=0,
+        _leg_replay=buf,
+        _async_cutscene_skip=True,
+        frame_skip=8,
+        project_root=tmp_path,
+        action_space=SimpleNamespace(n=45),
+        _progress=None,
+        _reset_options={},
+        _stage={"init_savestate": "missing.State"},
+        bridge=SimpleNamespace(
+            tape_dump_packed=lambda: {
+                "encoding": JOYPAD_PACKED_ENCODING,
+                "packed": packed,
+                "n": 2,
+            }
+        ),
+    )
+    payload = build_leg_replay_payload(
+        env,
+        completed_index=0,
+        completed_id="emblem_105",
+        settled=True,
+        live_state={"room_id": "105", "x": 1, "z": 2, "facing": 3, "hp": 96},
+        quality=(96, 45, 100, 4, 1, 0, -30, -8),
+        to_state_sha256="to",
+    )
+    assert payload is not None
+    assert payload["joypad_packed"] == packed
+    assert payload["joypad_encoding"] == JOYPAD_PACKED_ENCODING
+    assert payload["joypad_frames"] == 2
+    assert "joypad_bits" not in payload
+    assert "joypad_turbo" not in payload
+    assert joypad_replay_spans(payload) == [([1], "off"), ([16], "force")]
+
+
+def test_successor_state_sha_ok_matches_disk(tmp_path: Path) -> None:
+    state = tmp_path / "cell.State"
+    state.write_bytes(b"savestate-bytes")
+    digest = __import__("hashlib").sha256(b"savestate-bytes").hexdigest()
+    tape = {"to_checkpoint_index": 5, "to_state_sha256": digest}
+    assert successor_state_sha_ok(state, tape)
+    tape["to_state_sha256"] = "0" * 64
+    assert not successor_state_sha_ok(state, tape)
+    assert not successor_state_sha_ok(None, {"to_state_sha256": digest})
+
+
+def test_successor_cell_state_path_missing(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("RE1_YAWN_RAILS_ROOT", str(tmp_path))
+    tape = {"to_checkpoint_index": 5, "to_state_sha256": "abc"}
+    assert successor_cell_state_path(tmp_path, tape) is None
+    slot = tmp_path / "cells" / "cp05"
+    slot.mkdir(parents=True)
+    (slot / CELL_STATE_NAME).write_bytes(b"x")
+    got = successor_cell_state_path(tmp_path, tape)
+    assert got == slot / CELL_STATE_NAME
 
 
 def test_normalize_pads_missing_speed_with_sentinel() -> None:

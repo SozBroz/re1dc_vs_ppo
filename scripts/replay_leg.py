@@ -4,6 +4,7 @@ cp19 example (L hallway ammo pickup, captured from cp18):
 
   venv\\Scripts\\python.exe scripts\\replay_leg.py --to 19
   venv\\Scripts\\python.exe scripts\\replay_leg.py --to 12 13
+  venv\\Scripts\\python.exe scripts\\replay_leg.py --to 0 --watch
 """
 
 from __future__ import annotations
@@ -24,7 +25,14 @@ from re1_rl.bizhawk_paths import EMUHAWK, assert_rom_present, emuhawk_argv
 from re1_rl.env import ACTION_NAMES, RE1Env
 from re1_rl.go_explore_merge import CELL_REPLAY_NAME, CELL_SIDECAR_NAME, CELL_STATE_NAME
 from re1_rl.attack_macro import FACING_RESTORE_TOL, facing_signed_delta
-from re1_rl.leg_replay import joypad_replay_spans, tape_is_combat
+from re1_rl.leg_replay import (
+    joypad_replay_spans,
+    successor_cell_state_path,
+    successor_state_sha_ok,
+    tape_has_joypad,
+    tape_has_joypad_turbo,
+    tape_is_combat,
+)
 from re1_rl.yawn_rails import _settle_state_for_capture
 from re1_rl.yawn_rails_sync import cell_dir_name, yawn_rails_root
 from scripts.play_human import configure_ram_skip, wait_for_emuhawk
@@ -83,6 +91,7 @@ def _play_joypad(
     stop_at_end_pose: bool = False,
     billed_frames: int | None = None,
     tape_frames: int | None = None,
+    watch_long_skips: bool = False,
 ) -> dict[str, Any]:
     """TAS replay: apply recorded pad bits, no env.step / capture / skip."""
     chunk = 120
@@ -107,12 +116,42 @@ def _play_joypad(
             f"at {played}/{n}",
             flush=True,
         )
+        if (
+            watch_long_skips
+            and patch_mode == "force"
+            and len(span_bits) >= 480
+        ):
+            print(
+                f"[replay] {label} play {len(span_bits)} skip frames at 1x "
+                f"(pickup cinema)",
+                flush=True,
+            )
+            for start in range(0, len(span_bits), chunk):
+                sl = span_bits[start : start + chunk]
+                got = env.bridge.tape_play(sl, patch_mode="off")
+                played += int(got)
+                try:
+                    last_state = dict(env._read_state(track_items=True))
+                except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                    last_state = dict(getattr(env, "_prev_state") or {})
+                if played % 360 == 0 or start == 0:
+                    print(
+                        f"[replay] {label} cinema {played}/{n} "
+                        f"room={last_state.get('room_id')} "
+                        f"pos=({last_state.get('x')},{last_state.get('z')}) "
+                        f"inv={sorted(_inventory_names(last_state))} "
+                        f"in_control={last_state.get('in_control')}",
+                        flush=True,
+                    )
+            if not bool(last_state.get("in_control", True)):
+                last_state = _watch_cinema_1x(env, label=label)
+            continue
         for start in range(0, len(span_bits), chunk):
             sl = span_bits[start : start + chunk]
             got = env.bridge.tape_play(sl, patch_mode=patch_mode)
             played += int(got)
             try:
-                last_state = dict(env._read_state(track_items=False))
+                last_state = dict(env._read_state(track_items=True))
             except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
                 last_state = dict(getattr(env, "_prev_state") or {})
             want_hp = int(want.get("hp", 0) or 0)
@@ -145,6 +184,114 @@ def _play_joypad(
                     flush=True,
                 )
     return last_state
+
+
+def _inventory_names(state: dict[str, Any]) -> set[str]:
+    names: set[str] = set()
+    slots = state.get("inventory_slots") or []
+    if isinstance(slots, list):
+        for row in slots:
+            if isinstance(row, (list, tuple)) and row and str(row[0]).strip():
+                names.add(str(row[0]))
+            elif isinstance(row, str) and row.strip():
+                names.add(row)
+    for n in state.get("inventory") or []:
+        if str(n).strip():
+            names.add(str(n))
+    return names
+
+
+def _watch_until_inventory(
+    env: RE1Env,
+    want: dict[str, Any],
+    *,
+    label: str,
+    max_frames: int = 5400,
+) -> dict[str, Any]:
+    """1x Cross mash after the tape so pickup cinema / Yes-No can finish on-screen."""
+    want_names = _inventory_names(want)
+    last: dict[str, Any] = dict(getattr(env, "_prev_state") or {})
+    got = _inventory_names(last)
+    if want_names and want_names <= got and bool(last.get("in_control", True)):
+        return last
+    print(
+        f"[replay] {label} watch pickup until inventory {sorted(want_names)}",
+        flush=True,
+    )
+    played = 0
+    mash = ([16] * 8) + ([0] * 8)
+    while played < max_frames:
+        env.bridge.tape_play(mash, patch_mode="off")
+        played += len(mash)
+        try:
+            last = dict(env._read_state(track_items=True))
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            last = dict(getattr(env, "_prev_state") or {})
+        got = _inventory_names(last)
+        if want_names and want_names <= got and bool(last.get("in_control", True)):
+            print(
+                f"[replay] {label} inventory complete at +{played}f {sorted(got)}",
+                flush=True,
+            )
+            return last
+        if played % 480 == 0:
+            print(
+                f"[replay] {label} watch +{played}f room={last.get('room_id')} "
+                f"inv={sorted(got)} in_control={last.get('in_control')}",
+                flush=True,
+            )
+    print(
+        f"[replay] {label} watch timeout +{played}f inv={sorted(got)}",
+        flush=True,
+    )
+    return last
+
+
+def _watch_cinema_1x(
+    env: RE1Env,
+    *,
+    label: str,
+    max_frames: int = 7200,
+    min_frames: int = 180,
+) -> dict[str, Any]:
+    """Play a recorded skip cinema at 1x until control returns."""
+    last: dict[str, Any] = dict(getattr(env, "_prev_state") or {})
+    start_inv = _inventory_names(last)
+    print(
+        f"[replay] {label} 1x cinema mash in_control={last.get('in_control')} "
+        f"inv={sorted(start_inv)}",
+        flush=True,
+    )
+    played = 0
+    mash = ([16] * 8) + ([0] * 8)
+    announced: set[str] = set()
+    while played < max_frames:
+        env.bridge.tape_play(mash, patch_mode="off")
+        played += len(mash)
+        try:
+            last = dict(env._read_state(track_items=True))
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            last = dict(getattr(env, "_prev_state") or {})
+        names = _inventory_names(last)
+        new_items = names - start_inv - announced
+        if new_items:
+            announced |= new_items
+            print(
+                f"[replay] {label} cinema got {sorted(new_items)} at +{played}f",
+                flush=True,
+            )
+        ic = bool(last.get("in_control", True))
+        if played % 480 == 0 or new_items:
+            print(
+                f"[replay] {label} cinema +{played}f room={last.get('room_id')} "
+                f"pos=({last.get('x')},{last.get('z')}) inv={sorted(names)} "
+                f"in_control={ic}",
+                flush=True,
+            )
+        if announced and played >= 60:
+            return last
+    print(f"[replay] {label} cinema timeout +{played}f", flush=True)
+    return last
 
 
 def _play_actions(
@@ -219,6 +366,73 @@ def _end_failures(
     return fail
 
 
+def _resync_to_successor_state(
+    env: RE1Env,
+    tape: dict[str, Any],
+    last_state: dict[str, Any],
+) -> dict[str, Any]:
+    """Load the captured dest State so the next tape starts where it was recorded.
+
+    Each tape is recorded after ``reset(load pred State)``, not from the previous
+    tape-end RAM. Capture can save a different pose than ``tape['end']`` (settle
+    / bg-skip after ``tape_enable(False)``). Chain replay must reload.
+    """
+    path = successor_cell_state_path(ROOT, tape)
+    try:
+        to_idx = int(tape.get("to_checkpoint_index"))
+    except (TypeError, ValueError):
+        to_idx = -1
+    label = f"cp{to_idx:02d}"
+    if path is None:
+        print(f"[replay] {label} no successor State; continue from tape end", flush=True)
+        return last_state
+    if not successor_state_sha_ok(path, tape):
+        print(
+            f"[replay] {label} WARN successor State sha != tape to_state_sha256; "
+            "skip resync",
+            flush=True,
+        )
+        return last_state
+    before = (
+        str(last_state.get("room_id", "") or ""),
+        int(last_state.get("x", 0) or 0),
+        int(last_state.get("z", 0) or 0),
+        int(last_state.get("facing", 0) or 0),
+    )
+    env.bridge.load_savestate(str(path))
+    env.bridge.clear_latched_input()
+    env.bridge.frameadvance(1)
+    env._skip_uncontrolled()
+    try:
+        env._auto_accept_pause_pickup_modal()
+        env._dismiss_non_box_pause_menu_if_safe()
+    except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+        pass
+    env._skip_uncontrolled()
+    env.bridge.clear_latched_input()
+    try:
+        last_state = dict(env._read_state(track_items=True))
+    except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+        pass
+    after = (
+        str(last_state.get("room_id", "") or ""),
+        int(last_state.get("x", 0) or 0),
+        int(last_state.get("z", 0) or 0),
+        int(last_state.get("facing", 0) or 0),
+    )
+    drifted = before[0] != after[0] or abs(before[1] - after[1]) > 256 or abs(
+        before[2] - after[2]
+    ) > 256
+    print(
+        f"[replay] {label} resync load {path.name} sha={_sha256(path)[:12]} "
+        f"tape_end={before[0]} ({before[1]},{before[2]}) "
+        f"state={after[0]} ({after[1]},{after[2]})"
+        f"{' (pose drift)' if drifted else ''}",
+        flush=True,
+    )
+    return last_state
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -226,7 +440,7 @@ def main() -> int:
         type=int,
         nargs="+",
         default=[19],
-        help="Destination cell index(es); multiple plays back-to-back with no reload",
+        help="Destination cell index(es); multiple reload each captured successor State",
     )
     ap.add_argument("--tape", type=Path, default=None, help="Override leg_replay.json path")
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
@@ -255,7 +469,26 @@ def main() -> int:
         action="store_true",
         help="Leave EmuHawk running after the tape so you can watch the end pose.",
     )
+    ap.add_argument(
+        "--watch",
+        action="store_true",
+        help="Play the full tape at 1x with no cutscene turbo and leave EmuHawk open "
+        "so pickup cinemas / inventory are visible.",
+    )
+    ap.add_argument(
+        "--stop-at-end-pose",
+        action="store_true",
+        help="Stop each tape at the first pose match (skips leftover cinema/inventory).",
+    )
+    ap.add_argument(
+        "--no-resync",
+        action="store_true",
+        help="Do not reload captured successor State between chain legs "
+        "(single continuous TAS; fails when save pose != tape end).",
+    )
     args = ap.parse_args()
+    if args.watch:
+        args.keep_open = True
 
     dests = [int(x) for x in args.to]
     if args.tape is not None and len(dests) != 1:
@@ -411,7 +644,7 @@ def main() -> int:
 
     use_joypad = args.mode == "joypad" or (
         args.mode == "auto"
-        and all(bool((t.get("joypad_bits") or [])) for t, _ in loaded)
+        and all(tape_has_joypad(t) for t, _ in loaded)
     )
     env = RE1Env(
         curriculum_path=CURRICULUM,
@@ -441,7 +674,9 @@ def main() -> int:
     )
     print(
         f"[replay] chain={chain} tapes={len(loaded)} "
-        f"async_skip={async_skip} skip={frame_skip}",
+        f"async_skip={async_skip} skip={frame_skip} "
+        f"watch={bool(args.watch)} keep_open={bool(args.keep_open)} "
+        f"joypad_patch={args.joypad_patch}",
         flush=True,
     )
     for tape, tape_path in loaded:
@@ -466,7 +701,7 @@ def main() -> int:
                 f"(bg skip interleaved; skip_frames_per_step is not a TAS map)",
                 flush=True,
             )
-        if joy_n and not (tape.get("joypad_turbo") or []):
+        if joy_n and not tape_has_joypad_turbo(tape):
             print(
                 "[replay] WARN tape has no joypad_turbo; recapture after Lua "
                 "reload — this pad stream cannot TAS-replay combat skip",
@@ -516,7 +751,7 @@ def main() -> int:
     last_state: dict[str, Any] = dict(getattr(env, "_prev_state") or {})
     all_fail: list[str] = []
     try:
-        for tape, tape_path in loaded:
+        for tape_i, (tape, tape_path) in enumerate(loaded):
             to_idx = int(tape["to_checkpoint_index"])
             label = f"cp{to_idx:02d}"
             actions = [int(a) for a in tape.get("actions") or []]
@@ -534,10 +769,18 @@ def main() -> int:
                     spans,
                     label=label,
                     want_end=tape.get("end") or {},
-                    stop_at_end_pose=True,
+                    stop_at_end_pose=bool(args.stop_at_end_pose),
                     billed_frames=billed,
                     tape_frames=len(bits),
+                    watch_long_skips=bool(args.watch),
                 )
+                if args.watch:
+                    if "emblem" not in _inventory_names(last_state) or not bool(
+                        last_state.get("in_control", True)
+                    ):
+                        last_state = _watch_until_inventory(
+                            env, tape.get("end") or {}, label=label
+                        )
             else:
                 last_state, got_frames, term, trunc = _play_actions(
                     env,
@@ -545,11 +788,22 @@ def main() -> int:
                     label=label,
                     want_frames=[int(f) for f in tape.get("emu_frames_per_step") or []],
                 )
-            if bool(tape.get("settled")):
+            if (
+                not args.watch
+                and (
+                    bool(tape.get("settled"))
+                    or not bool(last_state.get("in_control", True))
+                )
+            ):
                 settled = _settle_state_for_capture(env, last_state)
                 if settled is not None:
                     last_state = settled
+            try:
+                last_state = dict(env._read_state(track_items=True))
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                pass
             end = tape.get("end") or {}
+            inv = last_state.get("inventory_slots") or last_state.get("inventory")
             print("[replay] end", json.dumps({
                 "leg": label,
                 "mode": "joypad" if use_joypad else "actions",
@@ -557,7 +811,9 @@ def main() -> int:
                 "hp": int(last_state.get("hp", 0) or 0),
                 "x": int(last_state.get("x", 0) or 0),
                 "z": int(last_state.get("z", 0) or 0),
+                "inventory": inv,
                 "want": {k: end.get(k) for k in ("room_id", "hp", "x", "z")},
+                "want_inventory": end.get("inventory_slots") or end.get("inventory"),
                 "steps_played": len(got_frames) if not use_joypad else None,
                 "joypad_frames": int(tape.get("joypad_frames") or 0) if use_joypad else None,
                 "steps_tape": len(actions),
@@ -570,18 +826,28 @@ def main() -> int:
             if term or trunc:
                 all_fail.append(f"{label}: episode ended early")
                 break
+            if not args.no_resync and tape_i + 1 < len(loaded):
+                last_state = _resync_to_successor_state(env, tape, last_state)
     finally:
-        try:
-            env.close()
-        except (OSError, RuntimeError):
-            pass
-        if proc is not None and not args.keep_open:
+        if args.keep_open:
             try:
-                proc.terminate()
-            except OSError:
+                env.bridge.close()
+            except (OSError, RuntimeError, AttributeError):
                 pass
-        elif proc is not None:
-            print("[replay] EmuHawk left open — close the window when you are done", flush=True)
+            print(
+                "[replay] EmuHawk left open — close the window when you are done",
+                flush=True,
+            )
+        else:
+            try:
+                env.close()
+            except (OSError, RuntimeError):
+                pass
+            if proc is not None:
+                try:
+                    proc.terminate()
+                except OSError:
+                    pass
 
     if all_fail:
         print("[replay] FAIL")
