@@ -27,7 +27,7 @@ def _compress_obs_arrays(obs: dict[str, np.ndarray]) -> tuple[dict[str, np.ndarr
     if frame is None:
         return out, None, None
     frame_u8 = np.ascontiguousarray(frame, dtype=np.uint8)
-    blob = zlib.compress(frame_u8.tobytes(), level=_FRAME_ZLIB_LEVEL)
+    blob = zlib.compress(memoryview(frame_u8), level=_FRAME_ZLIB_LEVEL)
     return out, blob, list(frame_u8.shape)
 
 

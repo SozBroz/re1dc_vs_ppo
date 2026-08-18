@@ -76,6 +76,10 @@ class FrameRingBuffer:
     # Emulated frames between stack planes; match RE1Env.frame_skip baseline.
     STRIDE = 8
 
+    # Keep enough history for [t-24, t-16, t-8, t] plus one stride of slack
+    # so plane_at() can still find a nearest-before sample for the oldest key.
+    KEEP_BEHIND = 4 * STRIDE
+
     def __init__(self) -> None:
         self._planes: dict[int, np.ndarray] = {}
         self._latest_frame: int | None = None
@@ -83,6 +87,15 @@ class FrameRingBuffer:
     def clear(self) -> None:
         self._planes.clear()
         self._latest_frame = None
+
+    def _prune(self) -> None:
+        latest = self._latest_frame
+        if latest is None or len(self._planes) <= FRAME_STACK + 1:
+            return
+        cutoff = latest - self.KEEP_BEHIND
+        stale = [fc for fc in self._planes if fc < cutoff]
+        for fc in stale:
+            del self._planes[fc]
 
     def note_frame(self, frame_count: int) -> None:
         if frame_count >= 0:
@@ -93,12 +106,14 @@ class FrameRingBuffer:
             return
         self._planes[int(frame_count)] = resize_rgb_to_plane(rgb)
         self._latest_frame = int(frame_count)
+        self._prune()
 
     def store_plane(self, frame_count: int, plane: np.ndarray) -> None:
         if frame_count < 0:
             return
         self._planes[int(frame_count)] = plane
         self._latest_frame = int(frame_count)
+        self._prune()
 
     def plane_at(self, frame_count: int) -> np.ndarray | None:
         if frame_count in self._planes:

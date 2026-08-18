@@ -103,8 +103,11 @@ def _obs_batch_for_many(need_msgs: list[dict[str, Any]]) -> dict[str, np.ndarray
     """Stack per-env obs dicts into one batch (n_envs, ...)."""
     if not need_msgs:
         raise ValueError("empty need_msgs")
-    parts = [_obs_batch_for_one(msg["obs"]) for msg in need_msgs]
-    return {key: np.concatenate([part[key] for part in parts], axis=0) for key in parts[0]}
+    first = need_msgs[0]["obs"]
+    return {
+        key: np.stack([msg["obs"][key] for msg in need_msgs], axis=0)
+        for key in first
+    }
 
 
 def _apply_mod_drop_from_needs(policy: Any, msgs: list[dict[str, Any]]) -> None:
@@ -724,10 +727,14 @@ def _actor_process(
     memlog_telemetry = None
 
     from re1_rl.modality_config import mod_drop_enabled
-    from re1_rl.modality_ablations import MOD_DROP_DIM, ModDropEpisodeState
 
     use_mod_drop = mod_drop_enabled()
-    mod_drop_state = ModDropEpisodeState(1) if use_mod_drop else None
+    mod_drop_state = None
+    MOD_DROP_DIM = 0
+    if use_mod_drop:
+        from re1_rl.modality_ablations import MOD_DROP_DIM, ModDropEpisodeState
+
+        mod_drop_state = ModDropEpisodeState(1)
 
     def _reset_bufs() -> None:
         nonlocal obs_bufs, mask_bufs, mod_drop_bufs, step_i, episode_infos, horizon_policy_version

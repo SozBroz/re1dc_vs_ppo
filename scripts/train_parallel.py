@@ -35,6 +35,36 @@ BASE_PORT = 5555
 CKPT_STATE_DIR = PROJECT_ROOT / "states" / "checkpoints"
 
 
+class _EpisodeStatsWrapper(gym.Wrapper):
+    """SB3 Monitor replacement that does not import Torch in actor processes."""
+
+    def __init__(self, env: gym.Env) -> None:
+        super().__init__(env)
+        self._ep_rew = 0.0
+        self._ep_len = 0
+
+    def reset(self, **kwargs):
+        self._ep_rew = 0.0
+        self._ep_len = 0
+        return self.env.reset(**kwargs)
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        self._ep_rew += float(reward)
+        self._ep_len += 1
+        if terminated or truncated:
+            info = dict(info)
+            info["episode"] = {
+                "r": float(self._ep_rew),
+                "l": int(self._ep_len),
+                "t": time.time(),
+            }
+        return obs, reward, terminated, truncated, info
+
+    def action_masks(self):
+        return self.env.unwrapped.action_masks()
+
+
 class CheckpointCaptureWrapper(gym.Wrapper):
     """Fleet-wide checkpoint collection during training.
 
@@ -144,8 +174,6 @@ def make_env(
     """Factory executed INSIDE the subprocess worker."""
 
     def _init():
-        from stable_baselines3.common.monitor import Monitor
-
         from re1_rl.bizhawk_bridge import BizHawkClient
         from re1_rl.env import RE1Env
 
@@ -242,12 +270,10 @@ def make_env(
         if capture_checkpoints:
             env = CheckpointCaptureWrapper(
                 env, PROJECT_ROOT / curriculum, port)
-        env = Monitor(env)
+        env = _EpisodeStatsWrapper(env)
         from re1_rl.go_explore_reset_wrapper import GoExploreResetWrapper
-        from sb3_contrib.common.wrappers import ActionMasker
 
         # Outer wrapper: fresh / PB / archive mix (replaces PbChampionResetWrapper).
-        env = ActionMasker(env, lambda e: e.unwrapped.action_masks())
         env = GoExploreResetWrapper(env, project_root=PROJECT_ROOT)
         _phase("env ready")
         return env

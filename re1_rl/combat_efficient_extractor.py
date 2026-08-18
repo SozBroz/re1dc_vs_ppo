@@ -489,11 +489,12 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
         else:
             self.mod_drop_presence = None
 
-        # Caches for auxiliary losses (set during forward when return_aux=True).
+        # Caches for auxiliary losses (set during the policy forward).
         self._last_combat_latent: th.Tensor | None = None
         self._last_outcome_pred: th.Tensor | None = None
         self._last_world_event_pred: th.Tensor | None = None
         self._last_tower_concat: th.Tensor | None = None
+        self._last_aux_obs: TensorDict | None = None
 
     def _room_index(self, proprio: th.Tensor) -> th.Tensor:
         raw = proprio[:, PROPRIO_ROOM_INDEX] * 128.0
@@ -644,12 +645,17 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
         if self.mod_drop_presence is not None and presence is not None:
             fused = fused + self.mod_drop_presence(presence)
 
-        outcome_pred = self.outcome_head(joint)
-        world_event_pred = self.world_event_head(self.world_event_proj(tower))
-        self._last_combat_latent = joint
-        self._last_outcome_pred = outcome_pred
-        self._last_world_event_pred = world_event_pred
-        self._last_tower_concat = tower
+        need_aux = bool(return_aux or self.training)
+        if need_aux:
+            outcome_pred = self.outcome_head(joint)
+            world_event_pred = self.world_event_head(self.world_event_proj(tower))
+            self._last_combat_latent = joint
+            self._last_outcome_pred = outcome_pred
+            self._last_world_event_pred = world_event_pred
+            self._last_tower_concat = tower
+            self._last_aux_obs = observations
+        else:
+            self._last_aux_obs = None
 
         if return_aux:
             return fused, {
@@ -666,6 +672,19 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
         return out
 
     def predict_aux(self, observations: TensorDict) -> dict[str, th.Tensor]:
+        if (
+            self._last_aux_obs is observations
+            and self._last_outcome_pred is not None
+            and self._last_world_event_pred is not None
+            and self._last_combat_latent is not None
+            and self._last_tower_concat is not None
+        ):
+            return {
+                "combat_latent": self._last_combat_latent,
+                "outcome_pred": self._last_outcome_pred,
+                "world_event_pred": self._last_world_event_pred,
+                "tower_concat": self._last_tower_concat,
+            }
         _, aux = self.forward_features(observations, return_aux=True)  # type: ignore[misc]
         return aux
 

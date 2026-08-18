@@ -82,7 +82,7 @@ from re1_rl.episode_history import (
     EpisodeHistory,
 )
 from re1_rl.cutscene_ledger import CUTSCENE_LEDGER_DIM, encode_cutscene_ledger
-from re1_rl.item_affordances import AFFORDANCES_DIM, encode_affordances
+from re1_rl.item_affordances import AFFORDANCES_DIM
 from re1_rl.world_catalog import WorldCatalog
 from re1_rl.world_state_encoder import WORLD_STATE_DIM, encode_world_state
 from re1_rl.key_items import KEY_ITEM_NAMES, KEYS_HELD_DIM, encode_keys_held
@@ -482,24 +482,55 @@ class RE1Env(gym.Env):
         self._player_motion = PlayerMotionTracker()
 
     def _load_stage(self) -> None:
-        with self.curriculum_path.open(encoding="utf-8") as f:
-            self._stage = json.load(f)
-        route_path = self.project_root / self._stage.get(
-            "route_path", "data/route_jill_anypct.json"
-        )
-        self._planner = WaypointPlanner(
-            route_path,
-            waypoints=self._stage.get("waypoints"),
-            route_steps=self._stage.get("route_steps"),
-            terminal_goal_room=self._stage.get("success_room"),
-            start_index=int(getattr(self, "_route_start_index", 0)),
-        )
-        if self._stage.get("mode") == "yawn_rails":
-            from re1_rl.yawn_rails import validate_route
+        route_path = None
+        cache_key = None
+        if self.curriculum_path.is_file():
+            try:
+                c_stat = self.curriculum_path.stat()
+                cache_key = (
+                    str(self.curriculum_path),
+                    int(getattr(c_stat, "st_mtime_ns", int(c_stat.st_mtime * 1e9))),
+                    int(c_stat.st_size),
+                )
+            except OSError:
+                cache_key = None
+        cached = getattr(self, "_stage_file_cache_key", None)
+        if (
+            cache_key is not None
+            and cached == cache_key
+            and getattr(self, "_stage", None) is not None
+            and self._planner is not None
+            and self._encoder is not None
+        ):
+            route_path = self.project_root / self._stage.get(
+                "route_path", "data/route_jill_anypct.json"
+            )
+            self._planner.reset_index(int(getattr(self, "_route_start_index", 0)))
+        else:
+            with self.curriculum_path.open(encoding="utf-8") as f:
+                self._stage = json.load(f)
+            route_path = self.project_root / self._stage.get(
+                "route_path", "data/route_jill_anypct.json"
+            )
+            self._planner = WaypointPlanner(
+                route_path,
+                waypoints=self._stage.get("waypoints"),
+                route_steps=self._stage.get("route_steps"),
+                terminal_goal_room=self._stage.get("success_room"),
+                start_index=int(getattr(self, "_route_start_index", 0)),
+            )
+            if self._stage.get("mode") == "yawn_rails":
+                from re1_rl.yawn_rails import validate_route
 
-            errors = validate_route(self._planner.route, graph=self.graph)
-            if errors:
-                raise ValueError("invalid Yawn rails route: " + "; ".join(errors))
+                errors = validate_route(self._planner.route, graph=self.graph)
+                if errors:
+                    raise ValueError("invalid Yawn rails route: " + "; ".join(errors))
+            self._encoder = ObsEncoder(
+                self.project_root / "data" / "rooms.json",
+                self.graph,
+                curriculum_stage_index=int(self._stage.get("stage_index", 0)),
+            )
+            self._stage_file_cache_key = cache_key
         from re1_rl.memory_map import ITEM_IDS, WEAPON_ITEM_IDS
 
         weapons = frozenset(
@@ -512,11 +543,6 @@ class RE1Env(gym.Env):
             repeat_pickups=True,
             once_only=frozenset(KEY_ITEM_NAMES),
             presence_only=weapons,
-        )
-        self._encoder = ObsEncoder(
-            self.project_root / "data" / "rooms.json",
-            self.graph,
-            curriculum_stage_index=int(self._stage.get("stage_index", 0)),
         )
 
     def _read_state(self, *, track_items: bool = True) -> dict[str, Any]:
@@ -640,35 +666,40 @@ class RE1Env(gym.Env):
             state_dict["box_cache"] = list(cache)
         return state_dict
 
+    def _hooks_from_state(self, state: dict[str, Any] | None) -> tuple[int, int, int]:
+        if state is not None:
+            return (
+                int(state.get("player_anim", 0) or 0),
+                int(state.get("player_aux", 0) or 0),
+                int(state.get("player_recovery", 0) or 0),
+            )
+        from re1_rl.knife_macro import read_knife_hooks
+
+        try:
+            return read_knife_hooks(self.bridge)
+        except (OSError, RuntimeError, ValueError):
+            return (0, 0, 0)
+
     def _init_anim_history(self) -> None:
-        from re1_rl.knife_macro import read_knife_hooks
+        self._anim_history = [self._hooks_from_state(None)] * 4
 
-        try:
-            hooks = read_knife_hooks(self.bridge)
-        except (OSError, RuntimeError, ValueError):
-            hooks = (0, 0, 0)
-        self._anim_history = [hooks] * 4
-
-    def _sample_anim_history(self) -> None:
-        from re1_rl.knife_macro import read_knife_hooks
-
-        try:
-            hooks = read_knife_hooks(self.bridge)
-        except (OSError, RuntimeError, ValueError):
-            hooks = (0, 0, 0)
+    def _sample_anim_history(self, state: dict[str, Any] | None = None) -> None:
+        hooks = self._hooks_from_state(state)
         if not hasattr(self, "_anim_history"):
             self._anim_history = []
         self._anim_history.append(hooks)
         while len(self._anim_history) > 4:
             self._anim_history.pop(0)
 
-    def _refresh_anim_history_before_obs(self) -> bool:
+    def _refresh_anim_history_before_obs(
+        self, state: dict[str, Any] | None = None
+    ) -> bool:
         """Macro steps replace anim hist with pin captures; else one step sample."""
         pins = self.bridge.attack_pins
         if pins.ready():
             self._anim_history = pins.macro_anim_history()
             return True
-        self._sample_anim_history()
+        self._sample_anim_history(state)
         return False
 
     def _box_obs(self, state: dict[str, Any]) -> np.ndarray:
@@ -677,7 +708,10 @@ class RE1Env(gym.Env):
 
         room = str(state.get("room_id", ""))
         in_box_room = is_box_room(room)
-        if in_box_room or self._box_cache is None:
+        cached = state.get("box_cache")
+        if cached is not None:
+            self._box_cache = list(cached)
+        elif in_box_room or self._box_cache is None:
             try:
                 # Full 48-slot live array — UI scroll parks past index 15.
                 self._box_cache = read_box_live(self.bridge)
@@ -1129,12 +1163,7 @@ class RE1Env(gym.Env):
             "acquisitions": hist["acquisitions"],
             "room_enemies": self._room_roster.encode(str(state.get("room_id", ""))),
             "keys_held": encode_keys_held(self._items.ever_held),
-            "affordances": encode_affordances(
-                ever_held=self._items.ever_held,
-                inventory_slots=state.get("inventory_slots"),
-                current_room=str(state.get("room_id", "")),
-                room_index=self._encoder.room_index,
-            ),
+            "affordances": np.zeros(AFFORDANCES_DIM, dtype=np.float32),
             "world_state": encode_world_state(
                 catalog=self._world_catalog,
                 room_items=self.room_items,
@@ -3737,11 +3766,12 @@ class RE1Env(gym.Env):
         assert self._planner is not None
         self._step_count += 1
         self._record_leg_replay_step(action, int(step_emulated_frames))
-        macro_pins = self._refresh_anim_history_before_obs()
         frame_obs = self._capture_step_obs()
+        state = self._read_state()
+        macro_pins = self._refresh_anim_history_before_obs(state)
+        state["anim_history"] = list(getattr(self, "_anim_history", []))
         if macro_pins:
             self.bridge.attack_pins.clear()
-        state = self._read_state()
         state = dict(state)
         state["step_emulated_frames"] = int(step_emulated_frames)
         state["reference_step_frames"] = self.frame_skip
@@ -4439,11 +4469,12 @@ class RE1Env(gym.Env):
 
         self._step_count += 1
         self._record_leg_replay_step(action, int(step_emulated_frames))
-        macro_pins = self._refresh_anim_history_before_obs()
         frame_obs = self.bridge.build_frame_stack()
+        state = self._read_state()
+        macro_pins = self._refresh_anim_history_before_obs(state)
+        state["anim_history"] = list(getattr(self, "_anim_history", []))
         if macro_pins:
             self.bridge.attack_pins.clear()
-        state = self._read_state()
         if died_during_skip or died_during_step:
             state = dict(state)
             state["dead"] = True

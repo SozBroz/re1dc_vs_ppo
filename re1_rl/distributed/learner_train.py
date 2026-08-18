@@ -176,23 +176,13 @@ def compute_episode_mc_returns(
     gamma: float,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Monte Carlo returns per episode segment (backward), then advantages."""
-    n_steps, n_envs = rewards.shape
-    returns = np.zeros_like(rewards, dtype=np.float32)
-    for env in range(n_envs):
-        seg_start = 0
-        for t in range(n_steps):
-            if not dones[t, env]:
-                continue
-            g = 0.0
-            for k in range(t, seg_start - 1, -1):
-                g = float(rewards[k, env]) + gamma * g
-                returns[k, env] = g
-            seg_start = t + 1
-        if seg_start < n_steps:
-            g = float(last_values[env])
-            for k in range(n_steps - 1, seg_start - 1, -1):
-                g = float(rewards[k, env]) + gamma * g
-                returns[k, env] = g
+    n_steps, _n_envs = rewards.shape
+    returns = np.empty_like(rewards, dtype=np.float32)
+    not_done = (~np.asarray(dones, dtype=bool)).astype(np.float32, copy=False)
+    g = np.asarray(last_values, dtype=np.float32)
+    for t in range(n_steps - 1, -1, -1):
+        g = np.asarray(rewards[t], dtype=np.float32) + float(gamma) * g * not_done[t]
+        returns[t] = g
     advantages = returns - values
     return returns, advantages
 
@@ -303,11 +293,10 @@ def merge_rollouts(rollouts: list[WorkerRollout]) -> dict[str, Any]:
         for r in rollouts:
             arr = getattr(r, attr, None)
             if arr is None:
-                fill = np.zeros((r.n_steps, r.n_envs, dim), dtype=np.float32)
-                for t in range(r.n_steps):
-                    for e in range(r.n_envs):
-                        fill[t, e] = empty_fn()
-                parts.append(fill)
+                empty = np.asarray(empty_fn(), dtype=np.float32)
+                parts.append(
+                    np.broadcast_to(empty, (r.n_steps, r.n_envs, dim)).copy()
+                )
             else:
                 parts.append(np.asarray(arr, dtype=np.float32))
         return np.concatenate(parts, axis=1)

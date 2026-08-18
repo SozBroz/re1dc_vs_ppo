@@ -26,6 +26,21 @@ from re1_rl.reset_curriculum import (
     sample_reset_source,
 )
 
+_CURRICULUM_CACHE: dict[str, tuple[int, int, dict[str, Any]]] = {}
+
+
+def _load_curriculum_cached(path: Path) -> dict[str, Any]:
+    key = str(path)
+    stat = path.stat()
+    mtime_ns = int(getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1e9)))
+    size = int(stat.st_size)
+    cached = _CURRICULUM_CACHE.get(key)
+    if cached is not None and cached[0] == mtime_ns and cached[1] == size:
+        return cached[2]
+    stage = json.loads(path.read_text(encoding="utf-8"))
+    _CURRICULUM_CACHE[key] = (mtime_ns, size, stage)
+    return stage
+
 
 def _pb_weight_from_env(default: float = 0.5) -> float:
     """Share of non-archive resets that use a PB sidecar (default 0.5 → 30/30 with archive=0.4)."""
@@ -105,9 +120,7 @@ class GoExploreResetWrapper(gym.Wrapper):
         curriculum_path = Path(getattr(base, "curriculum_path", ""))
         if curriculum_path.is_file():
             try:
-                stage = json.loads(
-                    curriculum_path.read_text(encoding="utf-8")
-                )
+                stage = _load_curriculum_cached(curriculum_path)
             except (OSError, ValueError):
                 stage = {}
             if stage.get("mode") == "yawn_rails":

@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 
-from stable_baselines3 import PPO
+if TYPE_CHECKING:
+    from stable_baselines3 import PPO
 
 from re1_rl.key_items import KEY_ITEM_NAMES
 from re1_rl.memory_map import ITEM_IDS, WEAPON_ITEM_IDS

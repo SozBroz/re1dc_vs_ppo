@@ -195,15 +195,28 @@ def resolve_cell_dir(root: Path | str, checkpoint_index: int) -> Path:
     return nested
 
 
+_SHA_CACHE: dict[str, tuple[int, int, str]] = {}
+
+
 def sha256_file(path: Path | str) -> str:
+    dest = Path(path)
+    stat = dest.stat()
+    cache_key = str(dest)
+    cached = _SHA_CACHE.get(cache_key)
+    mtime_ns = int(getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1e9)))
+    size = int(stat.st_size)
+    if cached is not None and cached[0] == mtime_ns and cached[1] == size:
+        return cached[2]
     digest = hashlib.sha256()
-    with open(path, "rb") as handle:
+    with open(dest, "rb") as handle:
         while True:
             chunk = handle.read(1024 * 1024)
             if not chunk:
                 break
             digest.update(chunk)
-    return digest.hexdigest()
+    hexdigest = digest.hexdigest()
+    _SHA_CACHE[cache_key] = (mtime_ns, size, hexdigest)
+    return hexdigest
 
 
 def slot_content_shas(slot: Path | str) -> tuple[str, str] | None:

@@ -8,6 +8,21 @@ import numpy as np
 from re1_rl.frame_ring import AttackFramePins, FrameRingBuffer, FRAME_SHAPE
 
 
+def test_stack_at_prunes_old_planes() -> None:
+    ring = FrameRingBuffer()
+    stride = FrameRingBuffer.STRIDE
+    for fc in range(0, 200, stride):
+        ring.store_plane(fc, np.full((63, 84, 1), fc % 256, dtype=np.uint8))
+    assert max(ring._planes) == 192
+    assert min(ring._planes) >= 192 - FrameRingBuffer.KEEP_BEHIND
+    stack = ring.stack_at(192)
+    assert stack.shape == FRAME_SHAPE
+    assert int(stack[0, 0, 3]) == 192
+    assert int(stack[0, 0, 2]) == 184
+    assert int(stack[0, 0, 1]) == 176
+    assert int(stack[0, 0, 0]) == 168
+
+
 def test_stack_at_stride_offsets() -> None:
     ring = FrameRingBuffer()
     stride = FrameRingBuffer.STRIDE

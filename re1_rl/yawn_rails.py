@@ -27,6 +27,25 @@ CAPTURE_MIN_FREE_SLOTS: dict[str, int] = {
 }
 
 _CAPTURE_INELIGIBLE_ATTR = "_yawn_capture_ineligible_reason"
+_JSON_FILE_CACHE: dict[str, tuple[int, int, Any]] = {}
+_PIN_FILE_CACHE: dict[str, tuple[str, dict[str, str]]] = {}
+
+
+def _file_mtime_size(path: Path) -> tuple[int, int]:
+    stat = path.stat()
+    mtime_ns = int(getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1e9)))
+    return mtime_ns, int(stat.st_size)
+
+
+def _load_json_cached(path: Path, *, encoding: str = "utf-8") -> Any:
+    key = str(path)
+    mtime_ns, size = _file_mtime_size(path)
+    cached = _JSON_FILE_CACHE.get(key)
+    if cached is not None and cached[0] == mtime_ns and cached[1] == size:
+        return cached[2]
+    data = json.loads(path.read_text(encoding=encoding))
+    _JSON_FILE_CACHE[key] = (mtime_ns, size, data)
+    return data
 
 
 def _mark_capture_ineligible(env: Any, reason: str) -> None:
@@ -224,7 +243,7 @@ def _checkpoint_after_row(
     route_path = stage.get("route_path")
     if not route_path:
         return None
-    route = json.loads((project_root / str(route_path)).read_text(encoding="utf-8"))
+    route = _load_json_cached(project_root / str(route_path))
     next_index = int(checkpoint_index) + 1
     if not isinstance(route, list) or next_index < 0 or next_index >= len(route):
         return None
@@ -247,9 +266,7 @@ def _sampling_row_eligible(
     next_checkpoint = _checkpoint_after_row(project_root, stage, checkpoint_index)
     if next_checkpoint is None and stage.get("route_path"):
         try:
-            route = json.loads(
-                (project_root / str(stage["route_path"])).read_text(encoding="utf-8")
-            )
+            route = _load_json_cached(project_root / str(stage["route_path"]))
             route_n = len(route) if isinstance(route, list) else 0
         except (OSError, json.JSONDecodeError, TypeError):
             route_n = 0
@@ -276,7 +293,18 @@ def load_manifest(project_root: Path, stage: dict[str, Any]) -> dict[str, Any]:
     # Windows multi-actor races on manifest replace → PermissionError; retry.
     from re1_rl.win_fs_retry import read_text_retry
 
-    data = json.loads(read_text_retry(path, encoding="utf-8-sig"))
+    key = str(path)
+    try:
+        mtime_ns, size = _file_mtime_size(path)
+    except OSError:
+        mtime_ns, size = -1, -1
+    cached = _JSON_FILE_CACHE.get(key)
+    if cached is not None and cached[0] == mtime_ns and cached[1] == size:
+        data = cached[2]
+    else:
+        data = json.loads(read_text_retry(path, encoding="utf-8-sig"))
+        if mtime_ns >= 0:
+            _JSON_FILE_CACHE[key] = (mtime_ns, size, data)
     if data.get("schema_version") != 1 or not isinstance(data.get("cells"), list):
         raise ValueError(f"invalid Yawn rails cells manifest: {path}")
     if data.get("route_id") != stage.get("route_id"):
@@ -387,15 +415,20 @@ def _pin_file_path(project_root: Path | str | None = None) -> Path | None:
 
 
 def _parse_pin_file(path: Path) -> dict[str, str]:
+    text = path.read_text(encoding="utf-8")
+    cached = _PIN_FILE_CACHE.get(str(path))
+    if cached is not None and cached[0] == text:
+        return cached[1]
     out: dict[str, str] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in text.splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
         if "=" not in stripped:
             continue
-        key, value = stripped.split("=", 1)
-        out[key.strip()] = value.strip()
+        name, value = stripped.split("=", 1)
+        out[name.strip()] = value.strip()
+    _PIN_FILE_CACHE[str(path)] = (text, out)
     return out
 
 
@@ -707,6 +740,30 @@ def _sample_cell_from_pin_weights(
     return by_index[chosen_idx]
 
 
+def _pinned_loadable_cell(
+    project_root: Path,
+    stage: dict[str, Any],
+    pin_index: int,
+) -> dict[str, Any] | None:
+    """Resolve one pinned row without scanning every manifest cell for eligibility."""
+    root = Path(project_root)
+    for row in load_manifest(root, stage)["cells"]:
+        try:
+            if int(row.get("checkpoint_index", -1)) != int(pin_index):
+                continue
+        except (TypeError, ValueError):
+            continue
+        state = root / str(row.get("state_path", ""))
+        sidecar = root / str(row.get("sidecar_path", ""))
+        if (
+            state.is_file()
+            and sidecar.is_file()
+            and _sampling_row_eligible(root, stage, row)
+        ):
+            return dict(row)
+    return None
+
+
 def eligible_reset_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Cells the random reset sampler may use (cp00–cp95; never the terminal cp96)."""
     return [
@@ -817,28 +874,17 @@ def sample_one_leg_options(
     from re1_rl.yawn_pin_march import maybe_advance_pin
 
     maybe_advance_pin(project_root)
-    all_cells = list(iter_loadable_cells(project_root, stage))
-    cells = eligible_reset_cells(all_cells)
     pin_index = reset_pin_index_from_env(project_root)
     if pin_index is not None:
-        pinned = [
-            row
-            for row in cells
-            if int(row.get("checkpoint_index", -1)) == int(pin_index)
-        ]
-        if not pinned:
-            # Pin may target a curated cell below the cp18 reset floor.
-            pinned = [
-                row
-                for row in iter_loadable_cells(project_root, stage)
-                if int(row.get("checkpoint_index", -1)) == int(pin_index)
-            ]
-        if not pinned:
+        pinned = _pinned_loadable_cell(project_root, stage, pin_index)
+        if pinned is None:
             raise ValueError(
                 f"RE1_YAWN_RESET_PIN_INDEX={pin_index} but cp{int(pin_index):02d} "
                 "is not loadable"
             )
-        return _options_from_cell(pinned[0], stage, reset_source="route_cell_pin")
+        return _options_from_cell(pinned, stage, reset_source="route_cell_pin")
+    all_cells = list(iter_loadable_cells(project_root, stage))
+    cells = eligible_reset_cells(all_cells)
     pin_range = reset_pin_range_from_env(project_root)
     raw_pin_weights = _pin_env_raw(_RESET_PIN_WEIGHTS_ENV, project_root)
     if pin_range is not None and raw_pin_weights:

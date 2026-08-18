@@ -77,6 +77,10 @@ class WaypointPlanner:
             if not self._waypoint_ids and self.route:
                 self._waypoint_ids = [str(step.get("room_id", "")) for step in self.route]
 
+    def reset_index(self, start_index: int = 0) -> None:
+        """Reuse a loaded route; only the active checkpoint index changes."""
+        self._index = max(0, int(start_index))
+
     def _load_route(self) -> list[dict[str, Any]]:
         if not self.route_path.is_file():
             return []
