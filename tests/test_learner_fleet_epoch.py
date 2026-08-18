@@ -65,7 +65,7 @@ def test_epoch_waits_for_all_live_then_ready() -> None:
     assert st["missing"] == []
 
 
-def test_dead_remote_dropped_from_expected() -> None:
+def test_dead_remote_stays_in_expected() -> None:
     store = WeightStore()
     q: queue.Queue = queue.Queue()
     state = LearnerState(store, q, machine_name="t", max_staleness=2, worker_liveness_s=0.05)
@@ -76,9 +76,13 @@ def test_dead_remote_dropped_from_expected() -> None:
     state.accept_rollout(_rollout("workhorse2"))
     time.sleep(0.08)
     st = state.epoch_status()
-    # pking heartbeat aged out; local remains
-    assert "pking" not in st["expected"]
-    assert st["ready"] is True
+    # Heartbeat aged out of workers, but the epoch snapshot stays so grace
+    # can train instead of n_expected hitting 0 and deadlocking.
+    assert "pking" in st["expected"]
+    assert st["n_live"] == 1
+    assert st["n_expected"] == 2
+    assert st["ready"] is False
+    assert "pking" in st["missing"]
     assert "workhorse2" in st["contributors"]
 
 
@@ -179,11 +183,12 @@ def test_capacity_full_rejects_after_cohort_fills() -> None:
         last_values=np.zeros((1,), dtype=np.float32),
         action_masks=np.ones((4, 1, 8), dtype=np.bool_),
     )
-    # 8 + 4 > 10 → capacity_full
+    # 8 + 4 > 10 → capacity_full, and that remainder marks the cohort done.
     ok, reason = state.accept_rollout(second)
     assert not ok
     assert reason == "capacity_full"
     assert state.rollouts_rejected_capacity == 1
+    assert state.cohort_full() is True
     assert q.qsize() == 1
 
 
@@ -270,3 +275,50 @@ def test_begin_epoch_reopens_admission_for_overlap() -> None:
     assert state.accept_rollout(_rollout("pking"))[0]
     assert state.admitted_steps() == 4
     assert q.qsize() == 1
+
+
+def test_heartbeat_wipe_does_not_empty_expected() -> None:
+    """All remotes looking dead must not clear the epoch expected set."""
+    store = WeightStore()
+    q: queue.Queue = queue.Queue()
+    state = LearnerState(store, q, machine_name="t", max_staleness=2, worker_liveness_s=0.05)
+    state.set_current_version(1)
+    state.register_worker("pking", n_envs=12)
+    state.register_worker("workhorse1", n_envs=8)
+    eid, expected = state.begin_epoch()
+    assert eid == 1
+    assert set(expected) == {"pking", "workhorse1"}
+    assert state.accept_rollout(_rollout("pking"))[0]
+    time.sleep(0.08)
+    st = state.epoch_status()
+    assert st["n_live"] == 0
+    assert st["n_expected"] == 2
+    assert set(st["expected"]) == {"pking", "workhorse1"}
+    assert st["ready"] is False
+
+
+def test_refresh_expected_does_not_reset_epoch() -> None:
+    store = WeightStore()
+    q: queue.Queue = queue.Queue()
+    state = LearnerState(
+        store,
+        q,
+        machine_name="t",
+        max_staleness=2,
+        worker_liveness_s=60,
+        max_pending_steps=100,
+    )
+    state.set_current_version(1)
+    eid, expected = state.begin_epoch()
+    assert eid == 1
+    assert expected == []
+    assert state.accept_rollout(_rollout("pking"))[0]
+    assert state.admitted_steps() == 4
+    state.register_worker("pking", n_envs=12)
+    state.register_worker("workhorse1", n_envs=8)
+    refreshed = state.refresh_expected()
+    assert set(refreshed) == {"pking", "workhorse1"}
+    st = state.epoch_status()
+    assert st["epoch_id"] == 1
+    assert state.admitted_steps() == 4
+    assert state.cohort_full() is False

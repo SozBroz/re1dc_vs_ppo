@@ -762,27 +762,25 @@ def _run_learner(args: argparse.Namespace) -> int:
             # capacity already filled — then train the admitted cohort early.
             if not cohort_full and not waiting_for_fleet:
                 waiting_for_fleet = True
-                # Refresh expected set once the collect window ends so late
-                # joiners (pking) that registered during the window are included.
-                if status["n_expected"] == 0 and learner_state.live_workers():
-                    epoch_id, expected = learner_state.begin_epoch()
-                    # Re-seed admission for any rollouts already in pending.
-                    with learner_state.lock:
-                        learner_state.epoch_admitted_steps = int(pending_steps)
-                    status = learner_state.epoch_status()
-                    log(
-                        args.machine_name,
-                        f"epoch {epoch_id} expected refreshed at barrier: {expected}",
-                    )
                 log(
                     args.machine_name,
                     f"epoch {status['epoch_id']} collect window done; "
                     f"expected={status['expected']} missing={status['missing']}",
                 )
 
+            # Empty expected is only a cold-start wait. A heartbeat wipe must
+            # not skip grace/train: re-snapshot if anyone is live, otherwise
+            # fall through so pending data can train when grace expires.
             if status["n_expected"] == 0 and not cohort_full:
-                # No live workers yet — do not train; keep waiting for register.
-                continue
+                if learner_state.live_workers():
+                    expected = learner_state.refresh_expected()
+                    status = learner_state.epoch_status()
+                    log(
+                        args.machine_name,
+                        f"epoch {status['epoch_id']} expected refreshed: {expected}",
+                    )
+                elif not pending:
+                    continue
 
             if not pending:
                 if elapsed >= sync_interval + epoch_grace:

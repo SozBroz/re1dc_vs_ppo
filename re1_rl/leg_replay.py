@@ -400,9 +400,9 @@ def successor_cell_state_path(
         to_index = int(tape.get("to_checkpoint_index"))
     except (TypeError, ValueError):
         return None
-    from re1_rl.yawn_rails_sync import cell_slot_dir, yawn_rails_root
+    from re1_rl.yawn_rails_sync import resolve_cell_dir, yawn_rails_root
 
-    path = cell_slot_dir(yawn_rails_root(project_root), to_index) / CELL_STATE_NAME
+    path = resolve_cell_dir(yawn_rails_root(project_root), to_index) / CELL_STATE_NAME
     return path if path.is_file() else None
 
 
@@ -412,6 +412,21 @@ def successor_state_sha_ok(path: Path | None, tape: dict[str, Any]) -> bool:
     if not want or path is None or not path.is_file():
         return False
     return _file_sha256(path) == want
+
+
+def chain_forgive_stale_tape_miss(
+    dest_path: Path | None,
+    tape: dict[str, Any],
+    *,
+    has_next: bool,
+) -> bool:
+    """Keep a chain going when this tape missed but the captured dest State is intact.
+
+    SHA-stale nav footage (cp11 gold shelf, cp17 gallery door) can fail from the
+    current predecessor and still have a good ``cell.State``. The next tape was
+    recorded from that file, not from this tape's live end.
+    """
+    return bool(has_next) and successor_state_sha_ok(dest_path, tape)
 
 
 def init_savestate_path(env: Any) -> Path | None:

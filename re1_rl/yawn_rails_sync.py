@@ -184,6 +184,17 @@ def cell_slot_dir(root: Path | str, checkpoint_index: int) -> Path:
     return Path(root) / "cells" / cell_dir_name(checkpoint_index)
 
 
+def resolve_cell_dir(root: Path | str, checkpoint_index: int) -> Path:
+    """``{root}/cells/cpNN`` or flat ``{root}/cpNN`` (Crystals_in_time backup)."""
+    nested = cell_slot_dir(root, checkpoint_index)
+    if nested.is_dir():
+        return nested
+    flat = Path(root) / cell_dir_name(checkpoint_index)
+    if flat.is_dir():
+        return flat
+    return nested
+
+
 def sha256_file(path: Path | str) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as handle:

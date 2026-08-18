@@ -20,6 +20,7 @@ from re1_rl.leg_replay import (
     JOYPAD_TURBO_BIT,
     LegReplayBuffer,
     build_leg_replay_payload,
+    chain_forgive_stale_tape_miss,
     decode_packed_joypad,
     joypad_replay_spans,
     new_leg_replay_buffer,
@@ -624,6 +625,17 @@ def test_successor_state_sha_ok_matches_disk(tmp_path: Path) -> None:
     assert not successor_state_sha_ok(None, {"to_state_sha256": digest})
 
 
+def test_chain_forgive_stale_tape_miss(tmp_path: Path) -> None:
+    state = tmp_path / "cell.State"
+    state.write_bytes(b"dest-state")
+    digest = __import__("hashlib").sha256(b"dest-state").hexdigest()
+    tape = {"to_state_sha256": digest}
+    assert chain_forgive_stale_tape_miss(state, tape, has_next=True)
+    assert not chain_forgive_stale_tape_miss(state, tape, has_next=False)
+    tape["to_state_sha256"] = "0" * 64
+    assert not chain_forgive_stale_tape_miss(state, tape, has_next=True)
+
+
 def test_successor_cell_state_path_missing(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("RE1_YAWN_RAILS_ROOT", str(tmp_path))
     tape = {"to_checkpoint_index": 5, "to_state_sha256": "abc"}
@@ -633,6 +645,23 @@ def test_successor_cell_state_path_missing(tmp_path: Path, monkeypatch) -> None:
     (slot / CELL_STATE_NAME).write_bytes(b"x")
     got = successor_cell_state_path(tmp_path, tape)
     assert got == slot / CELL_STATE_NAME
+
+
+def test_successor_cell_state_path_flat_crystals_layout(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("RE1_YAWN_RAILS_ROOT", str(tmp_path))
+    tape = {"to_checkpoint_index": 5, "to_state_sha256": "abc"}
+    slot = tmp_path / "cp05"
+    slot.mkdir()
+    (slot / CELL_STATE_NAME).write_bytes(b"flat")
+    got = successor_cell_state_path(tmp_path, tape)
+    assert got == slot / CELL_STATE_NAME
+
+
+def test_replay_leg_has_crystals_flag() -> None:
+    root = Path(__file__).resolve().parents[1]
+    replay = (root / "scripts" / "replay_leg.py").read_text(encoding="utf-8")
+    assert "--crystals" in replay
+    assert "backups" in replay and "Crystals_in_time" in replay
 
 
 def test_normalize_pads_missing_speed_with_sentinel() -> None:

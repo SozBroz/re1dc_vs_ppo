@@ -5,6 +5,7 @@ cp19 example (L hallway ammo pickup, captured from cp18):
   venv\\Scripts\\python.exe scripts\\replay_leg.py --to 19
   venv\\Scripts\\python.exe scripts\\replay_leg.py --to 12 13
   venv\\Scripts\\python.exe scripts\\replay_leg.py --to 0 --watch
+  venv\\Scripts\\python.exe scripts\\replay_leg.py --crystals --to 0 1 2
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -26,6 +28,7 @@ from re1_rl.env import ACTION_NAMES, RE1Env
 from re1_rl.go_explore_merge import CELL_REPLAY_NAME, CELL_SIDECAR_NAME, CELL_STATE_NAME
 from re1_rl.attack_macro import FACING_RESTORE_TOL, facing_signed_delta
 from re1_rl.leg_replay import (
+    chain_forgive_stale_tape_miss,
     joypad_replay_spans,
     successor_cell_state_path,
     successor_state_sha_ok,
@@ -34,22 +37,37 @@ from re1_rl.leg_replay import (
     tape_is_combat,
 )
 from re1_rl.yawn_rails import _settle_state_for_capture
-from re1_rl.yawn_rails_sync import cell_dir_name, yawn_rails_root
+from re1_rl.yawn_rails_sync import resolve_cell_dir, yawn_rails_root
 from scripts.play_human import configure_ram_skip, wait_for_emuhawk
 
 CURRICULUM = ROOT / "curriculum" / "yawn_rails_one_leg.json"
 DEFAULT_PORT = 7798
+CRYSTALS_ROOT = ROOT / "backups" / "Crystals_in_time"
 
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _load_tape(to_index: int, tape_path: Path | None) -> tuple[dict[str, Any], Path]:
+def _rails_root_from_args(args: argparse.Namespace) -> Path:
+    if bool(args.crystals) and args.rails_root is not None:
+        raise SystemExit("ERROR: use --crystals or --rails-root, not both")
+    if args.crystals:
+        return CRYSTALS_ROOT.resolve()
+    if args.rails_root is not None:
+        return Path(args.rails_root).resolve()
+    return yawn_rails_root(ROOT)
+
+
+def _cell_dir(rails_root: Path, idx: int) -> Path:
+    return resolve_cell_dir(rails_root, idx)
+
+
+def _load_tape(
+    to_index: int, tape_path: Path | None, rails_root: Path
+) -> tuple[dict[str, Any], Path]:
     if tape_path is None:
-        tape_path = (
-            yawn_rails_root(ROOT) / "cells" / cell_dir_name(to_index) / CELL_REPLAY_NAME
-        )
+        tape_path = _cell_dir(rails_root, to_index) / CELL_REPLAY_NAME
     if not tape_path.is_file():
         raise FileNotFoundError(f"no tape: {tape_path}")
     tape = json.loads(tape_path.read_text(encoding="utf-8"))
@@ -443,6 +461,17 @@ def main() -> int:
         help="Destination cell index(es); multiple reload each captured successor State",
     )
     ap.add_argument("--tape", type=Path, default=None, help="Override leg_replay.json path")
+    ap.add_argument(
+        "--crystals",
+        action="store_true",
+        help=f"Read cells from {CRYSTALS_ROOT} (flat cpNN dirs)",
+    )
+    ap.add_argument(
+        "--rails-root",
+        type=Path,
+        default=None,
+        help="Override yawn rails root (cells/cpNN or flat cpNN)",
+    )
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--speed", type=int, default=100)
     ap.add_argument("--no-launch", action="store_true")
@@ -489,6 +518,9 @@ def main() -> int:
     args = ap.parse_args()
     if args.watch:
         args.keep_open = True
+    rails_root = _rails_root_from_args(args)
+    os.environ["RE1_YAWN_RAILS_ROOT"] = str(rails_root)
+    print(f"[replay] rails_root={rails_root}", flush=True)
 
     dests = [int(x) for x in args.to]
     if args.tape is not None and len(dests) != 1:
@@ -497,7 +529,7 @@ def main() -> int:
 
     loaded: list[tuple[dict[str, Any], Path]] = []
     for dest in dests:
-        tape, tape_path = _load_tape(dest, args.tape)
+        tape, tape_path = _load_tape(dest, args.tape, rails_root)
         actions = [int(a) for a in tape.get("actions") or []]
         if not actions:
             print(f"ERROR: empty actions in {tape_path}", file=sys.stderr)
@@ -550,7 +582,7 @@ def main() -> int:
             flush=True,
         )
     else:
-        pred = yawn_rails_root(ROOT) / "cells" / cell_dir_name(from_idx)
+        pred = _cell_dir(rails_root, from_idx)
         state_path = pred / CELL_STATE_NAME
         sidecar_path = pred / CELL_SIDECAR_NAME
         if not state_path.is_file() or not sidecar_path.is_file():
@@ -559,9 +591,7 @@ def main() -> int:
         pred_sha = _sha256(state_path)
         want_sha = str(first.get("from_state_sha256") or "")
     if not fresh_start and want_sha and pred_sha != want_sha:
-        dest_cell = yawn_rails_root(ROOT) / "cells" / cell_dir_name(
-            int(first["to_checkpoint_index"])
-        )
+        dest_cell = _cell_dir(rails_root, int(first["to_checkpoint_index"]))
         dest_state = dest_cell / CELL_STATE_NAME
         dest_side = dest_cell / CELL_SIDECAR_NAME
         dest_sha = _sha256(dest_state) if dest_state.is_file() else ""
@@ -821,12 +851,23 @@ def main() -> int:
             fails = _end_failures(last_state, tape, got_frames)
             if use_joypad:
                 fails = [row for row in fails if not row.startswith("emu_frames")]
+            has_next = (not args.no_resync) and tape_i + 1 < len(loaded)
+            dest_path = successor_cell_state_path(ROOT, tape) if has_next else None
+            if fails and chain_forgive_stale_tape_miss(
+                dest_path, tape, has_next=has_next
+            ):
+                print(
+                    f"[replay] {label} tape miss; keep captured dest State "
+                    f"({'; '.join(fails)})",
+                    flush=True,
+                )
+                fails = []
             for row in fails:
                 all_fail.append(f"{label}: {row}")
             if term or trunc:
                 all_fail.append(f"{label}: episode ended early")
                 break
-            if not args.no_resync and tape_i + 1 < len(loaded):
+            if has_next:
                 last_state = _resync_to_successor_state(env, tape, last_state)
     finally:
         if args.keep_open:

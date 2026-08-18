@@ -124,6 +124,7 @@ class LearnerState:
         self.rollouts_rejected_capacity = 0
         self.steps_rejected_capacity = 0
         self.epoch_admitted_steps = 0
+        self.epoch_capacity_blocked = False
         self.epoch_id = 0
         self.epoch_contributors: set[str] = set()
         self.epoch_expected: set[str] = set()
@@ -228,8 +229,9 @@ class LearnerState:
                 dead.append(wid)
         for wid in dead:
             self.workers.pop(wid, None)
-            self.epoch_contributors.discard(wid)
-            self.epoch_expected.discard(wid)
+            # Leave epoch_expected / epoch_contributors alone. Pruning the
+            # snapshot on a heartbeat gap emptied n_expected and the train
+            # loop waited forever for a fleet that was already sending data.
         if dead:
             log(
                 self.machine_name,
@@ -254,13 +256,23 @@ class LearnerState:
             self.epoch_id += 1
             self.epoch_contributors.clear()
             self.epoch_admitted_steps = 0
+            self.epoch_capacity_blocked = False
             live = self._prune_and_list_live_unlocked()
             self.epoch_expected = set(live.keys())
             return self.epoch_id, sorted(self.epoch_expected)
 
-    def cohort_full(self) -> bool:
-        """True when this epoch has admitted at least ``max_pending_steps``."""
+    def refresh_expected(self) -> list[str]:
+        """Re-snapshot live workers into expected without opening a new epoch."""
         with self.lock:
+            live = self._prune_and_list_live_unlocked()
+            self.epoch_expected = set(live.keys())
+            return sorted(self.epoch_expected)
+
+    def cohort_full(self) -> bool:
+        """True when this epoch cannot admit another packet."""
+        with self.lock:
+            if self.epoch_capacity_blocked:
+                return True
             return (
                 self.max_pending_steps > 0
                 and self.epoch_admitted_steps >= self.max_pending_steps
@@ -406,6 +418,9 @@ class LearnerState:
                 self.rollouts_rejected_capacity += 1
                 self.steps_rejected_ingest += steps
                 self.steps_rejected_capacity += steps
+                # Remainder smaller than the next packet: train what we have
+                # instead of waiting forever for a 9-step fill that never comes.
+                self.epoch_capacity_blocked = True
                 return False, "capacity_full"
             min_ok = self.current_policy_version - self.max_staleness
             if rollout.policy_version < min_ok:
@@ -497,8 +512,8 @@ class LearnerState:
     def epoch_status(self) -> dict[str, Any]:
         with self.lock:
             live = self._prune_and_list_live_unlocked()
-            # Drop expected workers that died; keep snapshot otherwise.
-            self.epoch_expected &= set(live.keys())
+            # Keep the epoch snapshot even if a heartbeat aged out. Missing
+            # workers are a grace-train case, not an empty-fleet wait.
             expected = set(self.epoch_expected)
             contributors = set(self.epoch_contributors) & expected
             missing = sorted(expected - contributors)
@@ -626,8 +641,12 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "min_host_free_gb": self.state.min_host_free_gb,
                     "host_free_gb": self.state._host_free_gb(),
                     "cohort_full": (
-                        self.state.max_pending_steps > 0
-                        and self.state.epoch_admitted_steps >= self.state.max_pending_steps
+                        self.state.epoch_capacity_blocked
+                        or (
+                            self.state.max_pending_steps > 0
+                            and self.state.epoch_admitted_steps
+                            >= self.state.max_pending_steps
+                        )
                     )
                     or self.state.host_memory_pressure(),
                     "relevance_gate": self.state.relevance_gate,
