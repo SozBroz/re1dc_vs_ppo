@@ -67,13 +67,25 @@ def test_cp_budgets_match_imperator_multipliers() -> None:
     assert cell_timeout_frames(40, ROOT) == 10872  # 45.30s * 4 hard
     assert cell_timeout_frames(44, ROOT) == 15430  # 1:04.29 * 4 hard
     assert cell_timeout_frames(45, ROOT) == 28800  # flat 8 min, not 4:20.72 * 1.5
-    assert cell_timeout_frames(46, ROOT) == 0
+    assert cell_timeout_frames(46, ROOT) == 11647  # 1:37.06 * 2
+    assert cell_timeout_frames(47, ROOT) == 1814  # 15.12s * 2
+    assert cell_timeout_frames(53, ROOT) == 19385  # 1:20.77 * 4 hard
+    assert cell_timeout_frames(60, ROOT) == 31668  # 2:11.95 * 4 hard
+    assert cell_timeout_frames(84, ROOT) == 12473  # 2:18.59 * 1.5 cutscene
+    assert cell_timeout_frames(85, ROOT) == 5383  # 22.43s * 4 hard (Richard-wait)
+    assert cell_timeout_frames(91, ROOT) == 5021  # 20.92s * 4 hard (Richard-wait)
+    assert cell_timeout_frames(94, ROOT) == 6709  # 55.91s * 2
+    assert cell_timeout_frames(95, ROOT) == 0
+    assert cell_timeout_frames(96, ROOT) == 0
     assert cell_timeout_frames(8, ROOT) < CAP
     assert cell_timeout_frames(9, ROOT) < CAP
     assert cell_timeout_frames(19, ROOT) < CAP
     assert cell_timeout_frames(25, ROOT) < CAP
     assert cell_timeout_frames(27, ROOT) < CAP
     assert cell_timeout_frames(45, ROOT) < CAP
+    assert cell_timeout_frames(53, ROOT) < CAP
+    assert cell_timeout_frames(60, ROOT) < CAP
+    assert cell_timeout_frames(84, ROOT) < CAP
 
 
 def test_created_index_is_seq_minus_one() -> None:
