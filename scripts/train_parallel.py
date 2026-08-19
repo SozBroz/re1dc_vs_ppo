@@ -30,7 +30,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 EMUHAWK = PROJECT_ROOT / "tools" / "BizHawk-2.11.1" / "EmuHawk.exe"
 ROM = PROJECT_ROOT / "roms" / "Resident Evil - Director's Cut.cue"
-LUA = PROJECT_ROOT / "lua" / "re1_client.lua"
+LUA = PROJECT_ROOT / "lua" / "re1_bootstrap.lua"
 BASE_PORT = 5555
 CKPT_STATE_DIR = PROJECT_ROOT / "states" / "checkpoints"
 
