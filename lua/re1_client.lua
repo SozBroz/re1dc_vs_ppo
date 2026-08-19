@@ -50,8 +50,8 @@ local json
 do
   local last_err = "dkjson not found"
   for _, dir in ipairs(script_dir_candidates()) do
-    package.path = dir .. "?.lua;" .. package.path
-    local ok, mod = pcall(require, "dkjson")
+    -- Direct loading avoids WH2's package.search/require hang before hello.
+    local ok, mod = pcall(dofile, dir .. "dkjson.lua")
     if ok and mod then
       SCRIPT_DIR = dir
       json = mod
