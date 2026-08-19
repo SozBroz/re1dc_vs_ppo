@@ -36,6 +36,13 @@ BASE_PORT = 5555
 CKPT_STATE_DIR = PROJECT_ROOT / "states" / "checkpoints"
 
 
+def _actor_startup_stagger_s(rank: int) -> float:
+    per_rank_s = float(
+        os.environ.get("RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK", "1.0")
+    )
+    return max(0.0, per_rank_s) * max(0, int(rank))
+
+
 def _stop_owned_emuhawk(proc, bridge, *, timeout_s: float = 5.0) -> None:
     """Idempotently close the bridge and reap its exact EmuHawk child."""
     if bool(getattr(proc, "_re1_cleanup_done", False)):
@@ -325,7 +332,7 @@ def make_env(
 
         # Keep every launch distinct. The old 15s cap released ranks 15+ in one
         # burst, which can wedge all BizHawk instances before Lua starts.
-        stagger_s = rank * 1.0
+        stagger_s = _actor_startup_stagger_s(rank)
         if stagger_s:
             _phase(f"stagger {stagger_s:.0f}s")
         time.sleep(stagger_s)

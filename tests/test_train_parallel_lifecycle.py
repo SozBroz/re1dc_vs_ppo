@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import subprocess
 
-from scripts.train_parallel import _stop_owned_emuhawk
+from scripts.train_parallel import (
+    _actor_startup_stagger_s,
+    _stop_owned_emuhawk,
+)
 
 
 class _Bridge:
@@ -36,6 +39,14 @@ class _StubbornProcess:
         self.waits += 1
         if self.waits == 1:
             raise subprocess.TimeoutExpired("EmuHawk", timeout)
+
+
+def test_actor_startup_stagger_can_be_disabled_for_serial_boot(monkeypatch) -> None:
+    monkeypatch.delenv("RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK", raising=False)
+    assert _actor_startup_stagger_s(7) == 7.0
+
+    monkeypatch.setenv("RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK", "0")
+    assert _actor_startup_stagger_s(27) == 0.0
 
 
 def test_stop_owned_emuhawk_escalates_and_is_idempotent(monkeypatch) -> None:
