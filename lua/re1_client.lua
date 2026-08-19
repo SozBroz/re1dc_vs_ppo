@@ -1043,6 +1043,9 @@ comm.socketServerSetTimeout(600000)  -- 10 min; Python drives the pace
 console.log("re1_client: comm socket " .. comm.socketServerGetInfo())
 
 comm.socketServerSend(json.encode({ hello = "re1_client", frame = emu.framecount() }))
+-- Command-line A/V dumping begins before Lua. Handshake first so an optional
+-- pause failure can never make Python wait forever for the hello.
+pcall(client.pause_av)
 
 while true do
     local payload = comm.socketServerResponse()
