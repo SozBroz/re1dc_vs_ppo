@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from re1_rl.distributed.async_worker_runtime import (
     _credit_parent_block,
     _flush_local_epoch,
+    _hung_actor_indices,
     _pack_and_deliver_rollouts,
     _serve_need,
     _stale_actor_indices,
@@ -59,6 +60,53 @@ def test_stale_actor_indices_detect_dead_and_silent_ranks() -> None:
     )
 
     assert stale == [0, 1]
+
+
+def test_hung_actor_indices_require_grace_then_mark_stale() -> None:
+    hung_since: list[float | None] = [None, None]
+    pids: list[int | None] = [11, 22]
+    hung_now = {11}
+
+    first = _hung_actor_indices(
+        pids,
+        hung_since,
+        now=100.0,
+        hung_s=30.0,
+        is_hung=lambda pid: pid in hung_now,
+    )
+    assert first == []
+    assert hung_since == [100.0, None]
+
+    later = _hung_actor_indices(
+        pids,
+        hung_since,
+        now=130.0,
+        hung_s=30.0,
+        is_hung=lambda pid: pid in hung_now,
+    )
+    assert later == [0]
+
+    recovered = _hung_actor_indices(
+        pids,
+        hung_since,
+        now=131.0,
+        hung_s=30.0,
+        is_hung=lambda _pid: False,
+    )
+    assert recovered == []
+    assert hung_since == [None, None]
+
+
+def test_stale_actor_indices_hung_overrides_recent_activity() -> None:
+    processes = [_FakeProcess(True), _FakeProcess(True)]
+    stale = _stale_actor_indices(
+        processes,
+        [99.9, 99.9],
+        now=100.0,
+        timeout_s=360.0,
+        hung_indices={1},
+    )
+    assert stale == [1]
 
 
 def test_stale_actor_indices_activity_refresh_prevents_restart() -> None:

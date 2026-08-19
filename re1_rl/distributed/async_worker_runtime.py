@@ -38,6 +38,70 @@ from re1_rl.training_progress import TrainingProgressTracker
 
 
 DEFAULT_ACTOR_STALE_TIMEOUT_S = 360.0
+DEFAULT_EMUHAWK_HUNG_S = 30.0
+
+
+def _pid_not_responding(pid: int | None) -> bool:
+    """True when a Windows process has a visible hung window (Not Responding)."""
+    if os.name != "nt" or not pid:
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        return False
+    user32 = ctypes.windll.user32
+    found: list[int] = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def _enum(hwnd: int, _lparam: int) -> bool:
+        proc_id = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(proc_id))
+        if int(proc_id.value) == int(pid) and user32.IsWindowVisible(hwnd):
+            found.append(int(hwnd))
+        return True
+
+    try:
+        user32.EnumWindows(_enum, 0)
+    except OSError:
+        return False
+    if not found:
+        return False
+    is_hung = user32.IsHungAppWindow
+    is_hung.argtypes = [wintypes.HWND]
+    is_hung.restype = wintypes.BOOL
+    try:
+        return any(bool(is_hung(hwnd)) for hwnd in found)
+    except OSError:
+        return False
+
+
+def _hung_actor_indices(
+    emu_pids: list[int | None],
+    hung_since: list[float | None],
+    *,
+    now: float,
+    hung_s: float,
+    is_hung: Callable[[int | None], bool] | None = None,
+) -> list[int]:
+    """Ranks whose EmuHawk has been Not Responding past ``hung_s``.
+
+    Savestate load can freeze the UI for a few seconds; the grace window
+    avoids treating that as a dead actor. A frozen hawk can still emit
+    ``need`` messages, so silence-only watchdog never fires.
+    """
+    check = is_hung or _pid_not_responding
+    hung: list[int] = []
+    deadline = max(0.0, float(hung_s))
+    for index, pid in enumerate(emu_pids):
+        if pid and check(pid):
+            if hung_since[index] is None:
+                hung_since[index] = now
+            if now - float(hung_since[index]) >= deadline:
+                hung.append(index)
+        else:
+            hung_since[index] = None
+    return hung
 
 
 def _stale_actor_indices(
@@ -47,12 +111,16 @@ def _stale_actor_indices(
     now: float,
     timeout_s: float,
     exempt_indices: set[int] | None = None,
+    hung_indices: set[int] | None = None,
 ) -> list[int]:
     """Return dead ranks immediately and live ranks silent past the deadline."""
     exempt = exempt_indices or set()
+    hung = hung_indices or set()
     stale: list[int] = []
     for index, (proc, last) in enumerate(zip(processes, last_activity)):
         if not proc.is_alive():
+            stale.append(index)
+        elif index in hung:
             stale.append(index)
         elif index not in exempt and now - float(last) >= float(timeout_s):
             stale.append(index)
@@ -645,6 +713,15 @@ def run_async_worker_loop(
             )
         ),
     )
+    hung_timeout_s = max(
+        5.0,
+        float(
+            os.environ.get(
+                "RE1_EMUHAWK_HUNG_S",
+                str(DEFAULT_EMUHAWK_HUNG_S),
+            )
+        ),
+    )
     health_lock = threading.Lock()
     healthy_actor_count = 0
 
@@ -774,6 +851,7 @@ def run_async_worker_loop(
         for conn in parent_conns:
             conn.send({"t": "start"})
         last_actor_activity = [time.monotonic()] * actor_count
+        hung_since: list[float | None] = [None] * actor_count
         healthy_indices: set[int] = set()
         _set_healthy_actor_count(0)
 
@@ -871,6 +949,7 @@ def run_async_worker_loop(
                     processes[index], emuhawk_pid=actor_emu_pids[index]
                 )
                 actor_emu_pids[index] = None
+                hung_since[index] = None
 
             for attempt in range(1, 3):
                 replacements: list[tuple[int, mp.Process, Connection]] = []
@@ -942,18 +1021,35 @@ def run_async_worker_loop(
                     pass
 
             now = time.monotonic()
+            hung_indices = set(
+                _hung_actor_indices(
+                    actor_emu_pids,
+                    hung_since,
+                    now=now,
+                    hung_s=hung_timeout_s,
+                )
+            )
             stale_indices = _stale_actor_indices(
                 processes,
                 last_actor_activity,
                 now=now,
                 timeout_s=stale_timeout_s,
+                hung_indices=hung_indices,
             )
             if stale_indices:
                 # One rank per pass. Recovering N in parallel restampedes
                 # EmuHawk and, because this loop also serves inference,
                 # makes every other rank look silent.
+                target = stale_indices[:1]
+                hung_hit = [ranks[index] for index in target if index in hung_indices]
+                if hung_hit:
+                    log(
+                        machine_name,
+                        f"actor watchdog emuhawk hung ranks={hung_hit} "
+                        f"(>{hung_timeout_s:.0f}s Not Responding)",
+                    )
                 blocked_at = time.monotonic()
-                _recover_actor_indices(stale_indices[:1])
+                _recover_actor_indices(target)
                 _credit_parent_block(
                     last_actor_activity, time.monotonic() - blocked_at
                 )
