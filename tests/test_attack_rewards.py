@@ -328,7 +328,7 @@ def test_shotgun_zombie_hit_no_dog_penalty() -> None:
 
 
 def test_magnum_zombie_hit_pays_heavy_fodder_penalty() -> None:
-    assert HEAVY_WEAPON_FODDER_HIT_PENALTY == pytest.approx(-2.6)
+    assert HEAVY_WEAPON_FODDER_HIT_PENALTY == pytest.approx(-2.0)
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)

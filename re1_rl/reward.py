@@ -115,9 +115,7 @@ WEAPON_RELOAD_REWARD = 0.1
 # Shotgun vs cerberus is brutally ammo-inefficient in RE1 DC — steer to handgun.
 SHOTGUN_DOG_HIT_PENALTY = -1.4
 # Magnum / bazooka on fodder (dog or zombie) — keep heavy ammo for bosses.
-# −2.6 makes a dining-2F GL one-shot net-negative after spend + kill crumbs
-# (imperator 2026-08-19; was −2.0).
-HEAVY_WEAPON_FODDER_HIT_PENALTY = -2.6
+HEAVY_WEAPON_FODDER_HIT_PENALTY = -2.0
 HEAVY_WEAPON_FODDER_IDS: frozenset[int] = frozenset(
     {
         0x04,  # colt python dumdum
@@ -468,7 +466,7 @@ def shotgun_dog_hit_penalty(state: dict[str, Any]) -> float:
 
 
 def heavy_weapon_fodder_hit_penalty(state: dict[str, Any]) -> float:
-    """−2.6 per magnum/bazooka hit on a dog or zombie."""
+    """−2 per magnum/bazooka hit on a dog or zombie."""
     wid = _combat_ammo_weapon_id(state)
     if int(wid) not in HEAVY_WEAPON_FODDER_IDS:
         return 0.0
