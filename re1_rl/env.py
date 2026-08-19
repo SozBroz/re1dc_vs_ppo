@@ -464,6 +464,11 @@ class RE1Env(gym.Env):
         # room-crossing segment. Unlike _last_skip_frames, this never resets at
         # a door and is the sole duration used for cutscene reward qualification.
         self._skip_session_frames = 0
+        # Physical async-skip frames already charged to the current cell clock.
+        # This cannot share the reward cursor below because synthetic minimum
+        # bills may put that cursor ahead of actual emulated frames.
+        self._skip_session_frames_accounted = 0
+        self._post_skip_replay_frames = 0
         # Emulated frames already billed for step contempt this skip session.
         self._skip_frames_charged = 0
         # (entry_prev, crossing_state) queued by bg skip; credited on main thread.
@@ -1662,6 +1667,8 @@ class RE1Env(gym.Env):
         self._cutscene_skip_entry_prev = None
         self._cutscene_skip_origin_prev = None
         self._skip_session_frames = 0
+        self._skip_session_frames_accounted = 0
+        self._post_skip_replay_frames = 0
         self._skip_frames_charged = 0
         self._pending_skip_room_crossings = []
         self._pending_episode_failure = None
@@ -1980,6 +1987,8 @@ class RE1Env(gym.Env):
         self._bg_skip_stop.set()
         if self._bg_skip_thread is not None and self._bg_skip_thread.is_alive():
             self._bg_skip_thread.join(timeout=5.0)
+        if self._bg_skip_thread is not None and self._bg_skip_thread.is_alive():
+            raise RuntimeError("async cutscene worker did not stop within 5s")
         self._bg_skip_thread = None
 
     def _start_bg_skip(self) -> None:
@@ -2005,6 +2014,7 @@ class RE1Env(gym.Env):
             if not self._skipping_flag:
                 self._last_skip_frames = 0
                 self._skip_session_frames = 0
+                self._skip_session_frames_accounted = 0
                 self._skip_frames_charged = 0
                 # Live skip-entry pose (harness parity). Stale _prev_state can be
                 # idle while Kenneth scene_flag is already 0x84.
@@ -2178,7 +2188,7 @@ class RE1Env(gym.Env):
         return None
 
     def _flush_pending_episode_failure(
-        self, action: int
+        self, action: int, *, already_recorded: bool = False
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]] | None:
         reason = getattr(self, "_pending_episode_failure", None)
         if not reason:
@@ -2187,6 +2197,30 @@ class RE1Env(gym.Env):
         self._post_skip_reward = 0.0
         self._post_skip_bd = {}
         self._skipping_flag = False
+        if already_recorded:
+            self._stop_bg_skip()
+            reward, breakdown = self._episode_failure_penalty(str(reason))
+            try:
+                self._refresh_skip_cache()
+            except (OSError, RuntimeError, ValueError):
+                pass
+            obs = self._skip_cache_obs
+            if obs is None:
+                obs = self._build_obs(
+                    np.zeros(FRAME_SHAPE, dtype=np.uint8), self._prev_state
+                )
+            info = {
+                "room_id": self._prev_state.get("room_id"),
+                "cutscene_skip": True,
+                "action_name": ACTION_NAMES[int(action)]
+                if 0 <= int(action) < len(ACTION_NAMES)
+                else str(action),
+                "bridge_port": getattr(self.bridge, "port", None),
+                "reward_breakdown": breakdown,
+                "episode_failure": str(reason),
+            }
+            self._record_leg_replay_reward(reward, breakdown)
+            return obs, reward, True, False, info
         return self._episode_failure_step(action, reason=reason)
 
     def _queue_kenneth_gate_failure_if_needed(self) -> None:
@@ -2220,6 +2254,10 @@ class RE1Env(gym.Env):
             entry, crossing = self._pending_skip_room_crossings.pop(0)
             crossing = dict(crossing)
             crossing["cutscene_key"] = None
+            # Physical skip time is billed once by _bill_async_skip_step_penalty
+            # and the dedicated cell-clock cursor, not by this semantic crossing.
+            crossing["step_emulated_frames"] = 0
+            crossing["reference_step_frames"] = self.frame_skip
             self._progress.record_in_control_step(
                 str(crossing.get("room_id", "")),
                 bool(crossing.get("in_control", True)),
@@ -2248,6 +2286,14 @@ class RE1Env(gym.Env):
     def _apply_post_skip_sync(self) -> None:
         """Credit pickups / cutscenes that finished while async skip was running."""
         from re1_rl.story_item_use import annotate_story_use_success
+
+        real_delta = self._consume_async_skip_real_frames()
+        progress = getattr(self, "_progress", None)
+        if progress is not None and real_delta > 0:
+            progress.note_leg_frames(real_delta)
+        self._post_skip_replay_frames = int(
+            getattr(self, "_post_skip_replay_frames", 0) or 0
+        ) + int(real_delta)
 
         skip_trap_entry: dict[str, Any] | None = None
         pending_cross = getattr(self, "_pending_skip_room_crossings", None) or []
@@ -2341,6 +2387,10 @@ class RE1Env(gym.Env):
             float((getattr(self, "_post_skip_bd", {}) or {}).get("new_room", 0.0))
             > 0.0
         )
+        # Settlement is a reward-only transition; physical skip frames are
+        # already counted by the async frame cursor above.
+        state["step_emulated_frames"] = 0
+        state["reference_step_frames"] = self.frame_skip
         save_complete = self._poll_typewriter_save(entry_prev or {}, state)
         reward, bd = compute_reward(
             entry_prev,
@@ -2353,6 +2403,7 @@ class RE1Env(gym.Env):
             typewriter_save_complete=save_complete,
             return_breakdown=True,
         )
+        self._apply_async_skip_timeout(bd)
         self._after_reward_step(
             entry_prev or {}, state, bd, typewriter_save_complete=save_complete
         )
@@ -2378,6 +2429,7 @@ class RE1Env(gym.Env):
         self._last_settled_skip_kind = skip_session_kind(entry_prev, state)
         self._last_skip_frames = 0
         self._skip_session_frames = 0
+        self._skip_session_frames_accounted = 0
         self._skip_frames_charged = 0
         if state["hp"] > 0:
             self._prev_hp = state["hp"]
@@ -2497,6 +2549,9 @@ class RE1Env(gym.Env):
         skip_frames: int = 0,
         reward_only_frames: int = 0,
     ) -> None:
+        carry = max(0, int(getattr(self, "_post_skip_replay_frames", 0) or 0))
+        self._post_skip_replay_frames = 0
+        skip_frames = max(0, int(skip_frames)) + carry
         buf = getattr(self, "_leg_replay", None)
         if buf is None:
             return
@@ -2507,7 +2562,7 @@ class RE1Env(gym.Env):
                 policy_frames=(
                     None if policy_frames is None else max(0, int(policy_frames))
                 ),
-                skip_frames=max(0, int(skip_frames)),
+                skip_frames=skip_frames,
                 reward_only_frames=max(0, int(reward_only_frames)),
             )
         except (TypeError, ValueError, OverflowError):
@@ -2554,6 +2609,157 @@ class RE1Env(gym.Env):
         step = step_penalty_for_frames(bill, ref_frames=self.frame_skip)
         return float(step * REWARD_SCALE), {"step": step}, bill
 
+    def _consume_async_skip_real_frames(self) -> int:
+        """Return newly landed physical skip frames exactly once."""
+        session = max(0, int(getattr(self, "_skip_session_frames", 0) or 0))
+        accounted = max(
+            0, int(getattr(self, "_skip_session_frames_accounted", 0) or 0)
+        )
+        delta = max(0, session - accounted)
+        self._skip_session_frames_accounted = session
+        return delta
+
+    def _record_late_async_skip_frames(self, frames: int) -> None:
+        """Attach frames landed during terminal join to the current replay row."""
+        frames = max(0, int(frames))
+        if frames <= 0:
+            return
+        buf = getattr(self, "_leg_replay", None)
+        rows = getattr(buf, "skip_frames", None)
+        if rows is None or len(rows) <= 0:
+            return
+        try:
+            rows[-1] = int(rows[-1]) + frames
+        except (IndexError, OverflowError, TypeError, ValueError):
+            return
+
+    def _async_skip_timeout_due(self) -> bool:
+        progress = getattr(self, "_progress", None)
+        if progress is None or str(self._stage.get("mode") or "") != "yawn_rails":
+            return False
+        budget = int(getattr(progress, "cell_timeout_frames", 0) or 0)
+        used = int(getattr(progress, "leg_emulated_frames", 0) or 0)
+        return budget > 0 and used >= budget
+
+    def _apply_async_skip_timeout(self, breakdown: dict[str, float]) -> bool:
+        """Breach a Yawn cell wall using physical frames counted during skip."""
+        if str(self._stage.get("mode") or "") != "yawn_rails":
+            return False
+        progress = getattr(self, "_progress", None)
+        if progress is None:
+            return False
+        blocked = (
+            bool(getattr(progress, "checkpoint_success", False))
+            or bool(getattr(progress, "kenneth_gate_breached", False))
+            or bool(getattr(progress, "wrong_room_breached", False))
+            or bool(getattr(progress, "forbidden_item_breached", False))
+            or bool(getattr(progress, "shotgun_return_breached", False))
+            or bool(getattr(progress, "capture_ineligible_breached", False))
+            or bool(getattr(progress, "gallery_wrong_breached", False))
+        )
+        if blocked:
+            return False
+        breached = bool(getattr(progress, "cell_timeout_breached", False))
+        if not breached and self._async_skip_timeout_due():
+            breached = bool(progress.breach_cell_timeout())
+        if not breached:
+            return False
+        from re1_rl.reward import RAILS_CELL_TIMEOUT_PENALTY
+
+        breakdown["checkpoint_timeout"] = RAILS_CELL_TIMEOUT_PENALTY
+        for term, value in tuple(breakdown.items()):
+            if value > 0.0:
+                breakdown[term] = 0.0
+        return True
+
+    def _async_skip_terminal_result(
+        self,
+        action: int,
+        *,
+        obs: dict[str, np.ndarray] | None = None,
+        breakdown: dict[str, float] | None = None,
+        record_action: bool = False,
+        horizon_truncated: bool = False,
+    ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
+        """Quiesce async skip, then return its final terminal observation."""
+        merged = dict(getattr(self, "_post_skip_bd", {}) or {})
+        for key, value in (breakdown or {}).items():
+            merged[key] = float(merged.get(key, 0.0)) + float(value)
+        if record_action:
+            self._record_leg_replay_step(
+                action, policy_frames=0, skip_frames=0, reward_only_frames=0
+            )
+        self._skipping_flag = False
+        self._stop_bg_skip()
+        late_frames = self._consume_async_skip_real_frames()
+        progress = getattr(self, "_progress", None)
+        if progress is not None and late_frames > 0:
+            progress.note_leg_frames(late_frames)
+        self._record_late_async_skip_frames(late_frames)
+        _, late_bd, _ = self._bill_async_skip_step_penalty()
+        if late_bd:
+            for key, value in late_bd.items():
+                merged[key] = float(merged.get(key, 0.0)) + float(value)
+        try:
+            self._refresh_skip_cache()
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            pass
+        terminal_state = self._skip_cache_state or self._prev_state
+        died = bool(self._bg_death or terminal_state.get("dead"))
+        if died:
+            if progress is not None:
+                progress.cell_timeout_breached = False
+            merged.pop("checkpoint_timeout", None)
+            merged["death"] = DEATH_PENALTY
+            for term, value in tuple(merged.items()):
+                if value > 0.0:
+                    merged[term] = 0.0
+            terminal_state = dict(terminal_state)
+            terminal_state["dead"] = True
+            self._bg_death = False
+        else:
+            if self._apply_async_skip_timeout(merged):
+                try:
+                    self._refresh_skip_cache()
+                    terminal_state = self._skip_cache_state or terminal_state
+                except (
+                    OSError,
+                    RuntimeError,
+                    ValueError,
+                    AttributeError,
+                    TypeError,
+                ):
+                    pass
+        if self._skip_cache_obs is not None:
+            obs = self._skip_cache_obs
+        if obs is None:
+            obs = self._build_obs(
+                np.zeros(FRAME_SHAPE, dtype=np.uint8), self._prev_state
+            )
+        reward = float(sum(merged.values()) * REWARD_SCALE)
+        terminated, truncated, episode_failure = self._termination_flags(terminal_state)
+        if horizon_truncated and not terminated:
+            truncated = True
+        if died:
+            episode_failure = "death"
+        info: dict[str, Any] = {
+            "room_id": terminal_state.get("room_id"),
+            "cutscene_skip": True,
+            "action_name": ACTION_NAMES[int(action)]
+            if 0 <= int(action) < len(ACTION_NAMES)
+            else str(action),
+            "bridge_port": getattr(self.bridge, "port", None),
+            "reward_breakdown": merged,
+            "episode_failure": episode_failure,
+        }
+        if progress is not None:
+            info["visited_rooms"] = sorted(progress.visited_rooms)
+            info["n_rooms_visited"] = len(progress.visited_rooms)
+        self._post_skip_reward = 0.0
+        self._post_skip_bd = {}
+        self._record_leg_replay_reward(reward, merged)
+        return obs, reward, terminated, truncated, info
+
     def _fast_cutscene_step(
         self,
         action: int,
@@ -2570,9 +2776,7 @@ class RE1Env(gym.Env):
         pending = self._flush_pending_episode_failure(action)
         if pending is not None:
             return pending
-        charged_before = int(getattr(self, "_skip_frames_charged", 0) or 0)
-        session = int(getattr(self, "_skip_session_frames", 0) or 0)
-        real_delta = max(0, session - charged_before)
+        real_delta = self._consume_async_skip_real_frames()
         skip_reward, skip_bd, skip_frames = self._bill_async_skip_step_penalty(
             min_frames=self.frame_skip
         )
@@ -2587,12 +2791,15 @@ class RE1Env(gym.Env):
             skip_frames=skip_real,
             reward_only_frames=synthetic,
         )
+        progress = getattr(self, "_progress", None)
+        if progress is not None and real_delta > 0:
+            progress.note_leg_frames(real_delta)
         # Main-thread flush of door crossings noted by the bg skip worker.
         try:
             self._credit_async_skip_room_crossing()
         except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
             pass
-        pending = self._flush_pending_episode_failure(action)
+        pending = self._flush_pending_episode_failure(action, already_recorded=True)
         if pending is not None:
             return pending
         if self._skip_cache_obs is None:
@@ -2606,7 +2813,18 @@ class RE1Env(gym.Env):
                 np.zeros(FRAME_SHAPE, dtype=np.uint8),
                 self._prev_state or {"hp": 0, "room_id": "", "x": 0, "z": 0, "facing": 0},
             )
-        truncated = self._skip_cache_truncated
+        if self._async_skip_timeout_due():
+            return self._async_skip_terminal_result(
+                action, obs=obs, breakdown=skip_bd
+            )
+        truncated = self._episode_truncated()
+        if truncated:
+            return self._async_skip_terminal_result(
+                action,
+                obs=obs,
+                breakdown=skip_bd,
+                horizon_truncated=True,
+            )
         info: dict[str, Any] = {
             "room_id": self._prev_state.get("room_id"),
             "cutscene_skip": True,
@@ -4287,6 +4505,8 @@ class RE1Env(gym.Env):
             pending = self._flush_pending_episode_failure(action)
             if pending is not None:
                 return pending
+            if bool(getattr(self._progress, "cell_timeout_breached", False)):
+                return self._async_skip_terminal_result(action, record_action=True)
 
         if getattr(self, "_use_phase", 0) > 0 or int(action) == USE_ACTION:
             use_step = self._handle_use_action(int(action))
@@ -4718,8 +4938,10 @@ class RE1Env(gym.Env):
         return np.zeros((FRAME_H, FRAME_W, 3), dtype=np.uint8)
 
     def close(self):
-        self._stop_bg_skip()
         try:
-            self.bridge.quit()
+            self._stop_bg_skip()
         finally:
-            self.bridge.close()
+            try:
+                self.bridge.quit()
+            finally:
+                self.bridge.close()

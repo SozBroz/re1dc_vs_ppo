@@ -258,14 +258,22 @@ class LearnerState:
             self.epoch_admitted_steps = 0
             self.epoch_capacity_blocked = False
             live = self._prune_and_list_live_unlocked()
-            self.epoch_expected = set(live.keys())
+            self.epoch_expected = {
+                worker_id
+                for worker_id, meta in live.items()
+                if meta.get("n_envs") is None or int(meta.get("n_envs") or 0) > 0
+            }
             return self.epoch_id, sorted(self.epoch_expected)
 
     def refresh_expected(self) -> list[str]:
         """Re-snapshot live workers into expected without opening a new epoch."""
         with self.lock:
             live = self._prune_and_list_live_unlocked()
-            self.epoch_expected = set(live.keys())
+            self.epoch_expected = {
+                worker_id
+                for worker_id, meta in live.items()
+                if meta.get("n_envs") is None or int(meta.get("n_envs") or 0) > 0
+            }
             return sorted(self.epoch_expected)
 
     def cohort_full(self) -> bool:

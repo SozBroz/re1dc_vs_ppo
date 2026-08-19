@@ -12,11 +12,12 @@ from __future__ import annotations
 import multiprocessing as mp
 import os
 import queue
+import subprocess
 import threading
 import time
 from multiprocessing.connection import Connection, wait
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -34,6 +35,69 @@ from re1_rl.distributed.rollout_types import WorkerRollout, normalize_curriculum
 from re1_rl.distributed.spaces import OBS_SCHEMA_VERSION
 from re1_rl.distributed.worker_client import WorkerClient
 from re1_rl.training_progress import TrainingProgressTracker
+
+
+DEFAULT_ACTOR_STALE_TIMEOUT_S = 360.0
+
+
+def _stale_actor_indices(
+    processes: list[mp.Process],
+    last_activity: list[float],
+    *,
+    now: float,
+    timeout_s: float,
+    exempt_indices: set[int] | None = None,
+) -> list[int]:
+    """Return dead ranks immediately and live ranks silent past the deadline."""
+    exempt = exempt_indices or set()
+    stale: list[int] = []
+    for index, (proc, last) in enumerate(zip(processes, last_activity)):
+        if not proc.is_alive():
+            stale.append(index)
+        elif index not in exempt and now - float(last) >= float(timeout_s):
+            stale.append(index)
+    return stale
+
+
+def _terminate_actor_process(
+    proc: mp.Process,
+    *,
+    emuhawk_pid: int | None = None,
+    timeout_s: float = 5.0,
+) -> None:
+    """Terminate an actor and its owned EmuHawk process tree."""
+    if proc.is_alive() and os.name == "nt" and getattr(proc, "pid", None):
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(int(proc.pid)), "/T", "/F"],
+                check=False,
+                capture_output=True,
+                timeout=max(1.0, float(timeout_s)),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    if proc.is_alive():
+        try:
+            proc.terminate()
+        except (OSError, ValueError):
+            pass
+    proc.join(timeout=max(0.0, float(timeout_s)))
+    if proc.is_alive():
+        try:
+            proc.kill()
+        except (AttributeError, OSError, ValueError):
+            pass
+        proc.join(timeout=max(1.0, float(timeout_s)))
+    if os.name == "nt" and emuhawk_pid:
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(int(emuhawk_pid)), "/T", "/F"],
+                check=False,
+                capture_output=True,
+                timeout=max(1.0, float(timeout_s)),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            pass
 
 
 def worker_rollout_from_actor_msg(
@@ -433,6 +497,7 @@ def _shutdown_actors(
     stop_flag: mp.synchronize.Synchronized,
     parent_conns: list[Connection],
     processes: list[mp.Process],
+    emuhawk_pids: list[int | None] | None = None,
 ) -> None:
     stop_flag.value = True
     for conn in parent_conns:
@@ -444,10 +509,13 @@ def _shutdown_actors(
             conn.close()
         except OSError:
             pass
+    deadline = time.monotonic() + 30.0
     for proc in processes:
-        proc.join(timeout=30)
-        if proc.is_alive():
-            proc.terminate()
+        proc.join(timeout=max(0.0, deadline - time.monotonic()))
+    pids = emuhawk_pids or [None] * len(processes)
+    for proc, emu_pid in zip(processes, pids):
+        if proc.is_alive() or emu_pid:
+            _terminate_actor_process(proc, emuhawk_pid=emu_pid)
 
 
 def run_async_worker_loop(
@@ -476,6 +544,7 @@ def run_async_worker_loop(
     actor_ranks: list[int] | None = None,
     memlog_actor_rank: int | None = None,
     eval_only: bool = False,
+    health_callback: Callable[[int], None] | None = None,
 ) -> None:
     """Spawn desync actors and serve local inference until ``stop_event``.
 
@@ -522,6 +591,7 @@ def run_async_worker_loop(
     ctx = mp.get_context("spawn")
     processes: list[mp.Process] = []
     parent_conns: list[Connection] = []
+    actor_emu_pids: list[int | None] = []
     buffered: list[WorkerRollout] = []
     epoch_t0 = time.monotonic()
     last_heartbeat = 0.0
@@ -530,6 +600,32 @@ def run_async_worker_loop(
     # When set, drop new actor rollouts until policy advances or cohort reopens.
     pause_until_policy_gt: int | None = None
     hb_stop = threading.Event()
+    stale_timeout_s = max(
+        30.0,
+        float(
+            os.environ.get(
+                "RE1_ACTOR_STALE_TIMEOUT_S",
+                str(DEFAULT_ACTOR_STALE_TIMEOUT_S),
+            )
+        ),
+    )
+    health_lock = threading.Lock()
+    healthy_actor_count = 0
+
+    def _set_healthy_actor_count(value: int) -> None:
+        nonlocal healthy_actor_count
+        healthy = max(0, int(value))
+        with health_lock:
+            healthy_actor_count = healthy
+        if health_callback is not None:
+            try:
+                health_callback(healthy)
+            except Exception as exc:
+                log(machine_name, f"health callback error: {exc}")
+
+    def _get_healthy_actor_count() -> int:
+        with health_lock:
+            return int(healthy_actor_count)
 
     def _learner_accepting_rollouts() -> bool:
         """True when the learner can admit more steps (next cohort open)."""
@@ -552,7 +648,7 @@ def run_async_worker_loop(
             return
         while not hb_stop.is_set() and not stop_event.is_set():
             try:
-                rollout_sink.heartbeat(worker_id, actor_count)
+                rollout_sink.heartbeat(worker_id, _get_healthy_actor_count())
                 from re1_rl.go_explore_capture import go_explore_root
                 from re1_rl.go_explore_worker_cache import maybe_poll_manifest
                 from re1_rl.yawn_rails_worker_cache import maybe_poll_yawn_rails_manifest
@@ -571,58 +667,66 @@ def run_async_worker_loop(
         target=_heartbeat_loop, name="worker-heartbeat", daemon=True
     )
 
+    def _spawn_rank(rank: int) -> tuple[mp.Process, Connection]:
+        parent_conn, child_conn = ctx.Pipe(duplex=True)
+        proc = ctx.Process(
+            target=_actor_process,
+            args=(rank, child_conn),
+            kwargs={
+                "curriculum": curriculum,
+                "base_port": base_port,
+                "training_speed": training_speed,
+                "skip_chunk": skip_chunk,
+                "n_steps": n_steps,
+                "stop_flag": stop_flag,
+                "capture_checkpoints": capture_checkpoints,
+                "headless": headless,
+                "screenshot_mmf": screenshot_mmf,
+                "memlog_directory": (
+                    str(
+                        root
+                        / "data"
+                        / (
+                            os.environ.get("RE1_MEMLOG_DIRECTORY", "memlog").strip()
+                            or "memlog"
+                        )
+                    )
+                    if memlog_actor_rank is not None
+                    and rank == int(memlog_actor_rank)
+                    else None
+                ),
+            },
+            name=f"dist-async-actor-{rank}",
+        )
+        proc.start()
+        child_conn.close()
+        return proc, parent_conn
+
     try:
         if not is_local and isinstance(rollout_sink, WorkerClient):
-            rollout_sink.register(worker_id, actor_count, is_local=False)
-            rollout_sink.heartbeat(worker_id, actor_count)
+            rollout_sink.register(worker_id, 0, is_local=False)
+            rollout_sink.heartbeat(worker_id, 0)
             last_heartbeat = time.monotonic()
             hb_thread.start()
 
         for rank in ranks:
-            parent_conn, child_conn = ctx.Pipe(duplex=True)
-            proc = ctx.Process(
-                target=_actor_process,
-                args=(rank, child_conn),
-                kwargs={
-                    "curriculum": curriculum,
-                    "base_port": base_port,
-                    "training_speed": training_speed,
-                    "skip_chunk": skip_chunk,
-                    "n_steps": n_steps,
-                    "stop_flag": stop_flag,
-                    "capture_checkpoints": capture_checkpoints,
-                    "headless": headless,
-                    "screenshot_mmf": screenshot_mmf,
-                    "memlog_directory": (
-                        str(
-                            root
-                            / "data"
-                            / (
-                                os.environ.get("RE1_MEMLOG_DIRECTORY", "memlog").strip()
-                                or "memlog"
-                            )
-                        )
-                        if memlog_actor_rank is not None
-                        and rank == int(memlog_actor_rank)
-                        else None
-                    ),
-                },
-                name=f"dist-async-actor-{rank}",
-            )
-            proc.start()
-            child_conn.close()
+            proc, parent_conn = _spawn_rank(rank)
             processes.append(proc)
             parent_conns.append(parent_conn)
 
-        _wait_for_actor_spawn(
+        spawned_emu_pids = _wait_for_actor_spawn(
             parent_conns,
             actor_count,
             processes=processes,
             actor_ranks=ranks,
         )
+        actor_emu_pids = [spawned_emu_pids.get(rank) for rank in ranks]
         log(machine_name, f"async worker fleet ready ({actor_count} actors)")
         for conn in parent_conns:
             conn.send({"t": "start"})
+        last_actor_activity = [time.monotonic()] * actor_count
+        healthy_indices: set[int] = set()
+        _set_healthy_actor_count(0)
 
         def _maybe_pull_local_weights() -> None:
             if policy is None or weight_store is None:
@@ -698,6 +802,81 @@ def run_async_worker_loop(
                     f"cohort reopens or policy_version > {pause_until_policy_gt}",
                 )
 
+        def _recover_actor_indices(indices: list[int]) -> None:
+            stale_ranks = [ranks[index] for index in indices]
+            for index in indices:
+                healthy_indices.discard(index)
+            _set_healthy_actor_count(len(healthy_indices))
+            log(
+                machine_name,
+                f"actor watchdog recovering stale ranks={stale_ranks} "
+                f"(healthy={len(healthy_indices)}/{actor_count}, "
+                f"timeout_s={stale_timeout_s:.0f})",
+            )
+            for index in indices:
+                try:
+                    parent_conns[index].close()
+                except OSError:
+                    pass
+                _terminate_actor_process(
+                    processes[index], emuhawk_pid=actor_emu_pids[index]
+                )
+                actor_emu_pids[index] = None
+
+            for attempt in range(1, 3):
+                replacements: list[tuple[int, mp.Process, Connection]] = []
+                try:
+                    for index in indices:
+                        proc, conn = _spawn_rank(ranks[index])
+                        replacements.append((index, proc, conn))
+                    replacement_procs = [proc for _, proc, _ in replacements]
+                    replacement_conns = [conn for _, _, conn in replacements]
+                    replacement_ranks = [
+                        ranks[index] for index, _, _ in replacements
+                    ]
+                    replacement_pids = _wait_for_actor_spawn(
+                        replacement_conns,
+                        len(replacements),
+                        processes=replacement_procs,
+                        actor_ranks=replacement_ranks,
+                        timeout_s=120.0,
+                    )
+                    now = time.monotonic()
+                    for index, proc, conn in replacements:
+                        conn.send({"t": "start"})
+                        processes[index] = proc
+                        parent_conns[index] = conn
+                        actor_emu_pids[index] = replacement_pids.get(ranks[index])
+                        last_actor_activity[index] = now
+                    log(
+                        machine_name,
+                        f"actor watchdog restarted ranks={stale_ranks}; "
+                        "awaiting first post-reset activity",
+                    )
+                    return
+                except Exception as exc:
+                    log(
+                        machine_name,
+                        f"actor watchdog attempt {attempt}/2 failed for "
+                        f"ranks={stale_ranks}: {exc}",
+                    )
+                    for index, proc, conn in replacements:
+                        try:
+                            conn.close()
+                        except OSError:
+                            pass
+                        _terminate_actor_process(proc)
+                        processes[index] = proc
+                        parent_conns[index] = conn
+                        actor_emu_pids[index] = None
+                    if attempt < 2:
+                        time.sleep(5.0 * attempt)
+            log(
+                machine_name,
+                f"actor watchdog left ranks={stale_ranks} degraded; "
+                "retrying on the next watchdog pass",
+            )
+
         while not stop_event.is_set() and not stop_flag.value:
             if eval_only:
                 try:
@@ -712,6 +891,24 @@ def run_async_worker_loop(
                         break
                 except Exception:
                     pass
+
+            now = time.monotonic()
+            exempt_indices = {
+                index
+                for index, rank in enumerate(ranks)
+                if memlog_actor_rank is not None
+                and rank == int(memlog_actor_rank)
+            }
+            stale_indices = _stale_actor_indices(
+                processes,
+                last_actor_activity,
+                now=now,
+                timeout_s=stale_timeout_s,
+                exempt_indices=exempt_indices,
+            )
+            if stale_indices:
+                _recover_actor_indices(stale_indices)
+                continue
 
             if policy.policy_version <= 0:
                 time.sleep(0.1)
@@ -755,13 +952,50 @@ def run_async_worker_loop(
                     break
                 continue
 
-            needs, rollouts = _drain_actor_messages(
+            needs, rollouts, failed_conns = _drain_actor_messages(
                 ready,
                 parent_conns,
                 max_need_batch=inference_batch_max,
             )
-            if needs:
-                _serve_needs_batch(needs, policy, max_batch=inference_batch_max)
+            conn_to_index = {id(conn): index for index, conn in enumerate(parent_conns)}
+            failed_conn_ids = {id(conn) for conn in failed_conns}
+            safe_needs = [
+                (conn, msg) for conn, msg in needs if id(conn) not in failed_conn_ids
+            ]
+            send_failed = (
+                _serve_needs_batch(
+                    safe_needs, policy, max_batch=inference_batch_max
+                )
+                if safe_needs
+                else []
+            )
+            all_failed = [*failed_conns, *send_failed]
+            all_failed_ids = {id(conn) for conn in all_failed}
+            for conn in all_failed:
+                index = conn_to_index.get(id(conn))
+                if index is not None:
+                    last_actor_activity[index] = float("-inf")
+                    healthy_indices.discard(index)
+            if all_failed:
+                _set_healthy_actor_count(len(healthy_indices))
+            activity_now = time.monotonic()
+            health_changed = False
+            for conn, _msg in [*needs, *rollouts]:
+                if id(conn) in all_failed_ids:
+                    continue
+                index = conn_to_index.get(id(conn))
+                if index is not None:
+                    last_actor_activity[index] = activity_now
+                    if index not in healthy_indices:
+                        healthy_indices.add(index)
+                        health_changed = True
+            if health_changed:
+                _set_healthy_actor_count(len(healthy_indices))
+                log(
+                    machine_name,
+                    f"actor health {len(healthy_indices)}/{actor_count} "
+                    f"ranks={[ranks[index] for index in sorted(healthy_indices)]}",
+                )
             for conn, msg in rollouts:
                 rollout = worker_rollout_from_actor_msg(
                     msg,
@@ -810,10 +1044,12 @@ def run_async_worker_loop(
                 )
     finally:
         hb_stop.set()
+        if hb_thread.is_alive():
+            hb_thread.join(timeout=max(1.0, min(float(heartbeat_s), 10.0)))
         if not is_local and isinstance(rollout_sink, WorkerClient):
             try:
                 rollout_sink.unregister(worker_id)
             except Exception:
                 pass
-        _shutdown_actors(stop_flag, parent_conns, processes)
+        _shutdown_actors(stop_flag, parent_conns, processes, actor_emu_pids)
         log(machine_name, "async worker loop stopped")

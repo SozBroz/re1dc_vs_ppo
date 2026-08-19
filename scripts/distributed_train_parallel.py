@@ -413,7 +413,7 @@ def _run_local_worker(
     stop_event: threading.Event,
     device: str,
     learner_state: LearnerState | None = None,
-) -> None:
+) -> threading.Thread:
     from re1_rl.distributed.inference_policy import InferencePolicy
 
     obs_space, act_space = make_re1_policy_spaces()
@@ -439,10 +439,18 @@ def _run_local_worker(
         if learner_state is not None:
             learner_state.register_worker(
                 worker_id,
-                n_envs=int(args.n_envs),
+                n_envs=0,
                 hostname=args.machine_name,
                 is_local=True,
             )
+
+        def _report_health(n_envs: int) -> None:
+            if learner_state is not None:
+                learner_state.heartbeat_worker(
+                    worker_id,
+                    n_envs=int(n_envs),
+                    hostname=args.machine_name,
+                )
 
         # Local weights sync only at epoch flush inside run_async_worker_loop
         # (no mid-horizon _local_weight_sync_loop hot-swap).
@@ -471,12 +479,17 @@ def _run_local_worker(
                 actor_ranks=getattr(args, "actor_ranks", None),
                 memlog_actor_rank=4 if bool(getattr(args, "memlog", False)) else None,
                 eval_only=bool(getattr(args, "eval_only", False)),
+                health_callback=_report_health,
             )
         finally:
             if learner_state is not None:
                 learner_state.unregister_worker(worker_id)
 
-    threading.Thread(target=_warmup_then_run, name="local-worker", daemon=True).start()
+    thread = threading.Thread(
+        target=_warmup_then_run, name="local-worker", daemon=False
+    )
+    thread.start()
+    return thread
 
 
 def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
@@ -503,8 +516,6 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
     except Exception as exc:
         log(args.machine_name, f"remote worker warmup failed: {exc}")
         return 1
-
-    client.register(worker_id, args.n_envs)
 
     sync_interval = float(args.sync_interval_s)
     if args.weight_sync_poll_s is not None:
@@ -650,9 +661,10 @@ def _run_learner(args: argparse.Namespace) -> int:
 
     stop_event = threading.Event()
     run_local = not args.no_local_worker
+    local_worker_thread: threading.Thread | None = None
     grid_stop = _maybe_start_grid_tiler(args) if run_local else None
     if run_local:
-        _run_local_worker(
+        local_worker_thread = _run_local_worker(
             args,
             weight_store=weight_store,
             rollout_sink=local_rollout_sink,
@@ -999,6 +1011,13 @@ def _run_learner(args: argparse.Namespace) -> int:
         log(args.machine_name, "learner interrupted")
     finally:
         stop_event.set()
+        if local_worker_thread is not None:
+            local_worker_thread.join(timeout=180.0)
+            if local_worker_thread.is_alive():
+                log(
+                    args.machine_name,
+                    "CRITICAL: local worker did not stop within 180s",
+                )
         if grid_stop is not None:
             grid_stop.set()
         http_server.shutdown()

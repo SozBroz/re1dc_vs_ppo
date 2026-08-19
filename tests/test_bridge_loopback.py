@@ -15,11 +15,14 @@ import json
 import socket
 import sys
 import threading
+import time
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from re1_rl.bizhawk_bridge import BizHawkClient
+from re1_rl.bizhawk_bridge import BizHawkClient, BizHawkStartupError
 
 
 def _recv_message(sock: socket.socket) -> str:
@@ -45,6 +48,15 @@ def _recv_message(sock: socket.socket) -> str:
 
 def _send_message(sock: socket.socket, payload: str) -> None:
     sock.sendall(f"{len(payload.encode())} ".encode("ascii") + payload.encode("utf-8"))
+
+
+def _free_port() -> int:
+    sock = socket.socket()
+    try:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+    finally:
+        sock.close()
 
 
 # Fake RAM that the mock Lua endpoint serves.
@@ -134,6 +146,53 @@ def test_bridge_loopback() -> None:
     client.quit()
     client.close()
     t.join(timeout=2)
+
+
+def test_wait_for_client_reports_first_byte_timeout() -> None:
+    port = _free_port()
+    client = BizHawkClient(port=port, timeout=0.05, connect_timeout=1.0)
+    client.start_server()
+
+    def _silent_lua() -> None:
+        sock = socket.create_connection(("127.0.0.1", port), timeout=1)
+        try:
+            time.sleep(0.15)
+        finally:
+            sock.close()
+
+    thread = threading.Thread(target=_silent_lua, daemon=True)
+    thread.start()
+    with pytest.raises(BizHawkStartupError, match="first_byte") as exc_info:
+        client.wait_for_client()
+    assert exc_info.value.phase == "first_byte"
+    assert client._client is None
+    client.close()
+    thread.join(timeout=1)
+
+
+def test_wait_for_client_reports_malformed_hello_and_phases() -> None:
+    port = _free_port()
+    client = BizHawkClient(port=port, timeout=1.0, connect_timeout=1.0)
+    client.start_server()
+    phases: list[str] = []
+
+    def _bad_lua() -> None:
+        sock = socket.create_connection(("127.0.0.1", port), timeout=1)
+        try:
+            _send_message(sock, "[]")
+        finally:
+            sock.close()
+
+    thread = threading.Thread(target=_bad_lua, daemon=True)
+    thread.start()
+    with pytest.raises(BizHawkStartupError, match="hello") as exc_info:
+        client.wait_for_client(phases.append)
+    assert exc_info.value.phase == "hello"
+    assert phases[0].startswith("accepted Lua TCP")
+    assert phases[1] == "received Lua handshake first byte"
+    assert client._client is None
+    client.close()
+    thread.join(timeout=1)
 
 
 if __name__ == "__main__":

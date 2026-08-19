@@ -29,6 +29,9 @@ def _stub_env(async_cutscene_skip: bool) -> RE1Env:
     env._skip_cache_truncated = False
     env._stage = {"max_steps": 0}
     env._step_count = 0
+    from re1_rl.progress import ProgressTracker
+
+    env._progress = ProgressTracker()
     env._prev_state = {"room_id": "105", "hp": 96, "x": 0, "z": 0, "facing": 0}
     env._prev_hp = 96
     env._planner = MagicMock()
@@ -55,12 +58,15 @@ def _stub_env(async_cutscene_skip: bool) -> RE1Env:
     env._cutscene_skip_entry_prev = None
     env._last_skip_frames = 0
     env._skip_session_frames = 0
+    env._skip_session_frames_accounted = 0
     env._skip_frames_charged = 0
     env._enemy_fields = []
     env.bridge = MagicMock()
     env.project_root = Path(__file__).resolve().parents[1]
     env._enemy_motion = MagicMock()
     env._enemy_motion.update.side_effect = lambda enemies, *a, **k: enemies
+    env._player_motion = MagicMock()
+    env._player_motion.update.return_value = (0.0, 0.0)
     env.frame_skip = 8
     env._ram_skip = MagicMock()
     env._sticky_input = MagicMock()
@@ -106,6 +112,81 @@ def test_fast_cutscene_step_returns_immediately() -> None:
     assert info["cutscene_skip"] is True
     assert info["skip_step_frames_billed"] == env.frame_skip
     assert "frame" in obs
+
+
+def test_fast_cutscene_step_recomputes_live_horizon() -> None:
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    env._stage = {"max_steps": 1}
+    env._skip_cache_truncated = False
+    env.bridge.read_ram.return_value = {"player_hp": 96}
+
+    _, _, terminated, truncated, _ = env._fast_cutscene_step(0)
+
+    assert env._step_count == 1
+    assert not terminated
+    assert truncated
+
+
+def test_fast_cutscene_step_counts_physical_frames_and_ends_cell_timeout() -> None:
+    from re1_rl.leg_replay import new_leg_replay_buffer
+    from re1_rl.progress import ProgressTracker
+    from re1_rl.reward import RAILS_CELL_TIMEOUT_PENALTY
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    env._stage = {"mode": "yawn_rails", "max_steps": 5400}
+    env._progress = ProgressTracker()
+    env._progress.arm_cell_timeout(600)
+    env._skip_session_frames = 600
+    env._leg_replay = new_leg_replay_buffer()
+    env.bridge.read_ram.return_value = {"player_hp": 96}
+
+    _, reward, terminated, truncated, info = env._fast_cutscene_step(0)
+
+    assert env._progress.leg_emulated_frames == 600
+    assert env._leg_replay.skip_leg_frames == 600
+    assert terminated
+    assert not truncated
+    assert info["episode_failure"] == "checkpoint_timeout"
+    assert info["reward_breakdown"]["checkpoint_timeout"] == RAILS_CELL_TIMEOUT_PENALTY
+    assert reward < RAILS_CELL_TIMEOUT_PENALTY
+
+
+def test_fast_cutscene_terminal_consumes_inflight_chunk_and_death_wins() -> None:
+    from re1_rl.leg_replay import new_leg_replay_buffer
+    from re1_rl.progress import ProgressTracker
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    env._stage = {"mode": "yawn_rails", "max_steps": 5400}
+    env._progress = ProgressTracker()
+    env._progress.arm_cell_timeout(600)
+    env._skip_session_frames = 600
+    env._leg_replay = new_leg_replay_buffer()
+    env.bridge.read_ram.return_value = {"player_hp": 96}
+
+    def _finish_inflight_chunk() -> None:
+        env._skip_session_frames = 1200
+        env._bg_death = True
+
+    def _refresh_dead_cache() -> None:
+        env._skip_cache_state = {**env._prev_state, "dead": True, "hp": 0}
+        env._skip_cache_obs = {"frame": np.zeros((63, 84, 4), dtype=np.uint8)}
+
+    env._stop_bg_skip = _finish_inflight_chunk
+    env._refresh_skip_cache = _refresh_dead_cache
+
+    _, _, terminated, truncated, info = env._fast_cutscene_step(0)
+
+    assert env._skip_session_frames_accounted == 1200
+    assert env._progress.leg_emulated_frames == 1200
+    assert env._leg_replay.skip_leg_frames == 1200
+    assert terminated
+    assert not truncated
+    assert info["episode_failure"] == "death"
+    assert info["reward_breakdown"]["death"] < 0
+    assert "checkpoint_timeout" not in info["reward_breakdown"]
 
 
 def test_fast_cutscene_step_charges_min_decision_when_chunk_not_landed() -> None:
@@ -328,6 +409,7 @@ def test_fast_cutscene_step_polls_hp_when_cache_stale() -> None:
 
 
 def test_post_skip_sync_pays_cutscene_bonus_when_frames_recorded() -> None:
+    from re1_rl.leg_replay import new_leg_replay_buffer
     from re1_rl.progress import ProgressTracker
     from re1_rl.reward import NEW_CUTSCENE_BONUS
 
@@ -335,6 +417,7 @@ def test_post_skip_sync_pays_cutscene_bonus_when_frames_recorded() -> None:
     env._last_skip_frames = 60
     env._skip_session_frames = 450
     env._progress = ProgressTracker()
+    env._leg_replay = new_leg_replay_buffer()
     env._cutscene_skip_entry_prev = None
     env._pending_skip_room_crossings = []
     env._ram_skip.last_skip_peak_scene_flag = 0x84
@@ -378,6 +461,9 @@ def test_post_skip_sync_pays_cutscene_bonus_when_frames_recorded() -> None:
     )
     env._apply_post_skip_sync()
     assert env._post_skip_bd.get("new_cutscene") == NEW_CUTSCENE_BONUS
+    env._record_leg_replay_step(0, policy_frames=8)
+    assert env._leg_replay.policy_leg_frames == 8
+    assert env._leg_replay.skip_leg_frames == 450
 
 
 def test_post_skip_sync_message_text_no_cutscene() -> None:
@@ -579,7 +665,9 @@ def test_sync_mode_still_calls_skip_uncontrolled(monkeypatch) -> None:
     )
     env._push_frame = MagicMock(return_value=np.zeros((63, 84, 4), dtype=np.uint8))
     env._build_obs = MagicMock(return_value={"frame": np.zeros((63, 84, 4), dtype=np.uint8)})
-    env._progress = MagicMock()
+    from re1_rl.progress import ProgressTracker
+
+    env._progress = ProgressTracker()
     env._planner.next_waypoint_room.return_value = "106"
     env._planner.waypoint_index = 0
     env._stage = {"max_steps": 0, "success_room": None}
@@ -640,7 +728,9 @@ def test_refresh_cache_does_not_consume_new_items() -> None:
     )
     env._push_frame = MagicMock(return_value=np.zeros((63, 84, 4), dtype=np.uint8))
     env._build_obs = MagicMock(return_value={"frame": np.zeros((63, 84, 4), dtype=np.uint8)})
-    env._progress = MagicMock()
+    from re1_rl.progress import ProgressTracker
+
+    env._progress = ProgressTracker()
     env._planner.next_waypoint_room.return_value = "106"
     env._planner.waypoint_index = 0
     env._stage = {"max_steps": 0, "success_room": None}

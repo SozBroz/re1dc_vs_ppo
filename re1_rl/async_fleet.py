@@ -128,10 +128,18 @@ def _serve_needs_batch(
     policy: Any,
     *,
     max_batch: int = 32,
-) -> None:
+) -> list[Connection]:
     """Answer one or more actor ``need`` messages with batched inference."""
     if not pairs:
-        return
+        return []
+    failed: list[Connection] = []
+
+    def _send(conn: Connection, payload: dict[str, Any]) -> None:
+        try:
+            conn.send(payload)
+        except (BrokenPipeError, EOFError, OSError):
+            if conn not in failed:
+                failed.append(conn)
 
     def _serve_regular(chunk: list[tuple[Connection, dict[str, Any]]]) -> None:
         if not chunk:
@@ -156,7 +164,8 @@ def _serve_needs_batch(
                 finally:
                     if hasattr(policy, "set_mod_drop_masks"):
                         policy.set_mod_drop_masks(None)
-                conn.send(
+                _send(
+                    conn,
                     {
                         "t": "act",
                         "action": act,
@@ -175,7 +184,8 @@ def _serve_needs_batch(
                 policy.set_mod_drop_masks(None)
         policy_version = int(getattr(policy, "policy_version", 0) or 0)
         for i, (conn, _) in enumerate(chunk):
-            conn.send(
+            _send(
+                conn,
                 {
                     "t": "act",
                     "action": int(actions[i]),
@@ -210,7 +220,8 @@ def _serve_needs_batch(
                 policy.set_mod_drop_masks(None)
         policy_version = int(getattr(policy, "policy_version", 0) or 0)
         for i, (conn, _) in enumerate(usable):
-            conn.send(
+            _send(
+                conn,
                 {
                     "t": "act",
                     "action": int(actions[i]),
@@ -235,6 +246,7 @@ def _serve_needs_batch(
         ]
         _serve_regular(regular)
         _serve_diagnostics(diagnostic)
+    return failed
 
 
 def _drain_actor_messages(
@@ -243,14 +255,26 @@ def _drain_actor_messages(
     *,
     max_need_batch: int,
     batch_window_s: float = 0.002,
-) -> tuple[list[tuple[Connection, dict[str, Any]]], list[tuple[Connection, dict[str, Any]]]]:
+) -> tuple[
+    list[tuple[Connection, dict[str, Any]]],
+    list[tuple[Connection, dict[str, Any]]],
+    list[Connection],
+]:
     """Collect ``need`` / ``rollout`` messages; briefly coalesce stray needs."""
     needs: list[tuple[Connection, dict[str, Any]]] = []
     rollouts: list[tuple[Connection, dict[str, Any]]] = []
+    failed: list[Connection] = []
 
     def _take(conn: Connection) -> None:
-        while conn.poll():
-            msg = conn.recv()
+        while True:
+            try:
+                if not conn.poll():
+                    break
+                msg = conn.recv()
+            except (BrokenPipeError, EOFError, OSError):
+                if conn not in failed:
+                    failed.append(conn)
+                break
             kind = msg.get("t")
             if kind == "need":
                 needs.append((conn, msg))
@@ -269,18 +293,24 @@ def _drain_actor_messages(
         while time.monotonic() < deadline and len(needs) < max(1, int(max_need_batch)):
             got = False
             for conn in all_conns:
-                if conn.poll():
+                try:
+                    if not conn.poll():
+                        continue
                     got = True
                     msg = conn.recv()
-                    kind = msg.get("t")
-                    if kind == "need":
-                        needs.append((conn, msg))
-                    elif kind == "rollout":
-                        rollouts.append((conn, msg))
+                except (BrokenPipeError, EOFError, OSError):
+                    if conn not in failed:
+                        failed.append(conn)
+                    continue
+                kind = msg.get("t")
+                if kind == "need":
+                    needs.append((conn, msg))
+                elif kind == "rollout":
+                    rollouts.append((conn, msg))
             if not got:
                 time.sleep(0.0002)
 
-    return needs, rollouts
+    return needs, rollouts, failed
 
 def _policy_obs_and_act_spaces():
     from re1_rl.distributed.spaces import make_re1_policy_spaces
@@ -697,11 +727,24 @@ def _actor_process(
             ),
         )()
     except Exception as exc:
-        conn.send({"t": "spawn_error", "rank": rank, "error": repr(exc)})
+        try:
+            conn.send({"t": "spawn_error", "rank": rank, "error": repr(exc)})
+        except (BrokenPipeError, EOFError, OSError):
+            pass
         raise
-    conn.send({"t": "spawned", "rank": rank})
-
-    msg = conn.recv()
+    raw_env = getattr(env, "unwrapped", env)
+    try:
+        conn.send(
+            {
+                "t": "spawned",
+                "rank": rank,
+                "emuhawk_pid": getattr(raw_env, "_emuhawk_pid", None),
+            }
+        )
+        msg = conn.recv()
+    except (BrokenPipeError, EOFError, OSError):
+        env.close()
+        raise
     if msg.get("t") == "stop":
         env.close()
         return
@@ -710,7 +753,11 @@ def _actor_process(
         return
 
     # PbChampionResetWrapper (make_env) mixes champion vs fresh on reset.
-    obs, _ = env.reset()
+    try:
+        obs, _ = env.reset()
+    except BaseException:
+        env.close()
+        raise
 
     obs_bufs: dict[str, np.ndarray] | None = None
     mask_bufs: np.ndarray | None = None
@@ -951,7 +998,7 @@ def _wait_for_actor_spawn(
     processes: list[mp.Process] | None = None,
     actor_ranks: list[int] | None = None,
     timeout_s: float = 600.0,
-) -> None:
+) -> dict[int, int]:
     expected_ranks = (
         set(range(int(n_envs)))
         if actor_ranks is None
@@ -966,6 +1013,7 @@ def _wait_for_actor_spawn(
     )
     spawned: set[int] = set()
     errors: dict[int, str] = {}
+    emuhawk_pids: dict[int, int] = {}
     deadline = time.perf_counter() + timeout_s
     last_report = 0.0
     while spawned != expected_ranks:
@@ -992,22 +1040,20 @@ def _wait_for_actor_spawn(
                 flush=True,
             )
             last_report = time.perf_counter()
-        if processes:
-            for rank, proc in zip(ordered_ranks, processes):
-                if rank in spawned or proc.is_alive():
-                    continue
-                proc.join(timeout=0)
-                raise RuntimeError(
-                    f"actor {rank} died during warmup (exit={proc.exitcode}); "
-                    f"see [actor {rank}] lines above if printed"
-                )
         ready = wait(conns, timeout=min(1.0, remaining))
         for conn in ready:
-            if not conn.poll():
+            try:
+                if not conn.poll():
+                    continue
+                msg = conn.recv()
+            except (BrokenPipeError, EOFError, OSError):
                 continue
-            msg = conn.recv()
             if msg.get("t") == "spawned":
-                spawned.add(int(msg["rank"]))
+                rank = int(msg["rank"])
+                spawned.add(rank)
+                pid = msg.get("emuhawk_pid")
+                if pid is not None:
+                    emuhawk_pids[rank] = int(pid)
             elif msg.get("t") == "spawn_error":
                 r = int(msg["rank"])
                 errors[r] = str(msg.get("error", "unknown"))
@@ -1017,7 +1063,18 @@ def _wait_for_actor_spawn(
                     f"[train:async] actor {int(msg['rank'])}: {msg.get('phase', '')}",
                     flush=True,
                 )
+        if processes:
+            for rank, proc in zip(ordered_ranks, processes):
+                if rank in spawned or proc.is_alive():
+                    continue
+                proc.join(timeout=0)
+                detail = errors.get(rank)
+                raise RuntimeError(
+                    f"actor {rank} died during warmup (exit={proc.exitcode})"
+                    + (f": {detail}" if detail else "")
+                )
     print(f"[train:async] all {n_envs} actors connected", flush=True)
+    return emuhawk_pids
 
 
 def run_async_fleet_training(
@@ -1130,7 +1187,7 @@ def run_async_fleet_training(
                     break
                 continue
 
-            needs, rollouts = _drain_actor_messages(
+            needs, rollouts, _failed = _drain_actor_messages(
                 ready,
                 parent_conns,
                 max_need_batch=inference_batch_max,

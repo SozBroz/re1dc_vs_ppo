@@ -27,6 +27,14 @@ _DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SCREENSHOT_PATH = str(_DEFAULT_ROOT / "data" / "_frame.png")
 
 
+class BizHawkStartupError(ConnectionError):
+    """Phase-specific failure while waiting for the Lua bridge handshake."""
+
+    def __init__(self, phase: str, detail: str) -> None:
+        self.phase = str(phase)
+        super().__init__(f"BizHawk startup failed during {self.phase}: {detail}")
+
+
 class BizHawkClient:
     """TCP server; the BizHawk Lua script (re1_client.lua) connects to it.
 
@@ -90,16 +98,50 @@ class BizHawkClient:
         srv.settimeout(self.connect_timeout)
         self._server = srv
 
-    def wait_for_client(self) -> None:
+    def wait_for_client(
+        self, progress: Any | None = None
+    ) -> None:
         """Accept the BizHawk Lua connection and consume its hello message."""
         if self._server is None:
             self.start_server()
         assert self._server is not None
-        self._client, _ = self._server.accept()
-        self._client.settimeout(self.timeout)
-        hello = json.loads(self._decode_message(self._client))
-        if hello.get("hello") != "re1_client":
-            raise ConnectionError(f"unexpected hello from Lua client: {hello!r}")
+        try:
+            self._client, peer = self._server.accept()
+        except (OSError, TimeoutError) as exc:
+            raise BizHawkStartupError("accept", repr(exc)) from exc
+        if callable(progress):
+            progress(f"accepted Lua TCP peer={peer[0]}:{peer[1]}")
+        try:
+            self._client.settimeout(self.timeout)
+            try:
+                first = self._client.recv(1)
+            except (OSError, TimeoutError) as exc:
+                raise BizHawkStartupError("first_byte", repr(exc)) from exc
+            if not first:
+                raise BizHawkStartupError(
+                    "first_byte", "Lua disconnected before handshake"
+                )
+            if callable(progress):
+                progress("received Lua handshake first byte")
+            try:
+                hello = json.loads(self._decode_message(self._client, first_byte=first))
+            except BizHawkStartupError:
+                raise
+            except (OSError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+                raise BizHawkStartupError("hello", repr(exc)) from exc
+            if not isinstance(hello, dict) or hello.get("hello") != "re1_client":
+                raise BizHawkStartupError(
+                    "hello", f"unexpected payload {hello!r}"
+                )
+            if callable(progress):
+                progress("validated Lua hello")
+        except BaseException:
+            try:
+                self._client.close()
+            except OSError:
+                pass
+            self._client = None
+            raise
 
     def close(self) -> None:
         for sock in (self._client, self._server):
@@ -122,11 +164,15 @@ class BizHawkClient:
         return header + data
 
     @staticmethod
-    def _decode_message(sock: socket.socket) -> str:
+    def _decode_message(
+        sock: socket.socket, *, first_byte: bytes | None = None
+    ) -> str:
         """Read one BizHawk length-prefixed message."""
         length_buf = bytearray()
+        pending = first_byte
         while True:
-            ch = sock.recv(1)
+            ch = pending if pending is not None else sock.recv(1)
+            pending = None
             if not ch:
                 raise ConnectionError("BizHawk client disconnected")
             if ch == b" ":

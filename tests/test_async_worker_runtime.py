@@ -17,6 +17,8 @@ from re1_rl.distributed.async_worker_runtime import (
     _flush_local_epoch,
     _pack_and_deliver_rollouts,
     _serve_need,
+    _stale_actor_indices,
+    _terminate_actor_process,
     pack_rollouts,
     worker_rollout_from_actor_msg,
 )
@@ -27,6 +29,64 @@ from re1_rl.env import ACTION_NAMES
 from re1_rl.async_fleet import DISTRIBUTED_EPOCH_HYPERPARAMS, PPO_HYPERPARAMS
 
 N_ACTIONS = len(ACTION_NAMES)
+
+
+class _FakeProcess:
+    def __init__(self, alive: bool) -> None:
+        self.alive = bool(alive)
+        self.pid = 123
+        self.joins = 0
+        self.exitcode = None if alive else 1
+
+    def is_alive(self) -> bool:
+        return self.alive
+
+    def join(self, timeout: float) -> None:
+        self.joins += 1
+
+
+def test_stale_actor_indices_detect_dead_and_silent_ranks() -> None:
+    processes = [_FakeProcess(True), _FakeProcess(False), _FakeProcess(True)]
+
+    stale = _stale_actor_indices(
+        processes,
+        [90.0, 99.0, 0.0],
+        now=100.0,
+        timeout_s=10.0,
+        exempt_indices={2},
+    )
+
+    assert stale == [0, 1]
+
+
+def test_stale_actor_indices_activity_refresh_prevents_restart() -> None:
+    processes = [_FakeProcess(True), _FakeProcess(True)]
+
+    stale = _stale_actor_indices(
+        processes,
+        [99.9, 95.1],
+        now=100.0,
+        timeout_s=5.0,
+    )
+
+    assert stale == []
+
+
+def test_dead_actor_cleanup_still_kills_recorded_emuhawk(monkeypatch) -> None:
+    from re1_rl.distributed import async_worker_runtime as awr
+
+    calls: list[list[str]] = []
+    monkeypatch.setattr(awr.os, "name", "nt")
+    monkeypatch.setattr(
+        "re1_rl.distributed.async_worker_runtime.subprocess.run",
+        lambda argv, **_kwargs: calls.append(list(argv)),
+    )
+    proc = _FakeProcess(False)
+
+    _terminate_actor_process(proc, emuhawk_pid=456, timeout_s=0.01)
+
+    assert proc.joins == 1
+    assert calls == [["taskkill", "/PID", "456", "/T", "/F"]]
 
 
 class _FakePolicy:
@@ -144,6 +204,21 @@ def test_serve_needs_batch_one_forward_for_many_needs() -> None:
         assert payload["action"] == 3
 
 
+def test_serve_needs_batch_reports_broken_response_pipe() -> None:
+    policy = _FakePolicy()
+    masks = np.ones(N_ACTIONS, dtype=bool)
+    broken = MagicMock()
+    broken.send.side_effect = BrokenPipeError()
+
+    failed = _serve_needs_batch(
+        [(broken, {"t": "need", "obs": _fake_obs(), "action_masks": masks})],
+        policy,
+        max_batch=1,
+    )
+
+    assert failed == [broken]
+
+
 def test_serve_needs_batch_routes_diagnostics_only_to_requester() -> None:
     policy = _FakePolicy()
     masks = np.ones(N_ACTIONS, dtype=bool)
@@ -183,19 +258,39 @@ def test_wait_for_actor_spawn_accepts_arbitrary_logical_ranks() -> None:
     children = []
     for rank in (0, 3, 5):
         parent, child = mp.Pipe(duplex=True)
-        child.send({"t": "spawned", "rank": rank})
+        child.send({"t": "spawned", "rank": rank, "emuhawk_pid": 9000 + rank})
         parents.append(parent)
         children.append(child)
     try:
-        _wait_for_actor_spawn(
+        pids = _wait_for_actor_spawn(
             parents,
             3,
             actor_ranks=[0, 3, 5],
             timeout_s=1.0,
         )
+        assert pids == {0: 9000, 3: 9003, 5: 9005}
     finally:
         for conn in parents + children:
             conn.close()
+
+
+def test_wait_for_actor_spawn_preserves_reported_startup_error() -> None:
+    import multiprocessing as mp
+
+    parent, child = mp.Pipe(duplex=True)
+    child.send({"t": "spawn_error", "rank": 7, "error": "first_byte timeout"})
+    try:
+        with pytest.raises(RuntimeError, match="first_byte timeout"):
+            _wait_for_actor_spawn(
+                [parent],
+                1,
+                processes=[_FakeProcess(False)],
+                actor_ranks=[7],
+                timeout_s=1.0,
+            )
+    finally:
+        parent.close()
+        child.close()
 
 
 def test_serve_need_falls_back_to_predict_batch() -> None:

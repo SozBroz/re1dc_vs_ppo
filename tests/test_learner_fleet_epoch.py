@@ -65,6 +65,26 @@ def test_epoch_waits_for_all_live_then_ready() -> None:
     assert st["missing"] == []
 
 
+def test_epoch_excludes_live_workers_with_zero_healthy_actors() -> None:
+    store = WeightStore()
+    state = LearnerState(
+        store,
+        queue.Queue(),
+        machine_name="t",
+        max_staleness=2,
+        worker_liveness_s=60,
+    )
+    state.register_worker("workhorse2", n_envs=28, is_local=True)
+    state.register_worker("pking", n_envs=0)
+    state.register_worker("workhorse1", n_envs=8)
+
+    _, expected = state.begin_epoch()
+    assert set(expected) == {"workhorse2", "workhorse1"}
+
+    state.heartbeat_worker("workhorse1", n_envs=0)
+    assert state.refresh_expected() == ["workhorse2"]
+
+
 def test_dead_remote_stays_in_expected() -> None:
     store = WeightStore()
     q: queue.Queue = queue.Queue()
