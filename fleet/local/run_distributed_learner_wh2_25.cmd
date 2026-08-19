@@ -36,7 +36,12 @@ powershell -NoProfile -Command ^
   "$root='C:\Users\sshuser\re1_rl\states\pb\champions'; if (Test-Path $root) { Get-ChildItem $root -Directory -EA SilentlyContinue | ForEach-Object { Remove-Item -Force (Join-Path $_.FullName 'champion.sync.lock') -EA SilentlyContinue; Remove-Item -Recurse -Force (Join-Path $_.FullName '.incoming') -EA SilentlyContinue } }"
 REM Fresh heuristics log for this batch (truncate; do not delete).
 call "%~dp0flush_log.cmd" "C:\Users\sshuser\re1_rl\data\logs\learner_wh2_25.log"
+call "%~dp0flush_log.cmd" "C:\Users\sshuser\re1_rl\data\logs\worker_wh2_local.log"
 echo [%DATE% %TIME%] run_distributed_learner_wh2_25.cmd launching learner>> data\logs\learner_wh2_25.log
+
+REM Keep BizHawk startup out of the CUDA learner process. The worker waits for
+REM learner weights, supervises/restarts its own actors, and uses the same host.
+start "wh2-local-worker" /MIN cmd /c "cd /d C:\Users\sshuser\re1_rl && venv\Scripts\python.exe scripts\distributed_train_parallel.py --role worker --machine-name %MACHINE% --worker-id workhorse2 --learner-host 127.0.0.1 --learner-port %LEARNER_PORT% --curriculum curriculum/yawn_rails_one_leg.json --n-envs %N_ENVS% --base-port %BASE_PORT% --total-steps 0 --training-speed 6400 --skip-chunk 600 --capture-checkpoints --sync-interval-s %SYNC_INTERVAL_S% --headless --screenshot-mmf --inference-batch-max %N_ENVS% >> data\logs\worker_wh2_local.log 2>&1"
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role learner ^
@@ -57,6 +62,7 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --batch-size 3072 ^
   --min-host-free-gb 12 ^
   --resume auto ^
+  --no-local-worker ^
   --headless ^
   --screenshot-mmf ^
   --inference-batch-max %N_ENVS% >> data\logs\learner_wh2_25.log 2>&1
