@@ -70,6 +70,95 @@ def _stop_owned_emuhawk(proc, bridge, *, timeout_s: float = 5.0) -> None:
         pass
 
 
+class _StartProcessOwnedEmu:
+    """Process-like owner for EmuHawk launched by PowerShell Start-Process."""
+
+    def __init__(self, launcher: subprocess.Popen, emuhawk_pid: int) -> None:
+        self._launcher = launcher
+        self.pid = int(emuhawk_pid)
+
+    def poll(self):
+        return self._launcher.poll()
+
+    def wait(self, timeout: float):
+        return self._launcher.wait(timeout=timeout)
+
+    def _taskkill(self) -> None:
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(self.pid), "/T", "/F"],
+                check=False,
+                capture_output=True,
+                timeout=10.0,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+    def terminate(self) -> None:
+        self._taskkill()
+        if self._launcher.poll() is None:
+            self._launcher.terminate()
+
+    def kill(self) -> None:
+        self._taskkill()
+        if self._launcher.poll() is None:
+            self._launcher.kill()
+
+
+def _launch_emuhawk(
+    emuhawk_cmd: list[str], *, detach_console: bool
+):
+    use_start_process = os.name == "nt" and os.environ.get(
+        "RE1_EMUHAWK_START_PROCESS", ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    if use_start_process:
+        def _ps_literal(value: str) -> str:
+            return "'" + str(value).replace("'", "''") + "'"
+
+        ps_args = [f'"{emuhawk_cmd[1]}"', *emuhawk_cmd[2:]]
+        script = (
+            "$argList=@("
+            + ",".join(_ps_literal(arg) for arg in ps_args)
+            + ");"
+            + f"$p=Start-Process -FilePath {_ps_literal(emuhawk_cmd[0])} "
+            + f"-ArgumentList $argList -WorkingDirectory {_ps_literal(str(EMUHAWK.parent))} "
+            + "-PassThru;"
+            + "[Console]::Out.WriteLine($p.Id);[Console]::Out.Flush();"
+            + "Wait-Process -Id $p.Id"
+        )
+        launcher = subprocess.Popen(
+            ["powershell.exe", "-NoProfile", "-Command", script],
+            cwd=str(PROJECT_ROOT),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            bufsize=1,
+            creationflags=int(getattr(subprocess, "CREATE_NO_WINDOW", 0)),
+        )
+        assert launcher.stdout is not None
+        pid_line = launcher.stdout.readline().strip()
+        try:
+            return _StartProcessOwnedEmu(launcher, int(pid_line))
+        except ValueError:
+            launcher.kill()
+            raise RuntimeError(
+                f"Start-Process did not return an EmuHawk PID: {pid_line!r}"
+            )
+
+    creationflags = 0
+    if detach_console and os.name == "nt":
+        creationflags = int(getattr(subprocess, "DETACHED_PROCESS", 0)) | int(
+            getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        )
+    return subprocess.Popen(
+        emuhawk_cmd,
+        cwd=str(EMUHAWK.parent),
+        close_fds=bool(detach_console),
+        creationflags=creationflags,
+    )
+
+
 class _EpisodeStatsWrapper(gym.Wrapper):
     """SB3 Monitor replacement that does not import Torch in actor processes."""
 
@@ -256,17 +345,9 @@ def make_env(
         detach_console = os.environ.get(
             "RE1_EMUHAWK_DETACH_CONSOLE", ""
         ).strip().lower() in {"1", "true", "yes", "on"}
-        creationflags = 0
-        if detach_console and os.name == "nt":
-            creationflags = int(getattr(subprocess, "DETACHED_PROCESS", 0)) | int(
-                getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-            )
         try:
-            proc = subprocess.Popen(
-                emuhawk_cmd,
-                cwd=str(EMUHAWK.parent),
-                close_fds=bool(detach_console),
-                creationflags=creationflags,
+            proc = _launch_emuhawk(
+                emuhawk_cmd, detach_console=detach_console
             )
         except BaseException:
             bridge.close()
