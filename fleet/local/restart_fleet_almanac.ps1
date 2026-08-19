@@ -46,14 +46,13 @@ if (-not $SkipSync) {
 }
 
 Write-Host '=== START (fire and forget) ===' -ForegroundColor Green
-$wh2Start = Join-Path $ROOT '_tmp_start_wh2_now.ps1'
+$wh2Start = Join-Path $ROOT 'fleet\local\start_wh2_schtask.ps1'
 $wh1Start = Join-Path $ROOT '_tmp_start_wh1_now.ps1'
 if (-not (Test-Path $wh2Start) -or -not (Test-Path $wh1Start)) {
   throw "missing start scripts: $wh2Start / $wh1Start"
 }
-& scp.exe -o ConnectTimeout=10 $wh2Start "${WH2}:C:/Users/sshuser/re1_rl/_tmp_start_wh2_now.ps1"
 & scp.exe -o ConnectTimeout=10 $wh1Start "${WH1}:D:/re1_rl/_tmp_start_wh1_now.ps1"
-Invoke-FleetSsh $WH2 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\sshuser\re1_rl\_tmp_start_wh2_now.ps1'
+Invoke-FleetSsh $WH2 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\sshuser\re1_rl\fleet\local\start_wh2_schtask.ps1'
 Invoke-FleetSsh $WH1 'powershell -NoProfile -ExecutionPolicy Bypass -File D:\re1_rl\_tmp_start_wh1_now.ps1'
 & cmd.exe /c (Join-Path $ROOT 'fleet\local\start_worker_detached_pking_headless_plus_memlog.cmd')
 Write-Host 'PKING_STARTED_HEADLESS_19_PLUS_MEMLOG'
