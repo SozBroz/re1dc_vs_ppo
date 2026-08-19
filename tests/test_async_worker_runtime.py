@@ -14,6 +14,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.distributed.async_worker_runtime import (
+    _credit_parent_block,
     _flush_local_epoch,
     _pack_and_deliver_rollouts,
     _serve_need,
@@ -71,6 +72,21 @@ def test_stale_actor_indices_activity_refresh_prevents_restart() -> None:
     )
 
     assert stale == []
+
+
+def test_credit_parent_block_skips_failed_ranks_and_preserves_silence() -> None:
+    last = [10.0, float("-inf"), 40.0]
+    _credit_parent_block(last, 30.0)
+    assert last == [40.0, float("-inf"), 70.0]
+    now = 80.0
+    stale = _stale_actor_indices(
+        [_FakeProcess(True), _FakeProcess(False), _FakeProcess(True)],
+        last,
+        now=now,
+        timeout_s=50.0,
+    )
+    # Rank 0 was 70s silent before credit; after +30s it is still 40s silent.
+    assert stale == [1]
 
 
 def test_startup_rank_batches_bound_concurrent_emulator_pressure() -> None:

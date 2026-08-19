@@ -69,6 +69,22 @@ def _startup_rank_batches(
     return [ranks[index : index + size] for index in range(0, len(ranks), size)]
 
 
+def _credit_parent_block(last_activity: list[float], blocked_s: float) -> None:
+    """Do not count parent-side stalls as actor silence.
+
+    Watchdog recovery and epoch flush run on the same thread that drains
+    ``need`` messages. A 30s respawn would otherwise make every other rank
+    look stale and trigger a stampede restart.
+    """
+    credit = max(0.0, float(blocked_s))
+    if credit <= 0.0:
+        return
+    for index, last in enumerate(last_activity):
+        if last == float("-inf"):
+            continue
+        last_activity[index] = float(last) + credit
+
+
 def _terminate_actor_process(
     proc: mp.Process,
     *,
@@ -844,7 +860,7 @@ def run_async_worker_loop(
                 machine_name,
                 f"actor watchdog recovering stale ranks={stale_ranks} "
                 f"(healthy={len(healthy_indices)}/{actor_count}, "
-                f"timeout_s={stale_timeout_s:.0f})",
+                f"timeout_s={stale_timeout_s:.0f}, serial=1)",
             )
             for index in indices:
                 try:
@@ -872,7 +888,7 @@ def run_async_worker_loop(
                         len(replacements),
                         processes=replacement_procs,
                         actor_ranks=replacement_ranks,
-                        timeout_s=120.0,
+                        timeout_s=180.0,
                     )
                     now = time.monotonic()
                     for index, proc, conn in replacements:
@@ -926,21 +942,21 @@ def run_async_worker_loop(
                     pass
 
             now = time.monotonic()
-            exempt_indices = {
-                index
-                for index, rank in enumerate(ranks)
-                if memlog_actor_rank is not None
-                and rank == int(memlog_actor_rank)
-            }
             stale_indices = _stale_actor_indices(
                 processes,
                 last_actor_activity,
                 now=now,
                 timeout_s=stale_timeout_s,
-                exempt_indices=exempt_indices,
             )
             if stale_indices:
-                _recover_actor_indices(stale_indices)
+                # One rank per pass. Recovering N in parallel restampedes
+                # EmuHawk and, because this loop also serves inference,
+                # makes every other rank look silent.
+                blocked_at = time.monotonic()
+                _recover_actor_indices(stale_indices[:1])
+                _credit_parent_block(
+                    last_actor_activity, time.monotonic() - blocked_at
+                )
                 continue
 
             if policy.policy_version <= 0:
@@ -973,10 +989,18 @@ def run_async_worker_loop(
                 and buffered
                 and (timer_due or buffer_due)
             ):
+                blocked_at = time.monotonic()
                 _flush_buffered("buffer_cap" if buffer_due and not timer_due else "timer")
+                _credit_parent_block(
+                    last_actor_activity, time.monotonic() - blocked_at
+                )
             elif pause_until_policy_gt is None and timer_due and not buffered:
                 # Empty timer tick: still pull weights so remotes stay current.
+                blocked_at = time.monotonic()
                 _flush_buffered("timer")
+                _credit_parent_block(
+                    last_actor_activity, time.monotonic() - blocked_at
+                )
 
             ready = wait(parent_conns, timeout=1.0)
             if not ready:

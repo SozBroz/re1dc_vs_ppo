@@ -38,7 +38,7 @@ CKPT_STATE_DIR = PROJECT_ROOT / "states" / "checkpoints"
 
 def _actor_startup_stagger_s(rank: int) -> float:
     per_rank_s = float(
-        os.environ.get("RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK", "1.0")
+        os.environ.get("RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK", "0")
     )
     return max(0.0, per_rank_s) * max(0, int(rank))
 

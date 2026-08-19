@@ -41,8 +41,11 @@ class _StubbornProcess:
             raise subprocess.TimeoutExpired("EmuHawk", timeout)
 
 
-def test_actor_startup_stagger_can_be_disabled_for_serial_boot(monkeypatch) -> None:
+def test_actor_startup_stagger_defaults_off_for_serial_boot(monkeypatch) -> None:
     monkeypatch.delenv("RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK", raising=False)
+    assert _actor_startup_stagger_s(7) == 0.0
+
+    monkeypatch.setenv("RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK", "1.0")
     assert _actor_startup_stagger_s(7) == 7.0
 
     monkeypatch.setenv("RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK", "0")
