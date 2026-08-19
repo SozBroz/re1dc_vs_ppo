@@ -106,6 +106,12 @@ SOFTLOCK_TIMEOUT_PENALTY = -0.26666666666666666
 
 ENEMY_DAMAGE_REWARD = 0.014
 ENEMY_KILL_REWARD = 2.0
+# Imperator 2026-08-19: steer combat toward the Beretta.
+BERETTA_WEAPON_ID = 0x02
+BERETTA_DAMAGE_SCALE = 1.1
+# COMBINE reload when the weapon slot is at or below 1/3 combine capacity
+# (beretta 5/15, shotgun 2/7, bazooka/magnum 2/6).
+WEAPON_RELOAD_REWARD = 0.1
 # Shotgun vs cerberus is brutally ammo-inefficient in RE1 DC — steer to handgun.
 SHOTGUN_DOG_HIT_PENALTY = -1.4
 # Magnum / bazooka on fodder (dog or zombie) — keep heavy ammo for bosses.
@@ -539,6 +545,7 @@ RAILS_NAV_POSITIVE_TERMS: frozenset[str] = frozenset({
     "new_weapon",
     "ammo_pickup",
     "gallery",
+    "weapon_reload",
 })
 # PBRS, junk pickups, typewriter, etc.
 RAILS_MINOR_POSITIVE_SCALE = 0.05
@@ -765,10 +772,68 @@ def _state_boss_combat_scale(state: dict[str, Any]) -> float:
     return 1.0
 
 
+def _beretta_damage_scale(state: dict[str, Any]) -> float:
+    if int(_combat_ammo_weapon_id(state)) == BERETTA_WEAPON_ID:
+        return BERETTA_DAMAGE_SCALE
+    return 1.0
+
+
+def _inventory_id_qty_slots(state: dict[str, Any] | None) -> list[tuple[int, int]]:
+    from re1_rl.ammo_accounting import inventory_slots_to_id_qty
+
+    return inventory_slots_to_id_qty((state or {}).get("inventory_slots"))
+
+
+def reload_low_ammo_threshold(weapon_id: int) -> int:
+    """Max loaded qty that still qualifies a COMBINE reload crumb (floor of 1/3)."""
+    from re1_rl.ammo_accounting import combine_clip_capacity
+
+    return combine_clip_capacity(int(weapon_id) & 0xFF) // 3
+
+
+def low_ammo_reload_reward(prev_state: dict[str, Any], state: dict[str, Any]) -> float:
+    """+0.1 per weapon slot COMBINE-reloaded from at or below 1/3 capacity."""
+    from re1_rl.ammo_accounting import WEAPON_AMMO_ITEM
+    from re1_rl.memory_map import WEAPON_ITEM_IDS
+
+    prev_slots = _inventory_id_qty_slots(prev_state)
+    cur_slots = _inventory_id_qty_slots(state)
+    if not prev_slots or not cur_slots:
+        return 0.0
+    n = min(len(prev_slots), len(cur_slots))
+    total = 0.0
+    for i in range(n):
+        pid, pq = prev_slots[i]
+        cid, cq = cur_slots[i]
+        wid = int(pid) & 0xFF
+        if wid == 0 or wid != (int(cid) & 0xFF):
+            continue
+        if wid not in WEAPON_ITEM_IDS or wid == 0x01:
+            continue
+        ammo_id = WEAPON_AMMO_ITEM.get(wid)
+        if ammo_id is None:
+            continue
+        if int(pq) > reload_low_ammo_threshold(wid):
+            continue
+        if int(cq) <= int(pq):
+            continue
+        prev_ammo = sum(
+            int(q) for iid, q in prev_slots if (int(iid) & 0xFF) == int(ammo_id)
+        )
+        cur_ammo = sum(
+            int(q) for iid, q in cur_slots if (int(iid) & 0xFF) == int(ammo_id)
+        )
+        if cur_ammo >= prev_ammo:
+            continue
+        total += WEAPON_RELOAD_REWARD
+    return total
+
+
 def enemy_combat_rewards(state: dict[str, Any]) -> tuple[float, float]:
     """Return ``(damage_pay, kill_pay)`` honoring per-event crow / boss scaling."""
     room_id = str(state.get("room_id") or "")
     events = state.get("combat_events")
+    beretta = _beretta_damage_scale(state)
     if events:
         damage_pay = 0.0
         kill_pay = 0.0
@@ -776,7 +841,7 @@ def enemy_combat_rewards(state: dict[str, Any]) -> tuple[float, float]:
             if ev.get("reward_denied"):
                 continue
             scale = _combat_event_scale(ev, room_id=room_id)
-            damage_pay += ENEMY_DAMAGE_REWARD * int(ev.get("damage", 0)) * scale
+            damage_pay += ENEMY_DAMAGE_REWARD * int(ev.get("damage", 0)) * scale * beretta
             if ev.get("killed"):
                 kill_pay += ENEMY_KILL_REWARD * scale
         return damage_pay, kill_pay
@@ -784,7 +849,7 @@ def enemy_combat_rewards(state: dict[str, Any]) -> tuple[float, float]:
     enemy_damage = int(state.get("enemy_damage", 0) or 0)
     enemy_kills = int(state.get("enemy_kills", 0) or 0)
     return (
-        ENEMY_DAMAGE_REWARD * enemy_damage * scale,
+        ENEMY_DAMAGE_REWARD * enemy_damage * scale * beretta,
         ENEMY_KILL_REWARD * enemy_kills * scale,
     )
 
@@ -852,6 +917,7 @@ def compute_reward(
         "combat_overkill": 0.0,
         "shotgun_dog_hit": 0.0,
         "heavy_weapon_fodder_hit": 0.0,
+        "weapon_reload": 0.0,
         "attack_dry_fire": 0.0,
         "attack_macro_failure": 0.0,
     }
@@ -1221,6 +1287,10 @@ def compute_reward(
         bd["enemy_damage"] = enemy_damage_pay
     if enemy_kill_pay > 0.0:
         bd["enemy_kill"] = enemy_kill_pay
+
+    reload_pay = low_ammo_reload_reward(prev_state, state)
+    if reload_pay > 0.0:
+        bd["weapon_reload"] = reload_pay
 
     overkill = combat_overkill_penalty(state)
     if overkill < 0.0:

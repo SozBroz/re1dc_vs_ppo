@@ -69,7 +69,7 @@ def test_cp_budgets_match_imperator_multipliers() -> None:
     assert cell_timeout_frames(45, ROOT) == 28800  # flat 8 min, not 4:20.72 * 1.5
     assert cell_timeout_frames(46, ROOT) == 11647  # 1:37.06 * 2
     assert cell_timeout_frames(47, ROOT) == 1814  # 15.12s * 2
-    assert cell_timeout_frames(53, ROOT) == 19385  # 1:20.77 * 4 hard
+    assert cell_timeout_frames(53, ROOT) == CAP  # flat 12 min, not 1:20.77 * 4
     assert cell_timeout_frames(60, ROOT) == 31668  # 2:11.95 * 4 hard
     assert cell_timeout_frames(84, ROOT) == 12473  # 2:18.59 * 1.5 cutscene
     assert cell_timeout_frames(85, ROOT) == 5383  # 22.43s * 4 hard (Richard-wait)
@@ -83,7 +83,7 @@ def test_cp_budgets_match_imperator_multipliers() -> None:
     assert cell_timeout_frames(25, ROOT) < CAP
     assert cell_timeout_frames(27, ROOT) < CAP
     assert cell_timeout_frames(45, ROOT) < CAP
-    assert cell_timeout_frames(53, ROOT) < CAP
+    assert cell_timeout_frames(53, ROOT) == CAP
     assert cell_timeout_frames(60, ROOT) < CAP
     assert cell_timeout_frames(84, ROOT) < CAP
 

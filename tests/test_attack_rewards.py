@@ -14,6 +14,7 @@ from re1_rl.reward import (
     AMMO_SPEND_TAX_PER_ROUND,
     AMMO_WASTE_MAX_PENALTY,
     ATTACK_MISS_TAX_SCALE,
+    BERETTA_DAMAGE_SCALE,
     ENEMY_DAMAGE_REWARD,
     ENEMY_KILL_REWARD,
     HEAVY_WEAPON_FODDER_HIT_PENALTY,
@@ -22,6 +23,9 @@ from re1_rl.reward import (
     MISS_TAX_CLIP_SIZE,
     REFERENCE_STEP_FRAMES,
     STEP_PENALTY,
+    WEAPON_RELOAD_REWARD,
+    low_ammo_reload_reward,
+    reload_low_ammo_threshold,
     ammo_spend_penalty,
     ammo_spend_per_round,
     ammo_waste_per_missed_round,
@@ -180,7 +184,9 @@ def test_hit_pays_ammo_spend_not_miss_waste() -> None:
     reward, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["enemy_damage"] == ENEMY_DAMAGE_REWARD * 20
+    assert bd["enemy_damage"] == pytest.approx(
+        ENEMY_DAMAGE_REWARD * 20 * BERETTA_DAMAGE_SCALE
+    )
     assert bd["attack_miss"] == 0.0
     assert bd["ammo_waste"] == 0.0
     assert bd["ammo_spend"] == pytest.approx(ammo_spend_penalty(0x02, 1))
@@ -275,6 +281,7 @@ def test_breakdown_keys_present() -> None:
     assert "combat_overkill" in bd
     assert "shotgun_dog_hit" in bd
     assert "heavy_weapon_fodder_hit" in bd
+    assert "weapon_reload" in bd
 
 
 def test_shotgun_dog_hit_penalty_per_event() -> None:
@@ -649,9 +656,143 @@ def test_yawn_rails_keeps_combat_hit_positive_unscaled_against_miss_tax() -> Non
         prev, miss, make_planner(), progress=ProgressTracker(),
         rails_mode=True, return_breakdown=True,
     )
-    assert hit_bd["enemy_damage"] == pytest.approx(4 * ENEMY_DAMAGE_REWARD)
+    assert hit_bd["enemy_damage"] == pytest.approx(
+        4 * ENEMY_DAMAGE_REWARD * BERETTA_DAMAGE_SCALE
+    )
     assert hit_bd["ammo_spend"] == pytest.approx(ammo_spend_penalty(0x02, 1))
     assert hit_bd["enemy_damage"] + hit_bd["ammo_spend"] > 0.0
     assert abs(miss_bd["ammo_spend"]) + abs(miss_bd["ammo_waste"]) > abs(
         hit_bd["ammo_spend"]
     )
+
+
+def test_reload_low_ammo_thresholds_match_imperator() -> None:
+    assert reload_low_ammo_threshold(0x02) == 5
+    assert reload_low_ammo_threshold(0x03) == 2
+    assert reload_low_ammo_threshold(0x07) == 2
+    assert reload_low_ammo_threshold(0x05) == 2
+
+
+def test_beretta_damage_is_one_point_one_times() -> None:
+    assert BERETTA_DAMAGE_SCALE == pytest.approx(1.1)
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    cur["equipped_weapon_id"] = 0x02
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 10,
+            "killed": False,
+            "reward_denied": False,
+        }
+    ]
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["enemy_damage"] == pytest.approx(
+        10 * ENEMY_DAMAGE_REWARD * BERETTA_DAMAGE_SCALE
+    )
+
+
+def test_shotgun_damage_unscaled_by_beretta_bonus() -> None:
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    cur["equipped_weapon_id"] = 0x03
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 10,
+            "killed": False,
+            "reward_denied": False,
+        }
+    ]
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["enemy_damage"] == pytest.approx(10 * ENEMY_DAMAGE_REWARD)
+
+
+def test_low_ammo_weapon_reload_pays() -> None:
+    assert WEAPON_RELOAD_REWARD == pytest.approx(0.1)
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    prev["inventory_slots"] = [("beretta", 5), ("handgun_bullets", 30)]
+    cur["inventory_slots"] = [("beretta", 15), ("handgun_bullets", 20)]
+    assert low_ammo_reload_reward(prev, cur) == pytest.approx(WEAPON_RELOAD_REWARD)
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(),
+        rails_mode=True, return_breakdown=True,
+    )
+    assert bd["weapon_reload"] == pytest.approx(WEAPON_RELOAD_REWARD)
+
+
+def test_reload_above_one_third_does_not_pay() -> None:
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    prev["inventory_slots"] = [("beretta", 6), ("handgun_bullets", 30)]
+    cur["inventory_slots"] = [("beretta", 15), ("handgun_bullets", 21)]
+    assert low_ammo_reload_reward(prev, cur) == 0.0
+    prev["inventory_slots"] = [("shotgun", 3), ("shotgun_shells", 10)]
+    cur["inventory_slots"] = [("shotgun", 7), ("shotgun_shells", 6)]
+    assert low_ammo_reload_reward(prev, cur) == 0.0
+
+
+def test_shotgun_and_bazooka_low_reload_pays() -> None:
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    prev["inventory_slots"] = [("shotgun", 2), ("shotgun_shells", 10)]
+    cur["inventory_slots"] = [("shotgun", 7), ("shotgun_shells", 5)]
+    assert low_ammo_reload_reward(prev, cur) == pytest.approx(WEAPON_RELOAD_REWARD)
+    prev["inventory_slots"] = [("bazooka_acid", 0), ("acid_rounds", 6)]
+    cur["inventory_slots"] = [("bazooka_acid", 6), ("acid_rounds", 0)]
+    assert low_ammo_reload_reward(prev, cur) == pytest.approx(WEAPON_RELOAD_REWARD)
+
+
+def test_ammo_stack_merge_is_not_a_reload() -> None:
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    prev["inventory_slots"] = [("handgun_bullets", 20), ("handgun_bullets", 15)]
+    cur["inventory_slots"] = [("handgun_bullets", 35), ("", 0)]
+    assert low_ammo_reload_reward(prev, cur) == 0.0
+
+
+def test_herb_combine_is_not_a_reload() -> None:
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    prev["inventory_slots"] = [("green_herb", 1), ("red_herb", 1)]
+    cur["inventory_slots"] = [("mixed_herbs_gr", 1), ("", 0)]
+    assert low_ammo_reload_reward(prev, cur) == 0.0
+
+
+def test_empty_clip_reload_pays() -> None:
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    prev["inventory_slots"] = [("beretta", 0), ("handgun_bullets", 30)]
+    cur["inventory_slots"] = [("beretta", 15), ("handgun_bullets", 15)]
+    assert low_ammo_reload_reward(prev, cur) == pytest.approx(WEAPON_RELOAD_REWARD)
+
+
+def test_beretta_boss_damage_stacks_one_point_one_on_four_x() -> None:
+    planner = make_planner()
+    prev = make_state(hp=96, step=1)
+    cur = make_state(hp=96, step=2)
+    cur["equipped_weapon_id"] = 0x02
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 10,
+            "killed": False,
+            "reward_denied": False,
+            "is_boss": True,
+        }
+    ]
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["enemy_damage"] == pytest.approx(
+        10 * ENEMY_DAMAGE_REWARD * BOSS_COMBAT_REWARD_SCALE * BERETTA_DAMAGE_SCALE
+    )
+    assert bd["enemy_kill"] == 0.0
