@@ -13,6 +13,7 @@ set N_ENVS=28
 set BASE_PORT=5555
 set LEARNER_PORT=8765
 set SYNC_INTERVAL_S=360
+set RE1_ACTOR_STARTUP_BATCH_SIZE=1
 
 REM PB champions: typewriter saves + west-wing danger-room first-entry (108/202/204).
 REM Reset mix: sample_training_start — RE1_PB_FRESH_WEIGHT ignored (legacy).
