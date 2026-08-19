@@ -18,6 +18,7 @@ from re1_rl.distributed.async_worker_runtime import (
     _pack_and_deliver_rollouts,
     _serve_need,
     _stale_actor_indices,
+    _startup_rank_batches,
     _terminate_actor_process,
     pack_rollouts,
     worker_rollout_from_actor_msg,
@@ -70,6 +71,16 @@ def test_stale_actor_indices_activity_refresh_prevents_restart() -> None:
     )
 
     assert stale == []
+
+
+def test_startup_rank_batches_bound_concurrent_emulator_pressure() -> None:
+    assert _startup_rank_batches(list(range(10)), batch_size=4) == [
+        [0, 1, 2, 3],
+        [4, 5, 6, 7],
+        [8, 9],
+    ]
+    with pytest.raises(ValueError, match="batch_size"):
+        _startup_rank_batches([0], batch_size=0)
 
 
 def test_dead_actor_cleanup_still_kills_recorded_emuhawk(monkeypatch) -> None:

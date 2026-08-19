@@ -59,6 +59,16 @@ def _stale_actor_indices(
     return stale
 
 
+def _startup_rank_batches(
+    ranks: list[int], *, batch_size: int
+) -> list[list[int]]:
+    """Split initial emulator launches into bounded pressure-safe waves."""
+    size = int(batch_size)
+    if size <= 0:
+        raise ValueError("actor startup batch_size must be positive")
+    return [ranks[index : index + size] for index in range(0, len(ranks), size)]
+
+
 def _terminate_actor_process(
     proc: mp.Process,
     *,
@@ -568,6 +578,15 @@ def run_async_worker_loop(
     if memlog_actor_rank is not None and int(memlog_actor_rank) not in ranks:
         raise ValueError("memlog actor rank must be one of actor_ranks")
     actor_count = len(ranks)
+    try:
+        startup_batch_size = int(
+            os.environ.get("RE1_ACTOR_STARTUP_BATCH_SIZE", "4")
+        )
+    except ValueError:
+        startup_batch_size = 4
+    startup_batches = _startup_rank_batches(
+        ranks, batch_size=startup_batch_size
+    )
     buffer_cap = max(int(buffer_flush_steps), 0)
     log(
         machine_name,
@@ -577,6 +596,7 @@ def run_async_worker_loop(
         f"buffer_flush_steps={buffer_cap or 'off'}, "
         f"headless={headless}, screenshot_mmf={screenshot_mmf}, "
         f"inference_batch_max={inference_batch_max}, "
+        f"startup_batch_size={startup_batch_size}, "
         f"eval_only={eval_only})",
     )
     root = Path(project_root) if project_root else Path.cwd()
@@ -709,18 +729,31 @@ def run_async_worker_loop(
             last_heartbeat = time.monotonic()
             hb_thread.start()
 
-        for rank in ranks:
-            proc, parent_conn = _spawn_rank(rank)
-            processes.append(proc)
-            parent_conns.append(parent_conn)
-
-        spawned_emu_pids = _wait_for_actor_spawn(
-            parent_conns,
-            actor_count,
-            processes=processes,
-            actor_ranks=ranks,
-        )
-        actor_emu_pids = [spawned_emu_pids.get(rank) for rank in ranks]
+        for batch_number, batch_ranks in enumerate(startup_batches, start=1):
+            batch_processes: list[mp.Process] = []
+            batch_conns: list[Connection] = []
+            batch_indices: list[int] = []
+            log(
+                machine_name,
+                f"actor startup batch {batch_number}/{len(startup_batches)} "
+                f"ranks={batch_ranks}",
+            )
+            for rank in batch_ranks:
+                proc, parent_conn = _spawn_rank(rank)
+                batch_indices.append(len(processes))
+                processes.append(proc)
+                parent_conns.append(parent_conn)
+                actor_emu_pids.append(None)
+                batch_processes.append(proc)
+                batch_conns.append(parent_conn)
+            batch_pids = _wait_for_actor_spawn(
+                batch_conns,
+                len(batch_ranks),
+                processes=batch_processes,
+                actor_ranks=batch_ranks,
+            )
+            for index, rank in zip(batch_indices, batch_ranks):
+                actor_emu_pids[index] = batch_pids.get(rank)
         log(machine_name, f"async worker fleet ready ({actor_count} actors)")
         for conn in parent_conns:
             conn.send({"t": "start"})
