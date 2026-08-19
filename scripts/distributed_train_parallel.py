@@ -24,7 +24,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -405,6 +405,44 @@ def _maybe_start_grid_tiler(args: argparse.Namespace) -> threading.Event | None:
     return stop
 
 
+def _run_async_worker_with_restarts(
+    run_once: Callable[[], None],
+    *,
+    stop_event: threading.Event,
+    machine_name: str,
+    on_restart: Callable[[], None] | None = None,
+    initial_delay_s: float = 5.0,
+    max_delay_s: float = 60.0,
+) -> None:
+    """Keep an async worker alive across startup or fleet-wide actor failures."""
+    attempt = 0
+    while not stop_event.is_set():
+        failure: Exception | None = None
+        try:
+            run_once()
+        except KeyboardInterrupt:
+            raise
+        except Exception as exc:
+            failure = exc
+        if stop_event.is_set():
+            return
+
+        attempt += 1
+        if on_restart is not None:
+            on_restart()
+        delay_s = min(
+            float(max_delay_s),
+            float(initial_delay_s) * (2 ** min(attempt - 1, 4)),
+        )
+        reason = repr(failure) if failure is not None else "loop exited unexpectedly"
+        log(
+            machine_name,
+            f"async worker restart attempt={attempt} in {delay_s:.0f}s: {reason}",
+        )
+        if stop_event.wait(delay_s):
+            return
+
+
 def _run_local_worker(
     args: argparse.Namespace,
     *,
@@ -454,7 +492,7 @@ def _run_local_worker(
 
         # Local weights sync only at epoch flush inside run_async_worker_loop
         # (no mid-horizon _local_weight_sync_loop hot-swap).
-        try:
+        def _run_once() -> None:
             run_async_worker_loop(
                 policy,
                 machine_name=args.machine_name,
@@ -480,6 +518,14 @@ def _run_local_worker(
                 memlog_actor_rank=4 if bool(getattr(args, "memlog", False)) else None,
                 eval_only=bool(getattr(args, "eval_only", False)),
                 health_callback=_report_health,
+            )
+
+        try:
+            _run_async_worker_with_restarts(
+                _run_once,
+                stop_event=stop_event,
+                machine_name=args.machine_name,
+                on_restart=lambda: _report_health(0),
             )
         finally:
             if learner_state is not None:
@@ -542,29 +588,40 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
                 screenshot_mmf=args.screenshot_mmf,
             )
         else:
-            run_async_worker_loop(
-                policy,
-                machine_name=args.machine_name,
-                worker_id=worker_id,
-                n_envs=int(args.n_envs),
-                n_steps=int(args.n_steps),
-                curriculum=args.curriculum,
-                base_port=int(args.base_port),
-                training_speed=int(args.training_speed),
-                skip_chunk=int(args.skip_chunk),
-                capture_checkpoints=bool(args.capture_checkpoints),
+            def _run_once() -> None:
+                run_async_worker_loop(
+                    policy,
+                    machine_name=args.machine_name,
+                    worker_id=worker_id,
+                    n_envs=int(args.n_envs),
+                    n_steps=int(args.n_steps),
+                    curriculum=args.curriculum,
+                    base_port=int(args.base_port),
+                    training_speed=int(args.training_speed),
+                    skip_chunk=int(args.skip_chunk),
+                    capture_checkpoints=bool(args.capture_checkpoints),
+                    stop_event=stop_event,
+                    rollout_sink=client,
+                    is_local=False,
+                    sync_interval_s=sync_interval,
+                    buffer_flush_steps=int(
+                        getattr(args, "worker_buffer_steps", 0) or 0
+                    ),
+                    project_root=PROJECT_ROOT,
+                    headless=bool(args.headless),
+                    screenshot_mmf=args.screenshot_mmf,
+                    inference_batch_max=int(args.inference_batch_max),
+                    actor_ranks=getattr(args, "actor_ranks", None),
+                    memlog_actor_rank=(
+                        4 if bool(getattr(args, "memlog", False)) else None
+                    ),
+                    eval_only=bool(getattr(args, "eval_only", False)),
+                )
+
+            _run_async_worker_with_restarts(
+                _run_once,
                 stop_event=stop_event,
-                rollout_sink=client,
-                is_local=False,
-                sync_interval_s=sync_interval,
-                buffer_flush_steps=int(getattr(args, "worker_buffer_steps", 0) or 0),
-                project_root=PROJECT_ROOT,
-                headless=bool(args.headless),
-                screenshot_mmf=args.screenshot_mmf,
-                inference_batch_max=int(args.inference_batch_max),
-                actor_ranks=getattr(args, "actor_ranks", None),
-                memlog_actor_rank=4 if bool(getattr(args, "memlog", False)) else None,
-                eval_only=bool(getattr(args, "eval_only", False)),
+                machine_name=args.machine_name,
             )
     except KeyboardInterrupt:
         log(args.machine_name, "remote worker interrupted")

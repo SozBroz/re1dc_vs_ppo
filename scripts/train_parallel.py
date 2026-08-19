@@ -222,7 +222,11 @@ def make_env(
         shot = str(PROJECT_ROOT / "data" / f"_frame_{port}.png")
         bridge = BizHawkClient(
             port=port,
-            timeout=120.0,
+            # WH2 boots 28 emulators through one scheduled desktop session.
+            # TCP connects before ROM/Lua initialization finishes, and the
+            # first hello can legitimately take several minutes under that
+            # startup load. Runtime stalls are handled by the actor watchdog.
+            timeout=300.0,
             connect_timeout=75.0,
             screenshot_path=shot,
             screenshot_mmf=screenshot_mmf,
