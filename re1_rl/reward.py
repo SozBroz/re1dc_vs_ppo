@@ -107,9 +107,11 @@ SOFTLOCK_TIMEOUT_PENALTY = -0.26666666666666666
 ENEMY_DAMAGE_REWARD = 0.014
 ENEMY_KILL_REWARD = 2.0
 # Shotgun vs cerberus is brutally ammo-inefficient in RE1 DC — steer to handgun.
-SHOTGUN_DOG_HIT_PENALTY = -0.7
+SHOTGUN_DOG_HIT_PENALTY = -1.4
 # Magnum / bazooka on fodder (dog or zombie) — keep heavy ammo for bosses.
-HEAVY_WEAPON_FODDER_HIT_PENALTY = -2.0
+# −2.6 makes a dining-2F GL one-shot net-negative after spend + kill crumbs
+# (imperator 2026-08-19; was −2.0).
+HEAVY_WEAPON_FODDER_HIT_PENALTY = -2.6
 HEAVY_WEAPON_FODDER_IDS: frozenset[int] = frozenset(
     {
         0x04,  # colt python dumdum
@@ -460,7 +462,7 @@ def shotgun_dog_hit_penalty(state: dict[str, Any]) -> float:
 
 
 def heavy_weapon_fodder_hit_penalty(state: dict[str, Any]) -> float:
-    """−2 per magnum/bazooka hit on a dog or zombie."""
+    """−2.6 per magnum/bazooka hit on a dog or zombie."""
     wid = _combat_ammo_weapon_id(state)
     if int(wid) not in HEAVY_WEAPON_FODDER_IDS:
         return 0.0
@@ -1168,6 +1170,7 @@ def compute_reward(
                 bd,
                 RAILS_CAPTURE_INELIGIBLE_PENALTY,
                 room_id=room,
+                state=state,
             )
 
     if (
