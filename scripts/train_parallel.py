@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -252,10 +253,20 @@ def make_env(
             # on headless/autologon boxes. --chromeless: less UI chrome.
             emuhawk_cmd.extend(["--gdi", "--chromeless"])
         # Do NOT redirect stdout/stderr: WinForms ShowDialog needs UserInteractive.
+        detach_console = os.environ.get(
+            "RE1_EMUHAWK_DETACH_CONSOLE", ""
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        creationflags = 0
+        if detach_console and os.name == "nt":
+            creationflags = int(getattr(subprocess, "DETACHED_PROCESS", 0)) | int(
+                getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            )
         try:
             proc = subprocess.Popen(
                 emuhawk_cmd,
                 cwd=str(EMUHAWK.parent),
+                close_fds=bool(detach_console),
+                creationflags=creationflags,
             )
         except BaseException:
             bridge.close()
