@@ -43,6 +43,7 @@ SOFTWARE.
 local pairs, type, tostring, tonumber, getmetatable, setmetatable, rawset =
  pairs, type, tostring, tonumber, getmetatable, setmetatable, rawset
 local error, require, pcall, select = error, require, pcall, select
+local debuglib = debug
 local floor, huge = math.floor, math.huge
 local strrep, gsub, strsub, strbyte, strchar, strfind, strlen, strformat =
  string.rep, string.gsub, string.sub, string.byte, string.char,
@@ -61,7 +62,7 @@ local _ENV = nil -- blocking globals in Lua 5.2
 pcall (function()
  -- Enable access to blocked metatables.
  -- Don't worry, this module doesn't change anything in them.
- local debmeta = require "debug".getmetatable
+ local debmeta = debuglib and debuglib.getmetatable
  if debmeta then getmetatable = debmeta end
 end)
 
