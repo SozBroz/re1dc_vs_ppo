@@ -21,11 +21,14 @@ _ITEM_NAME_TO_ID = {canonical_item(name): item_id for item_id, name in ITEM_IDS.
 
 # Minimum on-person empty slots required to admit a curated capture.
 # cp42 / west-stairs-return: box logistics headroom.
-# plant_42_enter_10E: need room for Keeper ammo (heal herb + load shells).
 CAPTURE_MIN_FREE_SLOTS: dict[str, int] = {
     "east_stairs_101_post_storeroom": 2,
     "west_stairs_return_10B": 2,
-    "plant_42_enter_10E": 2,
+}
+
+# Items that must already be gone before a capture is admitted (e.g. heal used).
+CAPTURE_MUST_NOT_HOLD: dict[str, frozenset[str]] = {
+    "plant_42_enter_10E": frozenset({"green_herb"}),
 }
 
 _CAPTURE_INELIGIBLE_ATTR = "_yawn_capture_ineligible_reason"
@@ -1322,6 +1325,26 @@ def capture_successor_cell(
         for x in (state.get("inventory") or [])
         if str(x).strip()
     }
+    for entry in state.get("inventory_slots") or []:
+        if isinstance(entry, dict):
+            name = canonical_item(str(entry.get("name") or entry.get("item") or ""))
+        elif isinstance(entry, (list, tuple)) and entry:
+            name = canonical_item(str(entry[0]))
+        else:
+            continue
+        if name and name not in {"0", "none", "empty"}:
+            inv_names.add(name)
+    forbidden = CAPTURE_MUST_NOT_HOLD.get(cid)
+    if forbidden:
+        held = sorted(name for name in forbidden if name in inv_names)
+        if held:
+            print(
+                f"[yawn_capture] reject must_not_hold still held "
+                f"items={held} cp={cid}",
+                flush=True,
+            )
+            _mark_capture_ineligible(env, "must_not_hold")
+            return None
     for item in completed_cp.get("consume_before_gain") or []:
         name = canonical_item(str(item))
         if name and name in inv_names:
