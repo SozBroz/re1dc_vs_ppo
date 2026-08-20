@@ -19,11 +19,13 @@ from re1_rl.pb_sidecar import dump_episode_sidecar, utc_now_iso
 
 _ITEM_NAME_TO_ID = {canonical_item(name): item_id for item_id, name in ITEM_IDS.items()}
 
-# Minimum on-person empty slots required to admit a curated capture (cp42 needs
-# headroom for box withdraw/deposit after the storeroom chemical leg).
+# Minimum on-person empty slots required to admit a curated capture.
+# cp42 / west-stairs-return: box logistics headroom.
+# plant_42_enter_10E: need room for Keeper ammo (heal herb + load shells).
 CAPTURE_MIN_FREE_SLOTS: dict[str, int] = {
     "east_stairs_101_post_storeroom": 2,
     "west_stairs_return_10B": 2,
+    "plant_42_enter_10E": 2,
 }
 
 _CAPTURE_INELIGIBLE_ATTR = "_yawn_capture_ineligible_reason"

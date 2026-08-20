@@ -2522,6 +2522,84 @@ def test_west_stairs_return_capture_requires_two_free_slots(
     assert proposal["checkpoint_id"] == "west_stairs_return_10B"
 
 
+def test_plant_42_enter_capture_requires_two_free_slots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """cp67 capture refuses without 2 empty slots (heal herb + load shells)."""
+    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
+    bridge = MagicMock()
+    bridge.save_savestate.side_effect = (
+        lambda path: Path(path).write_bytes(b"state")
+    )
+    planner = _planner(start_index=_idx("plant_42_enter_10E") + 1)
+    six_items = (
+        ("beretta", 8),
+        ("shield_key", 1),
+        ("shotgun", 0),
+        ("handgun_bullets", 49),
+        ("acid_rounds", 6),
+        ("armor_key", 5),
+    )
+    env = SimpleNamespace(
+        project_root=tmp_path,
+        _stage={
+            "mode": "yawn_rails",
+            "cells_manifest": "states/yawn_rails/manifest.json",
+            "route_id": "test",
+        },
+        _planner=planner,
+        bridge=bridge,
+        _macro_active=False,
+        _progress=None,
+        _step_count=300,
+        _read_state=lambda track_items=False: _state("10E"),
+    )
+    monkeypatch.setattr(
+        "re1_rl.yawn_rails.dump_episode_sidecar",
+        lambda *_args, **_kwargs: {"schema_version": 1},
+    )
+    monkeypatch.setattr(
+        "re1_rl.go_explore_capture.compute_quality",
+        lambda *_args, **_kwargs: [96, 85, 68, 14, 1, 0, 0],
+    )
+
+    crowded = _state(
+        "10E",
+        inventory_slots=[*six_items, ("green_herb", 1), ("shotgun_shells", 7)],
+    )
+    assert (
+        capture_successor_cell(
+            env, crowded, {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
+        )
+        is None
+    )
+    assert yawn_capture_ineligible_reason(env) == "inventory_free_slots"
+    bridge.save_savestate.assert_not_called()
+
+    one_free = _state(
+        "10E",
+        inventory_slots=[*six_items, ("shotgun_shells", 7), (0, 0)],
+    )
+    assert (
+        capture_successor_cell(
+            env, one_free, {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
+        )
+        is None
+    )
+    assert yawn_capture_ineligible_reason(env) == "inventory_free_slots"
+
+    ok_state = _state(
+        "10E",
+        inventory_slots=[*six_items, (0, 0), (0, 0)],
+    )
+    proposal = capture_successor_cell(
+        env, ok_state, {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
+    )
+    assert proposal is not None
+    assert yawn_capture_ineligible_reason(env) is None
+    assert proposal["checkpoint_id"] == "plant_42_enter_10E"
+
+
 def test_capture_ineligible_claws_back_checkpoint_reward() -> None:
     """Hard capture ineligibility replaces +8 checkpoint_success with -4 failure."""
     progress = ProgressTracker(leg_span=1)
