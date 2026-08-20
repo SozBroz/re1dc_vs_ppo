@@ -1203,11 +1203,20 @@ def compute_reward(
         state["typewriter_save_complete"] = bool(typewriter_save_complete)
         if progress is not None:
             state["gallery_puzzle_solved"] = bool(progress.gallery_puzzle_solved)
-        advanced = bool(
-            planner.advance_if_success(
-                state, progress=progress, prev_state=prev_state
+        # While a CP freeze is waiting to capture, do not advance further
+        # (room_enter already-true after Richard 20D→204 dump).
+        freeze_pending = False
+        # planner is the env's planner; freeze flag lives on env when available.
+        # compute_reward does not get env — use progress attribute set by env.
+        if progress is not None and getattr(progress, "checkpoint_freeze_pending", False):
+            freeze_pending = True
+        advanced = False
+        if not freeze_pending:
+            advanced = bool(
+                planner.advance_if_success(
+                    state, progress=progress, prev_state=prev_state
+                )
             )
-        )
         if advanced:
             if progress is not None and progress.shotgun_return_breached:
                 claimed = False

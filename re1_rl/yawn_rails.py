@@ -1197,7 +1197,14 @@ def capture_successor_cell(
     if stage.get("mode") != "yawn_rails":
         return None
     planner = env._planner
-    completed = int(planner.waypoint_index) - 1
+    frozen = getattr(env, "_checkpoint_capture_index", None)
+    if frozen is not None:
+        try:
+            completed = int(frozen)
+        except (TypeError, ValueError):
+            completed = int(planner.waypoint_index) - 1
+    else:
+        completed = int(planner.waypoint_index) - 1
     if completed < 0 or completed >= planner.total_waypoints:
         return None
     completed_cp = planner.step_by_seq(completed + 1) or {}

@@ -73,6 +73,8 @@ class ProgressTracker:
     shotgun_return_breached: bool = False
     # Checkpoint nav succeeded but successor capture was hard-ineligible.
     capture_ineligible_breached: bool = False
+    # Env armed CP freeze — reward must not advance further until capture runs.
+    checkpoint_freeze_pending: bool = False
     # Per-CP emulated-frame wall for the current hunt (0 = no per-cell timeout).
     cell_timeout_frames: int = 0
     leg_emulated_frames: int = 0

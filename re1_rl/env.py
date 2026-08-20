@@ -419,6 +419,7 @@ class RE1Env(gym.Env):
         self._leg_replay = None
         self._footage_trace = None
         self._checkpoint_freeze_pending = False
+        self._checkpoint_capture_index = None
         self._checkpoint_captured = False
         self._prev_state: dict[str, Any] = {}
         self._prev_hp = 0
@@ -1308,6 +1309,15 @@ class RE1Env(gym.Env):
     def _arm_checkpoint_freeze(self) -> None:
         """Mark CP success. Capture on the next decision frame; last cell ends."""
         self._checkpoint_freeze_pending = True
+        # Freeze the completed index now. Richard's cutscene dumps into 204, and
+        # the next room_enter(204) would otherwise advance again before capture,
+        # minting cp85 and skipping cp84.
+        try:
+            self._checkpoint_capture_index = int(self._planner.waypoint_index) - 1
+        except (TypeError, ValueError, AttributeError):
+            self._checkpoint_capture_index = None
+        if self._progress is not None:
+            self._progress.checkpoint_freeze_pending = True
         self._macro_active = True
         self._skipping_flag = False
 
@@ -1328,6 +1338,9 @@ class RE1Env(gym.Env):
             offer_immediate_yawn_ingest(yr_prop)
         self._apply_yawn_capture_ineligibility_penalty(breakdown)
         self._checkpoint_freeze_pending = False
+        self._checkpoint_capture_index = None
+        if self._progress is not None:
+            self._progress.checkpoint_freeze_pending = False
         ineligible = bool(
             getattr(self._progress, "capture_ineligible_breached", False)
         )
@@ -1365,6 +1378,7 @@ class RE1Env(gym.Env):
             state = dict(getattr(self, "_prev_state") or {})
         if state.get("dead") or int(state.get("hp", 0) or 0) <= 0:
             self._checkpoint_freeze_pending = False
+            self._checkpoint_capture_index = None
             self._macro_active = False
             return None
         if not bool(state.get("in_control", True)):
@@ -1688,6 +1702,7 @@ class RE1Env(gym.Env):
         self._go_explore_capture_pending = []
         self._yawn_rails_capture_pending = []
         self._checkpoint_freeze_pending = False
+        self._checkpoint_capture_index = None
         self._checkpoint_captured = False
         self._go_explore_archive_cache = None
         self._go_capture_budget = {"last_capture_step": -10**9}
@@ -1838,6 +1853,7 @@ class RE1Env(gym.Env):
         self._leg_replay = None
         self._footage_trace = None
         self._checkpoint_freeze_pending = False
+        self._checkpoint_capture_index = None
         self._checkpoint_captured = False
         if str(self._stage.get("mode") or "") == "yawn_rails":
             from re1_rl.leg_replay import new_leg_replay_buffer
@@ -2068,6 +2084,13 @@ class RE1Env(gym.Env):
             self._skip_session_frames = int(
                 getattr(self, "_skip_session_frames", 0)
             ) + int(burned)
+            # Replay-only synchronization point. A tape audit may pause the
+            # worker after each completed chunk so the next env.step consumes
+            # the exact recorded skip-frame delta. Normal training never sets
+            # this hook and retains the existing asynchronous behavior.
+            chunk_hook = getattr(self, "_bg_skip_chunk_hook", None)
+            if callable(chunk_hook):
+                chunk_hook(self)
             if not died:
                 died = self._poll_death_during_skip()
             if died:
