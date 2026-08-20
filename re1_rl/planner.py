@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 
@@ -440,12 +440,22 @@ class WaypointPlanner:
             return completed_steps(raw) >= min_steps
         return False
 
-    def skip_spawn_satisfied_room_enters(self, spawn_room: str) -> int:
+    def skip_spawn_satisfied_room_enters(
+        self,
+        spawn_room: str,
+        *,
+        cell_minted: Callable[[int], bool] | None = None,
+    ) -> int:
         """Advance past ``room_enter`` checkpoints already true at spawn.
 
         Exit-room captures (cp89 ``yawn_box_prep_118`` in ``10B``) otherwise
         auto-complete the next ``room_enter`` on the first step and reset.
         Does not skip ``room_enter_from`` (needs a real transition).
+
+        When ``cell_minted`` is provided, refuse to skip an index that is not
+        yet loadable on disk. Pin-84 sits in 204 with next CP ``room_enter``
+        204; skipping an unminted cp85 made the fleet hunt 207 forever and
+        reject cp86 as ``missing_predecessor``.
         """
         spawn = str(spawn_room or "").strip().upper()
         skipped = 0
@@ -462,6 +472,8 @@ class WaypointPlanner:
                 cond.get("room_id") or step.get("room_id") or ""
             ).strip().upper()
             if not spawn or spawn != target:
+                break
+            if cell_minted is not None and not bool(cell_minted(int(self._index))):
                 break
             self._index += 1
             skipped += 1

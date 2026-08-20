@@ -865,6 +865,28 @@ def test_spawn_in_exit_room_skips_tautological_room_enter() -> None:
     assert planner.skip_spawn_satisfied_room_enters("204") == 0
 
 
+def test_spawn_skip_refuses_unminted_tautological_room_enter() -> None:
+    """Do not skip past an unminted cp85 — otherwise 207 captures die as holes."""
+    idx = _idx("richard_forced_return_204")
+    planner = _planner(start_index=idx)
+    assert planner.current_objective()["checkpoint_id"] == "richard_forced_return_204"
+
+    skipped = planner.skip_spawn_satisfied_room_enters(
+        "204", cell_minted=lambda i: False
+    )
+    assert skipped == 0
+    assert planner.current_objective()["checkpoint_id"] == "richard_forced_return_204"
+    assert planner.waypoint_index == idx
+
+    # Once the slot exists, today's skip still advances to 207.
+    planner2 = _planner(start_index=idx)
+    skipped2 = planner2.skip_spawn_satisfied_room_enters(
+        "204", cell_minted=lambda i: i == idx
+    )
+    assert skipped2 == 1
+    assert planner2.current_objective()["checkpoint_id"] == "east_stairs_201_post_richard"
+
+
 def test_richard_cutscene_does_not_auto_advance_without_ledger() -> None:
     """cp84 must not succeed the instant the planner reaches the cutscene step."""
     planner = _planner(start_index=_idx("richard_cutscene_20D"))

@@ -1942,8 +1942,24 @@ class RE1Env(gym.Env):
         self._visited.update(state["room_id"], state["x"], state["z"])
         self._prev_state = state
         self._prev_hp = state["hp"]
+        cell_minted = None
+        if str(self._stage.get("mode") or "") == "yawn_rails":
+            from re1_rl.yawn_rails_sync import (
+                CELL_STATE_NAME,
+                cell_slot_dir,
+                yawn_rails_root,
+            )
+
+            rails_root = yawn_rails_root(self.project_root)
+
+            def cell_minted(checkpoint_index: int) -> bool:
+                return (
+                    cell_slot_dir(rails_root, int(checkpoint_index)) / CELL_STATE_NAME
+                ).is_file()
+
         skipped = self._planner.skip_spawn_satisfied_room_enters(
-            str(state.get("room_id", ""))
+            str(state.get("room_id", "")),
+            cell_minted=cell_minted,
         )
         if skipped:
             self._route_start_index += skipped
