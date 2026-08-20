@@ -431,6 +431,26 @@ def try_install_yawn_cell(
     new_q = _as_quality(quality)
     if new_q is None:
         return False
+    from re1_rl.go_explore_archive import (
+        LEG_FRAMES_QUALITY_INDEX,
+        LEG_FRAMES_SENTINEL,
+    )
+
+    if int(new_q[LEG_FRAMES_QUALITY_INDEX]) == -int(LEG_FRAMES_SENTINEL):
+        print(
+            f"[yawn_install] reject sentinel_leg_frames cp{idx:02d}",
+            flush=True,
+        )
+        return False
+    if idx > 0:
+        pred = cell_slot_dir(root, idx - 1)
+        if not (pred / CELL_STATE_NAME).is_file():
+            print(
+                f"[yawn_install] reject missing_predecessor "
+                f"cp{idx:02d} need=cp{idx - 1:02d}",
+                flush=True,
+            )
+            return False
     state_src = Path(staged_dir) / CELL_STATE_NAME
     side_src = Path(staged_dir) / CELL_SIDECAR_NAME
     if not state_src.is_file() or not side_src.is_file():

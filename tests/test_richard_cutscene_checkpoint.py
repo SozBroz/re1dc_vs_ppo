@@ -217,6 +217,11 @@ def test_richard_cutscene_capture_in_room_204(tmp_path: Path) -> None:
     from re1_rl.reward import RAILS_CHECKPOINT_REWARD
     from re1_rl.yawn_rails import capture_successor_cell
 
+    # Predecessor required — refuse hole installs.
+    pred = tmp_path / "states" / "yawn_rails" / "cells" / "cp83"
+    pred.mkdir(parents=True)
+    (pred / "cell.State").write_bytes(b"pred")
+
     bridge = MagicMock()
     bridge.save_savestate.side_effect = lambda path: Path(path).write_bytes(
         b"state"
@@ -236,6 +241,7 @@ def test_richard_cutscene_capture_in_room_204(tmp_path: Path) -> None:
         _macro_active=False,
         _progress=progress,
         _step_count=300,
+        _route_start_index=int(_ROUTE_INDEX["richard_cutscene_20D"]),
         _read_state=lambda track_items=False: _state("204"),
     )
     monkeypatch.setattr(
@@ -245,6 +251,20 @@ def test_richard_cutscene_capture_in_room_204(tmp_path: Path) -> None:
             "progress": {"observed_cutscenes": sorted(progress.observed_cutscenes)},
             "episode_history": {"room_entries": [["20D", 100], ["204", 200]]},
         },
+    )
+    monkeypatch.setattr(
+        "re1_rl.leg_replay.should_write_leg_replay",
+        lambda *_a, **_k: True,
+    )
+    monkeypatch.setattr(
+        "re1_rl.leg_replay.maybe_write_capture_tape",
+        lambda *_a, **_k: None,
+    )
+    from re1_rl.go_explore_archive import attach_leg_frames as _real_attach
+
+    monkeypatch.setattr(
+        "re1_rl.go_explore_archive.attach_leg_frames",
+        lambda quality, leg_frames: _real_attach(quality, 120),
     )
     proposal = capture_successor_cell(
         env,

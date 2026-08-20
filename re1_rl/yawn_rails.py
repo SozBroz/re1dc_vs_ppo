@@ -1203,6 +1203,23 @@ def capture_successor_cell(
     completed_cp = planner.step_by_seq(completed + 1) or {}
     cid = str(completed_cp.get("checkpoint_id", "") or "")
     expected_room = str(completed_cp.get("room_id", "") or "")
+    # Refuse holes: cannot mint cpN without a loadable cp{N-1} on disk.
+    if completed > 0:
+        from re1_rl.yawn_rails_sync import (
+            CELL_STATE_NAME as _PRED_STATE,
+            cell_slot_dir as _pred_slot,
+            yawn_rails_root as _pred_root,
+        )
+
+        pred_dir = _pred_slot(_pred_root(env.project_root), completed - 1)
+        if not (pred_dir / _PRED_STATE).is_file():
+            print(
+                f"[yawn_capture] reject missing_predecessor "
+                f"cp{completed:02d} need=cp{completed - 1:02d} id={cid}",
+                flush=True,
+            )
+            _mark_capture_ineligible(env, "missing_predecessor")
+            return None
     unsettled_state = state
     state = _settle_state_for_capture(env, state)
     if state is None:
@@ -1509,6 +1526,22 @@ def capture_successor_cell(
                 # living-cost frames must not pollute quality dim 7.
                 leg_frames = int(getattr(buf, "policy_leg_frames", buf.leg_frames))
         quality = attach_leg_frames(quality, leg_frames)
+        from re1_rl.go_explore_archive import (
+            LEG_FRAMES_QUALITY_INDEX,
+            LEG_FRAMES_SENTINEL,
+        )
+
+        # Incomplete tape → sentinel frames. Those installs were minting hole
+        # cells (cp84 skip → junk cp85) without leg_replay.
+        if int(quality[LEG_FRAMES_QUALITY_INDEX]) == -int(LEG_FRAMES_SENTINEL):
+            print(
+                f"[yawn_capture] reject sentinel_leg_frames cp={checkpoint_id} "
+                f"idx={completed}",
+                flush=True,
+            )
+            _mark_capture_ineligible(env, "sentinel_leg_frames")
+            shutil.rmtree(staging, ignore_errors=True)
+            return None
         maybe_write_capture_tape(
             env,
             staging,
