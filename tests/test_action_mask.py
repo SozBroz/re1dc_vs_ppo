@@ -262,12 +262,12 @@ def test_typewriter_or_box_rooms_ban_attacks() -> None:
 
 
 def test_main_hall_f1_f2_ban_attacks() -> None:
-    """Main Hall 1F (106) and 2F upper hall (203): attacks always illegal."""
+    """Rooms where attack macros are always illegal (even with enemies near)."""
     from re1_rl.action_mask import ALWAYS_ILLEGAL_ATTACK_ROOMS
 
     idle = dict(player_anim=0x0D, player_aux=0x01, player_recovery=0)
-    assert ALWAYS_ILLEGAL_ATTACK_ROOMS == frozenset({"106", "203"})
-    for room in ("106", "203"):
+    assert ALWAYS_ILLEGAL_ATTACK_ROOMS == frozenset({"106", "203", "102", "10C"})
+    for room in ("106", "203", "102", "10C"):
         m = action_mask(
             N_ACTIONS,
             None,
