@@ -1257,7 +1257,10 @@ def capture_successor_cell(
         BARRY_RETURN_CHECKPOINT_ID,
         barry_return_capture_inventory_ok,
     )
-    from re1_rl.richard_cutscene_checkpoint import richard_cutscene_capture_room_ok
+    from re1_rl.richard_cutscene_checkpoint import (
+        richard_cutscene_capture_room_ok,
+        richard_cutscene_lab_evidence,
+    )
     from re1_rl.yawn_box_prep_checkpoint import yawn_box_prep_capture_room_ok
 
     if cid == BARRY_RETURN_CHECKPOINT_ID and not barry_return_capture_inventory_ok(state):
@@ -1269,12 +1272,17 @@ def capture_successor_cell(
         return None
 
     def _scripted_exit_capture_ok(
-        completed_cid: str, live_room: str, expect_room: str
+        completed_cid: str,
+        live_room: str,
+        expect_room: str,
+        *,
+        live: dict[str, Any] | None = None,
     ) -> bool:
+        snap = state if live is None else live
         return barry_rescue_capture_room_ok(
             completed_cid, live_room, expect_room
         ) or richard_cutscene_capture_room_ok(
-            completed_cid, live_room, expect_room
+            completed_cid, live_room, expect_room, state=snap
         ) or yawn_box_prep_capture_room_ok(
             completed_cid, live_room, expect_room
         )
@@ -1283,6 +1291,14 @@ def capture_successor_cell(
         if not _scripted_exit_capture_ok(cid, room_id, expected_room):
             _mark_capture_ineligible(env, "room_mismatch")
             return None
+    if cid == "richard_cutscene_20D" and not richard_cutscene_lab_evidence(state):
+        print(
+            f"[yawn_capture] reject richard_lab_missing cp={cid} "
+            f"lab_timer={state.get('lab_timer')!r}",
+            flush=True,
+        )
+        _mark_capture_ineligible(env, "richard_lab_missing")
+        return None
     progress = getattr(env, "_progress", None)
     # Cutscene keys stay on the sidecar but do not gate capture (2026-08-16).
     if cid in (
@@ -1427,7 +1443,9 @@ def capture_successor_cell(
                 except (OSError, RuntimeError, ValueError, TypeError, AttributeError):
                     live_room = room_id
             if expected_room and live_room.upper() != expected_room.upper():
-                if not _scripted_exit_capture_ok(cid, live_room, expected_room):
+                if not _scripted_exit_capture_ok(
+                    cid, live_room, expected_room, live=live_state
+                ):
                     print(
                         f"[yawn_capture] reject pre-save room drift "
                         f"live={live_room!r} expected={expected_room!r} cp={cid}",
@@ -1460,7 +1478,7 @@ def capture_successor_cell(
                     return False
                 if expected_room and after_room.upper() != expected_room.upper():
                     if not _scripted_exit_capture_ok(
-                        cid, after_room, expected_room
+                        cid, after_room, expected_room, live=live_after
                     ):
                         print(
                             f"[yawn_capture] reject post-save room drift "

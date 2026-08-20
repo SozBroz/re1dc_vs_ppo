@@ -55,11 +55,11 @@ def test_freeze_blocks_forced_return_auto_advance() -> None:
     g = RoomGraph(DOORS)
     planner = _planner("richard_cutscene_20D")
     progress = ProgressTracker(leg_span=1)
-    # Cutscene dump mints ledger + advances once.
+    # Cutscene dump mints ledger + advances once (lab countdown armed).
     progress.observe_cutscene(RICHARD_CUTSCENE_KEY)
     _, bd = compute_reward(
         _state("20D"),
-        _state("204"),
+        _state("204", lab_timer=900, richard_cutscene_scripted_exit=True),
         planner,
         progress=progress,
         graph=g,
