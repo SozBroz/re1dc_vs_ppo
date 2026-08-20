@@ -42,7 +42,9 @@
     "room_id": "105",
     "objective": "Enter Dining after the Kenneth cutscene",
     "action_type": "navigate",
-    "required_items": [],
+    "required_items": [
+      "first_aid_spray_alt"
+    ],
     "items_gained": [],
     "success_condition": {
       "type": "all_of",
@@ -58,6 +60,10 @@
           "type": "observed_cutscene",
           "prefix": "104:",
           "require_scene": true
+        },
+        {
+          "type": "has_item",
+          "item": "first_aid_spray_alt"
         }
       ]
     }
@@ -1432,7 +1438,8 @@
     "items_gained": [],
     "success_condition": {
       "type": "observed_cutscene",
-      "prefix": "20D:"
+      "prefix": "20D:",
+      "require_scene": true
     }
   },
   {

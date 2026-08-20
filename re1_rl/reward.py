@@ -966,11 +966,19 @@ def compute_reward(
                 should_suppress_wrong_room as barry_suppress_wrong_room,
             )
             from re1_rl.richard_cutscene_checkpoint import (
+                note_richard_cutscene_room_transition,
                 should_suppress_wrong_room as richard_suppress_wrong_room,
             )
             from re1_rl.yawn_box_prep_checkpoint import (
                 should_suppress_wrong_room as yawn_box_prep_suppress_wrong_room,
             )
+
+            # Mint 20D:richard on the scripted dump so cp84 cannot auto-fire
+            # from a bare observed_cutscene prefix (see planner gate).
+            if progress is not None:
+                note_richard_cutscene_room_transition(
+                    planner, progress, prev_room, room, state
+                )
 
             if (
                 barry_suppress_wrong_room(planner, prev_room, room, state)

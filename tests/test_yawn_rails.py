@@ -865,9 +865,22 @@ def test_spawn_in_exit_room_skips_tautological_room_enter() -> None:
     assert planner.skip_spawn_satisfied_room_enters("204") == 0
 
 
-def test_richard_checkpoint_accepts_forced_settle_in_204() -> None:
+def test_richard_cutscene_does_not_auto_advance_without_ledger() -> None:
+    """cp84 must not succeed the instant the planner reaches the cutscene step."""
     planner = _planner(start_index=_idx("richard_cutscene_20D"))
     progress = ProgressTracker()
+    # Generic 20D camera key is not the Richard beat.
+    progress.observed_cutscenes.add("20D:0:s0")
+    assert not planner.advance_if_success(_state("20D"), progress=progress)
+    assert planner.current_objective()["checkpoint_id"] == "richard_cutscene_20D"
+
+
+def test_richard_checkpoint_advances_after_richard_ledger() -> None:
+    from re1_rl.richard_cutscene_checkpoint import RICHARD_CUTSCENE_KEY
+
+    planner = _planner(start_index=_idx("richard_cutscene_20D"))
+    progress = ProgressTracker()
+    progress.observe_cutscene(RICHARD_CUTSCENE_KEY)
     settled = _state("204")
     assert planner.advance_if_success(settled, progress=progress)
     assert planner.current_objective()["checkpoint_id"] == "richard_forced_return_204"

@@ -28,9 +28,10 @@ def _is_key_or_weapon(name: str) -> bool:
 def _observed_cutscene_met(cond: dict[str, Any], progress: ProgressTracker | None) -> bool:
     """Generic cutscene keys do not gate CP success (2026-08-16).
 
-    Exception: Kenneth ``104:*:sN`` still blocks 104→105 before the cinema so
-    that return can fail the episode instead of minting cp02. Heal spray
-    ``first_aid_spray_alt`` is also required on that leg (cp01 start item).
+    Exceptions that still require a real ledger mark:
+    - Kenneth ``104:*:sN`` (``require_scene``) — blocks 104→105 before cinema.
+    - Richard ``20D:`` (``require_scene``) — must see ``20D:richard`` so cp84
+      cannot auto-mint the instant the planner reaches the cutscene step.
     """
     prefix = str(cond.get("prefix", ""))
     require_scene = bool(cond.get("require_scene"))
@@ -40,6 +41,10 @@ def _observed_cutscene_met(cond: dict[str, Any], progress: ProgressTracker | Non
         from re1_rl.cutscene_reward import kenneth_cutscene_seen
 
         return kenneth_cutscene_seen(set(progress.leg_observed_cutscenes or ()))
+    if prefix.startswith("20D:") and require_scene:
+        from re1_rl.richard_cutscene_checkpoint import richard_cutscene_seen
+
+        return richard_cutscene_seen(progress)
     return True
 
 # Order matters: index in this tuple = position in the objective one-hot.

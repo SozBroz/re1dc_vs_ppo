@@ -21,7 +21,9 @@ from re1_rl.reward import (
 )
 from re1_rl.richard_cutscene_checkpoint import (
     RICHARD_CUTSCENE_KEY,
+    note_richard_cutscene_room_transition,
     richard_cutscene_capture_room_ok,
+    richard_cutscene_seen,
     richard_cutscene_skip_settled,
     note_richard_cutscene_skip_settle,
     should_suppress_wrong_room,
@@ -60,6 +62,31 @@ def _state(room: str, **kw) -> dict:
     }
     s.update(kw)
     return s
+
+
+def test_richard_cutscene_seen_requires_ledger_not_camera_key() -> None:
+    progress = ProgressTracker()
+    assert not richard_cutscene_seen(progress)
+    progress.observe_cutscene("20D:0:s0")
+    assert not richard_cutscene_seen(progress)
+    progress.observe_cutscene(RICHARD_CUTSCENE_KEY)
+    assert richard_cutscene_seen(progress)
+
+
+def test_richard_cutscene_room_transition_mints_ledger() -> None:
+    planner = _planner("richard_cutscene_20D")
+    progress = ProgressTracker()
+    state = _state("204")
+    note_richard_cutscene_room_transition(planner, progress, "20D", "204", state)
+    assert RICHARD_CUTSCENE_KEY in progress.observed_cutscenes
+    assert state.get("richard_cutscene_scripted_exit") is True
+
+
+def test_richard_cutscene_does_not_advance_without_ledger() -> None:
+    planner = _planner("richard_cutscene_20D")
+    progress = ProgressTracker()
+    progress.observe_cutscene("20D:0:s0")
+    assert not planner.advance_if_success(_state("20D"), progress=progress)
 
 
 def test_richard_cutscene_skip_20d_to_204_mints_ledger_key() -> None:
@@ -120,6 +147,7 @@ def test_richard_cutscene_checkpoint_success_on_scripted_exit() -> None:
     progress = ProgressTracker()
     entry = _state("20D")
     cur = _state("204")
+    # Room transition mints 20D:richard inside compute_reward (and skip settle).
     note_richard_cutscene_skip_settle(
         planner, progress, entry, cur, skip_frames=120
     )
@@ -135,6 +163,25 @@ def test_richard_cutscene_checkpoint_success_on_scripted_exit() -> None:
     assert bd["wrong_room"] == 0.0
     assert bd["checkpoint_success"] == RAILS_CHECKPOINT_REWARD
     assert progress.checkpoint_success
+
+
+def test_richard_cutscene_natural_20d_to_204_mints_and_succeeds() -> None:
+    """Even without skip settle, the scripted dump must mint + advance."""
+    g = RoomGraph(DOORS)
+    planner = _planner("richard_cutscene_20D")
+    progress = ProgressTracker()
+    _, bd = compute_reward(
+        _state("20D"),
+        _state("204"),
+        planner,
+        progress=progress,
+        graph=g,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert RICHARD_CUTSCENE_KEY in progress.observed_cutscenes
+    assert bd["wrong_room"] == 0.0
+    assert bd["checkpoint_success"] == RAILS_CHECKPOINT_REWARD
 
 
 def test_richard_room_enter_20d_to_204_still_wrong_room() -> None:

@@ -23,6 +23,39 @@ def _on_richard_cutscene_leg(planner: Any) -> bool:
     return str(obj.get("checkpoint_id") or "") == RICHARD_CUTSCENE_CHECKPOINT_ID
 
 
+def richard_cutscene_seen(progress: Any) -> bool:
+    """True once the Pillar Passage Richard beat minted ``20D:richard``.
+
+    Generic ``20D:0:s0`` camera keys do **not** count — those fired on room
+    enter and were minting cp84 before cp83 existed.
+    """
+    if progress is None:
+        return False
+    keys = set(getattr(progress, "observed_cutscenes", None) or ())
+    keys |= set(getattr(progress, "rewarded_cutscenes", None) or ())
+    keys |= set(getattr(progress, "leg_observed_cutscenes", None) or ())
+    return RICHARD_CUTSCENE_KEY in keys
+
+
+def note_richard_cutscene_room_transition(
+    planner: Any,
+    progress: Any,
+    prev_room: str,
+    room: str,
+    state: dict[str, Any] | None = None,
+) -> None:
+    """Mint ``20D:richard`` on the scripted 20D→204 dump (skip or natural)."""
+    if progress is None or not _on_richard_cutscene_leg(planner):
+        return
+    if str(prev_room or "").upper() != RICHARD_PILLAR_ROOM:
+        return
+    if str(room or "").upper() != RICHARD_SCRIPTED_EXIT_ROOM.upper():
+        return
+    progress.observe_cutscene(RICHARD_CUTSCENE_KEY)
+    if state is not None:
+        state["richard_cutscene_scripted_exit"] = True
+
+
 def richard_cutscene_skip_settled(
     planner: Any,
     entry_prev: dict[str, Any] | None,

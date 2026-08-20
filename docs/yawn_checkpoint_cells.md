@@ -139,13 +139,14 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Room:** `105` (DINING ROOM)
 - **Action:** `navigate`
 - **Objective:** Enter Dining after the Kenneth cutscene
-- **Required items:** _(none)_
+- **Required items:** `first_aid_spray_alt` (Jill start heal spray from cp01; already held — must not use)
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **105**. Navigate until the success condition fires.
 - **Success condition:**
 - **all of:**
   - Enter room `105` from `104`
-  - Kenneth ``104:*:sN`` already on the ledger (dining-from-tea before Kenneth still fails the episode). Other cutscene keys are logged only.
+  - Kenneth ``104:*:sN`` observed during the current cp01→cp02 leg (an inherited predecessor-sidecar flag does not count; dining-from-tea before a fresh trigger fails the episode). Other cutscene keys are logged only.
+  - Still holding `first_aid_spray_alt` (using the spray before return fails the episode / blocks capture)
 
 ### `cp03` — `main_hall_106` (seq 4)
 
@@ -1085,7 +1086,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **20D**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
-- Cutscene keys are logged only; they do not create this cell (route still lists ``20D:`` observe, planner ignores it)
+- Observed cutscene ledger ``20D:richard`` (``require_scene``; generic ``20D:0:s0`` camera keys do not count)
 
 ### `cp85` — `richard_forced_return_204` (seq 86)
 
