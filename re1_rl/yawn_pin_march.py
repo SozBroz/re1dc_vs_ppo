@@ -109,14 +109,14 @@ def _int_pin_env(
 
 def march_start_pin(project_root: Path | str | None = None) -> int:
     return _int_pin_env(
-        _MARCH_START_ENV, DEFAULT_START_PIN, project_root, lo=0, hi=101
+        _MARCH_START_ENV, DEFAULT_START_PIN, project_root, lo=0, hi=107
     )
 
 
 def march_stop_pin(project_root: Path | str | None = None) -> int:
     start = march_start_pin(project_root)
     return _int_pin_env(
-        _MARCH_STOP_ENV, DEFAULT_STOP_PIN, project_root, lo=start, hi=101
+        _MARCH_STOP_ENV, DEFAULT_STOP_PIN, project_root, lo=start, hi=107
     )
 
 
