@@ -1508,7 +1508,8 @@
     "action_type": "navigate",
     "required_items": [
       "shield_key",
-      "shotgun"
+      "handgun_bullets",
+      "bazooka_acid"
     ],
     "items_gained": [],
     "consume_before_gain": [

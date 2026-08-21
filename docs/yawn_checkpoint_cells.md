@@ -1137,9 +1137,9 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Room:** `118` (STAIRS UNDER ROOM)
 - **Action:** `navigate`
 - **Objective:** Deposit wind crest and armor key, withdraw guns/ammo from the box, then leave to East Stairway
-- **Required items:** `shield_key`, `shotgun`
+- **Required items:** `shield_key`, `handgun_bullets`, `bazooka_acid`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **118**. Hold: `shield_key`, `shotgun`. Navigate until the success condition fires.
+- **How to achieve:** Be in / reach **118**. Bank wind crest + armor key (+2 each). Clear guns/ammo from the box onto person (at least handgun clip + acid bazooka; keep shield key). Leave **118→10B**.
 - **Success condition:**
 - (yawn_box_prep_exit) `{"type": "yawn_box_prep_exit"}`
 

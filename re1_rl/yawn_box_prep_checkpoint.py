@@ -22,13 +22,12 @@ ARMOR_KEY_NAME = "armor_key"
 YAWN_BOX_PREP_BANKED_KEYS = (WIND_CREST_NAME, ARMOR_KEY_NAME)
 YAWN_BOX_PREP_BANKED_KEY_IDS = frozenset({WIND_CREST_ITEM_ID, ARMOR_KEY_ITEM_ID})
 YAWN_BOX_PREP_HELD_KEYS = ("shield_key",)
+# Exit loadout for cp89: keep shield key; withdraw at least clip + bazooka.
+# Box must still be cleared of all guns/ammo (pollution); these are the
+# minimum that must remain on person when leaving 118→10B.
 YAWN_BOX_PREP_HELD_FIREPOWER = (
-    "beretta",
-    "shotgun",
-    "bazooka_acid",
     "handgun_bullets",
-    "shotgun_shells",
-    "acid_rounds",
+    "bazooka_acid",
 )
 
 
@@ -164,10 +163,38 @@ def _inventory_name_set(
     return {canonical_item(str(x)) for x in (inventory_names or []) if str(x).strip()}
 
 
+def deposited_yawn_box_key_names(
+    prev_state: dict[str, Any] | None,
+    state: dict[str, Any] | None,
+) -> list[str]:
+    """Names of wind crest / armor key that left inventory on a box deposit."""
+    from re1_rl.memory_map import ITEM_IDS
+
+    st = state or {}
+    prev = prev_state or {}
+    out: list[str] = []
+    moved = st.get("box_deposit_moved")
+    if isinstance(moved, (list, tuple)) and moved:
+        try:
+            item_id = int(moved[0]) & 0xFF
+        except (TypeError, ValueError):
+            item_id = 0
+        name = canonical_item(ITEM_IDS.get(item_id, "") or "")
+        if name in YAWN_BOX_PREP_BANKED_KEYS:
+            out.append(name)
+            return out
+    prev_inv = _inventory_name_set(list(prev.get("inventory") or []))
+    cur_inv = _inventory_name_set(list(st.get("inventory") or []))
+    for name in YAWN_BOX_PREP_BANKED_KEYS:
+        if name in prev_inv and name not in cur_inv:
+            out.append(name)
+    return out
+
+
 def yawn_box_prep_held_reason(
     inventory_names: list[str] | tuple[str, ...] | None,
 ) -> str | None:
-    """Person must hold the shield key and the guns/ammo for this loadout."""
+    """Person must hold shield key, handgun clip, and acid bazooka."""
     inv = _inventory_name_set(inventory_names)
     for name in YAWN_BOX_PREP_HELD_KEYS:
         if name not in inv:

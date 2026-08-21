@@ -47,9 +47,11 @@ WAYPOINT_ROOM_BONUS = 4.0
 ITEM_PICKUP_BONUS = 0.15
 # Ammunition stacks (handgun bullets, shells, launcher packs, …).
 AMMO_PICKUP_BONUS = 2.0
-# Box withdraw/deposit: no transfer reward and no pickup-channel pay
-# (imperator 2026-08-13).
+# Box withdraw/deposit: no generic transfer reward and no pickup-channel pay
+# (imperator 2026-08-13). Exception: yawn_box_prep_118 banks wind crest +
+# armor key for +YAWN_BOX_KEY_DEPOSIT_BONUS each (imperator 2026-08-21).
 BOX_WITHDRAW_BONUS = 0.0
+YAWN_BOX_KEY_DEPOSIT_BONUS = 2.0
 # Completed typewriter save (ink-ribbon consume + save cinema + stable control).
 TYPEWRITER_SAVE_BONUS = 0.3
 # Keys / emblems / crests — disabled 2026-08-16 (CP already pays the cell).
@@ -544,6 +546,7 @@ RAILS_NAV_POSITIVE_TERMS: frozenset[str] = frozenset({
     "ammo_pickup",
     "gallery",
     "weapon_reload",
+    "yawn_box_key_deposit",
 })
 # PBRS, junk pickups, typewriter, etc.
 RAILS_MINOR_POSITIVE_SCALE = 0.05
@@ -889,6 +892,7 @@ def compute_reward(
         "item": 0.0,
         "ammo_pickup": 0.0,
         "box_withdraw": 0.0,
+        "yawn_box_key_deposit": 0.0,
         "key_item": 0.0,
         "story_use": 0.0,
         "gallery": 0.0,
@@ -1089,6 +1093,29 @@ def compute_reward(
 
     if state.get("box_withdraw_success"):
         bd["box_withdraw"] = BOX_WITHDRAW_BONUS
+
+    # cp89 only: pay once per wind crest / armor key successfully banked.
+    if (
+        rails_mode
+        and state.get("box_deposit_success")
+        and progress is not None
+        and not progress.kenneth_gate_breached
+        and YAWN_BOX_KEY_DEPOSIT_BONUS > 0.0
+    ):
+        from re1_rl.yawn_box_prep_checkpoint import (
+            YAWN_BOX_PREP_BANKED_KEYS,
+            YAWN_BOX_PREP_CHECKPOINT_ID,
+            deposited_yawn_box_key_names,
+        )
+
+        obj = planner.current_objective() if planner is not None else None
+        cid = str((obj or {}).get("checkpoint_id") or "")
+        if cid == YAWN_BOX_PREP_CHECKPOINT_ID:
+            for name in deposited_yawn_box_key_names(prev_state, state):
+                if name in YAWN_BOX_PREP_BANKED_KEYS and progress.claim_yawn_box_key_deposit(
+                    name
+                ):
+                    bd["yawn_box_key_deposit"] += YAWN_BOX_KEY_DEPOSIT_BONUS
 
     # Observation and payout are separate ledgers. Every qualified key is
     # observed; payment still requires a new-room pairing on this transition.
@@ -1385,6 +1412,7 @@ def compute_reward(
         if (
             bd["checkpoint_success"] != 0.0
             or ammo_progress
+            or bd["yawn_box_key_deposit"] != 0.0
         ):
             progress.note_softlock_extension(SOFTLOCK_EXTENSION_FRAMES)
             softlock_threshold = softlock_frame_threshold(progress)
@@ -1393,6 +1421,7 @@ def compute_reward(
         made_progress = (
             bd["gallery"] > 0.0
             or bd["dining_statue_progress"] > 0.0
+            or bd["yawn_box_key_deposit"] > 0.0
         )
         # Pause idle clock during cutscenes / doors (not in_control).
         frames_before = progress.stagnation_frames

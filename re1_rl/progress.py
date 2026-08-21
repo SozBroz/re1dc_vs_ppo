@@ -89,6 +89,8 @@ class ProgressTracker:
     weapons_progressed: set[str] = field(default_factory=set)
     # Key items that already paid KEY_ITEM_PICKUP_BONUS this episode.
     key_items_rewarded: set[str] = field(default_factory=set)
+    # Yawn box prep (cp89): wind crest / armor key already paid bank crumb.
+    yawn_box_keys_deposited: set[str] = field(default_factory=set)
     # Async skip may present one inventory transition twice. A wall return pays
     # once, then cannot pay again until shotgun possession is observed.
     _shotgun_return_armed: bool | None = None
@@ -291,6 +293,14 @@ class ProgressTracker:
         if not name or name not in self.key_items_rewarded:
             return False
         self.key_items_rewarded.discard(name)
+        return True
+
+    def claim_yawn_box_key_deposit(self, item_name: str) -> bool:
+        """True once per banked wind crest / armor key on yawn_box_prep_118."""
+        name = str(item_name or "")
+        if not name or name in self.yawn_box_keys_deposited:
+            return False
+        self.yawn_box_keys_deposited.add(name)
         return True
 
     def claim_waypoint_bonus(self, waypoint_index: int) -> bool:

@@ -4098,6 +4098,7 @@ class RE1Env(gym.Env):
             and report_pre.get("moved") is not None
         ):
             state["box_deposit_success"] = True
+            state["box_deposit_moved"] = report_pre.get("moved")
         inv_before = getattr(self, "_inventory_before_use", None)
         if inv_before is not None:
             from re1_rl.item_box import read_inventory

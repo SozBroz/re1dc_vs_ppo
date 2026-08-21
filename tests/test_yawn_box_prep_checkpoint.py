@@ -225,11 +225,29 @@ def _ready_inv() -> list[str]:
     ]
 
 
+def _minimal_ready_inv() -> list[str]:
+    """Exit-ready: shield key + clip + bazooka (guns cleared from box)."""
+    return ["shield_key", "handgun_bullets", "bazooka_acid"]
+
+
 def _ready_box() -> list[tuple[int, int]]:
     box = _box()
     box[0] = (WIND_CREST_ITEM_ID, 1)
     box[1] = (ARMOR_KEY_ITEM_ID, 1)
     return box
+
+
+def test_yawn_box_prep_minimal_clip_bazooka_exit_ready() -> None:
+    box = _ready_box()
+    assert yawn_box_prep_capture_ready(box, _minimal_ready_inv()) is None
+    assert (
+        yawn_box_prep_capture_ready(box, ["shield_key", "handgun_bullets"])
+        == "missing_held:bazooka_acid"
+    )
+    assert (
+        yawn_box_prep_capture_ready(box, ["shield_key", "bazooka_acid"])
+        == "missing_held:handgun_bullets"
+    )
 
 
 def test_yawn_box_prep_capture_requires_wind_in_box_not_on_person() -> None:
@@ -291,6 +309,70 @@ def test_planner_yawn_box_prep_succeeds_on_leave_to_10b() -> None:
         ready, progress=progress, prev_state=_state("118")
     )
     assert planner.current_objective()["checkpoint_id"] == "east_stairs_201_to_yawn"
+
+
+def test_planner_yawn_box_prep_succeeds_with_clip_and_bazooka_only() -> None:
+    from re1_rl.progress import ProgressTracker
+    from tests.test_yawn_rails import _idx, _planner, _state
+
+    planner = _planner(start_index=_idx("yawn_box_prep_118"))
+    progress = ProgressTracker()
+    box = _ready_box()
+    ready = _state("10B")
+    ready["inventory"] = list(_minimal_ready_inv())
+    ready["box_cache"] = box
+    assert planner.advance_if_success(
+        ready, progress=progress, prev_state=_state("118")
+    )
+
+
+def test_yawn_box_key_deposit_pays_on_prep_cell_only() -> None:
+    from re1_rl.progress import ProgressTracker
+    from re1_rl.reward import YAWN_BOX_KEY_DEPOSIT_BONUS, compute_reward
+    from tests.test_yawn_rails import _idx, _planner, _state
+
+    planner = _planner(start_index=_idx("yawn_box_prep_118"))
+    progress = ProgressTracker()
+    prev = _state("118")
+    prev["inventory"] = ["wind_crest", "armor_key", "shield_key"]
+    cur = _state("118")
+    cur["inventory"] = ["armor_key", "shield_key"]
+    cur["box_deposit_success"] = True
+    cur["box_deposit_moved"] = (WIND_CREST_ITEM_ID, 1)
+    _total, bd = compute_reward(
+        prev,
+        cur,
+        planner,
+        progress=progress,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["yawn_box_key_deposit"] == YAWN_BOX_KEY_DEPOSIT_BONUS
+    assert "wind_crest" in progress.yawn_box_keys_deposited
+
+    # Second crest deposit does not re-pay.
+    _total2, bd2 = compute_reward(
+        prev,
+        cur,
+        planner,
+        progress=progress,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd2["yawn_box_key_deposit"] == 0.0
+
+    # Wrong cell: no pay.
+    other = _planner(start_index=_idx("yawn_box_enter_118"))
+    progress2 = ProgressTracker()
+    _total3, bd3 = compute_reward(
+        prev,
+        cur,
+        other,
+        progress=progress2,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd3["yawn_box_key_deposit"] == 0.0
 
 
 def test_suppress_wrong_room_only_when_prep_ready() -> None:
