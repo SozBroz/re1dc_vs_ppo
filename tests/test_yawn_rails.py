@@ -946,19 +946,19 @@ def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: P
 
 
 def test_default_mix_equal_fresh_and_each_loadable_cell(tmp_path: Path) -> None:
-    """Fresh start is its own slot, equal with each cp00–cp105 cell — not cp00."""
+    """Fresh start is its own slot, equal with each cp00–cp115 cell — not cp00."""
     manifest = {
         "schema_version": 1,
         "route_id": "test",
-        "cells": [_write_cell(tmp_path, i) for i in (0, 18, 105)],
+        "cells": [_write_cell(tmp_path, i) for i in (0, 18, 115)],
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     stage = {
         "route_id": "test",
         "cells_manifest": "manifest.json",
-        "route_steps": list(range(1, 108)),
+        "route_steps": list(range(1, 118)),
     }
-    counts: dict[str, int] = {"fresh": 0, "cp00": 0, "cp18": 0, "cp105": 0}
+    counts: dict[str, int] = {"fresh": 0, "cp00": 0, "cp18": 0, "cp115": 0}
     for seed in range(8000):
         opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
         if opts["reset_source"] == "route_initial":
@@ -977,38 +977,38 @@ def test_default_mix_equal_fresh_and_each_loadable_cell(tmp_path: Path) -> None:
         assert n / total == pytest.approx(0.25, abs=0.03), f"{key}={n}"
 
 
-def test_cp105_playthrough_is_the_yawn_fight_only(tmp_path: Path) -> None:
+def test_cp115_playthrough_is_the_yawn_fight_only(tmp_path: Path) -> None:
     manifest = {
         "schema_version": 1,
         "route_id": "test",
-        "cells": [_write_cell(tmp_path, 105)],
+        "cells": [_write_cell(tmp_path, 115)],
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     stage = {
         "route_id": "test",
         "cells_manifest": "manifest.json",
-        "route_steps": list(range(1, 108)),
+        "route_steps": list(range(1, 118)),
     }
     monkey_hits = 0
     for seed in range(200):
         opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
-        if opts.get("route_start_index") == 106:
+        if opts.get("route_start_index") == 116:
             monkey_hits += 1
             assert opts["leg_span"] == 1
             assert opts["reset_source"] == "route_cell"
     assert monkey_hits > 0
 
 
-def test_terminal_cp106_is_never_loadable(tmp_path: Path) -> None:
-    """cp106 has no next hunt target — no agent may reset into it."""
+def test_terminal_cp116_is_never_loadable(tmp_path: Path) -> None:
+    """cp116 has no next hunt target — no agent may reset into it."""
     import shutil
 
     route_src = ROOT / "data" / "yawn_checkpoint_route.json"
     shutil.copy(route_src, tmp_path / "yawn_checkpoint_route.json")
     cells = []
-    for idx in (105, 106):
+    for idx in (115, 116):
         row = _write_cell(tmp_path, idx)
-        row["next_checkpoint_id"] = "" if idx == 106 else "yawn_moon_210"
+        row["next_checkpoint_id"] = "" if idx == 116 else "yawn_moon_210"
         cells.append(row)
     manifest = {"schema_version": 1, "route_id": "test", "cells": cells}
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -1020,14 +1020,14 @@ def test_terminal_cp106_is_never_loadable(tmp_path: Path) -> None:
     }
     loadable = iter_loadable_cells(tmp_path, stage)
     indices = {int(r["checkpoint_index"]) for r in loadable}
-    assert 106 not in indices
-    assert 105 in indices
+    assert 116 not in indices
+    assert 115 in indices
 
 
 def test_empty_next_checkpoint_id_excluded_even_without_route_path(
     tmp_path: Path,
 ) -> None:
-    cells = [_write_cell(tmp_path, 18), _write_cell(tmp_path, 106)]
+    cells = [_write_cell(tmp_path, 18), _write_cell(tmp_path, 116)]
     cells[1]["next_checkpoint_id"] = ""
     manifest = {"schema_version": 1, "route_id": "test", "cells": cells}
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -1035,7 +1035,7 @@ def test_empty_next_checkpoint_id_excluded_even_without_route_path(
     loadable = iter_loadable_cells(tmp_path, stage)
     indices = {int(r["checkpoint_index"]) for r in loadable}
     assert 18 in indices
-    assert 106 not in indices
+    assert 116 not in indices
 
 
 def test_reset_mix_uniform_over_eligible_cells_and_fresh(
@@ -1817,10 +1817,10 @@ def test_checkpoint_success_proposes_without_local_install_when_sync_on(
         assert list(staging_root.iterdir()) == []
 
 
-def test_terminal_yawn_moon_capture_proposes_cp106(
+def test_terminal_yawn_moon_capture_proposes_cp116(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Last route leg (yawn_moon_210) must still install cp106."""
+    """Last route leg (yawn_moon_210) must still install cp116."""
     monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "1")
     bridge = MagicMock()
     bridge.save_savestate.side_effect = (
