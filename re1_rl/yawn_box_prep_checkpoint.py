@@ -258,6 +258,27 @@ def _on_yawn_box_prep_leg(planner: Any) -> bool:
     return str(obj.get("checkpoint_id") or "") == YAWN_BOX_PREP_CHECKPOINT_ID
 
 
+def yawn_box_prep_early_close_reason(
+    planner: Any,
+    state: dict[str, Any] | None,
+) -> str | None:
+    """If closing the box mid-prep is illegal, return the capture-ineligible reason.
+
+    On ``yawn_box_prep_118`` the box may close only after crest+armor are banked,
+    guns/ammo are cleared from the box, and clip+bazooka (plus shield key) are
+    on person. Closing earlier is an invalid-cell terminal.
+    """
+    if not _on_yawn_box_prep_leg(planner):
+        return None
+    why = yawn_box_prep_capture_ready(
+        box_pairs_from_state(state),
+        list((state or {}).get("inventory") or []),
+    )
+    if why is None:
+        return None
+    return f"yawn_box_prep_early_close:{why}"
+
+
 def should_suppress_wrong_room(
     planner: Any,
     prev_room: str,

@@ -375,6 +375,46 @@ def test_yawn_box_key_deposit_pays_on_prep_cell_only() -> None:
     assert bd3["yawn_box_key_deposit"] == 0.0
 
 
+def test_yawn_box_prep_early_close_reason_only_on_prep_leg() -> None:
+    from re1_rl.yawn_box_prep_checkpoint import yawn_box_prep_early_close_reason
+    from tests.test_yawn_rails import _idx, _planner, _state
+
+    prep = _planner(start_index=_idx("yawn_box_prep_118"))
+    enter = _planner(start_index=_idx("yawn_box_enter_118"))
+    dirty = _state("118")
+    dirty["inventory"] = ["wind_crest", "armor_key", "shield_key"]
+    dirty["box_cache"] = [(0, 0)] * BOX_SLOTS_LIVE
+    assert yawn_box_prep_early_close_reason(prep, dirty)
+    assert yawn_box_prep_early_close_reason(enter, dirty) is None
+
+    ready = _state("118")
+    ready["inventory"] = list(_minimal_ready_inv())
+    ready["box_cache"] = _ready_box()
+    assert yawn_box_prep_early_close_reason(prep, ready) is None
+
+
+def test_yawn_box_prep_early_close_pays_invalid_cell() -> None:
+    from re1_rl.progress import ProgressTracker
+    from re1_rl.reward import RAILS_CAPTURE_INELIGIBLE_PENALTY, compute_reward
+    from tests.test_yawn_rails import _idx, _planner, _state
+
+    planner = _planner(start_index=_idx("yawn_box_prep_118"))
+    progress = ProgressTracker()
+    prev = _state("118")
+    cur = _state("118")
+    cur["yawn_box_prep_early_close"] = "yawn_box_prep_early_close:wind_crest_not_in_box"
+    _total, bd = compute_reward(
+        prev,
+        cur,
+        planner,
+        progress=progress,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["checkpoint_capture_ineligible"] == RAILS_CAPTURE_INELIGIBLE_PENALTY
+    assert progress.capture_ineligible_breached
+
+
 def test_suppress_wrong_room_only_when_prep_ready() -> None:
     from tests.test_yawn_rails import _idx, _planner, _state
 

@@ -1094,6 +1094,18 @@ def compute_reward(
     if state.get("box_withdraw_success"):
         bd["box_withdraw"] = BOX_WITHDRAW_BONUS
 
+    # cp89: closing the box before prep-ready is an invalid-cell terminal (−4).
+    if (
+        rails_mode
+        and state.get("yawn_box_prep_early_close")
+        and progress is not None
+    ):
+        progress.breach_capture_ineligible()
+        for term, value in tuple(bd.items()):
+            if value > 0.0:
+                bd[term] = 0.0
+        bd["checkpoint_capture_ineligible"] = RAILS_CAPTURE_INELIGIBLE_PENALTY
+
     # cp89 only: pay once per wind crest / armor key successfully banked.
     if (
         rails_mode

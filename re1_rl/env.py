@@ -3442,6 +3442,43 @@ class RE1Env(gym.Env):
                     "box_pollution": pollution,
                 }
                 self._episode_failure_override = pollution
+            elif self._stage.get("mode") == "yawn_rails":
+                from re1_rl.item_box import read_box_live, read_inventory
+                from re1_rl.memory_map import ITEM_IDS
+                from re1_rl.yawn_box_prep_checkpoint import (
+                    yawn_box_prep_early_close_reason,
+                )
+
+                early_state: dict[str, Any] = dict(
+                    getattr(self, "_prev_state", None) or {}
+                )
+                try:
+                    live_box = read_box_live(self.bridge)
+                    self._box_cache = live_box
+                    early_state["box_cache"] = live_box
+                except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                    pass
+                try:
+                    live_inv = read_inventory(self.bridge)
+                    early_state["inventory"] = [
+                        ITEM_IDS.get(int(iid) & 0xFF, "")
+                        for iid, _qty in live_inv
+                        if int(iid) & 0xFF and ITEM_IDS.get(int(iid) & 0xFF)
+                    ]
+                except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                    pass
+                early = yawn_box_prep_early_close_reason(self._planner, early_state)
+                if early:
+                    report = {
+                        **report,
+                        "ok": False,
+                        "reason": early,
+                        "yawn_box_prep_early_close": early,
+                    }
+                    self._episode_failure_override = early
+                    progress = getattr(self, "_progress", None)
+                    if progress is not None:
+                        progress.breach_capture_ineligible()
             return self._submenu_step(
                 a,
                 step_emulated_frames=max(frames, self.frame_skip),
@@ -4099,6 +4136,9 @@ class RE1Env(gym.Env):
         ):
             state["box_deposit_success"] = True
             state["box_deposit_moved"] = report_pre.get("moved")
+        early_close = report_pre.get("yawn_box_prep_early_close")
+        if early_close:
+            state["yawn_box_prep_early_close"] = str(early_close)
         inv_before = getattr(self, "_inventory_before_use", None)
         if inv_before is not None:
             from re1_rl.item_box import read_inventory
