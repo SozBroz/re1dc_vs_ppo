@@ -946,19 +946,19 @@ def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: P
 
 
 def test_default_mix_equal_fresh_and_each_loadable_cell(tmp_path: Path) -> None:
-    """Fresh start is its own slot, equal with each cp00–cp95 cell — not cp00."""
+    """Fresh start is its own slot, equal with each cp00–cp105 cell — not cp00."""
     manifest = {
         "schema_version": 1,
         "route_id": "test",
-        "cells": [_write_cell(tmp_path, i) for i in (0, 18, 95)],
+        "cells": [_write_cell(tmp_path, i) for i in (0, 18, 105)],
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     stage = {
         "route_id": "test",
         "cells_manifest": "manifest.json",
-        "route_steps": list(range(1, 98)),
+        "route_steps": list(range(1, 108)),
     }
-    counts: dict[str, int] = {"fresh": 0, "cp00": 0, "cp18": 0, "cp95": 0}
+    counts: dict[str, int] = {"fresh": 0, "cp00": 0, "cp18": 0, "cp105": 0}
     for seed in range(8000):
         opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
         if opts["reset_source"] == "route_initial":
@@ -977,38 +977,38 @@ def test_default_mix_equal_fresh_and_each_loadable_cell(tmp_path: Path) -> None:
         assert n / total == pytest.approx(0.25, abs=0.03), f"{key}={n}"
 
 
-def test_cp95_playthrough_is_the_yawn_fight_only(tmp_path: Path) -> None:
+def test_cp105_playthrough_is_the_yawn_fight_only(tmp_path: Path) -> None:
     manifest = {
         "schema_version": 1,
         "route_id": "test",
-        "cells": [_write_cell(tmp_path, 95)],
+        "cells": [_write_cell(tmp_path, 105)],
     }
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     stage = {
         "route_id": "test",
         "cells_manifest": "manifest.json",
-        "route_steps": list(range(1, 98)),
+        "route_steps": list(range(1, 108)),
     }
     monkey_hits = 0
     for seed in range(200):
         opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
-        if opts.get("route_start_index") == 96:
+        if opts.get("route_start_index") == 106:
             monkey_hits += 1
             assert opts["leg_span"] == 1
             assert opts["reset_source"] == "route_cell"
     assert monkey_hits > 0
 
 
-def test_terminal_cp96_is_never_loadable(tmp_path: Path) -> None:
-    """cp96 has no next hunt target — no agent may reset into it."""
+def test_terminal_cp106_is_never_loadable(tmp_path: Path) -> None:
+    """cp106 has no next hunt target — no agent may reset into it."""
     import shutil
 
     route_src = ROOT / "data" / "yawn_checkpoint_route.json"
     shutil.copy(route_src, tmp_path / "yawn_checkpoint_route.json")
     cells = []
-    for idx in (95, 96):
+    for idx in (105, 106):
         row = _write_cell(tmp_path, idx)
-        row["next_checkpoint_id"] = "" if idx == 96 else "yawn_moon_210"
+        row["next_checkpoint_id"] = "" if idx == 106 else "yawn_moon_210"
         cells.append(row)
     manifest = {"schema_version": 1, "route_id": "test", "cells": cells}
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -1020,14 +1020,14 @@ def test_terminal_cp96_is_never_loadable(tmp_path: Path) -> None:
     }
     loadable = iter_loadable_cells(tmp_path, stage)
     indices = {int(r["checkpoint_index"]) for r in loadable}
-    assert 96 not in indices
-    assert 95 in indices
+    assert 106 not in indices
+    assert 105 in indices
 
 
 def test_empty_next_checkpoint_id_excluded_even_without_route_path(
     tmp_path: Path,
 ) -> None:
-    cells = [_write_cell(tmp_path, 18), _write_cell(tmp_path, 96)]
+    cells = [_write_cell(tmp_path, 18), _write_cell(tmp_path, 106)]
     cells[1]["next_checkpoint_id"] = ""
     manifest = {"schema_version": 1, "route_id": "test", "cells": cells}
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -1035,7 +1035,7 @@ def test_empty_next_checkpoint_id_excluded_even_without_route_path(
     loadable = iter_loadable_cells(tmp_path, stage)
     indices = {int(r["checkpoint_index"]) for r in loadable}
     assert 18 in indices
-    assert 96 not in indices
+    assert 106 not in indices
 
 
 def test_reset_mix_uniform_over_eligible_cells_and_fresh(
@@ -1817,16 +1817,23 @@ def test_checkpoint_success_proposes_without_local_install_when_sync_on(
         assert list(staging_root.iterdir()) == []
 
 
-def test_terminal_yawn_moon_capture_proposes_cp96(
+def test_terminal_yawn_moon_capture_proposes_cp106(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Last route leg (yawn_moon_210) must still install cp96."""
+    """Last route leg (yawn_moon_210) must still install cp106."""
     monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "1")
     bridge = MagicMock()
     bridge.save_savestate.side_effect = (
         lambda path: Path(path).write_bytes(b"state")
     )
     moon_idx = _idx("yawn_moon_210")
+    pred = tmp_path / f"states/yawn_rails/cells/cp{moon_idx - 1:02d}"
+    pred.mkdir(parents=True, exist_ok=True)
+    (pred / "cell.State").write_bytes(b"pred")
+    (pred / "meta.json").write_text(
+        json.dumps({"checkpoint_id": "yawn_arena_enter_210", "checkpoint_index": moon_idx - 1}),
+        encoding="utf-8",
+    )
     planner = _planner(start_index=moon_idx)
     planner._index = moon_idx + 1
     inv = [
@@ -1851,6 +1858,20 @@ def test_terminal_yawn_moon_capture_proposes_cp96(
     monkeypatch.setattr(
         "re1_rl.yawn_rails.dump_episode_sidecar",
         lambda *_args, **_kwargs: {"schema_version": 1},
+    )
+    monkeypatch.setattr(
+        "re1_rl.leg_replay.should_write_leg_replay",
+        lambda *_a, **_k: True,
+    )
+    monkeypatch.setattr(
+        "re1_rl.leg_replay.maybe_write_capture_tape",
+        lambda *_a, **_k: None,
+    )
+    from re1_rl.go_explore_archive import attach_leg_frames as _real_attach
+
+    monkeypatch.setattr(
+        "re1_rl.go_explore_archive.attach_leg_frames",
+        lambda quality, leg_frames: _real_attach(quality, 120),
     )
 
     proposal = capture_successor_cell(

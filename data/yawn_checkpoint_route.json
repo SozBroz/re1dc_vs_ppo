@@ -1553,7 +1553,7 @@
     "seq": 93,
     "checkpoint_id": "moon_hall_enter_20D",
     "room_id": "20D",
-    "objective": "Enter the east wing hallway for attic ammo",
+    "objective": "First return to Pillar Passage after box prep (Richard still up)",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
@@ -1564,6 +1564,151 @@
   },
   {
     "seq": 94,
+    "checkpoint_id": "richard_wait_exit_204",
+    "room_id": "204",
+    "objective": "Leave Pillar Passage to burn Richard's death timer",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter_from",
+      "room_id": "204",
+      "from_room_ids": [
+        "20D"
+      ]
+    }
+  },
+  {
+    "seq": 95,
+    "checkpoint_id": "richard_wait_upper_203",
+    "room_id": "203",
+    "objective": "Cross Upper Hall during the Richard wait lap",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter",
+      "room_id": "203"
+    }
+  },
+  {
+    "seq": 96,
+    "checkpoint_id": "richard_wait_terrace_pass_211",
+    "room_id": "211",
+    "objective": "Enter Terrace Passage during the Richard wait lap",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter",
+      "room_id": "211"
+    }
+  },
+  {
+    "seq": 97,
+    "checkpoint_id": "richard_wait_terrace_212",
+    "room_id": "212",
+    "objective": "Reach the Terrace dead-end turnaround",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter",
+      "room_id": "212"
+    }
+  },
+  {
+    "seq": 98,
+    "checkpoint_id": "richard_wait_terrace_back_211",
+    "room_id": "211",
+    "objective": "Return through Terrace Passage toward Upper Hall",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter_from",
+      "room_id": "211",
+      "from_room_ids": [
+        "212"
+      ]
+    }
+  },
+  {
+    "seq": 99,
+    "checkpoint_id": "richard_wait_upper_back_203",
+    "room_id": "203",
+    "objective": "Return to Upper Hall from the terrace side",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter_from",
+      "room_id": "203",
+      "from_room_ids": [
+        "211"
+      ]
+    }
+  },
+  {
+    "seq": 100,
+    "checkpoint_id": "richard_wait_main_106",
+    "room_id": "106",
+    "objective": "Walk Main Hall to burn Richard's death timer",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter",
+      "room_id": "106"
+    }
+  },
+  {
+    "seq": 101,
+    "checkpoint_id": "richard_wait_upper_again_203",
+    "room_id": "203",
+    "objective": "Climb back to Upper Hall after Main Hall",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter_from",
+      "room_id": "203",
+      "from_room_ids": [
+        "106"
+      ]
+    }
+  },
+  {
+    "seq": 102,
+    "checkpoint_id": "richard_wait_c_pass_204",
+    "room_id": "204",
+    "objective": "Cross C Passage toward Pillar Passage after the wait lap",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter",
+      "room_id": "204"
+    }
+  },
+  {
+    "seq": 103,
+    "checkpoint_id": "moon_hall_return_20D",
+    "room_id": "20D",
+    "objective": "Re-enter Pillar Passage after Richard's death wait",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter_from",
+      "room_id": "20D",
+      "from_room_ids": [
+        "204"
+      ]
+    }
+  },
+  {
+    "seq": 104,
     "checkpoint_id": "ammo_20D",
     "room_id": "20D",
     "objective": "Collect the mandatory Pillar Passage handgun bullets",
@@ -1578,7 +1723,7 @@
     }
   },
   {
-    "seq": 95,
+    "seq": 105,
     "checkpoint_id": "attic_entry_20E",
     "room_id": "20E",
     "objective": "Reach the shield-key attic entrance",
@@ -1596,7 +1741,7 @@
     }
   },
   {
-    "seq": 96,
+    "seq": 106,
     "checkpoint_id": "yawn_arena_enter_210",
     "room_id": "210",
     "objective": "Enter the Yawn moon corridor",
@@ -1609,7 +1754,7 @@
     }
   },
   {
-    "seq": 97,
+    "seq": 107,
     "checkpoint_id": "yawn_moon_210",
     "room_id": "210",
     "objective": "Complete the Yawn encounter, collect the shells, and take the moon crest",

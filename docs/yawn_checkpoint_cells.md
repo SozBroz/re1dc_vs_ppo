@@ -1,6 +1,6 @@
 # Yawn rails checkpoint cells (`cpNN`)
 
-Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (97 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
+Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (107 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
 
 **Source of truth:** `data/yawn_checkpoint_route.json` (objectives and success conditions below are copied verbatim). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
@@ -29,7 +29,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp16` | 17 | `ink_106` | `106` | navigate | Return through Main Hall |
 | `cp17` | 18 | `gallery_107` | `107` | navigate | Cross the Art Room |
 | `cp18` | 19 | `l_passage_enter_108` | `108` | navigate | Enter the L Passage (dangerous hallway) |
-| `cp19` | 20 | `ammo_108` | `108` | pickup | Collect the L Passage handgun bullets (already in hallway) |
+| `cp19` | 20 | `ammo_108` | `108` | pickup | Collect the L Passage handgun bullets after killing both hallway dogs |
 | `cp20` | 21 | `winding_109` | `109` | navigate | Reach the Winding Passage |
 | `cp21` | 22 | `trap_entry_115` | `115` | navigate | Enter the shotgun trap room |
 | `cp22` | 23 | `shotgun_room_enter_116` | `116` | navigate | Enter the shotgun armor room |
@@ -102,11 +102,21 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp89` | 90 | `yawn_box_prep_118` | `118` | navigate | Deposit wind crest and armor key, withdraw guns/ammo from the box, then leave to East Stairway |
 | `cp90` | 91 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
 | `cp91` | 92 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
-| `cp92` | 93 | `moon_hall_enter_20D` | `20D` | navigate | Enter the east wing hallway for attic ammo |
-| `cp93` | 94 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
-| `cp94` | 95 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
-| `cp95` | 96 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
-| `cp96` | 97 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
+| `cp92` | 93 | `moon_hall_enter_20D` | `20D` | navigate | First return to Pillar Passage after box prep (Richard still up) |
+| `cp93` | 94 | `richard_wait_exit_204` | `204` | navigate | Leave Pillar Passage to burn Richard's death timer |
+| `cp94` | 95 | `richard_wait_upper_203` | `203` | navigate | Cross Upper Hall during the Richard wait lap |
+| `cp95` | 96 | `richard_wait_terrace_pass_211` | `211` | navigate | Enter Terrace Passage during the Richard wait lap |
+| `cp96` | 97 | `richard_wait_terrace_212` | `212` | navigate | Reach the Terrace dead-end turnaround |
+| `cp97` | 98 | `richard_wait_terrace_back_211` | `211` | navigate | Return through Terrace Passage toward Upper Hall |
+| `cp98` | 99 | `richard_wait_upper_back_203` | `203` | navigate | Return to Upper Hall from the terrace side |
+| `cp99` | 100 | `richard_wait_main_106` | `106` | navigate | Walk Main Hall to burn Richard's death timer |
+| `cp100` | 101 | `richard_wait_upper_again_203` | `203` | navigate | Climb back to Upper Hall after Main Hall |
+| `cp101` | 102 | `richard_wait_c_pass_204` | `204` | navigate | Cross C Passage toward Pillar Passage after the wait lap |
+| `cp102` | 103 | `moon_hall_return_20D` | `20D` | navigate | Re-enter Pillar Passage after Richard's death wait |
+| `cp103` | 104 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
+| `cp104` | 105 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
+| `cp105` | 106 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
+| `cp106` | 107 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
 
 ## Details
 
@@ -139,14 +149,14 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Room:** `105` (DINING ROOM)
 - **Action:** `navigate`
 - **Objective:** Enter Dining after the Kenneth cutscene
-- **Required items:** `first_aid_spray_alt` (Jill start heal spray from cp01; already held — must not use)
+- **Required items:** `first_aid_spray_alt`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **105**. Navigate until the success condition fires.
+- **How to achieve:** Be in / reach **105**. Hold: `first_aid_spray_alt`. Navigate until the success condition fires.
 - **Success condition:**
 - **all of:**
   - Enter room `105` from `104`
-  - Kenneth ``104:*:sN`` observed during the current cp01→cp02 leg (an inherited predecessor-sidecar flag does not count; dining-from-tea before a fresh trigger fails the episode). Other cutscene keys are logged only.
-  - Still holding `first_aid_spray_alt` (using the spray before return fails the episode / blocks capture)
+  - Observe cutscene with prefix `104:` (``:s`` scene key, not a door load)
+  - Have item `first_aid_spray_alt` in inventory
 
 ### `cp03` — `main_hall_106` (seq 4)
 
@@ -157,7 +167,9 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **106**. Navigate until the success condition fires.
 - **Success condition:**
-- Enter room `106` (cutscene keys are logged only; they do not create this cell)
+- **all of:**
+  - Enter room `106`
+  - Observe cutscene with prefix `106:`
 
 ### `cp04` — `upper_hall_203` (seq 5)
 
@@ -344,12 +356,14 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `108` (L PASSAGE)
 - **Action:** `pickup`
-- **Objective:** Collect the L Passage handgun bullets (already in hallway)
+- **Objective:** Collect the L Passage handgun bullets after killing both hallway dogs
 - **Required items:** _(none)_
 - **Items gained:** `handgun_bullets`
 - **How to achieve:** Be in / reach **108**. Pick up `handgun_bullets`.
 - **Success condition:**
-- Acquire item `handgun_bullets`
+- **all of:**
+  - Acquire item `handgun_bullets`
+  - Kill **2** enemy in room `108` this leg
 
 ### `cp20` — `winding_109` (seq 21)
 
@@ -415,7 +429,9 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **115**. Hold: `shotgun`. Navigate until the success condition fires.
 - **Success condition:**
-- Have item `shotgun` in inventory (cutscene keys are logged only; they do not create this cell)
+- **all of:**
+  - Have item `shotgun` in inventory
+  - Observe cutscene with prefix `115:`
 
 ### `cp26` — `back_passage_10A` (seq 27)
 
@@ -1086,7 +1102,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **20D**. Hold: `shield_key`. Navigate until the success condition fires.
 - **Success condition:**
-- Observed cutscene ledger ``20D:richard`` (``require_scene``; generic ``20D:0:s0`` camera keys do not count)
+- Observe cutscene with prefix `20D:` (``:s`` scene key, not a door load)
 
 ### `cp85` — `richard_forced_return_204` (seq 86)
 
@@ -1139,7 +1155,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Objective:** Deposit wind crest and armor key, withdraw guns/ammo from the box, then leave to East Stairway
 - **Required items:** `shield_key`, `handgun_bullets`, `bazooka_acid`
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **118**. Bank wind crest + armor key (+2 each). Clear guns/ammo from the box onto person (at least handgun clip + acid bazooka; keep shield key). Leave **118→10B**. Closing the box before that prep-ready loadout is an invalid-cell terminal (−4).
+- **How to achieve:** Be in / reach **118**. Hold: `shield_key`, `handgun_bullets`, `bazooka_acid`. Navigate until the success condition fires.
 - **Success condition:**
 - (yawn_box_prep_exit) `{"type": "yawn_box_prep_exit"}`
 
@@ -1169,14 +1185,124 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `navigate`
-- **Objective:** Enter the east wing hallway for attic ammo
+- **Objective:** First return to Pillar Passage after box prep (Richard still up)
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **20D**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `20D`
 
-### `cp93` — `ammo_20D` (seq 94)
+### `cp93` — `richard_wait_exit_204` (seq 94)
+
+- **Room:** `204` (C PASSAGE)
+- **Action:** `navigate`
+- **Objective:** Leave Pillar Passage to burn Richard's death timer
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **204**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `204` from `20D`
+
+### `cp94` — `richard_wait_upper_203` (seq 95)
+
+- **Room:** `203` (HALL 2F)
+- **Action:** `navigate`
+- **Objective:** Cross Upper Hall during the Richard wait lap
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `203`
+
+### `cp95` — `richard_wait_terrace_pass_211` (seq 96)
+
+- **Room:** `211` (TERRACE PASSAGE)
+- **Action:** `navigate`
+- **Objective:** Enter Terrace Passage during the Richard wait lap
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **211**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `211`
+
+### `cp96` — `richard_wait_terrace_212` (seq 97)
+
+- **Room:** `212` (TERRACE)
+- **Action:** `navigate`
+- **Objective:** Reach the Terrace dead-end turnaround
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **212**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `212`
+
+### `cp97` — `richard_wait_terrace_back_211` (seq 98)
+
+- **Room:** `211` (TERRACE PASSAGE)
+- **Action:** `navigate`
+- **Objective:** Return through Terrace Passage toward Upper Hall
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **211**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `211` from `212`
+
+### `cp98` — `richard_wait_upper_back_203` (seq 99)
+
+- **Room:** `203` (HALL 2F)
+- **Action:** `navigate`
+- **Objective:** Return to Upper Hall from the terrace side
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `203` from `211`
+
+### `cp99` — `richard_wait_main_106` (seq 100)
+
+- **Room:** `106` (MAIN HALL)
+- **Action:** `navigate`
+- **Objective:** Walk Main Hall to burn Richard's death timer
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **106**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `106`
+
+### `cp100` — `richard_wait_upper_again_203` (seq 101)
+
+- **Room:** `203` (HALL 2F)
+- **Action:** `navigate`
+- **Objective:** Climb back to Upper Hall after Main Hall
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `203` from `106`
+
+### `cp101` — `richard_wait_c_pass_204` (seq 102)
+
+- **Room:** `204` (C PASSAGE)
+- **Action:** `navigate`
+- **Objective:** Cross C Passage toward Pillar Passage after the wait lap
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **204**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `204`
+
+### `cp102` — `moon_hall_return_20D` (seq 103)
+
+- **Room:** `20D` (PILLAR PASSAGE)
+- **Action:** `navigate`
+- **Objective:** Re-enter Pillar Passage after Richard's death wait
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **20D**. Navigate until the success condition fires.
+- **Success condition:**
+- Enter room `20D` from `204`
+
+### `cp103` — `ammo_20D` (seq 104)
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `pickup`
@@ -1187,7 +1313,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Acquire item `handgun_bullets`
 
-### `cp94` — `attic_entry_20E` (seq 95)
+### `cp104` — `attic_entry_20E` (seq 105)
 
 - **Room:** `20E` (FRONT OF ATTIC)
 - **Action:** `navigate`
@@ -1198,7 +1324,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `20E` from `20D`
 
-### `cp95` — `yawn_arena_enter_210` (seq 96)
+### `cp105` — `yawn_arena_enter_210` (seq 106)
 
 - **Room:** `210` (ATTIC)
 - **Action:** `navigate`
@@ -1209,7 +1335,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `210`
 
-### `cp96` — `yawn_moon_210` (seq 97)
+### `cp106` — `yawn_moon_210` (seq 107)
 
 - **Room:** `210` (ATTIC)
 - **Action:** `fight`
