@@ -122,9 +122,9 @@ def unexpected_keys_lost(
     """Keys that left the person and were not the intended allowlisted deposit.
 
     ``lost = keys_before - keys_after``. If the intended id is legal to deposit
-    in ``room_id`` (room-118 wind crest), drop it from ``lost``. Remaining ids
-    are a fail (``key_item_deposited``): shield_key / armor_key leaving in 118
-    still fail; crest leaving in room 100 still fails.
+    in ``room_id`` (room-118 wind crest / armor key), drop it from ``lost``.
+    Remaining ids are a fail (``key_item_deposited``): shield_key leaving in
+    118 still fails; crest or armor key leaving in room 100 still fails.
     """
     from re1_rl.item_box import is_deposit_allowed_item
 

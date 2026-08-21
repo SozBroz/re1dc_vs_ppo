@@ -99,7 +99,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp86` | 87 | `east_stairs_201_post_richard` | `207` | navigate | Reach East Stairway 2F after Richard |
 | `cp87` | 88 | `east_stairs_101_post_richard` | `10B` | navigate | Descend East Stairway after Richard |
 | `cp88` | 89 | `yawn_box_enter_118` | `118` | navigate | Enter the storeroom for Yawn box prep |
-| `cp89` | 90 | `yawn_box_prep_118` | `118` | navigate | Deposit wind crest, withdraw guns/ammo from the box, then leave to East Stairway |
+| `cp89` | 90 | `yawn_box_prep_118` | `118` | navigate | Deposit wind crest and armor key, withdraw guns/ammo from the box, then leave to East Stairway |
 | `cp90` | 91 | `east_stairs_201_to_yawn` | `207` | navigate | Climb East Stairway for Yawn |
 | `cp91` | 92 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
 | `cp92` | 93 | `moon_hall_enter_20D` | `20D` | navigate | Enter the east wing hallway for attic ammo |
@@ -1136,7 +1136,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `118` (STAIRS UNDER ROOM)
 - **Action:** `navigate`
-- **Objective:** Deposit wind crest, withdraw guns/ammo from the box, then leave to East Stairway
+- **Objective:** Deposit wind crest and armor key, withdraw guns/ammo from the box, then leave to East Stairway
 - **Required items:** `shield_key`, `shotgun`
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **118**. Hold: `shield_key`, `shotgun`. Navigate until the success condition fires.

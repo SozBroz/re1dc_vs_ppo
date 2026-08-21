@@ -1,4 +1,4 @@
-"""Yawn prep save room (118): deposit wind crest; box must have no guns/ammo."""
+"""Yawn prep save room (118): bank wind crest + armor key; box must have no guns/ammo."""
 
 from __future__ import annotations
 
@@ -13,11 +13,15 @@ from re1_rl.item_box import (
 from re1_rl.item_todo import canonical_item
 
 WIND_CREST_ITEM_ID = 0x29
+ARMOR_KEY_ITEM_ID = 0x34
 YAWN_BOX_PREP_CHECKPOINT_ID = "yawn_box_prep_118"
 YAWN_BOX_PREP_ROOM = "118"
 YAWN_BOX_PREP_EXIT_ROOM = "10B"
 WIND_CREST_NAME = "wind_crest"
-YAWN_BOX_PREP_HELD_KEYS = ("armor_key", "shield_key")
+ARMOR_KEY_NAME = "armor_key"
+YAWN_BOX_PREP_BANKED_KEYS = (WIND_CREST_NAME, ARMOR_KEY_NAME)
+YAWN_BOX_PREP_BANKED_KEY_IDS = frozenset({WIND_CREST_ITEM_ID, ARMOR_KEY_ITEM_ID})
+YAWN_BOX_PREP_HELD_KEYS = ("shield_key",)
 YAWN_BOX_PREP_HELD_FIREPOWER = (
     "beretta",
     "shotgun",
@@ -28,12 +32,17 @@ YAWN_BOX_PREP_HELD_FIREPOWER = (
 )
 
 
-def wind_crest_deposit_allowed(item_id: int, room_id: str | None) -> bool:
-    """Room 118 storeroom may bank the wind crest before Yawn."""
+def yawn_118_key_deposit_allowed(item_id: int, room_id: str | None) -> bool:
+    """Room 118 may bank the wind crest and armor key before Yawn."""
     return (
         str(room_id or "").strip().upper() == YAWN_BOX_PREP_ROOM
-        and int(item_id) & 0xFF == WIND_CREST_ITEM_ID
+        and int(item_id) & 0xFF in YAWN_BOX_PREP_BANKED_KEY_IDS
     )
+
+
+def wind_crest_deposit_allowed(item_id: int, room_id: str | None) -> bool:
+    """Room 118 storeroom may bank the wind crest (and armor key) before Yawn."""
+    return yawn_118_key_deposit_allowed(item_id, room_id)
 
 
 def yawn_box_forbidden_weapon_ammo_ids() -> frozenset[int]:
@@ -108,7 +117,7 @@ def yawn_box_weapon_ammo_clear(box: list[tuple[int, int]] | None) -> bool:
 def yawn_box_prep_box_pollution_reason(
     box: list[tuple[int, int]] | None,
 ) -> str | None:
-    """Stricter than generic pollution: wind crest ok; no guns/ammo; knife/heals ok."""
+    """Stricter than generic pollution: crest/armor key ok; no guns/ammo; knife/heals ok."""
     from re1_rl.key_items import KEY_ITEM_NAMES
     from re1_rl.memory_map import ITEM_IDS
 
@@ -117,7 +126,7 @@ def yawn_box_prep_box_pollution_reason(
 
     forbidden = yawn_box_forbidden_weapon_ammo_ids()
     key_names = frozenset(KEY_ITEM_NAMES)
-    allowed_modeled = DEPOSIT_ITEM_ALLOWLIST | {WIND_CREST_ITEM_ID}
+    allowed_modeled = DEPOSIT_ITEM_ALLOWLIST | YAWN_BOX_PREP_BANKED_KEY_IDS
 
     for i, entry in enumerate(box):
         if not entry:
@@ -131,11 +140,11 @@ def yawn_box_prep_box_pollution_reason(
             label = name or f"0x{item_id:02x}"
             return f"yawn_box_weapon_ammo:{label}@{i}"
 
-        if name and name in key_names and name != WIND_CREST_NAME:
+        if name and name in key_names and name not in YAWN_BOX_PREP_BANKED_KEYS:
             return f"key_item_in_box:{name}@{i}"
 
         if i >= BOX_SLOTS:
-            if name == WIND_CREST_NAME:
+            if name in YAWN_BOX_PREP_BANKED_KEYS:
                 continue
             if item_id in allowed_modeled:
                 continue
@@ -158,7 +167,7 @@ def _inventory_name_set(
 def yawn_box_prep_held_reason(
     inventory_names: list[str] | tuple[str, ...] | None,
 ) -> str | None:
-    """Person must hold both mansion keys and the guns/ammo for this loadout."""
+    """Person must hold the shield key and the guns/ammo for this loadout."""
     inv = _inventory_name_set(inventory_names)
     for name in YAWN_BOX_PREP_HELD_KEYS:
         if name not in inv:
@@ -177,16 +186,17 @@ def yawn_box_prep_capture_ready(
     pollution = yawn_box_prep_box_pollution_reason(box)
     if pollution:
         return pollution
-    if not box_has_item(box, WIND_CREST_NAME):
-        return "wind_crest_not_in_box"
     inv = _inventory_name_set(inventory_names)
-    if WIND_CREST_NAME in inv:
-        return "wind_crest_still_held"
+    for name in YAWN_BOX_PREP_BANKED_KEYS:
+        if not box_has_item(box, name):
+            return f"{name}_not_in_box"
+        if name in inv:
+            return f"{name}_still_held"
     return yawn_box_prep_held_reason(inventory_names)
 
 
 def yawn_box_prep_ready(state: dict[str, Any] | None) -> bool:
-    """True when crest is banked and keys plus guns/ammo are on person."""
+    """True when crest and armor key are banked and firepower is on person."""
     st = state or {}
     return yawn_box_prep_capture_ready(
         box_pairs_from_state(st),
@@ -199,7 +209,7 @@ def yawn_box_prep_exit_met(
     prev_state: dict[str, Any] | None,
     progress: Any,
 ) -> bool:
-    """Success: leave 118 into 10B with keys and firepower on person."""
+    """Success: leave 118 into 10B with crest/armor banked and firepower on person."""
     st = state or {}
     if str(st.get("room_id", "")).upper() != YAWN_BOX_PREP_EXIT_ROOM:
         return False

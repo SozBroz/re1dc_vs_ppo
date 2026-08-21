@@ -80,6 +80,10 @@ def test_u1_118_crest_lost_is_ok() -> None:
         keys_before, keys_after, WIND_CREST_ITEM_ID, "118"
     )
     assert lost == set()
+    armor_ok = unexpected_keys_lost(
+        keys_before, {WIND_CREST_ITEM_ID, SHIELD_KEY_ID}, ARMOR_KEY_ID, "118"
+    )
+    assert armor_ok == set()
 
 
 def test_u2_118_shield_key_lost_still_fails() -> None:
@@ -165,7 +169,8 @@ def test_u4_deposit_allowlist_crest_and_keys() -> None:
     assert not is_deposit_allowed_item(WIND_CREST_ITEM_ID, "100")
     assert not is_deposit_allowed_item(SHIELD_KEY_ID, "118")
     assert not is_deposit_allowed_item(SHIELD_KEY_ID, "100")
-    assert not is_deposit_allowed_item(ARMOR_KEY_ID, "118")
+    assert is_deposit_allowed_item(ARMOR_KEY_ID, "118")
+    assert not is_deposit_allowed_item(ARMOR_KEY_ID, "100")
 
 
 def test_u5_118_full_pack_only_crest_depositable() -> None:
@@ -177,7 +182,6 @@ def test_u5_118_full_pack_only_crest_depositable() -> None:
         2: SHIELD_KEY_ID,
         3: SHOTGUN_ID,
         4: ACID_ROUNDS_ID,
-        5: ARMOR_KEY_ID,
         6: SHOTGUN_SHELLS_ID,
     }
     for slot, iid in illegal.items():
@@ -203,6 +207,15 @@ def test_u5_118_full_pack_only_crest_depositable() -> None:
         enforce_allowlist=True,
     )
     assert ok7 and why7 == ""
+    ok5, why5 = can_deposit(
+        inv,
+        box,
+        5,
+        room_id="118",
+        checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID,
+        enforce_allowlist=True,
+    )
+    assert ok5 and why5 == ""
 
 
 def test_u6_withdraw_full_pack_then_every_box_slot_after_hole() -> None:
@@ -341,17 +354,18 @@ def test_u10_7pack_withdraw_legal_before_deposit_capture_still_needs_crest() -> 
 
     ready_box = list(banked_box)
     ready_box[1] = (0, 0)
+    ready_box[3] = (ARMOR_KEY_ID, 1)
+    names_without_banked = [n for n in names_after_bank if n != "armor_key"]
     ready_names = [
         "beretta",
         "handgun_bullets",
         "shield_key",
         "shotgun",
         "acid_rounds",
-        "armor_key",
         "shotgun_shells",
         "bazooka_acid",
     ]
-    assert yawn_box_prep_capture_ready(ready_box, names_after_bank) == (
+    assert yawn_box_prep_capture_ready(ready_box, names_without_banked) == (
         "missing_held:bazooka_acid"
     )
     assert yawn_box_prep_capture_ready(ready_box, ready_names) is None

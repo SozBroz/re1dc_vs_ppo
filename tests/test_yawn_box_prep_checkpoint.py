@@ -12,6 +12,7 @@ from re1_rl.item_box import (
     plan_deposit,
 )
 from re1_rl.yawn_box_prep_checkpoint import (
+    ARMOR_KEY_ITEM_ID,
     WIND_CREST_ITEM_ID,
     YAWN_BOX_PREP_CHECKPOINT_ID,
     yawn_box_prep_box_pollution_reason,
@@ -29,7 +30,9 @@ def _box() -> list[tuple[int, int]]:
 
 def test_wind_crest_deposit_allowed_only_in_room_118() -> None:
     assert is_deposit_allowed_item(WIND_CREST_ITEM_ID, "118")
+    assert is_deposit_allowed_item(ARMOR_KEY_ITEM_ID, "118")
     assert not is_deposit_allowed_item(WIND_CREST_ITEM_ID, "100")
+    assert not is_deposit_allowed_item(ARMOR_KEY_ITEM_ID, "100")
     assert not is_deposit_allowed_item(0x35, "118")  # shield_key
 
 
@@ -38,6 +41,11 @@ def test_can_deposit_wind_crest_at_118() -> None:
     box = [(0, 0)] * BOX_SLOTS
     ok, reason = can_deposit(inv, box, 0, room_id="118", enforce_allowlist=True)
     assert ok and reason == ""
+    armor_inv = [(ARMOR_KEY_ITEM_ID, 1)] + [(0, 0)] * 7
+    ok_armor, why_armor = can_deposit(
+        armor_inv, box, 0, room_id="118", enforce_allowlist=True
+    )
+    assert ok_armor and why_armor == ""
 
 
 def test_early_118_allows_ammo_yawn_prep_does_not() -> None:
@@ -95,6 +103,7 @@ def test_full_pack_select_slot_7_deposit_masked() -> None:
         0x11, "118", checkpoint_id=YAWN_BOX_PREP_CHECKPOINT_ID
     )  # acid_rounds
     assert is_deposit_allowed_item(WIND_CREST_ITEM_ID, "118")
+    assert is_deposit_allowed_item(ARMOR_KEY_ITEM_ID, "118")
     assert box_deposit_slot_reachable(inv, 6, from_slot=0)
     assert box_deposit_slot_reachable(inv, 7, from_slot=0)
     ok6, why6 = can_deposit(
@@ -182,6 +191,7 @@ def test_yawn_box_prep_allows_wind_crest_and_knife_rejects_ammo() -> None:
     box = _box()
     box[0] = (WIND_CREST_ITEM_ID, 1)
     box[1] = (0x01, 0)
+    box[3] = (ARMOR_KEY_ITEM_ID, 1)
     assert yawn_box_prep_box_pollution_reason(box) is None
 
     dirty = list(box)
@@ -198,6 +208,7 @@ def test_generic_pollution_allows_banked_wind_crest_and_bazooka() -> None:
     box[0] = (WIND_CREST_ITEM_ID, 1)
     box[1] = (0x01, 0)
     box[2] = (0x07, 4)
+    box[3] = (ARMOR_KEY_ITEM_ID, 1)
     assert box_pollution_reason(box) is None
     assert box_pollution_reason(box, room_id="10B") is None
 
@@ -209,20 +220,34 @@ def _ready_inv() -> list[str]:
         "shield_key",
         "shotgun",
         "acid_rounds",
-        "armor_key",
         "shotgun_shells",
         "bazooka_acid",
     ]
 
 
-def test_yawn_box_prep_capture_requires_wind_in_box_not_on_person() -> None:
+def _ready_box() -> list[tuple[int, int]]:
     box = _box()
     box[0] = (WIND_CREST_ITEM_ID, 1)
+    box[1] = (ARMOR_KEY_ITEM_ID, 1)
+    return box
+
+
+def test_yawn_box_prep_capture_requires_wind_in_box_not_on_person() -> None:
+    box = _ready_box()
     assert yawn_box_prep_capture_ready(box, _ready_inv()) is None
-    assert yawn_box_prep_capture_ready(box, []) == "missing_held:armor_key"
+    assert yawn_box_prep_capture_ready(box, []) == "missing_held:shield_key"
     assert (
         yawn_box_prep_capture_ready(box, _ready_inv() + ["wind_crest"])
         == "wind_crest_still_held"
+    )
+    assert (
+        yawn_box_prep_capture_ready(box, _ready_inv() + ["armor_key"])
+        == "armor_key_still_held"
+    )
+    missing_armor = _box()
+    missing_armor[0] = (WIND_CREST_ITEM_ID, 1)
+    assert yawn_box_prep_capture_ready(missing_armor, _ready_inv()) == (
+        "armor_key_not_in_box"
     )
     assert yawn_box_prep_capture_ready(_box(), _ready_inv()) == "wind_crest_not_in_box"
 
@@ -243,6 +268,7 @@ def test_planner_yawn_box_prep_succeeds_on_leave_to_10b() -> None:
     progress = ProgressTracker()
     box = [(0, 0)] * BOX_SLOTS_LIVE
     box[0] = (WIND_CREST_ITEM_ID, 1)
+    box[1] = (ARMOR_KEY_ITEM_ID, 1)
 
     still_in = _state("118")
     still_in["inventory"] = list(_ready_inv())
@@ -273,6 +299,7 @@ def test_suppress_wrong_room_only_when_prep_ready() -> None:
     planner = _planner(start_index=_idx("yawn_box_prep_118"))
     box = [(0, 0)] * BOX_SLOTS_LIVE
     box[0] = (WIND_CREST_ITEM_ID, 1)
+    box[1] = (ARMOR_KEY_ITEM_ID, 1)
     ready = _state("10B")
     ready["lab_timer"] = 8600
     ready["inventory"] = list(_ready_inv())

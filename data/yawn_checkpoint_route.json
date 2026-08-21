@@ -1504,7 +1504,7 @@
     "seq": 90,
     "checkpoint_id": "yawn_box_prep_118",
     "room_id": "118",
-    "objective": "Deposit wind crest, withdraw guns/ammo from the box, then leave to East Stairway",
+    "objective": "Deposit wind crest and armor key, withdraw guns/ammo from the box, then leave to East Stairway",
     "action_type": "navigate",
     "required_items": [
       "shield_key",
@@ -1512,7 +1512,8 @@
     ],
     "items_gained": [],
     "consume_before_gain": [
-      "wind_crest"
+      "wind_crest",
+      "armor_key"
     ],
     "success_condition": {
       "type": "yawn_box_prep_exit"

@@ -130,7 +130,7 @@ def deposit_allowlist_for_room(
     forbids guns/ammo deposits so Jill leaves holding firepower.
     """
     from re1_rl.yawn_box_prep_checkpoint import (
-        WIND_CREST_ITEM_ID,
+        YAWN_BOX_PREP_BANKED_KEY_IDS,
         YAWN_BOX_PREP_CHECKPOINT_ID,
         YAWN_BOX_PREP_ROOM,
     )
@@ -141,8 +141,8 @@ def deposit_allowlist_for_room(
         return DEPOSIT_ITEM_ALLOWLIST | ROOM_100_EXTRA_DEPOSIT_IDS
     if rid == YAWN_BOX_PREP_ROOM:
         if cid == YAWN_BOX_PREP_CHECKPOINT_ID:
-            return DEPOSIT_ITEM_ALLOWLIST | {WIND_CREST_ITEM_ID}
-        return DEPOSIT_ITEM_ALLOWLIST | ROOM_118_EARLY_AMMO_IDS | {WIND_CREST_ITEM_ID}
+            return DEPOSIT_ITEM_ALLOWLIST | YAWN_BOX_PREP_BANKED_KEY_IDS
+        return DEPOSIT_ITEM_ALLOWLIST | ROOM_118_EARLY_AMMO_IDS | YAWN_BOX_PREP_BANKED_KEY_IDS
     return DEPOSIT_ITEM_ALLOWLIST
 
 
@@ -275,7 +275,7 @@ def box_pollution_reason(
             continue
         name = canonical_item(ITEM_IDS.get(item_id, "") or "")
         if name and name in key_names:
-            if name == "wind_crest":
+            if name in ("wind_crest", "armor_key"):
                 continue
             return f"key_item_in_box:{name}@{i}"
         if i >= BOX_SLOTS:
