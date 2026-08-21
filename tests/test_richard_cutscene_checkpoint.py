@@ -27,7 +27,6 @@ from re1_rl.richard_cutscene_checkpoint import (
     RICHARD_CUTSCENE_KEY,
     note_richard_cutscene_room_transition,
     richard_cutscene_capture_room_ok,
-    richard_cutscene_lab_evidence,
     richard_cutscene_seen,
     richard_cutscene_skip_settled,
     note_richard_cutscene_skip_settle,
@@ -104,16 +103,15 @@ def test_richard_cutscene_walkout_does_not_mint_without_lab() -> None:
     assert not state.get("richard_cutscene_scripted_exit")
 
 
-def test_richard_cutscene_room_transition_mints_with_lab_timer() -> None:
+def test_richard_cutscene_room_transition_never_mints_with_lab_timer() -> None:
     planner = _planner("richard_cutscene_20D")
     progress = ProgressTracker()
     state = _post_richard_204()
     note_richard_cutscene_room_transition(planner, progress, "20D", "204", state)
-    assert RICHARD_CUTSCENE_KEY in progress.observed_cutscenes
-    assert state.get("richard_cutscene_scripted_exit") is True
+    assert RICHARD_CUTSCENE_KEY not in progress.observed_cutscenes
 
 
-def test_richard_cutscene_room_transition_mints_with_countdown_overlay() -> None:
+def test_richard_cutscene_room_transition_never_mints_with_countdown_overlay() -> None:
     planner = _planner("richard_cutscene_20D")
     progress = ProgressTracker()
     state = _state(
@@ -122,9 +120,28 @@ def test_richard_cutscene_room_transition_mints_with_countdown_overlay() -> None
         game_mode=RICHARD_LAB_COUNTDOWN_STATUS_GAME_MODE,
         game_state=RICHARD_LAB_COUNTDOWN_STATUS_GAME_STATE,
     )
-    assert richard_cutscene_lab_evidence(state)
+    note_richard_cutscene_room_transition(planner, progress, "20D", "204", state)
+    assert RICHARD_CUTSCENE_KEY not in progress.observed_cutscenes
+
+
+def test_richard_cutscene_room_transition_mints_with_script_peak() -> None:
+    planner = _planner("richard_cutscene_20D")
+    progress = ProgressTracker()
+    state = _post_richard_204(
+        _skip_session_frames=0,
+        _skip_peak_scene_flag=0x93,
+    )
     note_richard_cutscene_room_transition(planner, progress, "20D", "204", state)
     assert RICHARD_CUTSCENE_KEY in progress.observed_cutscenes
+    assert state["richard_cutscene_confirmed"] is True
+
+
+def test_richard_cutscene_room_transition_rejects_generic_script_peak() -> None:
+    planner = _planner("richard_cutscene_20D")
+    progress = ProgressTracker()
+    state = _post_richard_204(_skip_peak_scene_flag=0x90)
+    note_richard_cutscene_room_transition(planner, progress, "20D", "204", state)
+    assert RICHARD_CUTSCENE_KEY not in progress.observed_cutscenes
 
 
 def test_richard_cutscene_does_not_advance_without_ledger() -> None:
@@ -134,36 +151,61 @@ def test_richard_cutscene_does_not_advance_without_ledger() -> None:
     assert not planner.advance_if_success(_state("20D"), progress=progress)
 
 
-def test_richard_cutscene_skip_20d_to_204_mints_with_lab() -> None:
+def test_richard_cutscene_same_room_script_mints() -> None:
     planner = _planner("richard_cutscene_20D")
     progress = ProgressTracker()
-    entry = _state("20D")
-    new = _post_richard_204()
-    assert richard_cutscene_skip_settled(planner, entry, new, skip_frames=60)
+    entry = _state("20D", scene_flag=0x91)
+    new = _state("20D", scene_flag=0x80)
+    assert richard_cutscene_skip_settled(
+        planner,
+        entry,
+        new,
+        skip_frames=2984,
+        peak_scene_flag=0x93,
+    )
     note_richard_cutscene_skip_settle(
-        planner, progress, entry, new, skip_frames=60
+        planner,
+        progress,
+        entry,
+        new,
+        skip_frames=2984,
+        peak_scene_flag=0x93,
     )
     assert RICHARD_CUTSCENE_KEY in progress.observed_cutscenes
-    assert new.get("richard_cutscene_scripted_exit") is True
+    assert new.get("richard_cutscene_confirmed") is True
 
 
 def test_richard_cutscene_skip_ignored_on_other_legs() -> None:
     planner = _planner("richard_room_enter_20D")
-    entry = _state("20D")
-    new = _post_richard_204()
-    assert not richard_cutscene_skip_settled(planner, entry, new, skip_frames=60)
-
-
-def test_richard_cutscene_same_room_skip_never_mints() -> None:
-    """Long skip still in 20D is not the Richard dump."""
-    planner = _planner("richard_cutscene_20D")
-    entry = _state("20D")
-    new = _state("20D", lab_timer=900)
+    entry = _state("20D", scene_flag=0x91)
+    new = _state("20D")
     assert not richard_cutscene_skip_settled(
-        planner, entry, new, skip_frames=MIN_CUTSCENE_SKIP_FRAMES
+        planner, entry, new, skip_frames=2984, peak_scene_flag=0x93
     )
+
+
+def test_richard_cutscene_same_room_message_skip_never_mints() -> None:
+    """Long same-room text without a scripted scene is not Richard."""
+    planner = _planner("richard_cutscene_20D")
+    entry = _state("20D", scene_flag=0x80)
+    new = _state("20D", scene_flag=0x80)
     assert not richard_cutscene_skip_settled(
-        planner, entry, new, skip_frames=MIN_CUTSCENE_SKIP_FRAMES * 4
+        planner,
+        entry,
+        new,
+        skip_frames=2984,
+        peak_scene_flag=0x80,
+    )
+
+
+def test_richard_cutscene_short_script_never_mints() -> None:
+    planner = _planner("richard_cutscene_20D")
+    assert not richard_cutscene_skip_settled(
+        planner,
+        _state("20D", scene_flag=0x91),
+        _state("20D"),
+        skip_frames=MIN_CUTSCENE_SKIP_FRAMES - 1,
+        peak_scene_flag=0x93,
     )
 
 
@@ -189,13 +231,12 @@ def test_richard_cutscene_walkout_is_wrong_room() -> None:
     assert bd["checkpoint_success"] == 0.0
 
 
-def test_richard_cutscene_20d_to_204_no_terminal_wrong_room() -> None:
+def test_richard_cutscene_20d_to_204_is_wrong_room_before_confirmation() -> None:
     g = RoomGraph(DOORS)
     planner = _planner("richard_cutscene_20D")
     progress = ProgressTracker()
-    progress.observe_cutscene(RICHARD_CUTSCENE_KEY)
     prev = _state("20D")
-    cur = _post_richard_204(richard_cutscene_scripted_exit=True)
+    cur = _post_richard_204()
     _, bd = compute_reward(
         prev,
         cur,
@@ -205,18 +246,23 @@ def test_richard_cutscene_20d_to_204_no_terminal_wrong_room() -> None:
         rails_mode=True,
         return_breakdown=True,
     )
-    assert bd["wrong_room"] == 0.0
-    assert not progress.wrong_room_breached
+    assert bd["wrong_room"] == WRONG_ROOM_TERMINAL_PENALTY
+    assert progress.wrong_room_breached
 
 
-def test_richard_cutscene_checkpoint_success_on_scripted_exit() -> None:
+def test_richard_cutscene_checkpoint_success_on_same_room_script_settle() -> None:
     g = RoomGraph(DOORS)
     planner = _planner("richard_cutscene_20D")
     progress = ProgressTracker()
-    entry = _state("20D")
-    cur = _post_richard_204()
+    entry = _state("20D", scene_flag=0x91)
+    cur = _state("20D", scene_flag=0x80)
     note_richard_cutscene_skip_settle(
-        planner, progress, entry, cur, skip_frames=120
+        planner,
+        progress,
+        entry,
+        cur,
+        skip_frames=2984,
+        peak_scene_flag=0x93,
     )
     _, bd = compute_reward(
         entry,
@@ -232,8 +278,8 @@ def test_richard_cutscene_checkpoint_success_on_scripted_exit() -> None:
     assert progress.checkpoint_success
 
 
-def test_richard_cutscene_natural_20d_to_204_mints_and_succeeds() -> None:
-    """Real dump arms lab_timer; mint + advance without skip settle."""
+def test_richard_cutscene_20d_to_204_never_mints_from_timer() -> None:
+    """The timer is already active before Richard and cannot prove the event."""
     g = RoomGraph(DOORS)
     planner = _planner("richard_cutscene_20D")
     progress = ProgressTracker()
@@ -246,9 +292,9 @@ def test_richard_cutscene_natural_20d_to_204_mints_and_succeeds() -> None:
         rails_mode=True,
         return_breakdown=True,
     )
-    assert RICHARD_CUTSCENE_KEY in progress.observed_cutscenes
-    assert bd["wrong_room"] == 0.0
-    assert bd["checkpoint_success"] == RAILS_CHECKPOINT_REWARD
+    assert RICHARD_CUTSCENE_KEY not in progress.observed_cutscenes
+    assert bd["wrong_room"] == WRONG_ROOM_TERMINAL_PENALTY
+    assert bd["checkpoint_success"] == 0.0
 
 
 def test_richard_room_enter_20d_to_204_still_wrong_room() -> None:
@@ -271,10 +317,22 @@ def test_richard_room_enter_20d_to_204_still_wrong_room() -> None:
 
 def test_richard_cutscene_capture_room_ok_204() -> None:
     assert richard_cutscene_capture_room_ok(
-        "richard_cutscene_20D", "204", "20D", state=_post_richard_204()
+        "richard_cutscene_20D",
+        "204",
+        "20D",
+        state=_post_richard_204(richard_cutscene_confirmed=True),
     )
     assert not richard_cutscene_capture_room_ok(
-        "richard_cutscene_20D", "204", "20D", state=_state("204", lab_timer=0)
+        "richard_cutscene_20D", "204", "20D", state=_post_richard_204()
+    )
+    progress = ProgressTracker()
+    progress.observe_cutscene(RICHARD_CUTSCENE_KEY)
+    assert richard_cutscene_capture_room_ok(
+        "richard_cutscene_20D",
+        "204",
+        "20D",
+        state=_post_richard_204(),
+        progress=progress,
     )
     assert not richard_cutscene_capture_room_ok(
         "richard_cutscene_20D", "203", "20D", state=_post_richard_204()
@@ -362,5 +420,5 @@ def test_should_suppress_wrong_room_requires_scripted_exit_flag() -> None:
         planner,
         "20D",
         "204",
-        {"richard_cutscene_scripted_exit": True},
+        {"richard_cutscene_confirmed": True},
     )

@@ -1257,10 +1257,7 @@ def capture_successor_cell(
         BARRY_RETURN_CHECKPOINT_ID,
         barry_return_capture_inventory_ok,
     )
-    from re1_rl.richard_cutscene_checkpoint import (
-        richard_cutscene_capture_room_ok,
-        richard_cutscene_lab_evidence,
-    )
+    from re1_rl.richard_cutscene_checkpoint import richard_cutscene_capture_room_ok
     from re1_rl.yawn_box_prep_checkpoint import yawn_box_prep_capture_room_ok
 
     if cid == BARRY_RETURN_CHECKPOINT_ID and not barry_return_capture_inventory_ok(state):
@@ -1282,7 +1279,11 @@ def capture_successor_cell(
         return barry_rescue_capture_room_ok(
             completed_cid, live_room, expect_room
         ) or richard_cutscene_capture_room_ok(
-            completed_cid, live_room, expect_room, state=snap
+            completed_cid,
+            live_room,
+            expect_room,
+            state=snap,
+            progress=getattr(env, "_progress", None),
         ) or yawn_box_prep_capture_room_ok(
             completed_cid, live_room, expect_room
         )
@@ -1291,14 +1292,6 @@ def capture_successor_cell(
         if not _scripted_exit_capture_ok(cid, room_id, expected_room):
             _mark_capture_ineligible(env, "room_mismatch")
             return None
-    if cid == "richard_cutscene_20D" and not richard_cutscene_lab_evidence(state):
-        print(
-            f"[yawn_capture] reject richard_lab_missing cp={cid} "
-            f"lab_timer={state.get('lab_timer')!r}",
-            flush=True,
-        )
-        _mark_capture_ineligible(env, "richard_lab_missing")
-        return None
     progress = getattr(env, "_progress", None)
     # Cutscene keys stay on the sidecar but do not gate capture (2026-08-16).
     if cid in (

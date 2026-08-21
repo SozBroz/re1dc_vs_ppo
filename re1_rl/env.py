@@ -2271,6 +2271,29 @@ class RE1Env(gym.Env):
 
             self._pending_episode_failure = ILLEGAL_MAIN_HALL_FAILURE_REASON
 
+    def _attach_richard_transition_evidence(
+        self, prev_state: dict[str, Any], state: dict[str, Any]
+    ) -> None:
+        """Synchronize the cp84 crossing with the background scene-peak poll."""
+        objective = self._planner.current_objective() or {}
+        if str(objective.get("checkpoint_id") or "") != "richard_cutscene_20D":
+            return
+        if str(prev_state.get("room_id") or "").upper() != "20D":
+            return
+        if str(state.get("room_id") or "").upper() != "204":
+            return
+        # The main thread can observe 204 while fast_forward still owns the
+        # emulator and has not published its peak. Wait for that chunk only.
+        with self._bg_skip_emu_lock:
+            pass
+        peak = getattr(self._ram_skip, "last_skip_peak_scene_flag", None)
+        from re1_rl.richard_cutscene_checkpoint import (
+            richard_scene_flag_shows_script,
+        )
+
+        if richard_scene_flag_shows_script(int(peak or 0)):
+            state["_skip_peak_scene_flag"] = int(peak)
+
     def _credit_async_skip_room_crossing(self) -> None:
         """Harness parity: door mid-skip pays ``new_room`` only (main thread)."""
         # Also catch a crossing on the final chunk if bg note missed it.
@@ -2289,9 +2312,32 @@ class RE1Env(gym.Env):
                 self._cutscene_skip_entry_prev = dict(state)
                 self._last_skip_frames = 0
 
+        # Richard's scripted session can briefly return control in 20D while a
+        # latched forward input immediately enters 204.  Do not grade that
+        # crossing until the background skip has settled and published its
+        # mid-skip scene peak; without the peak it is indistinguishable from
+        # the ordinary walkable 20D→204 door.
+        if self._skipping_flag and self._pending_skip_room_crossings:
+            objective = self._planner.current_objective() or {}
+            if str(objective.get("checkpoint_id") or "") == "richard_cutscene_20D":
+                first_entry, first_crossing = self._pending_skip_room_crossings[0]
+                if (
+                    str(first_entry.get("room_id") or "").upper() == "20D"
+                    and str(first_crossing.get("room_id") or "").upper() == "204"
+                ):
+                    return
+
         while self._pending_skip_room_crossings:
             entry, crossing = self._pending_skip_room_crossings.pop(0)
             crossing = dict(crossing)
+            ram_skip = getattr(self, "_ram_skip", None)
+            crossing["_skip_session_frames"] = int(
+                getattr(self, "_skip_session_frames", 0) or 0
+            )
+            crossing["_skip_peak_scene_flag"] = getattr(
+                ram_skip, "last_skip_peak_scene_flag", None
+            )
+            self._attach_richard_transition_evidence(entry, crossing)
             crossing["cutscene_key"] = None
             # Physical skip time is billed once by _bill_async_skip_step_penalty
             # and the dedicated cell-clock cursor, not by this semantic crossing.
@@ -2406,6 +2452,7 @@ class RE1Env(gym.Env):
             skip_entry,
             state,
             skip_frames=skip_frames,
+            peak_scene_flag=getattr(ram_skip, "last_skip_peak_scene_flag", None),
         )
         note_kenneth_cutscene_skip_settle(
             self._progress,
@@ -4083,6 +4130,7 @@ class RE1Env(gym.Env):
             state.get("room_id", ""),
             bool(state.get("in_control", True)),
         )
+        self._attach_richard_transition_evidence(self._prev_state, state)
         save_complete = self._poll_typewriter_save(self._prev_state, state)
         reward, breakdown = compute_reward(
             self._prev_state,
@@ -4825,6 +4873,7 @@ class RE1Env(gym.Env):
             bool(state.get("in_control", True)),
         )
 
+        self._attach_richard_transition_evidence(self._prev_state, state)
         save_complete = self._poll_typewriter_save(self._prev_state, state)
         reward, breakdown = compute_reward(
             self._prev_state,

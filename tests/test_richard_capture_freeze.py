@@ -49,17 +49,17 @@ def _state(room: str, **kw) -> dict:
 
 
 def test_freeze_blocks_forced_return_auto_advance() -> None:
-    """After cutscene succeeds into 204, freeze must stop room_enter(204) skip."""
+    """After Richard succeeds in 20D, freeze must stop room_enter(204) skip."""
     from re1_rl.richard_cutscene_checkpoint import RICHARD_CUTSCENE_KEY
 
     g = RoomGraph(DOORS)
     planner = _planner("richard_cutscene_20D")
     progress = ProgressTracker(leg_span=1)
-    # Cutscene dump mints ledger + advances once (lab countdown armed).
+    # The same-room Richard script mints the ledger and advances once.
     progress.observe_cutscene(RICHARD_CUTSCENE_KEY)
     _, bd = compute_reward(
         _state("20D"),
-        _state("204", lab_timer=900, richard_cutscene_scripted_exit=True),
+        _state("20D", richard_cutscene_confirmed=True),
         planner,
         progress=progress,
         graph=g,

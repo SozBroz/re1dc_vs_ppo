@@ -1,26 +1,26 @@
-"""Surgical cp84 (``richard_cutscene_20D``) support for the Pillar Passage cutscene.
+"""Surgical cp84 (``richard_cutscene_20D``) support for Richard's cinema.
 
-The Pillar Passage script starts in room 20D and dumps Jill into room 204 (C
-Passage) with the lab countdown armed. Room ``20D→204`` is also a normal walkable
-door (entry ``x=12500,z=2800,facing=3072``) — bare room-change mint was installing
-walk-outs as cp84. Mint ``20D:richard`` only when post-Richard lab evidence is
-visible (``lab_timer > 0`` or the STATUS countdown overlay).
+The real event is a long scripted session that starts and settles in room 20D.
+Jill only reaches 204 afterward through the ordinary walkable door.  The value
+at ``LAB_TIMER`` is already nonzero before the event, so it is not evidence.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from re1_rl.richard_lab import (
-    richard_lab_countdown_screen_from_ram,
-    richard_lab_timer_active,
-)
+from re1_rl.cutscene_reward import MIN_CUTSCENE_SKIP_FRAMES
 
 RICHARD_CUTSCENE_CHECKPOINT_ID = "richard_cutscene_20D"
 RICHARD_PILLAR_ROOM = "20D"
 # Post-cutscene scripted dump observed in memlog (pillar 20D → C passage 204).
 RICHARD_SCRIPTED_EXIT_ROOM = "204"
 RICHARD_CUTSCENE_KEY = "20D:richard"
+
+
+def richard_scene_flag_shows_script(scene_flag: int) -> bool:
+    """True for the observed Richard script family (0x91/0x93)."""
+    return (int(scene_flag) & 0xF1) == 0x91
 
 
 def _on_richard_cutscene_leg(planner: Any) -> bool:
@@ -42,16 +42,6 @@ def richard_cutscene_seen(progress: Any) -> bool:
     return RICHARD_CUTSCENE_KEY in keys
 
 
-def richard_cutscene_lab_evidence(state: dict[str, Any] | None) -> bool:
-    """True when RAM shows the post-Richard lab countdown is armed."""
-    if not state:
-        return False
-    return bool(
-        richard_lab_timer_active(state)
-        or richard_lab_countdown_screen_from_ram(state)
-    )
-
-
 def note_richard_cutscene_room_transition(
     planner: Any,
     progress: Any,
@@ -59,18 +49,21 @@ def note_richard_cutscene_room_transition(
     room: str,
     state: dict[str, Any] | None = None,
 ) -> None:
-    """Mint ``20D:richard`` only on 20D→204 with lab-countdown evidence."""
+    """Confirm a 20D→204 crossing only when its skip saw the 20D script."""
     if progress is None or not _on_richard_cutscene_leg(planner):
         return
     if str(prev_room or "").upper() != RICHARD_PILLAR_ROOM:
         return
-    if str(room or "").upper() != RICHARD_SCRIPTED_EXIT_ROOM.upper():
+    if str(room or "").upper() != RICHARD_SCRIPTED_EXIT_ROOM:
         return
-    if not richard_cutscene_lab_evidence(state):
+    snap = state or {}
+    if not richard_scene_flag_shows_script(
+        int(snap.get("_skip_peak_scene_flag", 0) or 0)
+    ):
         return
     progress.observe_cutscene(RICHARD_CUTSCENE_KEY)
-    if state is not None:
-        state["richard_cutscene_scripted_exit"] = True
+    snap["richard_cutscene_confirmed"] = True
+    snap["richard_cutscene_scripted_exit"] = True
 
 
 def richard_cutscene_skip_settled(
@@ -79,22 +72,27 @@ def richard_cutscene_skip_settled(
     new_state: dict[str, Any] | None,
     *,
     skip_frames: int,
+    peak_scene_flag: int | None = None,
 ) -> bool:
-    """True when a skip settle shows the real 20D→204 dump + lab evidence.
-
-    Same-room long skips must not mint — interact/cutscene spam in 20D is not
-    the Richard beat. ``skip_frames`` is kept for call-site compatibility.
-    """
-    del skip_frames  # duration alone is not evidence of this cinema
+    """True only for Richard's long scripted session wholly inside 20D."""
     if not _on_richard_cutscene_leg(planner):
         return False
     entry = entry_prev or {}
     if str(entry.get("room_id") or "").upper() != RICHARD_PILLAR_ROOM:
         return False
     new_r = str((new_state or {}).get("room_id") or "")
-    if new_r.upper() != RICHARD_SCRIPTED_EXIT_ROOM.upper():
+    if new_r.upper() not in (RICHARD_PILLAR_ROOM, RICHARD_SCRIPTED_EXIT_ROOM):
         return False
-    return richard_cutscene_lab_evidence(new_state)
+    if int(skip_frames) < MIN_CUTSCENE_SKIP_FRAMES:
+        return False
+    return any(
+        richard_scene_flag_shows_script(flag)
+        for flag in (
+            int(entry.get("scene_flag", 0) or 0),
+            int((new_state or {}).get("scene_flag", 0) or 0),
+            int(peak_scene_flag or 0),
+        )
+    )
 
 
 def note_richard_cutscene_skip_settle(
@@ -104,16 +102,23 @@ def note_richard_cutscene_skip_settle(
     new_state: dict[str, Any],
     *,
     skip_frames: int,
+    peak_scene_flag: int | None = None,
 ) -> None:
-    """Record ``20D:richard`` on skip settle when lab evidence confirms the dump."""
+    """Record ``20D:richard`` after the genuine same-room scripted session."""
     if progress is None:
         return
     if not richard_cutscene_skip_settled(
-        planner, entry_prev, new_state, skip_frames=skip_frames
+        planner,
+        entry_prev,
+        new_state,
+        skip_frames=skip_frames,
+        peak_scene_flag=peak_scene_flag,
     ):
         return
     progress.observe_cutscene(RICHARD_CUTSCENE_KEY)
-    new_state["richard_cutscene_scripted_exit"] = True
+    new_state["richard_cutscene_confirmed"] = True
+    if str(new_state.get("room_id") or "").upper() == RICHARD_SCRIPTED_EXIT_ROOM:
+        new_state["richard_cutscene_scripted_exit"] = True
 
 
 def richard_cutscene_capture_room_ok(
@@ -121,15 +126,17 @@ def richard_cutscene_capture_room_ok(
     room_id: str,
     expected_room: str,
     state: dict[str, Any] | None = None,
+    progress: Any = None,
 ) -> bool:
-    """Allow cp84 capture in scripted exit room 204 only with lab evidence."""
+    """Allow 204 only after script evidence confirmed the merged skip session."""
     if completed_cid != RICHARD_CUTSCENE_CHECKPOINT_ID:
         return False
-    rid = str(room_id or "").upper()
-    if rid == RICHARD_SCRIPTED_EXIT_ROOM.upper():
-        return richard_cutscene_lab_evidence(state)
-    exp = str(expected_room or "").upper()
-    return bool(exp and rid == exp and richard_cutscene_lab_evidence(state))
+    if str(room_id or "").upper() != RICHARD_SCRIPTED_EXIT_ROOM:
+        return False
+    return bool(
+        (state or {}).get("richard_cutscene_confirmed")
+        or richard_cutscene_seen(progress)
+    )
 
 
 def should_suppress_wrong_room(
@@ -138,10 +145,10 @@ def should_suppress_wrong_room(
     room: str,
     state: dict[str, Any] | None,
 ) -> bool:
-    """Skip terminal wrong_room only after a confirmed Richard dump mint."""
-    if not _on_richard_cutscene_leg(planner):
-        return False
-    if str(prev_room).upper() != RICHARD_PILLAR_ROOM:
-        return False
-    # Walk-out 20D→204 is a real door — do not suppress without the mint flag.
-    return bool((state or {}).get("richard_cutscene_scripted_exit"))
+    """Suppress wrong-room only on the script-confirmed merged 20D→204 skip."""
+    return bool(
+        _on_richard_cutscene_leg(planner)
+        and str(prev_room or "").upper() == RICHARD_PILLAR_ROOM
+        and str(room or "").upper() == RICHARD_SCRIPTED_EXIT_ROOM
+        and (state or {}).get("richard_cutscene_confirmed")
+    )
