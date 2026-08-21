@@ -1,6 +1,6 @@
 # Yawn rails checkpoint cells (`cpNN`)
 
-Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (109 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
+Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (103 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
 
 **Source of truth:** `data/yawn_checkpoint_route.json` (objectives and success conditions below are copied verbatim). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
@@ -104,21 +104,15 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp91` | 92 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
 | `cp92` | 93 | `moon_hall_enter_20D` | `20D` | navigate | First return to Pillar Passage after box prep (Richard still up) |
 | `cp93` | 94 | `richard_wait_exit_204` | `204` | navigate | Leave Pillar Passage to burn Richard's death timer |
-| `cp94` | 95 | `richard_wait_upper_203` | `203` | navigate | Reach Upper Hall before the bar wait circuit |
-| `cp95` | 96 | `richard_wait_main_106` | `106` | navigate | Drop to Main Hall toward the Bar |
-| `cp96` | 97 | `richard_wait_dining_105` | `105` | navigate | Cross Dining toward Tea Room / Bar |
-| `cp97` | 98 | `richard_wait_tea_104` | `104` | navigate | Enter Tea Room en route to the Bar |
-| `cp98` | 99 | `richard_wait_bar_10F` | `10F` | navigate | Enter the Bar to burn Richard's death timer |
-| `cp99` | 100 | `richard_wait_tea_back_104` | `104` | navigate | Leave the Bar through the Tea Room |
-| `cp100` | 101 | `richard_wait_dining_back_105` | `105` | navigate | Return through Dining toward Main Hall |
-| `cp101` | 102 | `richard_wait_main_back_106` | `106` | navigate | Return to Main Hall after the Bar lap |
-| `cp102` | 103 | `richard_wait_upper_back_203` | `203` | navigate | Climb Upper Hall after the Bar lap |
-| `cp103` | 104 | `richard_wait_c_pass_204` | `204` | navigate | Cross C Passage toward Pillar Passage |
-| `cp104` | 105 | `moon_hall_return_20D` | `20D` | navigate | Re-enter Pillar Passage after the Bar wait lap |
-| `cp105` | 106 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
-| `cp106` | 107 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
-| `cp107` | 108 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
-| `cp108` | 109 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
+| `cp94` | 95 | `richard_wait_upper_203` | `203` | navigate | Reach Upper Hall before Main Hall wait |
+| `cp95` | 96 | `richard_wait_main_106` | `106` | navigate | Drop to Main Hall to burn Richard's death timer |
+| `cp96` | 97 | `richard_wait_upper_back_203` | `203` | navigate | Climb back to Upper Hall from Main Hall |
+| `cp97` | 98 | `richard_wait_c_pass_204` | `204` | navigate | Cross C Passage toward Pillar Passage |
+| `cp98` | 99 | `moon_hall_return_20D` | `20D` | navigate | Re-enter Pillar Passage after Main Hall wait |
+| `cp99` | 100 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
+| `cp100` | 101 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
+| `cp101` | 102 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
+| `cp102` | 103 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
 
 ## Details
 
@@ -1209,7 +1203,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `203` (HALL 2F)
 - **Action:** `navigate`
-- **Objective:** Reach Upper Hall before the bar wait circuit
+- **Objective:** Reach Upper Hall before Main Hall wait
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
@@ -1220,91 +1214,25 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `106` (MAIN HALL)
 - **Action:** `navigate`
-- **Objective:** Drop to Main Hall toward the Bar
+- **Objective:** Drop to Main Hall to burn Richard's death timer
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **106**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `106`
 
-### `cp96` — `richard_wait_dining_105` (seq 97)
-
-- **Room:** `105` (DINING ROOM)
-- **Action:** `navigate`
-- **Objective:** Cross Dining toward Tea Room / Bar
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **105**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `105`
-
-### `cp97` — `richard_wait_tea_104` (seq 98)
-
-- **Room:** `104` (TEA ROOM)
-- **Action:** `navigate`
-- **Objective:** Enter Tea Room en route to the Bar
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **104**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `104`
-
-### `cp98` — `richard_wait_bar_10F` (seq 99)
-
-- **Room:** `10F` (BAR)
-- **Action:** `navigate`
-- **Objective:** Enter the Bar to burn Richard's death timer
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **10F**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `10F` from `104`
-
-### `cp99` — `richard_wait_tea_back_104` (seq 100)
-
-- **Room:** `104` (TEA ROOM)
-- **Action:** `navigate`
-- **Objective:** Leave the Bar through the Tea Room
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **104**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `104` from `10F`
-
-### `cp100` — `richard_wait_dining_back_105` (seq 101)
-
-- **Room:** `105` (DINING ROOM)
-- **Action:** `navigate`
-- **Objective:** Return through Dining toward Main Hall
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **105**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `105` from `104`
-
-### `cp101` — `richard_wait_main_back_106` (seq 102)
-
-- **Room:** `106` (MAIN HALL)
-- **Action:** `navigate`
-- **Objective:** Return to Main Hall after the Bar lap
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **106**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `106` from `105`
-
-### `cp102` — `richard_wait_upper_back_203` (seq 103)
+### `cp96` — `richard_wait_upper_back_203` (seq 97)
 
 - **Room:** `203` (HALL 2F)
 - **Action:** `navigate`
-- **Objective:** Climb Upper Hall after the Bar lap
+- **Objective:** Climb back to Upper Hall from Main Hall
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `203` from `106`
 
-### `cp103` — `richard_wait_c_pass_204` (seq 104)
+### `cp97` — `richard_wait_c_pass_204` (seq 98)
 
 - **Room:** `204` (C PASSAGE)
 - **Action:** `navigate`
@@ -1315,18 +1243,18 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `204`
 
-### `cp104` — `moon_hall_return_20D` (seq 105)
+### `cp98` — `moon_hall_return_20D` (seq 99)
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `navigate`
-- **Objective:** Re-enter Pillar Passage after the Bar wait lap
+- **Objective:** Re-enter Pillar Passage after Main Hall wait
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **20D**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `20D` from `204`
 
-### `cp105` — `ammo_20D` (seq 106)
+### `cp99` — `ammo_20D` (seq 100)
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `pickup`
@@ -1337,7 +1265,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Acquire item `handgun_bullets`
 
-### `cp106` — `attic_entry_20E` (seq 107)
+### `cp100` — `attic_entry_20E` (seq 101)
 
 - **Room:** `20E` (FRONT OF ATTIC)
 - **Action:** `navigate`
@@ -1348,7 +1276,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `20E` from `20D`
 
-### `cp107` — `yawn_arena_enter_210` (seq 108)
+### `cp101` — `yawn_arena_enter_210` (seq 102)
 
 - **Room:** `210` (ATTIC)
 - **Action:** `navigate`
@@ -1359,7 +1287,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `210`
 
-### `cp108` — `yawn_moon_210` (seq 109)
+### `cp102` — `yawn_moon_210` (seq 103)
 
 - **Room:** `210` (ATTIC)
 - **Action:** `fight`
