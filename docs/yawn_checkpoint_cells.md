@@ -1,6 +1,6 @@
 # Yawn rails checkpoint cells (`cpNN`)
 
-Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (117 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
+Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (109 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
 
 **Source of truth:** `data/yawn_checkpoint_route.json` (objectives and success conditions below are copied verbatim). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
@@ -104,29 +104,21 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp91` | 92 | `c_passage_204_to_yawn` | `204` | navigate | Cross the C Passage from East Stairway toward Moon Hall |
 | `cp92` | 93 | `moon_hall_enter_20D` | `20D` | navigate | First return to Pillar Passage after box prep (Richard still up) |
 | `cp93` | 94 | `richard_wait_exit_204` | `204` | navigate | Leave Pillar Passage to burn Richard's death timer |
-| `cp94` | 95 | `richard_wait_upper_203` | `203` | navigate | Cross Upper Hall during the Richard wait lap |
-| `cp95` | 96 | `richard_wait_terrace_pass_211` | `211` | navigate | Enter Terrace Passage during the Richard wait lap |
-| `cp96` | 97 | `richard_wait_terrace_212` | `212` | navigate | Reach the Terrace dead-end turnaround |
-| `cp97` | 98 | `richard_wait_terrace_back_211` | `211` | navigate | Return through Terrace Passage toward Upper Hall |
-| `cp98` | 99 | `richard_wait_upper_back_203` | `203` | navigate | Return to Upper Hall from the terrace side |
-| `cp99` | 100 | `richard_wait_main_106` | `106` | navigate | Walk Main Hall to burn Richard's death timer |
-| `cp100` | 101 | `richard_wait_upper_again_203` | `203` | navigate | Climb back to Upper Hall after Main Hall |
-| `cp101` | 102 | `richard_wait_c_pass_204` | `204` | navigate | Cross C Passage toward Pillar Passage after the wait lap |
-| `cp102` | 103 | `moon_hall_return_20D` | `20D` | navigate | Re-enter Pillar Passage after first Richard wait lap |
-| `cp103` | 104 | `richard_wait2_exit_204` | `204` | navigate | Leave Pillar Passage for a second Richard death timer lap |
-| `cp104` | 105 | `richard_wait2_upper_203` | `203` | navigate | Cross Upper Hall on wait lap 2 |
-| `cp105` | 106 | `richard_wait2_terrace_pass_211` | `211` | navigate | Enter Terrace Passage on wait lap 2 |
-| `cp106` | 107 | `richard_wait2_terrace_212` | `212` | navigate | Terrace dead-end turnaround on wait lap 2 |
-| `cp107` | 108 | `richard_wait2_terrace_back_211` | `211` | navigate | Return through Terrace Passage on wait lap 2 |
-| `cp108` | 109 | `richard_wait2_upper_back_203` | `203` | navigate | Return to Upper Hall from terrace on wait lap 2 |
-| `cp109` | 110 | `richard_wait2_main_106` | `106` | navigate | Walk Main Hall again to burn Richard's death timer |
-| `cp110` | 111 | `richard_wait2_upper_again_203` | `203` | navigate | Climb back to Upper Hall after second Main Hall walk |
-| `cp111` | 112 | `richard_wait2_c_pass_204` | `204` | navigate | Cross C Passage toward Pillar Passage after wait lap 2 |
-| `cp112` | 113 | `moon_hall_return2_20D` | `20D` | navigate | Re-enter Pillar Passage after second Richard wait lap |
-| `cp113` | 114 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
-| `cp114` | 115 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
-| `cp115` | 116 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
-| `cp116` | 117 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
+| `cp94` | 95 | `richard_wait_upper_203` | `203` | navigate | Reach Upper Hall before the bar wait circuit |
+| `cp95` | 96 | `richard_wait_main_106` | `106` | navigate | Drop to Main Hall toward the Bar |
+| `cp96` | 97 | `richard_wait_dining_105` | `105` | navigate | Cross Dining toward Tea Room / Bar |
+| `cp97` | 98 | `richard_wait_tea_104` | `104` | navigate | Enter Tea Room en route to the Bar |
+| `cp98` | 99 | `richard_wait_bar_10F` | `10F` | navigate | Enter the Bar to burn Richard's death timer |
+| `cp99` | 100 | `richard_wait_tea_back_104` | `104` | navigate | Leave the Bar through the Tea Room |
+| `cp100` | 101 | `richard_wait_dining_back_105` | `105` | navigate | Return through Dining toward Main Hall |
+| `cp101` | 102 | `richard_wait_main_back_106` | `106` | navigate | Return to Main Hall after the Bar lap |
+| `cp102` | 103 | `richard_wait_upper_back_203` | `203` | navigate | Climb Upper Hall after the Bar lap |
+| `cp103` | 104 | `richard_wait_c_pass_204` | `204` | navigate | Cross C Passage toward Pillar Passage |
+| `cp104` | 105 | `moon_hall_return_20D` | `20D` | navigate | Re-enter Pillar Passage after the Bar wait lap |
+| `cp105` | 106 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
+| `cp106` | 107 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
+| `cp107` | 108 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
+| `cp108` | 109 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
 
 ## Details
 
@@ -1217,212 +1209,124 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 
 - **Room:** `203` (HALL 2F)
 - **Action:** `navigate`
-- **Objective:** Cross Upper Hall during the Richard wait lap
+- **Objective:** Reach Upper Hall before the bar wait circuit
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `203`
 
-### `cp95` — `richard_wait_terrace_pass_211` (seq 96)
-
-- **Room:** `211` (TERRACE PASSAGE)
-- **Action:** `navigate`
-- **Objective:** Enter Terrace Passage during the Richard wait lap
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **211**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `211`
-
-### `cp96` — `richard_wait_terrace_212` (seq 97)
-
-- **Room:** `212` (TERRACE)
-- **Action:** `navigate`
-- **Objective:** Reach the Terrace dead-end turnaround
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **212**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `212`
-
-### `cp97` — `richard_wait_terrace_back_211` (seq 98)
-
-- **Room:** `211` (TERRACE PASSAGE)
-- **Action:** `navigate`
-- **Objective:** Return through Terrace Passage toward Upper Hall
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **211**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `211` from `212`
-
-### `cp98` — `richard_wait_upper_back_203` (seq 99)
-
-- **Room:** `203` (HALL 2F)
-- **Action:** `navigate`
-- **Objective:** Return to Upper Hall from the terrace side
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `203` from `211`
-
-### `cp99` — `richard_wait_main_106` (seq 100)
+### `cp95` — `richard_wait_main_106` (seq 96)
 
 - **Room:** `106` (MAIN HALL)
 - **Action:** `navigate`
-- **Objective:** Walk Main Hall to burn Richard's death timer
+- **Objective:** Drop to Main Hall toward the Bar
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **106**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `106`
 
-### `cp100` — `richard_wait_upper_again_203` (seq 101)
+### `cp96` — `richard_wait_dining_105` (seq 97)
 
-- **Room:** `203` (HALL 2F)
+- **Room:** `105` (DINING ROOM)
 - **Action:** `navigate`
-- **Objective:** Climb back to Upper Hall after Main Hall
+- **Objective:** Cross Dining toward Tea Room / Bar
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
+- **How to achieve:** Be in / reach **105**. Navigate until the success condition fires.
 - **Success condition:**
-- Enter room `203` from `106`
+- Enter room `105`
 
-### `cp101` — `richard_wait_c_pass_204` (seq 102)
+### `cp97` — `richard_wait_tea_104` (seq 98)
 
-- **Room:** `204` (C PASSAGE)
+- **Room:** `104` (TEA ROOM)
 - **Action:** `navigate`
-- **Objective:** Cross C Passage toward Pillar Passage after the wait lap
+- **Objective:** Enter Tea Room en route to the Bar
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **204**. Navigate until the success condition fires.
+- **How to achieve:** Be in / reach **104**. Navigate until the success condition fires.
 - **Success condition:**
-- Enter room `204`
+- Enter room `104`
 
-### `cp102` — `moon_hall_return_20D` (seq 103)
+### `cp98` — `richard_wait_bar_10F` (seq 99)
 
-- **Room:** `20D` (PILLAR PASSAGE)
+- **Room:** `10F` (BAR)
 - **Action:** `navigate`
-- **Objective:** Re-enter Pillar Passage after first Richard wait lap
+- **Objective:** Enter the Bar to burn Richard's death timer
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **20D**. Navigate until the success condition fires.
+- **How to achieve:** Be in / reach **10F**. Navigate until the success condition fires.
 - **Success condition:**
-- Enter room `20D` from `204`
+- Enter room `10F` from `104`
 
-### `cp103` — `richard_wait2_exit_204` (seq 104)
+### `cp99` — `richard_wait_tea_back_104` (seq 100)
 
-- **Room:** `204` (C PASSAGE)
+- **Room:** `104` (TEA ROOM)
 - **Action:** `navigate`
-- **Objective:** Leave Pillar Passage for a second Richard death timer lap
+- **Objective:** Leave the Bar through the Tea Room
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **204**. Navigate until the success condition fires.
+- **How to achieve:** Be in / reach **104**. Navigate until the success condition fires.
 - **Success condition:**
-- Enter room `204` from `20D`
+- Enter room `104` from `10F`
 
-### `cp104` — `richard_wait2_upper_203` (seq 105)
+### `cp100` — `richard_wait_dining_back_105` (seq 101)
 
-- **Room:** `203` (HALL 2F)
+- **Room:** `105` (DINING ROOM)
 - **Action:** `navigate`
-- **Objective:** Cross Upper Hall on wait lap 2
+- **Objective:** Return through Dining toward Main Hall
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
+- **How to achieve:** Be in / reach **105**. Navigate until the success condition fires.
 - **Success condition:**
-- Enter room `203`
+- Enter room `105` from `104`
 
-### `cp105` — `richard_wait2_terrace_pass_211` (seq 106)
-
-- **Room:** `211` (TERRACE PASSAGE)
-- **Action:** `navigate`
-- **Objective:** Enter Terrace Passage on wait lap 2
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **211**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `211`
-
-### `cp106` — `richard_wait2_terrace_212` (seq 107)
-
-- **Room:** `212` (TERRACE)
-- **Action:** `navigate`
-- **Objective:** Terrace dead-end turnaround on wait lap 2
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **212**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `212`
-
-### `cp107` — `richard_wait2_terrace_back_211` (seq 108)
-
-- **Room:** `211` (TERRACE PASSAGE)
-- **Action:** `navigate`
-- **Objective:** Return through Terrace Passage on wait lap 2
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **211**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `211` from `212`
-
-### `cp108` — `richard_wait2_upper_back_203` (seq 109)
-
-- **Room:** `203` (HALL 2F)
-- **Action:** `navigate`
-- **Objective:** Return to Upper Hall from terrace on wait lap 2
-- **Required items:** _(none)_
-- **Items gained:** _(none)_
-- **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
-- **Success condition:**
-- Enter room `203` from `211`
-
-### `cp109` — `richard_wait2_main_106` (seq 110)
+### `cp101` — `richard_wait_main_back_106` (seq 102)
 
 - **Room:** `106` (MAIN HALL)
 - **Action:** `navigate`
-- **Objective:** Walk Main Hall again to burn Richard's death timer
+- **Objective:** Return to Main Hall after the Bar lap
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **106**. Navigate until the success condition fires.
 - **Success condition:**
-- Enter room `106`
+- Enter room `106` from `105`
 
-### `cp110` — `richard_wait2_upper_again_203` (seq 111)
+### `cp102` — `richard_wait_upper_back_203` (seq 103)
 
 - **Room:** `203` (HALL 2F)
 - **Action:** `navigate`
-- **Objective:** Climb back to Upper Hall after second Main Hall walk
+- **Objective:** Climb Upper Hall after the Bar lap
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **203**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `203` from `106`
 
-### `cp111` — `richard_wait2_c_pass_204` (seq 112)
+### `cp103` — `richard_wait_c_pass_204` (seq 104)
 
 - **Room:** `204` (C PASSAGE)
 - **Action:** `navigate`
-- **Objective:** Cross C Passage toward Pillar Passage after wait lap 2
+- **Objective:** Cross C Passage toward Pillar Passage
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **204**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `204`
 
-### `cp112` — `moon_hall_return2_20D` (seq 113)
+### `cp104` — `moon_hall_return_20D` (seq 105)
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `navigate`
-- **Objective:** Re-enter Pillar Passage after second Richard wait lap
+- **Objective:** Re-enter Pillar Passage after the Bar wait lap
 - **Required items:** _(none)_
 - **Items gained:** _(none)_
 - **How to achieve:** Be in / reach **20D**. Navigate until the success condition fires.
 - **Success condition:**
 - Enter room `20D` from `204`
 
-### `cp113` — `ammo_20D` (seq 114)
+### `cp105` — `ammo_20D` (seq 106)
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Action:** `pickup`
@@ -1433,7 +1337,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Acquire item `handgun_bullets`
 
-### `cp114` — `attic_entry_20E` (seq 115)
+### `cp106` — `attic_entry_20E` (seq 107)
 
 - **Room:** `20E` (FRONT OF ATTIC)
 - **Action:** `navigate`
@@ -1444,7 +1348,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `20E` from `20D`
 
-### `cp115` — `yawn_arena_enter_210` (seq 116)
+### `cp107` — `yawn_arena_enter_210` (seq 108)
 
 - **Room:** `210` (ATTIC)
 - **Action:** `navigate`
@@ -1455,7 +1359,7 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `210`
 
-### `cp116` — `yawn_moon_210` (seq 117)
+### `cp108` — `yawn_moon_210` (seq 109)
 
 - **Room:** `210` (ATTIC)
 - **Action:** `fight`

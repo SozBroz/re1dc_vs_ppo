@@ -1582,7 +1582,7 @@
     "seq": 95,
     "checkpoint_id": "richard_wait_upper_203",
     "room_id": "203",
-    "objective": "Cross Upper Hall during the Richard wait lap",
+    "objective": "Reach Upper Hall before the bar wait circuit",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
@@ -1593,225 +1593,112 @@
   },
   {
     "seq": 96,
-    "checkpoint_id": "richard_wait_terrace_pass_211",
-    "room_id": "211",
-    "objective": "Enter Terrace Passage during the Richard wait lap",
+    "checkpoint_id": "richard_wait_main_106",
+    "room_id": "106",
+    "objective": "Drop to Main Hall toward the Bar",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "211"
+      "room_id": "106"
     }
   },
   {
     "seq": 97,
-    "checkpoint_id": "richard_wait_terrace_212",
-    "room_id": "212",
-    "objective": "Reach the Terrace dead-end turnaround",
+    "checkpoint_id": "richard_wait_dining_105",
+    "room_id": "105",
+    "objective": "Cross Dining toward Tea Room / Bar",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "room_enter",
-      "room_id": "212"
+      "room_id": "105"
     }
   },
   {
     "seq": 98,
-    "checkpoint_id": "richard_wait_terrace_back_211",
-    "room_id": "211",
-    "objective": "Return through Terrace Passage toward Upper Hall",
+    "checkpoint_id": "richard_wait_tea_104",
+    "room_id": "104",
+    "objective": "Enter Tea Room en route to the Bar",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
-      "type": "room_enter_from",
-      "room_id": "211",
-      "from_room_ids": [
-        "212"
-      ]
+      "type": "room_enter",
+      "room_id": "104"
     }
   },
   {
     "seq": 99,
-    "checkpoint_id": "richard_wait_upper_back_203",
-    "room_id": "203",
-    "objective": "Return to Upper Hall from the terrace side",
+    "checkpoint_id": "richard_wait_bar_10F",
+    "room_id": "10F",
+    "objective": "Enter the Bar to burn Richard's death timer",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "room_enter_from",
-      "room_id": "203",
+      "room_id": "10F",
       "from_room_ids": [
-        "211"
+        "104"
       ]
     }
   },
   {
     "seq": 100,
-    "checkpoint_id": "richard_wait_main_106",
-    "room_id": "106",
-    "objective": "Walk Main Hall to burn Richard's death timer",
-    "action_type": "navigate",
-    "required_items": [],
-    "items_gained": [],
-    "success_condition": {
-      "type": "room_enter",
-      "room_id": "106"
-    }
-  },
-  {
-    "seq": 101,
-    "checkpoint_id": "richard_wait_upper_again_203",
-    "room_id": "203",
-    "objective": "Climb back to Upper Hall after Main Hall",
+    "checkpoint_id": "richard_wait_tea_back_104",
+    "room_id": "104",
+    "objective": "Leave the Bar through the Tea Room",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
       "type": "room_enter_from",
-      "room_id": "203",
+      "room_id": "104",
       "from_room_ids": [
-        "106"
+        "10F"
+      ]
+    }
+  },
+  {
+    "seq": 101,
+    "checkpoint_id": "richard_wait_dining_back_105",
+    "room_id": "105",
+    "objective": "Return through Dining toward Main Hall",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter_from",
+      "room_id": "105",
+      "from_room_ids": [
+        "104"
       ]
     }
   },
   {
     "seq": 102,
-    "checkpoint_id": "richard_wait_c_pass_204",
-    "room_id": "204",
-    "objective": "Cross C Passage toward Pillar Passage after the wait lap",
+    "checkpoint_id": "richard_wait_main_back_106",
+    "room_id": "106",
+    "objective": "Return to Main Hall after the Bar lap",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
     "success_condition": {
-      "type": "room_enter",
-      "room_id": "204"
+      "type": "room_enter_from",
+      "room_id": "106",
+      "from_room_ids": [
+        "105"
+      ]
     }
   },
   {
     "seq": 103,
-    "checkpoint_id": "moon_hall_return_20D",
-    "room_id": "20D",
-    "objective": "Re-enter Pillar Passage after first Richard wait lap",
-    "action_type": "navigate",
-    "required_items": [],
-    "items_gained": [],
-    "success_condition": {
-      "type": "room_enter_from",
-      "room_id": "20D",
-      "from_room_ids": [
-        "204"
-      ]
-    }
-  },
-  {
-    "seq": 104,
-    "checkpoint_id": "richard_wait2_exit_204",
-    "room_id": "204",
-    "objective": "Leave Pillar Passage for a second Richard death timer lap",
-    "action_type": "navigate",
-    "required_items": [],
-    "items_gained": [],
-    "success_condition": {
-      "type": "room_enter_from",
-      "room_id": "204",
-      "from_room_ids": [
-        "20D"
-      ]
-    }
-  },
-  {
-    "seq": 105,
-    "checkpoint_id": "richard_wait2_upper_203",
+    "checkpoint_id": "richard_wait_upper_back_203",
     "room_id": "203",
-    "objective": "Cross Upper Hall on wait lap 2",
-    "action_type": "navigate",
-    "required_items": [],
-    "items_gained": [],
-    "success_condition": {
-      "type": "room_enter",
-      "room_id": "203"
-    }
-  },
-  {
-    "seq": 106,
-    "checkpoint_id": "richard_wait2_terrace_pass_211",
-    "room_id": "211",
-    "objective": "Enter Terrace Passage on wait lap 2",
-    "action_type": "navigate",
-    "required_items": [],
-    "items_gained": [],
-    "success_condition": {
-      "type": "room_enter",
-      "room_id": "211"
-    }
-  },
-  {
-    "seq": 107,
-    "checkpoint_id": "richard_wait2_terrace_212",
-    "room_id": "212",
-    "objective": "Terrace dead-end turnaround on wait lap 2",
-    "action_type": "navigate",
-    "required_items": [],
-    "items_gained": [],
-    "success_condition": {
-      "type": "room_enter",
-      "room_id": "212"
-    }
-  },
-  {
-    "seq": 108,
-    "checkpoint_id": "richard_wait2_terrace_back_211",
-    "room_id": "211",
-    "objective": "Return through Terrace Passage on wait lap 2",
-    "action_type": "navigate",
-    "required_items": [],
-    "items_gained": [],
-    "success_condition": {
-      "type": "room_enter_from",
-      "room_id": "211",
-      "from_room_ids": [
-        "212"
-      ]
-    }
-  },
-  {
-    "seq": 109,
-    "checkpoint_id": "richard_wait2_upper_back_203",
-    "room_id": "203",
-    "objective": "Return to Upper Hall from terrace on wait lap 2",
-    "action_type": "navigate",
-    "required_items": [],
-    "items_gained": [],
-    "success_condition": {
-      "type": "room_enter_from",
-      "room_id": "203",
-      "from_room_ids": [
-        "211"
-      ]
-    }
-  },
-  {
-    "seq": 110,
-    "checkpoint_id": "richard_wait2_main_106",
-    "room_id": "106",
-    "objective": "Walk Main Hall again to burn Richard's death timer",
-    "action_type": "navigate",
-    "required_items": [],
-    "items_gained": [],
-    "success_condition": {
-      "type": "room_enter",
-      "room_id": "106"
-    }
-  },
-  {
-    "seq": 111,
-    "checkpoint_id": "richard_wait2_upper_again_203",
-    "room_id": "203",
-    "objective": "Climb back to Upper Hall after second Main Hall walk",
+    "objective": "Climb Upper Hall after the Bar lap",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
@@ -1824,10 +1711,10 @@
     }
   },
   {
-    "seq": 112,
-    "checkpoint_id": "richard_wait2_c_pass_204",
+    "seq": 104,
+    "checkpoint_id": "richard_wait_c_pass_204",
     "room_id": "204",
-    "objective": "Cross C Passage toward Pillar Passage after wait lap 2",
+    "objective": "Cross C Passage toward Pillar Passage",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
@@ -1837,10 +1724,10 @@
     }
   },
   {
-    "seq": 113,
-    "checkpoint_id": "moon_hall_return2_20D",
+    "seq": 105,
+    "checkpoint_id": "moon_hall_return_20D",
     "room_id": "20D",
-    "objective": "Re-enter Pillar Passage after second Richard wait lap",
+    "objective": "Re-enter Pillar Passage after the Bar wait lap",
     "action_type": "navigate",
     "required_items": [],
     "items_gained": [],
@@ -1853,7 +1740,7 @@
     }
   },
   {
-    "seq": 114,
+    "seq": 106,
     "checkpoint_id": "ammo_20D",
     "room_id": "20D",
     "objective": "Collect the mandatory Pillar Passage handgun bullets",
@@ -1868,7 +1755,7 @@
     }
   },
   {
-    "seq": 115,
+    "seq": 107,
     "checkpoint_id": "attic_entry_20E",
     "room_id": "20E",
     "objective": "Reach the shield-key attic entrance",
@@ -1886,7 +1773,7 @@
     }
   },
   {
-    "seq": 116,
+    "seq": 108,
     "checkpoint_id": "yawn_arena_enter_210",
     "room_id": "210",
     "objective": "Enter the Yawn moon corridor",
@@ -1899,7 +1786,7 @@
     }
   },
   {
-    "seq": 117,
+    "seq": 109,
     "checkpoint_id": "yawn_moon_210",
     "room_id": "210",
     "objective": "Complete the Yawn encounter, collect the shells, and take the moon crest",
