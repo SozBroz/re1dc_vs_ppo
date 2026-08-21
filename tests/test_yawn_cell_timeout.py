@@ -75,7 +75,7 @@ def test_cp_budgets_match_imperator_multipliers() -> None:
     assert cell_timeout_frames(85, ROOT) == 5383  # 22.43s * 4 hard (Richard-wait)
     assert cell_timeout_frames(91, ROOT) == 5021  # 20.92s * 4 hard (Richard-wait)
     assert cell_timeout_frames(95, ROOT) == 6600  # 55.00s * 2 main-hall wait
-    assert cell_timeout_frames(112, ROOT) == 6709  # 55.91s * 2 attic
+    assert cell_timeout_frames(118, ROOT) == 6709  # 55.91s * 2 attic
     assert cell_timeout_frames(200, ROOT) == 0
     assert cell_timeout_frames(8, ROOT) < CAP
     assert cell_timeout_frames(9, ROOT) < CAP

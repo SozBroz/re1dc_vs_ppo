@@ -384,10 +384,10 @@ def validate_manifest_cells(
 
 
 # Default reset mix: equal chance of a true fresh start (init savestate,
-# working on cp00) plus each loadable cell in [0, 113]. cp114 is never a
+# working on cp00) plus each loadable cell in [0, 119]. cp120 is never a
 # start — completing it ends the episode. Pin/PLR/payforward still override.
 RESET_MIN_CHECKPOINT_INDEX = 0
-RESET_MAX_CHECKPOINT_INDEX = 113
+RESET_MAX_CHECKPOINT_INDEX = 119
 RESET_LATEST_CELL_WEIGHT = 0.50
 _RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
 _RESET_PIN_INDEX_ENV = "RE1_YAWN_RESET_PIN_INDEX"
@@ -770,7 +770,7 @@ def _pinned_loadable_cell(
 
 
 def eligible_reset_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Cells the random reset sampler may use (cp00–cp113; never the terminal cp114)."""
+    """Cells the random reset sampler may use (cp00–cp119; never the terminal cp120)."""
     return [
         row
         for row in cells
@@ -806,7 +806,7 @@ def _choose_reset_candidate(
     rng: random.Random,
     latest_only: bool = False,
 ) -> dict[str, Any]:
-    """Uniform over eligible cp00–cp113 cells (no fresh start; no latest bias)."""
+    """Uniform over eligible cp00–cp119 cells (no fresh start; no latest bias)."""
     eligible = eligible_reset_cells(cells)
     if not eligible:
         raise ValueError(
@@ -846,7 +846,7 @@ def sample_one_leg_options(
     """Choose a start cell. Default: one successor cell, then the episode ends.
 
     Default mix: equal chance of a true fresh start (init savestate) or any
-    loadable cell in cp00–cp113. Completing the hunted cell ends the episode
+    loadable cell in cp00–cp119. Completing the hunted cell ends the episode
     and captures a successor. ``episode_mode=play_through`` still runs to Yawn.
     ``RE1_YAWN_PAYFORWARD_RIPPLE=1`` enables fight-progression mix instead:
     40% frontier fight cell, 60% uniform over all loadable cells from cp00.
@@ -971,7 +971,7 @@ def sample_one_leg_options(
         return _options_from_cell(chosen, stage)
     if not cells:
         return _fresh_start_options(stage)
-    # Equal chance: true fresh start + each loadable cp00–cp113 cell.
+    # Equal chance: true fresh start + each loadable cp00–cp119 cell.
     slot = rng.randrange(len(cells) + 1)
     if slot == 0:
         return _fresh_start_options(stage)

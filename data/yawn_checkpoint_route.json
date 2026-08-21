@@ -1825,6 +1825,93 @@
   },
   {
     "seq": 112,
+    "checkpoint_id": "richard_wait4_exit_204",
+    "room_id": "204",
+    "objective": "Leave Pillar Passage for a fourth Main Hall wait lap",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter_from",
+      "room_id": "204",
+      "from_room_ids": [
+        "20D"
+      ]
+    }
+  },
+  {
+    "seq": 113,
+    "checkpoint_id": "richard_wait4_upper_203",
+    "room_id": "203",
+    "objective": "Cross Upper Hall on wait lap 4",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter",
+      "room_id": "203"
+    }
+  },
+  {
+    "seq": 114,
+    "checkpoint_id": "richard_wait4_main_106",
+    "room_id": "106",
+    "objective": "Drop to Main Hall again to burn the timer",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter",
+      "room_id": "106"
+    }
+  },
+  {
+    "seq": 115,
+    "checkpoint_id": "richard_wait4_upper_back_203",
+    "room_id": "203",
+    "objective": "Climb back to Upper Hall after fourth Main Hall walk",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter_from",
+      "room_id": "203",
+      "from_room_ids": [
+        "106"
+      ]
+    }
+  },
+  {
+    "seq": 116,
+    "checkpoint_id": "richard_wait4_c_pass_204",
+    "room_id": "204",
+    "objective": "Cross C Passage toward Pillar Passage after wait lap 4",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter",
+      "room_id": "204"
+    }
+  },
+  {
+    "seq": 117,
+    "checkpoint_id": "moon_hall_return4_20D",
+    "room_id": "20D",
+    "objective": "Re-enter Pillar Passage after fourth Main Hall wait lap",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "room_enter_from",
+      "room_id": "20D",
+      "from_room_ids": [
+        "204"
+      ]
+    }
+  },
+  {
+    "seq": 118,
     "checkpoint_id": "ammo_20D",
     "room_id": "20D",
     "objective": "Collect the mandatory Pillar Passage handgun bullets",
@@ -1839,7 +1926,7 @@
     }
   },
   {
-    "seq": 113,
+    "seq": 119,
     "checkpoint_id": "attic_entry_20E",
     "room_id": "20E",
     "objective": "Reach the shield-key attic entrance",
@@ -1857,7 +1944,7 @@
     }
   },
   {
-    "seq": 114,
+    "seq": 120,
     "checkpoint_id": "yawn_arena_enter_210",
     "room_id": "210",
     "objective": "Enter the Yawn moon corridor",
@@ -1870,7 +1957,7 @@
     }
   },
   {
-    "seq": 115,
+    "seq": 121,
     "checkpoint_id": "yawn_moon_210",
     "room_id": "210",
     "objective": "Complete the Yawn encounter, collect the shells, and take the moon crest",
