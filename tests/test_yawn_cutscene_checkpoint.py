@@ -19,8 +19,10 @@ from re1_rl.room_graph import RoomGraph
 from re1_rl.yawn_cutscene_checkpoint import (
     YAWN_CUTSCENE_KEY,
     note_yawn_cutscene_skip_settle,
+    note_yawn_spawn,
     yawn_cutscene_seen,
     yawn_cutscene_skip_settled,
+    yawn_spawn_triggered,
 )
 
 YAWN_ROUTE = PROJECT_ROOT / "data" / "yawn_checkpoint_route.json"
@@ -55,6 +57,19 @@ def _state(room: str, **kw) -> dict:
     }
     s.update(kw)
     return s
+
+
+def _spawned_yawn() -> dict:
+    return {
+        "slot": 0,
+        "type_id": 0x0F,
+        "hp": 120,
+        "hp_raw": 3050,
+        "yawn_translated": True,
+        "active_byte": 1,
+        "in_room": 1,
+        "alive": 1,
+    }
 
 
 def test_yawn_cutscene_seen_requires_ledger_not_door_cam() -> None:
@@ -116,6 +131,54 @@ def test_yawn_cutscene_long_same_room_skip_mints() -> None:
     )
     assert YAWN_CUTSCENE_KEY in progress.observed_cutscenes
     assert cur.get("yawn_cutscene_confirmed") is True
+
+
+def test_yawn_spawn_edge_mints_without_duration_gate() -> None:
+    planner = _planner("yawn_cutscene_210")
+    progress = ProgressTracker()
+    prev = _state("210", enemies=[])
+    cur = _state("210", enemies=[_spawned_yawn()])
+
+    assert yawn_spawn_triggered(planner, prev, cur)
+    note_yawn_spawn(planner, progress, prev, cur)
+
+    assert YAWN_CUTSCENE_KEY in progress.observed_cutscenes
+    assert cur.get("yawn_cutscene_confirmed") is True
+
+
+def test_yawn_spawn_edge_does_not_mint_cp119_room_entry() -> None:
+    planner = _planner("yawn_arena_enter_210")
+    progress = ProgressTracker()
+    prev = _state("210", enemies=[])
+    cur = _state("210", enemies=[_spawned_yawn()])
+
+    assert not yawn_spawn_triggered(planner, prev, cur)
+    note_yawn_spawn(planner, progress, prev, cur)
+
+    assert YAWN_CUTSCENE_KEY not in progress.observed_cutscenes
+
+
+def test_yawn_spawn_edge_completes_cp120() -> None:
+    g = RoomGraph(DOORS)
+    planner = _planner("yawn_cutscene_210")
+    progress = ProgressTracker()
+    prev = _state("210", enemies=[])
+    cur = _state("210", enemies=[_spawned_yawn()])
+
+    note_yawn_spawn(planner, progress, prev, cur)
+    _, bd = compute_reward(
+        prev,
+        cur,
+        planner,
+        progress=progress,
+        graph=g,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+
+    assert bd["checkpoint_success"] == RAILS_CHECKPOINT_REWARD
+    assert progress.checkpoint_success
+    assert planner.current_objective()["checkpoint_id"] == "yawn_moon_210"
 
 
 def test_yawn_cutscene_checkpoint_success_on_skip_settle() -> None:

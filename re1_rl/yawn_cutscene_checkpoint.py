@@ -32,6 +32,38 @@ def yawn_cutscene_seen(progress: Any) -> bool:
     return YAWN_CUTSCENE_KEY in keys
 
 
+def yawn_spawn_triggered(
+    planner: Any,
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any] | None,
+) -> bool:
+    """True on the room-210 edge where Yawn becomes an active combatant."""
+    if not _on_yawn_cutscene_leg(planner):
+        return False
+    from re1_rl.yawn_outcome import yawn_contact_edge
+
+    state = new_state or {}
+    return yawn_contact_edge(
+        state,
+        prev_state,
+        enemies=state.get("enemies"),
+        prev_enemies=(prev_state or {}).get("enemies"),
+    )
+
+
+def note_yawn_spawn(
+    planner: Any,
+    progress: Any,
+    prev_state: dict[str, Any] | None,
+    new_state: dict[str, Any],
+) -> None:
+    """Mint ``210:yawn`` when the spawn cinema leaves Yawn active."""
+    if progress is None or not yawn_spawn_triggered(planner, prev_state, new_state):
+        return
+    progress.observe_cutscene(YAWN_CUTSCENE_KEY)
+    new_state["yawn_cutscene_confirmed"] = True
+
+
 def yawn_cutscene_skip_settled(
     planner: Any,
     entry_prev: dict[str, Any] | None,

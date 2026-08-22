@@ -2435,7 +2435,10 @@ class RE1Env(gym.Env):
         from re1_rl.richard_cutscene_checkpoint import (
             note_richard_cutscene_skip_settle,
         )
-        from re1_rl.yawn_cutscene_checkpoint import note_yawn_cutscene_skip_settle
+        from re1_rl.yawn_cutscene_checkpoint import (
+            note_yawn_cutscene_skip_settle,
+            note_yawn_spawn,
+        )
 
         skip_entry = skip_trap_entry or entry_prev
         skip_frames = int(getattr(self, "_skip_session_frames", 0) or 0)
@@ -2454,6 +2457,12 @@ class RE1Env(gym.Env):
             state,
             skip_frames=skip_frames,
             peak_scene_flag=getattr(ram_skip, "last_skip_peak_scene_flag", None),
+        )
+        note_yawn_spawn(
+            self._planner,
+            self._progress,
+            skip_entry,
+            state,
         )
         note_yawn_cutscene_skip_settle(
             self._planner,
@@ -4923,6 +4932,14 @@ class RE1Env(gym.Env):
         )
 
         self._attach_richard_transition_evidence(self._prev_state, state)
+        from re1_rl.yawn_cutscene_checkpoint import note_yawn_spawn
+
+        note_yawn_spawn(
+            self._planner,
+            self._progress,
+            self._prev_state,
+            state,
+        )
         save_complete = self._poll_typewriter_save(self._prev_state, state)
         reward, breakdown = compute_reward(
             self._prev_state,
