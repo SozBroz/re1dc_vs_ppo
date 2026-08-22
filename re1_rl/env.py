@@ -2463,6 +2463,7 @@ class RE1Env(gym.Env):
             self._progress,
             skip_entry,
             state,
+            after_skip=True,
         )
         note_yawn_cutscene_skip_settle(
             self._planner,

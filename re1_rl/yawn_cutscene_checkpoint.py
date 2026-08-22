@@ -36,11 +36,15 @@ def yawn_spawn_triggered(
     planner: Any,
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any] | None,
+    *,
+    after_skip: bool = False,
 ) -> bool:
-    """True when Yawn is active while cp120 is the current objective.
+    """True when cp120 observes the Yawn spawn.
 
-    The async cinema skip can first publish Yawn one sample before settlement,
-    so requiring a sampled absent→present edge loses genuine spawns.
+    Ordinary steps require an inactive→active edge. Async settlement may use
+    active presence because the skip itself proves a scripted session occurred;
+    this handles Yawn appearing one sample before settlement without letting
+    cp119's already-populated enemy slot complete cp120 on step one.
     """
     if not _on_yawn_cutscene_leg(planner):
         return False
@@ -49,9 +53,9 @@ def yawn_spawn_triggered(
     state = new_state or {}
     return yawn_contact_edge(
         state,
-        None,
+        None if after_skip else prev_state,
         enemies=state.get("enemies"),
-        prev_enemies=None,
+        prev_enemies=None if after_skip else (prev_state or {}).get("enemies"),
     )
 
 
@@ -60,9 +64,16 @@ def note_yawn_spawn(
     progress: Any,
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any],
+    *,
+    after_skip: bool = False,
 ) -> None:
     """Mint ``210:yawn`` when the spawn cinema leaves Yawn active."""
-    if progress is None or not yawn_spawn_triggered(planner, prev_state, new_state):
+    if progress is None or not yawn_spawn_triggered(
+        planner,
+        prev_state,
+        new_state,
+        after_skip=after_skip,
+    ):
         return
     progress.observe_cutscene(YAWN_CUTSCENE_KEY)
     new_state["yawn_cutscene_confirmed"] = True

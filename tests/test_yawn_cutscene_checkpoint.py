@@ -152,7 +152,20 @@ def test_yawn_spawn_presence_survives_async_sample_race() -> None:
     prev = _state("210", enemies=[yawn])
     cur = _state("210", enemies=[yawn])
 
-    assert yawn_spawn_triggered(planner, prev, cur)
+    assert not yawn_spawn_triggered(planner, prev, cur)
+    assert yawn_spawn_triggered(planner, prev, cur, after_skip=True)
+
+
+def test_yawn_presence_does_not_complete_cp120_on_first_ordinary_step() -> None:
+    planner = _planner("yawn_cutscene_210")
+    progress = ProgressTracker()
+    yawn = _spawned_yawn()
+    prev = _state("210", enemies=[yawn])
+    cur = _state("210", enemies=[yawn])
+
+    note_yawn_spawn(planner, progress, prev, cur)
+
+    assert YAWN_CUTSCENE_KEY not in progress.observed_cutscenes
 
 
 def test_yawn_spawn_edge_does_not_mint_cp119_room_entry() -> None:
