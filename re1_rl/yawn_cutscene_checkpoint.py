@@ -37,7 +37,11 @@ def yawn_spawn_triggered(
     prev_state: dict[str, Any] | None,
     new_state: dict[str, Any] | None,
 ) -> bool:
-    """True on the room-210 edge where Yawn becomes an active combatant."""
+    """True when Yawn is active while cp120 is the current objective.
+
+    The async cinema skip can first publish Yawn one sample before settlement,
+    so requiring a sampled absent→present edge loses genuine spawns.
+    """
     if not _on_yawn_cutscene_leg(planner):
         return False
     from re1_rl.yawn_outcome import yawn_contact_edge
@@ -45,9 +49,9 @@ def yawn_spawn_triggered(
     state = new_state or {}
     return yawn_contact_edge(
         state,
-        prev_state,
+        None,
         enemies=state.get("enemies"),
-        prev_enemies=(prev_state or {}).get("enemies"),
+        prev_enemies=None,
     )
 
 

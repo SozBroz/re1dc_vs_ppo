@@ -146,6 +146,15 @@ def test_yawn_spawn_edge_mints_without_duration_gate() -> None:
     assert cur.get("yawn_cutscene_confirmed") is True
 
 
+def test_yawn_spawn_presence_survives_async_sample_race() -> None:
+    planner = _planner("yawn_cutscene_210")
+    yawn = _spawned_yawn()
+    prev = _state("210", enemies=[yawn])
+    cur = _state("210", enemies=[yawn])
+
+    assert yawn_spawn_triggered(planner, prev, cur)
+
+
 def test_yawn_spawn_edge_does_not_mint_cp119_room_entry() -> None:
     planner = _planner("yawn_arena_enter_210")
     progress = ProgressTracker()
