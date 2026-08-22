@@ -648,3 +648,4 @@ def test_distributed_epoch_hyperparams_gentler_than_monolithic() -> None:
     assert DISTRIBUTED_EPOCH_HYPERPARAMS["batch_size"] >= PPO_HYPERPARAMS["batch_size"]
     # MC horizon ≈6× γ half-life; longer than monolithic n_steps=1024 at γ≈25s HL.
     assert DISTRIBUTED_EPOCH_HYPERPARAMS["n_steps"] == 1125
+    assert DISTRIBUTED_EPOCH_HYPERPARAMS["ent_coef"] == 0.01

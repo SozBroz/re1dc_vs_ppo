@@ -370,6 +370,7 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         f"batch_size={model.batch_size} "
         f"n_epochs={DISTRIBUTED_EPOCH_HYPERPARAMS['n_epochs']} "
         f"gamma={DISTRIBUTED_EPOCH_HYPERPARAMS['gamma']} "
+        f"ent_coef={getattr(model, 'ent_coef', None)} "
         f"target_kl={getattr(model, 'target_kl', None)}",
     )
     return model, ckpt_dir

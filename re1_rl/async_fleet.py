@@ -52,7 +52,7 @@ DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     n_epochs=4,
     learning_rate=1e-4,
     gamma=RL_GAMMA,
-    ent_coef=0.005,
+    ent_coef=0.01,
 )
 DEFAULT_SYNC_INTERVAL_S = 360.0
 
