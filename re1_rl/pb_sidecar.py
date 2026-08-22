@@ -91,6 +91,9 @@ def apply_progress_sidecar(progress: ProgressTracker, data: dict[str, Any]) -> N
     progress.observed_cutscenes = _as_set(
         data.get("observed_cutscenes", data.get("rewarded_cutscenes"))
     )
+    # A predecessor's ledger is historical context, not evidence that the
+    # current reset leg replayed a cutscene.
+    progress.leg_observed_cutscenes.clear()
     progress.rewarded_story_uses = _as_set(data.get("rewarded_story_uses"))
     progress.rewarded_document_rooms = _as_set(data.get("rewarded_document_rooms"))
     blocked = data.get("cutscene_blocked_after_pickup_room")

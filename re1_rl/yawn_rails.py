@@ -384,10 +384,11 @@ def validate_manifest_cells(
 
 
 # Default reset mix: equal chance of a true fresh start (init savestate,
-# working on cp00) plus each loadable cell in [0, 119]. cp120 is never a
-# start — completing it ends the episode. Pin/PLR/payforward still override.
+# working on cp00) plus each loadable cell in [0, 120]. The terminal fight
+# cell (cp121 yawn_moon_210) is never a start — completing it ends the
+# episode. Pin/PLR/payforward still override.
 RESET_MIN_CHECKPOINT_INDEX = 0
-RESET_MAX_CHECKPOINT_INDEX = 119
+RESET_MAX_CHECKPOINT_INDEX = 120
 RESET_LATEST_CELL_WEIGHT = 0.50
 _RESET_LATEST_ONLY_ENV = "RE1_YAWN_RESET_LATEST_ONLY"
 _RESET_PIN_INDEX_ENV = "RE1_YAWN_RESET_PIN_INDEX"
@@ -770,7 +771,7 @@ def _pinned_loadable_cell(
 
 
 def eligible_reset_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Cells the random reset sampler may use (cp00–cp119; never the terminal cp120)."""
+    """Cells the random reset sampler may use (cp00–cp120; never the terminal fight)."""
     return [
         row
         for row in cells
@@ -846,7 +847,7 @@ def sample_one_leg_options(
     """Choose a start cell. Default: one successor cell, then the episode ends.
 
     Default mix: equal chance of a true fresh start (init savestate) or any
-    loadable cell in cp00–cp119. Completing the hunted cell ends the episode
+    loadable cell in cp00–cp120. Completing the hunted cell ends the episode
     and captures a successor. ``episode_mode=play_through`` still runs to Yawn.
     ``RE1_YAWN_PAYFORWARD_RIPPLE=1`` enables fight-progression mix instead:
     40% frontier fight cell, 60% uniform over all loadable cells from cp00.

@@ -169,15 +169,15 @@ def test_route_is_legal_and_excludes_rejected_objectives() -> None:
             f"{cp['checkpoint_id']} still bundles enter with {extras}"
         )
     assert [(cp["room_id"], cp["checkpoint_id"]) for cp in route[-10:]] == [
-        ("10B", "east_stairs_101_post_richard"),
-        ("118", "yawn_box_enter_118"),
-        ("118", "yawn_box_prep_118"),
-        ("207", "east_stairs_201_to_yawn"),
-        ("204", "c_passage_204_to_yawn"),
-        ("20D", "moon_hall_enter_20D"),
+        ("203", "richard_wait4_upper_203"),
+        ("106", "richard_wait4_main_106"),
+        ("203", "richard_wait4_upper_back_203"),
+        ("204", "richard_wait4_c_pass_204"),
+        ("20D", "moon_hall_return4_20D"),
         ("20D", "ammo_20D"),
         ("20E", "attic_entry_20E"),
         ("210", "yawn_arena_enter_210"),
+        ("210", "yawn_cutscene_210"),
         ("210", "yawn_moon_210"),
     ]
     bar_ids = [cp["checkpoint_id"] for cp in route if cp["room_id"] == "10F"]
@@ -727,24 +727,27 @@ def test_goal_encodes_selected_one_leg_checkpoint() -> None:
 
 def test_goal_appends_six_masked_checkpoint_semantic_slots() -> None:
     encoder = ObsEncoder(ROOMS, _graph(), curriculum_stage_index=1)
-    # Lookahead from east stairs 1F after box prep: climb 207 … ammo_20D, attic, yawn.
-    planner = _planner(start_index=_idx("east_stairs_201_to_yawn"))
+    # Last moon-hall return: ammo pickup, attic, Yawn cinema, then the fight.
+    start = _idx("moon_hall_return4_20D")
+    planner = _planner(start_index=start)
     goal = encoder.encode_goal(
-        _state("10B", inventory=["shield_key", "shotgun"]),
+        _state("20D", inventory=["shield_key", "shotgun"]),
         planner,
     )
     slots = goal[GOAL_BASE_DIM:].reshape(
         GOAL_LOOKAHEAD_SLOTS, GOAL_LOOKAHEAD_SLOT_DIM
     )
     assert slots[0, 0] == 1.0
-    assert slots[0, 1] == encoder._room_idx_norm("207")
+    assert slots[0, 1] == encoder._room_idx_norm("20D")
     pickup_slots = [i for i in range(GOAL_LOOKAHEAD_SLOTS) if slots[i, 3 + 1] == 1.0]
     assert pickup_slots, "expected a pickup in lookahead"
-    assert any(
-        planner.peek_objective(offset) is not None
-        and planner.peek_objective(offset)["checkpoint_id"] == "yawn_moon_210"
-        for offset in range(0, _ROUTE_N - _idx("east_stairs_201_to_yawn"))
-    )
+    ids = [
+        planner.peek_objective(offset)["checkpoint_id"]
+        for offset in range(0, _ROUTE_N - start)
+        if planner.peek_objective(offset) is not None
+    ]
+    assert "yawn_cutscene_210" in ids
+    assert "yawn_moon_210" in ids
 
 
 def test_two_leg_episode_pays_each_checkpoint_and_resets_acquisitions() -> None:
@@ -946,7 +949,7 @@ def test_route_cell_sampling_is_seed_deterministic_and_never_archive(tmp_path: P
 
 
 def test_default_mix_equal_fresh_and_each_loadable_cell(tmp_path: Path) -> None:
-    """Fresh start is its own slot, equal with each cp00–cp119 cell — not cp00."""
+    """Fresh start is its own slot, equal with each loadable cell — not cp00."""
     manifest = {
         "schema_version": 1,
         "route_id": "test",
@@ -956,7 +959,7 @@ def test_default_mix_equal_fresh_and_each_loadable_cell(tmp_path: Path) -> None:
     stage = {
         "route_id": "test",
         "cells_manifest": "manifest.json",
-        "route_steps": list(range(1, 122)),
+        "route_steps": list(range(1, _ROUTE_N + 1)),
     }
     counts: dict[str, int] = {"fresh": 0, "cp00": 0, "cp18": 0, "cp119": 0}
     for seed in range(8000):
@@ -977,7 +980,8 @@ def test_default_mix_equal_fresh_and_each_loadable_cell(tmp_path: Path) -> None:
         assert n / total == pytest.approx(0.25, abs=0.03), f"{key}={n}"
 
 
-def test_cp119_playthrough_is_the_yawn_fight_only(tmp_path: Path) -> None:
+def test_cp119_playthrough_hunts_the_yawn_cutscene(tmp_path: Path) -> None:
+    """Loading cp119 hunts yawn_cutscene_210 (start_index 120), not the fight."""
     manifest = {
         "schema_version": 1,
         "route_id": "test",
@@ -987,7 +991,7 @@ def test_cp119_playthrough_is_the_yawn_fight_only(tmp_path: Path) -> None:
     stage = {
         "route_id": "test",
         "cells_manifest": "manifest.json",
-        "route_steps": list(range(1, 122)),
+        "route_steps": list(range(1, _ROUTE_N + 1)),
     }
     monkey_hits = 0
     for seed in range(200):
@@ -999,16 +1003,23 @@ def test_cp119_playthrough_is_the_yawn_fight_only(tmp_path: Path) -> None:
     assert monkey_hits > 0
 
 
-def test_terminal_cp120_is_never_loadable(tmp_path: Path) -> None:
-    """cp120 has no next hunt target — no agent may reset into it."""
+def test_terminal_last_cell_is_never_loadable(tmp_path: Path) -> None:
+    """The fight-complete cell has no next hunt target — never reset into it."""
     import shutil
 
     route_src = ROOT / "data" / "yawn_checkpoint_route.json"
     shutil.copy(route_src, tmp_path / "yawn_checkpoint_route.json")
+    last_idx = _ROUTE_N - 1
+    pred_id = str(_ROUTE_ROWS[last_idx - 1]["checkpoint_id"])
+    last_id = str(_ROUTE_ROWS[last_idx]["checkpoint_id"])
     cells = []
-    for idx in (119, 120):
+    for idx in (last_idx - 1, last_idx):
         row = _write_cell(tmp_path, idx)
-        row["next_checkpoint_id"] = "" if idx == 120 else "yawn_moon_210"
+        row["next_checkpoint_id"] = "" if idx == last_idx else last_id
+        if idx == last_idx - 1:
+            row["checkpoint_id"] = pred_id
+        else:
+            row["checkpoint_id"] = last_id
         cells.append(row)
     manifest = {"schema_version": 1, "route_id": "test", "cells": cells}
     (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -1020,8 +1031,8 @@ def test_terminal_cp120_is_never_loadable(tmp_path: Path) -> None:
     }
     loadable = iter_loadable_cells(tmp_path, stage)
     indices = {int(r["checkpoint_index"]) for r in loadable}
-    assert 120 not in indices
-    assert 119 in indices
+    assert last_idx not in indices
+    assert last_idx - 1 in indices
 
 
 def test_empty_next_checkpoint_id_excluded_even_without_route_path(
@@ -1817,10 +1828,10 @@ def test_checkpoint_success_proposes_without_local_install_when_sync_on(
         assert list(staging_root.iterdir()) == []
 
 
-def test_terminal_yawn_moon_capture_proposes_cp120(
+def test_terminal_yawn_moon_capture_proposes_last_index(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Last route leg (yawn_moon_210) must still install cp120."""
+    """Last route leg (yawn_moon_210) must still install the terminal cell."""
     monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "1")
     bridge = MagicMock()
     bridge.save_savestate.side_effect = (
@@ -1831,7 +1842,12 @@ def test_terminal_yawn_moon_capture_proposes_cp120(
     pred.mkdir(parents=True, exist_ok=True)
     (pred / "cell.State").write_bytes(b"pred")
     (pred / "meta.json").write_text(
-        json.dumps({"checkpoint_id": "yawn_arena_enter_210", "checkpoint_index": moon_idx - 1}),
+        json.dumps(
+            {
+                "checkpoint_id": "yawn_cutscene_210",
+                "checkpoint_index": moon_idx - 1,
+            }
+        ),
         encoding="utf-8",
     )
     planner = _planner(start_index=moon_idx)

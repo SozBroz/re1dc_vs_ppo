@@ -1,6 +1,6 @@
 # Yawn rails checkpoint cells (`cpNN`)
 
-Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (121 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
+Generated from [`data/yawn_checkpoint_route.json`](../data/yawn_checkpoint_route.json) (122 steps). Cell directory index is `seq - 1` (`cp00` = seq 1).
 
 **Source of truth:** `data/yawn_checkpoint_route.json` (objectives and success conditions below are copied verbatim). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
@@ -130,7 +130,8 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 | `cp117` | 118 | `ammo_20D` | `20D` | pickup | Collect the mandatory Pillar Passage handgun bullets |
 | `cp118` | 119 | `attic_entry_20E` | `20E` | navigate | Reach the shield-key attic entrance |
 | `cp119` | 120 | `yawn_arena_enter_210` | `210` | navigate | Enter the Yawn moon corridor |
-| `cp120` | 121 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
+| `cp120` | 121 | `yawn_cutscene_210` | `210` | navigate | Walk forward and trigger the Yawn intro cutscene |
+| `cp121` | 122 | `yawn_moon_210` | `210` | fight | Complete the Yawn encounter, collect the shells, and take the moon crest |
 
 ## Details
 
@@ -1503,7 +1504,18 @@ On success (yawn one-leg), the fleet captures/installs `states/yawn_rails/cells/
 - **Success condition:**
 - Enter room `210`
 
-### `cp120` — `yawn_moon_210` (seq 121)
+### `cp120` — `yawn_cutscene_210` (seq 121)
+
+- **Room:** `210` (ATTIC)
+- **Action:** `navigate`
+- **Objective:** Walk forward and trigger the Yawn intro cutscene
+- **Required items:** _(none)_
+- **Items gained:** _(none)_
+- **How to achieve:** Be in / reach **210**. Navigate until the success condition fires.
+- **Success condition:**
+- Observe cutscene with prefix `210:` (``:s`` scene key, not a door load)
+
+### `cp121` — `yawn_moon_210` (seq 122)
 
 - **Room:** `210` (ATTIC)
 - **Action:** `fight`

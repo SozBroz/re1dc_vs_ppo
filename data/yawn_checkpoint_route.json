@@ -1958,6 +1958,20 @@
   },
   {
     "seq": 121,
+    "checkpoint_id": "yawn_cutscene_210",
+    "room_id": "210",
+    "objective": "Walk forward and trigger the Yawn intro cutscene",
+    "action_type": "navigate",
+    "required_items": [],
+    "items_gained": [],
+    "success_condition": {
+      "type": "observed_cutscene",
+      "prefix": "210:",
+      "require_scene": true
+    }
+  },
+  {
+    "seq": 122,
     "checkpoint_id": "yawn_moon_210",
     "room_id": "210",
     "objective": "Complete the Yawn encounter, collect the shells, and take the moon crest",

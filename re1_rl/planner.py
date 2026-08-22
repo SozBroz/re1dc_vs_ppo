@@ -32,6 +32,8 @@ def _observed_cutscene_met(cond: dict[str, Any], progress: ProgressTracker | Non
     - Kenneth ``104:*:sN`` (``require_scene``) — blocks 104→105 before cinema.
     - Richard ``20D:`` (``require_scene``) — must see ``20D:richard`` so cp84
       cannot auto-mint the instant the planner reaches the cutscene step.
+    - Yawn ``210:`` (``require_scene``) — must see ``210:yawn``; door-cam
+      ``210:0:s0`` is already on cp119 and must not mint the intro cinema.
     """
     prefix = str(cond.get("prefix", ""))
     require_scene = bool(cond.get("require_scene"))
@@ -45,6 +47,10 @@ def _observed_cutscene_met(cond: dict[str, Any], progress: ProgressTracker | Non
         from re1_rl.richard_cutscene_checkpoint import richard_cutscene_seen
 
         return richard_cutscene_seen(progress)
+    if prefix.startswith("210:") and require_scene:
+        from re1_rl.yawn_cutscene_checkpoint import yawn_cutscene_seen
+
+        return yawn_cutscene_seen(progress)
     return True
 
 # Order matters: index in this tuple = position in the objective one-hot.
