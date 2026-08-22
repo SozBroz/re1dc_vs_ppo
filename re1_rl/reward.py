@@ -108,9 +108,12 @@ SOFTLOCK_TIMEOUT_PENALTY = -0.26666666666666666
 
 ENEMY_DAMAGE_REWARD = 0.014
 ENEMY_KILL_REWARD = 2.0
-# Imperator 2026-08-19: steer combat toward the Beretta.
+# Imperator 2026-08-19: steer combat toward the Beretta on fodder.
+# Imperator 2026-08-22: bosses (Yawn / Tiger / Plant 42 / Tyrant) pay 0.1× so
+# a 15-HP chip (+0.084) stays above the 0.04 ammo spend tax.
 BERETTA_WEAPON_ID = 0x02
 BERETTA_DAMAGE_SCALE = 1.1
+BERETTA_BOSS_DAMAGE_SCALE = 0.1
 # COMBINE reload when the weapon slot is at or below 1/3 combine capacity
 # (beretta 5/15, shotgun 2/7, bazooka/magnum 2/6).
 WEAPON_RELOAD_REWARD = 0.1
@@ -773,10 +776,12 @@ def _state_boss_combat_scale(state: dict[str, Any]) -> float:
     return 1.0
 
 
-def _beretta_damage_scale(state: dict[str, Any]) -> float:
-    if int(_combat_ammo_weapon_id(state)) == BERETTA_WEAPON_ID:
-        return BERETTA_DAMAGE_SCALE
-    return 1.0
+def _beretta_damage_scale(state: dict[str, Any], *, vs_boss: bool = False) -> float:
+    if int(_combat_ammo_weapon_id(state)) != BERETTA_WEAPON_ID:
+        return 1.0
+    if vs_boss:
+        return BERETTA_BOSS_DAMAGE_SCALE
+    return BERETTA_DAMAGE_SCALE
 
 
 def _inventory_id_qty_slots(state: dict[str, Any] | None) -> list[tuple[int, int]]:
@@ -834,7 +839,6 @@ def enemy_combat_rewards(state: dict[str, Any]) -> tuple[float, float]:
     """Return ``(damage_pay, kill_pay)`` honoring per-event crow / boss scaling."""
     room_id = str(state.get("room_id") or "")
     events = state.get("combat_events")
-    beretta = _beretta_damage_scale(state)
     if events:
         damage_pay = 0.0
         kill_pay = 0.0
@@ -842,11 +846,17 @@ def enemy_combat_rewards(state: dict[str, Any]) -> tuple[float, float]:
             if ev.get("reward_denied"):
                 continue
             scale = _combat_event_scale(ev, room_id=room_id)
+            beretta = _beretta_damage_scale(
+                state, vs_boss=scale == BOSS_COMBAT_REWARD_SCALE
+            )
             damage_pay += ENEMY_DAMAGE_REWARD * int(ev.get("damage", 0)) * scale * beretta
             if ev.get("killed"):
                 kill_pay += ENEMY_KILL_REWARD * scale
         return damage_pay, kill_pay
     scale = _state_boss_combat_scale(state)
+    beretta = _beretta_damage_scale(
+        state, vs_boss=scale == BOSS_COMBAT_REWARD_SCALE
+    )
     enemy_damage = int(state.get("enemy_damage", 0) or 0)
     enemy_kills = int(state.get("enemy_kills", 0) or 0)
     return (

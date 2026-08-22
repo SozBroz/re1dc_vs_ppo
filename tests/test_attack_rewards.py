@@ -14,6 +14,7 @@ from re1_rl.reward import (
     AMMO_SPEND_TAX_PER_ROUND,
     AMMO_WASTE_MAX_PENALTY,
     ATTACK_MISS_TAX_SCALE,
+    BERETTA_BOSS_DAMAGE_SCALE,
     BERETTA_DAMAGE_SCALE,
     ENEMY_DAMAGE_REWARD,
     ENEMY_KILL_REWARD,
@@ -775,7 +776,8 @@ def test_empty_clip_reload_pays() -> None:
     assert low_ammo_reload_reward(prev, cur) == pytest.approx(WEAPON_RELOAD_REWARD)
 
 
-def test_beretta_boss_damage_stacks_one_point_one_on_four_x() -> None:
+def test_beretta_boss_damage_is_point_one_on_four_x() -> None:
+    assert BERETTA_BOSS_DAMAGE_SCALE == pytest.approx(0.1)
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -793,6 +795,35 @@ def test_beretta_boss_damage_stacks_one_point_one_on_four_x() -> None:
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
     assert bd["enemy_damage"] == pytest.approx(
-        10 * ENEMY_DAMAGE_REWARD * BOSS_COMBAT_REWARD_SCALE * BERETTA_DAMAGE_SCALE
+        10 * ENEMY_DAMAGE_REWARD * BOSS_COMBAT_REWARD_SCALE
+        * BERETTA_BOSS_DAMAGE_SCALE
     )
     assert bd["enemy_kill"] == 0.0
+
+
+def test_beretta_yawn_chip_stays_positive_after_ammo_tax() -> None:
+    """15-HP attic chip at 0.1× still beats the 0.04 Beretta spend tax."""
+    planner = make_planner()
+    prev = make_state(hp=96, room="210", step=1)
+    cur = make_state(hp=96, room="210", step=2)
+    cur["equipped_weapon_id"] = 0x02
+    cur["ammo_spent"] = 1
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 15,
+            "killed": False,
+            "reward_denied": False,
+            "is_yawn": True,
+            "is_boss": True,
+        }
+    ]
+    _, bd = compute_reward(
+        prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
+    )
+    assert bd["enemy_damage"] == pytest.approx(
+        15 * ENEMY_DAMAGE_REWARD * BOSS_COMBAT_REWARD_SCALE
+        * BERETTA_BOSS_DAMAGE_SCALE
+    )
+    assert bd["ammo_spend"] == pytest.approx(ammo_spend_penalty(0x02, 1))
+    assert bd["enemy_damage"] + bd["ammo_spend"] > 0.0
