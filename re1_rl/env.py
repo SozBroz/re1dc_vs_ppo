@@ -1606,6 +1606,8 @@ class RE1Env(gym.Env):
 
         if not go_explore_capture_enabled():
             return None
+        if getattr(self, "_yawn_allow_capture", True) is False:
+            return None
 
         # After the daily cap, skip manifest/digest work until a new day rolls.
         if getattr(self, "_go_explore_capture_paused", False):
@@ -1667,6 +1669,7 @@ class RE1Env(gym.Env):
         opts = dict(options or {})
         self._reset_options = opts
         self._route_start_index = int(opts.get("route_start_index", 0))
+        self._yawn_allow_capture = bool(opts.get("allow_capture", True))
         self._stop_bg_skip()
         self.bridge.hp_floor = 0
         if getattr(self, "_progress", None) is not None:
@@ -1856,17 +1859,18 @@ class RE1Env(gym.Env):
         self._checkpoint_capture_index = None
         self._checkpoint_captured = False
         if str(self._stage.get("mode") or "") == "yawn_rails":
-            from re1_rl.leg_replay import new_leg_replay_buffer
+            from re1_rl.leg_replay import leg_replay_enabled_from_env, new_leg_replay_buffer
 
-            self._leg_replay = new_leg_replay_buffer()
-            try:
-                self.bridge.tape_clear()
-                self.bridge.tape_enable(True)
-            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
-                pass
-            from re1_rl.footage_trace import new_footage_trace_buffer
+            if leg_replay_enabled_from_env():
+                self._leg_replay = new_leg_replay_buffer()
+                try:
+                    self.bridge.tape_clear()
+                    self.bridge.tape_enable(True)
+                except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                    pass
+                from re1_rl.footage_trace import new_footage_trace_buffer
 
-            self._footage_trace = new_footage_trace_buffer()
+                self._footage_trace = new_footage_trace_buffer()
         self._frame_stack = []
         self.bridge.frame_ring.clear()
         self.bridge.attack_pins.clear()

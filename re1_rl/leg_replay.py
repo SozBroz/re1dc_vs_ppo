@@ -9,6 +9,7 @@ from __future__ import annotations
 import array
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -181,6 +182,15 @@ class LegReplayBuffer:
             rewards.append(0.0)
             events.append({})
         return rewards[:n], events[:n]
+
+
+_LEG_REPLAY_ENV = "RE1_YAWN_LEG_REPLAY"
+
+
+def leg_replay_enabled_from_env() -> bool:
+    """``RE1_YAWN_LEG_REPLAY=0`` disables joypad/action tape capture (code stays)."""
+    raw = os.environ.get(_LEG_REPLAY_ENV, "1").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
 
 
 def new_leg_replay_buffer() -> LegReplayBuffer:
@@ -480,6 +490,8 @@ def predecessor_meta_path(env: Any, from_index: int) -> Path | None:
 
 def should_write_leg_replay(env: Any, completed_index: int) -> bool:
     """Single-leg only: fresh→cp00 or episode loaded the adjacent predecessor."""
+    if not leg_replay_enabled_from_env():
+        return False
     try:
         start = int(getattr(env, "_route_start_index", -1))
         completed = int(completed_index)

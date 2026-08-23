@@ -400,6 +400,12 @@ _RESET_PIN_INCLUDE_FRESH_ENV = "RE1_YAWN_RESET_PIN_INCLUDE_FRESH"
 _RESET_PIN_FILE_ENV = "RE1_YAWN_RESET_PIN_FILE"
 _DEFAULT_PIN_FILE = "data/yawn_reset_pin.env"
 _RESET_FRONTIER_FIGHT_ENV = "RE1_YAWN_RESET_FRONTIER_FIGHT_ONLY"
+_RESET_TRAINING_MIX_ENV = "RE1_YAWN_RESET_TRAINING_MIX"
+_EXTEND_EPISODE_ON_CELL_ENV = "RE1_YAWN_EXTEND_EPISODE_ON_CELL"
+_TRAINING_HUNT_CHECKPOINT_INDEX = 120
+# When a pin index is also set, that official cell gets this share; the rest
+# is split equally across the training dirs.
+_TRAINING_OFFICIAL_SHARE = 1.0 / 3.0
 PIN_WEIGHT_LATEST_KEY = "latest"
 _LATEST_PIN_ALIASES = frozenset({"latest", "newest", "front", "frontier"})
 
@@ -452,9 +458,56 @@ def _pin_env_raw(
     return raw if raw else None
 
 
+def reset_training_mix_from_env(
+    project_root: Path | str | None = None,
+) -> list[Path] | None:
+    """``RE1_YAWN_RESET_TRAINING_MIX=dir1,dir2`` — equal-weight raw training starts.
+
+    Each dir must contain ``cell.State`` + ``cell.sidecar.json``. These are not
+    official cells. With ``RE1_YAWN_RESET_PIN_INDEX`` also set, one-third of
+    resets use that official cell and the rest use this mix; both can capture.
+    """
+    raw = _pin_env_raw(_RESET_TRAINING_MIX_ENV, project_root)
+    if not raw:
+        return None
+    root = Path(project_root) if project_root is not None else Path.cwd()
+    dirs: list[Path] = []
+    for part in raw.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        path = Path(token)
+        if not path.is_absolute():
+            path = root / path
+        state = path / "cell.State"
+        sidecar = path / "cell.sidecar.json"
+        if not state.is_file() or not sidecar.is_file():
+            raise ValueError(
+                f"RE1_YAWN_RESET_TRAINING_MIX missing cell.State/sidecar: {path}"
+            )
+        dirs.append(path)
+    return dirs or None
+
+
 def reset_latest_only_from_env() -> bool:
     """``RE1_YAWN_RESET_LATEST_ONLY=1`` — always start from the newest loadable cell."""
     raw = os.environ.get(_RESET_LATEST_ONLY_ENV, "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def extend_episode_on_cell_from_env(
+    project_root: Path | str | None = None,
+) -> bool:
+    """``RE1_YAWN_EXTEND_EPISODE_ON_CELL=1`` — keep playing after each cell capture.
+
+    Sets ``leg_span`` to remaining route legs so ``checkpoint_success`` does not
+    end the episode until max-steps / death / timeout.
+    """
+    raw = _pin_env_raw(_EXTEND_EPISODE_ON_CELL_ENV, project_root)
+    if raw is None:
+        raw = os.environ.get(_EXTEND_EPISODE_ON_CELL_ENV, "").strip().lower()
+    else:
+        raw = raw.strip().lower()
     return raw in {"1", "true", "yes", "on"}
 
 
@@ -781,9 +834,15 @@ def eligible_reset_cells(cells: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def _playthrough_leg_span(stage: dict[str, Any], start_index: int) -> int:
+def _playthrough_leg_span(
+    stage: dict[str, Any],
+    start_index: int,
+    *,
+    project_root: Path | str | None = None,
+) -> int:
     """Legs to play from this start. Default: one cell, then the episode ends."""
-    if str(stage.get("episode_mode") or "") == "play_through":
+    extend = extend_episode_on_cell_from_env(project_root)
+    if extend or str(stage.get("episode_mode") or "") == "play_through":
         route_steps = list(stage.get("route_steps", []))
         start = max(0, int(start_index))
         if route_steps:
@@ -792,11 +851,13 @@ def _playthrough_leg_span(stage: dict[str, Any], start_index: int) -> int:
     return 1
 
 
-def _fresh_start_options(stage: dict[str, Any]) -> dict[str, Any]:
+def _fresh_start_options(
+    stage: dict[str, Any], *, project_root: Path | str | None = None
+) -> dict[str, Any]:
     """Dining init savestate hunting cp00 (emblem). Same planner index as any other CP."""
     return {
         "route_start_index": 0,
-        "leg_span": _playthrough_leg_span(stage, 0),
+        "leg_span": _playthrough_leg_span(stage, 0, project_root=project_root),
         "reset_source": "route_initial",
     }
 
@@ -823,15 +884,20 @@ def _options_from_cell(
     chosen: dict[str, Any],
     stage: dict[str, Any],
     *,
+    project_root: Path | str | None = None,
     reset_source: str = "route_cell",
+    allow_capture: bool = True,
 ) -> dict[str, Any]:
     from re1_rl.yawn_rails_sync import yawn_cell_pb_bundle
 
     start_index = int(chosen["checkpoint_index"]) + 1
     opts: dict[str, Any] = {
         "route_start_index": start_index,
-        "leg_span": _playthrough_leg_span(stage, start_index),
+        "leg_span": _playthrough_leg_span(
+            stage, start_index, project_root=project_root
+        ),
         "reset_source": reset_source if start_index else "route_initial",
+        "allow_capture": bool(allow_capture),
     }
     if start_index:
         opts["pb_bundle"] = yawn_cell_pb_bundle(chosen)
@@ -880,7 +946,32 @@ def sample_one_leg_options(
     from re1_rl.yawn_pin_march import maybe_advance_pin
 
     maybe_advance_pin(project_root)
+    training_dirs = reset_training_mix_from_env(project_root)
     pin_index = reset_pin_index_from_env(project_root)
+    if training_dirs:
+        if pin_index is not None and rng.random() < _TRAINING_OFFICIAL_SHARE:
+            pinned = _pinned_loadable_cell(project_root, stage, pin_index)
+            if pinned is None:
+                raise ValueError(
+                    f"RE1_YAWN_RESET_PIN_INDEX={pin_index} but cp{int(pin_index):02d} "
+                    "is not loadable"
+                )
+            return _options_from_cell(
+                pinned, stage, project_root=project_root, reset_source="route_cell_pin"
+            )
+        picked = training_dirs[rng.randrange(len(training_dirs))]
+        try:
+            rel_state = picked.relative_to(Path(project_root))
+        except ValueError:
+            rel_state = picked
+        chosen = {
+            "checkpoint_index": _TRAINING_HUNT_CHECKPOINT_INDEX,
+            "state_path": str(rel_state / "cell.State"),
+            "sidecar_path": str(rel_state / "cell.sidecar.json"),
+        }
+        return _options_from_cell(
+            chosen, stage, project_root=project_root, reset_source="training_mix"
+        )
     if pin_index is not None:
         pinned = _pinned_loadable_cell(project_root, stage, pin_index)
         if pinned is None:
@@ -888,7 +979,9 @@ def sample_one_leg_options(
                 f"RE1_YAWN_RESET_PIN_INDEX={pin_index} but cp{int(pin_index):02d} "
                 "is not loadable"
             )
-        return _options_from_cell(pinned, stage, reset_source="route_cell_pin")
+        return _options_from_cell(
+            pinned, stage, project_root=project_root, reset_source="route_cell_pin"
+        )
     all_cells = list(iter_loadable_cells(project_root, stage))
     cells = eligible_reset_cells(all_cells)
     pin_range = reset_pin_range_from_env(project_root)
@@ -901,12 +994,20 @@ def sample_one_leg_options(
                 all_cells, lo, hi, latest_range_w, rng=rng
             )
             return _options_from_cell(
-                chosen, stage, reset_source="route_cell_pin_range_latest"
+                chosen,
+                stage,
+                project_root=project_root,
+                reset_source="route_cell_pin_range_latest",
             )
     pin_weights = reset_pin_weights_from_env(project_root)
     if pin_weights is not None:
         chosen = _sample_cell_from_pin_weights(all_cells, pin_weights, rng=rng)
-        return _options_from_cell(chosen, stage, reset_source="route_cell_pin_weights")
+        return _options_from_cell(
+            chosen,
+            stage,
+            project_root=project_root,
+            reset_source="route_cell_pin_weights",
+        )
     pin_set_cfg = reset_pin_set_from_env(project_root)
     if pin_set_cfg is not None and pin_range is not None:
         indices, weight = pin_set_cfg
@@ -914,7 +1015,10 @@ def sample_one_leg_options(
         if weight > 0.0 and pinned and rng.random() < weight:
             chosen = pinned[rng.randrange(len(pinned))]
             return _options_from_cell(
-                chosen, stage, reset_source="route_cell_pin_set"
+                chosen,
+                stage,
+                project_root=project_root,
+                reset_source="route_cell_pin_set",
             )
     if pin_range is not None:
         lo, hi = pin_range
@@ -927,12 +1031,20 @@ def sample_one_leg_options(
         if include_fresh:
             slot = rng.randrange(len(ranged) + 1)
             if slot == 0:
-                return _fresh_start_options(stage)
+                return _fresh_start_options(stage, project_root=project_root)
             return _options_from_cell(
-                ranged[slot - 1], stage, reset_source="route_cell_pin_range"
+                ranged[slot - 1],
+                stage,
+                project_root=project_root,
+                reset_source="route_cell_pin_range",
             )
         chosen = ranged[rng.randrange(len(ranged))]
-        return _options_from_cell(chosen, stage, reset_source="route_cell_pin_range")
+        return _options_from_cell(
+            chosen,
+            stage,
+            project_root=project_root,
+            reset_source="route_cell_pin_range",
+        )
     pin_set_cfg = reset_pin_set_from_env(project_root)
     if pin_set_cfg is not None:
         indices, weight = pin_set_cfg
@@ -940,14 +1052,20 @@ def sample_one_leg_options(
         if reset_pin_include_fresh_from_env(project_root):
             slot = rng.randrange(len(pinned) + 1)
             if slot == 0 or not pinned:
-                return _fresh_start_options(stage)
+                return _fresh_start_options(stage, project_root=project_root)
             return _options_from_cell(
-                pinned[slot - 1], stage, reset_source="route_cell_pin_set"
+                pinned[slot - 1],
+                stage,
+                project_root=project_root,
+                reset_source="route_cell_pin_set",
             )
         if weight > 0.0 and rng.random() < weight and pinned:
             chosen = pinned[rng.randrange(len(pinned))]
             return _options_from_cell(
-                chosen, stage, reset_source="route_cell_pin_set"
+                chosen,
+                stage,
+                project_root=project_root,
+                reset_source="route_cell_pin_set",
             )
     if reset_frontier_fight_only_from_env():
         from re1_rl.yawn_rails_payforward import sample_frontier_fight_options
@@ -969,14 +1087,14 @@ def sample_one_leg_options(
             return pf
     if latest_only:
         chosen = _choose_reset_candidate(cells, rng=rng, latest_only=True)
-        return _options_from_cell(chosen, stage)
+        return _options_from_cell(chosen, stage, project_root=project_root)
     if not cells:
-        return _fresh_start_options(stage)
+        return _fresh_start_options(stage, project_root=project_root)
     # Equal chance: true fresh start + each loadable cp00–cp119 cell.
     slot = rng.randrange(len(cells) + 1)
     if slot == 0:
-        return _fresh_start_options(stage)
-    return _options_from_cell(cells[slot - 1], stage)
+        return _fresh_start_options(stage, project_root=project_root)
+    return _options_from_cell(cells[slot - 1], stage, project_root=project_root)
 
 
 def validate_route(
@@ -1186,6 +1304,8 @@ def capture_successor_cell(
     new quality beats the existing curated cell.
     """
     if float(breakdown.get("checkpoint_success", 0.0)) <= 0.0:
+        return None
+    if getattr(env, "_yawn_allow_capture", True) is False:
         return None
     # Stop the joypad recorder before settle / bg-skip can append frames
     # after the success pose. Dump still reads the buffer later.
@@ -1528,7 +1648,11 @@ def capture_successor_cell(
         checkpoint_id = str(completed_cp.get("checkpoint_id", "") or cid)
         route_id = str(stage.get("route_id") or "yawn_quest_v2")
         from re1_rl.go_explore_archive import attach_leg_frames
-        from re1_rl.leg_replay import maybe_write_capture_tape, should_write_leg_replay
+        from re1_rl.leg_replay import (
+            leg_replay_enabled_from_env,
+            maybe_write_capture_tape,
+            should_write_leg_replay,
+        )
 
         to_state_sha = hashlib.sha256(state_path.read_bytes()).hexdigest()
         settled = not bool(unsettled_state.get("in_control", True))
@@ -1544,6 +1668,11 @@ def capture_successor_cell(
                 # Cell speed = agent-controlled frames only; auto-skip / synthetic
                 # living-cost frames must not pollute quality dim 7.
                 leg_frames = int(getattr(buf, "policy_leg_frames", buf.leg_frames))
+        elif not leg_replay_enabled_from_env():
+            try:
+                leg_frames = int(getattr(env, "_step_count", 0) or 0)
+            except (TypeError, ValueError):
+                leg_frames = 0
         quality = attach_leg_frames(quality, leg_frames)
         from re1_rl.go_explore_archive import (
             LEG_FRAMES_QUALITY_INDEX,
@@ -1552,7 +1681,10 @@ def capture_successor_cell(
 
         # Incomplete tape → sentinel frames. Those installs were minting hole
         # cells (cp84 skip → junk cp85) without leg_replay.
-        if int(quality[LEG_FRAMES_QUALITY_INDEX]) == -int(LEG_FRAMES_SENTINEL):
+        if (
+            leg_replay_enabled_from_env()
+            and int(quality[LEG_FRAMES_QUALITY_INDEX]) == -int(LEG_FRAMES_SENTINEL)
+        ):
             print(
                 f"[yawn_capture] reject sentinel_leg_frames cp={checkpoint_id} "
                 f"idx={completed}",

@@ -1,5 +1,5 @@
 @echo off
-REM WH1/WH2: same hot-reload pin file (cp10-cp95 only; no fresh start).
+REM WH1/WH2: hot-reload pin file; empty index = uniform fresh + loadable cells.
 set RE1_YAWN_RESET_PIN_FILE=data\workhorse_reset_pin.env
 set RE1_YAWN_RESET_PIN_INDEX=
 set RE1_YAWN_RESET_PIN_RANGE=

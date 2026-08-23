@@ -1147,6 +1147,100 @@ def test_reset_pin_index_env_forces_cell(
         )
 
 
+def test_reset_training_mix_without_pin_allows_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("yawn_sg_equip", "yawn_gl_equip"):
+        slot = tmp_path / "training" / name
+        slot.mkdir(parents=True)
+        (slot / "cell.State").write_bytes(b"state")
+        (slot / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+    pin_file = tmp_path / "yawn_reset_pin.env"
+    pin_file.write_text(
+        "RE1_YAWN_RESET_TRAINING_MIX="
+        "training/yawn_sg_equip,training/yawn_gl_equip\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_FILE", str(pin_file))
+    stage = {"route_id": "test", "cells_manifest": "manifest.json"}
+    paths = set()
+    for seed in range(40):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        assert opts["reset_source"] == "training_mix"
+        assert opts["allow_capture"] is True
+        assert opts["route_start_index"] == 121
+        paths.add(str(opts["pb_bundle"]["state_path"]).replace("\\", "/"))
+    assert paths == {
+        "training/yawn_sg_equip/cell.State",
+        "training/yawn_gl_equip/cell.State",
+    }
+
+
+def test_reset_training_mix_allows_capture_and_blends_official_pin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("yawn_sg_equip", "yawn_gl_equip"):
+        slot = tmp_path / "training" / name
+        slot.mkdir(parents=True)
+        (slot / "cell.State").write_bytes(b"state")
+        (slot / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+    pin_file = tmp_path / "yawn_reset_pin.env"
+    pin_file.write_text(
+        "RE1_YAWN_RESET_PIN_INDEX=33\n"
+        "RE1_YAWN_RESET_TRAINING_MIX="
+        "training/yawn_sg_equip,training/yawn_gl_equip\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_FILE", str(pin_file))
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, i) for i in range(18, 34)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 40)),
+    }
+    sources = {"training_mix": 0, "route_cell_pin": 0}
+    paths: set[str] = set()
+    for seed in range(90):
+        opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(seed))
+        assert opts["allow_capture"] is True
+        src = str(opts["reset_source"])
+        sources[src] += 1
+        paths.add(str(opts["pb_bundle"]["state_path"]).replace("\\", "/"))
+        if src == "route_cell_pin":
+            assert opts["route_start_index"] == 34
+        else:
+            assert src == "training_mix"
+            assert opts["route_start_index"] == 121
+    assert sources["route_cell_pin"] > 0
+    assert sources["training_mix"] > sources["route_cell_pin"]
+    assert paths >= {
+        "training/yawn_sg_equip/cell.State",
+        "training/yawn_gl_equip/cell.State",
+        "states/cp33/cell.State",
+    }
+
+
+def test_training_reset_skips_successor_capture() -> None:
+    env = SimpleNamespace(
+        project_root=Path("."),
+        _stage={"mode": "yawn_rails"},
+        _planner=SimpleNamespace(waypoint_index=121, total_waypoints=122),
+        _yawn_allow_capture=False,
+        bridge=SimpleNamespace(),
+    )
+    assert (
+        capture_successor_cell(
+            env, {"room_id": "210"}, {"checkpoint_success": RAILS_CHECKPOINT_REWARD}
+        )
+        is None
+    )
+
+
 def test_reset_pin_file_hot_reload_overrides_launcher_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1652,6 +1746,36 @@ def test_playthrough_curriculum_spans_remaining_route(tmp_path: Path) -> None:
     assert one_leg["legs_per_episode"] == 1
     assert one_leg["route_id"] == "yawn_quest_v2"
     assert one_leg["route_steps"][-1] == _ROUTE_N
+
+
+def test_extend_episode_on_cell_spans_remaining_route(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from re1_rl.yawn_rails import _fresh_start_options
+
+    manifest = {
+        "schema_version": 1,
+        "route_id": "test",
+        "cells": [_write_cell(tmp_path, 18)],
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    stage = {
+        "route_id": "test",
+        "cells_manifest": "manifest.json",
+        "route_steps": list(range(1, 30)),
+        "legs_per_episode": 1,
+        "episode_mode": "one_leg",
+    }
+    monkeypatch.setenv("RE1_YAWN_EXTEND_EPISODE_ON_CELL", "1")
+    monkeypatch.setenv("RE1_YAWN_RESET_PIN_INDEX", "18")
+    cell_opts = sample_one_leg_options(tmp_path, stage, rng=random.Random(0))
+    assert cell_opts["route_start_index"] == 19
+    assert cell_opts["leg_span"] == 10
+    fresh = _fresh_start_options(stage, project_root=tmp_path)
+    assert fresh["leg_span"] == 29
+    monkeypatch.delenv("RE1_YAWN_EXTEND_EPISODE_ON_CELL", raising=False)
+    one_leg = sample_one_leg_options(tmp_path, stage, rng=random.Random(0))
+    assert one_leg["leg_span"] == 1
 
 
 def test_successor_capacity_uses_stack_headroom_and_consumption() -> None:

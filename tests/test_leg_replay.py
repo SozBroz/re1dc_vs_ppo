@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from re1_rl.go_explore_archive import (
     LEG_FRAMES_SENTINEL,
     attach_leg_frames,
@@ -23,6 +25,7 @@ from re1_rl.leg_replay import (
     chain_forgive_stale_tape_miss,
     decode_packed_joypad,
     joypad_replay_spans,
+    leg_replay_enabled_from_env,
     new_leg_replay_buffer,
     policy_leg_frames_from_tape,
     reclassify_contaminated_async_skip_tape,
@@ -112,6 +115,17 @@ def test_single_leg_gate() -> None:
     env._leg_replay = buf
     assert should_write_leg_replay(env, 0)
     env._route_start_index = 1
+    assert not should_write_leg_replay(env, 0)
+
+
+def test_leg_replay_env_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RE1_YAWN_LEG_REPLAY", raising=False)
+    assert leg_replay_enabled_from_env()
+    monkeypatch.setenv("RE1_YAWN_LEG_REPLAY", "0")
+    assert not leg_replay_enabled_from_env()
+    buf = LegReplayBuffer()
+    buf.append(1, 8)
+    env = SimpleNamespace(_route_start_index=0, _leg_replay=buf)
     assert not should_write_leg_replay(env, 0)
 
 

@@ -26,6 +26,8 @@ set RE1_YAWN_RESET_PIN_SET=
 set RE1_YAWN_RESET_PIN_SET_WEIGHT=
 set RE1_YAWN_RESET_PIN_RANGE=
 set RE1_YAWN_RESET_PIN_WEIGHTS=
+set RE1_YAWN_RESET_TRAINING_MIX=
+set RE1_YAWN_PIN_MARCH=
 if not exist data\go_explore mkdir data\go_explore
 
 venv\Scripts\python.exe scripts\distributed_train_parallel.py --role worker --machine-name %MACHINE_NAME% --worker-id pking --learner-host %LEARNER_HOST% --learner-port %FLEET_LEARNER_PORT% --curriculum curriculum/yawn_rails_one_leg.json --n-envs %N_ENVS% --actor-ranks %ACTOR_RANKS% --base-port %BASE_PORT% --total-steps 0 --training-speed 6400 --skip-chunk 600 --sync-interval-s %SYNC_INTERVAL_S% --capture-checkpoints --headless --tile-windows --grid-cols 5 --grid-rows 4 --grid-monitor right --screenshot-mmf --inference-batch-max %N_ENVS%

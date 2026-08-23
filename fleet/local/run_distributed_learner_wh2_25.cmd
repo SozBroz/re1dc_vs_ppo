@@ -26,12 +26,12 @@ set RE1_PB_DANGER_ROOMS=1
 
 call "%~dp0go_explore_phase_c.env.cmd"
 call "%~dp0workhorse_reset_cp44.env.cmd"
-REM Equal mix: dining-room fresh + uniform loadable cp00–cp95 (hot-reload via pin file).
+REM Equal mix via workhorse2_reset_pin.env (hot-reload).
 set RE1_YAWN_RESET_PIN_FILE=C:\Users\sshuser\re1_rl\data\workhorse2_reset_pin.env
 set RE1_YAWN_RESET_PIN_SET=
 set RE1_YAWN_RESET_PIN_SET_WEIGHT=
 set RE1_YAWN_RESET_PIN_RANGE=
-set RE1_YAWN_RESET_PIN_INCLUDE_FRESH=1
+set RE1_YAWN_RESET_PIN_INCLUDE_FRESH=
 if not exist data\go_explore mkdir data\go_explore
 
 if not exist data\logs mkdir data\logs

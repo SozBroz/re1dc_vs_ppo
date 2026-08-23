@@ -11,7 +11,9 @@ set RE1_YAWN_RAILS_SYNC=1
 set RE1_YAWN_RAILS_ROOT=states\yawn_rails
 set RE1_YAWN_RAILS_MANIFEST_POLL_S=60
 REM Pins live in data/yawn_reset_pin.env (pking) and data/workhorse_reset_pin.env.
-REM Completing a cell captures a successor and ends the episode.
+REM Cell capture extends the episode (max-steps bump); does not terminate per cell.
+set RE1_YAWN_EXTEND_EPISODE_ON_CELL=1
+set RE1_YAWN_LEG_REPLAY=0
 set RE1_YAWN_PAYFORWARD_RIPPLE=0
 set RE1_YAWN_FIGHT_BIAS_WEIGHT=
 set RE1_GO_EXPLORE_MANIFEST_POLL_S=60
