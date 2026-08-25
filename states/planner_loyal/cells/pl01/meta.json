@@ -1,0 +1,30 @@
+{
+  "bundle_sha256": "eb6c25814fefc636c0203003002e6b9c6b0ab8752b65d35b4b118534b12fe1a7",
+  "bytes": 1358398,
+  "captured_in_box_room": false,
+  "checkpoint_id": "kenneth_104",
+  "checkpoint_index": 1,
+  "inventory_feasible": true,
+  "inventory_free_slots": 4,
+  "next_checkpoint_id": "barry_return_105",
+  "next_slots_needed": 0,
+  "quality": [
+    96,
+    45,
+    100,
+    4,
+    1,
+    0,
+    -30,
+    -198
+  ],
+  "room_id": "104",
+  "route_id": "planner_loyal_v1",
+  "source": {
+    "archive": "Crystals_in_time",
+    "checkpoint": "cp01"
+  },
+  "training_start": false,
+  "state_sha256": "847c11aad0397fb38cb3201be9ed6ffc5d65c47c1b15ed23003bf388bb4f15a9",
+  "sidecar_sha256": "7a71fd4a85bde814a94fd59fb314d4e8685c65e434b62b50f33d975b50a20033"
+}

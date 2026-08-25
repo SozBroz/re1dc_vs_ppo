@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "route_id": "planner_loyal_v1",
+  "training_start_index": 5,
+  "seed_source": "backups/Crystals_in_time",
+  "seed_through": 5,
+  "cells": [
+    {
+      "checkpoint_index": 0,
+      "checkpoint_id": "emblem_105",
+      "room_id": "105",
+      "quality": [
+        96,
+        45,
+        100,
+        4,
+        1,
+        0,
+        -30,
+        -682
+      ],
+      "training_start": false,
+      "chunk_id": null,
+      "planner_step_index": null,
+      "state_path": "states/planner_loyal/cells/pl00/cell.State",
+      "sidecar_path": "states/planner_loyal/cells/pl00/cell.sidecar.json",
+      "state_sha256": "3bb87f81b1f09cc27e4dedc0f57fa38857d9bb51d5b5b784d3ef7712e32aad0c",
+      "sidecar_sha256": "8a9f36d2969ce1ae26be71ef29b9ec816a15bfd147bc41c358cb00f5206313bc",
+      "bytes": 1511332
+    },
+    {
+      "checkpoint_index": 1,
+      "checkpoint_id": "kenneth_104",
+      "room_id": "104",
+      "quality": [
+        96,
+        45,
+        100,
+        4,
+        1,
+        0,
+        -30,
+        -198
+      ],
+      "training_start": false,
+      "chunk_id": null,
+      "planner_step_index": null,
+      "state_path": "states/planner_loyal/cells/pl01/cell.State",
+      "sidecar_path": "states/planner_loyal/cells/pl01/cell.sidecar.json",
+      "state_sha256": "847c11aad0397fb38cb3201be9ed6ffc5d65c47c1b15ed23003bf388bb4f15a9",
+      "sidecar_sha256": "7a71fd4a85bde814a94fd59fb314d4e8685c65e434b62b50f33d975b50a20033",
+      "bytes": 1358398
+    },
+    {
+      "checkpoint_index": 2,
+      "checkpoint_id": "barry_return_105",
+      "room_id": "105",
+      "quality": [
+        96,
+        45,
+        100,
+        4,
+        1,
+        0,
+        -30,
+        -694
+      ],
+      "training_start": false,
+      "chunk_id": null,
+      "planner_step_index": null,
+      "state_path": "states/planner_loyal/cells/pl02/cell.State",
+      "sidecar_path": "states/planner_loyal/cells/pl02/cell.sidecar.json",
+      "state_sha256": "02ae8dc3e5ddd2bd0f968616f7174f5e1d60fe81b37aff545acc0af09b0e1ea2",
+      "sidecar_sha256": "d6d59ae847f90e00e88c3fc50d2a62927335d3bb1b0817a1b4a04e32f5bb747f",
+      "bytes": 1458065
+    },
+    {
+      "checkpoint_index": 3,
+      "checkpoint_id": "main_hall_106",
+      "room_id": "106",
+      "quality": [
+        96,
+        45,
+        100,
+        4,
+        1,
+        0,
+        -30,
+        -740
+      ],
+      "training_start": false,
+      "chunk_id": null,
+      "planner_step_index": null,
+      "state_path": "states/planner_loyal/cells/pl03/cell.State",
+      "sidecar_path": "states/planner_loyal/cells/pl03/cell.sidecar.json",
+      "state_sha256": "a96c327af71fe998813eb79ce215492a53a33a4f7dce0e2c4b08d650b28fe507",
+      "sidecar_sha256": "07f392b928a1df91e6ec4cf09cb24af1ed8f09ad9908fbd24a6ace6cd00acb3e",
+      "bytes": 1501396
+    },
+    {
+      "checkpoint_index": 4,
+      "checkpoint_id": "upper_hall_203",
+      "room_id": "203",
+      "quality": [
+        96,
+        45,
+        100,
+        4,
+        1,
+        0,
+        -30,
+        -228
+      ],
+      "training_start": false,
+      "chunk_id": null,
+      "planner_step_index": null,
+      "state_path": "states/planner_loyal/cells/pl04/cell.State",
+      "sidecar_path": "states/planner_loyal/cells/pl04/cell.sidecar.json",
+      "state_sha256": "5058e072b9fed6f37c0875721bcdc16080758ab83b65d9197dab44167f0c6e0f",
+      "sidecar_sha256": "7e2644c5a728fa25727fb966eb5c7bf86728deae108b9fd1d0fdb905a8425284",
+      "bytes": 1592741
+    },
+    {
+      "checkpoint_index": 5,
+      "checkpoint_id": "barry_hall_return_106",
+      "room_id": "106",
+      "quality": [
+        96,
+        45,
+        100,
+        4,
+        1,
+        0,
+        -30,
+        -106
+      ],
+      "training_start": true,
+      "chunk_id": null,
+      "planner_step_index": null,
+      "state_path": "states/planner_loyal/cells/pl05/cell.State",
+      "sidecar_path": "states/planner_loyal/cells/pl05/cell.sidecar.json",
+      "state_sha256": "d98e248468fee05a6955a6f3cc906af7e4fd6246a8db6aa1ecbf85fef4af1035",
+      "sidecar_sha256": "1c51a7cf028922e9af5646fe65ec502869ed239201045a013e7a035b8e905c0a",
+      "bytes": 1486731
+    }
+  ]
+}

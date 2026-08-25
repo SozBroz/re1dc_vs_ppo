@@ -365,6 +365,10 @@ class RE1Env(gym.Env):
             }
         )
         self.action_space = spaces.Discrete(len(ACTION_NAMES))
+        self._planner_loyal_queue = None
+        self._planner_loyal_last_success: dict[str, Any] | None = None
+        self._box_opened_this_step = False
+        self._maybe_enable_planner_loyal()
 
         self.graph = RoomGraph(
             self.project_root / "data" / "doors_empirical.json",
@@ -486,6 +490,37 @@ class RE1Env(gym.Env):
         self._typewriter_save_detector = TypewriterSaveDetector()
         self._enemy_motion = EnemyMotionTracker()
         self._player_motion = PlayerMotionTracker()
+
+    def _maybe_enable_planner_loyal(self) -> None:
+        """Load the planner-loyal chunk when ``RE1_PLANNER_LOYAL=1``."""
+        from re1_rl.planner_loyal import (
+            PLANNER_LOYAL_OMIT_OBS_KEYS,
+            PLANNER_QUEUE_DIM,
+            PlannerLoyalQueue,
+            load_chunk,
+            planner_loyal_enabled,
+            resolve_chunk_path,
+        )
+
+        if not planner_loyal_enabled():
+            return
+        chunk = load_chunk(resolve_chunk_path(self.project_root))
+        self._planner_loyal_queue = PlannerLoyalQueue(chunk)
+        spaces_map = dict(self.observation_space.spaces)
+        for key in PLANNER_LOYAL_OMIT_OBS_KEYS:
+            spaces_map.pop(key, None)
+        spaces_map["planner_steps"] = spaces.Box(
+            -1.0, 1.0, shape=(PLANNER_QUEUE_DIM,), dtype=np.float32
+        )
+        self.observation_space = spaces.Dict(spaces_map)
+
+    def _planner_loyal_reward_kwargs(self) -> dict[str, Any]:
+        if getattr(self, "_planner_loyal_queue", None) is None:
+            return {}
+        return {
+            "planner_loyal_queue": self._planner_loyal_queue,
+            "box_opened": bool(getattr(self, "_box_opened_this_step", False)),
+        }
 
     def _load_stage(self) -> None:
         route_path = None
@@ -1012,11 +1047,19 @@ class RE1Env(gym.Env):
         capture_ineligible_failure = self._progress.capture_ineligible_breached
         cell_timeout_failure = self._progress.cell_timeout_breached
         box_pollution = getattr(self, "_episode_failure_override", None)
-        checkpoint_success = (
-            self._stage.get("mode") == "yawn_rails"
-            and self._progress.checkpoint_success
+        planner_loyal = getattr(self, "_planner_loyal_queue", None) is not None
+        planner_chunk_complete = (
+            planner_loyal
+            and getattr(self, "_planner_loyal_queue", None) is not None
+            and bool(self._planner_loyal_queue.done)
             and bool(getattr(self, "_checkpoint_captured", False))
         )
+        checkpoint_success = (
+            self._stage.get("mode") == "yawn_rails"
+            and not planner_loyal
+            and self._progress.checkpoint_success
+            and bool(getattr(self, "_checkpoint_captured", False))
+        ) or planner_chunk_complete
         terminated = (
             bool(state.get("dead"))
             or kenneth_gate_failure
@@ -1046,7 +1089,10 @@ class RE1Env(gym.Env):
         if kenneth_gate_failure:
             reason = "main_hall_before_kenneth"
         elif wrong_room_failure:
-            reason = "wrong_room"
+            divert = getattr(
+                getattr(self, "_planner_loyal_queue", None), "divert_reason", None
+            )
+            reason = "planner_divert" if divert else "wrong_room"
         elif forbidden_item_failure:
             reason = "forbidden_item"
         elif shotgun_return_failure:
@@ -1059,6 +1105,8 @@ class RE1Env(gym.Env):
             reason = "checkpoint_capture_ineligible"
         elif cell_timeout_failure:
             reason = "checkpoint_timeout"
+        elif planner_chunk_complete:
+            reason = "planner_chunk_complete"
         elif checkpoint_success:
             reason = "checkpoint_success"
         else:
@@ -1147,7 +1195,7 @@ class RE1Env(gym.Env):
             self._box_departure_snapshot = np.concatenate(
                 [logistics_obs, inventory_obs, box_obs]
             ).astype(np.float32).tolist()
-        return {
+        obs = {
             "frame": frame_obs,
             "proprio": self._encoder.encode_proprio(state, self._prev_hp),
             "goal": self._encoder.encode_goal(
@@ -1189,6 +1237,9 @@ class RE1Env(gym.Env):
             "maps_files": encode_maps_files_flags(state.get("maps_files_flags")),
             "named_state": encode_named_state(state),
         }
+        from re1_rl.planner_loyal import apply_planner_loyal_obs
+
+        return apply_planner_loyal_obs(obs, getattr(self, "_planner_loyal_queue", None))
 
     def _sync_episode_history(self, state: dict[str, Any]) -> None:
         self._episode_history.on_step(
@@ -1312,31 +1363,67 @@ class RE1Env(gym.Env):
         # Freeze the completed index now. Richard's cutscene dumps into 204, and
         # the next room_enter(204) would otherwise advance again before capture,
         # minting cp85 and skipping cp84.
-        try:
-            self._checkpoint_capture_index = int(self._planner.waypoint_index) - 1
-        except (TypeError, ValueError, AttributeError):
-            self._checkpoint_capture_index = None
+        queue = getattr(self, "_planner_loyal_queue", None)
+        if queue is not None:
+            self._checkpoint_capture_index = max(0, int(queue.index) - 1)
+        else:
+            try:
+                self._checkpoint_capture_index = int(self._planner.waypoint_index) - 1
+            except (TypeError, ValueError, AttributeError):
+                self._checkpoint_capture_index = None
         if self._progress is not None:
             self._progress.checkpoint_freeze_pending = True
         self._macro_active = True
         self._skipping_flag = False
+
+    def _maybe_capture_planner_loyal_cell(
+        self, state: dict[str, Any], breakdown: dict[str, float]
+    ) -> dict[str, Any] | None:
+        """Mint a ``states/planner_loyal`` cell for the completed planner step."""
+        from re1_rl.planner_loyal_cells import capture_planner_loyal_cell
+
+        queue = getattr(self, "_planner_loyal_queue", None)
+        if queue is None:
+            return None
+        if float(breakdown.get("checkpoint_success", 0.0) or 0.0) <= 0.0:
+            if float(breakdown.get("planner_step_success", 0.0) or 0.0) <= 0.0:
+                return None
+        completed = max(0, int(queue.index) - 1)
+        step = None
+        steps = getattr(queue, "_steps", [])
+        if 0 <= completed < len(steps):
+            step = dict(steps[completed])
+        self._planner_loyal_last_success = {
+            "chunk_id": queue.chunk_id,
+            "completed_index": completed,
+            "room_id": state.get("room_id"),
+            "op": (step or {}).get("op"),
+            "step": step,
+        }
+        return capture_planner_loyal_cell(self, state, breakdown)
 
     def _finish_checkpoint_capture(
         self, state: dict[str, Any], breakdown: dict[str, float]
     ) -> None:
         from re1_rl.yawn_rails import capture_successor_cell
 
-        yr_prop = capture_successor_cell(self, state, breakdown)
+        queue = getattr(self, "_planner_loyal_queue", None)
+        if queue is not None:
+            yr_prop = self._maybe_capture_planner_loyal_cell(state, breakdown)
+        else:
+            yr_prop = capture_successor_cell(self, state, breakdown)
         if yr_prop is not None:
             pending_yr = getattr(self, "_yawn_rails_capture_pending", None)
             if pending_yr is None:
                 self._yawn_rails_capture_pending = []
                 pending_yr = self._yawn_rails_capture_pending
             pending_yr.append(yr_prop)
-            from re1_rl.yawn_rails_immediate_ingest import offer_immediate_yawn_ingest
+            if queue is None:
+                from re1_rl.yawn_rails_immediate_ingest import offer_immediate_yawn_ingest
 
-            offer_immediate_yawn_ingest(yr_prop)
-        self._apply_yawn_capture_ineligibility_penalty(breakdown)
+                offer_immediate_yawn_ingest(yr_prop)
+        if queue is None:
+            self._apply_yawn_capture_ineligibility_penalty(breakdown)
         self._checkpoint_freeze_pending = False
         self._checkpoint_capture_index = None
         if self._progress is not None:
@@ -1346,9 +1433,21 @@ class RE1Env(gym.Env):
         )
         # One-leg: checkpoint_success is true after the hunted cell, so the
         # episode ends here. play_through (leg_span>1) keeps going.
-        self._checkpoint_captured = (
-            not ineligible and bool(self._progress.checkpoint_success)
-        )
+        # Planner-loyal keeps the episode open for mid-chunk steps; the final
+        # shield-key (queue.done) keeps capture flags so the episode ends.
+        if queue is not None:
+            if bool(queue.done):
+                self._checkpoint_captured = True
+                if self._progress is not None:
+                    self._progress.checkpoint_success = True
+            else:
+                self._checkpoint_captured = False
+                if self._progress is not None:
+                    self._progress.checkpoint_success = False
+        else:
+            self._checkpoint_captured = (
+                not ineligible and bool(self._progress.checkpoint_success)
+            )
         self._macro_active = False
 
     def _try_decision_checkpoint_capture(self, action: int):
@@ -1726,6 +1825,44 @@ class RE1Env(gym.Env):
         from re1_rl.pb_sidecar import apply_episode_sidecar
 
         pb_bundle = resolve_pb_bundle(opts)
+        # Planner-loyal: sample tip + opened non-final CPs; seek queue past completed steps.
+        if getattr(self, "_planner_loyal_queue", None) is not None:
+            from re1_rl.planner_loyal_cells import sample_training_start_cell
+
+            picked = sample_training_start_cell(self.project_root)
+            if picked is not None and picked["state"].is_file() and picked["sidecar"].is_file():
+                meta: dict[str, Any] = {}
+                if picked["meta"].is_file():
+                    try:
+                        meta = json.loads(picked["meta"].read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        meta = {}
+                pb_bundle = {
+                    "source": "planner_loyal",
+                    "state_path": str(picked["state"]),
+                    "sidecar_path": str(picked["sidecar"]),
+                    "checkpoint_id": meta.get("checkpoint_id")
+                    or picked.get("checkpoint_id")
+                    or "barry_hall_return_106",
+                    "checkpoint_index": int(
+                        meta.get("checkpoint_index")
+                        if meta.get("checkpoint_index") is not None
+                        else picked.get("checkpoint_index")
+                        if picked.get("checkpoint_index") is not None
+                        else 5
+                    ),
+                    "room_id": meta.get("room_id")
+                    or picked.get("room_id")
+                    or "106",
+                    "state_sha256": meta.get("state_sha256"),
+                    "sidecar_sha256": meta.get("sidecar_sha256"),
+                    "planner_step_index": meta.get("planner_step_index"),
+                }
+                print(
+                    f"[planner_loyal] reset tip={picked['cell_dir'].name} "
+                    f"id={pb_bundle['checkpoint_id']}",
+                    flush=True,
+                )
         if pb_bundle is not None:
             sp = Path(pb_bundle["state_path"])
             state_path = sp if sp.is_absolute() else self.project_root / sp
@@ -1875,6 +2012,29 @@ class RE1Env(gym.Env):
         self.bridge.frame_ring.clear()
         self.bridge.attack_pins.clear()
         self._progress = ProgressTracker(leg_span=self._leg_span)
+        if getattr(self, "_planner_loyal_queue", None) is not None:
+            self._planner_loyal_queue.reset()
+            self._planner_loyal_last_success = None
+            # Frontier starts resume mid-chunk after the completed step.
+            seek_raw = None
+            if isinstance(pb_bundle, dict):
+                seek_raw = pb_bundle.get("planner_step_index")
+            if seek_raw is None and isinstance(pb_bundle, dict):
+                # Tip pl05 has no completed planner step yet.
+                idx = pb_bundle.get("checkpoint_index")
+                if idx is not None and int(idx) > 5:
+                    seek_raw = int(idx) - 6
+            if seek_raw is not None:
+                try:
+                    self._planner_loyal_queue.seek(int(seek_raw) + 1)
+                except (TypeError, ValueError):
+                    pass
+            print(
+                f"[planner_loyal] queue_seek index={self._planner_loyal_queue.index} "
+                f"done={int(self._planner_loyal_queue.done)}",
+                flush=True,
+            )
+        self._box_opened_this_step = False
         self._visited.reset()
         self._enemy_motion.reset()
         self._player_motion.reset()
@@ -2364,6 +2524,7 @@ class RE1Env(gym.Env):
                 rails_mode=self._stage.get("mode") == "yawn_rails",
                 typewriter_save_complete=save_complete,
                 return_breakdown=True,
+                **self._planner_loyal_reward_kwargs(),
             )
             self._after_reward_step(
                 entry, crossing, bd, typewriter_save_complete=save_complete
@@ -2510,6 +2671,7 @@ class RE1Env(gym.Env):
             rails_mode=self._stage.get("mode") == "yawn_rails",
             typewriter_save_complete=save_complete,
             return_breakdown=True,
+            **self._planner_loyal_reward_kwargs(),
         )
         self._apply_async_skip_timeout(bd)
         self._after_reward_step(
@@ -3231,6 +3393,7 @@ class RE1Env(gym.Env):
         if open_now and self._current_room_is_box_room():
             if not self._box_ui_open:
                 self._box_ui_open = True
+                self._box_opened_this_step = True
                 self._box_phase = BOX_PHASE_CHOOSE
                 # After open animation the cursor homes on inventory slot 0;
                 # box list resumes at slot 0 on first Cross-in.
@@ -4205,6 +4368,7 @@ class RE1Env(gym.Env):
             rails_mode=self._stage.get("mode") == "yawn_rails",
             typewriter_save_complete=save_complete,
             return_breakdown=True,
+            **self._planner_loyal_reward_kwargs(),
         )
         self._after_reward_step(
             self._prev_state,
@@ -4551,6 +4715,7 @@ class RE1Env(gym.Env):
 
     def _step_once(self, action: int):
         assert self._planner is not None
+        self._box_opened_this_step = False
         # One-step TTL: clear prior last_attack before this step's observation.
         self._last_attack_obs = empty_last_attack()
         # Consume equip holdout after the masked decision step has begun.
@@ -4956,6 +5121,7 @@ class RE1Env(gym.Env):
             rails_mode=self._stage.get("mode") == "yawn_rails",
             typewriter_save_complete=save_complete,
             return_breakdown=True,
+            **self._planner_loyal_reward_kwargs(),
         )
         self._after_reward_step(
             self._prev_state,

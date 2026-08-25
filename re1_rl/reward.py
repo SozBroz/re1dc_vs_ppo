@@ -877,6 +877,8 @@ def compute_reward(
     rails_mode: bool = False,
     typewriter_save_complete: bool = False,
     return_breakdown: bool = False,
+    planner_loyal_queue: Any | None = None,
+    box_opened: bool = False,
 ) -> float | tuple[float, dict[str, float]]:
     """Compute scalar reward from symbolic state dicts."""
     del success_room
@@ -932,7 +934,50 @@ def compute_reward(
         "weapon_reload": 0.0,
         "attack_dry_fire": 0.0,
         "attack_macro_failure": 0.0,
+        "planner_step_success": 0.0,
+        "planner_divert": 0.0,
+        "heal_use_tax": 0.0,
     }
+
+    planner_loyal = planner_loyal_queue is not None
+    if planner_loyal:
+        from re1_rl.planner_loyal import (
+            PLANNER_DIVERT_PENALTY,
+            PLANNER_STEP_SUCCESS_REWARD,
+        )
+
+        loyal = planner_loyal_queue.evaluate_transition(
+            prev_state=prev_state,
+            state=state,
+            box_opened=box_opened,
+        )
+        bd["heal_use_tax"] = float(loyal.get("heal_use_tax") or 0.0)
+        if loyal.get("divert"):
+            bd["planner_divert"] = PLANNER_DIVERT_PENALTY
+            bd["wrong_room"] = PLANNER_DIVERT_PENALTY  # episode terminal path
+            if progress is not None and hasattr(progress, "breach_wrong_room"):
+                progress.breach_wrong_room()
+            # Zero same-step positives under divert.
+            for key in (
+                "checkpoint_success",
+                "planner_step_success",
+                "enemy_damage",
+                "enemy_kill",
+                "hp",
+                "ammo_pickup",
+                "item",
+                "key_item",
+                "story_use",
+                "gallery",
+                "new_room",
+                "new_weapon",
+            ):
+                bd[key] = 0.0
+        elif loyal.get("step_success"):
+            bd["planner_step_success"] = PLANNER_STEP_SUCCESS_REWARD
+            bd["checkpoint_success"] = PLANNER_STEP_SUCCESS_REWARD
+            if progress is not None and hasattr(progress, "claim_checkpoint_success"):
+                progress.claim_checkpoint_success()
 
     prev_room = str(prev_state.get("room_id", ""))
     room = str(state.get("room_id", ""))
@@ -1260,7 +1305,7 @@ def compute_reward(
         if progress is not None and getattr(progress, "checkpoint_freeze_pending", False):
             freeze_pending = True
         advanced = False
-        if not freeze_pending:
+        if not freeze_pending and not planner_loyal:
             advanced = bool(
                 planner.advance_if_success(
                     state, progress=progress, prev_state=prev_state
@@ -1459,7 +1504,46 @@ def compute_reward(
                     threshold=softlock_threshold,
                 )
 
-    reward = float(sum(bd.values())) * REWARD_SCALE
+    if planner_loyal:
+        # Strip legacy crumbs / rails pulses; keep contempt, combat, HP heal,
+        # heal-use tax, and planner step/divert channels.
+        for key in (
+            "pbrs_graph",
+            "pbrs_door",
+            "waypoint",
+            "new_room",
+            "document_examine",
+            "new_cutscene",
+            "typewriter_save",
+            "item",
+            "ammo_pickup",
+            "box_withdraw",
+            "yawn_box_key_deposit",
+            "key_item",
+            "story_use",
+            "gallery",
+            "dining_statue",
+            "dining_statue_progress",
+            "new_weapon",
+            "weapon_reload",
+            "checkpoint_capture_ineligible",
+            "checkpoint_timeout",
+            "success_room",
+        ):
+            bd[key] = 0.0
+        # Alias channels stay populated for capture / telemetry; do not
+        # double-count them in the scalar reward.
+        skip_alias = 0.0
+        if bd["planner_divert"] != 0.0:
+            bd["wrong_room"] = bd["planner_divert"]
+            skip_alias += bd["wrong_room"]
+        elif bd["planner_step_success"] != 0.0:
+            bd["checkpoint_success"] = bd["planner_step_success"]
+            bd["wrong_room"] = 0.0
+            skip_alias += bd["checkpoint_success"]
+        reward = float(sum(bd.values()) - skip_alias) * REWARD_SCALE
+    else:
+        reward = float(sum(bd.values())) * REWARD_SCALE
     if return_breakdown:
         return reward, bd
     return reward

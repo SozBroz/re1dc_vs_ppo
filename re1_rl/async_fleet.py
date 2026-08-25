@@ -48,7 +48,7 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
 #   - Credit assignment is per n_steps segment, not the whole sync window.
 DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     n_steps=_DISTRIBUTED_N_STEPS,
-    batch_size=2048,  # Doc04 medium + WH2 8GB VRAM; was 4096 on ~2M policy
+    batch_size=2048,  # WH2 learner default; launchers may override (e.g. 3072)
     n_epochs=4,
     learning_rate=1e-4,
     gamma=RL_GAMMA,

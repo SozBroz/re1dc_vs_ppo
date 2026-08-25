@@ -12,7 +12,7 @@
 | Trunks | `pi/vf [512, 512]` |
 | Vision | NatureCNN **512-d** (CNN-only transplant from pre-campaign zips if needed) |
 | Dropped from forward | `goal`, `affordances` |
-| Distributed `batch_size` | **2048** (VRAM) |
+| Distributed `batch_size` | **4096** on WH3 5090 (was 2048 on WH2; Doc-04 vacuum NN still deferred) |
 | WH2 `learner_n_envs` | **24** (was 32; RAM headroom) |
 
 ## Torched (all fleet hosts)
@@ -46,7 +46,8 @@ These need your call before we tune further — implementation proceeds with def
 
 ## RAM / VRAM notes
 
-- **WH2:** 24 local envs + `batch_size=2048` targets ~8 GB VRAM learner fit. If OOM at epoch train, drop to `batch_size=1024` or envs 20.
+- **WH3 (canonical learner):** packed `batch_size=4096` + ~5M planner-loyal policy on RTX 5090 32 GB; stop Muse first. OOM fallback: 3072.
+- **WH2 (legacy):** 24 local envs + `batch_size=2048` targeted ~8 GB VRAM. Kept as remote worker / emergency fallback (`--batch-size 3072`).
 - **Host RAM:** epoch ingest still scales with `n_steps × fleet_envs`; monitor first 6-minute epoch before raising WH2 envs.
 
 ## Next ops (when ready to train)

@@ -1,0 +1,30 @@
+{
+  "bundle_sha256": "038c3acafde700c62f0c56c43630652db88646129d87b724d22177c771d54f3e",
+  "bytes": 1486731,
+  "captured_in_box_room": false,
+  "checkpoint_id": "barry_hall_return_106",
+  "checkpoint_index": 5,
+  "inventory_feasible": true,
+  "inventory_free_slots": 4,
+  "next_checkpoint_id": "dining_return_105",
+  "next_slots_needed": 0,
+  "quality": [
+    96,
+    45,
+    100,
+    4,
+    1,
+    0,
+    -30,
+    -106
+  ],
+  "room_id": "106",
+  "route_id": "planner_loyal_v1",
+  "sidecar_sha256": "1c51a7cf028922e9af5646fe65ec502869ed239201045a013e7a035b8e905c0a",
+  "state_sha256": "d98e248468fee05a6955a6f3cc906af7e4fd6246a8db6aa1ecbf85fef4af1035",
+  "source": {
+    "archive": "Crystals_in_time",
+    "checkpoint": "cp05"
+  },
+  "training_start": true
+}

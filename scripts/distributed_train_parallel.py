@@ -9,7 +9,7 @@ Usage (learner host — learner + local BizHawk fleet):
 
 Usage (remote worker only):
     python scripts/distributed_train_parallel.py --role worker --machine-name pc-b \\
-        --learner-host 192.168.0.116 --learner-port 8765
+        --learner-host 192.168.0.229 --learner-port 8765
 
 Single-machine dev (learner + local worker, no remote workers):
     python scripts/distributed_train_parallel.py --role both --machine-name devbox

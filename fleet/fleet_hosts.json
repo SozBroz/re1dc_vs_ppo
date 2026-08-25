@@ -14,7 +14,17 @@
     "repo": "C:\\Users\\sshuser\\re1_rl",
     "learner_port": 8765,
     "learner_base_port": 5555,
-    "learner_n_envs": 28
+    "learner_n_envs": 16,
+    "notes": "Fleet learner (batch 3072)"
+  },
+  "workhorse3": {
+    "hostname": "DESKTOP-A2HP723",
+    "role": "remote_worker",
+    "lan_ip": "192.168.0.229",
+    "repo": "C:\\Users\\sshuser\\re1_rl",
+    "worker_base_port": 5855,
+    "worker_n_envs": 24,
+    "notes": "RTX 5090 32GB / 61GB RAM — dense remote worker; stop Muse before PPO workers"
   },
   "pking": {
     "role": "remote_worker",

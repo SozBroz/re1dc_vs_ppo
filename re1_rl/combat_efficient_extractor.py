@@ -1,7 +1,9 @@
 """Combat-efficient policy extractor: typed towers + joint combat latent.
 
-Preserves NatureCNN and flat fusion into 1024-d features for [512,512] pi/vf.
-Named persistent-state tower is conditional on verified RAM fields only.
+NatureCNN 512-d + typed towers; LayerNorm fusion into FEATURES_DIM (1024)
+for [512, 512] pi/vf. Goal tower is 256-d for planner_steps residual under
+RE1_PLANNER_LOYAL. Named persistent-state tower is conditional on verified
+RAM fields only. IMPALA-3 vision is still deferred.
 """
 
 from __future__ import annotations
@@ -41,6 +43,7 @@ from re1_rl.obs_encoder import (
     PROPRIO_FIELDS,
     ROOM_VISITED_DIM,
 )
+from re1_rl.planner_loyal import PLANNER_QUEUE_DIM
 from re1_rl.room_signature import ENEMY_ROSTER_DIM
 from re1_rl.spatial_encoder import (
     ENEMY_SLOT_DIM,
@@ -67,7 +70,8 @@ SPATIAL_TOWER_DIM = 192
 INVENTORY_TOWER_DIM = 160
 HISTORY_TOWER_DIM = 192
 FLAGS_TOWER_DIM = 64
-GOAL_TOWER_DIM = 48
+# Planner-loyal: widen goal tower for planner_steps; keep combat-efficient fusion/trunks.
+GOAL_TOWER_DIM = 256
 JOINT_COMBAT_DIM = 128
 WORLD_CONTEXT_DIM = 320
 ROOM_EMBED_DIM = 64
@@ -83,8 +87,8 @@ PERSISTENT_TOWER_DIM = 96
 NAMED_STATE_OBS_KEY = "named_state"
 
 FEATURES_DIM = 1024
-PARAM_HARD_CAP = 5_800_000
-PARAM_TARGET = 5_610_000
+PARAM_HARD_CAP = 8_000_000
+PARAM_TARGET = 5_000_000
 
 _OMIT_OBS_KEYS = frozenset({"frame", "world_state", "key_hints", "affordances"})
 
@@ -92,24 +96,36 @@ _INTERACTABLE_SLOT_DIM = 4
 _ITEM_SLOT_DIM = 8
 
 
-def _tower_out_dim(*, persistent_enabled: bool) -> int:
+def _tower_out_dim(
+    *,
+    persistent_enabled: bool,
+    history_enabled: bool = True,
+    world_enabled: bool = True,
+) -> int:
     width = (
         VISION_DIM
         + CONTROL_DIM
         + SPATIAL_TOWER_DIM
         + INVENTORY_TOWER_DIM
-        + HISTORY_TOWER_DIM
         + FLAGS_TOWER_DIM
         + GOAL_TOWER_DIM
         + JOINT_COMBAT_DIM
-        + WORLD_CONTEXT_DIM
     )
+    if history_enabled:
+        width += HISTORY_TOWER_DIM
+    if world_enabled:
+        width += WORLD_CONTEXT_DIM
     if persistent_enabled:
         width += PERSISTENT_TOWER_DIM
     return width
 
 
-TOWER_OUT_DIM = _tower_out_dim(persistent_enabled=PERSISTENT_STATE_DIM > 0)  # 1728 when named_state on
+TOWER_OUT_DIM = _tower_out_dim(persistent_enabled=PERSISTENT_STATE_DIM > 0)  # yawn/full schema
+TOWER_OUT_DIM_PLANNER = _tower_out_dim(
+    persistent_enabled=PERSISTENT_STATE_DIM > 0,
+    history_enabled=False,
+    world_enabled=False,
+)  # planner-loyal: no history / world towers
 
 
 class _MaskedPool(nn.Module):
@@ -370,7 +386,15 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
             PERSISTENT_STATE_DIM if persistent_state_dim is None else int(persistent_state_dim)
         )
         self._persistent_enabled = self._persistent_dim > 0
-        self._tower_out_dim = _tower_out_dim(persistent_enabled=self._persistent_enabled)
+        # Planner-loyal drops history/strategy/world keys; yawn keeps them.
+        self._history_enabled = "history" in observation_space.spaces
+        self._maps_files_enabled = "maps_files" in observation_space.spaces
+        self._world_enabled = "world_state" in observation_space.spaces
+        self._tower_out_dim = _tower_out_dim(
+            persistent_enabled=self._persistent_enabled,
+            history_enabled=self._history_enabled,
+            world_enabled=self._world_enabled,
+        )
         self._goal_film_enabled = bool(goal_film_enabled() if goal_film is None else goal_film)
         self._mod_drop_enabled = bool(mod_drop_enabled() if mod_drop is None else mod_drop)
         self._mod_drop_batch: th.Tensor | None = None
@@ -395,10 +419,13 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
 
         self.spatial_encoder = TypedSpatialEncoder(SPATIAL_TOWER_DIM)
         self.inventory_encoder = TypedInventoryEncoder(INVENTORY_TOWER_DIM)
-        self.history_encoder = TypedHistoryEncoder(HISTORY_TOWER_DIM)
+        if self._history_enabled:
+            self.history_encoder = TypedHistoryEncoder(HISTORY_TOWER_DIM)
+        else:
+            self.history_encoder = None
 
         visited_flat = int(VISITED_SHAPE[0] * VISITED_SHAPE[1] * VISITED_SHAPE[2])
-        flags_in = MAPS_FILES_DIM + visited_flat
+        flags_in = visited_flat + (MAPS_FILES_DIM if self._maps_files_enabled else 0)
         self.flags_mlp = nn.Sequential(
             nn.Linear(flags_in, 128),
             nn.ReLU(),
@@ -411,6 +438,18 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
             nn.Linear(128, GOAL_TOWER_DIM),
             nn.ReLU(),
         )
+        # Additive planner-queue residual. Absent when the flag is off so
+        # existing yawn-rails checkpoints keep their state_dict shape.
+        if "planner_steps" in observation_space.spaces:
+            self.planner_steps_proj = nn.Sequential(
+                nn.Linear(PLANNER_QUEUE_DIM, GOAL_TOWER_DIM),
+                nn.ReLU(),
+                nn.Linear(GOAL_TOWER_DIM, GOAL_TOWER_DIM),
+            )
+            nn.init.zeros_(self.planner_steps_proj[-1].weight)
+            nn.init.zeros_(self.planner_steps_proj[-1].bias)
+        else:
+            self.planner_steps_proj = None
         self.goal_lookahead_token = nn.Sequential(
             nn.Linear(GOAL_LOOKAHEAD_SLOT_DIM, 4),
             nn.ReLU(),
@@ -449,10 +488,14 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
             nn.Linear(64, COMBAT_OUTCOME_DIM),
         )
 
-        self.world_context = WorldContextModule(
-            output_dim=WORLD_CONTEXT_DIM,
-            hidden_dim=512,
-            project_root=root,
+        self.world_context = (
+            WorldContextModule(
+                output_dim=WORLD_CONTEXT_DIM,
+                hidden_dim=512,
+                project_root=root,
+            )
+            if self._world_enabled
+            else None
         )
 
         if self._persistent_enabled:
@@ -551,24 +594,32 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
             self._optional_tensor(observations, "box", BOX_DIM),
             self._optional_tensor(observations, "keys_held", KEYS_HELD_DIM),
         )
-        history = self.history_encoder(
-            self._optional_tensor(observations, "history", ROOM_HISTORY_DIM),
-            self._optional_tensor(observations, "acquisitions", ACQUISITION_LOG_DIM),
-            self._optional_tensor(observations, "rooms_visited", ROOM_VISITED_DIM),
-            self._optional_tensor(observations, "milestones", MILESTONE_DIM),
-            self._optional_tensor(observations, "cutscene_ledger", CUTSCENE_LEDGER_DIM),
-        )
         visited = self._optional_tensor(
             observations,
             "visited",
             int(VISITED_SHAPE[0] * VISITED_SHAPE[1] * VISITED_SHAPE[2]),
         )
-        flags = self.flags_mlp(
-            th.cat(
-                [self._optional_tensor(observations, "maps_files", MAPS_FILES_DIM), visited],
-                dim=-1,
+        if self._maps_files_enabled:
+            flags = self.flags_mlp(
+                th.cat(
+                    [
+                        self._optional_tensor(observations, "maps_files", MAPS_FILES_DIM),
+                        visited,
+                    ],
+                    dim=-1,
+                )
             )
-        )
+        else:
+            flags = self.flags_mlp(visited)
+        history = None
+        if self._history_enabled and self.history_encoder is not None:
+            history = self.history_encoder(
+                self._optional_tensor(observations, "history", ROOM_HISTORY_DIM),
+                self._optional_tensor(observations, "acquisitions", ACQUISITION_LOG_DIM),
+                self._optional_tensor(observations, "rooms_visited", ROOM_VISITED_DIM),
+                self._optional_tensor(observations, "milestones", MILESTONE_DIM),
+                self._optional_tensor(observations, "cutscene_ledger", CUTSCENE_LEDGER_DIM),
+            )
         goal_obs = self._optional_tensor(observations, "goal", GOAL_DIM)
         goal = self.goal_mlp(goal_obs[:, :GOAL_BASE_DIM])
         lookahead = goal_obs[:, GOAL_BASE_DIM:].reshape(
@@ -582,6 +633,11 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
             self._optional_tensor(observations, "logistics", LOGISTICS_DIM)
         )
         goal = goal + logistics
+        if self.planner_steps_proj is not None:
+            planner_vec = self._optional_tensor(
+                observations, "planner_steps", PLANNER_QUEUE_DIM
+            )
+            goal = goal + self.planner_steps_proj(planner_vec)
 
         # Identity-init FiLM: γ(g)⊙h+β(g) on vision/spatial (goal fields intact).
         if (
@@ -617,18 +673,19 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
                 dim=-1,
             )
         )
-        world = self.world_context(observations)
         parts_dict: dict[str, th.Tensor] = {
             "vision": vision,
             "control": control,
             "spatial": spatial,
             "inventory": inventory,
-            "history": history,
-            "flags": flags,
-            "goal": goal,
-            "joint": joint,
-            "world": world,
         }
+        if history is not None:
+            parts_dict["history"] = history
+        parts_dict["flags"] = flags
+        parts_dict["goal"] = goal
+        parts_dict["joint"] = joint
+        if self._world_enabled and self.world_context is not None:
+            parts_dict["world"] = self.world_context(observations)
         if self._persistent_enabled and self.persistent_encoder is not None:
             pers = self._optional_tensor(observations, NAMED_STATE_OBS_KEY, self._persistent_dim)
             parts_dict["persistent"] = self.persistent_encoder(pers)
@@ -706,4 +763,6 @@ def reload_combat_efficient_world_catalog_buffers(
             "reload_combat_efficient_world_catalog_buffers expected "
             f"RE1CombatEfficientExtractor, got {type(extractor)}"
         )
+    if extractor.world_context is None:
+        return
     reload_world_catalog_buffers(extractor.world_context, project_root)

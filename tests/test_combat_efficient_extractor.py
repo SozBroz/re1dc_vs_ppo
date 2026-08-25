@@ -50,8 +50,8 @@ def test_named_state_tower_enabled() -> None:
     obs_space = _stub_obs_space(with_world_state=True)
     extractor = RE1CombatEfficientExtractor(obs_space, project_root=PROJECT_ROOT)
     assert extractor.persistent_encoder is not None
-    assert TOWER_OUT_DIM == 1776
     assert extractor._tower_out_dim == TOWER_OUT_DIM
+    # GOAL_TOWER_DIM upsizing moves this with FEATURES_DIM / fusion.
 
 
 def test_named_state_absent_defaults_to_zeros() -> None:

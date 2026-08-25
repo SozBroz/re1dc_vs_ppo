@@ -146,23 +146,28 @@ class WorldContextModule(nn.Module):
         pickup_gated = ws[:, PICKUP_GATED_OFF : PICKUP_GATED_OFF + NUM_PICKUP_ROWS]
         room_remaining = ws[:, ROOM_REMAINING_OFF : ROOM_REMAINING_OFF + NUM_ROOMS]
         catalog_pickups = int(self.pickup_requires_mask.shape[0])
-        pickup_active_join = pickup_active[:, :catalog_pickups]
-        pickup_gated_join = pickup_gated[:, :catalog_pickups]
+        n_join = min(int(pickup_active.shape[1]), catalog_pickups)
+        pickup_active_join = pickup_active[:, :n_join]
+        pickup_gated_join = pickup_gated[:, :n_join]
+        requires_mask = self.pickup_requires_mask[:n_join]
+        item_id = self.pickup_item_id[:n_join]
+        category = self.pickup_category[:n_join]
+        key_flag = self.pickup_key_flag[:n_join]
 
-        requires_join = pickup_active_join @ self.pickup_requires_mask
+        requires_join = pickup_active_join @ requires_mask
 
         pickup_join = th.stack(
             [
-                (pickup_active_join * self.pickup_item_id.unsqueeze(0)).sum(dim=1),
-                (pickup_active_join * self.pickup_category.unsqueeze(0)).sum(dim=1),
-                (pickup_active_join * self.pickup_key_flag.unsqueeze(0)).sum(dim=1),
+                (pickup_active_join * item_id.unsqueeze(0)).sum(dim=1),
+                (pickup_active_join * category.unsqueeze(0)).sum(dim=1),
+                (pickup_active_join * key_flag.unsqueeze(0)).sum(dim=1),
                 pickup_active_join.sum(dim=1),
             ],
             dim=-1,
         )
         gated_join = th.stack(
             [
-                (pickup_gated_join * self.pickup_item_id.unsqueeze(0)).sum(dim=1),
+                (pickup_gated_join * item_id.unsqueeze(0)).sum(dim=1),
                 pickup_gated_join.sum(dim=1),
             ],
             dim=-1,

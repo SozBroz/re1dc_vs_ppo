@@ -1,0 +1,302 @@
+{
+  "box_cache": [
+    [
+      11,
+      15
+    ],
+    [
+      11,
+      15
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ],
+    [
+      0,
+      0
+    ]
+  ],
+  "capture_step": 13,
+  "captured_at_iso": "2026-08-18T18:18:52.176028+00:00",
+  "captured_room_id": "106",
+  "episode_history": {
+    "acquisition_entries": [
+      [
+        2,
+        "105"
+      ],
+      [
+        65,
+        "105"
+      ],
+      [
+        31,
+        "105"
+      ],
+      [
+        65,
+        "105"
+      ],
+      [
+        65,
+        "104"
+      ],
+      [
+        65,
+        "105"
+      ],
+      [
+        65,
+        "106"
+      ],
+      [
+        65,
+        "203"
+      ]
+    ],
+    "room_entries": [
+      [
+        "105",
+        0
+      ],
+      [
+        "104",
+        15
+      ],
+      [
+        "105",
+        74
+      ],
+      [
+        "106",
+        71
+      ],
+      [
+        "203",
+        25
+      ],
+      [
+        "106",
+        12
+      ]
+    ]
+  },
+  "ever_held": [
+    "beretta",
+    "emblem",
+    "first_aid_spray_alt",
+    "knife"
+  ],
+  "progress": {
+    "cutscene_blocked_after_pickup_room": null,
+    "dining_statue_rewarded": false,
+    "gallery_completed": false,
+    "gallery_needs_reentry": false,
+    "gallery_pending_reward": 0.0,
+    "gallery_puzzle_solved": false,
+    "gallery_step_index": 0,
+    "kenneth_gate_breached": false,
+    "key_items_rewarded": [
+      "emblem"
+    ],
+    "leg_kills_by_room": {},
+    "observed_cutscenes": [
+      "104:0:s0",
+      "105:2:s0",
+      "105:2:s1",
+      "105:2:s2"
+    ],
+    "rewarded_cutscenes": [],
+    "rewarded_document_rooms": [],
+    "rewarded_story_uses": [],
+    "softlock_cap_frames": 43200,
+    "spawn_room_bonus_paid": true,
+    "spawn_room_id": "105",
+    "stagnation_frames": 8,
+    "visited_rooms": [
+      "104",
+      "105",
+      "106",
+      "203"
+    ],
+    "weapons_progressed": []
+  },
+  "schema_version": 1
+}

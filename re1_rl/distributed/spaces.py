@@ -31,33 +31,44 @@ OBS_SCHEMA_VERSION = 1
 
 
 def make_re1_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
-    observation_space = spaces.Dict(
-        {
-            "frame": spaces.Box(0, 255, shape=FRAME_SHAPE, dtype="uint8"),
-            "proprio": spaces.Box(-1.0, 1.0, shape=(PROPRIO_DIM,), dtype="float32"),
-            "goal": spaces.Box(-2.0, 2.0, shape=(GOAL_DIM,), dtype="float32"),
-            "spatial": spaces.Box(-2.0, 2.0, shape=(SPATIAL_DIM,), dtype="float32"),
-            "visited": spaces.Box(0.0, 1.0, shape=VISITED_SHAPE, dtype="float32"),
-            "rooms_visited": spaces.Box(0.0, 1.0, shape=(ROOM_VISITED_DIM,), dtype="float32"),
-            "box": spaces.Box(0.0, 2.0, shape=(BOX_DIM,), dtype="float32"),
-            "inventory": spaces.Box(0.0, 1.0, shape=(INVENTORY_OBS_DIM,), dtype="float32"),
-            "logistics": spaces.Box(-1.0, 1.0, shape=(LOGISTICS_DIM,), dtype="float32"),
-            "weapon_card": spaces.Box(0.0, 1.0, shape=(WEAPON_CARD_DIM,), dtype="float32"),
-            "last_attack": spaces.Box(0.0, 1.0, shape=(LAST_ATTACK_DIM,), dtype="float32"),
-            "history": spaces.Box(0.0, 1.0, shape=(ROOM_HISTORY_DIM,), dtype="float32"),
-            "acquisitions": spaces.Box(0.0, 1.0, shape=(ACQUISITION_LOG_DIM,), dtype="float32"),
-            "room_enemies": spaces.Box(0.0, 1.0, shape=(ENEMY_ROSTER_DIM,), dtype="float32"),
-            "keys_held": spaces.Box(0.0, 1.0, shape=(KEYS_HELD_DIM,), dtype="float32"),
-            "affordances": spaces.Box(0.0, 1.0, shape=(AFFORDANCES_DIM,), dtype="float32"),
-            "world_state": spaces.Box(0.0, 8.0, shape=(WORLD_STATE_DIM,), dtype="float32"),
-            "cutscene_ledger": spaces.Box(
-                0.0, 1.0, shape=(CUTSCENE_LEDGER_DIM,), dtype="float32"
-            ),
-            "milestones": spaces.Box(0.0, 1.0, shape=(MILESTONE_DIM,), dtype="float32"),
-            "maps_files": spaces.Box(0.0, 1.0, shape=(MAPS_FILES_DIM,), dtype="float32"),
-            "named_state": spaces.Box(0.0, 1.0, shape=(NAMED_STATE_DIM,), dtype="float32"),
-        }
+    spaces_map: dict = {
+        "frame": spaces.Box(0, 255, shape=FRAME_SHAPE, dtype="uint8"),
+        "proprio": spaces.Box(-1.0, 1.0, shape=(PROPRIO_DIM,), dtype="float32"),
+        "goal": spaces.Box(-2.0, 2.0, shape=(GOAL_DIM,), dtype="float32"),
+        "spatial": spaces.Box(-2.0, 2.0, shape=(SPATIAL_DIM,), dtype="float32"),
+        "visited": spaces.Box(0.0, 1.0, shape=VISITED_SHAPE, dtype="float32"),
+        "rooms_visited": spaces.Box(0.0, 1.0, shape=(ROOM_VISITED_DIM,), dtype="float32"),
+        "box": spaces.Box(0.0, 2.0, shape=(BOX_DIM,), dtype="float32"),
+        "inventory": spaces.Box(0.0, 1.0, shape=(INVENTORY_OBS_DIM,), dtype="float32"),
+        "logistics": spaces.Box(-1.0, 1.0, shape=(LOGISTICS_DIM,), dtype="float32"),
+        "weapon_card": spaces.Box(0.0, 1.0, shape=(WEAPON_CARD_DIM,), dtype="float32"),
+        "last_attack": spaces.Box(0.0, 1.0, shape=(LAST_ATTACK_DIM,), dtype="float32"),
+        "history": spaces.Box(0.0, 1.0, shape=(ROOM_HISTORY_DIM,), dtype="float32"),
+        "acquisitions": spaces.Box(0.0, 1.0, shape=(ACQUISITION_LOG_DIM,), dtype="float32"),
+        "room_enemies": spaces.Box(0.0, 1.0, shape=(ENEMY_ROSTER_DIM,), dtype="float32"),
+        "keys_held": spaces.Box(0.0, 1.0, shape=(KEYS_HELD_DIM,), dtype="float32"),
+        "affordances": spaces.Box(0.0, 1.0, shape=(AFFORDANCES_DIM,), dtype="float32"),
+        "world_state": spaces.Box(0.0, 8.0, shape=(WORLD_STATE_DIM,), dtype="float32"),
+        "cutscene_ledger": spaces.Box(
+            0.0, 1.0, shape=(CUTSCENE_LEDGER_DIM,), dtype="float32"
+        ),
+        "milestones": spaces.Box(0.0, 1.0, shape=(MILESTONE_DIM,), dtype="float32"),
+        "maps_files": spaces.Box(0.0, 1.0, shape=(MAPS_FILES_DIM,), dtype="float32"),
+        "named_state": spaces.Box(0.0, 1.0, shape=(NAMED_STATE_DIM,), dtype="float32"),
+    }
+    from re1_rl.planner_loyal import (
+        PLANNER_LOYAL_OMIT_OBS_KEYS,
+        PLANNER_QUEUE_DIM,
+        planner_loyal_enabled,
     )
+
+    if planner_loyal_enabled():
+        for key in PLANNER_LOYAL_OMIT_OBS_KEYS:
+            spaces_map.pop(key, None)
+        spaces_map["planner_steps"] = spaces.Box(
+            -1.0, 1.0, shape=(PLANNER_QUEUE_DIM,), dtype="float32"
+        )
+    observation_space = spaces.Dict(spaces_map)
     action_space = spaces.Discrete(len(ACTION_NAMES))
     return observation_space, action_space
 

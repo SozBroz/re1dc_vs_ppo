@@ -12,7 +12,12 @@ import torch.nn.functional as F
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from re1_rl.combat_efficient_extractor import FEATURES_DIM, RE1CombatEfficientExtractor
+from re1_rl.combat_efficient_extractor import (
+    FEATURES_DIM,
+    GOAL_TOWER_DIM,
+    RE1CombatEfficientExtractor,
+    TOWER_OUT_DIM,
+)
 from re1_rl.modality_ablations import (
     MOD_DROP_BRANCHES,
     MOD_DROP_DIM,
@@ -53,12 +58,12 @@ def test_diagnostic_compute_on_dummy_batch() -> None:
     assert relu_dormant_fraction(torch.tensor([[-1.0, 1.0]])) == 0.5
 
 
-def test_tower_slices_cover_1776() -> None:
+def test_tower_slices_cover_concat() -> None:
     slices = tower_slices(persistent_enabled=True)
-    assert max(s.stop for s in slices.values()) == 1776
+    assert max(s.stop for s in slices.values()) == TOWER_OUT_DIM
     assert "goal" in slices
     goal = slices["goal"]
-    assert goal.stop - goal.start == 48
+    assert goal.stop - goal.start == GOAL_TOWER_DIM
 
 
 def test_film_identity_init_near_zero_policy_kl() -> None:

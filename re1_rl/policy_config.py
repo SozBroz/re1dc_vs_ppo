@@ -1,15 +1,15 @@
-"""Single source of truth for PPO policy sizing (combat-efficient campaign).
+"""Single source of truth for PPO policy sizing (planner-loyal campaign).
 
-Combat-efficient (WH2 8GB fit, hard cap 5.8M):
-  - NatureCNN 512-d (transplant-compatible conv weights)
-  - Typed modality towers + joint 128-d combat latent
+Planner-loyal baseline (near combat-efficient size; fresh ckpt required):
+  - NatureCNN 512-d
+  - Goal tower 256-d (+ planner_steps residual when RE1_PLANNER_LOYAL=1)
+  - No history / world towers under planner-loyal (those obs keys omitted)
   - Concat + LayerNorm fusion -> 1024-d
   - pi/vf trunks [512, 512]
   - flat 45-action MaskablePPO distribution
-  - legacy affordances path-hint omitted; live rails goal fused through its own tower
 
-Fresh training / one-time graft required — Doc04-medium 1280-d checkpoints are
-not shape-compatible. See scripts/transplant_combat_efficient.py.
+Doc-04 vacuum (2048-d + 3x1024 trunks / ~24M) stays deferred — that package
+needs IMPALA-3 + typed encoders, not a width-only cherry-pick.
 
 Optional modality flags (env, all default OFF — fleet path unchanged):
   RE1_MODALITY_DIAG=1       per-tower utilization diagnostics (periodic)

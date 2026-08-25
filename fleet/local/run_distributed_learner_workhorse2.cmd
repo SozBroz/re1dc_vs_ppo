@@ -1,5 +1,6 @@
 @echo off
-REM workhorse2 learner — repo at C:\Users\sshuser\re1_rl (no D: drive)
+REM RETIRED: fleet learner is WH3 (192.168.0.229). Use run_distributed_learner_wh3_stack.cmd.
+REM workhorse2 learner — repo at C:\Users\sshuser\re1_rl (no D: drive) — fallback only.
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 set MACHINE=workhorse2

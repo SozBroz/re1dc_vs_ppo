@@ -1,5 +1,6 @@
 @echo off
-REM Learner + local worker on workhorse2 (192.168.0.116)
+REM RETIRED: fleet learner is WH3 (192.168.0.229). Use run_distributed_learner_wh3_stack.cmd.
+REM Learner + local worker on workhorse2 (192.168.0.116) — fallback only.
 setlocal
 cd /d D:\re1_rl
 set MACHINE=workhorse2

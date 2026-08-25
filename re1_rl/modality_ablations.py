@@ -43,7 +43,7 @@ TOWER_DIMS: dict[str, int] = {
     "inventory": 160,
     "history": 192,
     "flags": 64,
-    "goal": 48,
+    "goal": 256,  # must match combat_efficient_extractor.GOAL_TOWER_DIM
     "joint": 128,
     "world": 320,
     "persistent": 96,
@@ -64,12 +64,21 @@ TOWER_ORDER: tuple[str, ...] = (
 )
 
 
-def tower_slices(*, persistent_enabled: bool = True) -> dict[str, slice]:
+def tower_slices(
+    *,
+    persistent_enabled: bool = True,
+    history_enabled: bool = True,
+    world_enabled: bool = True,
+) -> dict[str, slice]:
     """Byte-accurate slices into the tower concat vector."""
     out: dict[str, slice] = {}
     start = 0
     for name in TOWER_ORDER:
         if name == "persistent" and not persistent_enabled:
+            continue
+        if name == "history" and not history_enabled:
+            continue
+        if name == "world" and not world_enabled:
             continue
         width = TOWER_DIMS[name]
         out[name] = slice(start, start + width)
