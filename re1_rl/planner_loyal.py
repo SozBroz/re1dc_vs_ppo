@@ -44,6 +44,9 @@ PLANNER_LOYAL_OMIT_OBS_KEYS = frozenset(
     }
 )
 
+# Optional on-path loot: never divert (106 typewriter ribbons, etc.).
+OPTIONAL_START_PICKUPS = frozenset({"ink_ribbon"})
+
 LIGHT_HEAL_USE_ITEMS = frozenset({"green_herb", "blue_herb"})
 STRONG_HEAL_USE_ITEMS = frozenset(
     {
@@ -96,6 +99,7 @@ class PlannerLoyalQueue:
         self._index = 0
         self.step_success_pending = False
         self.divert_reason: str | None = None
+        self._start_held: set[str] = set()
 
     @property
     def remaining(self) -> list[dict[str, Any]]:
@@ -119,6 +123,11 @@ class PlannerLoyalQueue:
         self._index = 0
         self.step_success_pending = False
         self.divert_reason = None
+        self._start_held = set()
+
+    def note_start_inventory(self, state: dict[str, Any]) -> None:
+        """Snapshot episode-start inventory (sidecar / live RAM after reset)."""
+        self._start_held = set(_inventory_name_counts(state))
 
     def seek(self, index: int) -> None:
         """Jump queue to ``index`` (0 = first step; len(steps) = done)."""
@@ -126,6 +135,20 @@ class PlannerLoyalQueue:
         self._index = max(0, min(int(index), n))
         self.step_success_pending = False
         self.divert_reason = None
+
+    def _skip_satisfied_acquires(self) -> None:
+        """Skip acquire steps for items already held at episode start."""
+        while True:
+            step = self.current
+            if not step or str(step.get("op") or "") != "acquire":
+                return
+            want = str(step.get("pickup_id") or "")
+            want_item = want.split(":")[1] if want.count(":") >= 2 else want
+            want_item = canonical_item(want_item)
+            if want_item and want_item in self._start_held:
+                self._index += 1
+                continue
+            return
 
     def target_room(self) -> str | None:
         step = self.current
@@ -153,6 +176,10 @@ class PlannerLoyalQueue:
             "divert_reason": None,
             "heal_use_tax": 0.0,
         }
+        if self.done:
+            return result
+
+        self._skip_satisfied_acquires()
         if self.done:
             return result
 
@@ -195,21 +222,32 @@ class PlannerLoyalQueue:
         # Divert / complete: pickups
         gained = _inventory_gains(prev_state, state)
         if gained:
+            unexpected = {
+                name
+                for name in gained
+                if name not in self._start_held and name not in OPTIONAL_START_PICKUPS
+            }
+            want = str(step.get("pickup_id") or "")
+            want_item = want.split(":")[1] if want.count(":") >= 2 else want
+            want_item = canonical_item(want_item)
+            gained_canon = {canonical_item(x) for x in gained}
+            matched = want_item in gained or want in gained or want_item in gained_canon
+            if not unexpected:
+                if op == "acquire" and matched:
+                    result["step_success"] = True
+                    self._index += 1
+                    self.step_success_pending = True
+                return result
             if op != "acquire":
                 result["divert"] = True
                 result["divert_reason"] = f"unplanned_pickup:{sorted(gained)}"
                 self.divert_reason = result["divert_reason"]
                 return result
-            want = str(step.get("pickup_id") or "")
-            want_item = want.split(":")[1] if want.count(":") >= 2 else want
-            want_item = canonical_item(want_item)
-            if want_item not in gained and want not in gained:
-                # Soft: any gain of the expected item name counts.
-                if want_item not in {canonical_item(x) for x in gained}:
-                    result["divert"] = True
-                    result["divert_reason"] = f"wrong_pickup want={want} got={sorted(gained)}"
-                    self.divert_reason = result["divert_reason"]
-                    return result
+            if not matched:
+                result["divert"] = True
+                result["divert_reason"] = f"wrong_pickup want={want} got={sorted(gained)}"
+                self.divert_reason = result["divert_reason"]
+                return result
             result["step_success"] = True
             self._index += 1
             self.step_success_pending = True

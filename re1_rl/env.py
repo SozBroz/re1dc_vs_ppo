@@ -522,6 +522,35 @@ class RE1Env(gym.Env):
             "box_opened": bool(getattr(self, "_box_opened_this_step", False)),
         }
 
+    def _rails_mode(self) -> bool:
+        """Yawn rails policing only when not running a planner-loyal queue."""
+        return (
+            str(self._stage.get("mode") or "") == "yawn_rails"
+            and getattr(self, "_planner_loyal_queue", None) is None
+        )
+
+    def _episode_failure_context(
+        self, episode_failure: str | None
+    ) -> dict[str, Any]:
+        """Extra fields for episode-end logs (room is already on info)."""
+        if not episode_failure:
+            return {}
+        out: dict[str, Any] = {}
+        queue = getattr(self, "_planner_loyal_queue", None)
+        divert = getattr(queue, "divert_reason", None) if queue is not None else None
+        if divert:
+            out["planner_divert_reason"] = divert
+        target = None
+        if queue is not None:
+            target = queue.target_room()
+        if not target:
+            planner = getattr(self, "_planner", None)
+            if planner is not None:
+                target = planner.next_waypoint_room()
+        if target:
+            out["failure_target"] = target
+        return out
+
     def _load_stage(self) -> None:
         route_path = None
         cache_key = None
@@ -1418,10 +1447,9 @@ class RE1Env(gym.Env):
                 self._yawn_rails_capture_pending = []
                 pending_yr = self._yawn_rails_capture_pending
             pending_yr.append(yr_prop)
-            if queue is None:
-                from re1_rl.yawn_rails_immediate_ingest import offer_immediate_yawn_ingest
+            from re1_rl.yawn_rails_immediate_ingest import offer_immediate_yawn_ingest
 
-                offer_immediate_yawn_ingest(yr_prop)
+            offer_immediate_yawn_ingest(yr_prop)
         if queue is None:
             self._apply_yawn_capture_ineligibility_penalty(breakdown)
         self._checkpoint_freeze_pending = False
@@ -1560,6 +1588,7 @@ class RE1Env(gym.Env):
             "reward_breakdown": dict(gate),
             "episode_failure": episode_failure,
         }
+        info.update(self._episode_failure_context(episode_failure))
         return obs, float(reward), bool(terminated), bool(truncated), info
 
     def _apply_yawn_capture_ineligibility_penalty(
@@ -1768,6 +1797,9 @@ class RE1Env(gym.Env):
         opts = dict(options or {})
         self._reset_options = opts
         self._route_start_index = int(opts.get("route_start_index", 0))
+        # Legacy WaypointPlanner is not the loyalty cop; keep index harmless.
+        if getattr(self, "_planner_loyal_queue", None) is not None:
+            self._route_start_index = 0
         self._yawn_allow_capture = bool(opts.get("allow_capture", True))
         self._stop_bg_skip()
         self.bridge.hp_floor = 0
@@ -2106,6 +2138,8 @@ class RE1Env(gym.Env):
         self._visited.update(state["room_id"], state["x"], state["z"])
         self._prev_state = state
         self._prev_hp = state["hp"]
+        if getattr(self, "_planner_loyal_queue", None) is not None:
+            self._planner_loyal_queue.note_start_inventory(state)
         cell_minted = None
         if str(self._stage.get("mode") or "") == "yawn_rails":
             from re1_rl.yawn_rails_sync import (
@@ -2133,6 +2167,8 @@ class RE1Env(gym.Env):
                 f"next={self._planner.next_waypoint_room()!r}",
                 flush=True,
             )
+        if getattr(self, "_planner_loyal_queue", None) is not None:
+            self._route_start_index = 0
         self._arm_cell_timeout()
         if getattr(self, "_typewriter_save_detector", None) is not None:
             # Sidecar/PB starts hold off save detect until control+ribbons stable.
@@ -2432,6 +2468,7 @@ class RE1Env(gym.Env):
                 "reward_breakdown": breakdown,
                 "episode_failure": str(reason),
             }
+            info.update(self._episode_failure_context(str(reason)))
             self._record_leg_replay_reward(reward, breakdown)
             return obs, reward, True, False, info
         return self._episode_failure_step(action, reason=reason)
@@ -2531,7 +2568,7 @@ class RE1Env(gym.Env):
                 progress=self._progress,
                 graph=self.graph,
                 success_room=self._stage.get("success_room"),
-                rails_mode=self._stage.get("mode") == "yawn_rails",
+                rails_mode=self._rails_mode(),
                 typewriter_save_complete=save_complete,
                 return_breakdown=True,
                 **self._planner_loyal_reward_kwargs(),
@@ -2678,7 +2715,7 @@ class RE1Env(gym.Env):
             progress=self._progress,
             graph=self.graph,
             success_room=self._stage.get("success_room"),
-            rails_mode=self._stage.get("mode") == "yawn_rails",
+            rails_mode=self._rails_mode(),
             typewriter_save_complete=save_complete,
             return_breakdown=True,
             **self._planner_loyal_reward_kwargs(),
@@ -3032,6 +3069,7 @@ class RE1Env(gym.Env):
             "reward_breakdown": merged,
             "episode_failure": episode_failure,
         }
+        info.update(self._episode_failure_context(episode_failure))
         if progress is not None:
             info["visited_rooms"] = sorted(progress.visited_rooms)
             info["n_rooms_visited"] = len(progress.visited_rooms)
@@ -3247,6 +3285,7 @@ class RE1Env(gym.Env):
             "reward_breakdown": breakdown,
             "state": state,
         }
+        info.update(self._episode_failure_context(reason))
         loadout_sample = self._progress.pop_loadout_sample()
         if loadout_sample is not None:
             info["logistics_sample"] = loadout_sample
@@ -4375,7 +4414,7 @@ class RE1Env(gym.Env):
             progress=self._progress,
             graph=self.graph,
             success_room=self._stage.get("success_room"),
-            rails_mode=self._stage.get("mode") == "yawn_rails",
+            rails_mode=self._rails_mode(),
             typewriter_save_complete=save_complete,
             return_breakdown=True,
             **self._planner_loyal_reward_kwargs(),
@@ -4417,6 +4456,7 @@ class RE1Env(gym.Env):
             "inventory": state["inventory_slots"],
             "state": state,
         }
+        info.update(self._episode_failure_context(episode_failure))
         pending_ge = getattr(self, "_go_explore_capture_pending", None) or []
         if pending_ge:
             info["go_explore_capture"] = list(pending_ge)
@@ -5128,7 +5168,7 @@ class RE1Env(gym.Env):
             progress=self._progress,
             graph=self.graph,
             success_room=self._stage.get("success_room"),
-            rails_mode=self._stage.get("mode") == "yawn_rails",
+            rails_mode=self._rails_mode(),
             typewriter_save_complete=save_complete,
             return_breakdown=True,
             **self._planner_loyal_reward_kwargs(),
@@ -5245,6 +5285,7 @@ class RE1Env(gym.Env):
             ),
             "state": state,
         }
+        info.update(self._episode_failure_context(episode_failure))
         pending_ge = getattr(self, "_go_explore_capture_pending", None) or []
         if pending_ge:
             info["go_explore_capture"] = list(pending_ge)

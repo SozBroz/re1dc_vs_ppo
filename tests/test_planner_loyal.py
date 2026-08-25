@@ -21,6 +21,7 @@ from re1_rl.planner_loyal import (
     planner_loyal_enabled,
     prune_route_admin_goal,
 )
+from re1_rl.room_graph import RoomGraph
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import STEP_PENALTY, compute_reward
 
@@ -51,6 +52,10 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     sites = [s.get("site_id") for s in steps]
     assert "104:handgun_bullets:1" in pickups
     assert "104:handgun_bullets:2" in pickups
+    # Tip already holds wooden emblem — never re-acquire in this chunk.
+    assert not any(
+        str(p or "").startswith("105:emblem") for p in pickups
+    )
     assert "emblem@10F_alcove" in sites
     assert steps[-1]["pickup_id"].startswith("105:shield_key")
 
@@ -71,6 +76,97 @@ def test_queue_divert_on_wrong_room():
     cur = {"room_id": "107", "inventory_slots": []}
     result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["divert"] is True
+
+
+def test_ink_ribbon_pickup_does_not_divert_on_traverse():
+    q = PlannerLoyalQueue()
+    prev = {"room_id": "106", "inventory_slots": []}
+    cur = {
+        "room_id": "106",
+        "inventory_slots": [{"name": "ink_ribbon"}],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is False
+    assert q.current["edge_id"] == "106->105"
+
+
+def test_already_held_acquire_is_skipped():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "test",
+            "steps": [
+                {"n": 1, "op": "acquire", "pickup_id": "106:ink_ribbon:1"},
+                {"n": 2, "op": "traverse", "edge_id": "106->105"},
+            ],
+        }
+    )
+    q.note_start_inventory(
+        {"inventory_slots": [{"name": "ink_ribbon"}]}
+    )
+    prev = {
+        "room_id": "106",
+        "inventory_slots": [{"name": "ink_ribbon"}],
+    }
+    cur = {
+        "room_id": "105",
+        "inventory_slots": [{"name": "ink_ribbon"}],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is True
+    assert q.done is True
+
+
+def test_planner_loyal_curriculum_is_not_yawn_rails():
+    import json
+
+    stage = json.loads(
+        (PROJECT_ROOT / "curriculum" / "planner_loyal_one_leg.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert stage["mode"] == "planner_loyal"
+    assert stage["route_steps"] == []
+
+
+def test_reset_wrapper_skips_yawn_sampler_when_planner_loyal(monkeypatch):
+    import gymnasium as gym
+    from gymnasium import spaces
+
+    from re1_rl.go_explore_reset_wrapper import GoExploreResetWrapper
+
+    sampled: list[int] = []
+    monkeypatch.setenv("RE1_PLANNER_LOYAL", "1")
+    monkeypatch.setattr(
+        "re1_rl.yawn_rails.sample_one_leg_options",
+        lambda *a, **k: sampled.append(1) or {"route_start_index": 121},
+    )
+
+    class _StubEnv(gym.Env):
+        metadata = {"render_modes": []}
+
+        def __init__(self) -> None:
+            self.observation_space = spaces.Discrete(1)
+            self.action_space = spaces.Discrete(1)
+            self.curriculum_path = (
+                PROJECT_ROOT / "curriculum" / "yawn_rails_one_leg.json"
+            )
+            self.project_root = PROJECT_ROOT
+            self.last_options = None
+
+        def reset(self, *, seed=None, options=None):
+            self.last_options = options
+            return 0, {}
+
+        def step(self, action):
+            return 0, 0.0, False, False, {}
+
+    inner = _StubEnv()
+    wrapper = GoExploreResetWrapper(inner, project_root=PROJECT_ROOT)
+    wrapper.reset()
+    assert sampled == []
+    assert "route_start_index" not in (inner.last_options or {})
 
 
 def test_encode_dim_stable():
@@ -150,6 +246,72 @@ def test_reward_wrong_room_pays_minus_four_and_is_terminal():
     )
     assert terminated is True
     assert reason == "planner_divert"
+
+
+def test_rails_mode_loyal_traverse_does_not_breach_wrong_room():
+    """106→105 must credit planner_step_success even if legacy planner is on 210."""
+    graph = RoomGraph(PROJECT_ROOT / "data" / "doors_empirical.json")
+    yawn_route = PROJECT_ROOT / "data" / "yawn_checkpoint_route.json"
+    planner = WaypointPlanner(
+        yawn_route,
+        route_steps=list(range(1, 123)),
+        start_index=121,
+    )
+    assert planner.next_waypoint_room() == "210"
+    q = PlannerLoyalQueue()
+    progress = ProgressTracker(leg_span=1)
+    prev = {"room_id": "106", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    reward, bd = compute_reward(
+        prev,
+        cur,
+        planner,
+        progress=progress,
+        graph=graph,
+        rails_mode=True,
+        planner_loyal_queue=q,
+        return_breakdown=True,
+    )
+    assert bd["wrong_room"] == 0.0
+    assert progress.wrong_room_breached is False
+    assert bd["planner_step_success"] == PLANNER_STEP_SUCCESS_REWARD
+    assert bd["checkpoint_success"] == PLANNER_STEP_SUCCESS_REWARD
+    assert reward == STEP_PENALTY + PLANNER_STEP_SUCCESS_REWARD
+
+
+def test_divert_alias_net_is_minus_four_under_rails_mode():
+    graph = RoomGraph(PROJECT_ROOT / "data" / "doors_empirical.json")
+    planner = WaypointPlanner(ROUTE, waypoints=["210"])
+    q = PlannerLoyalQueue()
+    progress = ProgressTracker()
+    prev = {"room_id": "106", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "107", "inventory_slots": [], "hp": 96, "in_control": True}
+    reward, bd = compute_reward(
+        prev,
+        cur,
+        planner,
+        progress=progress,
+        graph=graph,
+        rails_mode=True,
+        planner_loyal_queue=q,
+        return_breakdown=True,
+    )
+    assert bd["planner_divert"] == PLANNER_DIVERT_PENALTY
+    assert bd["wrong_room"] == PLANNER_DIVERT_PENALTY
+    assert reward == STEP_PENALTY + PLANNER_DIVERT_PENALTY
+
+
+def test_episode_failure_context_includes_divert_and_target():
+    q = PlannerLoyalQueue()
+    q.divert_reason = "unplanned_pickup:['ink_ribbon']"
+    env = SimpleNamespace(
+        _planner_loyal_queue=q,
+        _planner=SimpleNamespace(next_waypoint_room=lambda: "210"),
+    )
+    ctx = RE1Env._episode_failure_context(env, "planner_divert")
+    assert ctx["planner_divert_reason"] == "unplanned_pickup:['ink_ribbon']"
+    assert ctx["failure_target"] == "105"
+    assert RE1Env._episode_failure_context(env, None) == {}
 
 
 def test_reward_heal_use_tax_fires():

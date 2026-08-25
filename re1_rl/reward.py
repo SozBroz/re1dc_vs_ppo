@@ -1032,7 +1032,12 @@ def compute_reward(
             at_route_seq=None,
         )
 
-    if rails_mode and ENABLE_CHECKPOINT_PATH and graph is not None:
+    if (
+        rails_mode
+        and ENABLE_CHECKPOINT_PATH
+        and graph is not None
+        and not planner_loyal
+    ):
         pg_prev, pd_prev = potential(prev_state, planner, graph)
         pg_now, pd_now = potential(state, planner, graph)
         bd["pbrs_graph"] = SHAPING_GAMMA * pg_now - pg_prev
@@ -1478,7 +1483,7 @@ def compute_reward(
             if value > 0.0:
                 bd[term] = 0.0
 
-    if rails_mode:
+    if rails_mode and not planner_loyal:
         for term, value in tuple(bd.items()):
             if term == "checkpoint_success":
                 continue
@@ -1551,11 +1556,12 @@ def compute_reward(
         ):
             bd[key] = 0.0
         # Alias channels stay populated for capture / telemetry; do not
-        # double-count them in the scalar reward.
+        # double-count them in the scalar reward. Divert scores planner_divert
+        # once (−4); wrong_room is a terminal-path alias only.
         skip_alias = 0.0
         if bd["planner_divert"] != 0.0:
             bd["wrong_room"] = bd["planner_divert"]
-            skip_alias += bd["wrong_room"]
+            skip_alias += bd["planner_divert"]
         elif bd["planner_step_success"] != 0.0:
             bd["checkpoint_success"] = bd["planner_step_success"]
             bd["wrong_room"] = 0.0

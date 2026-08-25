@@ -23,7 +23,7 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --role learner ^
   --machine-name %MACHINE% ^
   --run-name planner_loyal_shield_key ^
-  --curriculum curriculum\yawn_rails_one_leg.json ^
+  --curriculum curriculum\planner_loyal_one_leg.json ^
   --learner-port %LEARNER_PORT% ^
   --bind-host 0.0.0.0 ^
   --total-steps 0 ^

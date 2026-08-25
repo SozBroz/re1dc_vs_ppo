@@ -124,6 +124,12 @@ class GoExploreResetWrapper(gym.Wrapper):
             except (OSError, ValueError):
                 stage = {}
             if stage.get("mode") == "yawn_rails":
+                from re1_rl.planner_loyal import planner_loyal_enabled
+
+                # Planner-loyal samples its own tip/frontier cells in env.reset.
+                # Do not inject yawn pin route_start_index (e.g. cp120 → 121).
+                if planner_loyal_enabled():
+                    return self.env.reset(seed=seed, options=opts or None)
                 if (
                     "pb_bundle" not in opts
                     and "pb_state_path" not in opts

@@ -162,6 +162,48 @@ def test_tracker_episode_best_rooms(tmp_path: Path, capsys) -> None:
     assert latest.is_file()
 
 
+def test_slim_progress_info_keeps_planner_divert_fields() -> None:
+    slim = slim_progress_info(
+        {
+            "room_id": "107",
+            "episode_failure": "planner_divert",
+            "planner_divert_reason": "wrong_traverse:106->105 got 107",
+            "failure_target": "105",
+            "state": {"hp": 96},
+        }
+    )
+    assert slim["episode_failure"] == "planner_divert"
+    assert slim["planner_divert_reason"] == "wrong_traverse:106->105 got 107"
+    assert slim["failure_target"] == "105"
+    assert slim["room_id"] == "107"
+    assert "state" not in slim
+
+
+def test_tracker_logs_room_target_divert_on_planner_divert(capsys) -> None:
+    tracker = TrainingProgressTracker(machine_name="t")
+    tracker.consume_infos(
+        [
+            {
+                "room_id": "107",
+                "visited_rooms": ["106", "107"],
+                "n_rooms_visited": 2,
+                "bridge_port": 5555,
+                "episode": {"r": -4.2, "l": 12},
+                "episode_failure": "planner_divert",
+                "failure_target": "105",
+                "planner_divert_reason": "wrong_traverse:106->105 got 107",
+                "reward_breakdown": {"planner_divert": -4.0},
+            }
+        ],
+        num_timesteps=80,
+    )
+    out = capsys.readouterr().out
+    assert "fail='planner_divert'" in out
+    assert "room='107'" in out
+    assert "target='105'" in out
+    assert "divert='wrong_traverse:106->105 got 107'" in out
+
+
 def test_tracker_logs_weapon_and_key_pickups(capsys) -> None:
     tracker = TrainingProgressTracker(machine_name="t")
     tracker.consume_infos(

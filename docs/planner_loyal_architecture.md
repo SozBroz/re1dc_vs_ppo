@@ -6,6 +6,7 @@ Branch: `feature/planner-loyal-ppo`
 
 ### Wired now
 - Env flag `RE1_PLANNER_LOYAL=1` loads a chunk into `PlannerLoyalQueue` on env init and **resets the queue each episode**.
+- Curriculum is `curriculum/planner_loyal_one_leg.json` (`mode=planner_loyal`). Yawn `rails_mode` (wrong_room hops / `advance_if_success`) is off whenever the loyal queue is attached, even if an old `yawn_rails` curriculum is still passed. Reset sampling skips `sample_one_leg_options` so a yawn pin cannot inject `route_start_index=121` (legacy planner target 210) over a pl05 106 start.
 - Optional `RE1_PLANNER_CHUNK=path` (absolute, or relative to project root). Default: `data/planner_chunks/cp05_shield_key.json`.
 - Every `compute_reward` call site in `re1_rl/env.py` passes `planner_loyal_queue=` + `box_opened=` (box-UI rising edge).
 - Obs key `planner_steps` (182-d) is added **only when the flag is on**. `RE1WorldAwareExtractor` flattens it automatically; `RE1CombatEfficientExtractor` adds a zero-init residual into the goal tower.
@@ -15,6 +16,7 @@ Branch: `feature/planner-loyal-ppo`
 - Seed cells **`pl00`..`pl05`** copied from **`backups/Crystals_in_time`** (`cp00`..`cp05`). Training tip / earliest start = **`pl05` `barry_hall_return_106`** (Main Hall + lockpick).
 - NN sizing (fresh ckpt): `FEATURES_DIM=1024`, pi/vf `[512,512]`, WH2 batch **3072**, `GOAL_TOWER_DIM=256` + `planner_steps`. No history/world towers → concat ~1472→1024; **~5.0M** params. Doc-04 vacuum / IMPALA-3 deferred.
 - Fleet learner host: **WH2** `192.168.0.116`; WH3 = dense remote worker (24 envs). Thin cells (`RE1_YAWN_LEG_REPLAY=0`). Shield-key chunk complete ends the episode; mid-CP continues.
+- Cross-machine CP sync: `RE1_YAWN_RAILS_SYNC=1` + `RE1_YAWN_RAILS_ROOT=states/planner_loyal` + `RE1_YAWN_CELL_PREFIX=pl` (mint → learner ingest → worker poll).
 - Obs under planner-loyal: **physically drop** strategy/almanac keys (`history`, `acquisitions`, `rooms_visited`, `cutscene_ledger`, `milestones`, `maps_files`, `affordances`, **`world_state`**) — history + world towers not built. Keep pixels / spatial / visited grid / inventory / combat / `named_state` / `planner_steps`. Queue pops on step success and slides remaining orders forward.
 
 ### Deferred

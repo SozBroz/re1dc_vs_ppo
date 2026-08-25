@@ -65,6 +65,8 @@ def slim_progress_info(info: dict[str, Any]) -> dict[str, Any]:
         "endpoint_max_legs",
         "episode_wall_s",
         "episode_length",
+        "planner_divert_reason",
+        "failure_target",
     ):
         if key in info and info.get(key) is not None:
             out[key] = info.get(key)
@@ -208,13 +210,20 @@ class TrainingProgressTracker:
         worker_tag = (
             f"worker={int(worker)} " if worker is not None else ""
         )
+        fail_extra = ""
+        if failure in {"wrong_room", "planner_divert"}:
+            fail_extra = (
+                f" room={info.get('room_id')!r} "
+                f"target={info.get('failure_target')!r} "
+                f"divert={info.get('planner_divert_reason')!r}"
+            )
         print(
             f"[episode] machine={self.machine_name} {worker_tag}port={port} "
             f"rooms={n_rooms} ids={rooms} "
             f"keys={keys} weapons={weapons} items={items} "
             f"rew={rew:.3f} len={length} "
             f"wp={int(info.get('max_waypoint', 0) or 0)} "
-            f"fail={failure!r} steps={num_timesteps}",
+            f"fail={failure!r}{fail_extra} steps={num_timesteps}",
             flush=True,
         )
         if n_rooms > self.best_episode_n_rooms:

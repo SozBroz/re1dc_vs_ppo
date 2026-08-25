@@ -1,0 +1,12 @@
+{
+  "stage": "planner_loyal_one_leg",
+  "stage_index": 1,
+  "mode": "planner_loyal",
+  "episode_mode": "one_leg",
+  "legs_per_episode": 1,
+  "init_savestate": "states/jill_control_fresh.State",
+  "route_steps": [],
+  "success_room": null,
+  "required_items": [],
+  "max_steps": 5400
+}
