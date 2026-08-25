@@ -3,8 +3,10 @@
 Reward contract (imperator 2026-08-25):
 - Keep: stepwise contempt, damage taken, damage dealt, heal-from-HP rewards.
 - Heal-use tax: green/blue herb -0.05; stronger heals -0.10.
-- Completing the current planner step: +8 and cell capture (like rails CP).
+- Completing the current planner step: +8 scaled by leftover 12m cell budget
+  (``+8 * leftover_frac``); then rearm a fresh 12m wall for the next step.
 - Divert (wrong room / unplanned pickup / unplanned box open): -4, episode end.
+- Cell timer: flat 12 minutes only (no custom yawn_cell_timeouts.json times).
 """
 from __future__ import annotations
 

@@ -20,8 +20,10 @@ from re1_rl.reward import (
     rails_checkpoint_success_reward,
 )
 from re1_rl.yawn_cell_timeout import (
+    FLAT_CELL_TIMEOUT_FRAMES,
     cell_timeout_frames,
     created_checkpoint_index,
+    flat_cell_timeout_enabled,
     frames_from_human_time,
     parse_mmss,
 )
@@ -38,6 +40,14 @@ def test_parse_mmss_accepts_seconds_and_minutes() -> None:
     assert parse_mmss("3:21.61") == pytest.approx(201.61)
     assert parse_mmss("1:04.41") == pytest.approx(64.41)
     assert parse_mmss("1:47.00") == pytest.approx(107.0)
+
+
+def test_flat_12m_env_ignores_custom_table(monkeypatch) -> None:
+    monkeypatch.setenv("RE1_CELL_TIMEOUT_FLAT_12M", "1")
+    assert flat_cell_timeout_enabled() is True
+    assert cell_timeout_frames(0, ROOT) == FLAT_CELL_TIMEOUT_FRAMES
+    assert cell_timeout_frames(8, ROOT) == FLAT_CELL_TIMEOUT_FRAMES
+    assert cell_timeout_frames(200, ROOT) == FLAT_CELL_TIMEOUT_FRAMES
 
 
 def test_frames_use_60fps_and_clamp_to_twelve_minutes() -> None:

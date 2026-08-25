@@ -974,10 +974,29 @@ def compute_reward(
             ):
                 bd[key] = 0.0
         elif loyal.get("step_success"):
-            bd["planner_step_success"] = PLANNER_STEP_SUCCESS_REWARD
-            bd["checkpoint_success"] = PLANNER_STEP_SUCCESS_REWARD
+            from re1_rl.yawn_cell_timeout import FLAT_CELL_TIMEOUT_FRAMES
+
+            extra = int(state.get("step_emulated_frames") or 0)
+            if progress is not None and int(progress.cell_timeout_frames) <= 0:
+                # Ensure a 12m wall so leftover scaling is defined.
+                progress.arm_cell_timeout(int(FLAT_CELL_TIMEOUT_FRAMES))
+            pay = float(PLANNER_STEP_SUCCESS_REWARD)
+            if progress is not None and int(progress.cell_timeout_frames) > 0:
+                # Full +8 at fresh budget; drops linearly with time used.
+                pay = float(PLANNER_STEP_SUCCESS_REWARD) * float(
+                    progress.cell_timeout_remaining_frac(extra)
+                )
+            bd["planner_step_success"] = pay
+            bd["checkpoint_success"] = pay
             if progress is not None and hasattr(progress, "claim_checkpoint_success"):
                 progress.claim_checkpoint_success()
+            # Mid-chunk: reset a fresh 12m wall for the next planner step.
+            if (
+                progress is not None
+                and not planner_loyal_queue.done
+                and hasattr(progress, "arm_cell_timeout")
+            ):
+                progress.arm_cell_timeout(int(FLAT_CELL_TIMEOUT_FRAMES))
 
     prev_room = str(prev_state.get("room_id", ""))
     room = str(state.get("room_id", ""))

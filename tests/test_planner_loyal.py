@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from re1_rl.env import RE1Env
 from re1_rl.planner import WaypointPlanner
@@ -90,6 +91,39 @@ def test_reward_step_success_pays_eight_and_pops():
     assert q.current["edge_id"] == "105->104"
     assert progress.checkpoint_success is True
     assert reward == STEP_PENALTY + PLANNER_STEP_SUCCESS_REWARD
+    # Mid-chunk rearms a fresh 12m wall after the pulse.
+    from re1_rl.yawn_cell_timeout import FLAT_CELL_TIMEOUT_FRAMES
+
+    assert progress.cell_timeout_frames == FLAT_CELL_TIMEOUT_FRAMES
+    assert progress.leg_emulated_frames == 0
+
+
+def test_reward_step_success_scales_with_leftover_time():
+    q = PlannerLoyalQueue()
+    progress = ProgressTracker(leg_span=1)
+    from re1_rl.yawn_cell_timeout import FLAT_CELL_TIMEOUT_FRAMES
+
+    progress.arm_cell_timeout(1000)
+    progress.note_leg_frames(500)
+    prev = {
+        "room_id": "106",
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+    }
+    cur = {
+        "room_id": "105",
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+        "step_emulated_frames": 0,
+    }
+    _reward_total, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_step_success"] == pytest.approx(4.0)
+    assert bd["checkpoint_success"] == pytest.approx(4.0)
+    # Next step gets a fresh full 12m budget.
+    assert progress.cell_timeout_frames == FLAT_CELL_TIMEOUT_FRAMES
+    assert progress.leg_emulated_frames == 0
 
 
 def test_reward_wrong_room_pays_minus_four_and_is_terminal():

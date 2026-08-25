@@ -8,6 +8,8 @@ REM Thin status cells only (State+sidecar+meta+quality). No PPO leg tapes.
 set RE1_YAWN_LEG_REPLAY=0
 set RE1_YAWN_PAYFORWARD_RIPPLE=0
 set RE1_YAWN_EXTEND_EPISODE_ON_CELL=0
+REM Plain 12-minute wall per cell (ignore data/yawn_cell_timeouts.json customs).
+set RE1_CELL_TIMEOUT_FLAT_12M=1
 set RE1_YAWN_RAILS_SYNC=0
 set RE1_GO_EXPLORE_CAPTURE=0
 set RE1_GO_EXPLORE_SYNC=0

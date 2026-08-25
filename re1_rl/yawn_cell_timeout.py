@@ -9,6 +9,7 @@ existing 12 min idle / max_steps cap still applies).
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -18,8 +19,17 @@ _CAP_FRAMES = 12 * 60 * 60
 _DEFAULT_MULT = 2.0
 _HARD_MULT = 4.0
 _CUTSCENE_MULT = 1.5
+# Flat 12-minute wall (no per-CP human-time multipliers).
+FLAT_CELL_TIMEOUT_FRAMES = _CAP_FRAMES
+_FLAT_12M_ENV = "RE1_CELL_TIMEOUT_FLAT_12M"
 
 _cache: tuple[float, dict[str, Any]] | None = None
+
+
+def flat_cell_timeout_enabled() -> bool:
+    """When set, every cell uses a plain 12-minute wall (ignores custom table)."""
+    raw = (os.environ.get(_FLAT_12M_ENV) or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 def _seconds_to_hundredths(raw: str) -> int:
@@ -106,7 +116,13 @@ def cell_timeout_frames(
     created_index: int,
     project_root: Path | str | None = None,
 ) -> int:
-    """Emulated-frame budget for creating ``cp{created_index:02d}``, or 0 if none."""
+    """Emulated-frame budget for creating ``cp{created_index:02d}``, or 0 if none.
+
+    With ``RE1_CELL_TIMEOUT_FLAT_12M=1``, always returns the 12-minute cap
+    (custom ``yawn_cell_timeouts.json`` rows are ignored).
+    """
+    if flat_cell_timeout_enabled():
+        return int(FLAT_CELL_TIMEOUT_FRAMES)
     table = load_timeout_table(project_root)
     cells = table.get("cells") or {}
     row = cells.get(str(int(created_index)))
@@ -134,6 +150,8 @@ def cell_timeout_frames_for_planner(
     planner: Any,
     project_root: Path | str | None = None,
 ) -> int:
+    if flat_cell_timeout_enabled():
+        return int(FLAT_CELL_TIMEOUT_FRAMES)
     idx = created_checkpoint_index(planner)
     if idx is None:
         return 0

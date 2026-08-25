@@ -2161,12 +2161,22 @@ class RE1Env(gym.Env):
 
     def _arm_cell_timeout(self) -> None:
         """Start the per-CP emulated-frame wall for the current hunt."""
-        from re1_rl.yawn_cell_timeout import cell_timeout_frames_for_planner
+        from re1_rl.yawn_cell_timeout import (
+            FLAT_CELL_TIMEOUT_FRAMES,
+            cell_timeout_frames_for_planner,
+            flat_cell_timeout_enabled,
+        )
 
         self._progress.timeout_table_root = str(self.project_root)
-        self._progress.arm_cell_timeout(
-            cell_timeout_frames_for_planner(self._planner, self.project_root)
-        )
+        # Planner-loyal / flat-12m: plain 12 min — ignore yawn_cell_timeouts.json.
+        if (
+            getattr(self, "_planner_loyal_queue", None) is not None
+            or flat_cell_timeout_enabled()
+        ):
+            frames = int(FLAT_CELL_TIMEOUT_FRAMES)
+        else:
+            frames = cell_timeout_frames_for_planner(self._planner, self.project_root)
+        self._progress.arm_cell_timeout(frames)
 
     def _seed_episode_progress(self, state: dict[str, Any]) -> None:
         """Mark spawn room visited (no ``new_room`` payout on fresh start)."""
