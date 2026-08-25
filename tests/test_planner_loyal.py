@@ -102,20 +102,66 @@ def test_already_held_acquire_is_skipped():
         }
     )
     q.note_start_inventory(
-        {"inventory_slots": [{"name": "ink_ribbon"}]}
+        {"inventory_slots": [("ink_ribbon", 1)]}
     )
     prev = {
         "room_id": "106",
-        "inventory_slots": [{"name": "ink_ribbon"}],
+        "inventory_slots": [("ink_ribbon", 1)],
     }
     cur = {
         "room_id": "105",
-        "inventory_slots": [{"name": "ink_ribbon"}],
+        "inventory_slots": [("ink_ribbon", 1)],
     }
     result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["divert"] is False
     assert result["step_success"] is True
     assert q.done is True
+
+
+def test_second_bullet_pile_not_skipped_when_first_held():
+    """pl08 resume: pile :2 must not auto-skip just because pile :1 ammo is held."""
+    q = PlannerLoyalQueue()
+    q.seek(3)  # step 4 = 104:handgun_bullets:2
+    assert q.current["pickup_id"] == "104:handgun_bullets:2"
+    q.note_start_inventory({"inventory_slots": [("handgun_bullets", 15)]})
+    q._skip_satisfied_acquires()
+    assert q.index == 3
+    assert q.current["pickup_id"] == "104:handgun_bullets:2"
+
+
+def test_ammo_stack_qty_increase_counts_as_gain():
+    q = PlannerLoyalQueue()
+    q.seek(3)
+    prev = {
+        "room_id": "104",
+        "inventory_slots": [("beretta", 15), ("handgun_bullets", 15)],
+    }
+    cur = {
+        "room_id": "104",
+        "inventory_slots": [("beretta", 15), ("handgun_bullets", 30)],
+        "new_items": ["handgun_bullets"],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["step_success"] is True
+    assert result["divert"] is False
+    assert q.index == 4
+
+
+def test_ammo_new_slot_counts_as_gain():
+    q = PlannerLoyalQueue()
+    q.seek(2)  # first bullet pile
+    prev = {
+        "room_id": "104",
+        "inventory_slots": [("beretta", 15)],
+    }
+    cur = {
+        "room_id": "104",
+        "inventory_slots": [("beretta", 15), ("handgun_bullets", 15)],
+        "new_items": ["handgun_bullets"],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["step_success"] is True
+    assert q.index == 3
 
 
 def test_planner_loyal_curriculum_is_not_yawn_rails():

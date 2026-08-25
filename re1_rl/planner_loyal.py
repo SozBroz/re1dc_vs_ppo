@@ -100,6 +100,8 @@ class PlannerLoyalQueue:
         self.step_success_pending = False
         self.divert_reason: str | None = None
         self._start_held: set[str] = set()
+        self._start_qty_totals: dict[str, int] = {}
+        self._satisfied_pickups: set[str] = set()
 
     @property
     def remaining(self) -> list[dict[str, Any]]:
@@ -124,10 +126,15 @@ class PlannerLoyalQueue:
         self.step_success_pending = False
         self.divert_reason = None
         self._start_held = set()
+        self._start_qty_totals = {}
+        self._satisfied_pickups = set()
 
     def note_start_inventory(self, state: dict[str, Any]) -> None:
         """Snapshot episode-start inventory (sidecar / live RAM after reset)."""
-        self._start_held = set(_inventory_name_counts(state))
+        self._start_qty_totals = _inventory_qty_totals(state)
+        self._start_held = {
+            name for name, qty in self._start_qty_totals.items() if qty > 0
+        }
 
     def seek(self, index: int) -> None:
         """Jump queue to ``index`` (0 = first step; len(steps) = done)."""
@@ -135,18 +142,52 @@ class PlannerLoyalQueue:
         self._index = max(0, min(int(index), n))
         self.step_success_pending = False
         self.divert_reason = None
+        self._rebuild_satisfied_pickups()
+
+    def _rebuild_satisfied_pickups(self) -> None:
+        satisfied: set[str] = set()
+        for step in self._steps[: self._index]:
+            if str(step.get("op") or "") != "acquire":
+                continue
+            pickup_id = str(step.get("pickup_id") or "")
+            if pickup_id:
+                satisfied.add(pickup_id)
+        self._satisfied_pickups = satisfied
+
+    def _acquire_sibling_pile_ids(self, room: str, item: str) -> list[str]:
+        siblings: list[str] = []
+        for step in self._steps:
+            if str(step.get("op") or "") != "acquire":
+                continue
+            pickup_id = str(step.get("pickup_id") or "")
+            step_room, step_item, pile = _pickup_id_parts(pickup_id)
+            if step_room == room and step_item == item and pile is not None:
+                siblings.append(pickup_id)
+        return siblings
+
+    def _should_skip_acquire_at_start(self, pickup_id: str) -> bool:
+        if pickup_id in self._satisfied_pickups:
+            return True
+        room, item, pile = _pickup_id_parts(pickup_id)
+        if not item:
+            return False
+        siblings = self._acquire_sibling_pile_ids(room, item)
+        if len(siblings) > 1:
+            # Numbered piles (e.g. 104:handgun_bullets:1 vs :2): never skip from
+            # generic "already holding ammo"; only exact pickup_ids satisfied.
+            return False
+        return item in self._start_held
 
     def _skip_satisfied_acquires(self) -> None:
-        """Skip acquire steps for items already held at episode start."""
+        """Skip acquire steps already satisfied at episode start."""
         while True:
             step = self.current
             if not step or str(step.get("op") or "") != "acquire":
                 return
-            want = str(step.get("pickup_id") or "")
-            want_item = want.split(":")[1] if want.count(":") >= 2 else want
-            want_item = canonical_item(want_item)
-            if want_item and want_item in self._start_held:
+            pickup_id = str(step.get("pickup_id") or "")
+            if self._should_skip_acquire_at_start(pickup_id):
                 self._index += 1
+                self._rebuild_satisfied_pickups()
                 continue
             return
 
@@ -222,26 +263,19 @@ class PlannerLoyalQueue:
         # Divert / complete: pickups
         gained = _inventory_gains(prev_state, state)
         if gained:
-            unexpected = {
-                name
-                for name in gained
-                if name not in self._start_held and name not in OPTIONAL_START_PICKUPS
-            }
             want = str(step.get("pickup_id") or "")
-            want_item = want.split(":")[1] if want.count(":") >= 2 else want
-            want_item = canonical_item(want_item)
-            gained_canon = {canonical_item(x) for x in gained}
-            matched = want_item in gained or want in gained or want_item in gained_canon
-            if not unexpected:
-                if op == "acquire" and matched:
-                    result["step_success"] = True
-                    self._index += 1
-                    self.step_success_pending = True
-                return result
+            _, want_item, _ = _pickup_id_parts(want)
+            matched = op == "acquire" and _pickup_matches_gain(want, gained)
+            optional = {
+                name for name in gained if name in OPTIONAL_START_PICKUPS
+            }
+            planned = {want_item} if matched else set()
+            unexpected = gained - optional - planned
             if op != "acquire":
-                result["divert"] = True
-                result["divert_reason"] = f"unplanned_pickup:{sorted(gained)}"
-                self.divert_reason = result["divert_reason"]
+                if unexpected:
+                    result["divert"] = True
+                    result["divert_reason"] = f"unplanned_pickup:{sorted(gained)}"
+                    self.divert_reason = result["divert_reason"]
                 return result
             if not matched:
                 result["divert"] = True
@@ -251,6 +285,7 @@ class PlannerLoyalQueue:
             result["step_success"] = True
             self._index += 1
             self.step_success_pending = True
+            self._rebuild_satisfied_pickups()
             return result
 
         # Objective / puzzle / cutscene / boss completion via story_use or flags.
@@ -273,35 +308,62 @@ class PlannerLoyalQueue:
         return result
 
 
-def _inventory_name_counts(state: dict[str, Any]) -> dict[str, int]:
-    counts: dict[str, int] = {}
+def _pickup_id_parts(pickup_id: str) -> tuple[str, str, str | None]:
+    parts = str(pickup_id or "").split(":")
+    if len(parts) >= 3:
+        return parts[0], canonical_item(parts[1]), parts[2]
+    if len(parts) == 2:
+        return parts[0], canonical_item(parts[1]), None
+    if parts:
+        return "", canonical_item(parts[0]), None
+    return "", "", None
+
+
+def _pickup_matches_gain(pickup_id: str, gained: set[str]) -> bool:
+    if pickup_id in gained:
+        return True
+    _room, item, _pile = _pickup_id_parts(pickup_id)
+    if not item:
+        return False
+    return item in gained
+
+
+def _inventory_qty_totals(state: dict[str, Any]) -> dict[str, int]:
+    totals: dict[str, int] = {}
     for entry in state.get("inventory_slots") or []:
         if isinstance(entry, dict):
             name = entry.get("name") or entry.get("item")
+            qty = int(entry.get("qty", 1) or 0)
         elif isinstance(entry, (list, tuple)) and entry:
             name = entry[0]
+            qty = int(entry[1]) if len(entry) > 1 else 1
         else:
             name = None
+            qty = 0
         if not name:
             continue
         key = canonical_item(str(name))
-        counts[key] = counts.get(key, 0) + 1
-    return counts
+        totals[key] = totals.get(key, 0) + max(qty, 0)
+    return totals
 
 
 def _inventory_gains(prev_state: dict[str, Any], state: dict[str, Any]) -> set[str]:
-    prev = _inventory_name_counts(prev_state)
-    cur = _inventory_name_counts(state)
+    prev = _inventory_qty_totals(prev_state)
+    cur = _inventory_qty_totals(state)
     gained: set[str] = set()
-    for name, count in cur.items():
-        if count > prev.get(name, 0):
+    for name, qty in cur.items():
+        if qty > prev.get(name, 0):
             gained.add(name)
+    for name in state.get("new_items") or []:
+        key = canonical_item(str(name))
+        if key:
+            gained.add(key)
     return gained
 
 
 def _heal_use_tax(prev_state: dict[str, Any], state: dict[str, Any]) -> float:
-    prev = _inventory_name_counts(prev_state)
-    cur = _inventory_name_counts(state)
+    prev = _inventory_qty_totals(prev_state)
+    cur = _inventory_qty_totals(state)
     tax = 0.0
     for name, before in prev.items():
         after = cur.get(name, 0)
