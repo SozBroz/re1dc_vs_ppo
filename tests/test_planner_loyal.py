@@ -78,17 +78,41 @@ def test_queue_divert_on_wrong_room():
     assert result["divert"] is True
 
 
-def test_ink_ribbon_pickup_does_not_divert_on_traverse():
+def test_ink_ribbon_pickup_diverts_on_traverse():
     q = PlannerLoyalQueue()
     prev = {"room_id": "106", "inventory_slots": []}
     cur = {
         "room_id": "106",
-        "inventory_slots": [{"name": "ink_ribbon"}],
+        "inventory_slots": [("ink_ribbon", 1)],
+        "new_items": ["ink_ribbon"],
     }
     result = q.evaluate_transition(prev_state=prev, state=cur)
-    assert result["divert"] is False
+    assert result["divert"] is True
+    assert "unplanned_pickup" in str(result["divert_reason"])
     assert result["step_success"] is False
     assert q.current["edge_id"] == "106->105"
+
+
+def test_ink_ribbon_use_diverts_when_not_planned():
+    q = PlannerLoyalQueue()
+    prev = {"room_id": "106", "inventory_slots": [("ink_ribbon", 2)]}
+    cur = {"room_id": "106", "inventory_slots": [("ink_ribbon", 1)]}
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is True
+    assert result["divert_reason"] == "unplanned_ink_ribbon_use"
+
+
+def test_typewriter_save_diverts_when_not_planned():
+    q = PlannerLoyalQueue()
+    prev = {"room_id": "106", "inventory_slots": [("ink_ribbon", 1)]}
+    cur = {"room_id": "106", "inventory_slots": []}
+    result = q.evaluate_transition(
+        prev_state=prev,
+        state=cur,
+        typewriter_save_complete=True,
+    )
+    assert result["divert"] is True
+    assert result["divert_reason"] == "unplanned_typewriter_save"
 
 
 def test_already_held_acquire_is_skipped():

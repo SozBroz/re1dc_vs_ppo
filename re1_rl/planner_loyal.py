@@ -5,7 +5,7 @@ Reward contract (imperator 2026-08-25):
 - Heal-use tax: green/blue herb -0.05; stronger heals -0.10.
 - Completing the current planner step: +8 scaled by leftover 12m cell budget
   (``+8 * leftover_frac``); then rearm a fresh 12m wall for the next step.
-- Divert (wrong room / unplanned pickup / unplanned box open): -4, episode end.
+- Divert (wrong room / unplanned pickup / unplanned box / typewriter save): -4, episode end.
 - Cell timer: flat 12 minutes only (no custom yawn_cell_timeouts.json times).
 """
 from __future__ import annotations
@@ -43,9 +43,6 @@ PLANNER_LOYAL_OMIT_OBS_KEYS = frozenset(
         "world_state",
     }
 )
-
-# Optional on-path loot: never divert (106 typewriter ribbons, etc.).
-OPTIONAL_START_PICKUPS = frozenset({"ink_ribbon"})
 
 LIGHT_HEAL_USE_ITEMS = frozenset({"green_herb", "blue_herb"})
 STRONG_HEAL_USE_ITEMS = frozenset(
@@ -209,6 +206,7 @@ class PlannerLoyalQueue:
         prev_state: dict[str, Any],
         state: dict[str, Any],
         box_opened: bool = False,
+        typewriter_save_complete: bool = False,
     ) -> dict[str, Any]:
         """Return reward flags for this env step under planner loyalty."""
         result = {
@@ -232,6 +230,16 @@ class PlannerLoyalQueue:
         # Heal-use tax from inventory disappearance of heal items (not box).
         tax = _heal_use_tax(prev_state, state)
         result["heal_use_tax"] = tax
+
+        if typewriter_save_complete or _ink_ribbon_consumed(prev_state, state):
+            result["divert"] = True
+            result["divert_reason"] = (
+                "unplanned_typewriter_save"
+                if typewriter_save_complete
+                else "unplanned_ink_ribbon_use"
+            )
+            self.divert_reason = result["divert_reason"]
+            return result
 
         # Divert: unplanned box open.
         if box_opened and op != "use_box":
@@ -266,15 +274,12 @@ class PlannerLoyalQueue:
             want = str(step.get("pickup_id") or "")
             _, want_item, _ = _pickup_id_parts(want)
             matched = op == "acquire" and _pickup_matches_gain(want, gained)
-            optional = {
-                name for name in gained if name in OPTIONAL_START_PICKUPS
-            }
             planned = {want_item} if matched else set()
-            unexpected = gained - optional - planned
+            unexpected = gained - planned
             if op != "acquire":
                 if unexpected:
                     result["divert"] = True
-                    result["divert_reason"] = f"unplanned_pickup:{sorted(gained)}"
+                    result["divert_reason"] = f"unplanned_pickup:{sorted(unexpected)}"
                     self.divert_reason = result["divert_reason"]
                 return result
             if not matched:
@@ -306,6 +311,14 @@ class PlannerLoyalQueue:
             return result
 
         return result
+
+
+def _ink_ribbon_consumed(prev_state: dict[str, Any], state: dict[str, Any]) -> bool:
+    from re1_rl.typewriter_save import count_ink_ribbons
+
+    before = int(count_ink_ribbons(prev_state))
+    after = int(count_ink_ribbons(state))
+    return before > 0 and after < before
 
 
 def _pickup_id_parts(pickup_id: str) -> tuple[str, str, str | None]:

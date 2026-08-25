@@ -950,6 +950,7 @@ def compute_reward(
             prev_state=prev_state,
             state=state,
             box_opened=box_opened,
+            typewriter_save_complete=bool(typewriter_save_complete),
         )
         bd["heal_use_tax"] = float(loyal.get("heal_use_tax") or 0.0)
         if loyal.get("divert"):
