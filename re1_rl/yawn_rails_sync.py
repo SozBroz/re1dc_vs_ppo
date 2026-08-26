@@ -36,8 +36,11 @@ STORE_FILENAME = "store.json"
 MANIFEST_FILENAME = "manifest.json"
 _ROOT_ENV = "RE1_YAWN_RAILS_ROOT"
 _SYNC_ENV = "RE1_YAWN_RAILS_SYNC"
+_PREFIX_ENV = "RE1_YAWN_CELL_PREFIX"
 _LOCK_NAME = "cells.sync.lock"
 _STALE_LOCK_S = 180.0
+# Planner-loyal seed tip (pl05); never prune these when using ``pl`` prefix.
+_PLANNER_SEED_MAX_INDEX = 5
 
 
 def yawn_rails_sync_enabled() -> bool:
@@ -48,6 +51,31 @@ def yawn_rails_sync_enabled() -> bool:
     """
     raw = os.environ.get(_SYNC_ENV, "1").strip().lower()
     return raw not in {"0", "false", "no", "off"}
+
+
+def _planner_loyal_enabled() -> bool:
+    raw = os.environ.get("RE1_PLANNER_LOYAL", "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def cell_dir_prefix() -> str:
+    """Directory prefix for cell slots (``cp`` default; ``pl`` for planner-loyal)."""
+    raw = (os.environ.get(_PREFIX_ENV) or "").strip()
+    if raw:
+        return raw
+    if _planner_loyal_enabled():
+        return "pl"
+    return "cp"
+
+
+def yawn_rails_rel_path() -> str:
+    """Relative store root for manifest ``state_path`` strings."""
+    override = os.environ.get(_ROOT_ENV, "").strip()
+    if override:
+        return override.replace("\\", "/").rstrip("/")
+    if _planner_loyal_enabled():
+        return "states/planner_loyal"
+    return DEFAULT_YAWN_RAILS_REL
 
 
 def _lock_path(root: Path) -> Path:
@@ -173,11 +201,14 @@ def yawn_rails_root(project_root: Path | str | None = None) -> Path:
             p = base / p
         return p.resolve()
     base = Path(project_root) if project_root is not None else Path.cwd()
-    return (base / DEFAULT_YAWN_RAILS_REL).resolve()
+    rel = (
+        "states/planner_loyal" if _planner_loyal_enabled() else DEFAULT_YAWN_RAILS_REL
+    )
+    return (base / rel).resolve()
 
 
 def cell_dir_name(checkpoint_index: int) -> str:
-    return f"cp{int(checkpoint_index):02d}"
+    return f"{cell_dir_prefix()}{int(checkpoint_index):02d}"
 
 
 def cell_slot_dir(root: Path | str, checkpoint_index: int) -> Path:
@@ -185,7 +216,7 @@ def cell_slot_dir(root: Path | str, checkpoint_index: int) -> Path:
 
 
 def resolve_cell_dir(root: Path | str, checkpoint_index: int) -> Path:
-    """``{root}/cells/cpNN`` or flat ``{root}/cpNN`` (Crystals_in_time backup)."""
+    """``{root}/cells/{prefix}NN`` or flat ``{root}/{prefix}NN`` (Crystals backup)."""
     nested = cell_slot_dir(root, checkpoint_index)
     if nested.is_dir():
         return nested
@@ -517,13 +548,14 @@ def try_install_yawn_cell(
         install_row["quality"] = list(new_q)
         install_row["state_sha256"] = state_sha
         install_row["sidecar_sha256"] = side_sha
+        rel = yawn_rails_rel_path()
         install_row.setdefault(
             "state_path",
-            f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}",
+            f"{rel}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}",
         )
         install_row.setdefault(
             "sidecar_path",
-            f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}",
+            f"{rel}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}",
         )
         store = YawnRailsCellStore(root)
         store.cells[idx] = dict(install_row)
@@ -700,6 +732,7 @@ class YawnRailsCellStore:
         self.cells: dict[int, dict[str, Any]] = {}
         self.accepted = 0
         self.rejected = 0
+        self.last_rejects: list[str] = []
         self._lock = threading.Lock()
         self._load()
 
@@ -807,13 +840,14 @@ class YawnRailsCellStore:
     def _write_sampling_manifest_unlocked(self) -> None:
         """Curriculum-facing manifest consumed by ``sample_one_leg_options``."""
         cells = []
+        rel = yawn_rails_rel_path()
         for idx in sorted(self.cells):
             row = dict(self.cells[idx])
             row["state_path"] = (
-                f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}"
+                f"{rel}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}"
             )
             row["sidecar_path"] = (
-                f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}"
+                f"{rel}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}"
             )
             cells.append(row)
         manifest = {
@@ -848,6 +882,7 @@ class YawnRailsCellStore:
     def ingest_proposals(self, proposals: list[dict[str, Any]]) -> list[str]:
         """Admit/replace cells. Returns accepted ``cpNN`` ids."""
         accepted: list[str] = []
+        self.last_rejects = []
         if not proposals:
             return accepted
         with self._lock:
@@ -878,9 +913,15 @@ class YawnRailsCellStore:
                     entry = dict(row)
                     entry["checkpoint_index"] = int(idx)
                     cells.append(entry)
+                prefix = cell_dir_prefix()
                 for cid in accepted:
+                    raw = str(cid)
                     try:
-                        idx = int(str(cid).replace("cp", ""))
+                        idx = (
+                            int(raw[len(prefix) :], 10)
+                            if raw.startswith(prefix)
+                            else int(raw.replace("cp", "").replace("pl", ""), 10)
+                        )
                     except ValueError:
                         continue
                     notify_payforward_install(
@@ -890,27 +931,33 @@ class YawnRailsCellStore:
                 pass
         return accepted
 
+    def _reject(self, reason: str) -> None:
+        self.rejected += 1
+        self.last_rejects.append(reason)
+
     def _ingest_one_unlocked(self, prop: dict[str, Any]) -> str | None:
         try:
             idx = int(prop["checkpoint_index"])
         except (KeyError, TypeError, ValueError):
-            self.rejected += 1
+            self._reject("bad_checkpoint_index")
             return None
         if idx < 0:
-            self.rejected += 1
+            self._reject(f"idx={idx}: negative")
             return None
         quality = _as_quality(prop.get("quality"))
         if quality is None:
-            self.rejected += 1
+            self._reject(f"idx={idx}: bad_quality")
             return None
         route_id = str(prop.get("route_id") or "") or None
         if self.route_id and route_id and route_id != self.route_id:
-            self.rejected += 1
+            self._reject(
+                f"idx={idx}: route_mismatch store={self.route_id} got={route_id}"
+            )
             return None
         if route_id and not self.route_id:
             self.route_id = route_id
         if prop.get("inventory_feasible") is False:
-            self.rejected += 1
+            self._reject(f"idx={idx}: inventory_infeasible")
             return None
 
         existing = self.cells.get(idx)
@@ -926,7 +973,7 @@ class YawnRailsCellStore:
                 and old_q is not None
                 and not quality_beats(quality, old_q)
             ):
-                self.rejected += 1
+                self._reject(f"idx={idx}: quality_does_not_beat")
                 return None
             from re1_rl.go_explore_capture import quality_replace_significant
 
@@ -935,18 +982,18 @@ class YawnRailsCellStore:
                 and old_q is not None
                 and not quality_replace_significant(quality, old_q)
             ):
-                self.rejected += 1
+                self._reject(f"idx={idx}: quality_not_significant")
                 return None
 
         bundle_bytes = self._decode_bundle(prop)
         if bundle_bytes is None:
-            self.rejected += 1
+            self._reject(f"idx={idx}: missing_bundle")
             return None
-        ok, _reason, state_sha, side_sha = self._validate_bundle_bytes(
+        ok, reason, state_sha, side_sha = self._validate_bundle_bytes(
             bundle_bytes, prop
         )
         if not ok or not state_sha or not side_sha:
-            self.rejected += 1
+            self._reject(f"idx={idx}: {reason or 'bad_bundle'}")
             return None
 
         bundle_sha = _sha256_bytes(bundle_bytes)
@@ -963,10 +1010,10 @@ class YawnRailsCellStore:
             "sidecar_sha256": side_sha,
             "bytes": len(bundle_bytes),
             "state_path": (
-                f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}"
+                f"{yawn_rails_rel_path()}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}"
             ),
             "sidecar_path": (
-                f"{DEFAULT_YAWN_RAILS_REL}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}"
+                f"{yawn_rails_rel_path()}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}"
             ),
         }
         for key in (
@@ -975,6 +1022,11 @@ class YawnRailsCellStore:
             "next_slots_needed",
             "inventory_feasible",
             "captured_in_box_room",
+            "training_start",
+            "chunk_final",
+            "chunk_id",
+            "planner_step_index",
+            "source",
         ):
             if key in prop:
                 row[key] = prop[key]
@@ -1054,6 +1106,12 @@ class YawnRailsCellStore:
                 "next_slots_needed",
                 "inventory_feasible",
                 "captured_in_box_room",
+                "training_start",
+                "chunk_final",
+                "chunk_id",
+                "planner_step_index",
+                "planner_step",
+                "source",
             ):
                 if key in prop:
                     meta[key] = prop[key]
@@ -1075,7 +1133,11 @@ class YawnRailsCellStore:
                 self._persist_unlocked()
             ver = int(self.archive_version)
             cell_count = len(self.cells)
-            if int(since_version) >= ver:
+            # Version 0 is "bootstrapped, never ingested". Clients polling
+            # since_version=0 must still receive the snapshot (yawn did this
+            # after the first admit bumped the version). `>=` on ver=0 hid
+            # every cell and workers never pulled.
+            if int(since_version) > 0 and int(since_version) >= ver:
                 return {
                     "archive_version": ver,
                     "route_id": self.route_id,
@@ -1106,6 +1168,10 @@ class YawnRailsCellStore:
                                 "next_slots_needed",
                                 "inventory_feasible",
                                 "captured_in_box_room",
+                                "training_start",
+                                "chunk_final",
+                                "chunk_id",
+                                "planner_step_index",
                             )
                             if key in row
                         },
@@ -1119,16 +1185,28 @@ class YawnRailsCellStore:
             }
 
     def pack_bundle_zip(self, cell_id: str) -> bytes | None:
-        """Zip bytes for ``GET /yawn_rails/bundle/<cpNN>``."""
+        """Zip bytes for ``GET /yawn_rails/bundle/<prefixNN>``."""
         cid = str(cell_id).strip()
-        if not cid.startswith("cp") or "/" in cid or "\\" in cid or ".." in cid:
+        if "/" in cid or "\\" in cid or ".." in cid:
             return None
-        try:
-            idx = int(cid[2:], 10)
-        except ValueError:
+        idx = None
+        for prefix in (cell_dir_prefix(), "pl", "cp"):
+            if cid.startswith(prefix):
+                try:
+                    idx = int(cid[len(prefix) :], 10)
+                    break
+                except ValueError:
+                    continue
+        if idx is None:
             return None
         with yawn_cells_locked(self.root, holder="yawn_pack_bundle"):
             d = cell_slot_dir(self.root, idx)
+            if not (d / CELL_STATE_NAME).is_file():
+                for alt in ("pl", "cp"):
+                    cand = Path(self.root) / "cells" / f"{alt}{int(idx):02d}"
+                    if (cand / CELL_STATE_NAME).is_file():
+                        d = cand
+                        break
             state_p = d / CELL_STATE_NAME
             side_p = d / CELL_SIDECAR_NAME
             if not state_p.is_file() or not side_p.is_file():

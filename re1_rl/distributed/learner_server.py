@@ -366,6 +366,12 @@ class LearnerState:
                 self.machine_name,
                 f"yawn_rails merged {len(accepted)} cell(s) via {source}",
             )
+        if store.last_rejects:
+            log(
+                self.machine_name,
+                f"yawn_rails rejected {len(store.last_rejects)} via {source}: "
+                + "; ".join(store.last_rejects[:8]),
+            )
         return accepted
 
     def ingest_yawn_rails_from_rollout(self, rollout: WorkerRollout) -> list[str]:
@@ -856,6 +862,7 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                 200,
                 {
                     "accepted": accepted,
+                    "rejected": list(store.last_rejects),
                     "archive_version": int(store.archive_version),
                     "cell_count": len(store.cells),
                 },
