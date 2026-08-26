@@ -163,9 +163,8 @@ class PlannerLoyalQueue:
     def note_start_inventory(self, state: dict[str, Any]) -> None:
         """Snapshot episode-start inventory (sidecar / live RAM after reset)."""
         self._start_qty_totals = _inventory_qty_totals(state)
-        self._start_held = {
-            name for name, qty in self._start_qty_totals.items() if qty > 0
-        }
+        # Presence, not qty: files/notes often occupy a slot with qty 0.
+        self._start_held = set(_inventory_held_names(state))
 
     def seek(self, index: int) -> None:
         """Jump queue to ``index`` (0 = first step; len(steps) = done)."""
@@ -222,8 +221,7 @@ class PlannerLoyalQueue:
             return False
         if item in self._start_held:
             return False
-        held = _inventory_qty_totals(state)
-        return int(held.get(item, 0) or 0) > 0
+        return item in _inventory_held_names(state)
 
     def _skip_satisfied_acquires(self) -> None:
         """Skip acquire steps already satisfied at episode start."""
@@ -313,6 +311,11 @@ class PlannerLoyalQueue:
             self._index += 1
             self.step_success_pending = True
             self._rebuild_satisfied_pickups()
+            print(
+                f"[planner_loyal] unique_acquire {step.get('pickup_id')} "
+                f"room={room}",
+                flush=True,
+            )
             return result
 
         # Divert: unplanned room change.
@@ -427,12 +430,22 @@ def _inventory_qty_totals(state: dict[str, Any]) -> dict[str, int]:
     return totals
 
 
+def _inventory_held_names(state: dict[str, Any]) -> set[str]:
+    """Names occupying inventory, including files with qty 0."""
+    names = set(_inventory_qty_totals(state))
+    for raw in list(state.get("inventory") or []) + list(state.get("new_items") or []):
+        key = canonical_item(str(raw))
+        if key:
+            names.add(key)
+    return names
+
+
 def _inventory_gains(prev_state: dict[str, Any], state: dict[str, Any]) -> set[str]:
     prev = _inventory_qty_totals(prev_state)
     cur = _inventory_qty_totals(state)
     gained: set[str] = set()
     for name, qty in cur.items():
-        if qty > prev.get(name, 0):
+        if name not in prev or qty > prev.get(name, 0):
             gained.add(name)
     for name in state.get("new_items") or []:
         key = canonical_item(str(name))

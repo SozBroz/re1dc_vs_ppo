@@ -189,7 +189,7 @@ def test_unique_key_acquire_completes_without_rising_edge():
         ("knife", 1),
         ("beretta", 15),
         ("emblem", 1),
-        ("music_notes", 1),
+        ("music_notes", 0),
     ]
     result = q.evaluate_transition(
         prev_state={"room_id": "10F", "inventory_slots": slots},
@@ -199,6 +199,38 @@ def test_unique_key_acquire_completes_without_rising_edge():
     assert result["divert"] is False
     assert q.current["op"] == "objective"
     assert q.current["beat_id"] == "piano_play"
+
+
+def test_unique_key_acquire_qty_zero_file_slot():
+    """RE file items often occupy a slot with qty 0; that still counts as held."""
+    q = PlannerLoyalQueue()
+    q.seek(5)
+    q.note_start_inventory(
+        {
+            "inventory_slots": [
+                ("knife", 1),
+                ("beretta", 15),
+                ("emblem", 1),
+            ]
+        }
+    )
+    result = q.evaluate_transition(
+        prev_state={
+            "room_id": "10F",
+            "inventory_slots": [("knife", 1), ("beretta", 15), ("emblem", 1)],
+        },
+        state={
+            "room_id": "10F",
+            "inventory_slots": [
+                ("knife", 1),
+                ("beretta", 15),
+                ("emblem", 1),
+                ("music_notes", 0),
+            ],
+        },
+    )
+    assert result["step_success"] is True
+    assert q.current["op"] == "objective"
 
 
 def test_ammo_new_slot_counts_as_gain():
