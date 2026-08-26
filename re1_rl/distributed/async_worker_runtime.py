@@ -587,6 +587,46 @@ def _flush_local_epoch(
     return retained, capacity_full
 
 
+def _cleanup_worker_port_emuhawks(
+    base_port: int,
+    n_envs: int,
+    *,
+    project_root: Path | None = None,
+) -> None:
+    """Kill orphan EmuHawks still claimed on this worker's TCP port range."""
+    if os.name != "nt" or int(n_envs) <= 0:
+        return
+    from re1_rl.window_grid import port_map_dir
+
+    d = port_map_dir(project_root)
+    if not d.is_dir():
+        return
+    port_lo = int(base_port)
+    port_hi = port_lo + int(n_envs) - 1
+    for path in list(d.iterdir()):
+        if not path.is_file():
+            continue
+        try:
+            pid = int(path.name)
+            port = int(path.read_text(encoding="ascii").strip())
+        except (ValueError, OSError):
+            continue
+        if port_lo <= port <= port_hi:
+            try:
+                subprocess.run(
+                    ["taskkill", "/PID", str(pid), "/T", "/F"],
+                    check=False,
+                    capture_output=True,
+                    timeout=5.0,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
 def _shutdown_actors(
     stop_flag: mp.synchronize.Synchronized,
     parent_conns: list[Connection],
@@ -847,6 +887,15 @@ def run_async_worker_loop(
             )
             for index, rank in zip(batch_indices, batch_ranks):
                 actor_emu_pids[index] = batch_pids.get(rank)
+            if len(processes) >= 20:
+                try:
+                    cooldown_s = float(
+                        os.environ.get("RE1_ACTOR_STARTUP_BATCH_COOLDOWN_S", "0")
+                    )
+                except ValueError:
+                    cooldown_s = 0.0
+                if cooldown_s > 0:
+                    time.sleep(cooldown_s)
         log(machine_name, f"async worker fleet ready ({actor_count} actors)")
         for conn in parent_conns:
             conn.send({"t": "start"})
@@ -1205,4 +1254,7 @@ def run_async_worker_loop(
             except Exception:
                 pass
         _shutdown_actors(stop_flag, parent_conns, processes, actor_emu_pids)
+        _cleanup_worker_port_emuhawks(
+            int(base_port), actor_count, project_root=root
+        )
         log(machine_name, "async worker loop stopped")

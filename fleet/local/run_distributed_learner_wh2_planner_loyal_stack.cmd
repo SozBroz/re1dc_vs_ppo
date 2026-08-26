@@ -16,8 +16,8 @@ if not exist data\checkpoints mkdir data\checkpoints
 
 call "%~dp0flush_log.cmd" data\logs\learner_wh2_planner_loyal.log
 
-echo Starting WH2 local planner-loyal worker...
-start "wh2-planner-loyal-worker" /MIN cmd /c "cd /d C:\Users\sshuser\re1_rl && fleet\local\run_distributed_worker_workhorse2_planner_loyal.cmd"
+echo Starting WH2 local planner-loyal worker (delayed 45s so learner binds first)...
+start "wh2-planner-loyal-worker" /MIN cmd /c "cd /d C:\Users\sshuser\re1_rl && timeout /t 45 /nobreak >nul && fleet\local\run_distributed_worker_workhorse2_planner_loyal.cmd"
 
 echo [%DATE% %TIME%] WH2 planner-loyal learner start batch=%BATCH_SIZE% >> data\logs\learner_wh2_planner_loyal.log
 
