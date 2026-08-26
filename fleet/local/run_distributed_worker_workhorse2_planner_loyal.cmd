@@ -7,9 +7,11 @@ call "%~dp0planner_loyal.env.cmd"
 set MACHINE_NAME=workhorse2
 set LEARNER_HOST=127.0.0.1
 set BASE_PORT=5555
-set N_ENVS=16
+set N_ENVS=28
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
 set RE1_MACHINE_NAME=%MACHINE_NAME%
+REM Wave EmuHawk boots so 28 Lua hellos do not stampede (WH2_25 28-env path).
+set RE1_ACTOR_STARTUP_BATCH_SIZE=1
 
 if not exist data\logs mkdir data\logs
 call "%~dp0flush_log.cmd" data\logs\worker_wh2_planner_loyal.log

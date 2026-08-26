@@ -1,5 +1,5 @@
 @echo off
-REM WH2 learner — planner-loyal fresh run (no resume). Local 16-env worker.
+REM WH2 learner — planner-loyal, resume latest zip. Local 28-env worker.
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 call "%~dp0..\fleet_hosts.cmd"
@@ -35,5 +35,6 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --relevance-gate ^
   --batch-size %BATCH_SIZE% ^
   --min-host-free-gb 12 ^
+  --resume auto ^
   --no-local-worker ^
   --headless >> data\logs\learner_wh2_planner_loyal.log 2>&1

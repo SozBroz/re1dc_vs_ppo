@@ -72,7 +72,7 @@ python scripts/prune_checkpoints.py --keep 5
 
 | Machine | `--base-port` | `--n-envs` | Bottleneck |
 |---------|---------------|------------|------------|
-| workhorse2 (learner + local worker) | 5555 | **16** | learner + local envs; batch 3072 |
+| workhorse2 (learner + local worker) | 5555 | **28** | learner + local envs; batch 3072 |
 | workhorse3 | 5855 | **24** | RTX 5090; ~61 GB RAM; Muse must be down |
 | workhorse1 | 5655 | **8** | 8 CPU threads — launch from RDP/console |
 | pking | 5755 | **20** | ~48 GB RAM (~900 MB/EmuHawk) |
