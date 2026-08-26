@@ -175,6 +175,22 @@ class PlannerLoyalQueue:
             return False
         return item in self._start_held
 
+    def _unique_acquire_now_held(self, state: dict[str, Any]) -> bool:
+        """True when the current unique acquire's item is in inventory now."""
+        step = self.current or {}
+        if str(step.get("op") or "") != "acquire":
+            return False
+        pickup_id = str(step.get("pickup_id") or "")
+        room, item, _pile = _pickup_id_parts(pickup_id)
+        if not item or pickup_id in self._satisfied_pickups:
+            return False
+        if len(self._acquire_sibling_pile_ids(room, item)) > 1:
+            return False
+        if item in self._start_held:
+            return False
+        held = _inventory_qty_totals(state)
+        return int(held.get(item, 0) or 0) > 0
+
     def _skip_satisfied_acquires(self) -> None:
         """Skip acquire steps already satisfied at episode start."""
         while True:
@@ -246,6 +262,18 @@ class PlannerLoyalQueue:
             result["divert"] = True
             result["divert_reason"] = "unplanned_box"
             self.divert_reason = result["divert_reason"]
+            return result
+
+        # Unique key acquire (music_notes, gold_emblem, …): complete if the
+        # item is held now and was not held at episode start. File/document
+        # cinema often starts skip *after* RAM already has the item, so the
+        # inventory rising edge is gone. Numbered ammo piles still need a qty
+        # edge (same sibling rule as reset skip).
+        if self._unique_acquire_now_held(state):
+            result["step_success"] = True
+            self._index += 1
+            self.step_success_pending = True
+            self._rebuild_satisfied_pickups()
             return result
 
         # Divert: unplanned room change.
