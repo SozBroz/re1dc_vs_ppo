@@ -46,9 +46,10 @@ These need your call before we tune further — implementation proceeds with def
 
 ## RAM / VRAM notes
 
-- **WH3 (canonical learner):** packed `batch_size=4096` + ~5M planner-loyal policy on RTX 5090 32 GB; stop Muse first. OOM fallback: 3072.
-- **WH2 (legacy):** 24 local envs + `batch_size=2048` targeted ~8 GB VRAM. Kept as remote worker / emergency fallback (`--batch-size 3072`).
-- **Host RAM:** epoch ingest still scales with `n_steps × fleet_envs`; monitor first 6-minute epoch before raising WH2 envs.
+- **WH3 (canonical learner):** packed `batch_size=4096` + ~5M planner-loyal policy on RTX 5090 32 GB / **96 GB** host; 24 local envs; stop Muse first. OOM fallback: 3072.
+- **WH2 (remote worker):** 24 envs on 64 GB now that ingest lives on WH3. Emergency learner fallback: `--batch-size 3072`.
+- **pking:** 24 envs on **72 GB** (20 was the 48 GB cap).
+- **Host RAM:** epoch ingest still scales with `n_steps × fleet_envs`; monitor first 6-minute epoch before raising WH3 local past 24.
 
 ## Next ops (when ready to train)
 

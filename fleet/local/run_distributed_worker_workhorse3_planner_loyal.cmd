@@ -1,11 +1,11 @@
 @echo off
-REM WH3 dense remote worker — planner-loyal, 24 envs (Muse must be stopped).
+REM WH3 local worker — planner-loyal, 24 envs (Muse must be stopped; learner is this box).
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 call "%~dp0..\fleet_hosts.cmd"
 call "%~dp0planner_loyal.env.cmd"
 set MACHINE_NAME=workhorse3
-set LEARNER_HOST=%FLEET_LEARNER_HOST%
+set LEARNER_HOST=127.0.0.1
 set BASE_PORT=5855
 set N_ENVS=24
 set ACTOR_RANKS=0-23

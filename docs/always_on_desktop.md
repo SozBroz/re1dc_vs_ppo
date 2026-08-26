@@ -24,7 +24,7 @@ powershell -ExecutionPolicy Bypass -File tools\setup_always_on_desktop.ps1 `
   -Username sshuser -Role worker -RepoRoot D:\re1_rl
 ```
 
-WH2 learner host:
+WH3 learner host:
 
 ```powershell
 cd C:\Users\sshuser\re1_rl

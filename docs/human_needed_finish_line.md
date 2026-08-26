@@ -139,7 +139,7 @@ Tools already exist under `scripts/hunt_*.py`. Agents cannot flip in-game bits.
 
 ### H3.2 Fleet ops
 - Stop/restart learners on graft zip (`ppo_re1_world_almanac_graft.zip`).
-- WH2 `n_envs` cap — do not raise past 27 without pagefile green light.
+- WH3 local `n_envs` cap — do not raise past 24 until first epoch keeps ≥16 GB host free. WH2 remote 24; pking 24 (72 GB).
 - Rollback to `backup/pre-world-catalog-2026-07-17` if graft fails kill criterion.
 
 ### H3.3 Reward / skill changes

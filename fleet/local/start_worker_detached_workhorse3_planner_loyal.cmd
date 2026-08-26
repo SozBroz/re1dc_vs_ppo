@@ -1,5 +1,5 @@
 @echo off
-REM Detached WH3 planner-loyal worker (24 envs). Muse must already be stopped.
+REM Detached WH3 planner-loyal local worker (24 envs). Muse must already be stopped.
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 if not exist data\logs mkdir data\logs

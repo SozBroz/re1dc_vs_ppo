@@ -9,27 +9,28 @@
   },
   "workhorse2": {
     "hostname": "workhorse2",
-    "role": "learner_and_local_worker",
+    "role": "remote_worker",
     "lan_ip": "192.168.0.116",
     "repo": "C:\\Users\\sshuser\\re1_rl",
-    "learner_port": 8765,
-    "learner_base_port": 5555,
-    "learner_n_envs": 28,
-    "notes": "Fleet learner (batch 3072)"
+    "worker_base_port": 5555,
+    "worker_n_envs": 24,
+    "notes": "Ex-learner; 24 remote envs on 64 GB now that ingest lives on WH3"
   },
   "workhorse3": {
     "hostname": "DESKTOP-A2HP723",
-    "role": "remote_worker",
+    "role": "learner_and_local_worker",
     "lan_ip": "192.168.0.229",
     "repo": "C:\\Users\\sshuser\\re1_rl",
-    "worker_base_port": 5855,
-    "worker_n_envs": 24,
-    "notes": "RTX 5090 32GB / 61GB RAM — dense remote worker; stop Muse before PPO workers"
+    "learner_port": 8765,
+    "learner_base_port": 5855,
+    "learner_n_envs": 24,
+    "notes": "RTX 5090 32GB / 96GB RAM — canonical learner, batch 4096; stop Muse before PPO"
   },
   "pking": {
     "role": "remote_worker",
     "worker_base_port": 5755,
-    "worker_n_envs": 20
+    "worker_n_envs": 24,
+    "notes": "72 GB RAM; 24 was unsafe at 48 GB"
   },
   "network": {
     "gateway": "192.168.0.1",
