@@ -1,12 +1,17 @@
 """Planner-loyal cell bootstrap + slot mapping."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import pytest
+
+from re1_rl.go_explore_merge import CELL_SIDECAR_NAME, CELL_STATE_NAME
 from re1_rl.planner_loyal_cells import (
     TRAINING_START_INDEX,
     bootstrap_from_crystals,
     cell_dir_name,
+    iter_training_start_cells,
     planner_loyal_root,
     slot_index_for_completed_step,
     training_start_paths,
@@ -35,3 +40,96 @@ def test_bootstrap_crystals_tip_exists() -> None:
 
     _strip_fat_artifacts(tip["cell_dir"])
     assert not (tip["cell_dir"] / "leg_replay.json").is_file()
+
+
+def _write_cell(root: Path, idx: int, *, meta: dict | None = None) -> None:
+    slot = root / "states" / "planner_loyal" / "cells" / cell_dir_name(idx)
+    slot.mkdir(parents=True, exist_ok=True)
+    (slot / CELL_STATE_NAME).write_bytes(b"STATE")
+    (slot / CELL_SIDECAR_NAME).write_text("{}", encoding="utf-8")
+    payload = {"checkpoint_index": idx, "checkpoint_id": f"cell_{idx}"}
+    if meta:
+        payload.update(meta)
+    (slot / "meta.json").write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+
+def test_training_starts_are_pl05_and_every_later_slot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_INDEX", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_RANGE", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_SET", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_FILE", raising=False)
+    _write_cell(tmp_path, 4, meta={"training_start": False})
+    _write_cell(tmp_path, 5, meta={"training_start": True})
+    _write_cell(tmp_path, 10, meta={"training_start": True})
+    # Synced cells often drop the flag; slot index still qualifies.
+    _write_cell(tmp_path, 11, meta={})
+    _write_cell(tmp_path, 18, meta={"chunk_final": True, "training_start": False})
+
+    starts = iter_training_start_cells(tmp_path)
+    assert [int(row["checkpoint_index"]) for row in starts] == [5, 10, 11, 18]
+
+
+def _write_pin(root: Path, text: str) -> Path:
+    path = root / "data" / "planner_loyal_reset_pin.env"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _seed_starts(tmp_path: Path) -> None:
+    for idx in (5, 10, 11, 13):
+        _write_cell(tmp_path, idx)
+
+
+def test_reset_pin_file_index_and_hot_reload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_INDEX", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_RANGE", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_SET", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_FILE", raising=False)
+    _seed_starts(tmp_path)
+    pin = _write_pin(
+        tmp_path,
+        "RE1_PLANNER_RESET_PIN_INDEX=11\n"
+        "RE1_PLANNER_RESET_PIN_RANGE=\n"
+        "RE1_PLANNER_RESET_PIN_SET=\n",
+    )
+    assert [int(row["checkpoint_index"]) for row in iter_training_start_cells(tmp_path)] == [
+        11
+    ]
+    pin.write_text(
+        "RE1_PLANNER_RESET_PIN_INDEX=\n"
+        "RE1_PLANNER_RESET_PIN_RANGE=10-13\n"
+        "RE1_PLANNER_RESET_PIN_SET=\n",
+        encoding="utf-8",
+    )
+    assert [int(row["checkpoint_index"]) for row in iter_training_start_cells(tmp_path)] == [
+        10,
+        11,
+        13,
+    ]
+
+
+def test_reset_pin_set_and_unminted_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_INDEX", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_RANGE", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_SET", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_FILE", raising=False)
+    _seed_starts(tmp_path)
+    _write_pin(tmp_path, "RE1_PLANNER_RESET_PIN_SET=5,11\n")
+    assert [int(row["checkpoint_index"]) for row in iter_training_start_cells(tmp_path)] == [
+        5,
+        11,
+    ]
+    _write_pin(tmp_path, "RE1_PLANNER_RESET_PIN_INDEX=99\n")
+    assert [int(row["checkpoint_index"]) for row in iter_training_start_cells(tmp_path)] == [
+        5,
+        10,
+        11,
+        13,
+    ]

@@ -10,6 +10,10 @@ if "%RE1_PLANNER_CHUNK%"=="" set RE1_PLANNER_CHUNK=data\planner_chunks\cp05_shie
 
 set RE1_PLANNER_LOYAL_CELLS_ROOT=states\planner_loyal
 
+REM Hot-reload start pin (edit the file; workers re-read it every reset).
+
+if "%RE1_PLANNER_RESET_PIN_FILE%"=="" set RE1_PLANNER_RESET_PIN_FILE=data\planner_loyal_reset_pin.env
+
 REM Thin status cells only (State+sidecar+meta+quality). No PPO leg tapes.
 
 set RE1_YAWN_LEG_REPLAY=0
