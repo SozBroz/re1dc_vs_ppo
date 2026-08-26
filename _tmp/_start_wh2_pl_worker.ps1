@@ -12,11 +12,11 @@ if ($DelaySec -gt 0) {
 
 $tn = 'RE1_WH2_PlannerLoyalWorker'
 $launcher = Join-Path $repo 'fleet\local\run_distributed_worker_workhorse2_planner_loyal.cmd'
-$existing = schtasks /Query /TN $tn 2>$null
+$q = schtasks /Query /TN $tn 2>$null
 if ($LASTEXITCODE -ne 0) {
   schtasks /Create /TN $tn /TR $launcher /SC ONCE /ST 00:00 /RL HIGHEST /IT /F | Out-Host
 } else {
-  schtasks /Change /TN $tn /TR $launcher /RL HIGHEST /IT /F | Out-Host
+  schtasks /Change /TN $tn /TR $launcher /RL HIGHEST | Out-Host
 }
 schtasks /Run /TN $tn | Out-Host
 Write-Output 'WH2_PL_WORKER_SCHEDULED'

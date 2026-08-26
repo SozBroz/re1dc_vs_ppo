@@ -12,9 +12,9 @@ if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
 set RE1_MACHINE_NAME=%MACHINE_NAME%
 REM Wave EmuHawk boots so 28 Lua hellos do not stampede (WH2_25 28-env path).
 set RE1_ACTOR_STARTUP_BATCH_SIZE=1
-REM Rank 24+ wedged when stagger=0 with 24 EmuHawks already live under learner load.
-set RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK=2
-set RE1_ACTOR_STARTUP_BATCH_COOLDOWN_S=3
+REM Interactive schtasks (/IT) session is required for 28 headless EmuHawks on WH2.
+set RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK=0
+set RE1_ACTOR_STARTUP_BATCH_COOLDOWN_S=0
 set RE1_EMUHAWK_DETACH_CONSOLE=1
 set RE1_EMUHAWK_START_PROCESS=1
 
