@@ -7,12 +7,12 @@ call "%~dp0planner_loyal.env.cmd"
 set MACHINE_NAME=workhorse2
 set LEARNER_HOST=127.0.0.1
 set BASE_PORT=5555
-set N_ENVS=28
+set N_ENVS=16
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
 set RE1_MACHINE_NAME=%MACHINE_NAME%
-REM Wave EmuHawk boots so 28 Lua hellos do not stampede (WH2_25 28-env path).
+REM WH2 co-hosts learner: 16 local envs fits 64GB RAM (28 wedged at 0 GB free).
 set RE1_ACTOR_STARTUP_BATCH_SIZE=1
-REM Interactive schtasks (/IT) session is required for 28 headless EmuHawks on WH2.
+REM Interactive schtasks (/IT) session is required for headless EmuHawks on WH2.
 set RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK=0
 set RE1_ACTOR_STARTUP_BATCH_COOLDOWN_S=0
 set RE1_EMUHAWK_DETACH_CONSOLE=1
