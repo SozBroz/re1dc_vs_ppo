@@ -233,6 +233,108 @@ def test_unique_key_acquire_qty_zero_file_slot():
     assert q.current["op"] == "objective"
 
 
+def test_alcove_swap_completes_on_wooden_emblem_loss():
+    """Yawn place_emblem_10F: wooden gone in 10F, gold still held."""
+    q = PlannerLoyalQueue()
+    q.seek(8)  # n=9 emblem@10F_alcove
+    assert q.current["site_id"] == "emblem@10F_alcove"
+    q.note_start_inventory(
+        {
+            "inventory_slots": [
+                ("knife", 1),
+                ("beretta", 15),
+                ("emblem", 1),
+                ("gold_emblem", 1),
+            ]
+        }
+    )
+    held = [
+        ("knife", 1),
+        ("beretta", 15),
+        ("emblem", 1),
+        ("gold_emblem", 1),
+    ]
+    after = [
+        ("knife", 1),
+        ("beretta", 15),
+        ("gold_emblem", 1),
+    ]
+    result = q.evaluate_transition(
+        prev_state={"room_id": "10F", "inventory_slots": held},
+        state={"room_id": "10F", "inventory_slots": after},
+    )
+    assert result["step_success"] is True
+    assert result["divert"] is False
+    assert q.current["op"] == "traverse"
+    assert q.current["edge_id"] == "10F->104"
+
+
+def test_alcove_swap_accepts_wall_story_site():
+    q = PlannerLoyalQueue()
+    q.seek(8)
+    q.note_start_inventory(
+        {
+            "inventory_slots": [
+                ("emblem", 1),
+                ("gold_emblem", 1),
+            ]
+        }
+    )
+    result = q.evaluate_transition(
+        prev_state={
+            "room_id": "10F",
+            "inventory_slots": [("emblem", 1), ("gold_emblem", 1)],
+        },
+        state={
+            "room_id": "10F",
+            "inventory_slots": [("gold_emblem", 1)],
+            "story_use_success": "emblem@10F_wall",
+        },
+    )
+    assert result["step_success"] is True
+
+
+def test_alcove_swap_completes_after_skip_without_rising_edge():
+    """USE cinema can start skip after wooden emblem is already gone."""
+    q = PlannerLoyalQueue()
+    q.seek(8)
+    q.note_start_inventory(
+        {
+            "inventory_slots": [
+                ("emblem", 1),
+                ("gold_emblem", 1),
+            ]
+        }
+    )
+    after = [("gold_emblem", 1)]
+    result = q.evaluate_transition(
+        prev_state={"room_id": "10F", "inventory_slots": after},
+        state={"room_id": "10F", "inventory_slots": after},
+    )
+    assert result["step_success"] is True
+
+
+def test_alcove_swap_ignores_gold_emblem_putback():
+    q = PlannerLoyalQueue()
+    q.seek(8)
+    q.note_start_inventory(
+        {
+            "inventory_slots": [
+                ("emblem", 1),
+                ("gold_emblem", 1),
+            ]
+        }
+    )
+    result = q.evaluate_transition(
+        prev_state={
+            "room_id": "10F",
+            "inventory_slots": [("emblem", 1), ("gold_emblem", 1)],
+        },
+        state={"room_id": "10F", "inventory_slots": [("emblem", 1)]},
+    )
+    assert result["step_success"] is False
+
+
 def test_ammo_new_slot_counts_as_gain():
     q = PlannerLoyalQueue()
     q.seek(2)  # first bullet pile

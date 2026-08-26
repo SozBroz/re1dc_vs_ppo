@@ -93,6 +93,10 @@ STRONG_HEAL_USE_ITEMS = frozenset(
     }
 )
 
+# Yawn place_emblem_10F accepted either bar wooden-emblem USE site.
+_ALCOVE_SWAP_SITES = frozenset({"emblem@10F_alcove", "emblem@10F_wall"})
+_ALCOVE_SWAP_BEATS = frozenset({"emblem_swap_alcove"})
+
 # Ops encoded for the policy (one-hot order).
 PLANNER_OP_TYPES = (
     "traverse",
@@ -207,6 +211,29 @@ class PlannerLoyalQueue:
             # generic "already holding ammo"; only exact pickup_ids satisfied.
             return False
         return item in self._start_held
+
+    def _alcove_swap_complete(
+        self, prev_state: dict[str, Any], state: dict[str, Any]
+    ) -> bool:
+        """Wooden emblem left inventory in 10F while gold_emblem is still held.
+
+        Yawn ``place_emblem_10F`` used story_use (alcove or wall) plus
+        ``lacks_item`` emblem. Planner-loyal used to require an exact
+        ``emblem@10F_alcove`` story id, so a real swap often never minted.
+        """
+        step = self.current or {}
+        site = str(step.get("site_id") or "")
+        beat = str(step.get("beat_id") or "")
+        if site not in _ALCOVE_SWAP_SITES and beat not in _ALCOVE_SWAP_BEATS:
+            return False
+        if str(state.get("room_id") or "") != "10F":
+            return False
+        held_now = _inventory_held_names(state)
+        if "gold_emblem" not in held_now or "emblem" in held_now:
+            return False
+        if "emblem" in _inventory_held_names(prev_state):
+            return True
+        return "emblem" in self._start_held
 
     def _unique_acquire_now_held(self, state: dict[str, Any]) -> bool:
         """True when the current unique acquire's item is in inventory now."""
@@ -367,10 +394,30 @@ class PlannerLoyalQueue:
         if op in {"objective", "do_puzzle", "trigger_cutscene", "boss"}:
             site = str(step.get("site_id") or "")
             story = str(state.get("story_use_success") or "")
-            if site and story and story == site:
+            story_hit = _objective_story_matches(site, story)
+            if story_hit and (
+                story not in _ALCOVE_SWAP_SITES
+                or "emblem" not in _inventory_held_names(state)
+            ):
                 result["step_success"] = True
                 self._index += 1
                 self.step_success_pending = True
+                if story in _ALCOVE_SWAP_SITES or site in _ALCOVE_SWAP_SITES:
+                    print(
+                        f"[planner_loyal] alcove_swap site={site or story} "
+                        f"room={room}",
+                        flush=True,
+                    )
+                return result
+            if self._alcove_swap_complete(prev_state, state):
+                result["step_success"] = True
+                self._index += 1
+                self.step_success_pending = True
+                print(
+                    f"[planner_loyal] alcove_swap site={site or story} "
+                    f"room={room}",
+                    flush=True,
+                )
                 return result
             # Gallery / puzzle progress hooks can be added later.
 
@@ -389,6 +436,12 @@ def _ink_ribbon_consumed(prev_state: dict[str, Any], state: dict[str, Any]) -> b
     before = int(count_ink_ribbons(prev_state))
     after = int(count_ink_ribbons(state))
     return before > 0 and after < before
+
+
+def _objective_story_matches(site: str, story: str) -> bool:
+    if site and story and story == site:
+        return True
+    return bool(site in _ALCOVE_SWAP_SITES and story in _ALCOVE_SWAP_SITES)
 
 
 def _pickup_id_parts(pickup_id: str) -> tuple[str, str, str | None]:
