@@ -9,7 +9,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from re1_rl.distributed.rollout_codec import decode_rollout, encode_rollout
+from re1_rl.distributed.rollout_codec import (
+    decode_rollout,
+    encode_rollout,
+    peek_rollout_timesteps,
+)
 from re1_rl.distributed.rollout_types import WorkerRollout
 from re1_rl.distributed.spaces import OBS_SCHEMA_VERSION
 from re1_rl.obs_encoder import BOX_DIM, GOAL_DIM, PROPRIO_DIM
@@ -123,3 +127,9 @@ def test_rollout_codec_v2_frame_roundtrip() -> None:
     assert blob_v2[4] in (2, 3)  # codec version (v3 adds optional aux targets)
     restored = decode_rollout(blob_v2)
     assert np.array_equal(restored.obs["frame"], original.obs["frame"])
+
+
+def test_peek_rollout_timesteps() -> None:
+    original = _sample_rollout()
+    blob = encode_rollout(original)
+    assert peek_rollout_timesteps(blob) == original.n_steps * original.n_envs

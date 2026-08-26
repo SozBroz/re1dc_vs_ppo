@@ -212,6 +212,28 @@ def test_capacity_full_rejects_after_cohort_fills() -> None:
     assert q.qsize() == 1
 
 
+def test_would_reject_rollout_preflight() -> None:
+    store = WeightStore()
+    q: queue.Queue = queue.Queue()
+    state = LearnerState(
+        store,
+        q,
+        machine_name="t",
+        max_staleness=2,
+        worker_liveness_s=60,
+        max_pending_steps=10,
+    )
+    state.set_current_version(1)
+    state.begin_epoch()
+    state.epoch_admitted_steps = 8
+    assert state.would_reject_rollout(4) == "capacity_full"
+    assert state.would_reject_rollout(2) is None
+    state.record_capacity_reject(4)
+    assert state.rollouts_rejected_capacity == 1
+    assert state.steps_rejected_capacity == 4
+    assert state.epoch_capacity_blocked is True
+
+
 def test_capacity_allows_first_oversized_rollout() -> None:
     store = WeightStore()
     q: queue.Queue = queue.Queue()

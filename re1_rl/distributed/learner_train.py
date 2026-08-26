@@ -290,13 +290,15 @@ def merge_rollouts(rollouts: list[WorkerRollout]) -> dict[str, Any]:
 
     def _merge_optional_targets(attr: str, dim: int, empty_fn) -> np.ndarray:
         parts = []
+        empty_base = None
         for r in rollouts:
             arr = getattr(r, attr, None)
             if arr is None:
-                empty = np.asarray(empty_fn(), dtype=np.float32)
-                parts.append(
-                    np.broadcast_to(empty, (r.n_steps, r.n_envs, dim)).copy()
-                )
+                if empty_base is None:
+                    empty_base = np.asarray(empty_fn(), dtype=np.float32)
+                slab = np.empty((r.n_steps, r.n_envs, dim), dtype=np.float32)
+                slab[:] = empty_base
+                parts.append(slab)
             else:
                 parts.append(np.asarray(arr, dtype=np.float32))
         return np.concatenate(parts, axis=1)

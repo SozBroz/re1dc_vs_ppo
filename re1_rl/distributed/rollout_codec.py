@@ -95,7 +95,8 @@ def encode_rollout(rollout: WorkerRollout) -> bytes:
     )
 
 
-def decode_rollout(data: bytes) -> WorkerRollout:
+def _parse_rollout_header(data: bytes) -> tuple[dict[str, Any], int, int, int, int]:
+    """Return (meta, version, npz_off, npz_len, frame_len) without decoding arrays."""
     if len(data) < 13 or data[:4] != _MAGIC:
         raise ValueError("invalid rollout payload header")
     version = data[4]
@@ -110,8 +111,30 @@ def decode_rollout(data: bytes) -> WorkerRollout:
         off = 17
     else:
         raise ValueError(f"unsupported rollout codec version {version}")
-    meta = json.loads(data[off : off + meta_len].decode("utf-8"))
-    off += meta_len
+    meta_end = off + meta_len
+    if len(data) < meta_end:
+        raise ValueError("truncated rollout meta")
+    meta = json.loads(data[off:meta_end].decode("utf-8"))
+    npz_off = meta_end
+    return meta, int(version), npz_off, int(npz_len), int(frame_len)
+
+
+def peek_rollout_timesteps(data: bytes) -> int:
+    """Env-step count from the wire header only (no npz/frame decode)."""
+    meta, _version, _npz_off, npz_len, frame_len = _parse_rollout_header(data)
+    need = _npz_off + npz_len + frame_len
+    if len(data) < need:
+        raise ValueError("truncated rollout payload")
+    n_steps = int(meta.get("n_steps") or 0)
+    n_envs = int(meta.get("n_envs") or 0)
+    if n_steps <= 0 or n_envs <= 0:
+        raise ValueError("invalid rollout shape in meta")
+    return n_steps * n_envs
+
+
+def decode_rollout(data: bytes) -> WorkerRollout:
+    meta, version, off, npz_len, frame_len = _parse_rollout_header(data)
+    off = off  # npz offset
     npz_bytes = data[off : off + npz_len]
     off += npz_len
     if version in (2, 3):

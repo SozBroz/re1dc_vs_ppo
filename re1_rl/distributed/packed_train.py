@@ -101,6 +101,8 @@ def _merged_to_flat_segment(model: MaskablePPO, merged: dict[str, Any]) -> dict[
 def _concat_flat_segments(segments: list[dict[str, Any]]) -> dict[str, Any]:
     if not segments:
         raise ValueError("empty segment list")
+    if len(segments) == 1:
+        return segments[0]
     obs_keys = segments[0]["obs"].keys()
     return {
         "obs": {
@@ -156,8 +158,12 @@ def fill_packed_rollout_buffer(
 
     obs_prepared = prepare_obs_for_policy(flat["obs"], model.observation_space)
     for key in buffer.observations:
-        arr = np.asarray(obs_prepared[key])
-        # (N, *shape) -> (N, 1, *shape)
+        arr = obs_prepared[key]
+        if not isinstance(arr, np.ndarray):
+            arr = np.asarray(arr)
+        # (N, *shape) -> (N, 1, *shape); one contiguous copy for frame tensors.
+        if key == "frame" and not arr.flags["C_CONTIGUOUS"]:
+            arr = np.ascontiguousarray(arr)
         buffer.observations[key][:, 0] = arr
 
     actions = np.asarray(flat["actions"])

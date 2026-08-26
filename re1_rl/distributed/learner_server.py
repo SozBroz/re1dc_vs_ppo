@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlparse
 
 from re1_rl.distributed.log_util import log
 from re1_rl.distributed.relevance_gate import DEFAULT_RELEVANCE_MAX_AGE
-from re1_rl.distributed.rollout_codec import decode_rollout
+from re1_rl.distributed.rollout_codec import decode_rollout, peek_rollout_timesteps
 from re1_rl.distributed.rollout_types import WorkerRollout, normalize_curriculum_id
 from re1_rl.distributed.weight_store import WeightStore
 from re1_rl.go_explore_merge import GoExploreMerge, extract_proposals_from_infos
@@ -394,6 +394,32 @@ class LearnerState:
             f"relevance_max_age={self.relevance_max_age}) "
             f"+{rollout.num_timesteps()} steps",
         )
+
+    def would_reject_rollout(self, steps: int) -> str | None:
+        """Preflight capacity/RAM check without decoding rollout arrays."""
+        n = int(steps)
+        if n <= 0:
+            return "bad_rollout"
+        with self.lock:
+            if self.host_memory_pressure():
+                return "capacity_full"
+            if (
+                self.max_pending_steps > 0
+                and self.epoch_admitted_steps > 0
+                and self.epoch_admitted_steps + n > self.max_pending_steps
+            ):
+                return "capacity_full"
+        return None
+
+    def record_capacity_reject(self, steps: int) -> None:
+        """Account for a preflight capacity rejection (decode skipped)."""
+        n = int(steps)
+        with self.lock:
+            self.rollouts_rejected += 1
+            self.rollouts_rejected_capacity += 1
+            self.steps_rejected_ingest += n
+            self.steps_rejected_capacity += n
+            self.epoch_capacity_blocked = True
 
     def accept_rollout(self, rollout: WorkerRollout) -> tuple[bool, str]:
         wid = base_worker_id(rollout.worker_id)
@@ -780,6 +806,16 @@ class _LearnerHandler(BaseHTTPRequestHandler):
 
         if path == "/rollout":
             raw = self._read_body()
+            try:
+                pending_steps = peek_rollout_timesteps(raw)
+            except (ValueError, KeyError, UnicodeDecodeError) as exc:
+                self._send_json(400, {"error": f"bad rollout header: {exc}"})
+                return
+            preflight = self.state.would_reject_rollout(pending_steps)
+            if preflight == "capacity_full":
+                self.state.record_capacity_reject(pending_steps)
+                self._send_json(409, {"accepted": False, "reason": preflight})
+                return
             try:
                 rollout = decode_rollout(raw)
             except (ValueError, KeyError, OSError) as exc:

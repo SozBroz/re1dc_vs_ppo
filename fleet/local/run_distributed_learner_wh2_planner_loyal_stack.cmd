@@ -7,6 +7,8 @@ set MACHINE=workhorse2
 set LEARNER_PORT=%FLEET_LEARNER_PORT%
 set SYNC_INTERVAL_S=360
 set BATCH_SIZE=3072
+set MAX_PENDING_STEPS=160000
+set MIN_HOST_FREE_GB=16
 
 call "%~dp0planner_loyal.env.cmd"
 if not exist data\logs mkdir data\logs
@@ -34,7 +36,8 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --max-staleness 1 ^
   --relevance-gate ^
   --batch-size %BATCH_SIZE% ^
-  --min-host-free-gb 12 ^
+  --max-pending-steps %MAX_PENDING_STEPS% ^
+  --min-host-free-gb %MIN_HOST_FREE_GB% ^
   --resume auto ^
   --no-local-worker ^
   --headless >> data\logs\learner_wh2_planner_loyal.log 2>&1
