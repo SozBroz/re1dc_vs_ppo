@@ -23,7 +23,4 @@ for ($i = 0; $i -lt 12; $i++) {
 }
 Write-Output ("emu_remaining=" + @(Get-Process EmuHawk -EA SilentlyContinue).Count)
 
-Start-Sleep -Seconds 2
-$cmd = 'cmd.exe /c "' + $repo + '\fleet\local\start_worker_detached_workhorse2_planner_loyal.cmd"'
-$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine=$cmd; CurrentDirectory=$repo }
-Write-Output ("WMI rv={0} pid={1}" -f $r.ReturnValue, $r.ProcessId)
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo '_tmp\_start_wh2_pl_worker.ps1')
