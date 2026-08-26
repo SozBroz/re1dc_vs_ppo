@@ -10,17 +10,13 @@ if ($DelaySec -gt 0) {
   Start-Sleep -Seconds $DelaySec
 }
 
-$tn = 'RE1_WH2_PlannerLoyalWorker_Admin'
-Unregister-ScheduledTask -TaskName $tn -Confirm:$false -EA SilentlyContinue
-$action = New-ScheduledTaskAction `
-  -Execute 'cmd.exe' `
-  -Argument '/c fleet\local\run_distributed_worker_workhorse2_planner_loyal.cmd' `
-  -WorkingDirectory $repo
-$principal = New-ScheduledTaskPrincipal -UserId 'admin' -LogonType Interactive -RunLevel Highest
-$settings = New-ScheduledTaskSettingsSet `
-  -AllowStartIfOnBatteries `
-  -DontStopIfGoingOnBatteries `
-  -ExecutionTimeLimit ([TimeSpan]::Zero)
-Register-ScheduledTask -TaskName $tn -Action $action -Principal $principal -Settings $settings -Force | Out-Null
-Start-ScheduledTask -TaskName $tn
+$tn = 'RE1_WH2_PlannerLoyalWorker'
+$launcher = Join-Path $repo 'fleet\local\run_distributed_worker_workhorse2_planner_loyal.cmd'
+$existing = schtasks /Query /TN $tn 2>$null
+if ($LASTEXITCODE -ne 0) {
+  schtasks /Create /TN $tn /TR $launcher /SC ONCE /ST 00:00 /RL HIGHEST /IT /F | Out-Host
+} else {
+  schtasks /Change /TN $tn /TR $launcher /RL HIGHEST /IT /F | Out-Host
+}
+schtasks /Run /TN $tn | Out-Host
 Write-Output 'WH2_PL_WORKER_SCHEDULED'
