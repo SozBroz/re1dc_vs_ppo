@@ -1,5 +1,5 @@
 @echo off
-REM WH2 learner — planner-loyal, resume latest zip. Local 28-env worker.
+REM WH2 learner — planner-loyal, resume latest zip. Local 16-env worker.
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 call "%~dp0..\fleet_hosts.cmd"
