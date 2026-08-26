@@ -10,13 +10,15 @@ if ($DelaySec -gt 0) {
   Start-Sleep -Seconds $DelaySec
 }
 
-$tn = 'RE1_WH3_PlannerLoyalWorker'
-$launcher = Join-Path $repo 'fleet\local\run_distributed_worker_workhorse3_planner_loyal.cmd'
-$q = schtasks /Query /TN $tn 2>$null
-if ($LASTEXITCODE -ne 0) {
-  schtasks /Create /TN $tn /TR $launcher /SC ONCE /ST 00:00 /RL HIGHEST /IT /F | Out-Host
-} else {
-  schtasks /Change /TN $tn /TR $launcher /RL HIGHEST | Out-Host
-}
-schtasks /Run /TN $tn | Out-Host
-Write-Output 'WH3_PL_WORKER_SCHEDULED'
+# Console session on WH3 is `admin`, not sshuser. EmuHawk must start in that desktop.
+$tn = 'RE1_WH3_PlannerLoyalWorker_Admin'
+Get-CimInstance Win32_Process -Filter "Name='python.exe'" -EA SilentlyContinue |
+  Where-Object { $_.CommandLine -match 'workhorse3-planner-loyal' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }
+Unregister-ScheduledTask -TaskName $tn -Confirm:$false -EA SilentlyContinue
+$action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument '/c fleet\local\start_worker_detached_workhorse3_planner_loyal.cmd' -WorkingDirectory $repo
+$principal = New-ScheduledTaskPrincipal -UserId 'admin' -LogonType Interactive -RunLevel Highest
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
+Register-ScheduledTask -TaskName $tn -Action $action -Principal $principal -Settings $settings -Force | Out-Null
+Start-ScheduledTask -TaskName $tn
+Write-Output 'WH3_PL_WORKER_ADMIN_SCHEDULED'
