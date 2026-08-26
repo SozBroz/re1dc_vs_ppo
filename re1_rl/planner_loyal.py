@@ -26,8 +26,42 @@ DEFAULT_CHUNK = ROOT / "data" / "planner_chunks" / "cp05_shield_key.json"
 PLANNER_MAX_STEPS = 20
 PLANNER_STEP_SUCCESS_REWARD = 8.0
 PLANNER_DIVERT_PENALTY = -4.0
+PLANNER_TIMEOUT_PENALTY = -4.0
 HEAL_USE_TAX_LIGHT = -0.05  # green / blue herb
 HEAL_USE_TAX_STRONG = -0.10  # sprays, red mixes, multi-herb mixes
+
+# Scalar reward keys under strict planner-loyal (telemetry aliases excluded).
+PLANNER_LOYAL_SCALAR_KEYS: frozenset[str] = frozenset(
+    {
+        "step",
+        "softlock",
+        "hp",
+        "death",
+        "enemy_damage",
+        "enemy_kill",
+        "attack_miss",
+        "ammo_spend",
+        "ammo_waste",
+        "combat_overkill",
+        "shotgun_dog_hit",
+        "heavy_weapon_fodder_hit",
+        "attack_dry_fire",
+        "attack_macro_failure",
+        "heal_use_tax",
+        "planner_step_success",
+        "planner_divert",
+        "planner_timeout",
+    }
+)
+
+# Populated for capture / terminal paths; never summed into the scalar reward.
+PLANNER_LOYAL_TELEMETRY_KEYS: frozenset[str] = frozenset(
+    {
+        "wrong_room",
+        "checkpoint_success",
+        "checkpoint_timeout",
+    }
+)
 
 # Strategy-memory / almanac keys removed from the obs Dict under planner-loyal
 # (not zeroed). World tower is omitted when ``world_state`` is absent.
@@ -214,6 +248,11 @@ class PlannerLoyalQueue:
             if "->" in edge:
                 return edge.split("->", 1)[1]
             return None
+        if op == "acquire":
+            pickup_id = str(step.get("pickup_id") or "")
+            room, _item, _pile = _pickup_id_parts(pickup_id)
+            if room:
+                return room
         return str(step.get("room_id") or "") or None
 
     def evaluate_transition(
@@ -505,6 +544,158 @@ _ROUTE_ADMIN_GOAL_NAMES = (
     "item_todo_progress",
     "wrong_room_flag",
 )
+
+
+def scalarize_planner_loyal_reward(bd: dict[str, float]) -> float:
+    """Sum only documented planner-loyal scalar channels."""
+    from re1_rl.reward import REWARD_SCALE
+
+    total = sum(float(bd.get(key, 0.0) or 0.0) for key in PLANNER_LOYAL_SCALAR_KEYS)
+    return float(total) * REWARD_SCALE
+
+
+def validate_planner_loyal_stage(stage: dict[str, Any]) -> None:
+    """Fail closed when planner flag and curriculum disagree."""
+    mode = str(stage.get("mode") or "")
+    if mode != "planner_loyal":
+        raise ValueError(
+            "RE1_PLANNER_LOYAL=1 requires curriculum mode=planner_loyal, "
+            f"got {mode!r}"
+        )
+    if stage.get("route_steps"):
+        raise ValueError(
+            "planner_loyal curriculum must not supply legacy route_steps "
+            "(queue owns navigation)"
+        )
+
+
+def validate_planner_loyal_chunk(chunk: dict[str, Any]) -> None:
+    steps = list(chunk.get("steps") or [])
+    if not steps:
+        raise ValueError("planner loyal chunk has no steps")
+    if len(steps) > PLANNER_MAX_STEPS:
+        raise ValueError(
+            f"planner loyal chunk exceeds PLANNER_MAX_STEPS={PLANNER_MAX_STEPS}"
+        )
+
+
+def _planner_op_objective_index(op: str) -> int | None:
+    """Map planner op → goal objective one-hot slot (10..14 in GOAL_FIELDS)."""
+    mapping = {
+        "traverse": 0,  # obj_navigate
+        "acquire": 1,  # obj_pickup
+        "objective": 2,  # obj_use_item
+        "do_puzzle": 2,
+        "trigger_cutscene": 2,
+        "boss": 3,  # obj_fight
+        "use_box": 4,  # obj_scripted
+    }
+    idx = mapping.get(str(op or ""))
+    return idx
+
+
+def _planner_step_target_xz(
+    step: dict[str, Any],
+    *,
+    item_positions: Any | None = None,
+) -> tuple[float, float] | None:
+    """World XZ for the current planner step (pickup pile or story USE site)."""
+    op = str(step.get("op") or "")
+    if op == "acquire":
+        pickup_id = str(step.get("pickup_id") or "")
+        room, item, _pile = _pickup_id_parts(pickup_id)
+        if item_positions is not None and room and item:
+            pos = item_positions.get(room, item)
+            if pos is not None:
+                return float(pos[0]), float(pos[1])
+        return None
+    if op in {"objective", "do_puzzle", "trigger_cutscene", "boss"}:
+        site_id = str(step.get("site_id") or "")
+        if not site_id:
+            return None
+        from re1_rl.story_item_use import load_story_use_sites
+
+        for site in load_story_use_sites():
+            if str(site.get("id") or "") == site_id:
+                return float(site["x"]), float(site["z"])
+    return None
+
+
+def encode_planner_loyal_goal(
+    encoder: Any,
+    graph: Any,
+    state: dict[str, Any],
+    queue: PlannerLoyalQueue,
+    *,
+    cell_time_remaining: float | None = None,
+    item_positions: Any | None = None,
+) -> np.ndarray:
+    """Queue-driven goal vector: target room, hop distance, exit/in-room compass."""
+    from re1_rl.obs_encoder import (
+        CELL_TIME_REMAINING_INDEX,
+        GOAL_DIM,
+        GOAL_LOOKAHEAD_SLOT_DIM,
+        GOAL_LOOKAHEAD_SLOTS,
+        GOAL_BASE_DIM,
+    )
+    from re1_rl.memory_map import ITEM_IDS
+
+    v = np.zeros(GOAL_DIM, dtype=np.float32)
+    step = queue.current
+    if step is None:
+        remaining = 1.0 if cell_time_remaining is None else float(cell_time_remaining)
+        v[CELL_TIME_REMAINING_INDEX] = float(np.clip(remaining, 0.0, 1.0))
+        return v
+
+    room = str(state.get("room_id", "") or "")
+    target_room = queue.target_room()
+    v[0] = encoder._room_idx_norm(target_room)
+    hops = graph.hop_distance(room, target_room) if target_room else None
+    v[3] = 1.0 if hops is None else min(float(hops) / 20.0, 1.0)
+    v[4] = 1.0 if target_room is not None and room == str(target_room) else 0.0
+
+    op = str(step.get("op") or "")
+    compass_set = False
+    if op == "traverse" and target_room is not None and room != str(target_room):
+        door = graph.exit_toward(room, str(target_room))
+        if door is not None:
+            v[5:10] = encoder._compass_to_xz(state, float(door.x), float(door.z))
+            v[21] = 1.0
+            compass_set = True
+    elif room and (target_room is None or room == str(target_room)):
+        target_xz = _planner_step_target_xz(step, item_positions=item_positions)
+        if target_xz is not None:
+            v[5:10] = encoder._compass_to_xz(state, target_xz[0], target_xz[1])
+            v[21] = 1.0
+            compass_set = True
+    if not compass_set and op == "traverse" and target_room is not None:
+        door = graph.exit_toward(room, str(target_room))
+        if door is not None:
+            v[5:10] = encoder._compass_to_xz(state, float(door.x), float(door.z))
+            v[21] = 1.0
+
+    obj_idx = _planner_op_objective_index(op)
+    if obj_idx is not None:
+        v[10 + obj_idx] = 1.0
+
+    # Semantic target item id in lookahead slot 0 (stable, not hash-only).
+    base = GOAL_BASE_DIM
+    slot = v[base : base + GOAL_LOOKAHEAD_SLOT_DIM]
+    slot[0] = 1.0
+    slot[1] = encoder._room_idx_norm(target_room or str(step.get("room_id") or room))
+    if op == "acquire":
+        _room, item, _pile = _pickup_id_parts(str(step.get("pickup_id") or ""))
+        item_id = ITEM_IDS.get(item, 0)
+        slot[12] = float(item_id) / 75.0  # MAX_ITEM_ID ~= 0x4B
+    elif op in {"objective", "do_puzzle", "trigger_cutscene"}:
+        site_id = str(step.get("site_id") or "")
+        if site_id:
+            digest = hashlib.md5(site_id.encode("utf-8")).digest()
+            slot[12] = int.from_bytes(digest[:2], "big") / 65535.0
+
+    remaining = 1.0 if cell_time_remaining is None else float(cell_time_remaining)
+    v[CELL_TIME_REMAINING_INDEX] = float(np.clip(remaining, 0.0, 1.0))
+    return v
 
 
 def planner_loyal_enabled() -> bool:

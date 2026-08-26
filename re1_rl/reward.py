@@ -865,6 +865,203 @@ def enemy_combat_rewards(state: dict[str, Any]) -> tuple[float, float]:
     )
 
 
+def scalarize_reward(
+    breakdown: dict[str, float],
+    *,
+    planner_loyal: bool = False,
+) -> float:
+    """Mode-aware reward scalarizer used by env step paths."""
+    if planner_loyal:
+        from re1_rl.planner_loyal import scalarize_planner_loyal_reward
+
+        return scalarize_planner_loyal_reward(breakdown)
+    return float(sum(breakdown.values())) * REWARD_SCALE
+
+
+def _planner_loyal_breakdown_template() -> dict[str, float]:
+    from re1_rl.planner_loyal import (
+        PLANNER_LOYAL_SCALAR_KEYS,
+        PLANNER_LOYAL_TELEMETRY_KEYS,
+    )
+
+    bd: dict[str, float] = {
+        key: 0.0 for key in PLANNER_LOYAL_SCALAR_KEYS | PLANNER_LOYAL_TELEMETRY_KEYS
+    }
+    return bd
+
+
+def _compute_planner_loyal_reward(
+    prev_state: dict[str, Any],
+    state: dict[str, Any],
+    planner_loyal_queue: Any,
+    *,
+    progress: ProgressTracker | None = None,
+    typewriter_save_complete: bool = False,
+    box_opened: bool = False,
+    return_breakdown: bool = False,
+) -> float | tuple[float, dict[str, float]]:
+    """Strict planner-loyal reward path — no legacy crumbs or progress side effects."""
+    from re1_rl.planner_loyal import (
+        PLANNER_DIVERT_PENALTY,
+        PLANNER_STEP_SUCCESS_REWARD,
+        PLANNER_TIMEOUT_PENALTY,
+        scalarize_planner_loyal_reward,
+    )
+    from re1_rl.yawn_cell_timeout import FLAT_CELL_TIMEOUT_FRAMES
+
+    softlock_threshold = softlock_frame_threshold(progress)
+    step_frames = int(state.get("step_emulated_frames", REFERENCE_STEP_FRAMES))
+    ref_frames = int(state.get("reference_step_frames", REFERENCE_STEP_FRAMES))
+    step_scale = max(step_frames, 0) / max(ref_frames, 1)
+
+    bd = _planner_loyal_breakdown_template()
+    bd["step"] = STEP_PENALTY * step_scale
+
+    loyal = planner_loyal_queue.evaluate_transition(
+        prev_state=prev_state,
+        state=state,
+        box_opened=box_opened,
+        typewriter_save_complete=bool(typewriter_save_complete),
+    )
+    bd["heal_use_tax"] = float(loyal.get("heal_use_tax") or 0.0)
+
+    if loyal.get("divert"):
+        bd["planner_divert"] = PLANNER_DIVERT_PENALTY
+        bd["wrong_room"] = PLANNER_DIVERT_PENALTY
+        if progress is not None and hasattr(progress, "breach_wrong_room"):
+            progress.breach_wrong_room()
+        for key in (
+            "planner_step_success",
+            "checkpoint_success",
+            "enemy_damage",
+            "enemy_kill",
+            "hp",
+        ):
+            bd[key] = 0.0
+    elif loyal.get("step_success"):
+        extra = int(state.get("step_emulated_frames") or 0)
+        if progress is not None and int(progress.cell_timeout_frames) <= 0:
+            progress.arm_cell_timeout(int(FLAT_CELL_TIMEOUT_FRAMES))
+        pay = float(PLANNER_STEP_SUCCESS_REWARD)
+        if progress is not None and int(progress.cell_timeout_frames) > 0:
+            pay = float(PLANNER_STEP_SUCCESS_REWARD) * float(
+                progress.cell_timeout_remaining_frac(extra)
+            )
+        bd["planner_step_success"] = pay
+        bd["checkpoint_success"] = pay
+        if progress is not None and hasattr(progress, "claim_checkpoint_success"):
+            progress.claim_checkpoint_success()
+        if (
+            progress is not None
+            and not planner_loyal_queue.done
+            and hasattr(progress, "arm_cell_timeout")
+        ):
+            progress.arm_cell_timeout(int(FLAT_CELL_TIMEOUT_FRAMES))
+            progress.leg_emulated_frames = 0
+
+    if (
+        progress is not None
+        and "step_emulated_frames" in state
+        and not bd["planner_step_success"]
+        and not progress.wrong_room_breached
+    ):
+        progress.note_leg_frames(int(state.get("step_emulated_frames") or 0))
+        if (
+            progress.cell_timeout_frames > 0
+            and progress.leg_emulated_frames >= progress.cell_timeout_frames
+            and progress.breach_cell_timeout()
+        ):
+            bd["planner_timeout"] = PLANNER_TIMEOUT_PENALTY
+            bd["checkpoint_timeout"] = PLANNER_TIMEOUT_PENALTY
+
+    prev_hp = int(prev_state.get("hp", 0))
+    hp = int(state.get("hp", 0))
+    hp_delta = hp - prev_hp
+    if hp_delta < 0 and _player_hp_in_reward_band(prev_hp) and hp <= JILL_FINE_HP:
+        bd["hp"] = HP_LOSS_SCALE * hp_delta
+    elif (
+        hp_delta > 0
+        and _player_hp_in_reward_band(prev_hp)
+        and _player_hp_in_reward_band(hp)
+    ):
+        bd["hp"] = hp_heal_reward(hp_delta)
+
+    if state.get("dead"):
+        bd["death"] = DEATH_PENALTY
+
+    enemy_damage_pay, enemy_kill_pay = enemy_combat_rewards(state)
+    if enemy_damage_pay > 0.0:
+        bd["enemy_damage"] = enemy_damage_pay
+    if enemy_kill_pay > 0.0:
+        bd["enemy_kill"] = enemy_kill_pay
+
+    overkill = combat_overkill_penalty(state)
+    if overkill < 0.0:
+        bd["combat_overkill"] = overkill
+
+    dog_sg = shotgun_dog_hit_penalty(state)
+    if dog_sg < 0.0:
+        bd["shotgun_dog_hit"] = dog_sg
+
+    heavy_fodder = heavy_weapon_fodder_hit_penalty(state)
+    if heavy_fodder < 0.0:
+        bd["heavy_weapon_fodder_hit"] = heavy_fodder
+
+    rounds_spent = int(state.get("ammo_spent", 0) or 0)
+    if rounds_spent > 0 and not state.get("pending_combat_expired"):
+        bd["ammo_spend"] = ammo_spend_penalty(
+            _combat_ammo_weapon_id(state), rounds_spent,
+        )
+
+    if state.get("knife_swing_missed"):
+        bd["attack_miss"] = KNIFE_MISS_PENALTY
+    elif state.get("attack_missed"):
+        waste_rounds = int(state.get("deferred_waste_rounds") or 0)
+        if waste_rounds <= 0:
+            waste_rounds = rounds_spent
+        if waste_rounds > 0:
+            from re1_rl.ammo_accounting import fireable_ammo_before_miss
+
+            wid = _combat_ammo_weapon_id(state)
+            ammo_before = fireable_ammo_before_miss(
+                state, wid, rounds_spent=waste_rounds,
+            )
+            bd["ammo_waste"] = ammo_waste_penalty(
+                wid,
+                waste_rounds,
+                ammo_before=ammo_before,
+            )
+    if state.get("attack_dry_fire"):
+        bd["attack_dry_fire"] = ATTACK_DRY_FIRE_PENALTY
+    elif state.get("attack_macro_failure"):
+        bd["attack_macro_failure"] = ATTACK_MACRO_FAILURE_PENALTY
+
+    if progress is not None and (
+        progress.wrong_room_breached
+        or progress.cell_timeout_breached
+    ):
+        for term, value in tuple(bd.items()):
+            if value > 0.0:
+                bd[term] = 0.0
+
+    if progress is not None and not state.get("dead"):
+        frames_before = progress.stagnation_frames
+        progress.note_stagnation_step(
+            made_progress=False,
+            step_frames=step_frames,
+        )
+        bd["softlock"] = contempt_penalty_delta(
+            frames_before,
+            progress.stagnation_frames,
+            threshold=softlock_threshold,
+        )
+
+    reward = scalarize_planner_loyal_reward(bd)
+    if return_breakdown:
+        return reward, bd
+    return reward
+
+
 def compute_reward(
     prev_state: dict[str, Any],
     state: dict[str, Any],
@@ -882,6 +1079,16 @@ def compute_reward(
 ) -> float | tuple[float, dict[str, float]]:
     """Compute scalar reward from symbolic state dicts."""
     del success_room
+    if planner_loyal_queue is not None:
+        return _compute_planner_loyal_reward(
+            prev_state,
+            state,
+            planner_loyal_queue,
+            progress=progress,
+            typewriter_save_complete=typewriter_save_complete,
+            box_opened=box_opened,
+            return_breakdown=return_breakdown,
+        )
     if softlock_threshold is None:
         softlock_threshold = softlock_frame_threshold(progress)
 

@@ -248,11 +248,13 @@ def train_packed_on_rollouts(
         return 0
 
     groups = group_rollouts_for_train(rollouts)
+    from re1_rl.planner_loyal import planner_loyal_enabled
+
     loadout_samples = loadout_samples_from_infos(
         info for r in rollouts for info in (r.episode_infos or [])
     )
     loadout_stats: dict[str, float] = {}
-    if hasattr(model, "prepare_loadout_epoch"):
+    if hasattr(model, "prepare_loadout_epoch") and not planner_loyal_enabled():
         loadout_stats = model.prepare_loadout_epoch(loadout_samples)
 
     segments: list[dict[str, Any]] = []
@@ -268,7 +270,7 @@ def train_packed_on_rollouts(
         version_counts[int(merged["policy_version"])] = (
             version_counts.get(int(merged["policy_version"]), 0) + n_seg
         )
-        if hasattr(model, "frozen_loadout_scorer"):
+        if hasattr(model, "frozen_loadout_scorer") and not planner_loyal_enabled():
             guidance = apply_bounded_loadout_guidance(
                 merged,
                 model.frozen_loadout_scorer,
@@ -285,6 +287,8 @@ def train_packed_on_rollouts(
         "guidance_transfers": guidance_transfers,
         "guidance_total": guidance_total,
     }
+    if planner_loyal_enabled():
+        loadout_stats["guidance_skipped"] = 1.0
     flat = _concat_flat_segments(segments)
     segments.clear()
     n = int(flat["n"])

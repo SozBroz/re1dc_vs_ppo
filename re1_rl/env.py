@@ -500,11 +500,13 @@ class RE1Env(gym.Env):
             load_chunk,
             planner_loyal_enabled,
             resolve_chunk_path,
+            validate_planner_loyal_chunk,
         )
 
         if not planner_loyal_enabled():
             return
         chunk = load_chunk(resolve_chunk_path(self.project_root))
+        validate_planner_loyal_chunk(chunk)
         self._planner_loyal_queue = PlannerLoyalQueue(chunk)
         spaces_map = dict(self.observation_space.spaces)
         for key in PLANNER_LOYAL_OMIT_OBS_KEYS:
@@ -513,6 +515,9 @@ class RE1Env(gym.Env):
             -1.0, 1.0, shape=(PLANNER_QUEUE_DIM,), dtype=np.float32
         )
         self.observation_space = spaces.Dict(spaces_map)
+
+    def _planner_loyal_active(self) -> bool:
+        return getattr(self, "_planner_loyal_queue", None) is not None
 
     def _planner_loyal_reward_kwargs(self) -> dict[str, Any]:
         if getattr(self, "_planner_loyal_queue", None) is None:
@@ -579,6 +584,10 @@ class RE1Env(gym.Env):
         else:
             with self.curriculum_path.open(encoding="utf-8") as f:
                 self._stage = json.load(f)
+            if self._planner_loyal_active():
+                from re1_rl.planner_loyal import validate_planner_loyal_stage
+
+                validate_planner_loyal_stage(self._stage)
             route_path = self.project_root / self._stage.get(
                 "route_path", "data/route_jill_anypct.json"
             )
@@ -1133,7 +1142,11 @@ class RE1Env(gym.Env):
         elif capture_ineligible_failure:
             reason = "checkpoint_capture_ineligible"
         elif cell_timeout_failure:
-            reason = "checkpoint_timeout"
+            reason = (
+                "planner_timeout"
+                if planner_loyal
+                else "checkpoint_timeout"
+            )
         elif planner_chunk_complete:
             reason = "planner_chunk_complete"
         elif checkpoint_success:
@@ -1152,6 +1165,8 @@ class RE1Env(gym.Env):
         truncated: bool,
     ) -> None:
         """Carry one semantic box-departure sample to its factual outcome."""
+        if self._planner_loyal_active():
+            return
         from re1_rl.item_box import is_box_room
 
         prev_room = str(prev_state.get("room_id", ""))
@@ -1217,6 +1232,24 @@ class RE1Env(gym.Env):
         goal_state = dict(state)
         goal_state["gallery_needs_reentry"] = self._progress.gallery_needs_reentry
         goal_state["gallery_puzzle_solved"] = self._progress.gallery_puzzle_solved
+        queue = getattr(self, "_planner_loyal_queue", None)
+        if queue is not None:
+            from re1_rl.planner_loyal import encode_planner_loyal_goal
+
+            goal_vec = encode_planner_loyal_goal(
+                self._encoder,
+                self.graph,
+                goal_state,
+                queue,
+                cell_time_remaining=self._progress.cell_timeout_remaining_frac(),
+                item_positions=self.item_positions,
+            )
+        else:
+            goal_vec = self._encoder.encode_goal(
+                goal_state, self._planner,
+                item_tracker=self._items, room_items=self.room_items,
+                cell_time_remaining=self._progress.cell_timeout_remaining_frac(),
+            )
         box_obs = self._box_obs(state)
         inventory_obs = encode_inventory_slots(state.get("inventory_slots"))
         logistics_obs = self._encoder.encode_logistics(state, self._planner)
@@ -1227,11 +1260,7 @@ class RE1Env(gym.Env):
         obs = {
             "frame": frame_obs,
             "proprio": self._encoder.encode_proprio(state, self._prev_hp),
-            "goal": self._encoder.encode_goal(
-                goal_state, self._planner,
-                item_tracker=self._items, room_items=self.room_items,
-                cell_time_remaining=self._progress.cell_timeout_remaining_frac(),
-            ),
+            "goal": goal_vec,
             "spatial": self._spatial.encode(
                 state, room_items=self.room_items, item_tracker=self._items,
             ),
@@ -1296,7 +1325,14 @@ class RE1Env(gym.Env):
         *,
         typewriter_save_complete: bool = False,
     ) -> None:
-        """Auto-capture PB milestones when RE1_PB_CAPTURE=1."""
+        """Side effects after reward: capture hooks, go-explore, PB (legacy only)."""
+        if self._planner_loyal_active():
+            if (
+                float(breakdown.get("checkpoint_success", 0.0)) > 0.0
+                or float(breakdown.get("planner_step_success", 0.0)) > 0.0
+            ):
+                self._arm_checkpoint_freeze()
+            return
         from re1_rl.pb_capture import maybe_capture_pb, pb_capture_enabled, pb_root_dir
         from re1_rl.pb_milestones import detect_milestone_triggers
         from re1_rl.pb_sync import ensure_pb_sync_daemon
@@ -2952,15 +2988,21 @@ class RE1Env(gym.Env):
 
     def _async_skip_timeout_due(self) -> bool:
         progress = getattr(self, "_progress", None)
-        if progress is None or str(self._stage.get("mode") or "") != "yawn_rails":
+        if progress is None:
+            return False
+        if not self._planner_loyal_active() and str(
+            self._stage.get("mode") or ""
+        ) != "yawn_rails":
             return False
         budget = int(getattr(progress, "cell_timeout_frames", 0) or 0)
         used = int(getattr(progress, "leg_emulated_frames", 0) or 0)
         return budget > 0 and used >= budget
 
     def _apply_async_skip_timeout(self, breakdown: dict[str, float]) -> bool:
-        """Breach a Yawn cell wall using physical frames counted during skip."""
-        if str(self._stage.get("mode") or "") != "yawn_rails":
+        """Breach the per-step cell wall using physical frames counted during skip."""
+        if not self._planner_loyal_active() and str(
+            self._stage.get("mode") or ""
+        ) != "yawn_rails":
             return False
         progress = getattr(self, "_progress", None)
         if progress is None:
@@ -2981,9 +3023,15 @@ class RE1Env(gym.Env):
             breached = bool(progress.breach_cell_timeout())
         if not breached:
             return False
-        from re1_rl.reward import RAILS_CELL_TIMEOUT_PENALTY
+        if self._planner_loyal_active():
+            from re1_rl.planner_loyal import PLANNER_TIMEOUT_PENALTY
 
-        breakdown["checkpoint_timeout"] = RAILS_CELL_TIMEOUT_PENALTY
+            breakdown["planner_timeout"] = PLANNER_TIMEOUT_PENALTY
+            breakdown["checkpoint_timeout"] = PLANNER_TIMEOUT_PENALTY
+        else:
+            from re1_rl.reward import RAILS_CELL_TIMEOUT_PENALTY
+
+            breakdown["checkpoint_timeout"] = RAILS_CELL_TIMEOUT_PENALTY
         for term, value in tuple(breakdown.items()):
             if value > 0.0:
                 breakdown[term] = 0.0
@@ -4425,9 +4473,11 @@ class RE1Env(gym.Env):
             breakdown,
             typewriter_save_complete=save_complete,
         )
-        from re1_rl.reward import REWARD_SCALE
+        from re1_rl.reward import scalarize_reward
 
-        reward = sum(breakdown.values()) * REWARD_SCALE
+        reward = scalarize_reward(
+            breakdown, planner_loyal=self._planner_loyal_active()
+        )
         terminated, truncated, episode_failure = self._termination_flags(state)
         self._update_loadout_segment(
             self._prev_state,
@@ -5186,9 +5236,11 @@ class RE1Env(gym.Env):
             self._post_skip_reward = 0.0
             self._post_skip_bd = {}
 
-        from re1_rl.reward import REWARD_SCALE
+        from re1_rl.reward import scalarize_reward
 
-        reward = sum(breakdown.values()) * REWARD_SCALE
+        reward = scalarize_reward(
+            breakdown, planner_loyal=self._planner_loyal_active()
+        )
 
         if combat_attack:
             self._record_attack_telemetry(

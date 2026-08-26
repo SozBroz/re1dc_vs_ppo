@@ -504,7 +504,9 @@ def _train_one_version(
 
     _validate_merged_rollout_finite(merged)
     loadout_stats: dict[str, float] = {}
-    if hasattr(model, "prepare_loadout_epoch"):
+    from re1_rl.planner_loyal import planner_loyal_enabled
+
+    if hasattr(model, "prepare_loadout_epoch") and not planner_loyal_enabled():
         samples = loadout_samples_from_infos(
             info for rollout in rollouts for info in (rollout.episode_infos or [])
         )
@@ -519,6 +521,8 @@ def _train_one_version(
             "guidance_transfers": guidance["transfers"],
             "guidance_total": guidance["total"],
         })
+    elif planner_loyal_enabled():
+        loadout_stats = {"guidance_skipped": 1.0}
     model.rollout_buffer = fill_rollout_buffer(model, merged)
 
     ensure_training_logger(model)

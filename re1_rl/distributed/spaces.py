@@ -27,7 +27,7 @@ from re1_rl.spatial_encoder import SPATIAL_DIM, VISITED_SHAPE
 from re1_rl.weapon_damage import LAST_ATTACK_DIM, WEAPON_CARD_DIM
 
 # Bump when observation Dict layout or ACTION_NAMES cardinality changes.
-OBS_SCHEMA_VERSION = 1
+OBS_SCHEMA_VERSION = 2
 
 
 def make_re1_spaces() -> tuple[spaces.Dict, spaces.Discrete]:

@@ -173,11 +173,16 @@ def pack_world_event_target_from_info(
     y[1] = 1.0 if new_items else 0.0
     bd = info.get("reward_breakdown") or {}
     y[2] = 1.0 if float(bd.get("story_item_use", 0.0) or 0.0) > 0 else 0.0
-    y[3] = 1.0 if (
-        float(bd.get("document_examine", 0.0) or 0.0) > 0
-        or float(bd.get("cutscene", 0.0) or 0.0) > 0
-        or int(info.get("frames_skipped", 0) or 0) > 0
-    ) else 0.0
+    from re1_rl.planner_loyal import planner_loyal_enabled
+
+    if planner_loyal_enabled():
+        y[3] = 0.0
+    else:
+        y[3] = 1.0 if (
+            float(bd.get("document_examine", 0.0) or 0.0) > 0
+            or float(bd.get("cutscene", 0.0) or 0.0) > 0
+            or int(info.get("frames_skipped", 0) or 0) > 0
+        ) else 0.0
     magic = info.get("magic_report") or {}
     y[4] = 1.0 if (
         magic

@@ -628,3 +628,205 @@ def test_combat_extractor_fuses_planner_steps_without_changing_features_dim():
     assert plain.history_encoder is not None
     assert plain.world_context is not None
     assert plain.features_dim == FEATURES_DIM
+
+
+def test_planner_loyal_scalar_allowlist_exact_eight_and_minus_four():
+    from re1_rl.planner_loyal import (
+        PLANNER_LOYAL_SCALAR_KEYS,
+        PLANNER_LOYAL_TELEMETRY_KEYS,
+        scalarize_planner_loyal_reward,
+    )
+    from re1_rl.reward import scalarize_reward
+
+    q = PlannerLoyalQueue()
+    progress = ProgressTracker(leg_span=1)
+    prev = {"room_id": "106", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    reward, bd = _reward(prev, cur, q, progress=progress)
+    assert set(bd.keys()) <= PLANNER_LOYAL_SCALAR_KEYS | PLANNER_LOYAL_TELEMETRY_KEYS
+    assert "new_room" not in bd
+    assert reward == scalarize_planner_loyal_reward(bd)
+    assert reward == scalarize_reward(bd, planner_loyal=True)
+    assert reward == pytest.approx(STEP_PENALTY + PLANNER_STEP_SUCCESS_REWARD)
+
+    q2 = PlannerLoyalQueue()
+    progress2 = ProgressTracker()
+    prev2 = {"room_id": "106", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur2 = {"room_id": "107", "inventory_slots": [], "hp": 96, "in_control": True}
+    reward2, bd2 = _reward(prev2, cur2, q2, progress=progress2)
+    assert reward2 == pytest.approx(STEP_PENALTY + PLANNER_DIVERT_PENALTY)
+    assert bd2["wrong_room"] == PLANNER_DIVERT_PENALTY
+    assert reward2 == scalarize_planner_loyal_reward(bd2)
+
+
+def test_planner_loyal_no_legacy_side_effect_keys():
+    q = PlannerLoyalQueue()
+    prev = {"room_id": "106", "inventory_slots": [], "hp": 96, "in_control": False}
+    cur = {
+        "room_id": "106",
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": False,
+        "cutscene_key": "104:kenneth",
+        "new_items": [],
+    }
+    _reward_total, bd = _reward(prev, cur, q)
+    for legacy in (
+        "new_room",
+        "new_cutscene",
+        "document_examine",
+        "key_item",
+        "story_use",
+        "gallery",
+        "item",
+        "ammo_pickup",
+    ):
+        assert legacy not in bd
+
+
+def test_planner_loyal_timeout_pays_minus_four():
+    from re1_rl.yawn_cell_timeout import FLAT_CELL_TIMEOUT_FRAMES
+
+    q = PlannerLoyalQueue()
+    progress = ProgressTracker(leg_span=1)
+    progress.arm_cell_timeout(100)
+    progress.note_leg_frames(100)
+    prev = {"room_id": "106", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {
+        "room_id": "106",
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+        "step_emulated_frames": 8,
+    }
+    reward, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_timeout"] == PLANNER_DIVERT_PENALTY
+    assert progress.cell_timeout_breached is True
+    assert reward == pytest.approx(STEP_PENALTY + PLANNER_DIVERT_PENALTY)
+
+
+def test_planner_loyal_stagnation_advances_during_cutscene():
+    q = PlannerLoyalQueue()
+    progress = ProgressTracker()
+    prev = {"room_id": "106", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {
+        "room_id": "106",
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": False,
+        "step_emulated_frames": 8,
+    }
+    _reward(prev, cur, q, progress=progress)
+    assert progress.stagnation_frames == 8
+
+
+def test_encode_planner_loyal_goal_has_compass_for_traverse():
+    from re1_rl.obs_encoder import ObsEncoder
+    from re1_rl.planner_loyal import encode_planner_loyal_goal
+    from re1_rl.room_graph import RoomGraph
+    from re1_rl.spatial_encoder import ItemPositions
+
+    graph = RoomGraph(PROJECT_ROOT / "data" / "doors_empirical.json")
+    encoder = ObsEncoder(PROJECT_ROOT / "data" / "rooms.json", graph)
+    q = PlannerLoyalQueue()
+    state = {
+        "room_id": "106",
+        "x": 1000,
+        "z": 2000,
+        "facing": 0,
+        "inventory": [],
+    }
+    goal = encode_planner_loyal_goal(
+        encoder,
+        graph,
+        state,
+        q,
+        cell_time_remaining=1.0,
+        item_positions=ItemPositions(PROJECT_ROOT / "data" / "item_positions.json"),
+    )
+    assert goal[21] > 0.0  # compass valid
+    assert np.any(np.abs(goal[5:10]) > 0.01)
+    assert goal[10] > 0.0  # obj_navigate
+
+
+def test_encode_planner_loyal_goal_music_notes_compass():
+    from re1_rl.obs_encoder import GOAL_BASE_DIM, ObsEncoder
+    from re1_rl.planner_loyal import encode_planner_loyal_goal
+    from re1_rl.room_graph import RoomGraph
+    from re1_rl.spatial_encoder import ItemPositions
+
+    graph = RoomGraph(PROJECT_ROOT / "data" / "doors_empirical.json")
+    encoder = ObsEncoder(PROJECT_ROOT / "data" / "rooms.json", graph)
+    q = PlannerLoyalQueue()
+    q.seek(5)
+    state = {
+        "room_id": "10F",
+        "x": 9000,
+        "z": 8000,
+        "facing": 0,
+        "inventory": [],
+    }
+    goal = encode_planner_loyal_goal(
+        encoder,
+        graph,
+        state,
+        q,
+        item_positions=ItemPositions(PROJECT_ROOT / "data" / "item_positions.json"),
+    )
+    assert goal[4] > 0.0  # in target room
+    assert goal[11] > 0.0  # obj_pickup for acquire step
+    assert goal[21] > 0.0
+    assert goal[GOAL_BASE_DIM] > 0.0  # lookahead slot mask
+
+
+def test_validate_planner_loyal_stage_fail_closed():
+    from re1_rl.planner_loyal import validate_planner_loyal_stage
+
+    with pytest.raises(ValueError, match="mode=planner_loyal"):
+        validate_planner_loyal_stage({"mode": "yawn_rails"})
+    with pytest.raises(ValueError, match="route_steps"):
+        validate_planner_loyal_stage(
+            {"mode": "planner_loyal", "route_steps": [1, 2, 3]}
+        )
+
+
+def test_after_reward_step_skips_pb_and_go_explore(monkeypatch):
+    pb_called = []
+    ge_called = []
+
+    monkeypatch.setattr(
+        "re1_rl.pb_capture.pb_capture_enabled", lambda: True
+    )
+    monkeypatch.setattr(
+        "re1_rl.go_explore_capture.go_explore_capture_enabled", lambda: True
+    )
+
+    env = SimpleNamespace(
+        _planner_loyal_queue=PlannerLoyalQueue(),
+        _arm_checkpoint_freeze=lambda: pb_called.append("freeze"),
+        _queue_go_explore_progress=lambda *a, **k: ge_called.append(1),
+        _maybe_capture_go_explore=lambda *a, **k: ge_called.append(2),
+        _progress=SimpleNamespace(checkpoint_success=False),
+        _pb_captured_triggers=set(),
+        project_root=str(PROJECT_ROOT),
+    )
+    env._planner_loyal_active = lambda: True
+    RE1Env._after_reward_step(
+        env,
+        {"room_id": "106"},
+        {"room_id": "105"},
+        {"planner_step_success": 8.0, "checkpoint_success": 8.0},
+    )
+    assert pb_called == ["freeze"]
+    assert ge_called == []
+
+
+def test_combat_targets_skip_frames_skipped_under_planner_loyal(monkeypatch):
+    from re1_rl.combat_targets import pack_world_event_target_from_info
+
+    monkeypatch.setenv("RE1_PLANNER_LOYAL", "1")
+    y, _mask = pack_world_event_target_from_info(
+        0,
+        {"frames_skipped": 400, "reward_breakdown": {}},
+    )
+    assert y[3] == 0.0

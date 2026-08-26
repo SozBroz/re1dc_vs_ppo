@@ -1,5 +1,5 @@
 @echo off
-REM WH2 learner — planner-loyal, resume latest zip. Local 16-env worker.
+REM WH2 learner — planner-loyal strict isolation; resume from last scalpel checkpoint.
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 call "%~dp0..\fleet_hosts.cmd"
@@ -31,7 +31,6 @@ venv\Scripts\python.exe scripts\distributed_train_parallel.py ^
   --total-steps 0 ^
   --training-speed 6400 ^
   --skip-chunk 600 ^
-  --capture-checkpoints ^
   --sync-interval-s %SYNC_INTERVAL_S% ^
   --max-staleness 1 ^
   --relevance-gate ^
