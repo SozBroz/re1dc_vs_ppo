@@ -1,0 +1,152 @@
+{
+  "next_chunk": {
+    "end_anchor_beat_id": "chemical",
+    "steps": [
+      {
+        "n": 1,
+        "op": "traverse",
+        "edge_id": "105->106",
+        "id": "s1",
+        "beat_id": null,
+        "room_id": null,
+        "pickup_id": null,
+        "note": "105 to 106"
+      },
+      {
+        "n": 2,
+        "op": "traverse",
+        "edge_id": "106->107",
+        "id": "s2",
+        "beat_id": null,
+        "room_id": null,
+        "pickup_id": null,
+        "note": "106 to 107"
+      },
+      {
+        "n": 3,
+        "op": "traverse",
+        "edge_id": "107->108",
+        "id": "s3",
+        "beat_id": null,
+        "room_id": null,
+        "pickup_id": null,
+        "note": "107 to 108 lockpick required"
+      },
+      {
+        "n": 4,
+        "op": "traverse",
+        "edge_id": "108->109",
+        "id": "s4",
+        "beat_id": null,
+        "room_id": null,
+        "pickup_id": null,
+        "note": "108 to 109"
+      },
+      {
+        "n": 5,
+        "op": "acquire",
+        "edge_id": null,
+        "id": "s5",
+        "beat_id": null,
+        "room_id": "109",
+        "pickup_id": "109:green_herb:1",
+        "note": "on-path heal in 109"
+      },
+      {
+        "n": 6,
+        "op": "traverse",
+        "edge_id": "109->10A",
+        "id": "s6",
+        "beat_id": null,
+        "room_id": null,
+        "pickup_id": null,
+        "note": "109 to 10A"
+      },
+      {
+        "n": 7,
+        "op": "traverse",
+        "edge_id": "10A->10B",
+        "id": "s7",
+        "beat_id": null,
+        "room_id": null,
+        "pickup_id": null,
+        "note": "10A to 10B"
+      },
+      {
+        "n": 8,
+        "op": "acquire",
+        "edge_id": null,
+        "id": "s8",
+        "beat_id": null,
+        "room_id": "10B",
+        "pickup_id": "10B:green_herb:1",
+        "note": "on-path heal in 10B"
+      },
+      {
+        "n": 9,
+        "op": "traverse",
+        "edge_id": "10B->118",
+        "id": "s9",
+        "beat_id": null,
+        "room_id": null,
+        "pickup_id": null,
+        "note": "10B to 118"
+      },
+      {
+        "n": 10,
+        "op": "acquire",
+        "edge_id": null,
+        "id": "s10",
+        "beat_id": "chemical",
+        "room_id": "118",
+        "pickup_id": "118:chemical:1",
+        "note": "chemical obtained, anchor complete"
+      }
+    ],
+    "why": "shield_key is not spendable yet because attic_enter requires both shield_key and richard_timer_elapsed; richard_timer_elapsed needs armor_key via chemical chain. Highest unlocked frontier beat is chemical in 118 which unlocks armor_key and the sun crest chain."
+  },
+  "beat_order": [
+    "gallery_enter",
+    "gallery_portrait_1",
+    "gallery_portrait_2",
+    "gallery_portrait_3",
+    "gallery_portrait_4",
+    "gallery_portrait_5",
+    "gallery_portrait_6",
+    "star_crest",
+    "chemical",
+    "greenhouse_pump",
+    "armor_key",
+    "armor_room_enter",
+    "armor_room_statues",
+    "sun_crest",
+    "dining_2f_enter",
+    "push_statue_2f",
+    "blue_jewel",
+    "tiger_jewel",
+    "wind_crest",
+    "richard_approach",
+    "richard_bleedout",
+    "richard_timer_elapsed",
+    "attic_enter",
+    "yawn_intro",
+    "yawn_1",
+    "moon_crest",
+    "place_star_crest",
+    "place_wind_crest",
+    "place_sun_crest",
+    "place_moon_crest"
+  ],
+  "_meta": {
+    "model": "muse-glimmer",
+    "usage": {
+      "completion_tokens": 1715,
+      "prompt_tokens": 9266,
+      "total_tokens": 10981,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "backend": "http://127.0.0.1:8000/v1"
+  }
+}

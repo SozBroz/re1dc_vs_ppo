@@ -1,0 +1,202 @@
+{
+  "beat_order": [
+    "music_notes",
+    "piano_play",
+    "gold_emblem",
+    "emblem_swap_alcove",
+    "gold_emblem_fireplace",
+    "shield_key",
+    "gallery_enter",
+    "gallery_portrait_1",
+    "gallery_portrait_2",
+    "gallery_portrait_3",
+    "gallery_portrait_4",
+    "gallery_portrait_5",
+    "gallery_portrait_6",
+    "star_crest",
+    "chemical",
+    "greenhouse_pump",
+    "armor_key",
+    "armor_room_enter",
+    "armor_room_statues",
+    "sun_crest",
+    "dining_2f_enter",
+    "push_statue_2f",
+    "blue_jewel",
+    "tiger_jewel",
+    "wind_crest",
+    "richard_approach",
+    "richard_bleedout",
+    "richard_timer_elapsed",
+    "attic_enter",
+    "yawn_intro",
+    "yawn_1",
+    "moon_crest",
+    "place_star_crest",
+    "place_wind_crest",
+    "place_sun_crest",
+    "place_moon_crest"
+  ],
+  "next_chunk": {
+    "end_anchor_beat_id": "shield_key",
+    "steps": [
+      {
+        "beat_id": null,
+        "edge_id": "106->105",
+        "id": "s1",
+        "n": 1,
+        "note": "Main Hall to Dining Room",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "105->104",
+        "id": "s2",
+        "n": 2,
+        "note": "Dining Room to Tea Room",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": null,
+        "id": "s3",
+        "n": 3,
+        "note": "Kenneth body clip 1",
+        "op": "acquire",
+        "pickup_id": "104:handgun_bullets:1",
+        "room_id": "104",
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": null,
+        "id": "s4",
+        "n": 4,
+        "note": "Kenneth body clip 2",
+        "op": "acquire",
+        "pickup_id": "104:handgun_bullets:2",
+        "room_id": "104",
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "104->10F",
+        "id": "s5",
+        "n": 5,
+        "note": "Tea Room to Bar via lockpick",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": "music_notes",
+        "edge_id": null,
+        "id": "s6",
+        "n": 6,
+        "note": "Get music notes behind bookcase",
+        "op": "acquire",
+        "pickup_id": "10F:music_notes:1",
+        "room_id": "10F",
+        "site_id": null
+      },
+      {
+        "beat_id": "piano_play",
+        "edge_id": null,
+        "id": "s7",
+        "n": 7,
+        "note": "Play piano with notes",
+        "op": "objective",
+        "pickup_id": null,
+        "room_id": "10F",
+        "site_id": "music_notes@10F_piano"
+      },
+      {
+        "beat_id": "gold_emblem",
+        "edge_id": null,
+        "id": "s8",
+        "n": 8,
+        "note": "Obtain gold emblem from secret room",
+        "op": "acquire",
+        "pickup_id": "10F:gold_emblem:2",
+        "room_id": "10F",
+        "site_id": null
+      },
+      {
+        "beat_id": "emblem_swap_alcove",
+        "edge_id": null,
+        "id": "s9",
+        "n": 9,
+        "note": "Swap wooden emblem for gold in alcove before leaving",
+        "op": "objective",
+        "pickup_id": null,
+        "room_id": "10F",
+        "site_id": "emblem@10F_alcove"
+      },
+      {
+        "beat_id": null,
+        "edge_id": "10F->104",
+        "id": "s10",
+        "n": 10,
+        "note": "Bar back to Tea Room",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "104->105",
+        "id": "s11",
+        "n": 11,
+        "note": "Tea Room to Dining Room",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": "gold_emblem_fireplace",
+        "edge_id": null,
+        "id": "s12",
+        "n": 12,
+        "note": "Place gold emblem on dining fireplace",
+        "op": "objective",
+        "pickup_id": null,
+        "room_id": "105",
+        "site_id": "gold_emblem@105_fireplace"
+      },
+      {
+        "beat_id": "shield_key",
+        "edge_id": null,
+        "id": "s13",
+        "n": 13,
+        "note": "Shield key revealed behind clock",
+        "op": "acquire",
+        "pickup_id": "105:shield_key:2",
+        "room_id": "105",
+        "site_id": null
+      }
+    ],
+    "why": "Completes shield_key chain via 104->10F Bar route, picks both Kenneth clips on entry to 104, performs mandatory emblem_swap_alcove before fireplace use, and ends on shield_key acquire with no trailing moves."
+  },
+  "_meta": {
+    "model": "muse-glimmer",
+    "usage": {
+      "completion_tokens": 2576,
+      "prompt_tokens": 9834,
+      "total_tokens": 12410,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "backend": "http://127.0.0.1:8000/v1",
+    "finish_reason": "stop"
+  }
+}
