@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "notes": "Operator estimates for Muse loadout strain. Handgun (beretta) deals 4. Species HP = handgun_rounds * 4. On-path ammo pickups reduce the deficit.",
+  "handgun_damage": 4,
+  "species": {
+    "zombie": {
+      "handgun_rounds": 8,
+      "notes": "mansion zombie, average"
+    },
+    "dog": {
+      "handgun_rounds": 5,
+      "notes": "cerberus"
+    },
+    "yawn": {
+      "handgun_rounds": 60,
+      "notes": "first attic Yawn; operator estimate"
+    }
+  }
+}

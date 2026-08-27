@@ -9,10 +9,13 @@ import pytest
 from re1_rl.go_explore_merge import CELL_SIDECAR_NAME, CELL_STATE_NAME
 from re1_rl.planner_loyal_cells import (
     TRAINING_START_INDEX,
+    assemble_planner_loyal_quality,
     bootstrap_from_crystals,
     cell_dir_name,
     cell_has_remaining_planner_step,
     iter_training_start_cells,
+    lift_planner_loyal_quality,
+    planner_loyal_quality_beats,
     planner_loyal_root,
     seek_index_after_cell,
     slot_index_for_completed_step,
@@ -169,3 +172,17 @@ def test_reset_pin_set_and_unminted_fallback(
         11,
         13,
     ]
+
+
+def test_planner_loyal_quality_ranks_kills_after_hp() -> None:
+    legacy = (96, 60, 66, 11, 1, 0, -30, -30)
+    assert lift_planner_loyal_quality(legacy) == (96, 0, 60, 66, 11, 1, 0, -30, -30)
+    minted = assemble_planner_loyal_quality(legacy, 4)
+    assert minted == (96, 4, 60, 66, 11, 1, 0, -30, -30)
+    # Same HP: more path kills win even with less ammo.
+    assert planner_loyal_quality_beats((96, 3, 20, 0, 0, 1, 0, 0, -10), minted) is False
+    assert planner_loyal_quality_beats(minted, (96, 3, 99, 99, 99, 1, 0, 0, -1)) is True
+    # Lower HP loses even with more kills.
+    assert planner_loyal_quality_beats((80, 20, 99, 99, 99, 1, 0, 0, -1), minted) is False
+    # Legacy 8-tuple (implied 0 kills) loses to a same-HP 4-kill recapture.
+    assert planner_loyal_quality_beats(minted, legacy) is True

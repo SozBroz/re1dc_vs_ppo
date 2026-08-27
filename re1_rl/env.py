@@ -15,6 +15,7 @@ from gymnasium import spaces
 
 from re1_rl.bizhawk_bridge import BizHawkClient
 from re1_rl.enemy_combat import (
+    almanac_enemy_type,
     apply_combat_step_fields,
     combat_enemy_count,
     paid_combat_enemy_count,
@@ -139,7 +140,6 @@ from re1_rl.action_mask import (
     action_mask as build_action_mask,
 )
 from re1_rl.attack_macro import (
-    KNIFE_WEAPON_ID,
     execute_attack_down_macro,
     execute_attack_macro,
     execute_attack_up_macro,
@@ -439,7 +439,6 @@ class RE1Env(gym.Env):
         # worker must not start a fast_forward (which mashes cross and stomps
         # joypad) while this is set.
         self._macro_active = False
-        self._heading_restore_failed = False
         if camera_whiten is None:
             from re1_rl.camera_whiten import whitened_enabled_from_env
 
@@ -933,16 +932,6 @@ class RE1Env(gym.Env):
             recovery_ready=recovery == 0,
             weapon_state_valid=bool(valid),
         )
-
-    def _note_heading_restore(self, attack_report: dict[str, Any] | None) -> None:
-        """Sticky fail if a ranged attack did not return to pre-aim heading."""
-        if not attack_report:
-            return
-        if attack_report.get("facing_before") is None:
-            return
-        if int(attack_report.get("weapon_id") or 0) == KNIFE_WEAPON_ID:
-            return
-        self._heading_restore_failed = not bool(attack_report.get("facing_restored"))
 
     def _combat_audit(
         self,
@@ -2034,7 +2023,6 @@ class RE1Env(gym.Env):
         self._prev_action = None
         self.bridge.clear_latched_input()
         self._grab_escape_pending = False
-        self._heading_restore_failed = False
         self._forward_collision_stall = False
         self._use_phase = 0
         self._inventory_before_use = None
@@ -5161,7 +5149,6 @@ class RE1Env(gym.Env):
             outcome = str(attack_report.get("outcome", "") or "")
             state["attack_macro_failure"] = outcome not in ("", "ok", "dry_fire")
             state["attack_dry_fire"] = outcome == "dry_fire"
-            self._note_heading_restore(attack_report)
         wid_for_pending = int(
             (attack_report or {}).get("weapon_id")
             or state.get("equipped_weapon_id")
@@ -5180,8 +5167,12 @@ class RE1Env(gym.Env):
         )
         enemy_damage = int(state.get("enemy_damage", 0))
         enemy_kills = int(state.get("enemy_kills", 0))
+        room_now = str(state.get("room_id", "") or "")
         if enemy_kills > 0 and bool(state.get("in_control", True)):
-            self._progress.note_leg_kills(str(state.get("room_id", "") or ""), enemy_kills)
+            self._progress.note_leg_kills(room_now, enemy_kills)
+        for ev in state.get("combat_events") or []:
+            if ev.get("killed"):
+                self._progress.note_almanac_kill(room_now, almanac_enemy_type(ev))
         if combat_attack:
             self._fill_last_attack_obs(
                 self._prev_state,

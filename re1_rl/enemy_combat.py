@@ -633,6 +633,23 @@ def enemy_combat_events(
     return _collapse_yawn_body_events(events, room_id=room_id)
 
 
+def almanac_enemy_type(event: dict[str, Any] | None) -> str:
+    """Catalog type for the persistent killed-enemy ledger (room_enemies names)."""
+    ev = event or {}
+    if ev.get("is_yawn"):
+        return "yawn"
+    if ev.get("is_cerberus"):
+        return "dog"
+    if ev.get("is_crow"):
+        return "crow"
+    if ev.get("is_zombie"):
+        return "zombie"
+    name = str(ev.get("type_name") or ev.get("enemy_type") or ev.get("type") or "").lower()
+    if name in {"cerberus", "zombie_dog"}:
+        return "dog"
+    return name or "unknown"
+
+
 # Body-part sentinel drops above this are cinema/counter thrash, not a chip.
 YAWN_BODY_HIT_MAX = 200
 

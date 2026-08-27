@@ -81,6 +81,21 @@ def progress_to_sidecar(progress: ProgressTracker) -> dict[str, Any]:
             for k, v in sorted(progress.leg_kills_by_room.items())
             if str(k).strip() and int(v) > 0
         },
+        "episode_kills_by_room": {
+            str(k).upper(): int(v)
+            for k, v in sorted(progress.episode_kills_by_room.items())
+            if str(k).strip() and int(v) > 0
+        },
+        "enemies_killed_by_room": {
+            str(room).upper(): {
+                str(etype): int(n)
+                for etype, n in sorted(types.items())
+                if str(etype).strip() and int(n) > 0
+            }
+            for room, types in sorted(progress.enemies_killed_by_room.items())
+            if isinstance(types, dict)
+            and any(int(n) > 0 for n in types.values())
+        },
     }
 
 
@@ -123,6 +138,35 @@ def apply_progress_sidecar(progress: ProgressTracker, data: dict[str, Any]) -> N
                 continue
             if room_id and n > 0:
                 progress.leg_kills_by_room[room_id] = n
+    progress.enemies_killed_by_room = enemies_killed_from_sidecar(data)
+
+
+def enemies_killed_from_sidecar(data: dict[str, Any] | None) -> dict[str, dict[str, int]]:
+    """Read the world kill ledger from a sidecar or its ``progress`` block."""
+    raw = None
+    if isinstance(data, dict):
+        raw = data.get("enemies_killed_by_room")
+        if raw is None and isinstance(data.get("progress"), dict):
+            raw = data["progress"].get("enemies_killed_by_room")
+    out: dict[str, dict[str, int]] = {}
+    if not isinstance(raw, dict):
+        return out
+    for room, types in raw.items():
+        room_id = str(room or "").upper()
+        if not room_id or not isinstance(types, dict):
+            continue
+        bucket: dict[str, int] = {}
+        for etype, count in types.items():
+            name = str(etype or "").strip().lower()
+            try:
+                n = int(count)
+            except (TypeError, ValueError):
+                continue
+            if name and n > 0:
+                bucket[name] = n
+        if bucket:
+            out[room_id] = bucket
+    return out
 
 
 def item_tracker_to_sidecar(items: ItemTracker) -> dict[str, Any]:

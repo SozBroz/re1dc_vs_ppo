@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from re1_rl.enemy_combat import (
     HITSCAN_PENDING_FRAMES,
     PROJECTILE_PENDING_FRAMES,
+    almanac_enemy_type,
     alive_enemy_count,
     apply_combat_step_fields,
     combat_enemy_count,
@@ -119,6 +120,14 @@ def test_damage_and_kill_delta() -> None:
     damage, kills = enemy_combat_delta(prev, curr)
     assert damage == 90
     assert kills == 1
+
+
+def test_almanac_enemy_type_maps_cerberus_to_dog() -> None:
+    assert almanac_enemy_type({"is_cerberus": True}) == "dog"
+    assert almanac_enemy_type({"is_zombie": True}) == "zombie"
+    assert almanac_enemy_type({"is_yawn": True}) == "yawn"
+    assert almanac_enemy_type({"is_crow": True}) == "crow"
+    assert almanac_enemy_type({"type_name": "cerberus"}) == "dog"
 
 
 def test_new_spawn_not_counted_as_kill() -> None:

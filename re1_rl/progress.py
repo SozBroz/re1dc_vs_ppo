@@ -110,6 +110,13 @@ class ProgressTracker:
     # Snapshot of ``leg_kills_by_room`` taken at claim time. Capture runs after
     # claim clears the live map; successor sidecars still need kill evidence.
     last_claimed_leg_kills: dict[str, int] = field(default_factory=dict)
+    # Episode-cumulative kills from this reset. Not cleared on checkpoint claim
+    # — planner-loyal cell compare uses this as quality after HP.
+    episode_kills_by_room: dict[str, int] = field(default_factory=dict)
+    # World ledger: enemies already dead in this savestate lineage
+    # (room_id → enemy_type → count). Restored from the start-cell sidecar
+    # and written back on capture. Unkilled return_visit foes stay in the room.
+    enemies_killed_by_room: dict[str, dict[str, int]] = field(default_factory=dict)
     # Directed room transitions observed during the current rails leg. This
     # lets a checkpoint combine a valid entry with an event that settles a few
     # steps later without accepting an entry from a different room.
@@ -436,6 +443,22 @@ class ProgressTracker:
         if not room or n <= 0:
             return
         self.leg_kills_by_room[room] = int(self.leg_kills_by_room.get(room, 0)) + n
+        self.episode_kills_by_room[room] = int(
+            self.episode_kills_by_room.get(room, 0)
+        ) + n
+
+    def episode_kill_count(self) -> int:
+        return sum(int(n) for n in self.episode_kills_by_room.values())
+
+    def note_almanac_kill(self, room_id: str, enemy_type: str, n: int = 1) -> None:
+        """Record a world-persistent kill (survives claim; restored on cell load)."""
+        room = str(room_id or "").upper()
+        etype = str(enemy_type or "").strip().lower()
+        qty = int(n)
+        if not room or not etype or qty <= 0:
+            return
+        bucket = self.enemies_killed_by_room.setdefault(room, {})
+        bucket[etype] = int(bucket.get(etype, 0)) + qty
 
     def claim_checkpoint_success(self) -> bool:
         if self.checkpoint_success:

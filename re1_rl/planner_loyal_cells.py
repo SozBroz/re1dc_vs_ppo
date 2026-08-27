@@ -431,6 +431,61 @@ def sample_training_start_cell(
     }
 
 
+def path_kills_from_env(env: Any) -> int:
+    """Episode-cumulative paid kills since this reset (not the last claimed leg)."""
+    progress = getattr(env, "_progress", None)
+    if progress is None:
+        return 0
+    count = getattr(progress, "episode_kill_count", None)
+    if callable(count):
+        return int(count())
+    raw = getattr(progress, "episode_kills_by_room", None) or {}
+    return sum(int(n) for n in raw.values())
+
+
+def assemble_planner_loyal_quality(
+    raw: list[Any] | tuple[Any, ...],
+    path_kills: int,
+) -> tuple[int, ...]:
+    """``(hp, path_kills, ammo, healing, slots, poison, -ink, -box, -frames)``.
+
+    Legacy 8-tuples are ``(hp, ammo, ..., -frames)``; insert ``path_kills`` at
+    index 1. Already-new 9-tuples keep their stored kill count unless a fresh
+    count is supplied for a new capture.
+    """
+    vals = [int(x) for x in list(raw or [])]
+    kills = max(0, int(path_kills))
+    if len(vals) >= 9:
+        return (vals[0], kills, *vals[2:9])
+    if len(vals) == 8:
+        return (vals[0], kills, *vals[1:8])
+    while len(vals) < 7:
+        vals.append(0)
+    return (vals[0], kills, *vals[1:7], 0)
+
+
+def lift_planner_loyal_quality(
+    raw: list[Any] | tuple[Any, ...] | None,
+) -> tuple[int, ...]:
+    """Read stored quality. Missing kill dim (old 8-tuples) counts as 0 kills."""
+    vals = [int(x) for x in list(raw or [])]
+    if len(vals) >= 9:
+        return tuple(vals[:9])
+    if len(vals) == 8:
+        return (vals[0], 0, *vals[1:8])
+    return assemble_planner_loyal_quality(vals, 0)
+
+
+def planner_loyal_quality_beats(
+    new: list[Any] | tuple[Any, ...] | None,
+    old: list[Any] | tuple[Any, ...] | None,
+) -> bool:
+    """True if *new* should replace *old* (HP, then path kills, then the rest)."""
+    if old is None:
+        return True
+    return lift_planner_loyal_quality(new) > lift_planner_loyal_quality(old)
+
+
 def capture_planner_loyal_cell(
     env: Any,
     state: dict[str, Any],
@@ -497,6 +552,7 @@ def capture_planner_loyal_cell(
             "completed_step_index": completed,
             "slot_index": slot,
             "chunk_final": bool(is_final),
+            "path_kills": path_kills_from_env(env),
         }
         sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
     except Exception as exc:  # noqa: BLE001 — capture must not kill the env
@@ -504,7 +560,7 @@ def capture_planner_loyal_cell(
         shutil.rmtree(staging, ignore_errors=True)
         return None
 
-    from re1_rl.go_explore_archive import attach_leg_frames, quality_beats
+    from re1_rl.go_explore_archive import attach_leg_frames
     from re1_rl.go_explore_capture import compute_quality
 
     quality = compute_quality(
@@ -516,7 +572,12 @@ def capture_planner_loyal_cell(
         leg_frames = int(getattr(env, "_step_count", 0) or 0)
     except (TypeError, ValueError):
         leg_frames = 0
-    quality = list(attach_leg_frames(quality, leg_frames))
+    quality = list(
+        assemble_planner_loyal_quality(
+            attach_leg_frames(quality, leg_frames),
+            path_kills_from_env(env),
+        )
+    )
 
     if dest.exists():
         old_meta_p = dest / CELL_META_NAME
@@ -529,7 +590,7 @@ def capture_planner_loyal_cell(
                 )
             except (OSError, json.JSONDecodeError, TypeError):
                 old_q = []
-        if old_q and not quality_beats(tuple(quality), tuple(old_q)):
+        if old_q and not planner_loyal_quality_beats(quality, old_q):
             print(
                 f"[planner_loyal] reject quality {cell_dir_name(slot)} "
                 f"new={quality} old={old_q}",

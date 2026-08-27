@@ -5,6 +5,7 @@ Qwen authors beat order and every directed door hop. Code never invents or repai
 from __future__ import annotations
 
 import json
+import math
 from collections import deque
 from pathlib import Path
 from typing import Any
@@ -225,22 +226,102 @@ def filtered_pickups(valid_rooms: set[str], taken: set[str]) -> dict[str, list[d
     return rooms
 
 
-def filtered_enemies(valid_rooms: set[str]) -> dict[str, Any]:
+def _species_row(enemy_type: str, species: dict[str, Any] | None = None) -> dict[str, Any]:
+    table = species if species is not None else combat_strain_almanac()["species"]
+    row = table.get(str(enemy_type or ""))
+    if not isinstance(row, dict):
+        return {}
+    extra: dict[str, Any] = {}
+    if row.get("hp") is not None:
+        extra["hp"] = int(row["hp"])
+    if row.get("handgun_rounds") is not None:
+        extra["handgun_rounds"] = int(row["handgun_rounds"])
+    return extra
+
+
+def _annotate_enemy(enemy: dict[str, Any], species: dict[str, Any]) -> dict[str, Any]:
+    etype = enemy.get("enemy_type") or enemy.get("type")
+    row = {
+        "type": etype,
+        "count": enemy.get("count"),
+        "spawn": enemy.get("spawn") or enemy.get("spawn_trigger") or "unknown",
+    }
+    row.update(_species_row(str(etype or ""), species))
+    return row
+
+
+def combat_strain_almanac() -> dict[str, Any]:
+    """Species HP (handgun_rounds × 4) plus weapon damage for Muse strain math."""
+    raw = load_json(DATA / "combat_strain.json")
+    handgun_dmg = int(raw.get("handgun_damage") or 4)
+    species: dict[str, Any] = {}
+    for name, entry in (raw.get("species") or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        rounds = int(entry.get("handgun_rounds") or 0)
+        species[str(name)] = {
+            "handgun_rounds": rounds,
+            "hp": rounds * handgun_dmg,
+            "notes": entry.get("notes"),
+        }
+    from re1_rl.memory_map import ITEM_IDS
+    from re1_rl.weapon_damage import WEAPON_NOMINAL_DAMAGE
+
+    ammo_for = {
+        "beretta": "handgun_bullets",
+        "shotgun": "shotgun_shells",
+        "colt_python": "magnum_rounds",
+        "colt_python_dumdum": "dumdum_rounds",
+        "bazooka_acid": "acid_rounds",
+        "bazooka_explosive": "explosive_rounds",
+        "bazooka_flame": "flame_rounds",
+    }
+    weapons: dict[str, Any] = {}
+    for item_id, (lo, hi) in WEAPON_NOMINAL_DAMAGE.items():
+        name = ITEM_IDS.get(int(item_id))
+        if not name:
+            continue
+        avg = (int(lo) + int(hi)) / 2.0
+        if avg <= 0:
+            continue
+        row: dict[str, Any] = {
+            "dmg": avg,
+            "dmg_min": int(lo),
+            "dmg_max": int(hi),
+        }
+        ammo = ammo_for.get(name)
+        if ammo:
+            row["ammo"] = ammo
+        kills: dict[str, int] = {}
+        for sname, srow in species.items():
+            hp = int(srow["hp"])
+            kills[sname] = int(math.ceil(hp / avg))
+        row["rounds_to_kill"] = kills
+        weapons[name] = row
+    return {
+        "handgun_damage": handgun_dmg,
+        "notes": raw.get("notes"),
+        "species": species,
+        "weapons": weapons,
+        "on_path_ammo_relieves_strain": True,
+        "typical_ammo_pickup_qty": {"handgun_bullets": 15, "shotgun_shells": 7},
+    }
+
+
+def filtered_enemies(
+    valid_rooms: set[str],
+    *,
+    killed: dict[str, dict[str, int]] | None = None,
+) -> dict[str, Any]:
     raw = load_json(DATA / "room_enemies.json")
     overrides = load_json(DATA / "route_council_truth_overrides.json")
+    species = combat_strain_almanac()["species"]
+    dead = killed or {}
     rooms: dict[str, Any] = {}
     for room_id, entry in raw.items():
         if room_id not in valid_rooms or not isinstance(entry, dict):
             continue
-        enemies = []
-        for enemy in entry.get("enemies") or []:
-            enemies.append(
-                {
-                    "type": enemy.get("enemy_type"),
-                    "count": enemy.get("count"),
-                    "spawn": enemy.get("spawn_trigger", "unknown"),
-                }
-            )
+        enemies = [_annotate_enemy(enemy, species) for enemy in (entry.get("enemies") or [])]
         rooms[room_id] = {"name": entry.get("room_name", ""), "enemies": enemies}
     for room_id, override in (overrides.get("enemy_rosters") or {}).items():
         if room_id not in valid_rooms:
@@ -248,15 +329,36 @@ def filtered_enemies(valid_rooms: set[str]) -> dict[str, Any]:
         rooms[room_id] = {
             "name": override.get("room_name", ""),
             "enemies": [
-                {
-                    "type": e.get("enemy_type"),
-                    "count": e.get("count"),
-                    "spawn": e.get("spawn_trigger", "unknown"),
-                }
-                for e in override.get("enemies") or []
+                _annotate_enemy(e, species) for e in (override.get("enemies") or [])
             ],
             "authority": override.get("authority"),
         }
+    return _subtract_killed_enemies(rooms, dead)
+
+
+def _subtract_killed_enemies(
+    rooms: dict[str, Any],
+    killed: dict[str, dict[str, int]],
+) -> dict[str, Any]:
+    """Drop catalog rows that this lineage already killed. Remainder are still live."""
+    for room_id, block in rooms.items():
+        dead = killed.get(str(room_id).upper()) or killed.get(str(room_id)) or {}
+        live: list[dict[str, Any]] = []
+        for row in block.get("enemies") or []:
+            etype = str(row.get("type") or "")
+            catalog = int(row.get("count") or 0)
+            taken = int(dead.get(etype) or 0)
+            left = max(0, catalog - taken)
+            annotated = dict(row)
+            annotated["catalog_count"] = catalog
+            annotated["killed"] = min(taken, catalog)
+            annotated["count"] = left
+            if left > 0:
+                live.append(annotated)
+        block["enemies"] = live
+        leftover = {k: int(v) for k, v in dead.items() if int(v) > 0}
+        if leftover:
+            block["killed"] = leftover
     return rooms
 
 
@@ -279,7 +381,11 @@ def story_sites(valid_rooms: set[str]) -> list[dict[str, Any]]:
     return out
 
 
-def build_phase1_context(checkpoint: str = "cp05") -> dict[str, Any]:
+def build_phase1_context(
+    checkpoint: str = "cp05",
+    *,
+    enemies_killed: dict[str, dict[str, int]] | None = None,
+) -> dict[str, Any]:
     rooms = phase1_room_ids()
     tip = tip_snapshot(checkpoint)
     done = cp05_done_beats()
@@ -311,7 +417,13 @@ def build_phase1_context(checkpoint: str = "cp05") -> dict[str, Any]:
         "rooms": room_rows,
         "directed_edges": sorted(edges.values(), key=lambda r: (r["from"], r["to"])),
         "pickups_allowed": filtered_pickups(rooms, taken),
-        "enemies": filtered_enemies(rooms),
+        "enemies": filtered_enemies(rooms, killed=enemies_killed),
+        "enemies_killed": {
+            str(room).upper(): dict(types)
+            for room, types in (enemies_killed or {}).items()
+            if types
+        },
+        "combat_strain": combat_strain_almanac(),
         "story_use_sites": story_sites(rooms),
         "policy": {
             "llm_authors_every_hop": True,
@@ -322,6 +434,12 @@ def build_phase1_context(checkpoint: str = "cp05") -> dict[str, Any]:
             "on_path_ammo_heals_required": True,
             "chunk_ends_on_anchor_completion": True,
             "box_rooms_in_scope": ["100", "118"],
+            "combat_strain": (
+                "Sum enemy hp on your hops, divide by the carried weapon dmg, "
+                "then subtract on-path ammo pickups you acquire. "
+                "enemies[] already omits kills in enemies_killed; "
+                "unkilled return_visit foes are still in the room."
+            ),
         },
     }
 
@@ -355,7 +473,12 @@ YOU MUST:
   (catalog name may be clip), shotgun_shells, or healing herbs/sprays BEFORE
   leaving. Example: tea room 104 has two Kenneth clips; L-passage 108 has one
   clip — pick them when you pass through. Do not grab optional weapon ammo
-  (acid/flame/magnum) unless it is your explicit goal.
+  (acid/flame/magnum) unless it is your explicit goal. Those ammo pickups
+  reduce combat strain (see combat_strain): zombie ≈ 8 handgun rounds (HP 32),
+  dog ≈ 5 (HP 20), Yawn ≈ 60 (HP 240). Handgun deals 4; shotgun 15–25. Size
+  the leave-box loadout for the remaining deficit after on-path pickups.
+  enemies[] is the LIVE remainder after enemies_killed. Unkilled hallway
+  zombies are still there on return.
 - Also give full beat_order for the rest of Phase 1 (beat ids only).
 - Assume lockpick is held when tip.planner_assumed_held says so.
 - PPO handles combat; do not emit fight steps or coordinates or puzzle button
@@ -394,8 +517,12 @@ PASS1_CONTRACT = {
 }
 
 
-def build_pass1_prompt(checkpoint: str = "cp05") -> str:
-    ctx = build_phase1_context(checkpoint)
+def build_pass1_prompt(
+    checkpoint: str = "cp05",
+    *,
+    enemies_killed: dict[str, dict[str, int]] | None = None,
+) -> str:
+    ctx = build_phase1_context(checkpoint, enemies_killed=enemies_killed)
     # Drop bulky tip conflicts detail noise for model; keep essentials.
     tip = dict(ctx["tip"])
     tip.pop("truth_conflicts", None)
@@ -420,6 +547,8 @@ def build_pass1_prompt(checkpoint: str = "cp05") -> str:
         "directed_edges": ctx["directed_edges"],
         "pickups_allowed": ctx["pickups_allowed"],
         "enemies": ctx["enemies"],
+        "enemies_killed": ctx.get("enemies_killed") or {},
+        "combat_strain": ctx["combat_strain"],
         "story_use_sites": ctx["story_use_sites"],
         "policy": ctx["policy"],
         "output_contract": PASS1_CONTRACT,

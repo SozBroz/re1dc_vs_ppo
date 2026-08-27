@@ -51,8 +51,11 @@ def _sample_progress() -> ProgressTracker:
 def test_progress_round_trip() -> None:
     src = _sample_progress()
     src.note_leg_kills("10A", 2)
+    src.note_almanac_kill("108", "dog", 2)
+    dumped = progress_to_sidecar(src)
+    assert dumped["episode_kills_by_room"] == {"10A": 2}
     restored = ProgressTracker()
-    apply_progress_sidecar(restored, progress_to_sidecar(src))
+    apply_progress_sidecar(restored, dumped)
 
     assert restored.visited_rooms == src.visited_rooms
     assert restored.rewarded_cutscenes == src.rewarded_cutscenes
@@ -70,11 +73,16 @@ def test_progress_round_trip() -> None:
     assert restored.gallery_completed == src.gallery_completed
     assert restored.gallery_needs_reentry == src.gallery_needs_reentry
     assert restored.leg_kills_by_room == {"10A": 2}
+    # Episode path kills stay on the mint sidecar; a later start must not inherit them.
+    assert restored.episode_kills_by_room == {}
+    assert dumped["enemies_killed_by_room"] == {"108": {"dog": 2}}
+    assert restored.enemies_killed_by_room == {"108": {"dog": 2}}
 
 
 def test_legacy_sidecar_without_leg_kills_defaults_empty() -> None:
     restored = ProgressTracker()
     restored.note_leg_kills("10A", 9)
+    restored.note_almanac_kill("108", "dog", 2)
     apply_progress_sidecar(
         restored,
         {
@@ -103,17 +111,22 @@ def test_legacy_sidecar_without_leg_kills_defaults_empty() -> None:
         },
     )
     assert restored.leg_kills_by_room == {}
+    assert restored.enemies_killed_by_room == {}
 
 
 def test_claim_checkpoint_success_clears_leg_kills() -> None:
     p = ProgressTracker(leg_span=2)
     p.note_leg_kills("10A", 2)
+    p.note_almanac_kill("108", "dog", 2)
     assert p.claim_checkpoint_success() is True
     assert p.legs_completed == 1
     assert p.checkpoint_success is False
     assert p.leg_kills_by_room == {}
     assert p.last_claimed_leg_kills == {"10A": 2}
     assert p.leg_kills_for_capture() == {"10A": 2}
+    assert p.episode_kills_by_room == {"10A": 2}
+    assert p.episode_kill_count() == 2
+    assert p.enemies_killed_by_room == {"108": {"dog": 2}}
     p.note_leg_kills("10A", 1)
     assert p.claim_checkpoint_success() is True
     assert p.checkpoint_success is True
