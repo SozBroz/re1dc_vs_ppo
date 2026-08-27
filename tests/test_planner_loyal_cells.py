@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from re1_rl.go_explore_archive import LEG_FRAMES_SENTINEL
 from re1_rl.go_explore_merge import CELL_SIDECAR_NAME, CELL_STATE_NAME
 from re1_rl.planner_loyal_cells import (
     TRAINING_START_INDEX,
-    assemble_planner_loyal_quality,
     bootstrap_from_crystals,
     cell_dir_name,
     cell_has_remaining_planner_step,
@@ -174,15 +174,42 @@ def test_reset_pin_set_and_unminted_fallback(
     ]
 
 
-def test_planner_loyal_quality_ranks_kills_after_hp() -> None:
-    legacy = (96, 60, 66, 11, 1, 0, -30, -30)
-    assert lift_planner_loyal_quality(legacy) == (96, 0, 60, 66, 11, 1, 0, -30, -30)
-    minted = assemble_planner_loyal_quality(legacy, 4)
-    assert minted == (96, 4, 60, 66, 11, 1, 0, -30, -30)
-    # Same HP: more path kills win even with less ammo.
-    assert planner_loyal_quality_beats((96, 3, 20, 0, 0, 1, 0, 0, -10), minted) is False
-    assert planner_loyal_quality_beats(minted, (96, 3, 99, 99, 99, 1, 0, 0, -1)) is True
-    # Lower HP loses even with more kills.
-    assert planner_loyal_quality_beats((80, 20, 99, 99, 99, 1, 0, 0, -1), minted) is False
-    # Legacy 8-tuple (implied 0 kills) loses to a same-HP 4-kill recapture.
-    assert planner_loyal_quality_beats(minted, legacy) is True
+def test_planner_loyal_quality_drops_path_kills_dim() -> None:
+    clean = (96, 75, 33, 11, 1, 0, -30, -40)
+    assert lift_planner_loyal_quality(clean) == (96, 75, 33, 11, 1, 0, -30, -40)
+    # 9-tuple with kills at index 2 (local remints).
+    assert lift_planner_loyal_quality((96, 75, 87, 33, 11, 1, 0, -30, -40)) == (
+        96,
+        75,
+        33,
+        11,
+        1,
+        0,
+        -30,
+        -40,
+    )
+    # 9-tuple with kills at index 1 (shipped insert).
+    assert lift_planner_loyal_quality((96, 4, 75, 33, 11, 1, 0, -30, -40)) == (
+        96,
+        75,
+        33,
+        11,
+        1,
+        0,
+        -30,
+        -40,
+    )
+    # Truncated 8-tuple still carrying the insert (poison no longer at index 4).
+    assert lift_planner_loyal_quality((96, 75, 3, 33, 11, 1, 0, -30)) == (
+        96,
+        75,
+        33,
+        11,
+        1,
+        0,
+        -30,
+        -LEG_FRAMES_SENTINEL,
+    )
+    # Fat kill dim must not beat a same HP/ammo remint.
+    assert planner_loyal_quality_beats(clean, (96, 75, 87, 33, 11, 1, 0, -30, -40)) is False
+    assert planner_loyal_quality_beats((96, 80, 33, 11, 1, 0, -30, -40), clean) is True

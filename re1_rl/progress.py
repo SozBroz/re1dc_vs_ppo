@@ -110,8 +110,7 @@ class ProgressTracker:
     # Snapshot of ``leg_kills_by_room`` taken at claim time. Capture runs after
     # claim clears the live map; successor sidecars still need kill evidence.
     last_claimed_leg_kills: dict[str, int] = field(default_factory=dict)
-    # Episode-cumulative kills from this reset. Not cleared on checkpoint claim
-    # — planner-loyal cell compare uses this as quality after HP.
+    # Episode-cumulative kills from this reset. Not cleared on checkpoint claim.
     episode_kills_by_room: dict[str, int] = field(default_factory=dict)
     # World ledger: enemies already dead in this savestate lineage
     # (room_id → enemy_type → count). Restored from the start-cell sidecar

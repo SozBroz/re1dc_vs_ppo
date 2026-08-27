@@ -431,56 +431,40 @@ def sample_training_start_cell(
     }
 
 
-def path_kills_from_env(env: Any) -> int:
-    """Episode-cumulative paid kills since this reset (not the last claimed leg)."""
-    progress = getattr(env, "_progress", None)
-    if progress is None:
-        return 0
-    count = getattr(progress, "episode_kill_count", None)
-    if callable(count):
-        return int(count())
-    raw = getattr(progress, "episode_kills_by_room", None) or {}
-    return sum(int(n) for n in raw.values())
-
-
-def assemble_planner_loyal_quality(
-    raw: list[Any] | tuple[Any, ...],
-    path_kills: int,
-) -> tuple[int, ...]:
-    """``(hp, path_kills, ammo, healing, slots, poison, -ink, -box, -frames)``.
-
-    Legacy 8-tuples are ``(hp, ammo, ..., -frames)``; insert ``path_kills`` at
-    index 1. Already-new 9-tuples keep their stored kill count unless a fresh
-    count is supplied for a new capture.
-    """
-    vals = [int(x) for x in list(raw or [])]
-    kills = max(0, int(path_kills))
-    if len(vals) >= 9:
-        return (vals[0], kills, *vals[2:9])
-    if len(vals) == 8:
-        return (vals[0], kills, *vals[1:8])
-    while len(vals) < 7:
-        vals.append(0)
-    return (vals[0], kills, *vals[1:7], 0)
+def _drop_kill_insert(vals: list[int]) -> list[int]:
+    """Remove the dropped path-kills dim (index 1 or 2 depending on format)."""
+    if len(vals) < 3:
+        return vals
+    # Shipped insert was (hp, kills, ammo, ...). Local remints used
+    # (hp, ammo, kills, ...). Kills stay small; ammo/healing do not.
+    if vals[1] <= 20 and vals[2] >= 20:
+        return [vals[0], *vals[2:]]
+    return [vals[0], vals[1], *vals[3:]]
 
 
 def lift_planner_loyal_quality(
     raw: list[Any] | tuple[Any, ...] | None,
 ) -> tuple[int, ...]:
-    """Read stored quality. Missing kill dim (old 8-tuples) counts as 0 kills."""
+    """``(hp, ammo, healing, slots, poison, -ink, -box, -frames)``.
+
+    Path-kills is no longer a quality dim. Strip it from 9-tuples and from
+    8-tuples that still have the insert (poison shifted off index 4).
+    """
+    from re1_rl.go_explore_archive import normalize_quality
+
     vals = [int(x) for x in list(raw or [])]
     if len(vals) >= 9:
-        return tuple(vals[:9])
-    if len(vals) == 8:
-        return (vals[0], 0, *vals[1:8])
-    return assemble_planner_loyal_quality(vals, 0)
+        vals = _drop_kill_insert(vals)
+    elif len(vals) == 8 and vals[4] not in (0, 1):
+        vals = _drop_kill_insert(vals)
+    return tuple(normalize_quality(vals))
 
 
 def planner_loyal_quality_beats(
     new: list[Any] | tuple[Any, ...] | None,
     old: list[Any] | tuple[Any, ...] | None,
 ) -> bool:
-    """True if *new* should replace *old* (HP, then path kills, then the rest)."""
+    """True if *new* should replace *old* (HP, ammo, healing, then the rest)."""
     if old is None:
         return True
     return lift_planner_loyal_quality(new) > lift_planner_loyal_quality(old)
@@ -552,7 +536,6 @@ def capture_planner_loyal_cell(
             "completed_step_index": completed,
             "slot_index": slot,
             "chunk_final": bool(is_final),
-            "path_kills": path_kills_from_env(env),
         }
         sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
     except Exception as exc:  # noqa: BLE001 — capture must not kill the env
@@ -572,12 +555,7 @@ def capture_planner_loyal_cell(
         leg_frames = int(getattr(env, "_step_count", 0) or 0)
     except (TypeError, ValueError):
         leg_frames = 0
-    quality = list(
-        assemble_planner_loyal_quality(
-            attach_leg_frames(quality, leg_frames),
-            path_kills_from_env(env),
-        )
-    )
+    quality = list(attach_leg_frames(quality, leg_frames))
 
     if dest.exists():
         old_meta_p = dest / CELL_META_NAME
