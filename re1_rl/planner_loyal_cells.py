@@ -3,8 +3,10 @@
 Seed cells ``pl00``..``pl05`` are copied from ``backups/Crystals_in_time``
 (cp00..cp05) through Main Hall + Barry lockpick (``barry_hall_return_106``).
 
-Training starts: every loadable cell at ``pl05`` and later (no upper
-cap). ``pl00``..``pl04`` stay archive-only. Synced cells missing the
+Training starts: every loadable cell at ``pl05`` and later that still has
+a remaining planner step in the live chunk. The cell that completed the
+last authored step is not a start (episode already ended there).
+``pl00``..``pl04`` stay archive-only. Synced cells missing the
 ``training_start`` flag still count — the slot index is enough.
 
 Optional hot-reload pin (read every reset, no worker restart after the
@@ -335,14 +337,48 @@ def _apply_reset_pin(
     return cells
 
 
+def _live_chunk_n_steps(project_root: Path | str | None = None) -> int | None:
+    try:
+        from re1_rl.planner_loyal import load_chunk, resolve_chunk_path
+
+        path = resolve_chunk_path(project_root)
+        if not path.is_file():
+            return None
+        return len(load_chunk(path).get("steps") or [])
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
+def seek_index_after_cell(row: dict[str, Any]) -> int:
+    """Queue index after reset from this cell (0 = first chunk step)."""
+    raw = row.get("planner_step_index")
+    if raw is not None:
+        return int(raw) + 1
+    slot = int(row.get("checkpoint_index") or 0)
+    if slot <= TRAINING_START_INDEX:
+        return 0
+    return slot - TRAINING_START_INDEX
+
+
+def cell_has_remaining_planner_step(
+    row: dict[str, Any], n_steps: int | None
+) -> bool:
+    if not n_steps:
+        return True
+    return seek_index_after_cell(row) < int(n_steps)
+
+
 def iter_training_start_cells(
     project_root: Path | str | None = None,
 ) -> list[dict[str, Any]]:
-    """Loadable cells from the tip (``pl05``) through the newest minted slot."""
+    """Loadable cells from the tip (``pl05``) that still have a next step."""
     root = planner_loyal_root(project_root)
+    n_steps = _live_chunk_n_steps(project_root)
     out: list[dict[str, Any]] = []
     for row in _scan_cells(root):
         if int(row["checkpoint_index"]) < TRAINING_START_INDEX:
+            continue
+        if not cell_has_remaining_planner_step(row, n_steps):
             continue
         state_p = root / "cells" / cell_dir_name(int(row["checkpoint_index"])) / CELL_STATE_NAME
         sidecar_p = state_p.with_name(CELL_SIDECAR_NAME)

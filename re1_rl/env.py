@@ -1498,8 +1498,8 @@ class RE1Env(gym.Env):
         )
         # One-leg: checkpoint_success is true after the hunted cell, so the
         # episode ends here. play_through (leg_span>1) keeps going.
-        # Planner-loyal keeps the episode open for mid-chunk steps; the final
-        # shield-key (queue.done) keeps capture flags so the episode ends.
+        # Planner-loyal keeps the episode open for mid-chunk steps; the last
+        # authored step (queue.done) keeps capture flags so the episode ends.
         if queue is not None:
             if bool(queue.done):
                 self._checkpoint_captured = True

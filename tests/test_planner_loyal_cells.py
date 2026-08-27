@@ -11,8 +11,10 @@ from re1_rl.planner_loyal_cells import (
     TRAINING_START_INDEX,
     bootstrap_from_crystals,
     cell_dir_name,
+    cell_has_remaining_planner_step,
     iter_training_start_cells,
     planner_loyal_root,
+    seek_index_after_cell,
     slot_index_for_completed_step,
     training_start_paths,
 )
@@ -60,6 +62,7 @@ def test_training_starts_are_pl05_and_every_later_slot(
     monkeypatch.delenv("RE1_PLANNER_RESET_PIN_RANGE", raising=False)
     monkeypatch.delenv("RE1_PLANNER_RESET_PIN_SET", raising=False)
     monkeypatch.delenv("RE1_PLANNER_RESET_PIN_FILE", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_CHUNK", raising=False)
     _write_cell(tmp_path, 4, meta={"training_start": False})
     _write_cell(tmp_path, 5, meta={"training_start": True})
     _write_cell(tmp_path, 10, meta={"training_start": True})
@@ -68,7 +71,40 @@ def test_training_starts_are_pl05_and_every_later_slot(
     _write_cell(tmp_path, 18, meta={"chunk_final": True, "training_start": False})
 
     starts = iter_training_start_cells(tmp_path)
+    # Live chemical tail still has steps after pl18, so it stays in the pool.
     assert [int(row["checkpoint_index"]) for row in starts] == [5, 10, 11, 18]
+
+
+def test_exhausted_last_step_cell_is_not_a_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_INDEX", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_RANGE", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_SET", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_FILE", raising=False)
+    chunk = tmp_path / "chunk.json"
+    chunk.write_text(
+        json.dumps(
+            {
+                "chunk_id": "short",
+                "steps": [
+                    {"n": 1, "op": "traverse", "edge_id": "106->105"},
+                    {"n": 2, "op": "traverse", "edge_id": "105->104"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RE1_PLANNER_CHUNK", str(chunk))
+    _write_cell(tmp_path, 5, meta={"planner_step_index": None})
+    _write_cell(tmp_path, 6, meta={"planner_step_index": 0})
+    _write_cell(tmp_path, 7, meta={"planner_step_index": 1, "chunk_final": True})
+    starts = iter_training_start_cells(tmp_path)
+    assert [int(row["checkpoint_index"]) for row in starts] == [5, 6]
+    assert seek_index_after_cell({"planner_step_index": 1, "checkpoint_index": 7}) == 2
+    assert cell_has_remaining_planner_step(
+        {"planner_step_index": 1, "checkpoint_index": 7}, 2
+    ) is False
 
 
 def _write_pin(root: Path, text: str) -> Path:
