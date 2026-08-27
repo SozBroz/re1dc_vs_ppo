@@ -85,6 +85,10 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
         s.get("beat_id") for s in steps if str(s.get("beat_id") or "").startswith("gallery_portrait_")
     ]
     assert portraits == [f"gallery_portrait_{i}" for i in range(1, 7)]
+    end_life = next(i for i, s in enumerate(steps) if s.get("site_id") == "gallery_end_of_life")
+    crest_i = next(i for i, s in enumerate(steps) if str(s.get("pickup_id") or "").startswith("117:star_crest"))
+    old_man = next(i for i, s in enumerate(steps) if s.get("beat_id") == "gallery_portrait_6")
+    assert old_man < end_life < crest_i
     assert any(s.get("edge_id") == "106->107" for s in steps)
     assert "108:handgun_bullets:1" in pickups
     enter_108 = next(i for i, s in enumerate(steps) if s.get("edge_id") == "107->108")
@@ -458,6 +462,69 @@ def test_gallery_portrait_compass_uses_rdt_targets():
         {"op": "acquire", "pickup_id": "117:star_crest:1"}
     )
     assert crest == GALLERY_FINAL_SWITCH_TARGET
+    end_life = _planner_step_target_xz(
+        {
+            "op": "do_puzzle",
+            "site_id": "gallery_end_of_life",
+            "beat_id": "gallery_end_of_life",
+        }
+    )
+    assert end_life == GALLERY_FINAL_SWITCH_TARGET
+
+
+def test_gallery_end_of_life_completes_at_final_switch():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "eol",
+            "end_anchor_beat_id": "star_crest",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "do_puzzle",
+                    "site_id": "gallery_end_of_life",
+                    "room_id": "117",
+                    "beat_id": "gallery_end_of_life",
+                },
+                {
+                    "n": 2,
+                    "op": "acquire",
+                    "pickup_id": "117:star_crest:1",
+                    "room_id": "117",
+                    "beat_id": "star_crest",
+                },
+            ],
+        }
+    )
+    q.note_start_inventory(
+        {"room_id": "117", "gallery_progress": GALLERY_STEP_VALUES[5]}
+    )
+    fx, fz = GALLERY_FINAL_SWITCH_TARGET
+    ox, oz = GALLERY_TARGETS[5]
+    prev = {
+        "room_id": "117",
+        "gallery_progress": GALLERY_STEP_VALUES[5],
+        "x": ox,
+        "z": oz,
+        "inventory_slots": [],
+    }
+    away = {
+        "room_id": "117",
+        "gallery_progress": 0,
+        "x": ox,
+        "z": oz,
+        "inventory_slots": [],
+    }
+    assert q.evaluate_transition(prev_state=prev, state=away)["step_success"] is False
+    at_switch = {
+        "room_id": "117",
+        "gallery_progress": 0,
+        "x": fx,
+        "z": fz,
+        "inventory_slots": [],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=at_switch)
+    assert result["step_success"] is True
+    assert q.current["beat_id"] == "star_crest"
 
 
 def test_ammo_new_slot_counts_as_gain():

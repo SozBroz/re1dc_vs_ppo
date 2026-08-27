@@ -200,6 +200,7 @@ class PlannerLoyalQueue:
         self._start_qty_totals = {}
         self._start_room = ""
         self._start_gallery_progress = 0
+        self._start_gallery_solved = False
         self._satisfied_pickups: set[str] = set()
 
     def reload_if_stale(self, project_root: Path | str | None = None) -> bool:
@@ -251,6 +252,7 @@ class PlannerLoyalQueue:
         self._start_qty_totals = {}
         self._start_room = ""
         self._start_gallery_progress = 0
+        self._start_gallery_solved = False
         self._satisfied_pickups = set()
 
     def note_start_inventory(self, state: dict[str, Any]) -> None:
@@ -260,6 +262,7 @@ class PlannerLoyalQueue:
         self._start_held = set(_inventory_held_names(state))
         self._start_room = str(state.get("room_id") or "").strip().upper()
         self._start_gallery_progress = int(state.get("gallery_progress", 0) or 0)
+        self._start_gallery_solved = bool(state.get("gallery_puzzle_solved", False))
 
     def seek(self, index: int) -> None:
         """Jump queue to ``index`` (0 = first step; len(steps) = done)."""
@@ -369,13 +372,18 @@ class PlannerLoyalQueue:
             return
 
     def _skip_satisfied_gallery_portraits(self) -> None:
-        """Skip portrait steps already true in the episode-start RAM byte."""
+        """Skip portrait / end-of-life steps already true at episode start."""
         from re1_rl.gallery_puzzle import completed_steps
 
         done = completed_steps(self._start_gallery_progress)
         while True:
             step = self.current
             if not step or str(step.get("op") or "") != "do_puzzle":
+                return
+            if _is_gallery_end_of_life(step):
+                if self._start_gallery_solved:
+                    self._index += 1
+                    continue
                 return
             portrait = _gallery_portrait_index(step)
             if portrait is None or done < portrait:
@@ -594,6 +602,13 @@ class PlannerLoyalQueue:
                     flush=True,
                 )
                 return result
+            if _is_gallery_end_of_life(step) and _gallery_end_of_life_complete(
+                prev_state, state
+            ):
+                result["step_success"] = True
+                self._index += 1
+                self.step_success_pending = True
+                return result
             portrait = _gallery_portrait_index(step)
             if portrait is not None and room == "117":
                 from re1_rl.gallery_puzzle import completed_steps
@@ -640,6 +655,45 @@ def _objective_story_matches(site: str, story: str) -> bool:
 
 
 _GALLERY_PORTRAIT_RE = re.compile(r"gallery_portrait_(\d+)$")
+
+
+GALLERY_END_OF_LIFE_IDS = frozenset({"gallery_end_of_life", "gallery_final_switch"})
+
+
+def _is_gallery_end_of_life(step: dict[str, Any]) -> bool:
+    return (
+        str(step.get("beat_id") or "") in GALLERY_END_OF_LIFE_IDS
+        or str(step.get("site_id") or "") in GALLERY_END_OF_LIFE_IDS
+    )
+
+
+def _gallery_end_of_life_complete(
+    prev_state: dict[str, Any],
+    state: dict[str, Any],
+) -> bool:
+    """True when the end-of-life switch clears progress at the slot-8 AOT."""
+    from re1_rl.gallery_puzzle import (
+        GALLERY_COMPLETE_PREV_RAW,
+        near_gallery_final_switch,
+    )
+
+    if str(state.get("room_id") or "") != "117":
+        return False
+    if bool(state.get("gallery_puzzle_solved", False)):
+        return True
+    prev_raw = int(prev_state.get("gallery_progress", 0) or 0)
+    raw = int(state.get("gallery_progress", 0) or 0)
+    if raw != 0 or prev_raw != GALLERY_COMPLETE_PREV_RAW:
+        return False
+    near_now = near_gallery_final_switch(
+        float(state.get("x", 0) or 0),
+        float(state.get("z", 0) or 0),
+    )
+    near_prev = near_gallery_final_switch(
+        float(prev_state.get("x", state.get("x", 0)) or 0),
+        float(prev_state.get("z", state.get("z", 0)) or 0),
+    )
+    return near_now or near_prev
 
 
 def _gallery_portrait_index(step: dict[str, Any]) -> int | None:
@@ -895,6 +949,12 @@ def _planner_step_target_xz(
             )
         return None
     if op in {"objective", "do_puzzle", "trigger_cutscene", "boss"}:
+        if _is_gallery_end_of_life(step):
+            from re1_rl.gallery_puzzle import GALLERY_FINAL_SWITCH_TARGET
+
+            return float(GALLERY_FINAL_SWITCH_TARGET[0]), float(
+                GALLERY_FINAL_SWITCH_TARGET[1]
+            )
         portrait = _gallery_portrait_index(step)
         if portrait is not None:
             from re1_rl.gallery_puzzle import GALLERY_TARGETS
