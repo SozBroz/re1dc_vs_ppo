@@ -1,5 +1,5 @@
 @echo off
-REM WH2 remote worker — planner-loyal, 24 envs (learner is WH3).
+REM WH2 remote worker — planner-loyal, 28 envs (learner is WH3).
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 call "%~dp0..\fleet_hosts.cmd"
@@ -7,11 +7,11 @@ call "%~dp0planner_loyal.env.cmd"
 set MACHINE_NAME=workhorse2
 set LEARNER_HOST=%FLEET_LEARNER_HOST%
 set BASE_PORT=5555
-set N_ENVS=24
-set ACTOR_RANKS=0-23
+set N_ENVS=28
+set ACTOR_RANKS=0-27
 if "%SYNC_INTERVAL_S%"=="" set SYNC_INTERVAL_S=360
 set RE1_MACHINE_NAME=%MACHINE_NAME%
-REM Worker-only on 64 GB: 24 is safe; 28 wedged 0 GB free when this box also ran the learner.
+REM Worker-only on 64 GB: 28 is the standing count now that ingest lives on WH3.
 set RE1_ACTOR_STARTUP_BATCH_SIZE=2
 set RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK=1
 set RE1_EMUHAWK_DETACH_CONSOLE=1

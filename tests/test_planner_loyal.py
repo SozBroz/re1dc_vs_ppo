@@ -14,6 +14,7 @@ from re1_rl.gallery_puzzle import (
     GALLERY_FINAL_SWITCH_TARGET,
     GALLERY_STEP_VALUES,
     GALLERY_TARGETS,
+    GALLERY_WRONG_PORTRAIT_PENALTY,
 )
 from re1_rl.planner import WaypointPlanner
 from re1_rl.planner_loyal import (
@@ -672,6 +673,126 @@ def test_reward_wrong_room_pays_minus_four_and_is_terminal():
     )
     assert terminated is True
     assert reason == "planner_divert"
+
+
+def test_reward_wrong_gallery_portrait_pays_minus_four_and_is_terminal():
+    """pl45-style: Yes on a bad painting resets RAM and ends like yawn cells."""
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "gallery_old_man",
+            "end_anchor_beat_id": "gallery_portrait_6",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "do_puzzle",
+                    "site_id": "gallery_portrait_6",
+                    "room_id": "117",
+                    "beat_id": "gallery_portrait_6",
+                }
+            ],
+        }
+    )
+    progress = ProgressTracker()
+    prev = {
+        "room_id": "117",
+        "gallery_progress": GALLERY_STEP_VALUES[4],
+        "gallery_confirm": 0,
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+        "x": 16000.0,
+        "z": 7200.0,
+    }
+    cur = {
+        **prev,
+        "gallery_progress": 0,
+        "gallery_confirm": 4,
+    }
+    reward, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["gallery_wrong"] == pytest.approx(-GALLERY_WRONG_PORTRAIT_PENALTY)
+    assert bd["planner_step_success"] == 0.0
+    assert bd["planner_divert"] == 0.0
+    assert progress.gallery_wrong_breached is True
+    assert reward == STEP_PENALTY - GALLERY_WRONG_PORTRAIT_PENALTY
+    terminated, _truncated, reason = RE1Env._termination_flags(
+        SimpleNamespace(
+            _stage={"mode": "yawn_rails", "max_steps": 3000},
+            _progress=progress,
+            _checkpoint_captured=False,
+            _episode_failure_override=None,
+            _planner_loyal_queue=q,
+            _step_count=3,
+            _episode_truncated=lambda: False,
+        ),
+        {"dead": False},
+    )
+    assert terminated is True
+    assert reason == "gallery_wrong_portrait"
+
+
+def test_reward_correct_old_man_does_not_gallery_wrong():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "gallery_old_man",
+            "end_anchor_beat_id": "gallery_portrait_6",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "do_puzzle",
+                    "site_id": "gallery_portrait_6",
+                    "room_id": "117",
+                    "beat_id": "gallery_portrait_6",
+                }
+            ],
+        }
+    )
+    progress = ProgressTracker()
+    prev = {
+        "room_id": "117",
+        "gallery_progress": GALLERY_STEP_VALUES[4],
+        "gallery_confirm": 0,
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+        "x": 7250.0,
+        "z": 6100.0,
+    }
+    cur = {**prev, "gallery_progress": GALLERY_STEP_VALUES[5], "gallery_confirm": 2}
+    _reward_total, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["gallery_wrong"] == 0.0
+    assert bd["planner_step_success"] == PLANNER_STEP_SUCCESS_REWARD
+    assert progress.gallery_wrong_breached is False
+
+
+def test_reward_leave_gallery_is_divert_not_double_gallery_wrong():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "gallery_old_man",
+            "end_anchor_beat_id": "gallery_portrait_6",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "do_puzzle",
+                    "site_id": "gallery_portrait_6",
+                    "room_id": "117",
+                    "beat_id": "gallery_portrait_6",
+                }
+            ],
+        }
+    )
+    progress = ProgressTracker()
+    prev = {
+        "room_id": "117",
+        "gallery_progress": GALLERY_STEP_VALUES[4],
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+    }
+    cur = {**prev, "room_id": "10A"}
+    reward, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_divert"] == PLANNER_DIVERT_PENALTY
+    assert bd["gallery_wrong"] == 0.0
+    assert reward == STEP_PENALTY + PLANNER_DIVERT_PENALTY
 
 
 def test_rails_mode_loyal_traverse_does_not_breach_wrong_room():

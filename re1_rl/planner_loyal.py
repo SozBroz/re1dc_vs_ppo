@@ -52,6 +52,7 @@ PLANNER_LOYAL_SCALAR_KEYS: frozenset[str] = frozenset(
         "planner_step_success",
         "planner_divert",
         "planner_timeout",
+        "gallery_wrong",
     }
 )
 

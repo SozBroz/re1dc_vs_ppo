@@ -13,8 +13,8 @@
     "lan_ip": "192.168.0.116",
     "repo": "C:\\Users\\sshuser\\re1_rl",
     "worker_base_port": 5555,
-    "worker_n_envs": 24,
-    "notes": "Ex-learner; 24 remote envs on 64 GB now that ingest lives on WH3"
+    "worker_n_envs": 28,
+    "notes": "Ex-learner; 28 remote envs on 64 GB now that ingest lives on WH3"
   },
   "workhorse3": {
     "hostname": "DESKTOP-A2HP723",

@@ -1,5 +1,5 @@
 @echo off
-REM Detached WH2 planner-loyal remote worker (24 envs). Learner is WH3.
+REM Detached WH2 planner-loyal remote worker (28 envs). Learner is WH3.
 setlocal
 cd /d C:\Users\sshuser\re1_rl
 if not exist data\logs mkdir data\logs

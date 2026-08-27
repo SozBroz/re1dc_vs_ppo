@@ -961,11 +961,34 @@ def _compute_planner_loyal_reward(
             progress.arm_cell_timeout(int(FLAT_CELL_TIMEOUT_FRAMES))
             progress.leg_emulated_frames = 0
 
+    if progress is not None:
+        from re1_rl.weapon_equip import inventory_entries_to_names
+
+        inventory = set(inventory_entries_to_names(state.get("inventory")))
+        _, gallery_wrong = progress.gallery_step_reward(
+            prev_room=str(prev_state.get("room_id", "") or ""),
+            room=str(state.get("room_id", "") or ""),
+            prev_raw=int(prev_state.get("gallery_progress", 0) or 0),
+            raw=int(state.get("gallery_progress", 0) or 0),
+            prev_confirm=int(prev_state.get("gallery_confirm", 0) or 0),
+            confirm=int(state.get("gallery_confirm", 0) or 0),
+            star_crest_held="star_crest" in inventory,
+            x=float(state.get("x", 0) or 0),
+            z=float(state.get("z", 0) or 0),
+            prev_x=float(prev_state.get("x", 0) or 0),
+            prev_z=float(prev_state.get("z", 0) or 0),
+        )
+        # Leave-117 is already planner_divert. Same-room wrong Yes uses
+        # gallery_wrong like yawn cells (−4, episode end).
+        if gallery_wrong != 0.0 and not loyal.get("divert"):
+            bd["gallery_wrong"] = float(gallery_wrong)
+
     if (
         progress is not None
         and "step_emulated_frames" in state
         and not bd["planner_step_success"]
         and not progress.wrong_room_breached
+        and not progress.gallery_wrong_breached
     ):
         progress.note_leg_frames(int(state.get("step_emulated_frames") or 0))
         if (
@@ -1041,6 +1064,7 @@ def _compute_planner_loyal_reward(
     if progress is not None and (
         progress.wrong_room_breached
         or progress.cell_timeout_breached
+        or progress.gallery_wrong_breached
     ):
         for term, value in tuple(bd.items()):
             if value > 0.0:
