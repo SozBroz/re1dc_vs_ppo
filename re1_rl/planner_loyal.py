@@ -128,12 +128,16 @@ def load_chunk(path: str | Path | None = None) -> dict[str, Any]:
         return json.load(handle)
 
 
+def _chunk_file_digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 class PlannerLoyalQueue:
     """Pop-front queue of LLM-authored steps.
 
     The chunk may be longer than ``PLANNER_MAX_STEPS``; obs encodes at most
-    that many *remaining* orders. Pass ``chunk_path`` so ``reload_if_stale``
-    can pick up an appended tail without reconstructing the env.
+    that many *remaining* orders. Pass ``chunk_path`` so each reset re-reads
+    the file (content hash). A git pull is enough; do not bounce workers.
     """
 
     def __init__(
@@ -143,7 +147,7 @@ class PlannerLoyalQueue:
         chunk_path: Path | str | None = None,
     ) -> None:
         self._chunk_path: Path | None = None
-        self._chunk_mtime: float | None = None
+        self._chunk_digest: str | None = None
         if chunk is not None and chunk_path is None:
             self._apply_chunk(chunk)
         else:
@@ -167,9 +171,9 @@ class PlannerLoyalQueue:
         if path is not None:
             self._chunk_path = Path(path)
             try:
-                self._chunk_mtime = self._chunk_path.stat().st_mtime
+                self._chunk_digest = _chunk_file_digest(self._chunk_path)
             except OSError:
-                self._chunk_mtime = None
+                self._chunk_digest = None
         self._index = 0
         self.step_success_pending = False
         self.divert_reason = None
@@ -178,23 +182,25 @@ class PlannerLoyalQueue:
         self._satisfied_pickups: set[str] = set()
 
     def reload_if_stale(self, project_root: Path | str | None = None) -> bool:
-        """Reload the chunk file when path or mtime changed. True if replaced."""
+        """Re-read the chunk file. True when bytes or path changed."""
         if self._chunk_path is None:
             return False
         path = resolve_chunk_path(project_root)
         try:
-            mtime = path.stat().st_mtime
+            digest = _chunk_file_digest(path)
         except OSError:
             return False
-        same = (
+        if (
             path.resolve() == self._chunk_path.resolve()
-            and self._chunk_mtime is not None
-            and mtime == self._chunk_mtime
-        )
-        if same:
+            and self._chunk_digest is not None
+            and digest == self._chunk_digest
+        ):
             return False
-        data = load_chunk(path)
-        validate_planner_loyal_chunk(data)
+        try:
+            data = load_chunk(path)
+            validate_planner_loyal_chunk(data)
+        except (OSError, json.JSONDecodeError, ValueError):
+            return False
         self._apply_chunk(data, path)
         return True
 

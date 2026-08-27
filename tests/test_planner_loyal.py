@@ -1047,8 +1047,8 @@ def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):
         ),
         encoding="utf-8",
     )
-    later = (q._chunk_mtime or 0.0) + 5.0
-    os.utime(path, (later, later))
+    # Content hash, not mtime — git pull must count even if timestamps match.
+    os.utime(path, (q._chunk_path.stat().st_mtime, q._chunk_path.stat().st_mtime))
     assert q.reload_if_stale(tmp_path) is True
     assert len(q._steps) == 2
     assert q.end_anchor == "b"
