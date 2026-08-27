@@ -30,6 +30,14 @@ REQUIRED_ON_PATH_ITEMS = frozenset(
         "first_aid_spray_alt",
     }
 )
+INVENTORY_SLOTS = 8
+AMMO_STACK_CAP = {"handgun_bullets": 30, "shotgun_shells": 7}
+CHEMICAL_PUMP_BEATS = frozenset({"greenhouse_pump"})
+CHEMICAL_PUMP_SITES = frozenset({"chemical@10C_greenhouse_pump"})
+FIREARMS = frozenset({"beretta", "shotgun"})
+FIREARM_AMMO = {"beretta": "handgun_bullets", "shotgun": "shotgun_shells"}
+# 10C bench plants are slot-pressure, not walk-past clips.
+BULKY_ROOM_HEALS = frozenset({"10C"})
 
 
 def load_json(path: Path) -> Any:
@@ -212,6 +220,7 @@ def filtered_pickups(valid_rooms: set[str], taken: set[str]) -> dict[str, list[d
                 "item": name,
                 "category": cat,
                 "key_item": bool(item.get("key_item")),
+                "count": max(1, int(item.get("count") or 1)),
             }
             if item.get("gate"):
                 row["gate"] = item["gate"]
@@ -432,13 +441,18 @@ def build_phase1_context(
             "excluded_items": _gates().get("phase1_excluded_items"),
             "no_maps_ink_files": True,
             "on_path_ammo_heals_required": True,
+            "armor_key_immediately_after_pump": True,
             "chunk_ends_on_anchor_completion": True,
             "box_rooms_in_scope": ["100", "118"],
+            "no_unarmed_combat_path": True,
+            "knife_is_not_a_combat_kit": True,
+            "combat_kit": "firearm (beretta or shotgun) plus matching ammo",
             "combat_strain": (
                 "Sum enemy hp on your hops, divide by the carried weapon dmg, "
                 "then subtract on-path ammo pickups you acquire. "
                 "enemies[] already omits kills in enemies_killed; "
-                "unkilled return_visit foes are still in the room."
+                "unkilled return_visit foes are still in the room. "
+                "Do not bank the last gun to make herb slots — return to 118."
             ),
         },
     }
@@ -457,8 +471,10 @@ YOU MUST:
 - Choose an order for remaining mandatory beats (parallel chains may interleave).
 - Emit EVERY directed room hop yourself as traverse steps using edge_id from the
   supplied directed_edges list only.
-- Emit acquire / objective / do_puzzle / trigger_cutscene / boss / use_box steps
-  for mandatory work.
+- Emit acquire / objective / do_puzzle / trigger_cutscene / boss / go_to_box /
+  use_box steps for mandatory work. If she is not already in a box room, emit
+  go_to_box (room_id 118 or 100) BEFORE use_box so the policy gets a navigate
+  compass to the box. use_box then rearranges to held_on_exit.
 - Start from the tip room (Main Hall 106 after Barry lockpick).
 - For the shield_key chain: after acquiring gold_emblem in 10F you MUST emit an
   objective step for emblem@10F_alcove (beat_id emblem_swap_alcove) to place the
@@ -479,6 +495,19 @@ YOU MUST:
   the leave-box loadout for the remaining deficit after on-path pickups.
   enemies[] is the LIVE remainder after enemies_killed. Unkilled hallway
   zombies are still there on return.
+- After greenhouse_pump (chemical@10C_greenhouse_pump) the NEXT step MUST be
+  acquire 10C:armor_key:1. End that chunk on armor_key, not the pump.
+  10C herbs are ungated — pick what fits AFTER reserving a combat kit,
+  then pump, then the key.
+- Size leave_118 free slots for physical loot counts in rooms you enter
+  (10C is 4 green + 2 red, each herb is its own slot). Shotgun and
+  armor_key each take a slot. Bank shield_key; it only opens the attic.
+  If heals outnumber free slots after the combat kit, return to 118 or
+  pick only what fits — never bank the last firearm and its ammo.
+- COMBAT KIT: entering a room that still has live enemies[] requires a
+  firearm (beretta or shotgun) plus matching ammo. Knife is not a kit.
+  Empty shotgun with no shells is not a kit. 115/116 are live zombie
+  rooms — do not suicide-run them unarmed.
 - Also give full beat_order for the rest of Phase 1 (beat ids only).
 - Assume lockpick is held when tip.planner_assumed_held says so.
 - PPO handles combat; do not emit fight steps or coordinates or puzzle button
@@ -503,7 +532,7 @@ PASS1_CONTRACT = {
             {
                 "n": 1,
                 "id": "s1",
-                "op": "traverse|acquire|objective|do_puzzle|trigger_cutscene|boss|use_box",
+                "op": "traverse|acquire|objective|do_puzzle|trigger_cutscene|boss|go_to_box|use_box",
                 "edge_id": "from->to when op=traverse else null",
                 "pickup_id": "room:item:index when op=acquire else null",
                 "site_id": "story site when op=objective else null",
@@ -578,6 +607,12 @@ def validate_pass1_plan(
 ) -> list[str]:
     """Fail-closed sequential validation. Returns human-readable errors (first-failure style list)."""
     ctx = ctx if ctx is not None else build_phase1_context(checkpoint)
+    if plan.get("leave_118"):
+        tip = dict(ctx.get("tip") or {})
+        tip["leave_118"] = plan["leave_118"]
+        if (plan["leave_118"] or {}).get("held_on_exit"):
+            tip["inventory"] = plan["leave_118"]["held_on_exit"]
+        ctx = {**ctx, "tip": tip, "leave_118": plan["leave_118"]}
     errors: list[str] = []
     edges = {e["edge_id"]: e for e in ctx["directed_edges"]}
     tip_room = str((ctx["tip"].get("pose") or {}).get("room_id") or "106")
@@ -594,8 +629,7 @@ def validate_pass1_plan(
         p["pickup_id"]: p for rows in pickups_by_room.values() for p in rows
     }
     chunk = plan.get("next_chunk") or {}
-    steps = chunk.get("steps") or []
-    end_anchor = str(chunk.get("end_anchor_beat_id") or "")
+    steps, end_anchor = walk_steps(plan)
     if not isinstance(steps, list) or not steps:
         return ["next_chunk.steps missing or empty"]
     if not end_anchor:
@@ -608,8 +642,11 @@ def validate_pass1_plan(
                 continue
             if row.get("gate"):
                 continue
-            if row.get("item") in REQUIRED_ON_PATH_ITEMS:
-                missed.append(row["pickup_id"])
+            if row.get("item") not in REQUIRED_ON_PATH_ITEMS:
+                continue
+            if room_id in BULKY_ROOM_HEALS and row.get("item") not in AMMO_STACK_CAP:
+                continue
+            missed.append(row["pickup_id"])
         return missed
 
     visited_for_freebees: set[str] = set()
@@ -683,6 +720,11 @@ def validate_pass1_plan(
                 anchor_completed_at = index
             continue
 
+        if op == "go_to_box":
+            dest = str(step.get("room_id") or "118").strip().upper() or "118"
+            room = dest
+            continue
+
         if op in {"objective", "use_key_item", "do_puzzle", "trigger_cutscene", "boss", "use_box"}:
             need_room = str(step.get("room_id") or "")
             if need_room and need_room != room:
@@ -705,6 +747,18 @@ def validate_pass1_plan(
                         "emblem@10F_alcove (emblem_swap_alcove) before fireplace"
                     )
                     break
+            if beat_id in CHEMICAL_PUMP_BEATS or str(site) in CHEMICAL_PUMP_SITES:
+                nxt = steps[index + 1] if index + 1 < len(steps) else None
+                nxt_pick = str((nxt or {}).get("pickup_id") or "")
+                nxt_beat = str((nxt or {}).get("beat_id") or "")
+                if not nxt or str((nxt or {}).get("op") or "") != "acquire" or (
+                    "armor_key" not in nxt_pick and nxt_beat != "armor_key"
+                ):
+                    errors.append(
+                        f"{step_id}: ARMOR_KEY_MUST_FOLLOW_PUMP next step must "
+                        "acquire 10C:armor_key:1 immediately after greenhouse_pump"
+                    )
+                    break
             if beat_id == end_anchor:
                 anchor_completed_at = index
             continue
@@ -712,8 +766,33 @@ def validate_pass1_plan(
         errors.append(f"{step_id}: UNKNOWN_OP {op}")
         break
 
+    if room in visited_for_freebees:
+        missed = leftover_freebees(room)
+        if missed:
+            errors.append(
+                f"ON_PATH_FREEBEE_SKIPPED ending in {room} without acquiring {missed}"
+            )
+
+    pressure = inventory_pressure_report(plan, ctx)
+    inv_errors = [
+        (
+            f"INVENTORY_SLOT_SHORTFALL room={row['room_id']} "
+            f"heals={row['heal_units']} free={row['free_slots']} "
+            f"need={row['shortfall']} more empty slots "
+            f"({', '.join(row.get('loot') or [])})"
+        )
+        for row in pressure.get("shortfalls") or []
+    ]
+    inv_errors.extend(
+        (
+            f"UNARMED_COMBAT_PATH enter {row['room_id']} live={row.get('foes')} "
+            f"held={row.get('held')} — keep beretta+handgun_bullets or "
+            f"shotgun+shotgun_shells; knife is not a kit"
+        )
+        for row in pressure.get("unarmed_enters") or []
+    )
     if errors:
-        return errors
+        return errors + inv_errors
 
     if anchor_completed_at is None:
         errors.append(
@@ -730,7 +809,234 @@ def validate_pass1_plan(
     if not isinstance(beat_order, list) or len(beat_order) < 4:
         errors.append("beat_order must list remaining Phase 1 beats through crest placement")
 
-    return errors
+    return errors + inv_errors
+
+
+def walk_steps(plan: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
+    """Prefer ``next_leg`` (box then walk) else ``next_chunk``."""
+    leg = plan.get("next_leg") or {}
+    chunk = plan.get("next_chunk") or {}
+    if isinstance(leg, dict) and leg.get("steps"):
+        return list(leg.get("steps") or []), str(leg.get("end_anchor_beat_id") or "")
+    return list(chunk.get("steps") or []), str(chunk.get("end_anchor_beat_id") or "")
+
+
+def _tip_slots(ctx: dict[str, Any]) -> list[dict[str, Any]]:
+    leave = (ctx.get("tip") or {}).get("leave_118") or ctx.get("leave_118") or {}
+    raw = leave.get("held_on_exit") or (ctx.get("tip") or {}).get("inventory") or []
+    slots: list[dict[str, Any]] = []
+    for row in raw:
+        if not isinstance(row, dict):
+            continue
+        name = row.get("item")
+        slots.append(
+            {
+                "item": str(name) if name else None,
+                "qty": int(row.get("qty") or 0),
+            }
+        )
+    while len(slots) < INVENTORY_SLOTS:
+        slots.append({"item": None, "qty": 0})
+    return slots[:INVENTORY_SLOTS]
+
+
+def _free_slots(slots: list[dict[str, Any]]) -> int:
+    return sum(1 for row in slots if not row.get("item"))
+
+
+def _add_to_slots(slots: list[dict[str, Any]], name: str, qty: int) -> int:
+    """Put ``qty`` units of ``name`` into slots. Returns units that did not fit."""
+    remaining = max(1, int(qty))
+    cap = AMMO_STACK_CAP.get(name)
+    if cap:
+        for row in slots:
+            if row.get("item") != name:
+                continue
+            space = cap - int(row.get("qty") or 0)
+            if space <= 0:
+                continue
+            take = min(space, remaining)
+            row["qty"] = int(row.get("qty") or 0) + take
+            remaining -= take
+            if remaining <= 0:
+                return 0
+    units = remaining if cap else max(1, int(qty))
+    leftover = 0
+    for _ in range(units):
+        empty = next((row for row in slots if not row.get("item")), None)
+        if empty is None:
+            leftover += 1
+            continue
+        empty["item"] = name
+        empty["qty"] = min(cap, qty) if cap else 1
+    return leftover
+
+
+def _consume_named(slots: list[dict[str, Any]], name: str) -> None:
+    for row in slots:
+        if row.get("item") == name:
+            row["item"] = None
+            row["qty"] = 0
+            return
+
+
+def _ammo_qty(slots: list[dict[str, Any]], name: str) -> int:
+    return sum(int(row.get("qty") or 0) for row in slots if row.get("item") == name)
+
+
+def firearm_combat_kit(slots: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Beretta+handgun_bullets or shotgun+shells. Knife does not count."""
+    held = {str(row.get("item")) for row in slots if row.get("item")}
+    for weapon, ammo in FIREARM_AMMO.items():
+        if weapon in held and weapon in FIREARMS and _ammo_qty(slots, ammo) > 0:
+            return {
+                "weapon": weapon,
+                "ammo_item": ammo,
+                "ammo": _ammo_qty(slots, ammo),
+            }
+    return None
+
+
+def _live_foes(room_id: str, ctx: dict[str, Any]) -> list[str]:
+    block = (ctx.get("enemies") or {}).get(room_id) or {}
+    live: list[str] = []
+    for row in block.get("enemies") or []:
+        if not isinstance(row, dict):
+            continue
+        count = int(row.get("count") or 1)
+        if count <= 0:
+            continue
+        live.append(f"{count}x{row.get('type') or 'enemy'}")
+    return live
+
+
+def inventory_pressure_report(plan: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
+    """Walk the training steps and flag rooms whose physical loot exceeds free slots."""
+    steps, _anchor = walk_steps(plan)
+    leave = plan.get("leave_118") or (ctx.get("tip") or {}).get("leave_118") or {}
+    if leave.get("held_on_exit"):
+        ctx = {**ctx, "leave_118": leave}
+    slots = _tip_slots(ctx)
+    pickups = ctx.get("pickups_allowed") or {}
+    pickup_index = {
+        p["pickup_id"]: p for rows in pickups.values() for p in rows
+    }
+    taken = set((ctx.get("tip") or {}).get("known_taken_pickups") or [])
+    edges = {e["edge_id"]: e for e in ctx.get("directed_edges") or []}
+    room = str(((ctx.get("tip") or {}).get("pose") or {}).get("room_id") or "")
+    shortfalls: list[dict[str, Any]] = []
+    unarmed: list[dict[str, Any]] = []
+    timeline: list[dict[str, Any]] = []
+
+    def room_heal_need(room_id: str) -> tuple[int, list[str]]:
+        need = 0
+        ids: list[str] = []
+        for row in pickups.get(room_id) or []:
+            if row.get("pickup_id") in taken or row.get("gate"):
+                continue
+            if row.get("item") not in REQUIRED_ON_PATH_ITEMS:
+                continue
+            n = int(row.get("count") or 1)
+            if row.get("item") in AMMO_STACK_CAP:
+                continue
+            need += n
+            ids.append(f"{row['pickup_id']}x{n}")
+        return need, ids
+
+    if room:
+        need, ids = room_heal_need(room)
+        free = _free_slots(slots)
+        if need > 0 and free == 0:
+            shortfalls.append(
+                {
+                    "when": "start",
+                    "room_id": room,
+                    "free_slots": free,
+                    "heal_units": need,
+                    "shortfall": need - free,
+                    "loot": ids,
+                }
+            )
+    for index, step in enumerate(steps):
+        op = str(step.get("op") or "")
+        if op == "traverse":
+            edge = edges.get(str(step.get("edge_id") or ""))
+            if edge:
+                room = str(edge["to"])
+                foes = _live_foes(room, ctx)
+                kit = firearm_combat_kit(slots)
+                if foes and kit is None:
+                    unarmed.append(
+                        {
+                            "when": f"enter:{step.get('edge_id')}",
+                            "room_id": room,
+                            "foes": foes,
+                            "held": [
+                                r.get("item") for r in slots if r.get("item")
+                            ],
+                        }
+                    )
+                need, ids = room_heal_need(room)
+                free = _free_slots(slots)
+                if need > 0 and free == 0:
+                    shortfalls.append(
+                        {
+                            "when": f"enter:{step.get('edge_id')}",
+                            "room_id": room,
+                            "free_slots": free,
+                            "heal_units": need,
+                            "shortfall": need - free,
+                            "loot": ids,
+                        }
+                    )
+            continue
+        if op == "acquire":
+            pid = str(step.get("pickup_id") or "")
+            row = pickup_index.get(pid) or {}
+            name = str(row.get("item") or pid.split(":")[1] if ":" in pid else "")
+            qty = int(row.get("count") or 1)
+            if name in AMMO_STACK_CAP:
+                qty = int(row.get("known_qty_each") or qty)
+            overflow = _add_to_slots(slots, name, qty)
+            taken.add(pid)
+            timeline.append(
+                {
+                    "n": step.get("n") or index + 1,
+                    "op": op,
+                    "item": name,
+                    "qty": qty,
+                    "free_after": _free_slots(slots),
+                    "overflow": overflow,
+                }
+            )
+            continue
+        beat = str(step.get("beat_id") or "")
+        site = str(step.get("site_id") or "")
+        if beat in CHEMICAL_PUMP_BEATS or site in CHEMICAL_PUMP_SITES:
+            _consume_named(slots, "chemical")
+            timeline.append(
+                {
+                    "n": step.get("n") or index + 1,
+                    "op": op,
+                    "freed": "chemical",
+                    "free_after": _free_slots(slots),
+                }
+            )
+    return {
+        "leave_118": leave,
+        "held_on_exit": [
+            {"item": r.get("item"), "qty": r.get("qty")} for r in _tip_slots(ctx)
+        ],
+        "free_slots_on_exit": _free_slots(_tip_slots(ctx)),
+        "shortfalls": shortfalls,
+        "unarmed_enters": unarmed,
+        "acquire_timeline": timeline,
+        "notes": (
+            "10C catalog is 4 green_herb + 2 red_herb (6 slots) plus armor_key. "
+            "Each herb plant occupies its own slot. Ammo stacks to cap. "
+            "Combat kit (firearm+ammo) is reserved — do not strip it for herbs."
+        ),
+    }
 
 
 def _ungated_on_path_rows(
@@ -754,7 +1060,7 @@ def rooms_visited_by_chunk(plan: dict[str, Any], ctx: dict[str, Any]) -> list[st
     edges = {e["edge_id"]: e for e in ctx.get("directed_edges") or []}
     room = tip
     seen: list[str] = [tip] if tip else []
-    for step in (plan.get("next_chunk") or {}).get("steps") or []:
+    for step in walk_steps(plan)[0]:
         if str(step.get("op") or "") != "traverse":
             continue
         edge = edges.get(str(step.get("edge_id") or ""))
@@ -769,7 +1075,7 @@ def rooms_visited_by_chunk(plan: dict[str, Any], ctx: dict[str, Any]) -> list[st
 def loot_review_packet(plan: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     """Entered rooms + one-door neighbors and their remaining ungated freebees."""
     taken = set((ctx.get("tip") or {}).get("known_taken_pickups") or [])
-    for step in (plan.get("next_chunk") or {}).get("steps") or []:
+    for step in walk_steps(plan)[0]:
         pickup_id = step.get("pickup_id")
         if pickup_id:
             taken.add(str(pickup_id))
@@ -845,6 +1151,93 @@ def build_pass2_review_prompt(
         ("ROLE: system", PASS2_SYSTEM),
         ("ROLE: user", user),
         ("LOOT_REVIEW_PACKET", compact(packet)),
+    ]
+    sep = "\n\n" + "=" * 88 + "\n"
+    return sep.join(f"{title}\n{'-' * len(title)}\n{body}" for title, body in sections) + "\n"
+
+
+PASS4_SYSTEM = """You are refining inventory for a Phase 1 box-then-walk plan.
+
+The authoring pass undersized leave_118 or stripped the combat kit. Jill has
+8 slots. Each 10C herb plant is its own slot (4 green + 2 red). Shotgun and
+armor_key each take a slot. Chemical frees one slot at the pump. Ammo stacks
+(handgun 30, shells 7). Shield_key only opens the attic — bank it.
+
+COMBAT KIT (hard rule):
+- 115 (trap, 2 zombies) and 116 (living room, 2 zombies) plus any other room
+  still listed in enemies[] are live fights. Do NOT suicide-run them.
+- leave_118 MUST keep a firearm (beretta or shotgun) AND matching ammo
+  (at least one handgun clip of 15, or shells if the shotgun is loaded).
+- Knife is not a combat kit. Empty shotgun with 0 shells is not a kit.
+- NEVER bank the last gun and all ammo to make herb slots.
+
+10C herbs vs kit:
+- Reserve the kit first. Pick only as many bench plants as still fit.
+- If you need more empty slots, return to 118 AFTER the shotgun and box
+  again — keep chemical + shotgun + beretta + at least 15 bullets.
+- Do not enter 10C with zero empty slots.
+
+You MUST:
+- Keep the same story goal. After greenhouse_pump, immediately acquire
+  10C:armor_key:1. end_anchor_beat_id MUST be armor_key.
+- Fix every UNARMED_COMBAT_PATH, INVENTORY_SLOT_SHORTFALL, and
+  ARMOR_KEY_MUST_FOLLOW_PUMP.
+- Never invent pickup_id or edge_id. Use only ids in this packet.
+- Return ONE JSON object: leave_118, next_chunk (box step), next_leg (walk
+  ending on armor_key), beat_order, review_notes.
+
+YOU MUST NOT leave 118 with only chemical."""
+
+
+def build_pass4_inventory_prompt(
+    plan: dict[str, Any],
+    ctx: dict[str, Any],
+    *,
+    code_errors: list[str] | None = None,
+) -> str:
+    packet = {
+        "draft": {
+            "leave_118": plan.get("leave_118"),
+            "next_chunk": plan.get("next_chunk"),
+            "next_leg": plan.get("next_leg"),
+            "beat_order": plan.get("beat_order") or [],
+        },
+        "code_audit_errors": list(code_errors or []),
+        "inventory_pressure": inventory_pressure_report(plan, ctx),
+        "combat_kit_rule": (
+            "firearm+matching ammo required before every live-enemy door; "
+            "knife is not a kit; do not strip the kit for 10C herbs"
+        ),
+        "loot": loot_review_packet(
+            {"next_chunk": {"steps": walk_steps(plan)[0]}},
+            ctx,
+        ),
+        "policy": {
+            "armor_key_immediately_after_pump": True,
+            "10C_order": ["herbs that fit", "greenhouse_pump", "armor_key"],
+            "no_unarmed_combat_path": True,
+            "knife_is_not_a_combat_kit": True,
+            "shield_key_is_attic_only": True,
+            "herb_plants_are_separate_slots": True,
+            "10C_heal_plants": {"green_herb": 4, "red_herb": 2},
+        },
+        "output_contract": {
+            "leave_118": "8 slots held on 118 exit plus bank/withdraw",
+            "next_chunk": "one use_box in 118 if still in the save room",
+            "next_leg": "walk; 10C herbs, pump, armor_key; end on armor_key",
+            "review_notes": ["what you changed and why"],
+        },
+    }
+    user = (
+        "/think\nRefine inventory. Keep a firearm+ammo through live rooms. "
+        "Fix UNARMED_COMBAT_PATH, INVENTORY_SLOT_SHORTFALL, and "
+        "ARMOR_KEY_MUST_FOLLOW_PUMP. Do not suicide-run unarmed. "
+        "Bank shield_key. End on armor_key. JSON only."
+    )
+    sections = [
+        ("ROLE: system", PASS4_SYSTEM),
+        ("ROLE: user", user),
+        ("INVENTORY_REVIEW_PACKET", compact(packet)),
     ]
     sep = "\n\n" + "=" * 88 + "\n"
     return sep.join(f"{title}\n{'-' * len(title)}\n{body}" for title, body in sections) + "\n"

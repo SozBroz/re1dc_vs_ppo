@@ -118,19 +118,22 @@ def unexpected_keys_lost(
     keys_after: set[int],
     intended_item_id: int,
     room_id: str | None,
+    allowed_key_ids: frozenset[int] | None = None,
 ) -> set[int]:
     """Keys that left the person and were not the intended allowlisted deposit.
 
     ``lost = keys_before - keys_after``. If the intended id is legal to deposit
     in ``room_id`` (room-118 wind crest / armor key), drop it from ``lost``.
     Remaining ids are a fail (``key_item_deposited``): shield_key leaving in
-    118 still fails; crest or armor key leaving in room 100 still fails.
+    118 still fails unless the planner ``use_box`` target banks it.
     """
     from re1_rl.item_box import is_deposit_allowed_item
 
     lost = {int(i) & 0xFF for i in keys_before} - {int(i) & 0xFF for i in keys_after}
     intended = int(intended_item_id) & 0xFF
-    if intended in lost and is_deposit_allowed_item(intended, room_id):
+    if intended in lost and is_deposit_allowed_item(
+        intended, room_id, allowed_key_ids=allowed_key_ids
+    ):
         lost.discard(intended)
     return lost
 
@@ -160,6 +163,7 @@ def _finalize_transfer_failure(
     box_live_after: list[tuple[int, int]],
     default_reason: str,
     room_id: str | None = None,
+    allowed_key_names: frozenset[str] | None = None,
 ) -> None:
     """Annotate failed transfers; never emit cursor_out on failure."""
     from re1_rl.item_box import box_pollution_reason
@@ -174,7 +178,9 @@ def _finalize_transfer_failure(
     )
     report["ram_changed"] = bool(ram_changed)
     pollution = box_pollution_reason(
-        box_live_after, room_id=room_id or report.get("room_id")
+        box_live_after,
+        room_id=room_id or report.get("room_id"),
+        allowed_key_names=allowed_key_names,
     )
     if pollution:
         report["reason"] = pollution
@@ -784,6 +790,7 @@ def execute_box_withdraw_ui(
     inv_cursor: int = 0,
     box_cursor: int = 0,
     room_id: str | None = None,
+    allowed_key_ids: frozenset[int] | None = None,
 ) -> tuple[bool, int, dict[str, Any]]:
     """Withdraw ``box_slot`` via empty-inv-slot → box list → Cross.
 
@@ -981,8 +988,9 @@ def execute_box_withdraw_ui(
         )
         return _abort()
 
-    from re1_rl.item_box import box_pollution_reason
+    from re1_rl.item_box import box_pollution_reason, key_names_for_ids
 
+    allowed_names = key_names_for_ids(allowed_key_ids)
     if _deep_box_changed(box_live_before, box_live_after):
         _finalize_transfer_failure(
             report,
@@ -996,7 +1004,9 @@ def execute_box_withdraw_ui(
         )
         return _abort()
 
-    pollution = box_pollution_reason(box_live_after, room_id=room_id)
+    pollution = box_pollution_reason(
+        box_live_after, room_id=room_id, allowed_key_names=allowed_names
+    )
     if pollution:
         _finalize_transfer_failure(
             report,
@@ -1007,6 +1017,7 @@ def execute_box_withdraw_ui(
             box_live_before=box_live_before,
             box_live_after=box_live_after,
             default_reason=pollution,
+            allowed_key_names=allowed_names,
         )
         return _abort()
 
@@ -1035,6 +1046,7 @@ def execute_box_deposit_ui(
     trust_inv_cursor: bool = False,
     expected_item_id: int | None = None,
     checkpoint_id: str | None = None,
+    allowed_key_ids: frozenset[int] | None = None,
 ) -> tuple[bool, int, dict[str, Any]]:
     """Deposit ``inv_slot`` via occupied inv → Cross → empty box → Cross.
 
@@ -1064,14 +1076,18 @@ def execute_box_deposit_ui(
     inv_before = read_inventory(client)
     box_before = read_box(client)
     box_live_before = read_box_live(client)
-    from re1_rl.item_box import box_pollution_reason
+    from re1_rl.item_box import box_pollution_reason, key_names_for_ids
 
-    pollution_before = box_pollution_reason(box_live_before, room_id=room_id)
+    allowed_names = key_names_for_ids(allowed_key_ids)
+    pollution_before = box_pollution_reason(
+        box_live_before, room_id=room_id, allowed_key_names=allowed_names
+    )
     if pollution_before:
         report["reason"] = pollution_before
         report["exchange_detected"] = True
         return False, 0, report
-    # Live path always enforces allowlist; keys are hard-denied inside can_deposit.
+    # Live path always enforces allowlist; keys are hard-denied inside can_deposit
+    # unless the planner use_box target banks them.
     ok, reason = can_deposit(
         inv_before,
         box_before,
@@ -1079,6 +1095,7 @@ def execute_box_deposit_ui(
         room_id=room_id,
         checkpoint_id=checkpoint_id,
         enforce_allowlist=True,
+        allowed_key_ids=allowed_key_ids,
     )
     if not ok:
         report["reason"] = reason
@@ -1088,7 +1105,10 @@ def execute_box_deposit_ui(
 
     item_id, qty_before = inv_before[slot]
     if not is_deposit_allowed_item(
-        int(item_id), room_id, checkpoint_id=checkpoint_id
+        int(item_id),
+        room_id,
+        checkpoint_id=checkpoint_id,
+        allowed_key_ids=allowed_key_ids,
     ):
         report["reason"] = "key_item" if is_key_item_id(int(item_id)) else "not_allowlisted"
         return False, 0, report
@@ -1242,7 +1262,13 @@ def execute_box_deposit_ui(
         for iid, q in inv_after
         if int(iid) and is_key_item_id(int(iid)) and effective_transfer_qty(iid, q) > 0
     }
-    if unexpected_keys_lost(keys_before, keys_after, int(item_id), room_id):
+    if unexpected_keys_lost(
+        keys_before,
+        keys_after,
+        int(item_id),
+        room_id,
+        allowed_key_ids=allowed_key_ids,
+    ):
         _finalize_transfer_failure(
             report,
             inv_before=inv_before,
@@ -1305,7 +1331,9 @@ def execute_box_deposit_ui(
         )
         return _abort()
 
-    pollution = box_pollution_reason(box_live_after, room_id=room_id)
+    pollution = box_pollution_reason(
+        box_live_after, room_id=room_id, allowed_key_names=allowed_names
+    )
     if pollution:
         _finalize_transfer_failure(
             report,
@@ -1316,6 +1344,7 @@ def execute_box_deposit_ui(
             box_live_before=box_live_before,
             box_live_after=box_live_after,
             default_reason=pollution,
+            allowed_key_names=allowed_names,
         )
         return _abort()
 

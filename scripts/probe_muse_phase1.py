@@ -29,6 +29,7 @@ from re1_rl.phase1_route_council import (  # noqa: E402
     build_pass1_prompt,
     build_pass2_review_prompt,
     build_pass3_repair_prompt,
+    build_pass4_inventory_prompt,
     build_phase1_context,
     validate_pass1_plan,
 )
@@ -51,8 +52,18 @@ def _split_prompt(text: str) -> tuple[str, str]:
 
 def _extract_json(text: str) -> dict:
     text = re.sub(r"(?s)^<think>.*?</think>\s*", "", text.strip())
-    start, end = text.find("{"), text.rfind("}")
-    plan = json.loads(text[start : end + 1])
+    start = text.find("{")
+    blob = text[start:]
+    plan = None
+    last_err: json.JSONDecodeError | None = None
+    for extra in ("", "}", "]}", "}}"):
+        try:
+            plan = json.loads(blob + extra)
+            break
+        except json.JSONDecodeError as exc:
+            last_err = exc
+    if plan is None:
+        raise last_err or json.JSONDecodeError("no JSON object", text, 0)
     if "next_chunk" not in plan:
         for value in plan.values():
             if isinstance(value, dict) and "next_chunk" in value:
@@ -157,6 +168,21 @@ def run_muse_phase1_passes(
             plan = repaired
         passes.append({"name": "pass3_freebee_repair", "usage": raw3.get("usage")})
         errors = validate_pass1_plan(plan, checkpoint, ctx=ctx)
+    inv_prompt = build_pass4_inventory_prompt(plan, ctx, code_errors=errors)
+    i_sys, i_user = _split_prompt(inv_prompt)
+    refined, raw4 = muse_complete(i_sys, i_user, base_url=base_url, model=model)
+    if refined.get("next_chunk") or refined.get("next_leg") or refined.get("leave_118"):
+        if refined.get("leave_118"):
+            plan["leave_118"] = refined["leave_118"]
+        if refined.get("next_chunk"):
+            plan["next_chunk"] = refined["next_chunk"]
+        if refined.get("next_leg"):
+            plan["next_leg"] = refined["next_leg"]
+        if refined.get("beat_order"):
+            plan["beat_order"] = refined["beat_order"]
+        plan["inventory_review_notes"] = refined.get("review_notes")
+    passes.append({"name": "pass4_inventory_refine", "usage": raw4.get("usage")})
+    errors = validate_pass1_plan(plan, checkpoint, ctx=ctx)
     plan["_meta"] = {
         "model": model,
         "backend": base_url,

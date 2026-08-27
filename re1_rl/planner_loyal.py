@@ -110,7 +110,7 @@ _ON_PATH_PILE_ITEMS = frozenset(
     }
 )
 
-# Ops encoded for the policy (one-hot order).
+# Ops encoded for the policy (one-hot order). Do not add types — obs is 182-d.
 PLANNER_OP_TYPES = (
     "traverse",
     "acquire",
@@ -120,6 +120,22 @@ PLANNER_OP_TYPES = (
     "boss",
     "use_box",
 )
+DEFAULT_BOX_ROOM = "118"
+GO_TO_BOX_OP = "go_to_box"
+
+
+def _encode_queue_op(op: str) -> str:
+    """``go_to_box`` shares the ``use_box`` one-hot so planner_steps stay 182-d."""
+    raw = str(op or "")
+    if raw == GO_TO_BOX_OP:
+        return "use_box"
+    return raw
+
+
+def _box_dest_room(step: dict[str, Any] | None) -> str:
+    if not step:
+        return DEFAULT_BOX_ROOM
+    return str(step.get("room_id") or "").strip().upper() or DEFAULT_BOX_ROOM
 
 
 def load_chunk(path: str | Path | None = None) -> dict[str, Any]:
@@ -160,6 +176,8 @@ class PlannerLoyalQueue:
         raw_steps = list(data.get("steps") or [])
         self.chunk_id = str(data.get("chunk_id") or "unknown")
         self.end_anchor = str(data.get("end_anchor_beat_id") or "")
+        leave = data.get("leave_118")
+        self.leave_118 = leave if isinstance(leave, dict) else None
         self._steps = []
         for index, step in enumerate(raw_steps):
             row = dict(step)
@@ -179,6 +197,7 @@ class PlannerLoyalQueue:
         self.divert_reason = None
         self._start_held = set()
         self._start_qty_totals = {}
+        self._start_room = ""
         self._satisfied_pickups: set[str] = set()
 
     def reload_if_stale(self, project_root: Path | str | None = None) -> bool:
@@ -228,6 +247,7 @@ class PlannerLoyalQueue:
         self.divert_reason = None
         self._start_held = set()
         self._start_qty_totals = {}
+        self._start_room = ""
         self._satisfied_pickups = set()
 
     def note_start_inventory(self, state: dict[str, Any]) -> None:
@@ -235,6 +255,7 @@ class PlannerLoyalQueue:
         self._start_qty_totals = _inventory_qty_totals(state)
         # Presence, not qty: files/notes often occupy a slot with qty 0.
         self._start_held = set(_inventory_held_names(state))
+        self._start_room = str(state.get("room_id") or "").strip().upper()
 
     def seek(self, index: int) -> None:
         """Jump queue to ``index`` (0 = first step; len(steps) = done)."""
@@ -331,6 +352,18 @@ class PlannerLoyalQueue:
                 continue
             return
 
+    def _skip_satisfied_box_nav(self) -> None:
+        """Skip go_to_box when the episode already starts in that box room."""
+        while True:
+            step = self.current
+            if not step or str(step.get("op") or "") != GO_TO_BOX_OP:
+                return
+            dest = _box_dest_room(step)
+            if self._start_room and self._start_room == dest:
+                self._index += 1
+                continue
+            return
+
     def target_room(self) -> str | None:
         step = self.current
         if not step:
@@ -346,7 +379,49 @@ class PlannerLoyalQueue:
             room, _item, _pile = _pickup_id_parts(pickup_id)
             if room:
                 return room
+        if op == GO_TO_BOX_OP:
+            return _box_dest_room(step)
         return str(step.get("room_id") or "") or None
+
+    def box_target_held(self) -> list[Any] | None:
+        """``held_on_exit`` for the current ``use_box`` step, else None."""
+        step = self.current
+        if not step or str(step.get("op") or "") != "use_box":
+            return None
+        held = step.get("held_on_exit")
+        nested = step.get("leave_118")
+        if not held and isinstance(nested, dict):
+            held = nested.get("held_on_exit")
+        if not held and isinstance(self.leave_118, dict):
+            held = self.leave_118.get("held_on_exit")
+        if not isinstance(held, list) or not held:
+            return None
+        return list(held)
+
+    def allowed_banked_key_names(self) -> frozenset[str]:
+        """Story keys Muse authored into ``leave_118.banked_in_box``."""
+        from re1_rl.item_todo import canonical_item
+        from re1_rl.key_items import KEY_ITEM_NAMES
+
+        leave = self.leave_118 if isinstance(self.leave_118, dict) else {}
+        names: set[str] = set()
+        for row in leave.get("banked_in_box") or []:
+            if not isinstance(row, dict):
+                continue
+            name = canonical_item(str(row.get("item") or ""))
+            if name and name in KEY_ITEM_NAMES:
+                names.add(name)
+        return frozenset(names)
+
+    def allowed_banked_key_ids(self) -> frozenset[int]:
+        from re1_rl.box_target import item_name_to_id
+
+        ids: set[int] = set()
+        for name in self.allowed_banked_key_names():
+            iid = item_name_to_id(name)
+            if iid is not None:
+                ids.add(int(iid))
+        return frozenset(ids)
 
     def evaluate_transition(
         self,
@@ -354,6 +429,7 @@ class PlannerLoyalQueue:
         prev_state: dict[str, Any],
         state: dict[str, Any],
         box_opened: bool = False,
+        box_closed: bool = False,
         typewriter_save_complete: bool = False,
     ) -> dict[str, Any]:
         """Return reward flags for this env step under planner loyalty."""
@@ -367,6 +443,7 @@ class PlannerLoyalQueue:
             return result
 
         self._skip_satisfied_acquires()
+        self._skip_satisfied_box_nav()
         if self.done:
             return result
 
@@ -413,8 +490,19 @@ class PlannerLoyalQueue:
             )
             return result
 
-        # Divert: unplanned room change.
+        # Divert: unplanned room change. go_to_box may hop any door until dest.
         if room and prev_room and room != prev_room:
+            if op == GO_TO_BOX_OP:
+                dest = _box_dest_room(step)
+                if room == dest:
+                    result["step_success"] = True
+                    self._index += 1
+                    self.step_success_pending = True
+                    print(
+                        f"[planner_loyal] go_to_box arrived {dest} from {prev_room}",
+                        flush=True,
+                    )
+                return result
             if op != "traverse":
                 result["divert"] = True
                 result["divert_reason"] = f"unplanned_room:{prev_room}->{room}"
@@ -489,11 +577,22 @@ class PlannerLoyalQueue:
                 return result
             # Gallery / puzzle progress hooks can be added later.
 
-        if op == "use_box" and box_opened:
-            result["step_success"] = True
-            self._index += 1
-            self.step_success_pending = True
-            return result
+        if op == "use_box":
+            target = self.box_target_held()
+            if target:
+                from re1_rl.box_target import inventory_matches_target
+
+                slots = state.get("inventory_slots") or state.get("inventory") or []
+                if inventory_matches_target(slots, target) and box_closed:
+                    result["step_success"] = True
+                    self._index += 1
+                    self.step_success_pending = True
+                return result
+            if box_opened:
+                result["step_success"] = True
+                self._index += 1
+                self.step_success_pending = True
+                return result
 
         return result
 
@@ -618,8 +717,9 @@ def encode_planner_queue(
         return float(room_index.get(str(room_id), 0)) / 128.0
 
     def fill_op(dest: list[float], offset: int, op: str) -> None:
-        if op in PLANNER_OP_TYPES:
-            dest[offset + PLANNER_OP_TYPES.index(op)] = 1.0
+        encoded = _encode_queue_op(op)
+        if encoded in PLANNER_OP_TYPES:
+            dest[offset + PLANNER_OP_TYPES.index(encoded)] = 1.0
 
     def stable_unit(token: str) -> float:
         """Process-stable [0,1] id for pickup_id / site_id (not Python hash())."""
@@ -634,6 +734,8 @@ def encode_planner_queue(
     if str(cur.get("op")) == "traverse":
         edge = str(cur.get("edge_id") or "")
         tgt = edge.split("->", 1)[1] if "->" in edge else None
+    elif str(cur.get("op")) == GO_TO_BOX_OP:
+        tgt = _box_dest_room(cur)
     else:
         tgt = str(cur.get("room_id") or "") or None
     out[1 + len(PLANNER_OP_TYPES)] = room_norm(tgt)
@@ -648,6 +750,8 @@ def encode_planner_queue(
         if str(step.get("op")) == "traverse":
             edge = str(step.get("edge_id") or "")
             rt = edge.split("->", 1)[1] if "->" in edge else None
+        elif str(step.get("op")) == GO_TO_BOX_OP:
+            rt = _box_dest_room(step)
         else:
             rt = str(step.get("room_id") or "") or None
         out[o + 1 + len(PLANNER_OP_TYPES)] = room_norm(rt)
@@ -720,6 +824,7 @@ def _planner_op_objective_index(op: str) -> int | None:
         "trigger_cutscene": 2,
         "boss": 3,  # obj_fight
         "use_box": 4,  # obj_scripted
+        "go_to_box": 0,  # obj_navigate — walk to the box room
     }
     idx = mapping.get(str(op or ""))
     return idx
@@ -787,7 +892,12 @@ def encode_planner_loyal_goal(
 
     op = str(step.get("op") or "")
     compass_set = False
-    if op == "traverse" and target_room is not None and room != str(target_room):
+    nav_away = (
+        op in {"traverse", GO_TO_BOX_OP}
+        and target_room is not None
+        and room != str(target_room)
+    )
+    if nav_away:
         door = graph.exit_toward(room, str(target_room))
         if door is not None:
             v[5:10] = encoder._compass_to_xz(state, float(door.x), float(door.z))
@@ -799,7 +909,7 @@ def encode_planner_loyal_goal(
             v[5:10] = encoder._compass_to_xz(state, target_xz[0], target_xz[1])
             v[21] = 1.0
             compass_set = True
-    if not compass_set and op == "traverse" and target_room is not None:
+    if not compass_set and op in {"traverse", GO_TO_BOX_OP} and target_room is not None:
         door = graph.exit_toward(room, str(target_room))
         if door is not None:
             v[5:10] = encoder._compass_to_xz(state, float(door.x), float(door.z))

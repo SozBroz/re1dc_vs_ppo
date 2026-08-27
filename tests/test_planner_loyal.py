@@ -64,8 +64,12 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert any(
         str(p or "").startswith("105:shield_key") for p in pickups
     )
-    assert steps[-1]["pickup_id"].startswith("118:chemical")
-    assert steps[-1].get("beat_id") == "chemical"
+    assert any(
+        str(p or "").startswith("118:chemical") for p in pickups
+    )
+    assert any(s.get("op") == "use_box" for s in steps)
+    assert steps[-1]["pickup_id"].startswith("10C:armor_key")
+    assert steps[-1].get("beat_id") == "armor_key"
     assert any(s.get("edge_id") == "106->107" for s in steps)
     assert "108:handgun_bullets:1" in pickups
     enter_108 = next(i for i, s in enumerate(steps) if s.get("edge_id") == "107->108")
@@ -1014,8 +1018,10 @@ def test_pl18_seek_lands_on_chemical_tail():
     q.seek(13)
     assert q.current is not None
     assert q.current["edge_id"] == "105->106"
-    assert q.end_anchor == "chemical"
-    assert q._steps[-1]["pickup_id"].startswith("118:chemical")
+    assert q.end_anchor == "armor_key"
+    assert q._steps[23]["pickup_id"].startswith("118:chemical")
+    assert q._steps[24]["op"] == "use_box"
+    assert q._steps[-1]["pickup_id"].startswith("10C:armor_key")
 
 
 def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):

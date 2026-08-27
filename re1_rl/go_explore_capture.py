@@ -761,6 +761,7 @@ def compute_quality(
 def integrity_gate_ok(
     state: dict[str, Any],
     progress: ProgressTracker,
+    allowed_key_names: frozenset[str] | None = None,
 ) -> tuple[bool, str]:
     """Admit only stable, controllable, non-terminal states."""
     from re1_rl.item_box import box_pollution_reason
@@ -790,7 +791,9 @@ def integrity_gate_ok(
                     pairs.append((int(entry[0]), int(entry[1])))
                 except (TypeError, ValueError):
                     continue
-        pollution = box_pollution_reason(pairs, room_id=room)
+        pollution = box_pollution_reason(
+            pairs, room_id=room, allowed_key_names=allowed_key_names
+        )
         if pollution:
             return False, pollution
     return True, "ok"
@@ -947,7 +950,14 @@ def maybe_capture_cell(
         if cache is not None:
             env_state["box_cache"] = cache
 
-    ok, reason = integrity_gate_ok(env_state, progress)
+    allowed_keys = None
+    queue = getattr(env, "_planner_loyal_queue", None) if env is not None else None
+    getter = getattr(queue, "allowed_banked_key_names", None) if queue else None
+    if getter is not None:
+        allowed_keys = getter()
+    ok, reason = integrity_gate_ok(
+        env_state, progress, allowed_key_names=allowed_keys
+    )
     if not ok:
         return None
 

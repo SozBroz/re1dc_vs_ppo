@@ -368,6 +368,7 @@ class RE1Env(gym.Env):
         self._planner_loyal_queue = None
         self._planner_loyal_last_success: dict[str, Any] | None = None
         self._box_opened_this_step = False
+        self._box_closed_this_step = False
         self._maybe_enable_planner_loyal()
 
         self.graph = RoomGraph(
@@ -525,6 +526,7 @@ class RE1Env(gym.Env):
         return {
             "planner_loyal_queue": self._planner_loyal_queue,
             "box_opened": bool(getattr(self, "_box_opened_this_step", False)),
+            "box_closed": bool(getattr(self, "_box_closed_this_step", False)),
         }
 
     def _rails_mode(self) -> bool:
@@ -798,6 +800,20 @@ class RE1Env(gym.Env):
                 pass
         return encode_box(self._box_cache, in_box_room=in_box_room)
 
+    def _planner_allowed_box_key_ids(self) -> frozenset[int]:
+        queue = getattr(self, "_planner_loyal_queue", None)
+        getter = getattr(queue, "allowed_banked_key_ids", None) if queue else None
+        if getter is None:
+            return frozenset()
+        return frozenset(getter())
+
+    def _planner_allowed_box_key_names(self) -> frozenset[str]:
+        queue = getattr(self, "_planner_loyal_queue", None)
+        getter = getattr(queue, "allowed_banked_key_names", None) if queue else None
+        if getter is None:
+            return frozenset()
+        return frozenset(getter())
+
     def _box_pollution_failure(self) -> str | None:
         """Terminal if a key (or any deep-slot item) is parked in the live box."""
         from re1_rl.item_box import box_pollution_reason, read_box_live
@@ -811,7 +827,11 @@ class RE1Env(gym.Env):
         room_id = str(
             (getattr(self, "_prev_state", {}) or {}).get("room_id", "") or ""
         )
-        return box_pollution_reason(live, room_id=room_id)
+        return box_pollution_reason(
+            live,
+            room_id=room_id,
+            allowed_key_names=self._planner_allowed_box_key_names(),
+        )
 
     def _apply_box_ui_cursors_from_report(
         self,
@@ -2099,6 +2119,7 @@ class RE1Env(gym.Env):
                 flush=True,
             )
         self._box_opened_this_step = False
+        self._box_closed_this_step = False
         self._visited.reset()
         self._enemy_motion.reset()
         self._player_motion.reset()
@@ -3511,6 +3532,7 @@ class RE1Env(gym.Env):
             return
         if self._box_ui_open and not open_now:
             self._box_ui_open = False
+            self._box_closed_this_step = True
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_inv_cursor = 0
             self._box_list_cursor = 0
@@ -3707,6 +3729,7 @@ class RE1Env(gym.Env):
                 self._macro_active = False
                 self._sticky_input.reset()
             self._box_ui_open = False
+            self._box_closed_this_step = True
             self._box_phase = BOX_PHASE_CHOOSE
             self._box_inv_cursor = 0
             self._box_list_cursor = 0
@@ -3888,6 +3911,7 @@ class RE1Env(gym.Env):
                         or ""
                     )
                     or None,
+                    allowed_key_ids=self._planner_allowed_box_key_ids(),
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, 0
@@ -3979,6 +4003,7 @@ class RE1Env(gym.Env):
                     trust_inv_cursor=False,
                     expected_item_id=expected_id,
                     checkpoint_id=checkpoint_id,
+                    allowed_key_ids=self._planner_allowed_box_key_ids(),
                 )
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, 0
@@ -4701,6 +4726,12 @@ class RE1Env(gym.Env):
             checkpoint_id = str(
                 (planner.current_objective() or {}).get("checkpoint_id") or ""
             ) or None
+        box_target_held = None
+        box_close_only = False
+        if self._planner_loyal_active():
+            queue = getattr(self, "_planner_loyal_queue", None)
+            box_target_held = queue.box_target_held() if queue is not None else None
+            box_close_only = box_target_held is None
         mask = build_action_mask(
             int(self.action_space.n),
             self._prev_action,
@@ -4741,6 +4772,8 @@ class RE1Env(gym.Env):
             ),
             box_inv_cursor=int(getattr(self, "_box_inv_cursor", 0) or 0),
             checkpoint_id=checkpoint_id,
+            box_target_held=box_target_held,
+            box_close_only=box_close_only,
         )
         if (
             box_ui_open
@@ -4812,6 +4845,7 @@ class RE1Env(gym.Env):
     def _step_once(self, action: int):
         assert self._planner is not None
         self._box_opened_this_step = False
+        self._box_closed_this_step = False
         # One-step TTL: clear prior last_attack before this step's observation.
         self._last_attack_obs = empty_last_attack()
         # Consume equip holdout after the masked decision step has begun.

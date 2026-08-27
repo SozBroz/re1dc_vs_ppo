@@ -146,6 +146,21 @@ def deposit_allowlist_for_room(
     return DEPOSIT_ITEM_ALLOWLIST
 
 
+def key_names_for_ids(item_ids: frozenset[int] | None) -> frozenset[str]:
+    """Canonical names for a set of item ids (empty if none)."""
+    from re1_rl.item_todo import canonical_item
+    from re1_rl.memory_map import ITEM_IDS
+
+    if not item_ids:
+        return frozenset()
+    names: set[str] = set()
+    for raw in item_ids:
+        name = canonical_item(ITEM_IDS.get(int(raw) & 0xFF, "") or "")
+        if name:
+            names.add(name)
+    return frozenset(names)
+
+
 def is_key_item_id(item_id: int) -> bool:
     """True for story keys (chemical, crest, shield_key, …). Never depositable."""
     from re1_rl.item_todo import canonical_item
@@ -161,11 +176,14 @@ def is_deposit_allowed_item(
     room_id: str | None = None,
     *,
     checkpoint_id: str | None = None,
+    allowed_key_ids: frozenset[int] | None = None,
 ) -> bool:
     """Allowlist gate used by masks + macros (keys always False)."""
     from re1_rl.yawn_box_prep_checkpoint import wind_crest_deposit_allowed
 
     iid = int(item_id) & 0xFF
+    if allowed_key_ids and iid in allowed_key_ids:
+        return True
     if wind_crest_deposit_allowed(iid, room_id):
         return True
     if iid == 0 or is_key_item_id(iid):
@@ -249,6 +267,7 @@ def box_pollution_reason(
     box: list[tuple[int, int]] | None,
     *,
     room_id: str | None = None,
+    allowed_key_names: frozenset[str] | None = None,
 ) -> str | None:
     """Reject illegal box contents (keys, weapons, deep scroll, non-bank items).
 
@@ -277,6 +296,8 @@ def box_pollution_reason(
         if name and name in key_names:
             if name in ("wind_crest", "armor_key"):
                 continue
+            if allowed_key_names and name in allowed_key_names:
+                continue
             return f"key_item_in_box:{name}@{i}"
         if i >= BOX_SLOTS:
             label = name or f"0x{item_id:02x}"
@@ -295,6 +316,7 @@ def can_deposit(
     room_id: str | None = None,
     checkpoint_id: str | None = None,
     enforce_allowlist: bool | None = None,
+    allowed_key_ids: frozenset[int] | None = None,
 ) -> tuple[bool, str]:
     """Legal iff source occupied, allowlisted, and modeled box has a free slot.
 
@@ -311,8 +333,11 @@ def can_deposit(
         return False, "lockpick"
     from re1_rl.yawn_box_prep_checkpoint import wind_crest_deposit_allowed
 
-    if is_key_item_id(int(item_id)) and not wind_crest_deposit_allowed(
-        int(item_id), room_id
+    planned_key = bool(allowed_key_ids and (int(item_id) & 0xFF) in allowed_key_ids)
+    if (
+        is_key_item_id(int(item_id))
+        and not wind_crest_deposit_allowed(int(item_id), room_id)
+        and not planned_key
     ):
         return False, "key_item"
     if effective_transfer_qty(item_id, qty) <= 0:
@@ -323,8 +348,12 @@ def can_deposit(
         else bool(enforce_allowlist)
     )
     # Live macros always pass enforce_allowlist=True. Keys already refused above.
-    if use_allowlist and int(item_id) not in deposit_allowlist_for_room(
-        room_id, checkpoint_id=checkpoint_id
+    if (
+        use_allowlist
+        and not planned_key
+        and int(item_id) not in deposit_allowlist_for_room(
+            room_id, checkpoint_id=checkpoint_id
+        )
     ):
         return False, "not_allowlisted"
     modeled = list(box)[:BOX_SLOTS]

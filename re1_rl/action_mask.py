@@ -199,6 +199,8 @@ def _mask_box_ui_session(
     room_id: str | None = None,
     checkpoint_id: str | None = None,
     box_inv_cursor: int = 0,
+    box_target_held: list | None = None,
+    box_close_only: bool = False,
 ) -> np.ndarray:
     """Legal actions while the item-box UI is open (in_control is false)."""
     from re1_rl.item_box import (
@@ -210,6 +212,19 @@ def _mask_box_ui_session(
     from re1_rl.item_box_ui_macro import first_empty_inventory_slot
 
     mask[:] = False
+    if box_close_only and not box_target_held:
+        if BOX_CLOSE_ACTION < n_actions:
+            mask[BOX_CLOSE_ACTION] = True
+        return mask
+    if box_target_held:
+        return _mask_box_target_session(
+            mask,
+            n_actions,
+            box_phase=box_phase,
+            inventory=inventory,
+            box=box,
+            target=box_target_held,
+        )
     phase = int(box_phase)
     # UI withdraw requires an empty inv slot (Cross on empty → box list).
     has_empty_inv = (
@@ -288,6 +303,69 @@ def _mask_box_ui_session(
     return mask
 
 
+def _mask_box_target_session(
+    mask: np.ndarray,
+    n_actions: int,
+    *,
+    box_phase: int,
+    inventory: list[tuple[int, int]] | None,
+    box: list[tuple[int, int]] | None,
+    target: list,
+) -> np.ndarray:
+    """Only transfers that close the gap to ``held_on_exit``; close when done."""
+    from re1_rl.box_target import (
+        inventory_matches_target,
+        needed_box_slots,
+        surplus_inventory_slots,
+    )
+    from re1_rl.item_box import _first_empty_slot, can_withdraw
+    from re1_rl.item_box_ui_macro import first_empty_inventory_slot
+
+    mask[:] = False
+    inv = inventory or []
+    bx = box or []
+    if inventory_matches_target(inv, target):
+        if BOX_CLOSE_ACTION < n_actions:
+            mask[BOX_CLOSE_ACTION] = True
+        return mask
+    surplus = set(surplus_inventory_slots(inv, target))
+    needed = set(needed_box_slots(inv, bx, target))
+    has_empty_inv = first_empty_inventory_slot(inv) is not None
+    box_has_empty = _first_empty_slot(list(bx)[:16]) is not None
+    phase = int(box_phase)
+
+    if phase == BOX_PHASE_WITHDRAW_SLOT:
+        if has_empty_inv:
+            for i in needed:
+                idx = WITHDRAW_ACTION_BASE + i
+                if idx < n_actions:
+                    ok, _ = can_withdraw(inv, bx, i)
+                    mask[idx] = bool(ok)
+        if not mask.any() and BOX_CLOSE_ACTION < n_actions:
+            mask[BOX_CLOSE_ACTION] = True
+        return mask
+
+    if phase == BOX_PHASE_DEPOSIT_SLOT:
+        if box_has_empty:
+            for i in surplus:
+                idx = SELECT_SLOT_BASE + i
+                if 0 <= i < N_SELECT_SLOT and idx < n_actions:
+                    mask[idx] = True
+        if not mask.any() and BOX_CLOSE_ACTION < n_actions:
+            mask[BOX_CLOSE_ACTION] = True
+        return mask
+
+    can_dep = bool(surplus) and box_has_empty
+    can_wd = bool(needed) and has_empty_inv
+    if BOX_DEPOSIT_ACTION < n_actions:
+        mask[BOX_DEPOSIT_ACTION] = can_dep
+    if BOX_WITHDRAW_ACTION < n_actions:
+        mask[BOX_WITHDRAW_ACTION] = can_wd
+    if not can_dep and not can_wd and BOX_CLOSE_ACTION < n_actions:
+        mask[BOX_CLOSE_ACTION] = True
+    return mask
+
+
 def action_mask(
     n_actions: int,
     prev_action: int | None,
@@ -323,6 +401,8 @@ def action_mask(
     equip_switch_cooldown: int = 0,
     box_inv_cursor: int = 0,
     checkpoint_id: str | None = None,
+    box_target_held: list | None = None,
+    box_close_only: bool = False,
 ) -> np.ndarray:
     """Return bool mask (True = legal) for MaskablePPO / ActionMasker."""
     del prev_action
@@ -350,6 +430,8 @@ def action_mask(
             room_id=room_id,
             checkpoint_id=checkpoint_id,
             box_inv_cursor=box_inv_cursor,
+            box_target_held=box_target_held,
+            box_close_only=box_close_only,
         )
     if not in_control:
         mask[:] = False

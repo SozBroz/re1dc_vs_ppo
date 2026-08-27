@@ -3,8 +3,28 @@
   "checkpoint_id": "barry_hall_return_106",
   "chunk_id": "cp05_shield_key",
   "source": "phase1_pass1_council",
-  "end_anchor_beat_id": "chemical",
-  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical (skip shotgun 116).",
+  "end_anchor_beat_id": "armor_key",
+  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun path 115/116, greenhouse pump, armor_key immediately after pump.",
+  "leave_118": {
+    "banked_in_box": [
+      {"item": "shield_key", "qty": 1, "why": "attic only; bank to free a slot"},
+      {"item": "green_herb", "qty": 1, "why": "spare heal; defer 10C bench plants"},
+      {"item": "handgun_bullets", "qty": 15, "why": "keep one clip in box; retain 30 on person"}
+    ],
+    "free_slots_on_exit": 5,
+    "held_on_exit": [
+      {"item": "beretta", "qty": 0, "slot": 1},
+      {"item": "handgun_bullets", "qty": 30, "slot": 2},
+      {"item": "chemical", "qty": 1, "slot": 3},
+      {"item": null, "qty": 0, "slot": 4},
+      {"item": null, "qty": 0, "slot": 5},
+      {"item": null, "qty": 0, "slot": 6},
+      {"item": null, "qty": 0, "slot": 7},
+      {"item": null, "qty": 0, "slot": 8}
+    ],
+    "next_beat_this_loadout_is_for": "greenhouse_pump",
+    "why": "Combat kit for 115/116 (beretta+30), chemical for pump, shield_key banked."
+  },
   "steps": [
     {"n": 1, "op": "traverse", "edge_id": "106->105"},
     {"n": 2, "op": "traverse", "edge_id": "105->104"},
@@ -29,6 +49,20 @@
     {"n": 21, "op": "traverse", "edge_id": "10A->10B"},
     {"n": 22, "op": "acquire", "pickup_id": "10B:green_herb:1"},
     {"n": 23, "op": "traverse", "edge_id": "10B->118"},
-    {"n": 24, "op": "acquire", "pickup_id": "118:chemical:1", "beat_id": "chemical"}
+    {"n": 24, "op": "acquire", "pickup_id": "118:chemical:1", "beat_id": "chemical"},
+    {"n": 25, "op": "use_box", "room_id": "118"},
+    {"n": 26, "op": "traverse", "edge_id": "118->10B"},
+    {"n": 27, "op": "traverse", "edge_id": "10B->10A"},
+    {"n": 28, "op": "traverse", "edge_id": "10A->109"},
+    {"n": 29, "op": "traverse", "edge_id": "109->115"},
+    {"n": 30, "op": "traverse", "edge_id": "115->116"},
+    {"n": 31, "op": "acquire", "pickup_id": "116:shotgun:1", "room_id": "116"},
+    {"n": 32, "op": "traverse", "edge_id": "116->106"},
+    {"n": 33, "op": "traverse", "edge_id": "106->105"},
+    {"n": 34, "op": "traverse", "edge_id": "105->104"},
+    {"n": 35, "op": "traverse", "edge_id": "104->103"},
+    {"n": 36, "op": "traverse", "edge_id": "103->10C"},
+    {"n": 37, "op": "do_puzzle", "site_id": "chemical@10C_greenhouse_pump", "room_id": "10C", "beat_id": "greenhouse_pump"},
+    {"n": 38, "op": "acquire", "pickup_id": "10C:armor_key:1", "room_id": "10C", "beat_id": "armor_key"}
   ]
 }

@@ -898,6 +898,7 @@ def _compute_planner_loyal_reward(
     progress: ProgressTracker | None = None,
     typewriter_save_complete: bool = False,
     box_opened: bool = False,
+    box_closed: bool = False,
     return_breakdown: bool = False,
 ) -> float | tuple[float, dict[str, float]]:
     """Strict planner-loyal reward path — no legacy crumbs or progress side effects."""
@@ -921,6 +922,7 @@ def _compute_planner_loyal_reward(
         prev_state=prev_state,
         state=state,
         box_opened=box_opened,
+        box_closed=box_closed,
         typewriter_save_complete=bool(typewriter_save_complete),
     )
     bd["heal_use_tax"] = float(loyal.get("heal_use_tax") or 0.0)
@@ -1076,6 +1078,7 @@ def compute_reward(
     return_breakdown: bool = False,
     planner_loyal_queue: Any | None = None,
     box_opened: bool = False,
+    box_closed: bool = False,
 ) -> float | tuple[float, dict[str, float]]:
     """Compute scalar reward from symbolic state dicts."""
     del success_room
@@ -1087,6 +1090,7 @@ def compute_reward(
             progress=progress,
             typewriter_save_complete=typewriter_save_complete,
             box_opened=box_opened,
+            box_closed=box_closed,
             return_breakdown=return_breakdown,
         )
     if softlock_threshold is None:
@@ -1157,6 +1161,7 @@ def compute_reward(
             prev_state=prev_state,
             state=state,
             box_opened=box_opened,
+            box_closed=box_closed,
             typewriter_save_complete=bool(typewriter_save_complete),
         )
         bd["heal_use_tax"] = float(loyal.get("heal_use_tax") or 0.0)
