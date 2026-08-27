@@ -69,6 +69,33 @@ def test_withdraw_needed_clip_when_ammo_short() -> None:
     assert needed_box_slots(inv, box, TARGET) == [0]
 
 
+def test_extra_clip_is_not_surplus() -> None:
+    inv = [(0x02, 0), (0x0B, 45), (0x26, 1)] + [(0, 0)] * 5
+    assert surplus_inventory_slots(inv, TARGET) == []
+    assert inventory_matches_target(inv, TARGET)
+
+
+def test_loaded_gun_plus_clip_meets_minimum() -> None:
+    # 15 in the beretta + 15 spare = 30. Reload must not force a deposit.
+    inv = [(0x02, 15), (0x0B, 15), (0x26, 1)] + [(0, 0)] * 5
+    assert inventory_matches_target(inv, TARGET)
+    assert surplus_inventory_slots(inv, TARGET) == []
+    assert needed_box_slots(inv, [(0x0B, 15)] + [(0, 0)] * 15, TARGET) == []
+
+
+def test_loaded_gun_plus_extra_clip_still_matches() -> None:
+    inv = [(0x02, 15), (0x0B, 30), (0x26, 1)] + [(0, 0)] * 5
+    assert inventory_matches_target(inv, TARGET)
+    assert surplus_inventory_slots(inv, TARGET) == []
+
+
+def test_loaded_only_below_minimum_still_needs_clip() -> None:
+    inv = [(0x02, 15), (0x26, 1)] + [(0, 0)] * 6
+    box = [(0x0B, 30)] + [(0, 0)] * 15
+    assert inventory_matches_target(inv, TARGET) is False
+    assert needed_box_slots(inv, box, TARGET) == [0]
+
+
 def test_match_ignores_slot_order() -> None:
     inv = [
         (0x26, 1),
