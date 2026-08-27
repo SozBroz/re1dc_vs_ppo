@@ -22,12 +22,13 @@
     {"n": 14, "op": "traverse", "edge_id": "105->106"},
     {"n": 15, "op": "traverse", "edge_id": "106->107"},
     {"n": 16, "op": "traverse", "edge_id": "107->108"},
-    {"n": 17, "op": "traverse", "edge_id": "108->109"},
-    {"n": 18, "op": "acquire", "pickup_id": "109:green_herb:1"},
-    {"n": 19, "op": "traverse", "edge_id": "109->10A"},
-    {"n": 20, "op": "traverse", "edge_id": "10A->10B"},
-    {"n": 21, "op": "acquire", "pickup_id": "10B:green_herb:1"},
-    {"n": 22, "op": "traverse", "edge_id": "10B->118"},
-    {"n": 23, "op": "acquire", "pickup_id": "118:chemical:1", "beat_id": "chemical"}
+    {"n": 17, "op": "acquire", "pickup_id": "108:handgun_bullets:1"},
+    {"n": 18, "op": "traverse", "edge_id": "108->109"},
+    {"n": 19, "op": "acquire", "pickup_id": "109:green_herb:1"},
+    {"n": 20, "op": "traverse", "edge_id": "109->10A"},
+    {"n": 21, "op": "traverse", "edge_id": "10A->10B"},
+    {"n": 22, "op": "acquire", "pickup_id": "10B:green_herb:1"},
+    {"n": 23, "op": "traverse", "edge_id": "10B->118"},
+    {"n": 24, "op": "acquire", "pickup_id": "118:chemical:1", "beat_id": "chemical"}
   ]
 }

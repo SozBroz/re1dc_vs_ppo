@@ -67,6 +67,9 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[-1]["pickup_id"].startswith("118:chemical")
     assert steps[-1].get("beat_id") == "chemical"
     assert any(s.get("edge_id") == "106->107" for s in steps)
+    assert "108:handgun_bullets:1" in pickups
+    enter_108 = next(i for i, s in enumerate(steps) if s.get("edge_id") == "107->108")
+    assert steps[enter_108 + 1]["pickup_id"] == "108:handgun_bullets:1"
 
 
 def test_queue_pops_on_correct_traverse():
@@ -149,6 +152,20 @@ def test_already_held_acquire_is_skipped():
     assert result["divert"] is False
     assert result["step_success"] is True
     assert q.done is True
+
+
+def test_108_bullets_not_skipped_when_104_ammo_already_held():
+    q = PlannerLoyalQueue()
+    idx = next(
+        i
+        for i, step in enumerate(q._steps)
+        if step.get("pickup_id") == "108:handgun_bullets:1"
+    )
+    q.seek(idx)
+    q.note_start_inventory({"inventory_slots": [("handgun_bullets", 30)]})
+    q._skip_satisfied_acquires()
+    assert q.current is not None
+    assert q.current["pickup_id"] == "108:handgun_bullets:1"
 
 
 def test_second_bullet_pile_not_skipped_when_first_held():

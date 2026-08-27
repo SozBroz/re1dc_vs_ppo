@@ -97,6 +97,19 @@ STRONG_HEAL_USE_ITEMS = frozenset(
 _ALCOVE_SWAP_SITES = frozenset({"emblem@10F_alcove", "emblem@10F_wall"})
 _ALCOVE_SWAP_BEATS = frozenset({"emblem_swap_alcove"})
 
+# Already holding this type must not skip a later room's pile (108 clip after 104).
+_ON_PATH_PILE_ITEMS = frozenset(
+    {
+        "handgun_bullets",
+        "shotgun_shells",
+        "green_herb",
+        "red_herb",
+        "blue_herb",
+        "first_aid_spray",
+        "first_aid_spray_alt",
+    }
+)
+
 # Ops encoded for the policy (one-hot order).
 PLANNER_OP_TYPES = (
     "traverse",
@@ -251,6 +264,8 @@ class PlannerLoyalQueue:
             return True
         room, item, pile = _pickup_id_parts(pickup_id)
         if not item:
+            return False
+        if item in _ON_PATH_PILE_ITEMS:
             return False
         siblings = self._acquire_sibling_pile_ids(room, item)
         if len(siblings) > 1:
