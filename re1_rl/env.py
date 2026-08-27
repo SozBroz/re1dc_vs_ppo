@@ -505,9 +505,10 @@ class RE1Env(gym.Env):
 
         if not planner_loyal_enabled():
             return
-        chunk = load_chunk(resolve_chunk_path(self.project_root))
+        chunk_path = resolve_chunk_path(self.project_root)
+        chunk = load_chunk(chunk_path)
         validate_planner_loyal_chunk(chunk)
-        self._planner_loyal_queue = PlannerLoyalQueue(chunk)
+        self._planner_loyal_queue = PlannerLoyalQueue(chunk, chunk_path=chunk_path)
         spaces_map = dict(self.observation_space.spaces)
         for key in PLANNER_LOYAL_OMIT_OBS_KEYS:
             spaces_map.pop(key, None)
@@ -2081,6 +2082,13 @@ class RE1Env(gym.Env):
         self.bridge.attack_pins.clear()
         self._progress = ProgressTracker(leg_span=self._leg_span)
         if getattr(self, "_planner_loyal_queue", None) is not None:
+            if self._planner_loyal_queue.reload_if_stale(self.project_root):
+                print(
+                    f"[planner_loyal] reloaded chunk "
+                    f"id={self._planner_loyal_queue.chunk_id} "
+                    f"steps={len(self._planner_loyal_queue._steps)}",
+                    flush=True,
+                )
             self._planner_loyal_queue.reset()
             self._planner_loyal_last_success = None
             # Frontier starts resume mid-chunk after the completed step.

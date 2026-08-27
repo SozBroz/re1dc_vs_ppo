@@ -3,7 +3,8 @@
   "checkpoint_id": "barry_hall_return_106",
   "chunk_id": "cp05_shield_key",
   "source": "phase1_pass1_council",
-  "end_anchor_beat_id": "shield_key",
+  "end_anchor_beat_id": "chemical",
+  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical (skip shotgun 116).",
   "steps": [
     {"n": 1, "op": "traverse", "edge_id": "106->105"},
     {"n": 2, "op": "traverse", "edge_id": "105->104"},
@@ -17,6 +18,16 @@
     {"n": 10, "op": "traverse", "edge_id": "10F->104"},
     {"n": 11, "op": "traverse", "edge_id": "104->105"},
     {"n": 12, "op": "objective", "site_id": "gold_emblem@105_fireplace", "room_id": "105", "beat_id": "gold_emblem_fireplace"},
-    {"n": 13, "op": "acquire", "pickup_id": "105:shield_key:2", "beat_id": "shield_key"}
+    {"n": 13, "op": "acquire", "pickup_id": "105:shield_key:2", "beat_id": "shield_key"},
+    {"n": 14, "op": "traverse", "edge_id": "105->106"},
+    {"n": 15, "op": "traverse", "edge_id": "106->107"},
+    {"n": 16, "op": "traverse", "edge_id": "107->108"},
+    {"n": 17, "op": "traverse", "edge_id": "108->109"},
+    {"n": 18, "op": "acquire", "pickup_id": "109:green_herb:1"},
+    {"n": 19, "op": "traverse", "edge_id": "109->10A"},
+    {"n": 20, "op": "traverse", "edge_id": "10A->10B"},
+    {"n": 21, "op": "acquire", "pickup_id": "10B:green_herb:1"},
+    {"n": 22, "op": "traverse", "edge_id": "10B->118"},
+    {"n": 23, "op": "acquire", "pickup_id": "118:chemical:1", "beat_id": "chemical"}
   ]
 }

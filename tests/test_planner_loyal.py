@@ -1,6 +1,8 @@
 """Unit tests for planner-loyal queue + encoding."""
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,6 +14,7 @@ from re1_rl.planner import WaypointPlanner
 from re1_rl.planner_loyal import (
     HEAL_USE_TAX_LIGHT,
     PLANNER_DIVERT_PENALTY,
+    PLANNER_MAX_STEPS,
     PLANNER_QUEUE_DIM,
     PLANNER_STEP_SUCCESS_REWARD,
     PlannerLoyalQueue,
@@ -20,6 +23,7 @@ from re1_rl.planner_loyal import (
     load_chunk,
     planner_loyal_enabled,
     prune_route_admin_goal,
+    validate_planner_loyal_chunk,
 )
 from re1_rl.room_graph import RoomGraph
 from re1_rl.progress import ProgressTracker
@@ -57,7 +61,12 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
         str(p or "").startswith("105:emblem") for p in pickups
     )
     assert "emblem@10F_alcove" in sites
-    assert steps[-1]["pickup_id"].startswith("105:shield_key")
+    assert any(
+        str(p or "").startswith("105:shield_key") for p in pickups
+    )
+    assert steps[-1]["pickup_id"].startswith("118:chemical")
+    assert steps[-1].get("beat_id") == "chemical"
+    assert any(s.get("edge_id") == "106->107" for s in steps)
 
 
 def test_queue_pops_on_correct_traverse():
@@ -964,3 +973,66 @@ def test_combat_targets_skip_frames_skipped_under_planner_loyal(monkeypatch):
         {"frames_skipped": 400, "reward_breakdown": {}},
     )
     assert y[3] == 0.0
+
+
+def test_chunk_may_exceed_obs_window(tmp_path: Path):
+    steps = [
+        {"n": i + 1, "op": "traverse", "edge_id": f"10{i:X}->10{(i + 1):X}"}
+        for i in range(PLANNER_MAX_STEPS + 3)
+    ]
+    chunk = {"chunk_id": "long", "end_anchor_beat_id": "tail", "steps": steps}
+    validate_planner_loyal_chunk(chunk)
+    q = PlannerLoyalQueue(chunk)
+    assert len(q._steps) == PLANNER_MAX_STEPS + 3
+    encoded = encode_planner_queue(q)
+    assert len(encoded) == PLANNER_QUEUE_DIM
+    q.seek(PLANNER_MAX_STEPS)
+    assert q.current is not None
+    assert not q.done
+
+
+def test_pl18_seek_lands_on_chemical_tail():
+    q = PlannerLoyalQueue()
+    # pl18 completed shield_key (step index 12) → seek to 13.
+    q.seek(13)
+    assert q.current is not None
+    assert q.current["edge_id"] == "105->106"
+    assert q.end_anchor == "chemical"
+    assert q._steps[-1]["pickup_id"].startswith("118:chemical")
+
+
+def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):
+    path = tmp_path / "chunk.json"
+    path.write_text(
+        json.dumps(
+            {
+                "chunk_id": "grow",
+                "end_anchor_beat_id": "a",
+                "steps": [{"n": 1, "op": "traverse", "edge_id": "105->106"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("RE1_PLANNER_CHUNK", str(path))
+    q = PlannerLoyalQueue(chunk_path=path)
+    assert len(q._steps) == 1
+    assert q.reload_if_stale(tmp_path) is False
+    path.write_text(
+        json.dumps(
+            {
+                "chunk_id": "grow",
+                "end_anchor_beat_id": "b",
+                "steps": [
+                    {"n": 1, "op": "traverse", "edge_id": "105->106"},
+                    {"n": 2, "op": "traverse", "edge_id": "106->107"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    later = (q._chunk_mtime or 0.0) + 5.0
+    os.utime(path, (later, later))
+    assert q.reload_if_stale(tmp_path) is True
+    assert len(q._steps) == 2
+    assert q.end_anchor == "b"
+    assert q.current["edge_id"] == "105->106"
