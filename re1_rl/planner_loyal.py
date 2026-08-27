@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -198,6 +199,7 @@ class PlannerLoyalQueue:
         self._start_held = set()
         self._start_qty_totals = {}
         self._start_room = ""
+        self._start_gallery_progress = 0
         self._satisfied_pickups: set[str] = set()
 
     def reload_if_stale(self, project_root: Path | str | None = None) -> bool:
@@ -248,6 +250,7 @@ class PlannerLoyalQueue:
         self._start_held = set()
         self._start_qty_totals = {}
         self._start_room = ""
+        self._start_gallery_progress = 0
         self._satisfied_pickups = set()
 
     def note_start_inventory(self, state: dict[str, Any]) -> None:
@@ -256,6 +259,7 @@ class PlannerLoyalQueue:
         # Presence, not qty: files/notes often occupy a slot with qty 0.
         self._start_held = set(_inventory_held_names(state))
         self._start_room = str(state.get("room_id") or "").strip().upper()
+        self._start_gallery_progress = int(state.get("gallery_progress", 0) or 0)
 
     def seek(self, index: int) -> None:
         """Jump queue to ``index`` (0 = first step; len(steps) = done)."""
@@ -364,6 +368,20 @@ class PlannerLoyalQueue:
                 continue
             return
 
+    def _skip_satisfied_gallery_portraits(self) -> None:
+        """Skip portrait steps already true in the episode-start RAM byte."""
+        from re1_rl.gallery_puzzle import completed_steps
+
+        done = completed_steps(self._start_gallery_progress)
+        while True:
+            step = self.current
+            if not step or str(step.get("op") or "") != "do_puzzle":
+                return
+            portrait = _gallery_portrait_index(step)
+            if portrait is None or done < portrait:
+                return
+            self._index += 1
+
     def target_room(self) -> str | None:
         step = self.current
         if not step:
@@ -444,6 +462,7 @@ class PlannerLoyalQueue:
 
         self._skip_satisfied_acquires()
         self._skip_satisfied_box_nav()
+        self._skip_satisfied_gallery_portraits()
         if self.done:
             return result
 
@@ -575,7 +594,16 @@ class PlannerLoyalQueue:
                     flush=True,
                 )
                 return result
-            # Gallery / puzzle progress hooks can be added later.
+            portrait = _gallery_portrait_index(step)
+            if portrait is not None and room == "117":
+                from re1_rl.gallery_puzzle import completed_steps
+
+                raw = int(state.get("gallery_progress", 0) or 0)
+                if completed_steps(raw) >= portrait:
+                    result["step_success"] = True
+                    self._index += 1
+                    self.step_success_pending = True
+                    return result
 
         if op == "use_box":
             target = self.box_target_held()
@@ -609,6 +637,21 @@ def _objective_story_matches(site: str, story: str) -> bool:
     if site and story and story == site:
         return True
     return bool(site in _ALCOVE_SWAP_SITES and story in _ALCOVE_SWAP_SITES)
+
+
+_GALLERY_PORTRAIT_RE = re.compile(r"gallery_portrait_(\d+)$")
+
+
+def _gallery_portrait_index(step: dict[str, Any]) -> int | None:
+    """1..6 for yawn-rails gallery portrait steps; else None."""
+    for key in ("beat_id", "site_id"):
+        match = _GALLERY_PORTRAIT_RE.fullmatch(str(step.get(key) or ""))
+        if not match:
+            continue
+        index = int(match.group(1))
+        if 1 <= index <= 6:
+            return index
+    return None
 
 
 def _pickup_id_parts(pickup_id: str) -> tuple[str, str, str | None]:
@@ -844,8 +887,20 @@ def _planner_step_target_xz(
             pos = item_positions.get(room, item)
             if pos is not None:
                 return float(pos[0]), float(pos[1])
+        if item == "star_crest" and room == "117":
+            from re1_rl.gallery_puzzle import GALLERY_FINAL_SWITCH_TARGET
+
+            return float(GALLERY_FINAL_SWITCH_TARGET[0]), float(
+                GALLERY_FINAL_SWITCH_TARGET[1]
+            )
         return None
     if op in {"objective", "do_puzzle", "trigger_cutscene", "boss"}:
+        portrait = _gallery_portrait_index(step)
+        if portrait is not None:
+            from re1_rl.gallery_puzzle import GALLERY_TARGETS
+
+            tx, tz = GALLERY_TARGETS[portrait - 1]
+            return float(tx), float(tz)
         site_id = str(step.get("site_id") or "")
         if not site_id:
             return None
@@ -854,7 +909,7 @@ def _planner_step_target_xz(
         for site in load_story_use_sites():
             if str(site.get("id") or "") == site_id:
                 return float(site["x"]), float(site["z"])
-    return None
+        return None
 
 
 def encode_planner_loyal_goal(

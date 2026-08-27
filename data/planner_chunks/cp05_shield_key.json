@@ -3,8 +3,8 @@
   "checkpoint_id": "barry_hall_return_106",
   "chunk_id": "cp05_shield_key",
   "source": "phase1_pass1_council",
-  "end_anchor_beat_id": "armor_key",
-  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun path 115/116, greenhouse pump, armor_key immediately after pump.",
+  "end_anchor_beat_id": "star_crest",
+  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). 103->10C is locked until 10C->103, so do not go greenhouse. From 109: 10A->117, then yawn-rails gallery: 6 portraits + star crest.",
   "leave_118": {
     "banked_in_box": [
       {"item": "shield_key", "qty": 1, "why": "attic only; bank to free a slot"},
@@ -22,8 +22,8 @@
       {"item": null, "qty": 0, "slot": 7},
       {"item": null, "qty": 0, "slot": 8}
     ],
-    "next_beat_this_loadout_is_for": "greenhouse_pump",
-    "why": "Combat kit for 115/116 (beretta+30), chemical for pump, shield_key banked."
+    "next_beat_this_loadout_is_for": "star_crest",
+    "why": "Combat kit for 115/116 (beretta+30), chemical kept (10C locked), shield_key banked. Shotgun then gallery portraits."
   },
   "steps": [
     {"n": 1, "op": "traverse", "edge_id": "106->105"},
@@ -57,12 +57,16 @@
     {"n": 29, "op": "traverse", "edge_id": "109->115"},
     {"n": 30, "op": "traverse", "edge_id": "115->116"},
     {"n": 31, "op": "acquire", "pickup_id": "116:shotgun:1", "room_id": "116"},
-    {"n": 32, "op": "traverse", "edge_id": "116->106"},
-    {"n": 33, "op": "traverse", "edge_id": "106->105"},
-    {"n": 34, "op": "traverse", "edge_id": "105->104"},
-    {"n": 35, "op": "traverse", "edge_id": "104->103"},
-    {"n": 36, "op": "traverse", "edge_id": "103->10C"},
-    {"n": 37, "op": "do_puzzle", "site_id": "chemical@10C_greenhouse_pump", "room_id": "10C", "beat_id": "greenhouse_pump"},
-    {"n": 38, "op": "acquire", "pickup_id": "10C:armor_key:1", "room_id": "10C", "beat_id": "armor_key"}
+    {"n": 32, "op": "traverse", "edge_id": "116->115"},
+    {"n": 33, "op": "traverse", "edge_id": "115->109"},
+    {"n": 34, "op": "traverse", "edge_id": "109->10A"},
+    {"n": 35, "op": "traverse", "edge_id": "10A->117", "beat_id": "gallery_enter"},
+    {"n": 36, "op": "do_puzzle", "site_id": "gallery_portrait_1", "room_id": "117", "beat_id": "gallery_portrait_1", "note": "newborn"},
+    {"n": 37, "op": "do_puzzle", "site_id": "gallery_portrait_2", "room_id": "117", "beat_id": "gallery_portrait_2", "note": "infant"},
+    {"n": 38, "op": "do_puzzle", "site_id": "gallery_portrait_3", "room_id": "117", "beat_id": "gallery_portrait_3", "note": "boy"},
+    {"n": 39, "op": "do_puzzle", "site_id": "gallery_portrait_4", "room_id": "117", "beat_id": "gallery_portrait_4", "note": "young man"},
+    {"n": 40, "op": "do_puzzle", "site_id": "gallery_portrait_5", "room_id": "117", "beat_id": "gallery_portrait_5", "note": "middle-aged man"},
+    {"n": 41, "op": "do_puzzle", "site_id": "gallery_portrait_6", "room_id": "117", "beat_id": "gallery_portrait_6", "note": "old man"},
+    {"n": 42, "op": "acquire", "pickup_id": "117:star_crest:1", "room_id": "117", "beat_id": "star_crest"}
   ]
 }

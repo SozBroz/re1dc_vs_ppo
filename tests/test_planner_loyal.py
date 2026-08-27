@@ -10,6 +10,11 @@ import numpy as np
 import pytest
 
 from re1_rl.env import RE1Env
+from re1_rl.gallery_puzzle import (
+    GALLERY_FINAL_SWITCH_TARGET,
+    GALLERY_STEP_VALUES,
+    GALLERY_TARGETS,
+)
 from re1_rl.planner import WaypointPlanner
 from re1_rl.planner_loyal import (
     HEAL_USE_TAX_LIGHT,
@@ -20,6 +25,7 @@ from re1_rl.planner_loyal import (
     PlannerLoyalQueue,
     apply_planner_loyal_obs,
     encode_planner_queue,
+    _planner_step_target_xz,
     load_chunk,
     planner_loyal_enabled,
     prune_route_admin_goal,
@@ -68,8 +74,17 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
         str(p or "").startswith("118:chemical") for p in pickups
     )
     assert any(s.get("op") == "use_box" for s in steps)
-    assert steps[-1]["pickup_id"].startswith("10C:armor_key")
-    assert steps[-1].get("beat_id") == "armor_key"
+    assert steps[-1]["pickup_id"].startswith("117:star_crest")
+    assert steps[-1].get("beat_id") == "star_crest"
+    assert any(s.get("edge_id") == "116->115" for s in steps)
+    assert any(s.get("edge_id") == "115->109" for s in steps)
+    assert any(s.get("edge_id") == "10A->117" for s in steps)
+    assert not any(s.get("edge_id") == "116->106" for s in steps)
+    assert not any(s.get("edge_id") == "103->10C" for s in steps)
+    portraits = [
+        s.get("beat_id") for s in steps if str(s.get("beat_id") or "").startswith("gallery_portrait_")
+    ]
+    assert portraits == [f"gallery_portrait_{i}" for i in range(1, 7)]
     assert any(s.get("edge_id") == "106->107" for s in steps)
     assert "108:handgun_bullets:1" in pickups
     enter_108 = next(i for i, s in enumerate(steps) if s.get("edge_id") == "107->108")
@@ -363,6 +378,86 @@ def test_alcove_swap_ignores_gold_emblem_putback():
         state={"room_id": "10F", "inventory_slots": [("emblem", 1)]},
     )
     assert result["step_success"] is False
+
+
+def _gallery_chunk() -> dict:
+    return {
+        "chunk_id": "gallery",
+        "end_anchor_beat_id": "star_crest",
+        "steps": [
+            {
+                "n": 1,
+                "op": "do_puzzle",
+                "site_id": "gallery_portrait_1",
+                "room_id": "117",
+                "beat_id": "gallery_portrait_1",
+            },
+            {
+                "n": 2,
+                "op": "do_puzzle",
+                "site_id": "gallery_portrait_2",
+                "room_id": "117",
+                "beat_id": "gallery_portrait_2",
+            },
+            {
+                "n": 3,
+                "op": "acquire",
+                "pickup_id": "117:star_crest:1",
+                "room_id": "117",
+                "beat_id": "star_crest",
+            },
+        ],
+    }
+
+
+def test_gallery_portrait_completes_on_progress():
+    q = PlannerLoyalQueue(_gallery_chunk())
+    q.note_start_inventory({"room_id": "117", "gallery_progress": 0})
+    prev = {"room_id": "117", "gallery_progress": 0, "inventory_slots": []}
+    cur = {
+        "room_id": "117",
+        "gallery_progress": GALLERY_STEP_VALUES[0],
+        "inventory_slots": [],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["step_success"] is True
+    assert q.current["beat_id"] == "gallery_portrait_2"
+
+
+def test_gallery_portraits_already_done_are_skipped():
+    q = PlannerLoyalQueue(_gallery_chunk())
+    q.note_start_inventory(
+        {"room_id": "117", "gallery_progress": GALLERY_STEP_VALUES[1]}
+    )
+    prev = {
+        "room_id": "117",
+        "gallery_progress": GALLERY_STEP_VALUES[1],
+        "inventory_slots": [],
+    }
+    cur = {
+        "room_id": "117",
+        "gallery_progress": GALLERY_STEP_VALUES[1],
+        "inventory_slots": [("star_crest", 1)],
+        "new_items": ["star_crest"],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["step_success"] is True
+    assert q.done is True
+
+
+def test_gallery_portrait_compass_uses_rdt_targets():
+    xz = _planner_step_target_xz(
+        {
+            "op": "do_puzzle",
+            "site_id": "gallery_portrait_3",
+            "beat_id": "gallery_portrait_3",
+        }
+    )
+    assert xz == GALLERY_TARGETS[2]
+    crest = _planner_step_target_xz(
+        {"op": "acquire", "pickup_id": "117:star_crest:1"}
+    )
+    assert crest == GALLERY_FINAL_SWITCH_TARGET
 
 
 def test_ammo_new_slot_counts_as_gain():
@@ -1018,10 +1113,10 @@ def test_pl18_seek_lands_on_chemical_tail():
     q.seek(13)
     assert q.current is not None
     assert q.current["edge_id"] == "105->106"
-    assert q.end_anchor == "armor_key"
+    assert q.end_anchor == "star_crest"
     assert q._steps[23]["pickup_id"].startswith("118:chemical")
     assert q._steps[24]["op"] == "use_box"
-    assert q._steps[-1]["pickup_id"].startswith("10C:armor_key")
+    assert q._steps[-1]["pickup_id"].startswith("117:star_crest")
 
 
 def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):
