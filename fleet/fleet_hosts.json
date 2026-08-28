@@ -29,8 +29,8 @@
   "pking": {
     "role": "remote_worker",
     "worker_base_port": 5755,
-    "worker_n_envs": 24,
-    "notes": "72 GB RAM; 24 was unsafe at 48 GB"
+    "worker_n_envs": 20,
+    "notes": "72 GB RAM; 20 remote envs"
   },
   "network": {
     "gateway": "192.168.0.1",

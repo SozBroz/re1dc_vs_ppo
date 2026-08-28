@@ -75,13 +75,14 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
         str(p or "").startswith("118:chemical") for p in pickups
     )
     assert any(s.get("op") == "use_box" for s in steps)
-    assert steps[-1]["pickup_id"].startswith("117:star_crest")
-    assert steps[-1].get("beat_id") == "star_crest"
+    assert steps[-1]["pickup_id"].startswith("10C:armor_key")
+    assert steps[-1].get("beat_id") == "armor_key"
     assert any(s.get("edge_id") == "116->115" for s in steps)
     assert any(s.get("edge_id") == "115->109" for s in steps)
     assert any(s.get("edge_id") == "10A->117" for s in steps)
     assert not any(s.get("edge_id") == "116->106" for s in steps)
-    assert not any(s.get("edge_id") == "103->10C" for s in steps)
+    assert any(s.get("edge_id") == "103->10C" for s in steps)
+    assert not any(s.get("edge_id") == "103->104" for s in steps)
     portraits = [
         s.get("beat_id") for s in steps if str(s.get("beat_id") or "").startswith("gallery_portrait_")
     ]
@@ -91,6 +92,14 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     old_man = next(i for i, s in enumerate(steps) if s.get("beat_id") == "gallery_portrait_6")
     assert old_man < crest_i
     assert steps[old_man + 1]["pickup_id"].startswith("117:star_crest")
+    assert steps[crest_i + 1]["edge_id"] == "117->10A"
+    assert steps[crest_i + 2]["edge_id"] == "10A->11A"
+    assert steps[crest_i + 3]["site_id"] == "star_crest@11A_crest_slot"
+    pump_i = next(i for i, s in enumerate(steps) if s.get("site_id") == "chemical@10C_greenhouse_pump")
+    herb_i = next(i for i, s in enumerate(steps) if s.get("pickup_id") == "10C:green_herb:2")
+    armor_i = next(i for i, s in enumerate(steps) if str(s.get("pickup_id") or "").startswith("10C:armor_key"))
+    assert pump_i < herb_i < armor_i
+    assert steps[pump_i - 1]["edge_id"] == "103->10C"
     assert any(s.get("edge_id") == "106->107" for s in steps)
     assert "108:handgun_bullets:1" in pickups
     enter_108 = next(i for i, s in enumerate(steps) if s.get("edge_id") == "107->108")
@@ -1302,10 +1311,10 @@ def test_pl18_seek_lands_on_chemical_tail():
     q.seek(13)
     assert q.current is not None
     assert q.current["edge_id"] == "105->106"
-    assert q.end_anchor == "star_crest"
+    assert q.end_anchor == "armor_key"
     assert q._steps[23]["pickup_id"].startswith("118:chemical")
     assert q._steps[24]["op"] == "use_box"
-    assert q._steps[-1]["pickup_id"].startswith("117:star_crest")
+    assert q._steps[-1]["pickup_id"].startswith("10C:armor_key")
 
 
 def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):
