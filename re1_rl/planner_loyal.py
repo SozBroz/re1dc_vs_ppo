@@ -289,6 +289,16 @@ class PlannerLoyalQueue:
                 satisfied.add(pickup_id)
         self._satisfied_pickups = satisfied
 
+    def _completed_acquire_names(self, room: str) -> set[str]:
+        """Item names already minted in this room — leftover cinema is not a pickup."""
+        names: set[str] = set()
+        room = str(room or "")
+        for pickup_id in self._satisfied_pickups:
+            step_room, item, _pile = _pickup_id_parts(pickup_id)
+            if item and (not step_room or step_room == room):
+                names.add(item)
+        return names
+
     def _acquire_sibling_pile_ids(self, room: str, item: str) -> list[str]:
         siblings: list[str] = []
         for step in self._steps:
@@ -566,6 +576,7 @@ class PlannerLoyalQueue:
             unexpected = gained - planned
             unexpected -= _combine_explained_gains(prev_state, state)
             unexpected -= unexpected & _event_grant_names(room)
+            unexpected -= self._completed_acquire_names(room)
             if op != "acquire":
                 if unexpected:
                     result["divert"] = True

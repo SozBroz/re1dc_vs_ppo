@@ -175,6 +175,43 @@ def test_combine_herb_mix_does_not_divert_on_traverse():
     assert result["step_success"] is False
 
 
+def test_shotgun_after_unique_acquire_does_not_divert():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "test",
+            "steps": [
+                {"n": 1, "op": "acquire", "pickup_id": "116:shotgun:1", "room_id": "116"},
+                {"n": 2, "op": "traverse", "edge_id": "116->115"},
+            ],
+        }
+    )
+    q.note_start_inventory({"room_id": "116", "inventory_slots": [("knife", 1)]})
+    first = q.evaluate_transition(
+        prev_state={"room_id": "116", "inventory_slots": [("knife", 1)]},
+        state={
+            "room_id": "116",
+            "inventory_slots": [("knife", 1), ("shotgun", 1)],
+            "new_items": ["shotgun"],
+        },
+    )
+    assert first["step_success"] is True
+    assert first["divert"] is False
+    assert q.current["edge_id"] == "116->115"
+    leftover = q.evaluate_transition(
+        prev_state={
+            "room_id": "116",
+            "inventory_slots": [("knife", 1), ("shotgun", 1)],
+        },
+        state={
+            "room_id": "116",
+            "inventory_slots": [("knife", 1), ("shotgun", 1)],
+            "new_items": ["shotgun"],
+        },
+    )
+    assert leftover["divert"] is False
+    assert leftover["step_success"] is False
+
+
 def test_cutscene_event_grant_does_not_divert_on_traverse():
     q = PlannerLoyalQueue()
     q.current["edge_id"] = "203->202"

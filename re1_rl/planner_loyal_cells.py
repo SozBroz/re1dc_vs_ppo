@@ -13,8 +13,11 @@ Optional hot-reload pin (read every reset, no worker restart after the
 code is loaded): ``data/planner_loyal_reset_pin.env`` or
 ``RE1_PLANNER_RESET_PIN_FILE``. Blank knobs keep the full ``pl05+``
 pool. ``RE1_PLANNER_RESET_PIN_INDEX`` wins over
-``RE1_PLANNER_RESET_PIN_RANGE`` over ``RE1_PLANNER_RESET_PIN_SET``.
-A pin that matches no minted start falls back to the unpinned pool.
+``RE1_PLANNER_RESET_PIN_RANGE`` over ``RE1_PLANNER_RESET_PIN_WEIGHTS``
+over ``RE1_PLANNER_RESET_PIN_SET``. Exclusive pins that match no minted
+start fall back to the unpinned pool.
+``SET`` plus ``SET_WEIGHT=0.5`` (or ``WEIGHTS=54:50,rest:50``) puts that
+fraction on the named cells and the remainder on the other minted starts.
 
 Captures are always thin: ``cell.State`` + sidecar + ``meta.json`` with a
 quality vector for healthier-thin comparison. No ``leg_replay`` / ``leg_policy``.
@@ -47,8 +50,11 @@ TRAINING_START_INDEX = 5  # earliest training start (lockpick tip)
 _PIN_INDEX_ENV = "RE1_PLANNER_RESET_PIN_INDEX"
 _PIN_RANGE_ENV = "RE1_PLANNER_RESET_PIN_RANGE"
 _PIN_SET_ENV = "RE1_PLANNER_RESET_PIN_SET"
+_PIN_SET_WEIGHT_ENV = "RE1_PLANNER_RESET_PIN_SET_WEIGHT"
+_PIN_WEIGHTS_ENV = "RE1_PLANNER_RESET_PIN_WEIGHTS"
 _PIN_FILE_ENV = "RE1_PLANNER_RESET_PIN_FILE"
 _DEFAULT_PIN_FILE = "data/planner_loyal_reset_pin.env"
+_PIN_REST_KEYS = frozenset({"rest", "uniform", "pool"})
 
 MANIFEST_FILENAME = "manifest.json"
 ROUTE_ID = "planner_loyal_v1"
@@ -298,10 +304,74 @@ def _parse_pin_set(raw: str) -> frozenset[int] | None:
     return frozenset(indices) if indices else None
 
 
+def _parse_pin_weight_value(raw: str) -> float | None:
+    token = raw.strip()
+    if not token:
+        return None
+    pct = token.endswith("%")
+    try:
+        value = float(token.rstrip("%"))
+    except ValueError:
+        return None
+    if value <= 0.0:
+        return None
+    if pct or value > 1.0:
+        value /= 100.0
+    return max(0.0, min(1.0, value))
+
+
+def _pin_set_weight(project_root: Path | str | None = None) -> float | None:
+    """Blend weight for ``SET``. Blank = exclusive set (weight 1)."""
+    raw = _pin_raw(_PIN_SET_WEIGHT_ENV, project_root)
+    if not raw:
+        return None
+    return _parse_pin_weight_value(raw)
+
+
+def _parse_pin_weights(raw: str) -> dict[int | str, float] | None:
+    """``54:50,rest:50`` or ``5:0.25,11:0.25``. Values normalize to 1."""
+    weights: dict[int | str, float] = {}
+    for part in raw.replace(";", ",").split(","):
+        token = part.strip()
+        if not token:
+            continue
+        for sep in (":", "=", "/"):
+            if sep in token:
+                left, right = token.split(sep, 1)
+                break
+        else:
+            continue
+        try:
+            value = float(right.strip().rstrip("%"))
+        except ValueError:
+            continue
+        if value <= 0.0:
+            continue
+        left_token = left.strip().lower()
+        key: int | str
+        if left_token in _PIN_REST_KEYS:
+            key = "rest"
+        else:
+            try:
+                idx = int(left_token, 10)
+            except ValueError:
+                continue
+            if idx < 0:
+                continue
+            key = idx
+        weights[key] = weights.get(key, 0.0) + value
+    if not weights:
+        return None
+    total = sum(weights.values())
+    if total <= 0.0:
+        return None
+    return {key: weight / total for key, weight in weights.items()}
+
+
 def reset_pin_allowed_indices(
     project_root: Path | str | None = None,
 ) -> set[int] | None:
-    """Allowed start indices from the live pin file/env, or ``None`` if unpinned."""
+    """Exclusive start indices from the live pin, or ``None`` if mixed/unpinned."""
     index_raw = _pin_raw(_PIN_INDEX_ENV, project_root)
     if index_raw:
         idx = _parse_pin_index(index_raw)
@@ -313,8 +383,12 @@ def reset_pin_allowed_indices(
             return None
         lo, hi = span
         return set(range(lo, hi + 1))
+    if _pin_raw(_PIN_WEIGHTS_ENV, project_root):
+        return None
     set_raw = _pin_raw(_PIN_SET_ENV, project_root)
     if set_raw:
+        if _pin_set_weight(project_root) is not None:
+            return None
         return set(_parse_pin_set(set_raw) or ()) or None
     return None
 
@@ -335,6 +409,64 @@ def _apply_reset_pin(
         flush=True,
     )
     return cells
+
+
+def _sample_from_pin_weights(
+    cells: list[dict[str, Any]],
+    weights: dict[int | str, float],
+    rng: random.Random,
+) -> dict[str, Any]:
+    by_index = {int(row["checkpoint_index"]): row for row in cells}
+    named = {
+        idx: float(weight)
+        for idx, weight in weights.items()
+        if isinstance(idx, int) and idx in by_index
+    }
+    rest_w = float(weights.get("rest") or 0.0)
+    others = [row for row in cells if int(row["checkpoint_index"]) not in named]
+    if rest_w > 0.0 and others:
+        pick_w = [(by_index[idx], named[idx]) for idx in named]
+        each_rest = rest_w / len(others)
+        pick_w.extend((row, each_rest) for row in others)
+    elif named:
+        pick_w = [(by_index[idx], named[idx]) for idx in named]
+    else:
+        return rng.choice(cells)
+    total = sum(weight for _row, weight in pick_w)
+    if total <= 0.0:
+        return rng.choice(cells)
+    chosen = rng.choices(
+        [row for row, _weight in pick_w],
+        weights=[weight / total for _row, weight in pick_w],
+        k=1,
+    )[0]
+    return chosen
+
+
+def _sample_training_start(
+    cells: list[dict[str, Any]],
+    project_root: Path | str | None,
+    rng: random.Random,
+) -> dict[str, Any]:
+    weights_raw = _pin_raw(_PIN_WEIGHTS_ENV, project_root)
+    if weights_raw and reset_pin_allowed_indices(project_root) is None:
+        parsed = _parse_pin_weights(weights_raw)
+        if parsed:
+            return _sample_from_pin_weights(cells, parsed, rng)
+    set_raw = _pin_raw(_PIN_SET_ENV, project_root)
+    set_weight = _pin_set_weight(project_root)
+    if set_raw and set_weight is not None:
+        focused_idx = _parse_pin_set(set_raw) or frozenset()
+        focused = [
+            row for row in cells if int(row["checkpoint_index"]) in focused_idx
+        ]
+        others = [
+            row for row in cells if int(row["checkpoint_index"]) not in focused_idx
+        ]
+        if focused and rng.random() < set_weight:
+            return rng.choice(focused)
+        return rng.choice(others or cells)
+    return rng.choice(cells)
 
 
 def _live_chunk_n_steps(project_root: Path | str | None = None) -> int | None:
@@ -418,7 +550,7 @@ def sample_training_start_cell(
     cells = iter_training_start_cells(project_root)
     if not cells:
         return None
-    pick = (rng or random).choice(cells)
+    pick = _sample_training_start(cells, project_root, rng or random)
     root = planner_loyal_root(project_root)
     idx = int(pick["checkpoint_index"])
     slot = cell_slot_dir(root, idx)

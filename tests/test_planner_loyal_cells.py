@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import random
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -17,6 +19,7 @@ from re1_rl.planner_loyal_cells import (
     lift_planner_loyal_quality,
     planner_loyal_quality_beats,
     planner_loyal_root,
+    sample_training_start_cell,
     seek_index_after_cell,
     slot_index_for_completed_step,
     training_start_paths,
@@ -61,10 +64,7 @@ def _write_cell(root: Path, idx: int, *, meta: dict | None = None) -> None:
 def test_training_starts_are_pl05_and_every_later_slot(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_INDEX", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_RANGE", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_SET", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_FILE", raising=False)
+    _clear_pin_env(monkeypatch)
     monkeypatch.delenv("RE1_PLANNER_CHUNK", raising=False)
     _write_cell(tmp_path, 4, meta={"training_start": False})
     _write_cell(tmp_path, 5, meta={"training_start": True})
@@ -81,10 +81,7 @@ def test_training_starts_are_pl05_and_every_later_slot(
 def test_exhausted_last_step_cell_is_not_a_start(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_INDEX", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_RANGE", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_SET", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_FILE", raising=False)
+    _clear_pin_env(monkeypatch)
     chunk = tmp_path / "chunk.json"
     chunk.write_text(
         json.dumps(
@@ -110,6 +107,18 @@ def test_exhausted_last_step_cell_is_not_a_start(
     ) is False
 
 
+def _clear_pin_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in (
+        "RE1_PLANNER_RESET_PIN_INDEX",
+        "RE1_PLANNER_RESET_PIN_RANGE",
+        "RE1_PLANNER_RESET_PIN_SET",
+        "RE1_PLANNER_RESET_PIN_SET_WEIGHT",
+        "RE1_PLANNER_RESET_PIN_WEIGHTS",
+        "RE1_PLANNER_RESET_PIN_FILE",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+
 def _write_pin(root: Path, text: str) -> Path:
     path = root / "data" / "planner_loyal_reset_pin.env"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -125,10 +134,7 @@ def _seed_starts(tmp_path: Path) -> None:
 def test_reset_pin_file_index_and_hot_reload(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_INDEX", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_RANGE", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_SET", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_FILE", raising=False)
+    _clear_pin_env(monkeypatch)
     _seed_starts(tmp_path)
     pin = _write_pin(
         tmp_path,
@@ -155,10 +161,7 @@ def test_reset_pin_file_index_and_hot_reload(
 def test_reset_pin_set_and_unminted_fallback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_INDEX", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_RANGE", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_SET", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_RESET_PIN_FILE", raising=False)
+    _clear_pin_env(monkeypatch)
     _seed_starts(tmp_path)
     _write_pin(tmp_path, "RE1_PLANNER_RESET_PIN_SET=5,11\n")
     assert [int(row["checkpoint_index"]) for row in iter_training_start_cells(tmp_path)] == [
@@ -172,6 +175,51 @@ def test_reset_pin_set_and_unminted_fallback(
         11,
         13,
     ]
+
+
+def _sample_counts(root: Path, n: int = 400) -> Counter:
+    rng = random.Random(0)
+    counts: Counter = Counter()
+    for _ in range(n):
+        pick = sample_training_start_cell(root, rng=rng)
+        assert pick is not None
+        counts[int(pick["checkpoint_index"])] += 1
+    return counts
+
+
+def test_reset_pin_set_weight_mixes_named_and_rest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_pin_env(monkeypatch)
+    _seed_starts(tmp_path)
+    _write_pin(
+        tmp_path,
+        "RE1_PLANNER_RESET_PIN_SET=11\n"
+        "RE1_PLANNER_RESET_PIN_SET_WEIGHT=0.5\n",
+    )
+    assert [int(row["checkpoint_index"]) for row in iter_training_start_cells(tmp_path)] == [
+        5,
+        10,
+        11,
+        13,
+    ]
+    counts = _sample_counts(tmp_path)
+    assert 150 <= counts[11] <= 250
+    assert counts[5] > 20 and counts[10] > 20 and counts[13] > 20
+
+
+def test_reset_pin_weights_rest_and_exclusive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_pin_env(monkeypatch)
+    _seed_starts(tmp_path)
+    _write_pin(tmp_path, "RE1_PLANNER_RESET_PIN_WEIGHTS=11:50,rest:50\n")
+    counts = _sample_counts(tmp_path)
+    assert 150 <= counts[11] <= 250
+    assert counts[5] > 20 and counts[10] > 20 and counts[13] > 20
+    _write_pin(tmp_path, "RE1_PLANNER_RESET_PIN_WEIGHTS=5:1,11:1\n")
+    exclusive = _sample_counts(tmp_path, n=80)
+    assert set(exclusive) == {5, 11}
 
 
 def test_planner_loyal_quality_drops_path_kills_dim() -> None:
