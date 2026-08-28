@@ -144,6 +144,53 @@ def test_ink_ribbon_pickup_diverts_on_traverse():
     assert q.current["edge_id"] == "106->105"
 
 
+def test_combine_reload_does_not_divert_on_traverse():
+    q = PlannerLoyalQueue()
+    prev = {
+        "room_id": "106",
+        "inventory_slots": [("beretta", 0), ("handgun_bullets", 45)],
+    }
+    cur = {
+        "room_id": "106",
+        "inventory_slots": [("beretta", 15), ("handgun_bullets", 30)],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is False
+    assert q.current["edge_id"] == "106->105"
+
+
+def test_combine_herb_mix_does_not_divert_on_traverse():
+    q = PlannerLoyalQueue()
+    prev = {
+        "room_id": "106",
+        "inventory_slots": [("green_herb", 1), ("green_herb", 1)],
+    }
+    cur = {
+        "room_id": "106",
+        "inventory_slots": [("mixed_herbs_gg", 1), ("", 0)],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is False
+
+
+def test_cutscene_event_grant_does_not_divert_on_traverse():
+    q = PlannerLoyalQueue()
+    q.current["edge_id"] = "203->202"
+    q.current["op"] = "traverse"
+    prev = {"room_id": "203", "inventory_slots": [("knife", 1)]}
+    cur = {
+        "room_id": "203",
+        "inventory_slots": [("knife", 1), ("acid_rounds", 6)],
+        "new_items": ["acid_rounds"],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is False
+    assert result["divert_reason"] is None
+
+
 def test_ink_ribbon_use_diverts_when_not_planned():
     q = PlannerLoyalQueue()
     prev = {"room_id": "106", "inventory_slots": [("ink_ribbon", 2)]}

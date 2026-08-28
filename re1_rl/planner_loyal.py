@@ -9,6 +9,8 @@ Reward contract (imperator 2026-08-25):
   ``max_steps`` by 12m, and keep playing. The last authored chunk step ends
   the episode.
 - Divert (wrong room / unplanned pickup / unplanned box / typewriter save): -4, episode end.
+  COMBINE reshuffles (reload / herb mix / ammo merge) and scripted ``event``
+  grants (Barry acid, Speyer bazooka, …) are not pickups.
 - Cell timer: flat 12 minutes only (no custom yawn_cell_timeouts.json times).
 """
 from __future__ import annotations
@@ -553,7 +555,8 @@ class PlannerLoyalQueue:
             self.step_success_pending = True
             return result
 
-        # Divert / complete: pickups
+        # Divert / complete: pickups. COMBINE and scripted event grants change
+        # inventory without a walk-to-AOT take; those are not unplanned pickups.
         gained = _inventory_gains(prev_state, state)
         if gained:
             want = str(step.get("pickup_id") or "")
@@ -561,6 +564,8 @@ class PlannerLoyalQueue:
             matched = op == "acquire" and _pickup_matches_gain(want, gained)
             planned = {want_item} if matched else set()
             unexpected = gained - planned
+            unexpected -= _combine_explained_gains(prev_state, state)
+            unexpected -= unexpected & _event_grant_names(room)
             if op != "acquire":
                 if unexpected:
                     result["divert"] = True
@@ -568,9 +573,12 @@ class PlannerLoyalQueue:
                     self.divert_reason = result["divert_reason"]
                 return result
             if not matched:
-                result["divert"] = True
-                result["divert_reason"] = f"wrong_pickup want={want} got={sorted(gained)}"
-                self.divert_reason = result["divert_reason"]
+                if unexpected:
+                    result["divert"] = True
+                    result["divert_reason"] = (
+                        f"wrong_pickup want={want} got={sorted(gained)}"
+                    )
+                    self.divert_reason = result["divert_reason"]
                 return result
             result["step_success"] = True
             self._index += 1
@@ -774,6 +782,83 @@ def _inventory_gains(prev_state: dict[str, Any], state: dict[str, Any]) -> set[s
         if key:
             gained.add(key)
     return gained
+
+
+def _inventory_id_qty(state: dict[str, Any]) -> list[tuple[int, int]]:
+    from re1_rl.ammo_accounting import inventory_slots_to_id_qty
+
+    return inventory_slots_to_id_qty((state or {}).get("inventory_slots"))
+
+
+def _id_qty_slots_equal(
+    left: list[tuple[int, int]],
+    right: list[tuple[int, int]],
+) -> bool:
+    n = max(len(left), len(right))
+
+    def _pad(slots: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        out = [(int(iid) & 0xFF, int(qty)) for iid, qty in slots]
+        while len(out) < n:
+            out.append((0, 0))
+        return out
+
+    return _pad(left) == _pad(right)
+
+
+def _combine_explained_gains(
+    prev_state: dict[str, Any],
+    state: dict[str, Any],
+) -> set[str]:
+    """Names gained solely by one legal COMBINE (reload / herb mix / ammo merge)."""
+    from re1_rl.inventory_combine import plan_combine
+
+    prev_inv = _inventory_id_qty(prev_state)
+    cur_inv = _inventory_id_qty(state)
+    if len(prev_inv) < 2 or not cur_inv:
+        return set()
+    for first in range(len(prev_inv)):
+        for second in range(len(prev_inv)):
+            planned = plan_combine(prev_inv, first, second)
+            if planned is None:
+                continue
+            new_inv, _dest, _product = planned
+            if _id_qty_slots_equal(new_inv, cur_inv):
+                return _inventory_gains(prev_state, state)
+    return set()
+
+
+_EVENT_GRANTS_BY_ROOM: dict[str, frozenset[str]] | None = None
+
+
+def _load_event_grants_by_room() -> dict[str, frozenset[str]]:
+    path = ROOT / "data" / "room_items.json"
+    if not path.is_file():
+        return {}
+    with path.open(encoding="utf-8") as handle:
+        raw = json.load(handle)
+    out: dict[str, set[str]] = {}
+    for room_id, entry in raw.items():
+        if str(room_id).startswith("_"):
+            continue
+        names: set[str] = set()
+        for item in entry.get("items") or []:
+            gate = item.get("gate") or {}
+            if str(gate.get("type") or "") != "event":
+                continue
+            name = canonical_item(str(item.get("name") or ""))
+            if name:
+                names.add(name)
+        if names:
+            out[str(room_id)] = names
+    return {room: frozenset(names) for room, names in out.items()}
+
+
+def _event_grant_names(room: str) -> frozenset[str]:
+    """Items this room only grants via cinema / story event, not a floor pile."""
+    global _EVENT_GRANTS_BY_ROOM
+    if _EVENT_GRANTS_BY_ROOM is None:
+        _EVENT_GRANTS_BY_ROOM = _load_event_grants_by_room()
+    return _EVENT_GRANTS_BY_ROOM.get(str(room or ""), frozenset())
 
 
 def _heal_use_tax(prev_state: dict[str, Any], state: dict[str, Any]) -> float:
