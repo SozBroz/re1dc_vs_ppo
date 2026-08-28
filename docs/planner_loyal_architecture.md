@@ -30,7 +30,8 @@ Branch: `feature/planner-loyal-ppo`
 See `re1_rl/planner_loyal.py` + `compute_reward(..., planner_loyal_queue=...)`.
 
 - Keep: step contempt, HP damage/heal, enemy damage/kill taxes as already coded.
-- Heal-use tax: green/blue herb −0.05; stronger heals −0.10.
+- Heal-use tax: any consumed heal item −0.10 (`heal_use_tax`).
+- Low-ammo COMBINE reload (weapon at or below 1/3 clip): +0.50 (`weapon_reload`).
 - Planner step complete: +8 (`planner_step_success` / `checkpoint_success`).
 - Divert (wrong room / unplanned pickup / unplanned box): −4 + episode terminal.
 

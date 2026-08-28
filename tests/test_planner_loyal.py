@@ -34,7 +34,7 @@ from re1_rl.planner_loyal import (
 )
 from re1_rl.room_graph import RoomGraph
 from re1_rl.progress import ProgressTracker
-from re1_rl.reward import STEP_PENALTY, compute_reward
+from re1_rl.reward import STEP_PENALTY, WEAPON_RELOAD_REWARD, compute_reward
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ROUTE = PROJECT_ROOT / "data" / "route_jill_anypct.json"
@@ -873,6 +873,7 @@ def test_episode_failure_context_includes_divert_and_target():
 
 def test_reward_heal_use_tax_fires():
     q = PlannerLoyalQueue()
+    assert HEAL_USE_TAX_LIGHT == pytest.approx(-0.10)
     prev = {
         "room_id": "106",
         "inventory_slots": [{"name": "green_herb"}],
@@ -887,6 +888,42 @@ def test_reward_heal_use_tax_fires():
     }
     _reward_total, bd = _reward(prev, cur, q)
     assert bd["heal_use_tax"] == HEAL_USE_TAX_LIGHT
+
+
+def test_reward_low_ammo_reload_pays():
+    q = PlannerLoyalQueue()
+    prev = {
+        "room_id": "106",
+        "inventory_slots": [("beretta", 5), ("handgun_bullets", 30)],
+        "hp": 96,
+        "in_control": True,
+    }
+    cur = {
+        "room_id": "106",
+        "inventory_slots": [("beretta", 15), ("handgun_bullets", 20)],
+        "hp": 96,
+        "in_control": True,
+    }
+    _reward_total, bd = _reward(prev, cur, q)
+    assert bd["weapon_reload"] == pytest.approx(WEAPON_RELOAD_REWARD)
+
+
+def test_reward_reload_above_one_third_does_not_pay():
+    q = PlannerLoyalQueue()
+    prev = {
+        "room_id": "106",
+        "inventory_slots": [("beretta", 6), ("handgun_bullets", 30)],
+        "hp": 96,
+        "in_control": True,
+    }
+    cur = {
+        "room_id": "106",
+        "inventory_slots": [("beretta", 15), ("handgun_bullets", 21)],
+        "hp": 96,
+        "in_control": True,
+    }
+    _reward_total, bd = _reward(prev, cur, q)
+    assert bd["weapon_reload"] == 0.0
 
 
 def test_apply_obs_drops_strategy_keys_and_scalpels_world():

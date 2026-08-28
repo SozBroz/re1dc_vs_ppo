@@ -716,7 +716,7 @@ def test_shotgun_damage_unscaled_by_beretta_bonus() -> None:
 
 
 def test_low_ammo_weapon_reload_pays() -> None:
-    assert WEAPON_RELOAD_REWARD == pytest.approx(0.1)
+    assert WEAPON_RELOAD_REWARD == pytest.approx(0.5)
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -728,6 +728,15 @@ def test_low_ammo_weapon_reload_pays() -> None:
         rails_mode=True, return_breakdown=True,
     )
     assert bd["weapon_reload"] == pytest.approx(WEAPON_RELOAD_REWARD)
+
+
+def test_reload_crumb_cannot_profit_from_beretta_miss_dump() -> None:
+    """10 misses (15→≤5) + COMBINE must stay net-negative at the current crumb."""
+    dump_rounds = 15 - reload_low_ammo_threshold(0x02)
+    spend = ammo_spend_penalty(0x02, dump_rounds)
+    waste = ammo_waste_penalty(0x02, dump_rounds)
+    assert dump_rounds == 10
+    assert spend + waste + WEAPON_RELOAD_REWARD < 0.0
 
 
 def test_reload_above_one_third_does_not_pay() -> None:

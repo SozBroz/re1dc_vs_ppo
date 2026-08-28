@@ -2,7 +2,8 @@
 
 Reward contract (imperator 2026-08-25):
 - Keep: stepwise contempt, damage taken, damage dealt, heal-from-HP rewards.
-- Heal-use tax: green/blue herb -0.05; stronger heals -0.10.
+- Heal-use tax: any consumed heal item -0.10.
+- Low-ammo COMBINE reload (weapon at or below 1/3 clip): +0.50.
 - Completing the current planner step: +8 scaled by leftover 12m cell budget
   (``+8 * leftover_frac``); then rearm a fresh 12m wall for the next step.
 - Divert (wrong room / unplanned pickup / unplanned box / typewriter save): -4, episode end.
@@ -28,7 +29,7 @@ PLANNER_MAX_STEPS = 20
 PLANNER_STEP_SUCCESS_REWARD = 8.0
 PLANNER_DIVERT_PENALTY = -4.0
 PLANNER_TIMEOUT_PENALTY = -4.0
-HEAL_USE_TAX_LIGHT = -0.05  # green / blue herb
+HEAL_USE_TAX_LIGHT = -0.10  # green / blue herb
 HEAL_USE_TAX_STRONG = -0.10  # sprays, red mixes, multi-herb mixes
 
 # Scalar reward keys under strict planner-loyal (telemetry aliases excluded).
@@ -49,6 +50,7 @@ PLANNER_LOYAL_SCALAR_KEYS: frozenset[str] = frozenset(
         "attack_dry_fire",
         "attack_macro_failure",
         "heal_use_tax",
+        "weapon_reload",
         "planner_step_success",
         "planner_divert",
         "planner_timeout",

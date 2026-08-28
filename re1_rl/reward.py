@@ -116,7 +116,9 @@ BERETTA_DAMAGE_SCALE = 1.1
 BERETTA_BOSS_DAMAGE_SCALE = 0.1
 # COMBINE reload when the weapon slot is at or below 1/3 combine capacity
 # (beretta 5/15, shotgun 2/7, bazooka/magnum 2/6).
-WEAPON_RELOAD_REWARD = 0.1
+# 0.5 stays under the cheapest repeat dump (10 beretta misses to go 15→5:
+# spend 0.40 + base miss-waste ~0.267). Hits are not this farm — they are combat.
+WEAPON_RELOAD_REWARD = 0.5
 # Shotgun vs cerberus is brutally ammo-inefficient in RE1 DC — steer to handgun.
 SHOTGUN_DOG_HIT_PENALTY = -1.4
 # Magnum / bazooka on fodder (dog or zombie) — keep heavy ammo for bosses.
@@ -938,6 +940,7 @@ def _compute_planner_loyal_reward(
             "enemy_damage",
             "enemy_kill",
             "hp",
+            "weapon_reload",
         ):
             bd[key] = 0.0
     elif loyal.get("step_success"):
@@ -1019,6 +1022,10 @@ def _compute_planner_loyal_reward(
         bd["enemy_damage"] = enemy_damage_pay
     if enemy_kill_pay > 0.0:
         bd["enemy_kill"] = enemy_kill_pay
+
+    reload_pay = low_ammo_reload_reward(prev_state, state)
+    if reload_pay > 0.0:
+        bd["weapon_reload"] = reload_pay
 
     overkill = combat_overkill_penalty(state)
     if overkill < 0.0:
