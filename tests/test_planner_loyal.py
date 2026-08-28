@@ -34,7 +34,12 @@ from re1_rl.planner_loyal import (
 )
 from re1_rl.room_graph import RoomGraph
 from re1_rl.progress import ProgressTracker
-from re1_rl.reward import STEP_PENALTY, WEAPON_RELOAD_REWARD, compute_reward
+from re1_rl.reward import (
+    CHECKPOINT_MAX_STEPS_EXTENSION,
+    STEP_PENALTY,
+    WEAPON_RELOAD_REWARD,
+    compute_reward,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ROUTE = PROJECT_ROOT / "data" / "route_jill_anypct.json"
@@ -622,13 +627,15 @@ def test_reward_step_success_pays_eight_and_pops():
     assert bd["planner_step_success"] == PLANNER_STEP_SUCCESS_REWARD
     assert bd["checkpoint_success"] == PLANNER_STEP_SUCCESS_REWARD
     assert q.current["edge_id"] == "105->104"
-    assert progress.checkpoint_success is True
+    assert progress.checkpoint_success is False
     assert reward == STEP_PENALTY + PLANNER_STEP_SUCCESS_REWARD
-    # Mid-chunk rearms a fresh 12m wall after the pulse.
+    # Mid-chunk rearms a fresh 12m wall and extends the episode, not a reset.
     from re1_rl.yawn_cell_timeout import FLAT_CELL_TIMEOUT_FRAMES
 
     assert progress.cell_timeout_frames == FLAT_CELL_TIMEOUT_FRAMES
     assert progress.leg_emulated_frames == 0
+    assert progress.max_steps_bonus == CHECKPOINT_MAX_STEPS_EXTENSION
+    assert progress.stagnation_frames == 0
 
 
 def test_reward_step_success_scales_with_leftover_time():

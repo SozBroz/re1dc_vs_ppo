@@ -954,15 +954,16 @@ def _compute_planner_loyal_reward(
             )
         bd["planner_step_success"] = pay
         bd["checkpoint_success"] = pay
-        if progress is not None and hasattr(progress, "claim_checkpoint_success"):
-            progress.claim_checkpoint_success()
-        if (
-            progress is not None
-            and not planner_loyal_queue.done
-            and hasattr(progress, "arm_cell_timeout")
-        ):
-            progress.arm_cell_timeout(int(FLAT_CELL_TIMEOUT_FRAMES))
-            progress.leg_emulated_frames = 0
+        if progress is not None and planner_loyal_queue.done:
+            if hasattr(progress, "claim_checkpoint_success"):
+                progress.claim_checkpoint_success()
+        elif progress is not None:
+            # Mid-chunk: keep playing with a fresh 12m idle / max_steps budget.
+            progress.note_softlock_extension(SOFTLOCK_EXTENSION_FRAMES)
+            progress.note_max_steps_extension(CHECKPOINT_MAX_STEPS_EXTENSION)
+            if hasattr(progress, "arm_cell_timeout"):
+                progress.arm_cell_timeout(int(FLAT_CELL_TIMEOUT_FRAMES))
+                progress.leg_emulated_frames = 0
 
     if progress is not None:
         from re1_rl.weapon_equip import inventory_entries_to_names
@@ -1079,10 +1080,11 @@ def _compute_planner_loyal_reward(
 
     if progress is not None and not state.get("dead"):
         frames_before = progress.stagnation_frames
-        progress.note_stagnation_step(
-            made_progress=False,
-            step_frames=step_frames,
-        )
+        if bd.get("planner_step_success", 0.0) == 0.0:
+            progress.note_stagnation_step(
+                made_progress=False,
+                step_frames=step_frames,
+            )
         bd["softlock"] = contempt_penalty_delta(
             frames_before,
             progress.stagnation_frames,

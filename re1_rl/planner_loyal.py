@@ -5,7 +5,9 @@ Reward contract (imperator 2026-08-25):
 - Heal-use tax: any consumed heal item -0.10.
 - Low-ammo COMBINE reload (weapon at or below 1/3 clip): +0.50.
 - Completing the current planner step: +8 scaled by leftover 12m cell budget
-  (``+8 * leftover_frac``); then rearm a fresh 12m wall for the next step.
+  (``+8 * leftover_frac``); rearm a fresh 12m cell wall, extend idle +
+  ``max_steps`` by 12m, and keep playing. The last authored chunk step ends
+  the episode.
 - Divert (wrong room / unplanned pickup / unplanned box / typewriter save): -4, episode end.
 - Cell timer: flat 12 minutes only (no custom yawn_cell_timeouts.json times).
 """
