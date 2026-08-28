@@ -86,10 +86,11 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
         s.get("beat_id") for s in steps if str(s.get("beat_id") or "").startswith("gallery_portrait_")
     ]
     assert portraits == [f"gallery_portrait_{i}" for i in range(1, 7)]
-    end_life = next(i for i, s in enumerate(steps) if s.get("site_id") == "gallery_end_of_life")
+    assert not any(s.get("site_id") == "gallery_end_of_life" for s in steps)
     crest_i = next(i for i, s in enumerate(steps) if str(s.get("pickup_id") or "").startswith("117:star_crest"))
     old_man = next(i for i, s in enumerate(steps) if s.get("beat_id") == "gallery_portrait_6")
-    assert old_man < end_life < crest_i
+    assert old_man < crest_i
+    assert steps[old_man + 1]["pickup_id"].startswith("117:star_crest")
     assert any(s.get("edge_id") == "106->107" for s in steps)
     assert "108:handgun_bullets:1" in pickups
     enter_108 = next(i for i, s in enumerate(steps) if s.get("edge_id") == "107->108")

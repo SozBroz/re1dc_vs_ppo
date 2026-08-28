@@ -4,7 +4,7 @@
   "chunk_id": "cp05_shield_key",
   "source": "phase1_pass1_council",
   "end_anchor_beat_id": "star_crest",
-  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). 103->10C is locked until 10C->103, so do not go greenhouse. From 109: 10A->117, then gallery: 6 portraits, end-of-life switch, star crest.",
+  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). 103->10C is locked until 10C->103, so do not go greenhouse. From 109: 10A->117, then gallery portraits and star crest (end-of-life switch is implied by the crest pickup).",
   "leave_118": {
     "banked_in_box": [
       {"item": "shield_key", "qty": 1, "why": "attic only; bank to free a slot"},
@@ -67,7 +67,6 @@
     {"n": 39, "op": "do_puzzle", "site_id": "gallery_portrait_4", "room_id": "117", "beat_id": "gallery_portrait_4", "note": "young man"},
     {"n": 40, "op": "do_puzzle", "site_id": "gallery_portrait_5", "room_id": "117", "beat_id": "gallery_portrait_5", "note": "middle-aged man"},
     {"n": 41, "op": "do_puzzle", "site_id": "gallery_portrait_6", "room_id": "117", "beat_id": "gallery_portrait_6", "note": "old man"},
-    {"n": 42, "op": "do_puzzle", "site_id": "gallery_end_of_life", "room_id": "117", "beat_id": "gallery_end_of_life", "note": "end of life switch"},
-    {"n": 43, "op": "acquire", "pickup_id": "117:star_crest:1", "room_id": "117", "beat_id": "star_crest"}
+    {"n": 42, "op": "acquire", "pickup_id": "117:star_crest:1", "room_id": "117", "beat_id": "star_crest"}
   ]
 }
