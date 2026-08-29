@@ -565,8 +565,9 @@ class PlannerLoyalQueue:
             self.step_success_pending = True
             return result
 
-        # Divert / complete: pickups. COMBINE and scripted event grants change
-        # inventory without a walk-to-AOT take; those are not unplanned pickups.
+        # Divert / complete: pickups. COMBINE, already-held qty bumps
+        # (reload of a gun they already have), leftover cinema after a minted
+        # acquire, and scripted event grants are not unplanned pickups.
         gained = _inventory_gains(prev_state, state)
         if gained:
             want = str(step.get("pickup_id") or "")
@@ -574,6 +575,7 @@ class PlannerLoyalQueue:
             matched = op == "acquire" and _pickup_matches_gain(want, gained)
             planned = {want_item} if matched else set()
             unexpected = gained - planned
+            unexpected -= _already_held_names(prev_state, self._start_held)
             unexpected -= _combine_explained_gains(prev_state, state)
             unexpected -= unexpected & _event_grant_names(room)
             unexpected -= self._completed_acquire_names(room)
@@ -779,6 +781,17 @@ def _inventory_held_names(state: dict[str, Any]) -> set[str]:
         if key:
             names.add(key)
     return names
+
+
+def _already_held_names(
+    prev_state: dict[str, Any],
+    start_held: set[str] | None = None,
+) -> set[str]:
+    """Names already in inventory — a qty bump is not a new pickup."""
+    held = set(_inventory_held_names(prev_state))
+    if start_held:
+        held |= {canonical_item(str(name)) for name in start_held if name}
+    return held
 
 
 def _inventory_gains(prev_state: dict[str, Any], state: dict[str, Any]) -> set[str]:

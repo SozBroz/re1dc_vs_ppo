@@ -144,6 +144,26 @@ def test_ink_ribbon_pickup_diverts_on_traverse():
     assert q.current["edge_id"] == "106->105"
 
 
+def test_already_held_beretta_qty_bump_does_not_divert():
+    q = PlannerLoyalQueue()
+    q.note_start_inventory(
+        {"room_id": "204", "inventory_slots": [("beretta", 5), ("handgun_bullets", 45)]}
+    )
+    result = q.evaluate_transition(
+        prev_state={
+            "room_id": "204",
+            "inventory_slots": [("beretta", 5), ("handgun_bullets", 45)],
+        },
+        state={
+            "room_id": "204",
+            "inventory_slots": [("beretta", 15), ("handgun_bullets", 45)],
+            "new_items": ["beretta"],
+        },
+    )
+    assert result["divert"] is False
+    assert result["step_success"] is False
+
+
 def test_combine_reload_does_not_divert_on_traverse():
     q = PlannerLoyalQueue()
     prev = {
