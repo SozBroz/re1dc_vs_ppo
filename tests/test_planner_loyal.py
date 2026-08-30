@@ -80,8 +80,11 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
         str(p or "").startswith("118:chemical") for p in pickups
     )
     assert any(s.get("op") == "use_box" for s in steps)
-    assert steps[-1]["pickup_id"].startswith("10C:armor_key")
-    assert steps[-1].get("beat_id") == "armor_key"
+    assert any(
+        str(s.get("pickup_id") or "").startswith("10C:armor_key") for s in steps
+    )
+    assert steps[-1]["edge_id"] == "101->100"
+    assert chunk["end_anchor_beat_id"] == "mansion_save_100"
     assert any(s.get("edge_id") == "116->115" for s in steps)
     assert any(s.get("edge_id") == "115->109" for s in steps)
     assert any(s.get("edge_id") == "10A->117" for s in steps)
@@ -1459,10 +1462,13 @@ def test_pl18_seek_lands_on_chemical_tail():
     q.seek(13)
     assert q.current is not None
     assert q.current["edge_id"] == "105->106"
-    assert q.end_anchor == "armor_key"
+    assert q.end_anchor == "mansion_save_100"
     assert q._steps[23]["pickup_id"].startswith("118:chemical")
     assert q._steps[24]["op"] == "use_box"
-    assert q._steps[-1]["pickup_id"].startswith("10C:armor_key")
+    assert any(
+        str(s.get("pickup_id") or "").startswith("10C:armor_key") for s in q._steps
+    )
+    assert q._steps[-1]["edge_id"] == "101->100"
 
 
 def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):
