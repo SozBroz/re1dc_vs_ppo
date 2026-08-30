@@ -260,28 +260,26 @@ def test_pushing_at_door_pedestal_does_not_complete() -> None:
     assert q.current["beat_id"] == "armor_vent_door"
 
 
-def test_seating_door_completes_first_pl_then_points_at_far() -> None:
+def test_standing_on_door_vent_does_not_complete() -> None:
+    """False pl79: Jill on the empty door grate, flag still 0."""
     q = _door_queue()
     prev = _pushing(x=14400, z=7236)
-    cur = _pushing(x=13985, z=7236)
+    cur = _pushing(x=14067, z=7118)
+    assert armor_vent_step_complete(q.current, cur) is False
     result = q.evaluate_transition(prev_state=prev, state=cur)
-    assert result["step_success"] is True
+    assert result["step_success"] is False
     assert q.current is not None
-    assert q.current["beat_id"] == "armor_vent_far"
-    assert armor_statue_nav_target(cur, q) == (
-        float(FAR_VENT[0]),
-        float(FAR_VENT[1]),
-    )
+    assert q.current["beat_id"] == "armor_vent_door"
 
 
-def test_seating_far_completes_second_pl() -> None:
+def test_standing_on_far_vent_does_not_complete_far_step() -> None:
     q = _far_queue()
     prev = _pushing(x=5600, z=7236)
     cur = _pushing(x=5135, z=7236)
     result = q.evaluate_transition(prev_state=prev, state=cur)
-    assert result["step_success"] is True
+    assert result["step_success"] is False
     assert q.current is not None
-    assert q.current["beat_id"] == "sun_crest"
+    assert q.current["beat_id"] == "armor_vent_far"
 
 
 def test_standing_on_far_vent_does_not_complete_door_step() -> None:

@@ -15,7 +15,8 @@ Reward contract (imperator 2026-08-25):
 - Armor room 205 vents: ``armor_vent_door`` then ``armor_vent_far``
   (pl79/pl80), then ``sun_crest`` acquire (pl81). Clipped Jill→vent
   progress ``armor_statue_progress`` ±0.5/step while ``gs 0x80800044``;
-  dining statue crumbs stay stripped.
+  dining statue crumbs stay stripped. Vent steps complete only on
+  ``u8@0x800C8704`` bit ``0x20`` / crest — not Jill-on-grate.
 """
 from __future__ import annotations
 
