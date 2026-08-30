@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from re1_rl.dining_statue_puzzle import DINING_PUSH_GAME_STATE
 from re1_rl.pushable import (
+    ARMOR_PUSH_HOLD_FRAMES,
+    ARMOR_ROOM_ID,
     FORWARD_ACTION,
     JAM_WALK_ANIM,
     PUSH_ANIM,
@@ -53,6 +55,24 @@ def test_forward_hold_extends_when_jammed() -> None:
         == PUSHABLE_HOLD_FRAMES
     )
     assert forward_hold_frames(state, action=3, frame_skip=8) == 8  # turn_left
+
+
+def test_armor_room_push_does_not_extend_hold() -> None:
+    state = {
+        "game_state": PUSH_GAME_STATE,
+        "player_anim": PUSH_ANIM,
+        "room_id": ARMOR_ROOM_ID,
+    }
+    assert (
+        forward_hold_frames(state, action=FORWARD_ACTION, frame_skip=8)
+        == ARMOR_PUSH_HOLD_FRAMES
+    )
+    assert ARMOR_PUSH_HOLD_FRAMES == 8
+    other = {"game_state": PUSH_GAME_STATE, "player_anim": PUSH_ANIM, "room_id": "10F"}
+    assert (
+        forward_hold_frames(other, action=FORWARD_ACTION, frame_skip=8)
+        == PUSHABLE_HOLD_FRAMES
+    )
 
 
 def test_forward_hold_normal_when_free() -> None:
