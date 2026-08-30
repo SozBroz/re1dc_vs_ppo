@@ -15,8 +15,10 @@ from re1_rl.planner_loyal_cells import (
     bootstrap_from_crystals,
     cell_dir_name,
     cell_has_remaining_planner_step,
+    close_planner_loyal_stretch,
     iter_training_start_cells,
     lift_planner_loyal_quality,
+    planner_loyal_kill_audit,
     planner_loyal_quality_beats,
     planner_loyal_root,
     sample_training_start_cell,
@@ -24,6 +26,7 @@ from re1_rl.planner_loyal_cells import (
     slot_index_for_completed_step,
     training_start_paths,
 )
+from re1_rl.progress import ProgressTracker
 
 
 def test_slot_mapping() -> None:
@@ -261,3 +264,32 @@ def test_planner_loyal_quality_drops_path_kills_dim() -> None:
     # Fat kill dim must not beat a same HP/ammo remint.
     assert planner_loyal_quality_beats(clean, (96, 75, 87, 33, 11, 1, 0, -30, -40)) is False
     assert planner_loyal_quality_beats((96, 80, 33, 11, 1, 0, -30, -40), clean) is True
+
+
+def test_planner_loyal_kill_audit_prefers_live_then_claim() -> None:
+    progress = ProgressTracker()
+    progress.note_leg_kills("103", 2)
+    progress.note_almanac_kill("103", "zombie", 1)
+    progress.note_almanac_kill("108", "dog", 2)
+    live = planner_loyal_kill_audit(
+        progress,
+        predecessor_almanac={"108": {"dog": 2}},
+    )
+    assert live["paid_stretch"] == 2
+    assert live["paid_stretch_by_room"] == {"103": 2}
+    assert live["paid_episode"] == 2
+    assert live["almanac_stretch"] == 1
+    assert live["almanac_stretch_by_room"] == {"103": {"zombie": 1}}
+    assert live["almanac_total"] == 3
+
+    progress.claim_checkpoint_success()
+    claimed = planner_loyal_kill_audit(progress)
+    assert claimed["paid_stretch"] == 2
+    assert claimed["paid_stretch_by_room"] == {"103": 2}
+    assert claimed["paid_episode"] == 2
+
+    close_planner_loyal_stretch(progress)
+    closed = planner_loyal_kill_audit(progress)
+    assert closed["paid_stretch"] == 0
+    assert closed["paid_episode"] == 2
+    assert closed["almanac_total"] == 3

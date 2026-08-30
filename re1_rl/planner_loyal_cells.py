@@ -563,6 +563,130 @@ def sample_training_start_cell(
     }
 
 
+def _positive_room_counts(raw: Any) -> dict[str, int]:
+    out: dict[str, int] = {}
+    if not isinstance(raw, dict):
+        return out
+    for room, count in raw.items():
+        room_id = str(room or "").upper()
+        try:
+            n = int(count)
+        except (TypeError, ValueError):
+            continue
+        if room_id and n > 0:
+            out[room_id] = n
+    return out
+
+
+def _almanac_delta(
+    current: dict[str, dict[str, int]],
+    predecessor: dict[str, dict[str, int]] | None,
+) -> dict[str, dict[str, int]]:
+    pred = predecessor or {}
+    out: dict[str, dict[str, int]] = {}
+    for room, types in current.items():
+        if not isinstance(types, dict):
+            continue
+        bucket: dict[str, int] = {}
+        pred_types = pred.get(room) or {}
+        for etype, count in types.items():
+            try:
+                n = int(count) - int(pred_types.get(etype, 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            if n > 0:
+                bucket[str(etype)] = n
+        if bucket:
+            out[str(room)] = bucket
+    return out
+
+
+def _almanac_from_cell_dir(cell_dir: Path) -> dict[str, dict[str, int]]:
+    sidecar_p = cell_dir / CELL_SIDECAR_NAME
+    if not sidecar_p.is_file():
+        return {}
+    try:
+        data = json.loads(sidecar_p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {}
+    from re1_rl.pb_sidecar import enemies_killed_from_sidecar
+
+    return enemies_killed_from_sidecar(data)
+
+
+def planner_loyal_kill_audit(
+    progress: Any,
+    predecessor_almanac: dict[str, dict[str, int]] | None = None,
+) -> dict[str, Any]:
+    """What this stretch thinks it killed. Audit only — not a quality dim."""
+    empty = {
+        "paid_stretch": 0,
+        "paid_stretch_by_room": {},
+        "paid_episode": 0,
+        "paid_episode_by_room": {},
+        "almanac_stretch": 0,
+        "almanac_stretch_by_room": {},
+        "almanac_total": 0,
+        "almanac_total_by_room": {},
+    }
+    if progress is None:
+        return empty
+    live = _positive_room_counts(getattr(progress, "leg_kills_by_room", None) or {})
+    claimed = _positive_room_counts(
+        getattr(progress, "last_claimed_leg_kills", None) or {}
+    )
+    paid_stretch = live or claimed
+    paid_episode = _positive_room_counts(
+        getattr(progress, "episode_kills_by_room", None) or {}
+    )
+    from re1_rl.pb_sidecar import enemies_killed_from_sidecar
+
+    almanac_total = enemies_killed_from_sidecar(
+        {"enemies_killed_by_room": getattr(progress, "enemies_killed_by_room", None)}
+    )
+    almanac_stretch = _almanac_delta(almanac_total, predecessor_almanac)
+    return {
+        "paid_stretch": sum(paid_stretch.values()),
+        "paid_stretch_by_room": paid_stretch,
+        "paid_episode": sum(paid_episode.values()),
+        "paid_episode_by_room": paid_episode,
+        "almanac_stretch": sum(
+            sum(types.values()) for types in almanac_stretch.values()
+        ),
+        "almanac_stretch_by_room": almanac_stretch,
+        "almanac_total": sum(sum(types.values()) for types in almanac_total.values()),
+        "almanac_total_by_room": almanac_total,
+    }
+
+
+def _fmt_room_kills(counts: dict[str, int]) -> str:
+    if not counts:
+        return "-"
+    return ",".join(f"{room}:{n}" for room, n in sorted(counts.items()))
+
+
+def _fmt_almanac_kills(counts: dict[str, dict[str, int]]) -> str:
+    if not counts:
+        return "-"
+    parts: list[str] = []
+    for room, types in sorted(counts.items()):
+        for etype, n in sorted(types.items()):
+            parts.append(f"{room}:{etype}={n}")
+    return ",".join(parts)
+
+
+def close_planner_loyal_stretch(progress: Any) -> None:
+    """Next planner step starts a fresh paid-kill stretch. Almanac stays."""
+    if progress is None:
+        return
+    live = getattr(progress, "leg_kills_by_room", None)
+    if isinstance(live, dict):
+        live.clear()
+    claimed = getattr(progress, "last_claimed_leg_kills", None)
+    if isinstance(claimed, dict):
+        claimed.clear()
+
+
 def _drop_kill_insert(vals: list[int]) -> list[int]:
     """Remove the dropped path-kills dim (index 1 or 2 depending on format)."""
     if len(vals) < 3:
@@ -646,6 +770,14 @@ def capture_planner_loyal_cell(
 
     state_path = staging / CELL_STATE_NAME
     sidecar_path = staging / CELL_SIDECAR_NAME
+    pred_almanac: dict[str, dict[str, int]] = {}
+    if slot > TRAINING_START_INDEX:
+        pred_almanac = _almanac_from_cell_dir(
+            cell_slot_dir(planner_loyal_root(env.project_root), slot - 1)
+        )
+    kill_audit = planner_loyal_kill_audit(
+        getattr(env, "_progress", None), pred_almanac
+    )
     try:
         env.bridge.save_savestate(str(state_path))
     except (OSError, RuntimeError, ValueError, AttributeError, TypeError) as exc:
@@ -668,6 +800,7 @@ def capture_planner_loyal_cell(
             "completed_step_index": completed,
             "slot_index": slot,
             "chunk_final": bool(is_final),
+            "kills": kill_audit,
         }
         sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
     except Exception as exc:  # noqa: BLE001 — capture must not kill the env
@@ -732,6 +865,7 @@ def capture_planner_loyal_cell(
         "quality": quality,
         "training_start": True,
         "chunk_final": bool(is_final),
+        "kills": kill_audit,
         "state_sha256": _sha256_file(state_path),
         "sidecar_sha256": _sha256_file(sidecar_path),
         "bytes": state_path.stat().st_size,
@@ -758,6 +892,7 @@ def capture_planner_loyal_cell(
         "chunk_final": bool(is_final),
         "training_start": True,
         "quality": quality,
+        "kills": kill_audit,
         "state_path": str(dest / CELL_STATE_NAME),
         "sidecar_path": str(dest / CELL_SIDECAR_NAME),
         "meta_path": str(dest / CELL_META_NAME),
@@ -784,13 +919,20 @@ def capture_planner_loyal_cell(
             proposal["chunk_final"] = bool(is_final)
             proposal["training_start"] = True
             proposal["planner_step"] = step
+            proposal["kills"] = kill_audit
         except (OSError, ValueError, TypeError, KeyError) as exc:
             print(f"[planner_loyal] bundle pack failed: {exc}", flush=True)
 
+    close_planner_loyal_stretch(getattr(env, "_progress", None))
     print(
         f"[planner_loyal] minted {cell_dir_name(slot)} "
         f"chunk={queue.chunk_id} step={completed} room={room_id} "
-        f"final={int(is_final)} start=1 q={quality}",
+        f"final={int(is_final)} start=1 q={quality} "
+        f"kills_paid={kill_audit['paid_stretch']} "
+        f"{_fmt_room_kills(kill_audit['paid_stretch_by_room'])} "
+        f"almanac_stretch={kill_audit['almanac_stretch']} "
+        f"{_fmt_almanac_kills(kill_audit['almanac_stretch_by_room'])} "
+        f"almanac_total={kill_audit['almanac_total']}",
         flush=True,
     )
     return proposal
