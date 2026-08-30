@@ -46,9 +46,10 @@ function Wait-LearnerHealth([int]$TimeoutSec) {
 if (-not $SkipTeardown) {
   Write-Host '=== TEARDOWN ===' -ForegroundColor Yellow
   & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ROOT '_tmp\_stop_fleet_procs.ps1')
-  Invoke-FleetSsh $WH2 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul'
-  Invoke-FleetSsh $WH1 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul'
-  Invoke-FleetSsh $WH3 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul'
+  # taskkill exits 128 when the image is not running; do not fail the restart.
+  Invoke-FleetSsh $WH2 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul & exit 0'
+  Invoke-FleetSsh $WH1 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul & exit 0'
+  Invoke-FleetSsh $WH3 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul & exit 0'
   Start-Sleep -Seconds 3
 }
 
