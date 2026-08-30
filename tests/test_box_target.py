@@ -197,6 +197,41 @@ def test_matched_target_only_closes() -> None:
     assert not m[BOX_WITHDRAW_ACTION]
 
 
+def test_use_box_withdraw_is_not_unplanned_pickup() -> None:
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "test_box",
+            "leave_100": {
+                "held_on_exit": [
+                    {"item": "beretta", "qty": 0, "slot": 1},
+                    {"item": "handgun_bullets", "qty": 30, "slot": 2},
+                ]
+            },
+            "steps": [
+                {"n": 1, "op": "use_box", "room_id": "100"},
+                {"n": 2, "op": "traverse", "edge_id": "100->101"},
+            ],
+        }
+    )
+    prev = {
+        "room_id": "100",
+        "inventory_slots": [("beretta", 0), ("shotgun", 0), ("armor_key", 1)],
+    }
+    withdrawn = {
+        "room_id": "100",
+        "inventory_slots": [
+            ("beretta", 0),
+            ("shotgun", 0),
+            ("armor_key", 1),
+            ("handgun_bullets", 15),
+        ],
+    }
+    mid = q.evaluate_transition(prev_state=prev, state=withdrawn)
+    assert mid["divert"] is False
+    assert mid["step_success"] is False
+    assert q.current["op"] == "use_box"
+
+
 def test_use_box_with_target_completes_on_close_not_open() -> None:
     q = PlannerLoyalQueue(
         {

@@ -582,8 +582,10 @@ class PlannerLoyalQueue:
         # Divert / complete: pickups. COMBINE, already-held qty bumps
         # (reload of a gun they already have), leftover cinema after a minted
         # acquire, and scripted event grants are not unplanned pickups.
+        # Box withdraw/deposit during use_box is also not a world pickup
+        # (pl71 100-box dies on handgun_bullets otherwise).
         gained = _inventory_gains(prev_state, state)
-        if gained:
+        if gained and op != "use_box":
             want = str(step.get("pickup_id") or "")
             _, want_item, _ = _pickup_id_parts(want)
             matched = op == "acquire" and _pickup_matches_gain(want, gained)
