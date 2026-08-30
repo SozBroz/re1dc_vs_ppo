@@ -304,6 +304,42 @@ def test_live_chunk_use_box_unlocks_shield_key_bank() -> None:
     assert box_pollution_reason(dirty, room_id="118") == "key_item_in_box:shield_key@0"
 
 
+def test_leave_100_deposits_any_incoming_heal() -> None:
+    """Older PLs may arrive with herbs/mixes/spray; none stay on exit."""
+    from re1_rl.item_box import can_deposit
+
+    q = PlannerLoyalQueue()
+    q.seek(66)
+    assert q.current is not None
+    assert q.current["op"] == "use_box"
+    assert q.current.get("room_id") == "100"
+    target = q.box_target_held()
+    assert target is not None
+    assert q.box_target_held() == target
+    # beretta, shotgun, armor_key, then three heals an older start might carry
+    inv = [
+        (0x02, 0),
+        (0x03, 0),
+        (0x34, 1),
+        (0x4A, 1),  # mixed_herbs_ggg
+        (0x43, 1),  # red_herb
+        (0x41, 1),  # first_aid_spray_alt
+        (0x44, 1),  # green_herb
+        (0, 0),
+    ]
+    box = [(0, 0)] * 16
+    surplus = surplus_inventory_slots(inv, target)
+    assert surplus == [3, 4, 5, 6]
+    assert inventory_matches_target(inv, target) is False
+    for slot in surplus:
+        ok, reason = can_deposit(
+            inv, box, slot, room_id="100", allowed_key_ids=q.allowed_banked_key_ids()
+        )
+        assert ok, (slot, reason)
+    cleaned = [(0x02, 0), (0x03, 0), (0x34, 1), (0x0B, 15), (0x0B, 15)] + [(0, 0)] * 3
+    assert inventory_matches_target(cleaned, target)
+
+
 def test_go_to_box_encodes_as_use_box_one_hot() -> None:
     q = PlannerLoyalQueue(_box_chunk())
     vec = encode_planner_queue(q)

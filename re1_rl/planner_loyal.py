@@ -186,6 +186,8 @@ class PlannerLoyalQueue:
         self.end_anchor = str(data.get("end_anchor_beat_id") or "")
         leave = data.get("leave_118")
         self.leave_118 = leave if isinstance(leave, dict) else None
+        leave_100 = data.get("leave_100")
+        self.leave_100 = leave_100 if isinstance(leave_100, dict) else None
         self._steps = []
         for index, step in enumerate(raw_steps):
             row = dict(step)
@@ -432,9 +434,12 @@ class PlannerLoyalQueue:
         if not step or str(step.get("op") or "") != "use_box":
             return None
         held = step.get("held_on_exit")
-        nested = step.get("leave_118")
+        nested = step.get("leave_100") or step.get("leave_118")
         if not held and isinstance(nested, dict):
             held = nested.get("held_on_exit")
+        room = str(step.get("room_id") or "")
+        if not held and room == "100" and isinstance(self.leave_100, dict):
+            held = self.leave_100.get("held_on_exit")
         if not held and isinstance(self.leave_118, dict):
             held = self.leave_118.get("held_on_exit")
         if not isinstance(held, list) or not held:
@@ -442,18 +447,27 @@ class PlannerLoyalQueue:
         return list(held)
 
     def allowed_banked_key_names(self) -> frozenset[str]:
-        """Story keys Muse authored into ``leave_118.banked_in_box``."""
+        """Story keys Muse authored into ``leave_118`` / ``leave_100`` banks."""
         from re1_rl.item_todo import canonical_item
         from re1_rl.key_items import KEY_ITEM_NAMES
 
-        leave = self.leave_118 if isinstance(self.leave_118, dict) else {}
         names: set[str] = set()
-        for row in leave.get("banked_in_box") or []:
-            if not isinstance(row, dict):
-                continue
-            name = canonical_item(str(row.get("item") or ""))
-            if name and name in KEY_ITEM_NAMES:
-                names.add(name)
+        leaves = [
+            self.leave_118 if isinstance(self.leave_118, dict) else {},
+            getattr(self, "leave_100", None) if isinstance(getattr(self, "leave_100", None), dict) else {},
+        ]
+        step = self.current or {}
+        for key in ("leave_100", "leave_118"):
+            nested = step.get(key)
+            if isinstance(nested, dict):
+                leaves.append(nested)
+        for leave in leaves:
+            for row in (leave or {}).get("banked_in_box") or []:
+                if not isinstance(row, dict):
+                    continue
+                name = canonical_item(str(row.get("item") or ""))
+                if name and name in KEY_ITEM_NAMES:
+                    names.add(name)
         return frozenset(names)
 
     def allowed_banked_key_ids(self) -> frozenset[int]:

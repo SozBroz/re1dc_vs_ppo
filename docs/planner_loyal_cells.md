@@ -1,6 +1,6 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (66 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (73 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **Source of truth:** the live chunk JSON. Seed cells `pl00`–`pl05` are the opening crystals (same beats as yawn `cp00`–`cp05`); they are **not** minted from this chunk.
 
@@ -11,7 +11,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl05`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - One-way lock: `103->104` (tea room). `103->10C` is open. Do not walk `116->106` after the shotgun.
-- Chunk end-anchor: `mansion_save_100` (`pl71`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `armor_room_enter` (`pl78`). Mid-chunk success keeps the episode open.
 
 ## Summary table
 
@@ -89,6 +89,13 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 | `pl69` | 64 | `102:shotgun_shells:2` | `102` (VACANT ROOM) | acquire | Take `102:shotgun_shells:2` |
 | `pl70` | 65 | `102->101` | `101` (1F LEFT STAIRS) | traverse | Walk `102->101` into `101` (1F LEFT STAIRS) |
 | `pl71` | 66 | `101->100` | `100` (SAVE ROOM) | traverse | Walk `101->100` into `100` (SAVE ROOM) |
+| `pl72` | 67 | `use_box` | `100` (SAVE ROOM) | use_box | Rearrange the 100 box to the leave_100 loadout, then close the box |
+| `pl73` | 68 | `100->101` | `101` (1F LEFT STAIRS) | traverse | Walk `100->101` into `101` (1F LEFT STAIRS) |
+| `pl74` | 69 | `101->201` | `201` (2F LEFT STAIRS) | traverse | Walk `101->201` into `201` (2F LEFT STAIRS) |
+| `pl75` | 70 | `201->202` | `202` (DINING ROOM 2F) | traverse | Walk `201->202` into `202` (DINING ROOM 2F) |
+| `pl76` | 71 | `202->203` | `203` (HALL 2F) | traverse | Walk `202->203` into `203` (HALL 2F) |
+| `pl77` | 72 | `203->204` | `204` (C PASSAGE) | traverse | Walk `203->204` into `204` (C PASSAGE) |
+| `pl78` | 73 | `armor_room_enter` | `205` (ARMOR ROOM) | traverse | Walk `204->205` into `205` (ARMOR ROOM) |
 
 ## Details
 
@@ -142,7 +149,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl06`–`pl71`)
+### Chunk cells (`pl06`–`pl78`)
 
 ### `pl06` — `106->105` (step 1)
 
@@ -826,4 +833,74 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `101->100` into `100` (SAVE ROOM).
 - **Success condition:** Enter room `100` via `101->100`. Any other door is `wrong_traverse:101->100 got <room>` (−4).
+
+### `pl72` — `use_box` (step 67)
+
+- **Room:** `100` (SAVE ROOM)
+- **Op:** `use_box`
+- **Objective:** Rearrange the 100 box to the leave_100 loadout, then close the box
+- **Items gained:** _(none)_
+- **How to achieve:** Rearrange the 100 box to the leave_100 loadout, then close the box.
+- **Success condition:** Box closes and inventory matches `leave_100.held_on_exit`
+
+### `pl73` — `100->101` (step 68)
+
+- **Room:** `101` (1F LEFT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `100->101`
+- **Objective:** Walk `100->101` into `101` (1F LEFT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `100->101` into `101` (1F LEFT STAIRS).
+- **Success condition:** Enter room `101` via `100->101`. Any other door is `wrong_traverse:100->101 got <room>` (−4).
+
+### `pl74` — `101->201` (step 69)
+
+- **Room:** `201` (2F LEFT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `101->201`
+- **Objective:** Walk `101->201` into `201` (2F LEFT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `101->201` into `201` (2F LEFT STAIRS).
+- **Success condition:** Enter room `201` via `101->201`. Any other door is `wrong_traverse:101->201 got <room>` (−4).
+
+### `pl75` — `201->202` (step 70)
+
+- **Room:** `202` (DINING ROOM 2F)
+- **Op:** `traverse`
+- **Edge:** `201->202`
+- **Objective:** Walk `201->202` into `202` (DINING ROOM 2F)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `201->202` into `202` (DINING ROOM 2F).
+- **Success condition:** Enter room `202` via `201->202`. Any other door is `wrong_traverse:201->202 got <room>` (−4).
+
+### `pl76` — `202->203` (step 71)
+
+- **Room:** `203` (HALL 2F)
+- **Op:** `traverse`
+- **Edge:** `202->203`
+- **Objective:** Walk `202->203` into `203` (HALL 2F)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `202->203` into `203` (HALL 2F).
+- **Success condition:** Enter room `203` via `202->203`. Any other door is `wrong_traverse:202->203 got <room>` (−4).
+
+### `pl77` — `203->204` (step 72)
+
+- **Room:** `204` (C PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `203->204`
+- **Objective:** Walk `203->204` into `204` (C PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `203->204` into `204` (C PASSAGE).
+- **Success condition:** Enter room `204` via `203->204`. Any other door is `wrong_traverse:203->204 got <room>` (−4).
+
+### `pl78` — `armor_room_enter` (step 73)
+
+- **Room:** `205` (ARMOR ROOM)
+- **Op:** `traverse`
+- **Edge:** `204->205`
+- **Beat:** `armor_room_enter`
+- **Objective:** Walk `204->205` into `205` (ARMOR ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `204->205` into `205` (ARMOR ROOM).
+- **Success condition:** Enter room `205` via `204->205`. Any other door is `wrong_traverse:204->205 got <room>` (−4).
 

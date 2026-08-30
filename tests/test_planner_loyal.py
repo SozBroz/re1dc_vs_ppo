@@ -83,8 +83,22 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert any(
         str(s.get("pickup_id") or "").startswith("10C:armor_key") for s in steps
     )
-    assert steps[-1]["edge_id"] == "101->100"
-    assert chunk["end_anchor_beat_id"] == "mansion_save_100"
+    assert any(s.get("edge_id") == "101->100" for s in steps)
+    assert any(s.get("op") == "use_box" and s.get("room_id") == "100" for s in steps)
+    assert steps[-1]["edge_id"] == "204->205"
+    assert chunk["end_anchor_beat_id"] == "armor_room_enter"
+    assert chunk["leave_100"]["held_on_exit"][2]["item"] == "armor_key"
+    assert not any(
+        str(r.get("item") or "") in {
+            "green_herb",
+            "red_herb",
+            "blue_herb",
+            "mixed_herbs_ggg",
+            "mixed_herbs_gr",
+            "first_aid_spray_alt",
+        }
+        for r in chunk["leave_100"]["held_on_exit"]
+    )
     assert any(s.get("edge_id") == "116->115" for s in steps)
     assert any(s.get("edge_id") == "115->109" for s in steps)
     assert any(s.get("edge_id") == "10A->117" for s in steps)
@@ -1462,13 +1476,14 @@ def test_pl18_seek_lands_on_chemical_tail():
     q.seek(13)
     assert q.current is not None
     assert q.current["edge_id"] == "105->106"
-    assert q.end_anchor == "mansion_save_100"
+    assert q.end_anchor == "armor_room_enter"
     assert q._steps[23]["pickup_id"].startswith("118:chemical")
     assert q._steps[24]["op"] == "use_box"
     assert any(
         str(s.get("pickup_id") or "").startswith("10C:armor_key") for s in q._steps
     )
-    assert q._steps[-1]["edge_id"] == "101->100"
+    assert any(s.get("edge_id") == "101->100" for s in q._steps)
+    assert q._steps[-1]["edge_id"] == "204->205"
 
 
 def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):
