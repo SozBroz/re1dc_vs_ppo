@@ -12,7 +12,8 @@ Reward contract (imperator 2026-08-25):
   COMBINE reshuffles (reload / herb mix / ammo merge) and scripted ``event``
   grants (Barry acid, Speyer bazooka, …) are not pickups.
 - Cell timer: flat 12 minutes only (no custom yawn_cell_timeouts.json times).
-- Armor room 205 vents (pl78→pl79 / ``sun_crest``): clipped Jill→vent
+- Armor room 205 vents: ``armor_vent_door`` then ``armor_vent_far``
+  (pl79/pl80), then ``sun_crest`` acquire (pl81). Clipped Jill→vent
   progress ``armor_statue_progress`` ±0.5/step while ``gs 0x80800044``;
   dining statue crumbs stay stripped.
 """
@@ -413,6 +414,23 @@ class PlannerLoyalQueue:
                 return
             self._index += 1
 
+    def _skip_satisfied_armor_vents(self, state: dict[str, Any]) -> None:
+        """Skip door/far vent steps when the 205 puzzle is already done."""
+        from re1_rl.armor_room_puzzle import (
+            armor_puzzle_ready_from_state,
+            armor_sun_crest_held,
+            armor_vent_index,
+        )
+
+        while True:
+            step = self.current
+            if armor_vent_index(step) is None:
+                return
+            if armor_puzzle_ready_from_state(state) or armor_sun_crest_held(state):
+                self._index += 1
+                continue
+            return
+
     def target_room(self) -> str | None:
         step = self.current
         if not step:
@@ -506,6 +524,7 @@ class PlannerLoyalQueue:
         self._skip_satisfied_acquires()
         self._skip_satisfied_box_nav()
         self._skip_satisfied_gallery_portraits()
+        self._skip_satisfied_armor_vents(state)
         if self.done:
             return result
 
@@ -665,6 +684,13 @@ class PlannerLoyalQueue:
                     self._index += 1
                     self.step_success_pending = True
                     return result
+            from re1_rl.armor_room_puzzle import armor_vent_step_complete
+
+            if armor_vent_step_complete(step, state):
+                result["step_success"] = True
+                self._index += 1
+                self.step_success_pending = True
+                return result
 
         if op == "use_box":
             target = self.box_target_held()
@@ -1095,6 +1121,12 @@ def _planner_step_target_xz(
 
             tx, tz = GALLERY_TARGETS[portrait - 1]
             return float(tx), float(tz)
+        from re1_rl.armor_room_puzzle import ARMOR_VENTS, armor_vent_index
+
+        vent_idx = armor_vent_index(step)
+        if vent_idx is not None:
+            vx, vz = ARMOR_VENTS[vent_idx]
+            return float(vx), float(vz)
         site_id = str(step.get("site_id") or "")
         if not site_id:
             return None

@@ -86,6 +86,8 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert any(s.get("edge_id") == "101->100" for s in steps)
     assert any(s.get("op") == "use_box" and s.get("room_id") == "100" for s in steps)
     assert any(s.get("edge_id") == "204->205" for s in steps)
+    assert steps[-3]["beat_id"] == "armor_vent_door"
+    assert steps[-2]["beat_id"] == "armor_vent_far"
     assert steps[-1]["pickup_id"] == "205:sun_crest:1"
     assert steps[-1]["beat_id"] == "sun_crest"
     assert chunk["end_anchor_beat_id"] == "sun_crest"

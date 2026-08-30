@@ -4,7 +4,7 @@
   "chunk_id": "cp05_shield_key",
   "source": "phase1_pass1_council",
   "end_anchor_beat_id": "sun_crest",
-  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). 103->104 is the one-way tea-room lock. After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, then 10C greens, then armor_key. After armor_key: leftover 10C reds, 101->102 clip+lockpick-desk shells, 102->101->100. Then use_box in 100 (leave_100: no heals on exit — incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) and walk 100->101->201->202->203->204->205. In 205, cover both poison vents then take 205:sun_crest:1 from the cabinet.",
+  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). 103->104 is the one-way tea-room lock. After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, then 10C greens, then armor_key. After armor_key: leftover 10C reds, 101->102 clip+lockpick-desk shells, 102->101->100. Then use_box in 100 (leave_100: no heals on exit — incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) and walk 100->101->201->202->203->204->205. In 205, cover the door-side poison vent first, then the far vent, then take 205:sun_crest:1 from the cabinet.",
   "leave_118": {
     "banked_in_box": [
       {"item": "shield_key", "qty": 1, "why": "attic only; bank to free a slot"},
@@ -125,6 +125,8 @@
     {"n": 71, "op": "traverse", "edge_id": "202->203"},
     {"n": 72, "op": "traverse", "edge_id": "203->204"},
     {"n": 73, "op": "traverse", "edge_id": "204->205", "beat_id": "armor_room_enter"},
-    {"n": 74, "op": "acquire", "pickup_id": "205:sun_crest:1", "room_id": "205", "beat_id": "sun_crest", "note": "cabinet after both poison vents covered"}
+    {"n": 74, "op": "do_puzzle", "site_id": "armor_vent_door", "room_id": "205", "beat_id": "armor_vent_door", "note": "door-side grate (13985, 7236) first"},
+    {"n": 75, "op": "do_puzzle", "site_id": "armor_vent_far", "room_id": "205", "beat_id": "armor_vent_far", "note": "far grate (5135, 7236) after the door statue"},
+    {"n": 76, "op": "acquire", "pickup_id": "205:sun_crest:1", "room_id": "205", "beat_id": "sun_crest", "note": "cabinet after both poison vents covered"}
   ]
 }

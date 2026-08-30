@@ -1,14 +1,14 @@
-"""Armor Room 205 statue vents → sun crest (pl78→pl79).
+"""Armor Room 205 statue vents → sun crest (pl79 door, pl80 far, pl81 crest).
 
 Live shove 2026-08-30 (QS2): push uses ``gs 0x80800044`` (same as the bar
 bookcase). Movable-object XZ shares the player-adjacent work table and is
 not a stable pair of addresses like dining 202. Progress therefore uses
-Jill→vent distance while that push state is active; seating a vent claims
-it once when she arrives in-push inside ``SEAT_RADIUS``.
+Jill→current-step vent distance while that push state is active; seating
+completes the planner step when she arrives in-push inside ``SEAT_RADIUS``.
 
-RDT grate AOTs: (5135, 7236) far / (13985, 7236) door-side. Cabinet crest
-pickup is (9735, 7236). QS1 vs QS2 sets u8@0x800C8704 bit 0x20 after the
-puzzle (crest available / taken).
+Authored order is door-side first, then far. RDT grate AOTs: door
+(13985, 7236) / far (5135, 7236). Cabinet crest pickup is (9735, 7236).
+QS1 vs QS2 sets u8@0x800C8704 bit 0x20 after the puzzle (crest available).
 """
 
 from __future__ import annotations
@@ -24,12 +24,18 @@ from re1_rl.pushable import PUSH_GAME_STATE
 ARMOR_ROOM_ID = "205"
 SUN_CREST_PICKUP_ID = "205:sun_crest:1"
 SUN_CREST_BEAT_ID = "sun_crest"
+ARMOR_VENT_DOOR_BEAT = "armor_vent_door"
+ARMOR_VENT_FAR_BEAT = "armor_vent_far"
+ARMOR_VENT_BEATS: tuple[str, str] = (ARMOR_VENT_DOOR_BEAT, ARMOR_VENT_FAR_BEAT)
 ARMOR_PUZZLE_FLAG = _FLAG_ADDR
 ARMOR_PUZZLE_FLAG_MASK = 0x20
 
+ARMOR_VENT_DOOR: tuple[int, int] = (13985, 7236)
+ARMOR_VENT_FAR: tuple[int, int] = (5135, 7236)
+# Door first, then far — matches authored pl79 → pl80.
 ARMOR_VENTS: tuple[tuple[int, int], tuple[int, int]] = (
-    (5135, 7236),
-    (13985, 7236),
+    ARMOR_VENT_DOOR,
+    ARMOR_VENT_FAR,
 )
 ARMOR_CABINET_XZ: tuple[int, int] = (9735, 7236)
 ARMOR_VENT_SEAT_RADIUS = 420.0
@@ -40,6 +46,28 @@ ARMOR_STATUE_PROGRESS_REF_DIST = 2000.0
 
 FACING_FULL_CIRCLE = 4096.0
 DIST_NORM = 4096.0
+
+
+def _step_from_queue(queue: Any) -> dict[str, Any] | None:
+    step = getattr(queue, "current", None) if queue is not None else None
+    return step if isinstance(step, dict) else None
+
+
+def armor_vent_index(step: dict[str, Any] | None) -> int | None:
+    """0 = door-side vent, 1 = far vent; else None."""
+    if not isinstance(step, dict):
+        return None
+    for key in ("beat_id", "site_id"):
+        label = str(step.get(key) or "")
+        if label == ARMOR_VENT_DOOR_BEAT:
+            return 0
+        if label == ARMOR_VENT_FAR_BEAT:
+            return 1
+    return None
+
+
+def armor_vent_step(queue: Any) -> bool:
+    return armor_vent_index(_step_from_queue(queue)) is not None
 
 
 def armor_puzzle_ready_from_state(state: dict[str, Any] | None) -> bool:
@@ -77,8 +105,8 @@ def armor_pushing(state: dict[str, Any] | None) -> bool:
 
 
 def armor_sun_crest_step(queue: Any) -> bool:
-    step = getattr(queue, "current", None) if queue is not None else None
-    if not isinstance(step, dict):
+    step = _step_from_queue(queue)
+    if step is None:
         return False
     if str(step.get("beat_id") or "") == SUN_CREST_BEAT_ID:
         return True
@@ -103,7 +131,7 @@ def armor_statue_active(queue: Any, state: dict[str, Any] | None) -> bool:
         return False
     if armor_sun_crest_held(state):
         return False
-    return armor_sun_crest_step(queue)
+    return armor_vent_step(queue) or armor_sun_crest_step(queue)
 
 
 def _jill_xz(state: dict[str, Any]) -> tuple[float, float]:
@@ -113,6 +141,21 @@ def _jill_xz(state: dict[str, Any]) -> tuple[float, float]:
 def _dist_to(state: dict[str, Any], target: tuple[float, float]) -> float:
     jx, jz = _jill_xz(state)
     return math.hypot(jx - float(target[0]), jz - float(target[1]))
+
+
+def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] | None) -> bool:
+    """True when the authored vent is seated (in-push on the grate) or the puzzle is done."""
+    idx = armor_vent_index(step)
+    if idx is None or not state:
+        return False
+    if str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return False
+    if armor_puzzle_ready_from_state(state) or armor_sun_crest_held(state):
+        return True
+    if not armor_pushing(state):
+        return False
+    vx, vz = ARMOR_VENTS[idx]
+    return _dist_to(state, (float(vx), float(vz))) <= ARMOR_VENT_SEAT_RADIUS
 
 
 def claim_armor_vent_seats(state: dict[str, Any] | None, progress: Any) -> None:
@@ -140,21 +183,17 @@ def armor_statue_nav_target(
     queue: Any = None,
     progress: Any = None,
 ) -> tuple[float, float] | None:
-    """Next world XZ: first open vent nearest Jill, else the cabinet."""
+    """World XZ for the current armor step: door vent, then far, then cabinet."""
+    del progress
     if not armor_statue_active(queue, state):
         return None
-    seated = armor_vents_seated(state, progress)
-    if all(seated) or armor_puzzle_ready_from_state(state):
+    idx = armor_vent_index(_step_from_queue(queue))
+    if idx is not None:
+        vx, vz = ARMOR_VENTS[idx]
+        return (float(vx), float(vz))
+    if armor_sun_crest_step(queue):
         return (float(ARMOR_CABINET_XZ[0]), float(ARMOR_CABINET_XZ[1]))
-    jx, jz = _jill_xz(state)
-    open_vents = [
-        (float(vx), float(vz))
-        for seated_i, (vx, vz) in zip(seated, ARMOR_VENTS)
-        if not seated_i
-    ]
-    if not open_vents:
-        return (float(ARMOR_CABINET_XZ[0]), float(ARMOR_CABINET_XZ[1]))
-    return min(open_vents, key=lambda t: math.hypot(jx - t[0], jz - t[1]))
+    return None
 
 
 def armor_statue_progress_phi(remaining: float) -> float:
@@ -173,9 +212,11 @@ def armor_statue_progress_reward(
     """Clipped potential on Jill→current vent while pushing in 205.
 
     Closer → up to ``+PROGRESS_STEP``; farther → down to ``-PROGRESS_STEP``.
-    Vent-target switches rebaseline with zero pay. Seating claims stick.
+    Pays only on the door/far vent steps, not the crest acquire.
     """
     if not prev_state or not state:
+        return 0.0
+    if not armor_vent_step(queue):
         return 0.0
     if not armor_statue_active(queue, state):
         return 0.0
