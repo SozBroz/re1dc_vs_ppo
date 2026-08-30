@@ -12,6 +12,9 @@ Reward contract (imperator 2026-08-25):
   COMBINE reshuffles (reload / herb mix / ammo merge) and scripted ``event``
   grants (Barry acid, Speyer bazooka, …) are not pickups.
 - Cell timer: flat 12 minutes only (no custom yawn_cell_timeouts.json times).
+- Armor room 205 vents (pl78→pl79 / ``sun_crest``): clipped Jill→vent
+  progress ``armor_statue_progress`` ±0.5/step while ``gs 0x80800044``;
+  dining statue crumbs stay stripped.
 """
 from __future__ import annotations
 
@@ -59,6 +62,7 @@ PLANNER_LOYAL_SCALAR_KEYS: frozenset[str] = frozenset(
         "planner_divert",
         "planner_timeout",
         "gallery_wrong",
+        "armor_statue_progress",
     }
 )
 
@@ -1149,11 +1153,19 @@ def encode_planner_loyal_goal(
             v[21] = 1.0
             compass_set = True
     elif room and (target_room is None or room == str(target_room)):
-        target_xz = _planner_step_target_xz(step, item_positions=item_positions)
-        if target_xz is not None:
-            v[5:10] = encoder._compass_to_xz(state, target_xz[0], target_xz[1])
+        from re1_rl.armor_room_puzzle import armor_statue_nav_target
+
+        armor_xz = armor_statue_nav_target(state, queue)
+        if armor_xz is not None:
+            v[5:10] = encoder._compass_to_xz(state, armor_xz[0], armor_xz[1])
             v[21] = 1.0
             compass_set = True
+        else:
+            target_xz = _planner_step_target_xz(step, item_positions=item_positions)
+            if target_xz is not None:
+                v[5:10] = encoder._compass_to_xz(state, target_xz[0], target_xz[1])
+                v[21] = 1.0
+                compass_set = True
     if not compass_set and op in {"traverse", GO_TO_BOX_OP} and target_room is not None:
         door = graph.exit_toward(room, str(target_room))
         if door is not None:

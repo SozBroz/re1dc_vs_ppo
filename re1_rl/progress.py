@@ -101,6 +101,9 @@ class ProgressTracker:
     gallery_needs_reentry: bool = False
     gallery_wrong_breached: bool = False
     dining_statue_rewarded: bool = False
+    # Armor room 205: each poison-vent seat claimed once per episode while
+    # pushing (pl78→pl79). Not persisted on sidecars.
+    armor_vents_seated: list[bool] = field(default_factory=lambda: [False, False])
     # Pickups made after the current rails checkpoint. For non-key/non-weapon
     # items, only this set satisfies ``acquired_item``. Key items and weapons
     # also accept current inventory / earlier episode reward bookkeeping.
@@ -241,10 +244,10 @@ class ProgressTracker:
     ) -> None:
         """Advance idle clock when no exploration progress this step.
 
-        Progress is defined in ``compute_reward``: gallery or dining-statue
-        distance crumbs. Room / weapon / statue-knock / cutscene / document /
-        key / story-use no longer reset (2026-08-16). Revisiting rooms, junk
-        pickups, and shotgun rack re-takes do not reset.
+        Progress is defined in ``compute_reward``: gallery, dining-statue, or
+        armor-statue distance crumbs. Room / weapon / statue-knock / cutscene /
+        document / key / story-use no longer reset (2026-08-16). Revisiting
+        rooms, junk pickups, and shotgun rack re-takes do not reset.
         Each env step advances stagnation by ``step_frames`` (macro steps count more).
         """
         if made_progress:

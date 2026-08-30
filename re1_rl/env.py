@@ -722,6 +722,10 @@ class RE1Env(gym.Env):
             ),
             "dining_statue_x": int(ram.get("dining_statue_x", 0) or 0),
             "dining_statue_z": int(ram.get("dining_statue_z", 0) or 0),
+            "armor_puzzle_flag": int(ram.get("armor_puzzle_flag", 0) or 0),
+            "armor_puzzle_ready": bool(
+                int(ram.get("armor_puzzle_flag", 0) or 0) & 0x20
+            ),
             "player_anim": int(ram.get("player_anim", 0)),
             "player_aux": int(ram.get("player_aux", 0)),
             "player_recovery": int(ram.get("player_recovery", 0)),
@@ -1242,6 +1246,9 @@ class RE1Env(gym.Env):
         goal_state = dict(state)
         goal_state["gallery_needs_reentry"] = self._progress.gallery_needs_reentry
         goal_state["gallery_puzzle_solved"] = self._progress.gallery_puzzle_solved
+        goal_state["armor_vents_seated"] = list(
+            getattr(self._progress, "armor_vents_seated", [False, False])
+        )
         queue = getattr(self, "_planner_loyal_queue", None)
         if queue is not None:
             from re1_rl.planner_loyal import encode_planner_loyal_goal

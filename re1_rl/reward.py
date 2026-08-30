@@ -987,6 +987,13 @@ def _compute_planner_loyal_reward(
         if gallery_wrong != 0.0 and not loyal.get("divert"):
             bd["gallery_wrong"] = float(gallery_wrong)
 
+    from re1_rl.armor_room_puzzle import armor_statue_progress_reward
+
+    if not loyal.get("divert"):
+        bd["armor_statue_progress"] = armor_statue_progress_reward(
+            prev_state, state, planner_loyal_queue, progress
+        )
+
     if (
         progress is not None
         and "step_emulated_frames" in state
@@ -1080,9 +1087,10 @@ def _compute_planner_loyal_reward(
 
     if progress is not None and not state.get("dead"):
         frames_before = progress.stagnation_frames
+        armor_progress = float(bd.get("armor_statue_progress") or 0.0) > 0.0
         if bd.get("planner_step_success", 0.0) == 0.0:
             progress.note_stagnation_step(
-                made_progress=False,
+                made_progress=armor_progress,
                 step_frames=step_frames,
             )
         bd["softlock"] = contempt_penalty_delta(
@@ -1155,6 +1163,7 @@ def compute_reward(
         "gallery_wrong": 0.0,
         "dining_statue": 0.0,
         "dining_statue_progress": 0.0,
+        "armor_statue_progress": 0.0,
         "gold_emblem_return": 0.0,
         "key_item_return": 0.0,
         "shotgun_return": 0.0,
@@ -1217,6 +1226,7 @@ def compute_reward(
                 "gallery",
                 "new_room",
                 "new_weapon",
+                "armor_statue_progress",
             ):
                 bd[key] = 0.0
         elif loyal.get("step_success"):
@@ -1516,6 +1526,11 @@ def compute_reward(
         bd["dining_statue_progress"] = dining_statue_progress_reward(
             prev_state, state, planner
         )
+        from re1_rl.armor_room_puzzle import armor_statue_progress_reward
+
+        bd["armor_statue_progress"] = armor_statue_progress_reward(
+            prev_state, state, planner_loyal_queue, progress
+        )
         if bool(state.get("in_control")) and progress.claim_dining_statue_bonus(
             knocked=dining_statue_knocked_from_state(state),
             prev_knocked=dining_statue_knocked_from_state(prev_state),
@@ -1758,6 +1773,7 @@ def compute_reward(
         made_progress = (
             bd["gallery"] > 0.0
             or bd["dining_statue_progress"] > 0.0
+            or bd["armor_statue_progress"] > 0.0
             or bd["yawn_box_key_deposit"] > 0.0
         )
         # Pause idle clock during cutscenes / doors (not in_control).
