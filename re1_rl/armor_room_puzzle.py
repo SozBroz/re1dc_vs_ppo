@@ -37,8 +37,16 @@ ARMOR_VENTS: tuple[tuple[int, int], tuple[int, int]] = (
     ARMOR_VENT_DOOR,
     ARMOR_VENT_FAR,
 )
+# Pedestal rest (QS2 shove 2026-08-30). Door statue sits ~296 west of its
+# grate; a 420 seat radius completed the cell on first contact. Far rest is
+# the same offset toward the aisle center.
+ARMOR_STATUE_REST: tuple[tuple[int, int], tuple[int, int]] = (
+    (13696, 7300),
+    (5424, 7300),
+)
 ARMOR_CABINET_XZ: tuple[int, int] = (9735, 7236)
-ARMOR_VENT_SEAT_RADIUS = 420.0
+# Must be on the grate, not the pedestal (~296 away).
+ARMOR_VENT_SEAT_RADIUS = 160.0
 
 ARMOR_STATUE_PROGRESS_STEP = 0.5
 ARMOR_STATUE_PROGRESS_BUDGET = 10.0
@@ -189,8 +197,11 @@ def armor_statue_nav_target(
         return None
     idx = armor_vent_index(_step_from_queue(queue))
     if idx is not None:
-        vx, vz = ARMOR_VENTS[idx]
-        return (float(vx), float(vz))
+        if armor_pushing(state):
+            vx, vz = ARMOR_VENTS[idx]
+            return (float(vx), float(vz))
+        rx, rz = ARMOR_STATUE_REST[idx]
+        return (float(rx), float(rz))
     if armor_sun_crest_step(queue):
         return (float(ARMOR_CABINET_XZ[0]), float(ARMOR_CABINET_XZ[1]))
     return None

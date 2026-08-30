@@ -10,11 +10,13 @@ from re1_rl.armor_room_puzzle import (
     ARMOR_CABINET_XZ,
     ARMOR_STATUE_PROGRESS_BUDGET,
     ARMOR_STATUE_PROGRESS_STEP,
+    ARMOR_STATUE_REST,
     ARMOR_VENT_DOOR,
     ARMOR_VENT_FAR,
     ARMOR_VENTS,
     armor_statue_nav_target,
     armor_statue_progress_reward,
+    armor_vent_step_complete,
 )
 from re1_rl.planner import WaypointPlanner
 from re1_rl.planner_loyal import PlannerLoyalQueue, encode_planner_loyal_goal
@@ -115,19 +117,29 @@ def test_vent_order_is_door_then_far() -> None:
     assert FAR_VENT == (5135, 7236)
 
 
-def test_nav_target_door_vent_on_first_step_even_from_far_side() -> None:
+def test_nav_target_door_rest_until_pushing() -> None:
     q = _door_queue()
     near_far = _armor_state(x=6000, z=7300)
     assert armor_statue_nav_target(near_far, q) == (
+        float(ARMOR_STATUE_REST[0][0]),
+        float(ARMOR_STATUE_REST[0][1]),
+    )
+    shoving = _pushing(x=13696, z=7300)
+    assert armor_statue_nav_target(shoving, q) == (
         float(DOOR_VENT[0]),
         float(DOOR_VENT[1]),
     )
 
 
-def test_nav_target_far_vent_on_second_step() -> None:
+def test_nav_target_far_rest_until_pushing() -> None:
     q = _far_queue()
     at_door = _armor_state(x=16000, z=7300)
     assert armor_statue_nav_target(at_door, q) == (
+        float(ARMOR_STATUE_REST[1][0]),
+        float(ARMOR_STATUE_REST[1][1]),
+    )
+    shoving = _pushing(x=5424, z=7300)
+    assert armor_statue_nav_target(shoving, q) == (
         float(FAR_VENT[0]),
         float(FAR_VENT[1]),
     )
@@ -238,6 +250,16 @@ def test_progress_approach_accumulates_before_seat() -> None:
     assert progress.armor_vents_seated == [False, False]
 
 
+def test_pushing_at_door_pedestal_does_not_complete() -> None:
+    q = _door_queue()
+    rest = _pushing(x=ARMOR_STATUE_REST[0][0], z=ARMOR_STATUE_REST[0][1])
+    assert armor_vent_step_complete(q.current, rest) is False
+    result = q.evaluate_transition(prev_state=rest, state=rest)
+    assert result["step_success"] is False
+    assert q.current is not None
+    assert q.current["beat_id"] == "armor_vent_door"
+
+
 def test_seating_door_completes_first_pl_then_points_at_far() -> None:
     q = _door_queue()
     prev = _pushing(x=14400, z=7236)
@@ -311,13 +333,39 @@ def test_encode_goal_points_at_door_vent_not_cabinet() -> None:
         q,
         item_positions=ItemPositions(PROJECT_ROOT / "data" / "item_positions.json"),
     )
+    rest = encoder._compass_to_xz(
+        state, float(ARMOR_STATUE_REST[0][0]), float(ARMOR_STATUE_REST[0][1])
+    )
     vent = encoder._compass_to_xz(state, float(DOOR_VENT[0]), float(DOOR_VENT[1]))
     cabinet = encoder._compass_to_xz(
         state, float(ARMOR_CABINET_XZ[0]), float(ARMOR_CABINET_XZ[1])
     )
     assert goal[21] == pytest.approx(1.0)
-    assert goal[5:10] == pytest.approx(vent)
+    assert goal[5:10] == pytest.approx(rest)
+    assert goal[5:10] != pytest.approx(vent)
     assert goal[5:10] != pytest.approx(cabinet)
+
+
+def test_encode_goal_points_at_door_vent_while_pushing() -> None:
+    from re1_rl.obs_encoder import ObsEncoder
+    from re1_rl.room_graph import RoomGraph
+    from re1_rl.spatial_encoder import ItemPositions
+
+    graph = RoomGraph(PROJECT_ROOT / "data" / "doors_empirical.json")
+    encoder = ObsEncoder(PROJECT_ROOT / "data" / "rooms.json", graph)
+    q = PlannerLoyalQueue()
+    idx = next(i for i, s in enumerate(q._steps) if s.get("beat_id") == "armor_vent_door")
+    q.seek(idx)
+    state = _pushing(x=13696, z=7300, facing=0)
+    goal = encode_planner_loyal_goal(
+        encoder,
+        graph,
+        state,
+        q,
+        item_positions=ItemPositions(PROJECT_ROOT / "data" / "item_positions.json"),
+    )
+    vent = encoder._compass_to_xz(state, float(DOOR_VENT[0]), float(DOOR_VENT[1]))
+    assert goal[5:10] == pytest.approx(vent)
 
 
 def test_encode_goal_points_at_far_vent_on_second_cell() -> None:
@@ -338,10 +386,12 @@ def test_encode_goal_points_at_far_vent_on_second_cell() -> None:
         q,
         item_positions=ItemPositions(PROJECT_ROOT / "data" / "item_positions.json"),
     )
+    rest = encoder._compass_to_xz(
+        state, float(ARMOR_STATUE_REST[1][0]), float(ARMOR_STATUE_REST[1][1])
+    )
     far = encoder._compass_to_xz(state, float(FAR_VENT[0]), float(FAR_VENT[1]))
-    door = encoder._compass_to_xz(state, float(DOOR_VENT[0]), float(DOOR_VENT[1]))
-    assert goal[5:10] == pytest.approx(far)
-    assert goal[5:10] != pytest.approx(door)
+    assert goal[5:10] == pytest.approx(rest)
+    assert goal[5:10] != pytest.approx(far)
 
 
 def test_encode_goal_points_at_cabinet_on_crest_step() -> None:

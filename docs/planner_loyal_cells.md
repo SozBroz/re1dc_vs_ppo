@@ -917,7 +917,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** `armor_vent_door` at `armor_vent_door` — door-side grate (13985, 7236) first
 - **Items gained:** _(none)_
 - **How to achieve:** `armor_vent_door` at `armor_vent_door` — door-side grate (13985, 7236) first.
-- **Success condition:** Room `205`, pushing (`gs 0x80800044`), and Jill within 420 of the door-side (13985, 7236) grate — or `armor_puzzle_flag` bit `0x20` / sun crest held
+- **Success condition:** Room `205`, pushing (`gs 0x80800044`), and Jill within 160 of the door-side (13985, 7236) grate — or `armor_puzzle_flag` bit `0x20` / sun crest held
 
 ### `pl80` — `armor_vent_far` (step 75)
 
@@ -929,7 +929,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** `armor_vent_far` at `armor_vent_far` — far grate (5135, 7236) after the door statue
 - **Items gained:** _(none)_
 - **How to achieve:** `armor_vent_far` at `armor_vent_far` — far grate (5135, 7236) after the door statue.
-- **Success condition:** Room `205`, pushing (`gs 0x80800044`), and Jill within 420 of the far (5135, 7236) grate — or `armor_puzzle_flag` bit `0x20` / sun crest held
+- **Success condition:** Room `205`, pushing (`gs 0x80800044`), and Jill within 160 of the far (5135, 7236) grate — or `armor_puzzle_flag` bit `0x20` / sun crest held
 
 ### `pl81` — `sun_crest` (step 76)
 
