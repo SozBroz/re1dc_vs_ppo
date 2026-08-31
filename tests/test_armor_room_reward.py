@@ -114,8 +114,8 @@ def _pushing(**kw):
 
 def test_vent_order_is_door_then_far() -> None:
     assert ARMOR_VENTS == (ARMOR_VENT_DOOR, ARMOR_VENT_FAR)
-    assert DOOR_VENT == (13936, 6347)
-    assert FAR_VENT == (5013, 8102)
+    assert DOOR_VENT == (13892, 6370)
+    assert FAR_VENT == (5258, 8152)
 
 
 def test_nav_target_door_rest_until_pushing() -> None:
@@ -274,10 +274,10 @@ def test_standing_on_door_vent_does_not_complete() -> None:
 
 
 def test_statue_on_door_drain_completes_pl() -> None:
-    """QS1 seat while still pushing — idle helper poses do not mint."""
+    """QS1-class seat still completes after baking the authored pl79 oracle."""
     q = _door_queue()
     prev = _pushing(x=14047, z=6118, armor_statue_x=13829, armor_statue_z=6200)
-    cur = _pushing(x=14083, z=6351, armor_statue_x=13936, armor_statue_z=6347)
+    cur = _pushing(x=14083, z=6351, armor_statue_x=13935, armor_statue_z=6347)
     assert armor_vent_step_complete(q.current, cur) is True
     result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["step_success"] is True
@@ -285,10 +285,32 @@ def test_statue_on_door_drain_completes_pl() -> None:
     assert q.current["beat_id"] == "armor_vent_far"
 
 
-def test_slot_at_qs1_z_while_jill_south_does_not_complete() -> None:
-    """Last QS4 undershoot: live slot at QS1 Z, Jill still 200 south."""
+def test_authored_pl79_pose_completes_and_advances() -> None:
+    """Worker mint: the human pl79 RAM pose must fire step_success."""
     q = _door_queue()
-    cur = _pushing(x=14047, z=6118, armor_statue_x=13829, armor_statue_z=6348)
+    cur = _armor_state(x=14080, z=6468, armor_statue_x=13892, armor_statue_z=6370)
+    assert armor_vent_step_complete(q.current, cur) is True
+    result = q.evaluate_transition(prev_state=cur, state=cur)
+    assert result["step_success"] is True
+    assert q.current["beat_id"] == "armor_vent_far"
+
+
+def test_authored_pl79_pose_pays_planner_step_success() -> None:
+    """Capture keys on this pulse — freeze then mint pl79."""
+    q = _door_queue()
+    prev = _armor_state(x=14080, z=6468, armor_statue_x=13892, armor_statue_z=6370)
+    cur = _armor_state(
+        x=14080, z=6468, armor_statue_x=13892, armor_statue_z=6370, step=2
+    )
+    _total, bd = _reward(prev, cur, q)
+    assert bd["planner_step_success"] > 0.0
+    assert bd["checkpoint_success"] > 0.0
+
+
+def test_statue_on_door_grate_but_jill_far_does_not_complete() -> None:
+    """Seat requires Jill beside the statue, not across the room."""
+    q = _door_queue()
+    cur = _pushing(x=16000, z=7300, armor_statue_x=13892, armor_statue_z=6370)
     assert armor_vent_step_complete(q.current, cur) is False
 
 
@@ -318,14 +340,24 @@ def test_statue_on_door_drain_does_not_complete_far_step() -> None:
 
 
 def test_statue_on_far_drain_completes_far_pl() -> None:
-    """QS5 seat while still pushing — idle helper poses do not mint."""
+    """Prior live far seat still completes after baking authored pl80."""
     q = _far_queue()
-    prev = _pushing(x=4827, z=7800, armor_statue_x=5013, armor_statue_z=7900)
-    cur = _pushing(x=4827, z=8008, armor_statue_x=5013, armor_statue_z=8102)
+    prev = _pushing(x=5050, z=7900, armor_statue_x=5236, armor_statue_z=8000)
+    cur = _armor_state(x=5050, z=8008, armor_statue_x=5236, armor_statue_z=8102)
     assert armor_vent_step_complete(q.current, cur) is True
     result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["step_success"] is True
     assert q.current is not None
+    assert q.current["beat_id"] == "sun_crest"
+
+
+def test_authored_pl80_pose_completes_and_advances() -> None:
+    """Worker mint: the human pl80 RAM pose must fire step_success."""
+    q = _far_queue()
+    cur = _armor_state(x=5072, z=8058, armor_statue_x=5258, armor_statue_z=8152)
+    assert armor_vent_step_complete(q.current, cur) is True
+    result = q.evaluate_transition(prev_state=cur, state=cur)
+    assert result["step_success"] is True
     assert q.current["beat_id"] == "sun_crest"
 
 
@@ -398,10 +430,10 @@ def test_bad_pl79_remint_does_not_complete() -> None:
     assert armor_vent_step_complete(q.current, cur) is False
 
 
-def test_idle_qs1_pose_does_not_complete() -> None:
+def test_idle_qs1_pose_completes() -> None:
     q = _door_queue()
-    cur = _armor_state(x=14083, z=6351, armor_statue_x=13936, armor_statue_z=6347)
-    assert armor_vent_step_complete(q.current, cur) is False
+    cur = _armor_state(x=14083, z=6351, armor_statue_x=13935, armor_statue_z=6347)
+    assert armor_vent_step_complete(q.current, cur) is True
 
 
 def test_compass_ahead_when_facing_door_grate() -> None:
