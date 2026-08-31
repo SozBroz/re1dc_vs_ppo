@@ -113,7 +113,7 @@ def _pushing(**kw):
 
 def test_vent_order_is_door_then_far() -> None:
     assert ARMOR_VENTS == (ARMOR_VENT_DOOR, ARMOR_VENT_FAR)
-    assert DOOR_VENT == (13985, 7236)
+    assert DOOR_VENT == (14001, 6303)
     assert FAR_VENT == (5135, 7236)
 
 
@@ -273,15 +273,22 @@ def test_standing_on_door_vent_does_not_complete() -> None:
 
 
 def test_statue_on_door_drain_completes_pl() -> None:
-    """QS3 shove: statue on the door grate, Jill offset south."""
+    """QS3 shove: statue on the visual door drain, Jill offset south."""
     q = _door_queue()
-    prev = _pushing(x=14047, z=6518, armor_statue_x=13993, armor_statue_z=6965)
-    cur = _pushing(x=14047, z=6718, armor_statue_x=14008, armor_statue_z=7231)
+    prev = _pushing(x=14047, z=5768, armor_statue_x=13998, armor_statue_z=6233)
+    cur = _pushing(x=14047, z=5818, armor_statue_x=14001, armor_statue_z=6303)
     assert armor_vent_step_complete(q.current, cur) is True
     result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["step_success"] is True
     assert q.current is not None
     assert q.current["beat_id"] == "armor_vent_far"
+
+
+def test_rdt_aot_overshoot_does_not_complete_door() -> None:
+    """Statue at the old RDT AOT (13985, 7236) has already passed the drain."""
+    q = _door_queue()
+    cur = _pushing(x=14047, z=6718, armor_statue_x=14008, armor_statue_z=7231)
+    assert armor_vent_step_complete(q.current, cur) is False
 
 
 def test_idle_helper_near_jill_does_not_complete() -> None:
