@@ -11,8 +11,9 @@ seated pedestal ``(13936, 6347)`` (Jill stands beside it at ``(14083, 6351)``).
 The push helper ``0x800DBA44`` leads the pedestal and minted short/long.
 Jill on the grate does not mint. Flag ``0x20`` / crest still completes both.
 
-Authored order is door-side first, then far. RDT grate AOTs: door
-    (13985, 7236) / far (5135, 7236). Cabinet crest pickup is (9735, 7236).
+Authored order is door-side first, then far. QS5 seated far pillar is
+    ``(5013, 8102)`` with Jill beside it at ``(4827, 8008)`` — not the RDT
+    AOT ``(5135, 7236)``. Cabinet crest pickup is (9735, 7236).
 """
 
 from __future__ import annotations
@@ -36,9 +37,11 @@ ARMOR_VENT_BEATS: tuple[str, str] = (ARMOR_VENT_DOOR_BEAT, ARMOR_VENT_FAR_BEAT)
 ARMOR_PUZZLE_FLAG = _FLAG_ADDR
 ARMOR_PUZZLE_FLAG_MASK = 0x20
 
-# QS1 seated door statue (Jill beside it at (14083, 6351)).
+# QS1 seated door statue (Jill beside it at this dock).
 ARMOR_VENT_DOOR: tuple[int, int] = (13936, 6347)
-ARMOR_VENT_FAR: tuple[int, int] = (5135, 7236)
+ARMOR_VENT_DOOR_DOCK: tuple[int, int] = (14083, 6351)
+ARMOR_VENT_FAR: tuple[int, int] = (5013, 8102)
+ARMOR_VENT_FAR_DOCK: tuple[int, int] = (4827, 8008)
 # Door first, then far — matches authored pl79 → pl80.
 ARMOR_VENTS: tuple[tuple[int, int], tuple[int, int]] = (
     ARMOR_VENT_DOOR,
@@ -52,9 +55,17 @@ ARMOR_STATUE_REST: tuple[tuple[int, int], tuple[int, int]] = (
     (5424, 7300),
 )
 ARMOR_CABINET_XZ: tuple[int, int] = (9735, 7236)
-# QS1 Jill is ~147 from the seated pedestal; 80 still rejects standing on it.
-ARMOR_VENT_SEAT_RADIUS = 120.0
 ARMOR_STATUE_AHEAD_MIN = 80.0
+# Door complete waits until Jill reaches the QS1 stand-beside pose.
+ARMOR_VENT_DOOR_DOCK_RADIUS = 160.0
+# Pedestal has left the south rest but has not run on to the RDT AOT.
+ARMOR_VENT_DOOR_STATUE_Z_LO = 6200.0
+ARMOR_VENT_DOOR_STATUE_Z_HI = 6700.0
+# QS5 far dock. One PPO push step is 8 frames ≈ 200 Z; the 160 dock
+# radius is two steps wide so a forward/noop can land on it.
+ARMOR_VENT_FAR_DOCK_RADIUS = 160.0
+ARMOR_VENT_FAR_STATUE_Z_LO = 7800.0
+ARMOR_VENT_FAR_STATUE_Z_HI = 8400.0
 ARMOR_STATUE_X = _STATUE_X_ADDR
 ARMOR_STATUE_Z = _STATUE_Z_ADDR
 
@@ -172,9 +183,10 @@ def armor_statue_xz(state: dict[str, Any] | None) -> tuple[float, float] | None:
 def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] | None) -> bool:
     """True when the authored statue covers that grate, or the puzzle is done.
 
-    QS1 seated door statue is ``(13936, 6347)`` with Jill beside it at
-    ``(14083, 6351)``. Live XZ is ``0x800DB7D8/E0``. Jill on the grate does
-    not mint.
+    QS1 door: statue ``(13936, 6347)``, Jill ``(14083, 6351)``.
+    QS5 far: statue ``(5013, 8102)``, Jill ``(4827, 8008)``. Completing when
+    the live slot first hits that Z undershoots. Each step waits until Jill
+    is at that dock and the pedestal is in the drain Z band.
     """
     idx = armor_vent_index(step)
     if idx is None or not state:
@@ -186,13 +198,18 @@ def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] 
     statue = armor_statue_xz(state)
     if statue is None:
         return False
-    vx, vz = ARMOR_VENTS[idx]
-    if math.hypot(statue[0] - vx, statue[1] - vz) > ARMOR_VENT_SEAT_RADIUS:
-        return False
-    if _dist_to(state, (float(vx), float(vz))) <= ARMOR_VENT_SEAT_RADIUS:
-        return False
     jx, jz = _jill_xz(state)
     if math.hypot(jx - statue[0], jz - statue[1]) < ARMOR_STATUE_AHEAD_MIN:
+        return False
+    if idx == 0:
+        if _dist_to(state, ARMOR_VENT_DOOR_DOCK) > ARMOR_VENT_DOOR_DOCK_RADIUS:
+            return False
+        if not (ARMOR_VENT_DOOR_STATUE_Z_LO <= statue[1] <= ARMOR_VENT_DOOR_STATUE_Z_HI):
+            return False
+        return True
+    if _dist_to(state, ARMOR_VENT_FAR_DOCK) > ARMOR_VENT_FAR_DOCK_RADIUS:
+        return False
+    if not (ARMOR_VENT_FAR_STATUE_Z_LO <= statue[1] <= ARMOR_VENT_FAR_STATUE_Z_HI):
         return False
     return True
 
@@ -213,14 +230,11 @@ def claim_armor_vent_seats(state: dict[str, Any] | None, progress: Any) -> None:
     if math.hypot(jx - statue[0], jz - statue[1]) < ARMOR_STATUE_AHEAD_MIN:
         progress.armor_vents_seated = seated
         return
-    for i, (vx, vz) in enumerate(ARMOR_VENTS):
+    for i, beat in enumerate(ARMOR_VENT_BEATS):
         if seated[i]:
             continue
-        if math.hypot(statue[0] - vx, statue[1] - vz) > ARMOR_VENT_SEAT_RADIUS:
-            continue
-        if math.hypot(jx - vx, jz - vz) <= ARMOR_VENT_SEAT_RADIUS:
-            continue
-        seated[i] = True
+        if armor_vent_step_complete({"beat_id": beat}, state):
+            seated[i] = True
     progress.armor_vents_seated = seated
 
 

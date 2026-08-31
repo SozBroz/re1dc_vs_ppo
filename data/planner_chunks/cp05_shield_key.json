@@ -126,7 +126,7 @@
     {"n": 72, "op": "traverse", "edge_id": "203->204"},
     {"n": 73, "op": "traverse", "edge_id": "204->205", "beat_id": "armor_room_enter"},
     {"n": 74, "op": "do_puzzle", "site_id": "armor_vent_door", "room_id": "205", "beat_id": "armor_vent_door", "note": "door-side seated statue (13936, 6347) first"},
-    {"n": 75, "op": "do_puzzle", "site_id": "armor_vent_far", "room_id": "205", "beat_id": "armor_vent_far", "note": "far grate (5135, 7236) after the door statue"},
+    {"n": 75, "op": "do_puzzle", "site_id": "armor_vent_far", "room_id": "205", "beat_id": "armor_vent_far", "note": "QS5 far seated statue (5013, 8102) after the door statue"},
     {"n": 76, "op": "acquire", "pickup_id": "205:sun_crest:1", "room_id": "205", "beat_id": "sun_crest", "note": "cabinet after both poison vents covered"}
   ]
 }

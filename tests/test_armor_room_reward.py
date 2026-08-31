@@ -114,7 +114,7 @@ def _pushing(**kw):
 def test_vent_order_is_door_then_far() -> None:
     assert ARMOR_VENTS == (ARMOR_VENT_DOOR, ARMOR_VENT_FAR)
     assert DOOR_VENT == (13936, 6347)
-    assert FAR_VENT == (5135, 7236)
+    assert FAR_VENT == (5013, 8102)
 
 
 def test_nav_target_door_rest_until_pushing() -> None:
@@ -284,6 +284,13 @@ def test_statue_on_door_drain_completes_pl() -> None:
     assert q.current["beat_id"] == "armor_vent_far"
 
 
+def test_slot_at_qs1_z_while_jill_south_does_not_complete() -> None:
+    """Last QS4 undershoot: live slot at QS1 Z, Jill still 200 south."""
+    q = _door_queue()
+    cur = _pushing(x=14047, z=6118, armor_statue_x=13829, armor_statue_z=6348)
+    assert armor_vent_step_complete(q.current, cur) is False
+
+
 def test_rdt_aot_overshoot_does_not_complete_door() -> None:
     """Statue at the old RDT AOT (13985, 7236) has already passed the drain."""
     q = _door_queue()
@@ -310,14 +317,29 @@ def test_statue_on_door_drain_does_not_complete_far_step() -> None:
 
 
 def test_statue_on_far_drain_completes_far_pl() -> None:
+    """QS5: far statue seated, Jill standing beside it."""
     q = _far_queue()
-    prev = _pushing(x=5135, z=6700, armor_statue_x=5135, armor_statue_z=7000)
-    cur = _pushing(x=5135, z=6700, armor_statue_x=5135, armor_statue_z=7236)
+    prev = _pushing(x=4827, z=7800, armor_statue_x=5013, armor_statue_z=7900)
+    cur = _armor_state(x=4827, z=8008, armor_statue_x=5013, armor_statue_z=8102)
     assert armor_vent_step_complete(q.current, cur) is True
     result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["step_success"] is True
     assert q.current is not None
     assert q.current["beat_id"] == "sun_crest"
+
+
+def test_far_rdt_aot_does_not_complete() -> None:
+    """RDT far grate (5135, 7236) is 874 from the QS5 seat."""
+    q = _far_queue()
+    cur = _pushing(x=5135, z=7236, armor_statue_x=5135, armor_statue_z=7236)
+    assert armor_vent_step_complete(q.current, cur) is False
+
+
+def test_far_slot_z_while_jill_south_does_not_complete() -> None:
+    """Same undershoot class as the door: slot in band, Jill still 200 south."""
+    q = _far_queue()
+    cur = _pushing(x=4827, z=7800, armor_statue_x=5013, armor_statue_z=8102)
+    assert armor_vent_step_complete(q.current, cur) is False
 
 
 def test_standing_on_far_vent_does_not_complete_far_step() -> None:
