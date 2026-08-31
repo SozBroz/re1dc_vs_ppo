@@ -726,6 +726,8 @@ class RE1Env(gym.Env):
             "armor_puzzle_ready": bool(
                 int(ram.get("armor_puzzle_flag", 0) or 0) & 0x20
             ),
+            "armor_statue_x": int(ram.get("armor_statue_x", 0) or 0),
+            "armor_statue_z": int(ram.get("armor_statue_z", 0) or 0),
             "player_anim": int(ram.get("player_anim", 0)),
             "player_aux": int(ram.get("player_aux", 0)),
             "player_recovery": int(ram.get("player_recovery", 0)),

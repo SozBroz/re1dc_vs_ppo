@@ -6,12 +6,12 @@ not a stable pair of addresses like dining 202 (QS1 seated statues go to
 sentinel ``-32640``). Progress uses Jill→current-step vent distance while
 that push state is active.
 
-Do **not** complete a vent because Jill is standing on the grate. QS1
-(solved) has the statues on the vents and Jill off them at ``(3612, 7015)``,
-flag ``u8@0x800C8704`` bit ``0x20``. A false pl79 minted at ``(14067, 7118)``
-(~144 from the door AOT) with the flag still 0 — she was on the empty grate
-pushing the statue *off* it. Per-vent mint waits on that flag / crest; the
-grate AOTs stay compass targets only.
+Complete a vent when live push-object XZ ``0x800DBA44/4C`` covers that grate
+and Jill is *off* it (QS3 shove: statue ``(14008, 7231)``, Jill
+``(14047, 6718)``). Jill on the AOT is the unsolved pose (false pl79 at
+``(14067, 7118)``). After release the slot snaps to a Jill-adjacent helper —
+require ``AHEAD_MIN`` so that cannot mint. Flag ``0x20`` / crest still
+completes both.
 
 Authored order is door-side first, then far. RDT grate AOTs: door
     (13985, 7236) / far (5135, 7236). Cabinet crest pickup is (9735, 7236).
@@ -25,6 +25,8 @@ from typing import Any
 import numpy as np
 
 from re1_rl.memory_map import ARMOR_PUZZLE_FLAG as _FLAG_ADDR
+from re1_rl.memory_map import ARMOR_STATUE_X as _STATUE_X_ADDR
+from re1_rl.memory_map import ARMOR_STATUE_Z as _STATUE_Z_ADDR
 from re1_rl.pushable import PUSH_GAME_STATE
 
 ARMOR_ROOM_ID = "205"
@@ -51,8 +53,13 @@ ARMOR_STATUE_REST: tuple[tuple[int, int], tuple[int, int]] = (
     (5424, 7300),
 )
 ARMOR_CABINET_XZ: tuple[int, int] = (9735, 7236)
-# Jill-on-grate radius. Standing here is the *wrong* pose (false pl79).
+# Statue-on-grate radius. Jill standing here is the *wrong* pose (false pl79).
 ARMOR_VENT_SEAT_RADIUS = 160.0
+# Live push slot sits ~500 ahead of Jill on the grate; after release it snaps
+# to a ~300 Jill-adjacent helper. Require this gap so idle helper cannot mint.
+ARMOR_STATUE_AHEAD_MIN = 400.0
+ARMOR_STATUE_X = _STATUE_X_ADDR
+ARMOR_STATUE_Z = _STATUE_Z_ADDR
 
 ARMOR_STATUE_PROGRESS_STEP = 0.5
 ARMOR_STATUE_PROGRESS_BUDGET = 10.0
@@ -157,26 +164,67 @@ def _dist_to(state: dict[str, Any], target: tuple[float, float]) -> float:
     return math.hypot(jx - float(target[0]), jz - float(target[1]))
 
 
-def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] | None) -> bool:
-    """True only when the 205 puzzle is actually done (flag / crest).
+def armor_statue_xz(state: dict[str, Any] | None) -> tuple[float, float] | None:
+    if not state:
+        return None
+    if "armor_statue_x" not in state or "armor_statue_z" not in state:
+        return None
+    return (float(state.get("armor_statue_x") or 0), float(state.get("armor_statue_z") or 0))
 
-    Jill in-push on a grate AOT is the *unsolved* pose — do not mint.
+
+def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] | None) -> bool:
+    """True when the authored statue covers that grate, or the puzzle is done.
+
+    QS3 shove 2026-08-30: live slot ``0x800DBA44/4C`` on the door grate at
+    ``(14008, 7231)`` while Jill stayed at ``(14047, 6718)``. Jill on the AOT
+    is the unsolved pose — do not mint that.
     """
-    if armor_vent_index(step) is None or not state:
+    idx = armor_vent_index(step)
+    if idx is None or not state:
         return False
     if str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
         return False
-    return armor_puzzle_ready_from_state(state) or armor_sun_crest_held(state)
+    if armor_puzzle_ready_from_state(state) or armor_sun_crest_held(state):
+        return True
+    statue = armor_statue_xz(state)
+    if statue is None:
+        return False
+    vx, vz = ARMOR_VENTS[idx]
+    if math.hypot(statue[0] - vx, statue[1] - vz) > ARMOR_VENT_SEAT_RADIUS:
+        return False
+    if _dist_to(state, (float(vx), float(vz))) <= ARMOR_VENT_SEAT_RADIUS:
+        return False
+    jx, jz = _jill_xz(state)
+    if math.hypot(jx - statue[0], jz - statue[1]) < ARMOR_STATUE_AHEAD_MIN:
+        return False
+    return True
 
 
 def claim_armor_vent_seats(state: dict[str, Any] | None, progress: Any) -> None:
-    """Bookkeeping only: both vents count as seated once the puzzle flag / crest is on."""
+    """Mark a vent seated once the live statue slot covers it (Jill off the grate)."""
     if progress is None or not state:
         return
+    seated = armor_vents_seated(state, progress)
     if armor_puzzle_ready_from_state(state) or armor_sun_crest_held(state):
         progress.armor_vents_seated = [True, True]
         return
-    progress.armor_vents_seated = armor_vents_seated(state, progress)
+    statue = armor_statue_xz(state)
+    if statue is None:
+        progress.armor_vents_seated = seated
+        return
+    jx, jz = _jill_xz(state)
+    if math.hypot(jx - statue[0], jz - statue[1]) < ARMOR_STATUE_AHEAD_MIN:
+        progress.armor_vents_seated = seated
+        return
+    for i, (vx, vz) in enumerate(ARMOR_VENTS):
+        if seated[i]:
+            continue
+        if math.hypot(statue[0] - vx, statue[1] - vz) > ARMOR_VENT_SEAT_RADIUS:
+            continue
+        if math.hypot(jx - vx, jz - vz) <= ARMOR_VENT_SEAT_RADIUS:
+            continue
+        seated[i] = True
+    progress.armor_vents_seated = seated
 
 
 def armor_statue_nav_target(

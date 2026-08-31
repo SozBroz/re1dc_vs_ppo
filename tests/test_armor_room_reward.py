@@ -264,12 +264,53 @@ def test_standing_on_door_vent_does_not_complete() -> None:
     """False pl79: Jill on the empty door grate, flag still 0."""
     q = _door_queue()
     prev = _pushing(x=14400, z=7236)
-    cur = _pushing(x=14067, z=7118)
+    cur = _pushing(x=14067, z=7118, armor_statue_x=14008, armor_statue_z=7231)
     assert armor_vent_step_complete(q.current, cur) is False
     result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["step_success"] is False
     assert q.current is not None
     assert q.current["beat_id"] == "armor_vent_door"
+
+
+def test_statue_on_door_drain_completes_pl() -> None:
+    """QS3 shove: statue on the door grate, Jill offset south."""
+    q = _door_queue()
+    prev = _pushing(x=14047, z=6518, armor_statue_x=13993, armor_statue_z=6965)
+    cur = _pushing(x=14047, z=6718, armor_statue_x=14008, armor_statue_z=7231)
+    assert armor_vent_step_complete(q.current, cur) is True
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["step_success"] is True
+    assert q.current is not None
+    assert q.current["beat_id"] == "armor_vent_far"
+
+
+def test_idle_helper_near_jill_does_not_complete() -> None:
+    """After release the live slot snaps ~300 from Jill — not a seat."""
+    q = _door_queue()
+    idle = _armor_state(
+        x=14000,
+        z=7000,
+        armor_statue_x=13985,
+        armor_statue_z=7236,
+    )
+    assert armor_vent_step_complete(q.current, idle) is False
+
+
+def test_statue_on_door_drain_does_not_complete_far_step() -> None:
+    q = _far_queue()
+    cur = _pushing(x=14047, z=6718, armor_statue_x=14008, armor_statue_z=7231)
+    assert armor_vent_step_complete(q.current, cur) is False
+
+
+def test_statue_on_far_drain_completes_far_pl() -> None:
+    q = _far_queue()
+    prev = _pushing(x=5135, z=6700, armor_statue_x=5135, armor_statue_z=7000)
+    cur = _pushing(x=5135, z=6700, armor_statue_x=5135, armor_statue_z=7236)
+    assert armor_vent_step_complete(q.current, cur) is True
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["step_success"] is True
+    assert q.current is not None
+    assert q.current["beat_id"] == "sun_crest"
 
 
 def test_standing_on_far_vent_does_not_complete_far_step() -> None:
