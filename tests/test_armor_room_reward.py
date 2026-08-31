@@ -349,6 +349,27 @@ def test_false_pl80_helper_near_dock_does_not_complete() -> None:
     assert armor_vent_step_complete(q.current, cur) is False
 
 
+def test_false_pl80_jill_on_empty_west_grate_does_not_complete() -> None:
+    """Remint: Jill on the empty west grate, far pillar not on QS5."""
+    q = _far_queue()
+    cur = _armor_state(x=4605, z=7724, armor_statue_x=4806, armor_statue_z=7678)
+    assert armor_vent_step_complete(q.current, cur) is False
+
+
+def test_jill_standing_on_far_seat_does_not_complete() -> None:
+    """Statue-on-grate only — Jill standing on the QS5 grate is not a seat."""
+    q = _far_queue()
+    cur = _armor_state(x=5013, z=8102, armor_statue_x=5013, armor_statue_z=8102)
+    assert armor_vent_step_complete(q.current, cur) is False
+
+
+def test_door_statue_slot_does_not_complete_far_step() -> None:
+    """The east pedestal is the other statue — not pl80."""
+    q = _far_queue()
+    cur = _armor_state(x=4827, z=8008, armor_statue_x=13936, armor_statue_z=6347)
+    assert armor_vent_step_complete(q.current, cur) is False
+
+
 def test_standing_on_far_vent_does_not_complete_far_step() -> None:
     q = _far_queue()
     prev = _pushing(x=5600, z=7236)

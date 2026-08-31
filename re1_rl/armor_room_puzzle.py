@@ -56,16 +56,19 @@ ARMOR_STATUE_REST: tuple[tuple[int, int], tuple[int, int]] = (
 )
 ARMOR_CABINET_XZ: tuple[int, int] = (9735, 7236)
 ARMOR_STATUE_AHEAD_MIN = 80.0
+# Live ``0x800DB7D8`` is the nearby pedestal, not a dedicated pair.
+# East of this X is the door statue; west is the far statue.
+ARMOR_STATUE_SIDE_SPLIT_X = 9000.0
 # Door complete waits until Jill reaches the QS1 stand-beside pose.
 ARMOR_VENT_DOOR_DOCK_RADIUS = 160.0
 # Pedestal has left the south rest but has not run on to the RDT AOT.
 ARMOR_VENT_DOOR_STATUE_Z_LO = 6200.0
 ARMOR_VENT_DOOR_STATUE_Z_HI = 6700.0
-# QS5 far dock. One PPO push step is 8 frames ≈ 200 Z; the 160 dock
-# radius is two steps wide so a forward/noop can land on it.
+# QS5: far pillar on ``(5013, 8102)``, Jill 208 off that grate. Do not
+# complete on Jill standing on the empty west grate.
+ARMOR_VENT_FAR_SEAT_RADIUS = 100.0
+ARMOR_VENT_FAR_JILL_OFF_GRATE = 180.0
 ARMOR_VENT_FAR_DOCK_RADIUS = 160.0
-# Live slot at the QS5 pedestal — a Z band alone minted on a nearby helper.
-ARMOR_VENT_FAR_SEAT_RADIUS = 150.0
 ARMOR_STATUE_X = _STATUE_X_ADDR
 ARMOR_STATUE_Z = _STATUE_Z_ADDR
 
@@ -183,10 +186,9 @@ def armor_statue_xz(state: dict[str, Any] | None) -> tuple[float, float] | None:
 def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] | None) -> bool:
     """True when the authored statue covers that grate, or the puzzle is done.
 
-    QS1 door: statue ``(13936, 6347)``, Jill ``(14083, 6351)``.
-    QS5 far: statue ``(5013, 8102)``, Jill ``(4827, 8008)``. Completing when
-    the live slot first hits that Z undershoots. Far also requires the slot
-    on the QS5 pedestal — a Z band alone minted on a nearby helper.
+    Two pedestals share the nearby-object slot. Door uses the east statue
+    (x>9000) on the QS1 drain with Jill beside it. Far uses the west statue
+    (x<9000) on the QS5 drain; Jill on that grate does not mint.
     """
     idx = armor_vent_index(step)
     if idx is None or not state:
@@ -202,14 +204,20 @@ def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] 
     if math.hypot(jx - statue[0], jz - statue[1]) < ARMOR_STATUE_AHEAD_MIN:
         return False
     if idx == 0:
+        if statue[0] < ARMOR_STATUE_SIDE_SPLIT_X:
+            return False
         if _dist_to(state, ARMOR_VENT_DOOR_DOCK) > ARMOR_VENT_DOOR_DOCK_RADIUS:
             return False
         if not (ARMOR_VENT_DOOR_STATUE_Z_LO <= statue[1] <= ARMOR_VENT_DOOR_STATUE_Z_HI):
             return False
         return True
-    if _dist_to(state, ARMOR_VENT_FAR_DOCK) > ARMOR_VENT_FAR_DOCK_RADIUS:
+    if statue[0] > ARMOR_STATUE_SIDE_SPLIT_X:
         return False
     if math.hypot(statue[0] - ARMOR_VENT_FAR[0], statue[1] - ARMOR_VENT_FAR[1]) > ARMOR_VENT_FAR_SEAT_RADIUS:
+        return False
+    if _dist_to(state, ARMOR_VENT_FAR) < ARMOR_VENT_FAR_JILL_OFF_GRATE:
+        return False
+    if _dist_to(state, ARMOR_VENT_FAR_DOCK) > ARMOR_VENT_FAR_DOCK_RADIUS:
         return False
     return True
 
