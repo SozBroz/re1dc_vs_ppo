@@ -282,35 +282,9 @@ def armor_statue_progress_reward(
     queue: Any = None,
     progress: Any = None,
 ) -> float:
-    """Clipped potential on Jill→current vent while pushing in 205.
-
-    Closer → up to ``+PROGRESS_STEP``; farther → down to ``-PROGRESS_STEP``.
-    Pays only on the door/far vent steps, not the crest acquire.
-    """
-    if not prev_state or not state:
-        return 0.0
-    if not armor_vent_step(queue):
-        return 0.0
-    if not armor_statue_active(queue, state):
-        return 0.0
-    if not armor_statue_active(queue, prev_state):
-        return 0.0
-    if not (armor_pushing(prev_state) or armor_pushing(state)):
-        claim_armor_vent_seats(state, progress)
-        return 0.0
-    t0 = armor_statue_nav_target(prev_state, queue, progress)
-    claim_armor_vent_seats(state, progress)
-    t1 = armor_statue_nav_target(state, queue, progress)
-    if t0 is None or t1 is None:
-        return 0.0
-    if t0 != t1:
-        return 0.0
-    raw = armor_statue_progress_phi(_dist_to(state, t1)) - armor_statue_progress_phi(
-        _dist_to(prev_state, t0)
-    )
-    return float(
-        np.clip(raw, -ARMOR_STATUE_PROGRESS_STEP, ARMOR_STATUE_PROGRESS_STEP)
-    )
+    """Retired. Vent helper crumbs poisoned training. Crest is acquire-only."""
+    del prev_state, state, queue, progress
+    return 0.0
 
 
 def encode_armor_statue_compass(

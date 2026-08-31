@@ -920,14 +920,6 @@ def _compute_planner_loyal_reward(
     bd = _planner_loyal_breakdown_template()
     bd["step"] = STEP_PENALTY * step_scale
 
-    from re1_rl.armor_room_puzzle import armor_statue_progress_reward
-
-    # Score the vent crumb against the still-current step, then evaluate
-    # (seating pops the queue to the next vent / crest).
-    armor_pay = armor_statue_progress_reward(
-        prev_state, state, planner_loyal_queue, progress
-    )
-
     loyal = planner_loyal_queue.evaluate_transition(
         prev_state=prev_state,
         state=state,
@@ -994,9 +986,6 @@ def _compute_planner_loyal_reward(
         # gallery_wrong like yawn cells (−4, episode end).
         if gallery_wrong != 0.0 and not loyal.get("divert"):
             bd["gallery_wrong"] = float(gallery_wrong)
-
-    if not loyal.get("divert"):
-        bd["armor_statue_progress"] = armor_pay
 
     if (
         progress is not None
@@ -1529,11 +1518,6 @@ def compute_reward(
 
         bd["dining_statue_progress"] = dining_statue_progress_reward(
             prev_state, state, planner
-        )
-        from re1_rl.armor_room_puzzle import armor_statue_progress_reward
-
-        bd["armor_statue_progress"] = armor_statue_progress_reward(
-            prev_state, state, planner_loyal_queue, progress
         )
         if bool(state.get("in_control")) and progress.claim_dining_statue_bonus(
             knocked=dining_statue_knocked_from_state(state),

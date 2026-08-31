@@ -1,6 +1,6 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (76 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (74 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **Source of truth:** the live chunk JSON. Seed cells `pl00`–`pl05` are the opening crystals (same beats as yawn `cp00`–`cp05`); they are **not** minted from this chunk.
 
@@ -11,7 +11,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl05`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - One-way lock: `103->104` (tea room). `103->10C` is open. Do not walk `116->106` after the shotgun.
-- Chunk end-anchor: `sun_crest` (`pl81`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `sun_crest` (`pl79`). Mid-chunk success keeps the episode open.
 
 ## Summary table
 
@@ -96,9 +96,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 | `pl76` | 71 | `202->203` | `203` (HALL 2F) | traverse | Walk `202->203` into `203` (HALL 2F) |
 | `pl77` | 72 | `203->204` | `204` (C PASSAGE) | traverse | Walk `203->204` into `204` (C PASSAGE) |
 | `pl78` | 73 | `armor_room_enter` | `205` (ARMOR ROOM) | traverse | Walk `204->205` into `205` (ARMOR ROOM) |
-| `pl79` | 74 | `armor_vent_door` | `205` (ARMOR ROOM) | do_puzzle | `armor_vent_door` at `armor_vent_door` — door-side grate (13985, 7236) first |
-| `pl80` | 75 | `armor_vent_far` | `205` (ARMOR ROOM) | do_puzzle | `armor_vent_far` at `armor_vent_far` — far grate (5135, 7236) after the door statue |
-| `pl81` | 76 | `sun_crest` | `205` (ARMOR ROOM) | acquire | Take `205:sun_crest:1` (cabinet after both poison vents covered) |
+| `pl79` | 74 | `sun_crest` | `205` (ARMOR ROOM) | acquire | Take `205:sun_crest:1` (cabinet sun crest; no vent helper cells) |
 
 ## Details
 
@@ -152,7 +150,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl06`–`pl81`)
+### Chunk cells (`pl06`–`pl79`)
 
 ### `pl06` — `106->105` (step 1)
 
@@ -907,39 +905,15 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `204->205` into `205` (ARMOR ROOM).
 - **Success condition:** Enter room `205` via `204->205`. Any other door is `wrong_traverse:204->205 got <room>` (−4).
 
-### `pl79` — `armor_vent_door` (step 74)
-
-- **Room:** `205` (ARMOR ROOM)
-- **Op:** `do_puzzle`
-- **Site:** `armor_vent_door`
-- **Beat:** `armor_vent_door`
-- **Note:** door-side grate (13985, 7236) first
-- **Objective:** `armor_vent_door` at `armor_vent_door` — door-side grate (13985, 7236) first
-- **Items gained:** _(none)_
-- **How to achieve:** `armor_vent_door` at `armor_vent_door` — door-side grate (13985, 7236) first.
-- **Success condition:** Room `205`, pushing (`gs 0x80800044`), and Jill within 160 of the door-side (13985, 7236) grate — or `armor_puzzle_flag` bit `0x20` / sun crest held
-
-### `pl80` — `armor_vent_far` (step 75)
-
-- **Room:** `205` (ARMOR ROOM)
-- **Op:** `do_puzzle`
-- **Site:** `armor_vent_far`
-- **Beat:** `armor_vent_far`
-- **Note:** far grate (5135, 7236) after the door statue
-- **Objective:** `armor_vent_far` at `armor_vent_far` — far grate (5135, 7236) after the door statue
-- **Items gained:** _(none)_
-- **How to achieve:** `armor_vent_far` at `armor_vent_far` — far grate (5135, 7236) after the door statue.
-- **Success condition:** Room `205`, pushing (`gs 0x80800044`), and Jill within 160 of the far (5135, 7236) grate — or `armor_puzzle_flag` bit `0x20` / sun crest held
-
-### `pl81` — `sun_crest` (step 76)
+### `pl79` — `sun_crest` (step 74)
 
 - **Room:** `205` (ARMOR ROOM)
 - **Op:** `acquire`
 - **Pickup:** `205:sun_crest:1`
 - **Beat:** `sun_crest`
-- **Note:** cabinet after both poison vents covered
-- **Objective:** Take `205:sun_crest:1` (cabinet after both poison vents covered)
+- **Note:** cabinet sun crest; no vent helper cells
+- **Objective:** Take `205:sun_crest:1` (cabinet sun crest; no vent helper cells)
 - **Items gained:** `sun_crest`
-- **How to achieve:** Take `205:sun_crest:1` (cabinet after both poison vents covered).
+- **How to achieve:** Take `205:sun_crest:1` (cabinet sun crest; no vent helper cells).
 - **Success condition:** Inventory gains `205:sun_crest:1` while this step is current
 
