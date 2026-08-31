@@ -113,7 +113,7 @@ def _pushing(**kw):
 
 def test_vent_order_is_door_then_far() -> None:
     assert ARMOR_VENTS == (ARMOR_VENT_DOOR, ARMOR_VENT_FAR)
-    assert DOOR_VENT == (14001, 6303)
+    assert DOOR_VENT == (13936, 6347)
     assert FAR_VENT == (5135, 7236)
 
 
@@ -273,10 +273,10 @@ def test_standing_on_door_vent_does_not_complete() -> None:
 
 
 def test_statue_on_door_drain_completes_pl() -> None:
-    """QS3 shove: statue on the visual door drain, Jill offset south."""
+    """QS1: statue on the drain, Jill standing beside it."""
     q = _door_queue()
-    prev = _pushing(x=14047, z=5768, armor_statue_x=13998, armor_statue_z=6233)
-    cur = _pushing(x=14047, z=5818, armor_statue_x=14001, armor_statue_z=6303)
+    prev = _pushing(x=14047, z=6118, armor_statue_x=13829, armor_statue_z=6200)
+    cur = _armor_state(x=14083, z=6351, armor_statue_x=13936, armor_statue_z=6347)
     assert armor_vent_step_complete(q.current, cur) is True
     result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["step_success"] is True

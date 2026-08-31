@@ -90,10 +90,10 @@ DINING_STATUE_X = 0x800DB6E0  # s16
 DINING_STATUE_Z = 0x800DB6E8  # s16
 # Armor room 205 vents-covered / crest-available (QS2=0, QS1=0x20).
 ARMOR_PUZZLE_FLAG = 0x800C8704  # u8 bit 0x20 [CONFIRMED QS1 vs QS2 2026-08-30]
-# Live 205 push-object XZ while shoving (QS3→drain 2026-08-30). Valid on the
-# grate during gs 0x80800044; snaps back to a Jill-adjacent helper after idle.
-ARMOR_STATUE_X = 0x800DBA44  # s16
-ARMOR_STATUE_Z = 0x800DBA4C  # s16
+# Live 205 door-statue XZ (QS1 seated vs QS3 rest 2026-08-30). Stays on the
+# grate after release; 0x800DBA44 is the push helper and leads the pedestal.
+ARMOR_STATUE_X = 0x800DB7D8  # s16
+ARMOR_STATUE_Z = 0x800DB7E0  # s16
 # Player entity block [CONFIRMED via live walk trace 2026-07-02, verify_pos.py]:
 # X/Z step ~64-162 units per frame while walking; facing full circle = 4096
 # (0x1000), turning ~192/quarter-second. Y is elevation (0 on ground floor).

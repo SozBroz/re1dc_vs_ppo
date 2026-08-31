@@ -6,12 +6,10 @@ not a stable pair of addresses like dining 202 (QS1 seated statues go to
 sentinel ``-32640``). Progress uses Jill→current-step vent distance while
 that push state is active.
 
-Complete a vent when live push-object XZ ``0x800DBA44/4C`` covers that grate
-and Jill is *off* it (QS3 shove: statue ``(14001, 6303)``, Jill
-``(14047, 5818)``). The RDT pair ``(13985, 7236)`` is past the visual drain —
-do not mint there. Jill on the grate is the unsolved pose. After release the
-slot snaps to a Jill-adjacent helper — require ``AHEAD_MIN``. Flag ``0x20`` /
-crest still completes both.
+Complete a vent when live door-statue XZ ``0x800DB7D8/E0`` matches the QS1
+seated pedestal ``(13936, 6347)`` (Jill stands beside it at ``(14083, 6351)``).
+The push helper ``0x800DBA44`` leads the pedestal and minted short/long.
+Jill on the grate does not mint. Flag ``0x20`` / crest still completes both.
 
 Authored order is door-side first, then far. RDT grate AOTs: door
     (13985, 7236) / far (5135, 7236). Cabinet crest pickup is (9735, 7236).
@@ -38,8 +36,8 @@ ARMOR_VENT_BEATS: tuple[str, str] = (ARMOR_VENT_DOOR_BEAT, ARMOR_VENT_FAR_BEAT)
 ARMOR_PUZZLE_FLAG = _FLAG_ADDR
 ARMOR_PUZZLE_FLAG_MASK = 0x20
 
-# Visual door-side drain from QS3 shove (not the RDT AOT at z=7236 — that overshoots).
-ARMOR_VENT_DOOR: tuple[int, int] = (14001, 6303)
+# QS1 seated door statue (Jill beside it at (14083, 6351)).
+ARMOR_VENT_DOOR: tuple[int, int] = (13936, 6347)
 ARMOR_VENT_FAR: tuple[int, int] = (5135, 7236)
 # Door first, then far — matches authored pl79 → pl80.
 ARMOR_VENTS: tuple[tuple[int, int], tuple[int, int]] = (
@@ -54,11 +52,9 @@ ARMOR_STATUE_REST: tuple[tuple[int, int], tuple[int, int]] = (
     (5424, 7300),
 )
 ARMOR_CABINET_XZ: tuple[int, int] = (9735, 7236)
-# Statue-on-grate radius. 160 reached the RDT AOT past the visual drain.
-ARMOR_VENT_SEAT_RADIUS = 80.0
-# Live push slot sits ~500 ahead of Jill on the grate; after release it snaps
-# to a ~300 Jill-adjacent helper. Require this gap so idle helper cannot mint.
-ARMOR_STATUE_AHEAD_MIN = 400.0
+# QS1 Jill is ~147 from the seated pedestal; 80 still rejects standing on it.
+ARMOR_VENT_SEAT_RADIUS = 120.0
+ARMOR_STATUE_AHEAD_MIN = 80.0
 ARMOR_STATUE_X = _STATUE_X_ADDR
 ARMOR_STATUE_Z = _STATUE_Z_ADDR
 
@@ -176,9 +172,9 @@ def armor_statue_xz(state: dict[str, Any] | None) -> tuple[float, float] | None:
 def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] | None) -> bool:
     """True when the authored statue covers that grate, or the puzzle is done.
 
-    QS3 shove 2026-08-30: live slot ``0x800DBA44/4C`` on the visual door drain
-    at ``(14001, 6303)`` while Jill stayed at ``(14047, 5818)``. Pushing on to
-    the RDT AOT ``(13985, 7236)`` overshoots. Jill on the grate does not mint.
+    QS1 seated door statue is ``(13936, 6347)`` with Jill beside it at
+    ``(14083, 6351)``. Live XZ is ``0x800DB7D8/E0``. Jill on the grate does
+    not mint.
     """
     idx = armor_vent_index(step)
     if idx is None or not state:
