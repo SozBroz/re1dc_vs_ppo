@@ -1186,11 +1186,17 @@ def encode_planner_loyal_goal(
             v[21] = 1.0
             compass_set = True
     elif room and (target_room is None or room == str(target_room)):
-        from re1_rl.armor_room_puzzle import armor_statue_nav_target
+        from re1_rl.armor_room_puzzle import (
+            armor_statue_nav_target,
+            encode_armor_statue_compass,
+        )
 
         armor_xz = armor_statue_nav_target(state, queue)
         if armor_xz is not None:
-            v[5:10] = encoder._compass_to_xz(state, armor_xz[0], armor_xz[1])
+            armor_compass = encode_armor_statue_compass(state, queue)
+            v[5:10] = armor_compass if armor_compass is not None else encoder._compass_to_xz(
+                state, armor_xz[0], armor_xz[1]
+            )
             v[21] = 1.0
             compass_set = True
         else:

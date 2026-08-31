@@ -61,6 +61,8 @@ ARMOR_STATUE_AHEAD_MIN = 80.0
 ARMOR_STATUE_SIDE_SPLIT_X = 9000.0
 # Door complete waits until Jill reaches the QS1 stand-beside pose.
 ARMOR_VENT_DOOR_DOCK_RADIUS = 160.0
+ARMOR_VENT_DOOR_SEAT_RADIUS = 170.0
+ARMOR_VENT_DOOR_JILL_MAX = 270.0
 # Pedestal has left the south rest but has not run on to the RDT AOT.
 ARMOR_VENT_DOOR_STATUE_Z_LO = 6200.0
 ARMOR_VENT_DOOR_STATUE_Z_HI = 6700.0
@@ -197,6 +199,8 @@ def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] 
         return False
     if armor_puzzle_ready_from_state(state) or armor_sun_crest_held(state):
         return True
+    if not armor_pushing(state):
+        return False
     statue = armor_statue_xz(state)
     if statue is None:
         return False
@@ -206,9 +210,9 @@ def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] 
     if idx == 0:
         if statue[0] < ARMOR_STATUE_SIDE_SPLIT_X:
             return False
-        if _dist_to(state, ARMOR_VENT_DOOR_DOCK) > ARMOR_VENT_DOOR_DOCK_RADIUS:
+        if math.hypot(jx - statue[0], jz - statue[1]) > ARMOR_VENT_DOOR_JILL_MAX:
             return False
-        if not (ARMOR_VENT_DOOR_STATUE_Z_LO <= statue[1] <= ARMOR_VENT_DOOR_STATUE_Z_HI):
+        if math.hypot(statue[0] - ARMOR_VENT_DOOR[0], statue[1] - ARMOR_VENT_DOOR[1]) > ARMOR_VENT_DOOR_SEAT_RADIUS:
             return False
         return True
     if statue[0] > ARMOR_STATUE_SIDE_SPLIT_X:
@@ -322,7 +326,9 @@ def encode_armor_statue_compass(
     dx = target[0] - float(state.get("x", 0) or 0)
     dz = target[1] - float(state.get("z", 0) or 0)
     distance = math.hypot(dx, dz)
-    facing = 2.0 * math.pi * float(state.get("facing", 0) or 0) / FACING_FULL_CIRCLE
+    # RE1 facing is clockwise from +X (QS2: 2048 + up = -X). Negate so
+    # north/south grate bearings are ahead, not 180° off.
+    facing = -2.0 * math.pi * float(state.get("facing", 0) or 0) / FACING_FULL_CIRCLE
     relative = math.atan2(dz, dx) - facing
     return np.asarray(
         [

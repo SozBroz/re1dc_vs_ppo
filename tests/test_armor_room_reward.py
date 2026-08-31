@@ -17,6 +17,7 @@ from re1_rl.armor_room_puzzle import (
     armor_statue_nav_target,
     armor_statue_progress_reward,
     armor_vent_step_complete,
+    encode_armor_statue_compass,
 )
 from re1_rl.planner import WaypointPlanner
 from re1_rl.planner_loyal import PlannerLoyalQueue, encode_planner_loyal_goal
@@ -273,10 +274,10 @@ def test_standing_on_door_vent_does_not_complete() -> None:
 
 
 def test_statue_on_door_drain_completes_pl() -> None:
-    """QS1: statue on the drain, Jill standing beside it."""
+    """QS1 seat while still pushing — idle helper poses do not mint."""
     q = _door_queue()
     prev = _pushing(x=14047, z=6118, armor_statue_x=13829, armor_statue_z=6200)
-    cur = _armor_state(x=14083, z=6351, armor_statue_x=13936, armor_statue_z=6347)
+    cur = _pushing(x=14083, z=6351, armor_statue_x=13936, armor_statue_z=6347)
     assert armor_vent_step_complete(q.current, cur) is True
     result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["step_success"] is True
@@ -317,10 +318,10 @@ def test_statue_on_door_drain_does_not_complete_far_step() -> None:
 
 
 def test_statue_on_far_drain_completes_far_pl() -> None:
-    """QS5: far statue seated, Jill standing beside it."""
+    """QS5 seat while still pushing — idle helper poses do not mint."""
     q = _far_queue()
     prev = _pushing(x=4827, z=7800, armor_statue_x=5013, armor_statue_z=7900)
-    cur = _armor_state(x=4827, z=8008, armor_statue_x=5013, armor_statue_z=8102)
+    cur = _pushing(x=4827, z=8008, armor_statue_x=5013, armor_statue_z=8102)
     assert armor_vent_step_complete(q.current, cur) is True
     result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["step_success"] is True
@@ -388,6 +389,28 @@ def test_standing_on_far_vent_does_not_complete_door_step() -> None:
     assert result["step_success"] is False
     assert q.current is not None
     assert q.current["beat_id"] == "armor_vent_door"
+
+
+def test_bad_pl79_remint_does_not_complete() -> None:
+    """Jill 13963,6279 / slot 14181,6495 is 286 off the QS1 seat."""
+    q = _door_queue()
+    cur = _pushing(x=13963, z=6279, armor_statue_x=14181, armor_statue_z=6495)
+    assert armor_vent_step_complete(q.current, cur) is False
+
+
+def test_idle_qs1_pose_does_not_complete() -> None:
+    q = _door_queue()
+    cur = _armor_state(x=14083, z=6351, armor_statue_x=13936, armor_statue_z=6347)
+    assert armor_vent_step_complete(q.current, cur) is False
+
+
+def test_compass_ahead_when_facing_door_grate() -> None:
+    """RE1 1024 is -Z. Door grate is north of the aisle rest."""
+    q = _door_queue()
+    state = _pushing(x=13696, z=7300, facing=1024)
+    compass = encode_armor_statue_compass(state, q)
+    assert compass is not None
+    assert compass[4] == pytest.approx(1.0, abs=0.15)
 
 
 def test_flag_ready_skips_both_vents_to_crest() -> None:
