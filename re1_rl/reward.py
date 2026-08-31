@@ -919,6 +919,14 @@ def _compute_planner_loyal_reward(
 
     bd = _planner_loyal_breakdown_template()
     bd["step"] = STEP_PENALTY * step_scale
+    from re1_rl.armor_room_puzzle import armor_statue_progress_reward
+
+    bd["armor_statue_progress"] = armor_statue_progress_reward(
+        prev_state,
+        state,
+        planner_loyal_queue,
+        progress,
+    )
 
     loyal = planner_loyal_queue.evaluate_transition(
         prev_state=prev_state,

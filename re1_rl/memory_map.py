@@ -94,6 +94,13 @@ ARMOR_PUZZLE_FLAG = 0x800C8704  # u8 bit 0x20 [CONFIRMED QS1 vs QS2 2026-08-30]
 # grate after release; 0x800DBA44 is the push helper and leads the pedestal.
 ARMOR_STATUE_X = 0x800DB7D8  # s16
 ARMOR_STATUE_Z = 0x800DB7E0  # s16
+# Stable room-script statue coordinates, confirmed against the user's
+# multi-angle QS1-8 and target QS0/QS9 (2026-08-31). Unlike ARMOR_STATUE_X/Z,
+# these survive release and do not change when Jill circles the statue.
+ARMOR_EAST_STATUE_X = 0x800E1700  # s16; QS0 target 13155
+ARMOR_EAST_STATUE_Z = 0x800E1710  # s16; QS0 target 5504
+ARMOR_WEST_STATUE_X = 0x800DEF2C  # s16; QS9 target 5139
+ARMOR_WEST_STATUE_Z = 0x800DEF3C  # s16; QS9 target 5396
 # Player entity block [CONFIRMED via live walk trace 2026-07-02, verify_pos.py]:
 # X/Z step ~64-162 units per frame while walking; facing full circle = 4096
 # (0x1000), turning ~192/quarter-second. Y is elevation (0 on ground floor).
@@ -491,6 +498,10 @@ DEFAULT_RAM_FIELDS: list[tuple[str, int, str]] = [
     ("armor_puzzle_flag", ARMOR_PUZZLE_FLAG, "u8"),
     ("armor_statue_x", ARMOR_STATUE_X, "s16"),
     ("armor_statue_z", ARMOR_STATUE_Z, "s16"),
+    ("armor_east_statue_x", ARMOR_EAST_STATUE_X, "s16"),
+    ("armor_east_statue_z", ARMOR_EAST_STATUE_Z, "s16"),
+    ("armor_west_statue_x", ARMOR_WEST_STATUE_X, "s16"),
+    ("armor_west_statue_z", ARMOR_WEST_STATUE_Z, "s16"),
     ("player_x", PLAYER_X, "s16"),
     ("player_y", PLAYER_Y, "s16"),
     ("player_z", PLAYER_Z, "s16"),

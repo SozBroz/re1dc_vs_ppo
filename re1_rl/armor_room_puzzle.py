@@ -1,20 +1,10 @@
-"""Armor Room 205 statue vents → sun crest (pl79 door, pl80 far, pl81 crest).
+"""Armor Room 205 statue vents → sun crest.
 
-Live shove 2026-08-30 (QS2): push uses ``gs 0x80800044`` (same as the bar
-bookcase). Movable-object XZ shares the player-adjacent work table and is
-not a stable pair of addresses like dining 202 (QS1 seated statues go to
-sentinel ``-32640``). Progress uses Jill→current-step vent distance while
-that push state is active.
-
-Complete a vent when the nearby-object slot is on that grate and Jill
-stands beside it. Oracles are the authored cells: pl79 door
-``(13892, 6370)``, pl80 far ``(5258, 8152)``. Idle stand-beside is
-enough. Flag ``0x20`` / crest still skips both vents. The scratch pad
-is only the nearby statue; do not treat it as a dedicated pair.
-
-Authored order is door-side first, then far. RDT AOTs
-``(13985, 7236)`` / ``(5135, 7236)`` are past the visual drains.
-``(9735, 7236)`` is the center button, not the west-wall cabinet.
+pl79 requires the exact east-vent placement; pl80 requires both exact vent
+placements; pl81 acquires the crest. Stable room-script coordinates were
+identified from multi-angle QS1-8 and verified by live pushes against human
+target QS0/QS9. ``0x800DB7D8/E0`` is only a player-adjacent scratch slot and
+must not grade statue placement.
 """
 
 from __future__ import annotations
@@ -57,6 +47,20 @@ ARMOR_STATUE_REST: tuple[tuple[int, int], tuple[int, int]] = (
     (5424, 7300),
 )
 ARMOR_CABINET_XZ: tuple[int, int] = (9735, 7236)
+ARMOR_BUTTON_XZ: tuple[int, int] = (9735, 7236)
+
+# Human demonstrations, 2026-08-31. The approach pose puts Jill on the correct
+# side; the push endpoint is where a continuous forward hold reached the target.
+ARMOR_EAST_APPROACH_XZ: tuple[int, int] = (13947, 5368)  # QS2
+ARMOR_EAST_PUSH_ENDPOINT_XZ: tuple[int, int] = (14008, 6718)
+ARMOR_WEST_APPROACH_XZ: tuple[int, int] = (9617, 7879)  # QS5
+ARMOR_WEST_PUSH_ENDPOINT_XZ: tuple[int, int] = (4867, 7836)
+
+# Stable room-script values at the demonstrated placements (QS0 / QS9).
+ARMOR_EAST_SCRIPT_TARGET: tuple[int, int] = (13155, 5504)
+ARMOR_WEST_SCRIPT_TARGET: tuple[int, int] = (5139, 5396)
+ARMOR_SCRIPT_TARGET_TOLERANCE = 8
+ARMOR_APPROACH_RADIUS = 384.0
 ARMOR_STATUE_AHEAD_MIN = 80.0
 # Live ``0x800DB7D8`` is the nearby pedestal, not a dedicated pair.
 # East of this X is the door statue; west is the far statue.
@@ -72,8 +76,7 @@ ARMOR_STATUE_X = _STATUE_X_ADDR
 ARMOR_STATUE_Z = _STATUE_Z_ADDR
 
 ARMOR_STATUE_PROGRESS_STEP = 0.5
-ARMOR_STATUE_PROGRESS_BUDGET = 10.0
-ARMOR_STATUE_PROGRESS_REF_DIST = 2000.0
+ARMOR_STATUE_PROGRESS_BUDGET = 4.0
 
 FACING_FULL_CIRCLE = 4096.0
 DIST_NORM = 4096.0
@@ -144,6 +147,62 @@ def armor_sun_crest_step(queue: Any) -> bool:
     return str(step.get("pickup_id") or "") == SUN_CREST_PICKUP_ID
 
 
+def _stable_statue_at_target(
+    state: dict[str, Any],
+    prefix: str,
+    target: tuple[int, int],
+) -> bool:
+    x_key = f"armor_{prefix}_statue_x"
+    z_key = f"armor_{prefix}_statue_z"
+    if x_key not in state or z_key not in state:
+        return False
+    return (
+        abs(int(state.get(x_key, 0) or 0) - target[0])
+        <= ARMOR_SCRIPT_TARGET_TOLERANCE
+        and abs(int(state.get(z_key, 0) or 0) - target[1])
+        <= ARMOR_SCRIPT_TARGET_TOLERANCE
+    )
+
+
+def armor_stable_statues_seated(state: dict[str, Any] | None) -> tuple[bool, bool]:
+    """Placement truth from stable room-script fields: (east, west)."""
+    if not state or str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return False, False
+    return (
+        _stable_statue_at_target(state, "east", ARMOR_EAST_SCRIPT_TARGET),
+        _stable_statue_at_target(state, "west", ARMOR_WEST_SCRIPT_TARGET),
+    )
+
+
+def armor_statue_goal_target(
+    state: dict[str, Any] | None,
+) -> tuple[float, float] | None:
+    """Phase-aware compass target; supplies guidance only and never pays reward."""
+    if not state or str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return None
+    if armor_puzzle_ready_from_state(state) or armor_sun_crest_held(state):
+        return None
+
+    east_seated, west_seated = armor_stable_statues_seated(state)
+    if not east_seated:
+        target = (
+            ARMOR_EAST_PUSH_ENDPOINT_XZ
+            if armor_pushing(state)
+            or _dist_to(state, ARMOR_EAST_APPROACH_XZ) <= ARMOR_APPROACH_RADIUS
+            else ARMOR_EAST_APPROACH_XZ
+        )
+        return float(target[0]), float(target[1])
+    if not west_seated:
+        target = (
+            ARMOR_WEST_PUSH_ENDPOINT_XZ
+            if armor_pushing(state)
+            or _dist_to(state, ARMOR_WEST_APPROACH_XZ) <= ARMOR_APPROACH_RADIUS
+            else ARMOR_WEST_APPROACH_XZ
+        )
+        return float(target[0]), float(target[1])
+    return float(ARMOR_BUTTON_XZ[0]), float(ARMOR_BUTTON_XZ[1])
+
+
 def armor_vents_seated(state: dict[str, Any] | None, progress: Any = None) -> list[bool]:
     if progress is not None:
         seated = getattr(progress, "armor_vents_seated", None)
@@ -183,69 +242,28 @@ def armor_statue_xz(state: dict[str, Any] | None) -> tuple[float, float] | None:
 
 
 def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] | None) -> bool:
-    """True when the authored statue covers that grate, or the puzzle is done.
-
-    Two pedestals share the nearby-object slot. Door uses the east statue
-    (x>9000) on the north grate. Far uses the west statue (x<9000) on the
-    south grate. Jill must stand beside the seated statue, not on it.
-    """
+    """Strict helper-cell gate: pl79=east; pl80=east AND west."""
     idx = armor_vent_index(step)
     if idx is None or not state:
         return False
     if str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
         return False
-    if armor_puzzle_ready_from_state(state) or armor_sun_crest_held(state):
-        return True
-    return armor_vent_physically_seated(step, state)
+    east_seated, west_seated = armor_stable_statues_seated(state)
+    return east_seated if idx == 0 else east_seated and west_seated
 
 
 def armor_vent_physically_seated(
     step: dict[str, Any] | None, state: dict[str, Any] | None
 ) -> bool:
-    """Geometry only — ignores flag 0x20. Used by the author harness to mint."""
-    idx = armor_vent_index(step)
-    if idx is None or not state:
-        return False
-    if str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
-        return False
-    statue = armor_statue_xz(state)
-    if statue is None:
-        return False
-    jx, jz = _jill_xz(state)
-    apart = math.hypot(jx - statue[0], jz - statue[1])
-    if apart < ARMOR_STATUE_AHEAD_MIN or apart > ARMOR_VENT_JILL_MAX:
-        return False
-    vent = ARMOR_VENTS[idx]
-    if idx == 0:
-        if statue[0] < ARMOR_STATUE_SIDE_SPLIT_X:
-            return False
-    elif statue[0] > ARMOR_STATUE_SIDE_SPLIT_X:
-        return False
-    return math.hypot(statue[0] - vent[0], statue[1] - vent[1]) <= ARMOR_VENT_SEAT_RADIUS
+    """Stable room-script placement gate used by authoring and live minting."""
+    return armor_vent_step_complete(step, state)
 
 
 def claim_armor_vent_seats(state: dict[str, Any] | None, progress: Any) -> None:
-    """Mark a vent seated once the live statue slot covers it (Jill off the grate)."""
+    """Mirror stable placement truth into episode telemetry."""
     if progress is None or not state:
         return
-    seated = armor_vents_seated(state, progress)
-    if armor_puzzle_ready_from_state(state) or armor_sun_crest_held(state):
-        progress.armor_vents_seated = [True, True]
-        return
-    statue = armor_statue_xz(state)
-    if statue is None:
-        progress.armor_vents_seated = seated
-        return
-    jx, jz = _jill_xz(state)
-    if math.hypot(jx - statue[0], jz - statue[1]) < ARMOR_STATUE_AHEAD_MIN:
-        progress.armor_vents_seated = seated
-        return
-    for i, beat in enumerate(ARMOR_VENT_BEATS):
-        if seated[i]:
-            continue
-        if armor_vent_step_complete({"beat_id": beat}, state):
-            seated[i] = True
-    progress.armor_vents_seated = seated
+    progress.armor_vents_seated = list(armor_stable_statues_seated(state))
 
 
 def armor_statue_nav_target(
@@ -253,26 +271,17 @@ def armor_statue_nav_target(
     queue: Any = None,
     progress: Any = None,
 ) -> tuple[float, float] | None:
-    """World XZ for the current armor step: door vent, then far, then cabinet."""
+    """World XZ for the phase-aware approach/push/button compass."""
     del progress
     if not armor_statue_active(queue, state):
         return None
-    idx = armor_vent_index(_step_from_queue(queue))
-    if idx is not None:
-        if armor_pushing(state):
-            vx, vz = ARMOR_VENTS[idx]
-            return (float(vx), float(vz))
-        rx, rz = ARMOR_STATUE_REST[idx]
-        return (float(rx), float(rz))
-    if armor_sun_crest_step(queue):
-        return (float(ARMOR_CABINET_XZ[0]), float(ARMOR_CABINET_XZ[1]))
-    return None
+    return armor_statue_goal_target(state)
 
 
-def armor_statue_progress_phi(remaining: float) -> float:
-    capped = min(max(float(remaining), 0.0), ARMOR_STATUE_PROGRESS_REF_DIST)
+def armor_statue_progress_phi(remaining: float, reference: float) -> float:
+    distance = max(float(remaining), 0.0)
     return ARMOR_STATUE_PROGRESS_BUDGET * (
-        1.0 - capped / ARMOR_STATUE_PROGRESS_REF_DIST
+        1.0 - distance / max(float(reference), 1.0)
     )
 
 
@@ -282,9 +291,51 @@ def armor_statue_progress_reward(
     queue: Any = None,
     progress: Any = None,
 ) -> float:
-    """Retired. Vent helper crumbs poisoned training. Crest is acquire-only."""
-    del prev_state, state, queue, progress
-    return 0.0
+    """Shove-only potential: toward endpoint pays; away is punished.
+
+    Jill and the pedestal move together while ``PUSH_GAME_STATE`` is active.
+    Using Jill's demonstrated push corridor avoids the angle-dependent nearby
+    object scratch slot. Each full vent shove telescopes to at most +4, below
+    the +8 helper-cell completion pulse.
+    """
+    del progress
+    if not prev_state or not state:
+        return 0.0
+    idx = armor_vent_index(_step_from_queue(queue))
+    if idx is None:
+        return 0.0
+    if str(prev_state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return 0.0
+    if str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return 0.0
+    if not (armor_pushing(prev_state) or armor_pushing(state)):
+        return 0.0
+
+    if idx == 0:
+        # East helper: reject pushes on the west half of the room.
+        if min(_jill_xz(prev_state)[0], _jill_xz(state)[0]) < 12000.0:
+            return 0.0
+        approach = ARMOR_EAST_APPROACH_XZ
+        target = ARMOR_EAST_PUSH_ENDPOINT_XZ
+    else:
+        # West helper: reject pushes on the east statue.
+        if max(_jill_xz(prev_state)[0], _jill_xz(state)[0]) > 11000.0:
+            return 0.0
+        approach = ARMOR_WEST_APPROACH_XZ
+        target = ARMOR_WEST_PUSH_ENDPOINT_XZ
+
+    reference = math.hypot(
+        float(approach[0] - target[0]),
+        float(approach[1] - target[1]),
+    )
+    raw = armor_statue_progress_phi(
+        _dist_to(state, target), reference
+    ) - armor_statue_progress_phi(
+        _dist_to(prev_state, target), reference
+    )
+    return float(
+        np.clip(raw, -ARMOR_STATUE_PROGRESS_STEP, ARMOR_STATUE_PROGRESS_STEP)
+    )
 
 
 def encode_armor_statue_compass(

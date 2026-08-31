@@ -12,8 +12,8 @@ Reward contract (imperator 2026-08-25):
   COMBINE reshuffles (reload / herb mix / ammo merge) and scripted ``event``
   grants (Barry acid, Speyer bazooka, …) are not pickups.
 - Cell timer: flat 12 minutes only (no custom yawn_cell_timeouts.json times).
-- Armor room 205: ``armor_room_enter`` (pl78) then ``sun_crest`` acquire
-  (pl79). No vent helper cells or shove crumbs.
+- Armor room 205: ``armor_room_enter`` (pl78), exact east vent (pl79),
+  exact east+west vents (pl80), then ``sun_crest`` acquire (pl81).
 """
 from __future__ import annotations
 
@@ -618,6 +618,14 @@ class PlannerLoyalQueue:
             self._rebuild_satisfied_pickups()
             return result
 
+        from re1_rl.armor_room_puzzle import armor_vent_step_complete
+
+        if armor_vent_step_complete(step, state):
+            result["step_success"] = True
+            self._index += 1
+            self.step_success_pending = True
+            return result
+
         # Objective / puzzle / cutscene / boss completion via story_use or flags.
         if op in {"objective", "do_puzzle", "trigger_cutscene", "boss"}:
             site = str(step.get("site_id") or "")
@@ -1151,7 +1159,17 @@ def encode_planner_loyal_goal(
             v[21] = 1.0
             compass_set = True
     elif room and (target_room is None or room == str(target_room)):
-        target_xz = _planner_step_target_xz(step, item_positions=item_positions)
+        target_xz = None
+        if room == "205":
+            from re1_rl.armor_room_puzzle import (
+                armor_statue_active,
+                armor_statue_goal_target,
+            )
+
+            if armor_statue_active(queue, state):
+                target_xz = armor_statue_goal_target(state)
+        if target_xz is None:
+            target_xz = _planner_step_target_xz(step, item_positions=item_positions)
         if target_xz is not None:
             v[5:10] = encoder._compass_to_xz(state, target_xz[0], target_xz[1])
             v[21] = 1.0

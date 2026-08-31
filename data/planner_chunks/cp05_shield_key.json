@@ -125,6 +125,8 @@
     {"n": 71, "op": "traverse", "edge_id": "202->203"},
     {"n": 72, "op": "traverse", "edge_id": "203->204"},
     {"n": 73, "op": "traverse", "edge_id": "204->205", "beat_id": "armor_room_enter"},
-    {"n": 74, "op": "acquire", "pickup_id": "205:sun_crest:1", "room_id": "205", "beat_id": "sun_crest", "note": "cabinet sun crest; no vent helper cells"}
+    {"n": 74, "op": "do_puzzle", "site_id": "armor_vent_door", "room_id": "205", "beat_id": "armor_vent_door", "note": "east statue exactly on its vent"},
+    {"n": 75, "op": "do_puzzle", "site_id": "armor_vent_far", "room_id": "205", "beat_id": "armor_vent_far", "note": "both east and west statues exactly on their vents"},
+    {"n": 76, "op": "acquire", "pickup_id": "205:sun_crest:1", "room_id": "205", "beat_id": "sun_crest", "note": "activate center button, then take cabinet sun crest"}
   ]
 }
