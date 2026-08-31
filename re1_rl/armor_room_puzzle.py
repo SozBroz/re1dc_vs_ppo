@@ -1,10 +1,10 @@
 """Armor Room 205 statue vents → sun crest.
 
 pl79 requires the exact east-vent placement; pl80 requires both exact vent
-placements; pl81 acquires the crest. Stable room-script coordinates were
-identified from multi-angle QS1-8 and verified by live pushes against human
-target QS0/QS9. ``0x800DB7D8/E0`` is only a player-adjacent scratch slot and
-must not grade statue placement.
+placements; pl81 acquires the crest. Placement uses ROOM2050's fixed object-1
+and object-2 work records, verified against QS1-9/0, both false mints, live
+50-unit shoves, overshoots, and savestate reloads. ``0x800DB7D8/E0`` is player
+model geometry and must never grade statue placement.
 """
 
 from __future__ import annotations
@@ -28,23 +28,19 @@ ARMOR_VENT_BEATS: tuple[str, str] = (ARMOR_VENT_DOOR_BEAT, ARMOR_VENT_FAR_BEAT)
 ARMOR_PUZZLE_FLAG = _FLAG_ADDR
 ARMOR_PUZZLE_FLAG_MASK = 0x20
 
-# Authored pl79 (2026-08-31): Jill (14080, 6468) / statue (13892, 6370).
-ARMOR_VENT_DOOR: tuple[int, int] = (13892, 6370)
-ARMOR_VENT_DOOR_DOCK: tuple[int, int] = (14080, 6468)
-# Authored pl80 (2026-08-31): Jill (5072, 8058) / statue (5258, 8152).
-ARMOR_VENT_FAR: tuple[int, int] = (5258, 8152)
-ARMOR_VENT_FAR_DOCK: tuple[int, int] = (5072, 8058)
+ARMOR_VENT_DOOR: tuple[int, int] = (14035, 7340)
+ARMOR_VENT_DOOR_DOCK: tuple[int, int] = (14008, 6518)
+ARMOR_VENT_FAR: tuple[int, int] = (4895, 7186)
+ARMOR_VENT_FAR_DOCK: tuple[int, int] = (5717, 7136)
 # Door first, then far — matches authored pl79 → pl80.
 ARMOR_VENTS: tuple[tuple[int, int], tuple[int, int]] = (
     ARMOR_VENT_DOOR,
     ARMOR_VENT_FAR,
 )
-# Pedestal rest (QS2 shove 2026-08-30). Door statue sits ~296 west of its
-# grate; a 420 seat radius completed the cell on first contact. Far rest is
-# the same offset toward the aisle center.
+# ROOM2050 Om_set starting coordinates for object 2 (east) and object 1 (west).
 ARMOR_STATUE_REST: tuple[tuple[int, int], tuple[int, int]] = (
-    (13696, 7300),
-    (5424, 7300),
+    (14035, 6190),
+    (8795, 7886),
 )
 ARMOR_CABINET_XZ: tuple[int, int] = (9735, 7236)
 ARMOR_BUTTON_XZ: tuple[int, int] = (9735, 7236)
@@ -52,13 +48,15 @@ ARMOR_BUTTON_XZ: tuple[int, int] = (9735, 7236)
 # Human demonstrations, 2026-08-31. The approach pose puts Jill on the correct
 # side; the push endpoint is where a continuous forward hold reached the target.
 ARMOR_EAST_APPROACH_XZ: tuple[int, int] = (13947, 5368)  # QS2
-ARMOR_EAST_PUSH_ENDPOINT_XZ: tuple[int, int] = (14008, 6718)
-ARMOR_WEST_APPROACH_XZ: tuple[int, int] = (9617, 7879)  # QS5
-ARMOR_WEST_PUSH_ENDPOINT_XZ: tuple[int, int] = (4867, 7836)
+ARMOR_EAST_PUSH_ENDPOINT_XZ: tuple[int, int] = (14008, 6518)
+ARMOR_WEST_APPROACH_XZ: tuple[int, int] = (8704, 8708)  # QS6, align Z first
+ARMOR_WEST_PUSH_ENDPOINT_XZ: tuple[int, int] = (8539, 8008)
+ARMOR_WEST_LATERAL_APPROACH_XZ: tuple[int, int] = (9617, 7179)
+ARMOR_WEST_LATERAL_PUSH_ENDPOINT_XZ: tuple[int, int] = (5717, 7136)
 
-# Stable room-script values at the demonstrated placements (QS0 / QS9).
-ARMOR_EAST_SCRIPT_TARGET: tuple[int, int] = (13155, 5504)
-ARMOR_WEST_SCRIPT_TARGET: tuple[int, int] = (5139, 5396)
+# Exact ROOM2050 object-work coordinates at the demonstrated QS0/QS9 seats.
+ARMOR_EAST_SCRIPT_TARGET: tuple[int, int] = ARMOR_VENT_DOOR
+ARMOR_WEST_SCRIPT_TARGET: tuple[int, int] = ARMOR_VENT_FAR
 ARMOR_SCRIPT_TARGET_TOLERANCE = 8
 ARMOR_APPROACH_RADIUS = 384.0
 ARMOR_STATUE_AHEAD_MIN = 80.0
@@ -152,15 +150,19 @@ def _stable_statue_at_target(
     prefix: str,
     target: tuple[int, int],
 ) -> bool:
-    x_key = f"armor_{prefix}_statue_x"
-    z_key = f"armor_{prefix}_statue_z"
-    if x_key not in state or z_key not in state:
+    pairs = [
+        (f"armor_{prefix}_statue_x", f"armor_{prefix}_statue_z"),
+        (f"armor_{prefix}_statue_x_b", f"armor_{prefix}_statue_z_b"),
+        (f"armor_{prefix}_statue_x_c", f"armor_{prefix}_statue_z_c"),
+    ]
+    if any(x_key not in state or z_key not in state for x_key, z_key in pairs):
         return False
-    return (
+    return all(
         abs(int(state.get(x_key, 0) or 0) - target[0])
         <= ARMOR_SCRIPT_TARGET_TOLERANCE
         and abs(int(state.get(z_key, 0) or 0) - target[1])
         <= ARMOR_SCRIPT_TARGET_TOLERANCE
+        for x_key, z_key in pairs
     )
 
 
@@ -193,12 +195,28 @@ def armor_statue_goal_target(
         )
         return float(target[0]), float(target[1])
     if not west_seated:
-        target = (
-            ARMOR_WEST_PUSH_ENDPOINT_XZ
-            if armor_pushing(state)
-            or _dist_to(state, ARMOR_WEST_APPROACH_XZ) <= ARMOR_APPROACH_RADIUS
-            else ARMOR_WEST_APPROACH_XZ
+        west = _named_statue_xz(state, "west")
+        depth_aligned = (
+            west is not None
+            and abs(west[1] - ARMOR_WEST_SCRIPT_TARGET[1])
+            <= ARMOR_SCRIPT_TARGET_TOLERANCE
         )
+        if depth_aligned:
+            target = (
+                ARMOR_WEST_LATERAL_PUSH_ENDPOINT_XZ
+                if armor_pushing(state)
+                or _dist_to(state, ARMOR_WEST_LATERAL_APPROACH_XZ)
+                <= ARMOR_APPROACH_RADIUS
+                else ARMOR_WEST_LATERAL_APPROACH_XZ
+            )
+        else:
+            target = (
+                ARMOR_WEST_PUSH_ENDPOINT_XZ
+                if armor_pushing(state)
+                or _dist_to(state, ARMOR_WEST_APPROACH_XZ)
+                <= ARMOR_APPROACH_RADIUS
+                else ARMOR_WEST_APPROACH_XZ
+            )
         return float(target[0]), float(target[1])
     return float(ARMOR_BUTTON_XZ[0]), float(ARMOR_BUTTON_XZ[1])
 
@@ -239,6 +257,18 @@ def armor_statue_xz(state: dict[str, Any] | None) -> tuple[float, float] | None:
     if "armor_statue_x" not in state or "armor_statue_z" not in state:
         return None
     return (float(state.get("armor_statue_x") or 0), float(state.get("armor_statue_z") or 0))
+
+
+def _named_statue_xz(
+    state: dict[str, Any] | None, prefix: str
+) -> tuple[float, float] | None:
+    if not state:
+        return None
+    x_key = f"armor_{prefix}_statue_x"
+    z_key = f"armor_{prefix}_statue_z"
+    if x_key not in state or z_key not in state:
+        return None
+    return float(state.get(x_key) or 0), float(state.get(z_key) or 0)
 
 
 def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] | None) -> bool:
@@ -291,13 +321,7 @@ def armor_statue_progress_reward(
     queue: Any = None,
     progress: Any = None,
 ) -> float:
-    """Shove-only potential: toward endpoint pays; away is punished.
-
-    Jill and the pedestal move together while ``PUSH_GAME_STATE`` is active.
-    Using Jill's demonstrated push corridor avoids the angle-dependent nearby
-    object scratch slot. Each full vent shove telescopes to at most +4, below
-    the +8 helper-cell completion pulse.
-    """
+    """Shove-only object potential: toward the exact seat pays; away is punished."""
     del progress
     if not prev_state or not state:
         return 0.0
@@ -312,26 +336,25 @@ def armor_statue_progress_reward(
         return 0.0
 
     if idx == 0:
-        # East helper: reject pushes on the west half of the room.
-        if min(_jill_xz(prev_state)[0], _jill_xz(state)[0]) < 12000.0:
-            return 0.0
-        approach = ARMOR_EAST_APPROACH_XZ
-        target = ARMOR_EAST_PUSH_ENDPOINT_XZ
+        prefix = "east"
+        rest = ARMOR_STATUE_REST[0]
+        target = ARMOR_EAST_SCRIPT_TARGET
     else:
-        # West helper: reject pushes on the east statue.
-        if max(_jill_xz(prev_state)[0], _jill_xz(state)[0]) > 11000.0:
-            return 0.0
-        approach = ARMOR_WEST_APPROACH_XZ
-        target = ARMOR_WEST_PUSH_ENDPOINT_XZ
+        prefix = "west"
+        rest = ARMOR_STATUE_REST[1]
+        target = ARMOR_WEST_SCRIPT_TARGET
 
-    reference = math.hypot(
-        float(approach[0] - target[0]),
-        float(approach[1] - target[1]),
-    )
+    prev_xz = _named_statue_xz(prev_state, prefix)
+    current_xz = _named_statue_xz(state, prefix)
+    if prev_xz is None or current_xz is None:
+        return 0.0
+    reference = math.hypot(float(rest[0] - target[0]), float(rest[1] - target[1]))
     raw = armor_statue_progress_phi(
-        _dist_to(state, target), reference
+        math.hypot(current_xz[0] - target[0], current_xz[1] - target[1]),
+        reference,
     ) - armor_statue_progress_phi(
-        _dist_to(prev_state, target), reference
+        math.hypot(prev_xz[0] - target[0], prev_xz[1] - target[1]),
+        reference,
     )
     return float(
         np.clip(raw, -ARMOR_STATUE_PROGRESS_STEP, ARMOR_STATUE_PROGRESS_STEP)

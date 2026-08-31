@@ -90,17 +90,26 @@ DINING_STATUE_X = 0x800DB6E0  # s16
 DINING_STATUE_Z = 0x800DB6E8  # s16
 # Armor room 205 vents-covered / crest-available (QS2=0, QS1=0x20).
 ARMOR_PUZZLE_FLAG = 0x800C8704  # u8 bit 0x20 [CONFIRMED QS1 vs QS2 2026-08-30]
-# Live 205 door-statue XZ (QS1 seated vs QS3 rest 2026-08-30). Stays on the
-# grate after release; 0x800DBA44 is the push helper and leads the pedestal.
+# Player-model work vertices near Jill, not armor statue coordinates. Kept for
+# backwards-compatible telemetry only; never use these to grade room 205.
 ARMOR_STATUE_X = 0x800DB7D8  # s16
 ARMOR_STATUE_Z = 0x800DB7E0  # s16
-# Stable room-script statue coordinates, confirmed against the user's
-# multi-angle QS1-8 and target QS0/QS9 (2026-08-31). Unlike ARMOR_STATUE_X/Z,
-# these survive release and do not change when Jill circles the statue.
-ARMOR_EAST_STATUE_X = 0x800E1700  # s16; QS0 target 13155
-ARMOR_EAST_STATUE_Z = 0x800E1710  # s16; QS0 target 5504
-ARMOR_WEST_STATUE_X = 0x800DEF2C  # s16; QS9 target 5139
-ARMOR_WEST_STATUE_Z = 0x800DEF3C  # s16; QS9 target 5396
+# ROOM2050 OM work records: object 1 = west statue, object 2 = east statue.
+# These match the Om_set coordinates in ROOM2050.RDT, move by exactly 50 world
+# units during live shoves, survive release/reload, and reject both false mints.
+# Each record contains three identical XZ copies; grading requires all three.
+ARMOR_WEST_STATUE_X = 0x8012CC0C  # s16
+ARMOR_WEST_STATUE_Z = 0x8012CC14  # s16
+ARMOR_WEST_STATUE_X_B = 0x8012CC2C  # s16
+ARMOR_WEST_STATUE_Z_B = 0x8012CC34  # s16
+ARMOR_WEST_STATUE_X_C = 0x8012CC44  # s16
+ARMOR_WEST_STATUE_Z_C = 0x8012CC48  # s16
+ARMOR_EAST_STATUE_X = 0x8012CCB0  # s16
+ARMOR_EAST_STATUE_Z = 0x8012CCB8  # s16
+ARMOR_EAST_STATUE_X_B = 0x8012CCD0  # s16
+ARMOR_EAST_STATUE_Z_B = 0x8012CCD8  # s16
+ARMOR_EAST_STATUE_X_C = 0x8012CCE8  # s16
+ARMOR_EAST_STATUE_Z_C = 0x8012CCEC  # s16
 # Player entity block [CONFIRMED via live walk trace 2026-07-02, verify_pos.py]:
 # X/Z step ~64-162 units per frame while walking; facing full circle = 4096
 # (0x1000), turning ~192/quarter-second. Y is elevation (0 on ground floor).
@@ -500,8 +509,16 @@ DEFAULT_RAM_FIELDS: list[tuple[str, int, str]] = [
     ("armor_statue_z", ARMOR_STATUE_Z, "s16"),
     ("armor_east_statue_x", ARMOR_EAST_STATUE_X, "s16"),
     ("armor_east_statue_z", ARMOR_EAST_STATUE_Z, "s16"),
+    ("armor_east_statue_x_b", ARMOR_EAST_STATUE_X_B, "s16"),
+    ("armor_east_statue_z_b", ARMOR_EAST_STATUE_Z_B, "s16"),
+    ("armor_east_statue_x_c", ARMOR_EAST_STATUE_X_C, "s16"),
+    ("armor_east_statue_z_c", ARMOR_EAST_STATUE_Z_C, "s16"),
     ("armor_west_statue_x", ARMOR_WEST_STATUE_X, "s16"),
     ("armor_west_statue_z", ARMOR_WEST_STATUE_Z, "s16"),
+    ("armor_west_statue_x_b", ARMOR_WEST_STATUE_X_B, "s16"),
+    ("armor_west_statue_z_b", ARMOR_WEST_STATUE_Z_B, "s16"),
+    ("armor_west_statue_x_c", ARMOR_WEST_STATUE_X_C, "s16"),
+    ("armor_west_statue_z_c", ARMOR_WEST_STATUE_Z_C, "s16"),
     ("player_x", PLAYER_X, "s16"),
     ("player_y", PLAYER_Y, "s16"),
     ("player_z", PLAYER_Z, "s16"),

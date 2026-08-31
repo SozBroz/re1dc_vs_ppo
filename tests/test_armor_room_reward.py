@@ -12,6 +12,7 @@ from re1_rl.armor_room_puzzle import (
     ARMOR_EAST_PUSH_ENDPOINT_XZ,
     ARMOR_EAST_SCRIPT_TARGET,
     ARMOR_WEST_APPROACH_XZ,
+    ARMOR_WEST_LATERAL_APPROACH_XZ,
     ARMOR_WEST_PUSH_ENDPOINT_XZ,
     ARMOR_WEST_SCRIPT_TARGET,
     armor_statue_progress_reward,
@@ -59,18 +60,21 @@ def test_east_shove_toward_pays_and_away_is_punished() -> None:
         x=ARMOR_EAST_APPROACH_XZ[0],
         z=ARMOR_EAST_APPROACH_XZ[1],
         game_state=PUSH_GAME_STATE,
+        **_statue_fields("east", (14035, 6190)),
     )
     toward = _armor_state(
         x=ARMOR_EAST_APPROACH_XZ[0],
         z=ARMOR_EAST_APPROACH_XZ[1] + 200,
         game_state=PUSH_GAME_STATE,
         step=2,
+        **_statue_fields("east", (14035, 6390)),
     )
     away = _armor_state(
         x=ARMOR_EAST_APPROACH_XZ[0],
         z=ARMOR_EAST_APPROACH_XZ[1] - 200,
         game_state=PUSH_GAME_STATE,
         step=2,
+        **_statue_fields("east", (14035, 5990)),
     )
     assert armor_statue_progress_reward(prev, toward, q, progress) > 0.0
     assert armor_statue_progress_reward(prev, away, q, progress) < 0.0
@@ -91,8 +95,12 @@ def test_shaping_requires_active_push_and_current_vent_step() -> None:
         i for i, s in enumerate(q._steps) if s.get("beat_id") == "armor_vent_door"
     )
     q.seek(idx)
-    prev = _armor_state(x=14000, z=5400)
-    cur = _armor_state(x=14000, z=5600)
+    prev = _armor_state(
+        x=14000, z=5400, **_statue_fields("east", (14035, 6190))
+    )
+    cur = _armor_state(
+        x=14000, z=5600, **_statue_fields("east", (14035, 6390))
+    )
     assert armor_statue_progress_reward(prev, cur, q) == 0.0
     q.seek(idx + 2)
     prev["game_state"] = PUSH_GAME_STATE
@@ -117,6 +125,18 @@ def _goal(state: dict, beat_id: str) -> tuple[object, object]:
     return goal, encoder
 
 
+def _statue_fields(prefix: str, xz: tuple[int, int]) -> dict[str, int]:
+    x, z = xz
+    return {
+        f"armor_{prefix}_statue_x": x,
+        f"armor_{prefix}_statue_z": z,
+        f"armor_{prefix}_statue_x_b": x,
+        f"armor_{prefix}_statue_z_b": z,
+        f"armor_{prefix}_statue_x_c": x,
+        f"armor_{prefix}_statue_z_c": z,
+    }
+
+
 def _armor_state(**overrides: object) -> dict:
     state = make_state(
         room="205",
@@ -124,10 +144,8 @@ def _armor_state(**overrides: object) -> dict:
         z=7300,
         facing=0,
         in_control=True,
-        armor_east_statue_x=13155,
-        armor_east_statue_z=704,
-        armor_west_statue_x=6949,
-        armor_west_statue_z=3864,
+        **_statue_fields("east", (14035, 6190)),
+        **_statue_fields("west", (8795, 7886)),
     )
     state.update(overrides)
     return state
@@ -156,22 +174,23 @@ def test_crest_goal_guides_to_east_approach_then_push_endpoint() -> None:
 
 
 def test_crest_goal_advances_to_west_only_after_stable_east_target() -> None:
-    state = _armor_state(
-        armor_east_statue_x=ARMOR_EAST_SCRIPT_TARGET[0],
-        armor_east_statue_z=ARMOR_EAST_SCRIPT_TARGET[1],
-    )
+    state = _armor_state(**_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET))
     assert armor_stable_statues_seated(state) == (True, False)
     _assert_compass(state, ARMOR_WEST_APPROACH_XZ, "armor_vent_far")
     state.update(x=ARMOR_WEST_APPROACH_XZ[0], z=ARMOR_WEST_APPROACH_XZ[1])
     _assert_compass(state, ARMOR_WEST_PUSH_ENDPOINT_XZ, "armor_vent_far")
+    state.update(x=16000, z=7300)
+    state.update(**_statue_fields("west", (8795, ARMOR_WEST_SCRIPT_TARGET[1])))
+    _assert_compass(state, ARMOR_WEST_LATERAL_APPROACH_XZ, "armor_vent_far")
 
 
 def test_crest_goal_points_to_button_after_both_stable_targets() -> None:
     state = _armor_state(
-        armor_east_statue_x=ARMOR_EAST_SCRIPT_TARGET[0],
-        armor_east_statue_z=ARMOR_EAST_SCRIPT_TARGET[1],
-        armor_west_statue_x=ARMOR_WEST_SCRIPT_TARGET[0],
-        armor_west_statue_z=ARMOR_WEST_SCRIPT_TARGET[1] + 1,
+        **_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET),
+        **_statue_fields(
+            "west",
+            (ARMOR_WEST_SCRIPT_TARGET[0], ARMOR_WEST_SCRIPT_TARGET[1] + 1),
+        ),
     )
     assert armor_stable_statues_seated(state) == (True, True)
     _assert_compass(state, ARMOR_BUTTON_XZ, "sun_crest")
@@ -179,19 +198,10 @@ def test_crest_goal_points_to_button_after_both_stable_targets() -> None:
 
 def test_pl80_gate_rejects_either_statue_alone_and_requires_both() -> None:
     step = {"beat_id": "armor_vent_far"}
-    east_only = _armor_state(
-        armor_east_statue_x=ARMOR_EAST_SCRIPT_TARGET[0],
-        armor_east_statue_z=ARMOR_EAST_SCRIPT_TARGET[1],
-    )
-    west_only = _armor_state(
-        armor_west_statue_x=ARMOR_WEST_SCRIPT_TARGET[0],
-        armor_west_statue_z=ARMOR_WEST_SCRIPT_TARGET[1],
-    )
+    east_only = _armor_state(**_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET))
+    west_only = _armor_state(**_statue_fields("west", ARMOR_WEST_SCRIPT_TARGET))
     both = dict(east_only)
-    both.update(
-        armor_west_statue_x=ARMOR_WEST_SCRIPT_TARGET[0],
-        armor_west_statue_z=ARMOR_WEST_SCRIPT_TARGET[1],
-    )
+    both.update(_statue_fields("west", ARMOR_WEST_SCRIPT_TARGET))
     flagged_but_unseated = _armor_state(armor_puzzle_flag=0x20)
     assert armor_vent_step_complete(step, east_only) is False
     assert armor_vent_step_complete(step, west_only) is False
@@ -201,19 +211,54 @@ def test_pl80_gate_rejects_either_statue_alone_and_requires_both() -> None:
 
 def test_pl79_gate_requires_exact_east_target() -> None:
     step = {"beat_id": "armor_vent_door"}
-    west_only = _armor_state(
-        armor_west_statue_x=ARMOR_WEST_SCRIPT_TARGET[0],
-        armor_west_statue_z=ARMOR_WEST_SCRIPT_TARGET[1],
-    )
+    west_only = _armor_state(**_statue_fields("west", ARMOR_WEST_SCRIPT_TARGET))
     east = _armor_state(
-        armor_east_statue_x=ARMOR_EAST_SCRIPT_TARGET[0],
-        armor_east_statue_z=ARMOR_EAST_SCRIPT_TARGET[1] + 8,
+        **_statue_fields(
+            "east",
+            (ARMOR_EAST_SCRIPT_TARGET[0], ARMOR_EAST_SCRIPT_TARGET[1] + 8),
+        )
     )
     east_outside_tolerance = dict(east)
-    east_outside_tolerance["armor_east_statue_z"] += 1
+    for suffix in ("", "_b", "_c"):
+        east_outside_tolerance[f"armor_east_statue_z{suffix}"] += 1
     assert armor_vent_step_complete(step, west_only) is False
     assert armor_vent_step_complete(step, east) is True
     assert armor_vent_step_complete(step, east_outside_tolerance) is False
+
+
+def test_gate_rejects_mirror_mismatch_and_observed_false_mints() -> None:
+    east_step = {"beat_id": "armor_vent_door"}
+    west_step = {"beat_id": "armor_vent_far"}
+    mismatched = _armor_state(**_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET))
+    mismatched["armor_east_statue_z_b"] -= 50
+    false_pl79 = _armor_state()
+    false_pl80 = _armor_state(**_statue_fields("east", (14035, 5340)))
+    assert armor_vent_step_complete(east_step, mismatched) is False
+    assert armor_vent_step_complete(east_step, false_pl79) is False
+    assert armor_vent_step_complete(west_step, false_pl80) is False
+
+
+@pytest.mark.parametrize(
+    ("prefix", "target"),
+    [
+        ("east", ARMOR_EAST_SCRIPT_TARGET),
+        ("west", ARMOR_WEST_SCRIPT_TARGET),
+    ],
+)
+def test_gate_rejects_one_live_shove_step_around_exact_target(
+    prefix: str, target: tuple[int, int]
+) -> None:
+    step = {
+        "beat_id": "armor_vent_door" if prefix == "east" else "armor_vent_far"
+    }
+    base = _armor_state(**_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET))
+    if prefix == "west":
+        base.update(_statue_fields("west", target))
+    assert armor_vent_step_complete(step, base) is True
+    for dx, dz in ((50, 0), (-50, 0), (0, 50), (0, -50)):
+        near_miss = dict(base)
+        near_miss.update(_statue_fields(prefix, (target[0] + dx, target[1] + dz)))
+        assert armor_vent_step_complete(step, near_miss) is False
 
 
 def test_pl80_transition_advances_only_with_both_statues_seated() -> None:
@@ -222,19 +267,13 @@ def test_pl80_transition_advances_only_with_both_statues_seated() -> None:
         i for i, s in enumerate(q._steps) if s.get("beat_id") == "armor_vent_far"
     )
     q.seek(idx)
-    east_only = _armor_state(
-        armor_east_statue_x=ARMOR_EAST_SCRIPT_TARGET[0],
-        armor_east_statue_z=ARMOR_EAST_SCRIPT_TARGET[1],
-    )
+    east_only = _armor_state(**_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET))
     result = q.evaluate_transition(prev_state=east_only, state=east_only)
     assert result["step_success"] is False
     assert q.current and q.current["beat_id"] == "armor_vent_far"
 
     both = dict(east_only)
-    both.update(
-        armor_west_statue_x=ARMOR_WEST_SCRIPT_TARGET[0],
-        armor_west_statue_z=ARMOR_WEST_SCRIPT_TARGET[1],
-    )
+    both.update(_statue_fields("west", ARMOR_WEST_SCRIPT_TARGET))
     result = q.evaluate_transition(prev_state=east_only, state=both)
     assert result["step_success"] is True
     assert q.current and q.current["beat_id"] == "sun_crest"
