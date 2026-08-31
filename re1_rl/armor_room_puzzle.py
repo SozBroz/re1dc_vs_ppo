@@ -64,8 +64,8 @@ ARMOR_VENT_DOOR_STATUE_Z_HI = 6700.0
 # QS5 far dock. One PPO push step is 8 frames ≈ 200 Z; the 160 dock
 # radius is two steps wide so a forward/noop can land on it.
 ARMOR_VENT_FAR_DOCK_RADIUS = 160.0
-ARMOR_VENT_FAR_STATUE_Z_LO = 7800.0
-ARMOR_VENT_FAR_STATUE_Z_HI = 8400.0
+# Live slot at the QS5 pedestal — a Z band alone minted on a nearby helper.
+ARMOR_VENT_FAR_SEAT_RADIUS = 150.0
 ARMOR_STATUE_X = _STATUE_X_ADDR
 ARMOR_STATUE_Z = _STATUE_Z_ADDR
 
@@ -185,8 +185,8 @@ def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] 
 
     QS1 door: statue ``(13936, 6347)``, Jill ``(14083, 6351)``.
     QS5 far: statue ``(5013, 8102)``, Jill ``(4827, 8008)``. Completing when
-    the live slot first hits that Z undershoots. Each step waits until Jill
-    is at that dock and the pedestal is in the drain Z band.
+    the live slot first hits that Z undershoots. Far also requires the slot
+    on the QS5 pedestal — a Z band alone minted on a nearby helper.
     """
     idx = armor_vent_index(step)
     if idx is None or not state:
@@ -209,7 +209,7 @@ def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] 
         return True
     if _dist_to(state, ARMOR_VENT_FAR_DOCK) > ARMOR_VENT_FAR_DOCK_RADIUS:
         return False
-    if not (ARMOR_VENT_FAR_STATUE_Z_LO <= statue[1] <= ARMOR_VENT_FAR_STATUE_Z_HI):
+    if math.hypot(statue[0] - ARMOR_VENT_FAR[0], statue[1] - ARMOR_VENT_FAR[1]) > ARMOR_VENT_FAR_SEAT_RADIUS:
         return False
     return True
 

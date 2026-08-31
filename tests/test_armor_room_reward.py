@@ -342,6 +342,13 @@ def test_far_slot_z_while_jill_south_does_not_complete() -> None:
     assert armor_vent_step_complete(q.current, cur) is False
 
 
+def test_false_pl80_helper_near_dock_does_not_complete() -> None:
+    """Minted pl80: Jill at the far dock, live slot on a helper, pillar unmoved."""
+    q = _far_queue()
+    cur = _armor_state(x=4841, z=8063, armor_statue_x=4777, armor_statue_z=7861)
+    assert armor_vent_step_complete(q.current, cur) is False
+
+
 def test_standing_on_far_vent_does_not_complete_far_step() -> None:
     q = _far_queue()
     prev = _pushing(x=5600, z=7236)
