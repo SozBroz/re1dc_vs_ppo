@@ -54,10 +54,17 @@ ARMOR_WEST_PUSH_ENDPOINT_XZ: tuple[int, int] = (8539, 8008)
 ARMOR_WEST_LATERAL_APPROACH_XZ: tuple[int, int] = (9617, 7179)
 ARMOR_WEST_LATERAL_PUSH_ENDPOINT_XZ: tuple[int, int] = (5717, 7136)
 
-# Exact ROOM2050 object-work coordinates at the demonstrated QS0/QS9 seats.
+# ROOM2050 object-work coordinates at the demonstrated QS0/QS9 seats.
+# East (pl79) stays pixel-tight. West vent AOT also covers the neighboring
+# 50-unit shove cell (human button+no-gas at (4945, 7136) vs QS (4895, 7186)).
 ARMOR_EAST_SCRIPT_TARGET: tuple[int, int] = ARMOR_VENT_DOOR
 ARMOR_WEST_SCRIPT_TARGET: tuple[int, int] = ARMOR_VENT_FAR
-ARMOR_SCRIPT_TARGET_TOLERANCE = 8
+ARMOR_EAST_SCRIPT_TARGET_TOLERANCE = 8
+ARMOR_WEST_SCRIPT_TARGET_TOLERANCE = 50
+# Back-compat alias used by west depth-align / older callers.
+ARMOR_SCRIPT_TARGET_TOLERANCE = ARMOR_WEST_SCRIPT_TARGET_TOLERANCE
+# Torn object records (mirrors disagree) must still fail even inside the AOT.
+ARMOR_MIRROR_AGREE_TOLERANCE = 8
 ARMOR_APPROACH_RADIUS = 384.0
 ARMOR_STATUE_AHEAD_MIN = 80.0
 # Live ``0x800DB7D8`` is the nearby pedestal, not a dedicated pair.
@@ -149,6 +156,8 @@ def _stable_statue_at_target(
     state: dict[str, Any],
     prefix: str,
     target: tuple[int, int],
+    *,
+    tolerance: int,
 ) -> bool:
     pairs = [
         (f"armor_{prefix}_statue_x", f"armor_{prefix}_statue_z"),
@@ -157,22 +166,43 @@ def _stable_statue_at_target(
     ]
     if any(x_key not in state or z_key not in state for x_key, z_key in pairs):
         return False
-    return all(
-        abs(int(state.get(x_key, 0) or 0) - target[0])
-        <= ARMOR_SCRIPT_TARGET_TOLERANCE
-        and abs(int(state.get(z_key, 0) or 0) - target[1])
-        <= ARMOR_SCRIPT_TARGET_TOLERANCE
+    coords = [
+        (
+            int(state.get(x_key, 0) or 0),
+            int(state.get(z_key, 0) or 0),
+        )
         for x_key, z_key in pairs
+    ]
+    if not all(
+        abs(x - target[0]) <= tolerance and abs(z - target[1]) <= tolerance
+        for x, z in coords
+    ):
+        return False
+    xs = [x for x, _ in coords]
+    zs = [z for _, z in coords]
+    return (
+        max(xs) - min(xs) <= ARMOR_MIRROR_AGREE_TOLERANCE
+        and max(zs) - min(zs) <= ARMOR_MIRROR_AGREE_TOLERANCE
     )
 
 
 def armor_stable_statues_seated(state: dict[str, Any] | None) -> tuple[bool, bool]:
-    """Placement truth from stable room-script fields: (east, west)."""
+    """Placement truth from stable ROOM2050 object-work mirrors: (east, west)."""
     if not state or str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
         return False, False
     return (
-        _stable_statue_at_target(state, "east", ARMOR_EAST_SCRIPT_TARGET),
-        _stable_statue_at_target(state, "west", ARMOR_WEST_SCRIPT_TARGET),
+        _stable_statue_at_target(
+            state,
+            "east",
+            ARMOR_EAST_SCRIPT_TARGET,
+            tolerance=ARMOR_EAST_SCRIPT_TARGET_TOLERANCE,
+        ),
+        _stable_statue_at_target(
+            state,
+            "west",
+            ARMOR_WEST_SCRIPT_TARGET,
+            tolerance=ARMOR_WEST_SCRIPT_TARGET_TOLERANCE,
+        ),
     )
 
 
@@ -199,7 +229,7 @@ def armor_statue_goal_target(
         depth_aligned = (
             west is not None
             and abs(west[1] - ARMOR_WEST_SCRIPT_TARGET[1])
-            <= ARMOR_SCRIPT_TARGET_TOLERANCE
+            <= ARMOR_WEST_SCRIPT_TARGET_TOLERANCE
         )
         if depth_aligned:
             target = (

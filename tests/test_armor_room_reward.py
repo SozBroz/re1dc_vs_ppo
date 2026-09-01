@@ -238,27 +238,57 @@ def test_gate_rejects_mirror_mismatch_and_observed_false_mints() -> None:
     assert armor_vent_step_complete(west_step, false_pl80) is False
 
 
-@pytest.mark.parametrize(
-    ("prefix", "target"),
-    [
-        ("east", ARMOR_EAST_SCRIPT_TARGET),
-        ("west", ARMOR_WEST_SCRIPT_TARGET),
-    ],
-)
-def test_gate_rejects_one_live_shove_step_around_exact_target(
-    prefix: str, target: tuple[int, int]
-) -> None:
-    step = {
-        "beat_id": "armor_vent_door" if prefix == "east" else "armor_vent_far"
-    }
+def test_pl79_still_rejects_one_shove_step_off_east() -> None:
+    step = {"beat_id": "armor_vent_door"}
     base = _armor_state(**_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET))
-    if prefix == "west":
-        base.update(_statue_fields("west", target))
     assert armor_vent_step_complete(step, base) is True
     for dx, dz in ((50, 0), (-50, 0), (0, 50), (0, -50)):
-        near_miss = dict(base)
-        near_miss.update(_statue_fields(prefix, (target[0] + dx, target[1] + dz)))
-        assert armor_vent_step_complete(step, near_miss) is False
+        near = dict(base)
+        near.update(
+            _statue_fields(
+                "east",
+                (ARMOR_EAST_SCRIPT_TARGET[0] + dx, ARMOR_EAST_SCRIPT_TARGET[1] + dz),
+            )
+        )
+        assert armor_vent_step_complete(step, near) is False
+
+
+def test_pl80_accepts_one_west_shove_step_and_rejects_two() -> None:
+    step = {"beat_id": "armor_vent_far"}
+    base = _armor_state(
+        **_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET),
+        **_statue_fields("west", ARMOR_WEST_SCRIPT_TARGET),
+    )
+    assert armor_vent_step_complete(step, base) is True
+    for dx, dz in ((50, 0), (-50, 0), (0, 50), (0, -50), (50, -50)):
+        near = dict(base)
+        near.update(
+            _statue_fields(
+                "west",
+                (ARMOR_WEST_SCRIPT_TARGET[0] + dx, ARMOR_WEST_SCRIPT_TARGET[1] + dz),
+            )
+        )
+        assert armor_vent_step_complete(step, near) is True
+    for dx, dz in ((100, 0), (-100, 0), (0, 100), (0, -100)):
+        far = dict(base)
+        far.update(
+            _statue_fields(
+                "west",
+                (ARMOR_WEST_SCRIPT_TARGET[0] + dx, ARMOR_WEST_SCRIPT_TARGET[1] + dz),
+            )
+        )
+        assert armor_vent_step_complete(step, far) is False
+
+
+def test_human_button_valid_west_seat_mints_pl80() -> None:
+    """Live human: west (4945, 7136), button pressed, no gas — must mint pl80."""
+    step = {"beat_id": "armor_vent_far"}
+    both = _armor_state(
+        **_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET),
+        **_statue_fields("west", (4945, 7136)),
+    )
+    assert armor_vent_step_complete(step, both) is True
+    assert armor_stable_statues_seated(both) == (True, True)
 
 
 def test_pl80_transition_advances_only_with_both_statues_seated() -> None:

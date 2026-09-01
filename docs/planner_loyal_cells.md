@@ -929,7 +929,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** `armor_vent_far` at `armor_vent_far` — both east and west statues exactly on their vents
 - **Items gained:** _(none)_
 - **How to achieve:** `armor_vent_far` at `armor_vent_far` — both east and west statues exactly on their vents.
-- **Success condition:** Room `205`, east OM-object target `(14035, 7340)` within ±8 in all three mirrors, and west OM-object target `(4895, 7186)` within ±8 in all three mirrors; both are mandatory
+- **Success condition:** Room `205`, east OM-object target `(14035, 7340)` within ±8 in all three mirrors, and west OM-object target `(4895, 7186)` within ±50 in all three agreeing mirrors; both are mandatory (one shove-grid cell still covers the west vent AOT)
 
 ### `pl81` — `sun_crest` (step 76)
 
