@@ -62,6 +62,7 @@ PLANNER_LOYAL_SCALAR_KEYS: frozenset[str] = frozenset(
         "planner_timeout",
         "gallery_wrong",
         "armor_statue_progress",
+        "armor_inplace_statue_push",
     }
 )
 

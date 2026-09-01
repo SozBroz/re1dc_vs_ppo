@@ -919,7 +919,11 @@ def _compute_planner_loyal_reward(
 
     bd = _planner_loyal_breakdown_template()
     bd["step"] = STEP_PENALTY * step_scale
-    from re1_rl.armor_room_puzzle import armor_statue_progress_reward
+    from re1_rl.armor_room_puzzle import (
+        ARMOR_INPLACE_STATUE_PUSH_PENALTY,
+        armor_inplace_statue_push_detected,
+        armor_statue_progress_reward,
+    )
 
     bd["armor_statue_progress"] = armor_statue_progress_reward(
         prev_state,
@@ -927,6 +931,11 @@ def _compute_planner_loyal_reward(
         planner_loyal_queue,
         progress,
     )
+    if progress is not None and armor_inplace_statue_push_detected(
+        prev_state, state, planner_loyal_queue
+    ):
+        if progress.breach_armor_inplace_statue_push():
+            bd["armor_inplace_statue_push"] = -float(ARMOR_INPLACE_STATUE_PUSH_PENALTY)
 
     loyal = planner_loyal_queue.evaluate_transition(
         prev_state=prev_state,
@@ -1001,6 +1010,7 @@ def _compute_planner_loyal_reward(
         and not bd["planner_step_success"]
         and not progress.wrong_room_breached
         and not progress.gallery_wrong_breached
+        and not progress.armor_inplace_statue_push_breached
     ):
         progress.note_leg_frames(int(state.get("step_emulated_frames") or 0))
         if (
@@ -1081,6 +1091,7 @@ def _compute_planner_loyal_reward(
         progress.wrong_room_breached
         or progress.cell_timeout_breached
         or progress.gallery_wrong_breached
+        or progress.armor_inplace_statue_push_breached
     ):
         for term, value in tuple(bd.items()):
             if value > 0.0:

@@ -320,3 +320,91 @@ def test_crest_goal_points_to_crest_after_puzzle_flag() -> None:
     assert goal[21] == 1.0
     want = encoder._compass_to_xz(state, float(target[0]), float(target[1]))
     assert goal[5:10] == pytest.approx(want)
+
+
+def test_inplace_push_west_on_east_step_is_ignored() -> None:
+    from re1_rl.armor_room_puzzle import armor_inplace_statue_push_detected
+
+    q = PlannerLoyalQueue()
+    idx = next(
+        i for i, s in enumerate(q._steps) if s.get("beat_id") == "armor_vent_door"
+    )
+    q.seek(idx)
+    prev = _armor_state(game_state=PUSH_GAME_STATE)
+    cur = _armor_state(
+        game_state=PUSH_GAME_STATE,
+        **_statue_fields("west", (8795, 7836)),
+    )
+    assert armor_inplace_statue_push_detected(prev, cur, q) is False
+
+
+def test_inplace_push_east_on_pl80_step_is_detected() -> None:
+    from re1_rl.armor_room_puzzle import armor_inplace_statue_push_detected
+
+    q = PlannerLoyalQueue()
+    idx = next(
+        i for i, s in enumerate(q._steps) if s.get("beat_id") == "armor_vent_far"
+    )
+    q.seek(idx)
+    prev = _armor_state(
+        game_state=PUSH_GAME_STATE,
+        **_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET),
+    )
+    cur = _armor_state(
+        game_state=PUSH_GAME_STATE,
+        **_statue_fields("east", (14035, 7290)),
+        **_statue_fields("west", (8795, 7886)),
+    )
+    assert armor_inplace_statue_push_detected(prev, cur, q) is True
+
+
+def test_target_statue_shove_toward_vent_is_not_inplace_breach() -> None:
+    from re1_rl.armor_room_puzzle import armor_inplace_statue_push_detected
+
+    q = PlannerLoyalQueue()
+    idx = next(
+        i for i, s in enumerate(q._steps) if s.get("beat_id") == "armor_vent_far"
+    )
+    q.seek(idx)
+    prev = _armor_state(
+        game_state=PUSH_GAME_STATE,
+        **_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET),
+    )
+    cur = _armor_state(
+        game_state=PUSH_GAME_STATE,
+        **_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET),
+        **_statue_fields("west", (8795, 7836)),
+    )
+    assert armor_inplace_statue_push_detected(prev, cur, q) is False
+
+
+def test_inplace_push_applies_terminal_penalty() -> None:
+    from re1_rl.armor_room_puzzle import ARMOR_INPLACE_STATUE_PUSH_PENALTY
+
+    q = PlannerLoyalQueue()
+    idx = next(
+        i for i, s in enumerate(q._steps) if s.get("beat_id") == "armor_vent_far"
+    )
+    q.seek(idx)
+    progress = ProgressTracker()
+    prev = _armor_state(
+        game_state=PUSH_GAME_STATE,
+        **_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET),
+    )
+    cur = _armor_state(
+        game_state=PUSH_GAME_STATE,
+        **_statue_fields("east", (14035, 7290)),
+    )
+    _total, bd = compute_reward(
+        prev,
+        cur,
+        _planner(),
+        progress=progress,
+        planner_loyal_queue=q,
+        return_breakdown=True,
+    )
+    assert bd["armor_inplace_statue_push"] == pytest.approx(
+        -ARMOR_INPLACE_STATUE_PUSH_PENALTY
+    )
+    assert progress.armor_inplace_statue_push_breached is True
+    assert bd["armor_statue_progress"] == 0.0

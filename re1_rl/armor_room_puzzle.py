@@ -82,6 +82,9 @@ ARMOR_STATUE_Z = _STATUE_Z_ADDR
 
 ARMOR_STATUE_PROGRESS_STEP = 0.5
 ARMOR_STATUE_PROGRESS_BUDGET = 4.0
+# Live shoves move 50 world units; ignore mirror jitter below this.
+ARMOR_STATUE_MOVE_THRESHOLD = 25
+ARMOR_INPLACE_STATUE_PUSH_PENALTY = 4.0
 
 FACING_FULL_CIRCLE = 4096.0
 DIST_NORM = 4096.0
@@ -389,6 +392,48 @@ def armor_statue_progress_reward(
     return float(
         np.clip(raw, -ARMOR_STATUE_PROGRESS_STEP, ARMOR_STATUE_PROGRESS_STEP)
     )
+
+
+def _statue_moved(
+    prev_state: dict[str, Any],
+    state: dict[str, Any],
+    prefix: str,
+) -> bool:
+    prev_xz = _named_statue_xz(prev_state, prefix)
+    current_xz = _named_statue_xz(state, prefix)
+    if prev_xz is None or current_xz is None:
+        return False
+    return (
+        math.hypot(current_xz[0] - prev_xz[0], current_xz[1] - prev_xz[1])
+        >= ARMOR_STATUE_MOVE_THRESHOLD
+    )
+
+
+def armor_inplace_statue_push_detected(
+    prev_state: dict[str, Any] | None,
+    state: dict[str, Any] | None,
+    queue: Any = None,
+) -> bool:
+    """True when a seated vent statue moves during a shove on the pl79->80 step only.
+
+    pl79->80 (``armor_vent_far``): east is already on its vent; pushing it ends
+    the episode. pl78->79 is unchanged.
+    """
+    idx = armor_vent_index(_step_from_queue(queue))
+    if idx != 1 or not prev_state or not state:
+        return False
+    if str(prev_state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return False
+    if str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return False
+    if not (armor_pushing(prev_state) or armor_pushing(state)):
+        return False
+
+    prev_seated = armor_stable_statues_seated(prev_state)
+    for prefix, seated in zip(("east", "west"), prev_seated, strict=True):
+        if seated and _statue_moved(prev_state, state, prefix):
+            return True
+    return False
 
 
 def encode_armor_statue_compass(

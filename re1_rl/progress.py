@@ -100,6 +100,7 @@ class ProgressTracker:
     gallery_puzzle_solved: bool = False
     gallery_needs_reentry: bool = False
     gallery_wrong_breached: bool = False
+    armor_inplace_statue_push_breached: bool = False
     dining_statue_rewarded: bool = False
     # Armor room 205: each poison-vent seat claimed once per episode while
     # pushing (pl79 door, pl80 far). Not persisted on sidecars.
@@ -716,6 +717,14 @@ class ProgressTracker:
         if self.gallery_wrong_breached:
             return False
         self.gallery_wrong_breached = True
+        self.softlock_cap_frames = 0
+        return True
+
+    def breach_armor_inplace_statue_push(self) -> bool:
+        """Mark armor wrong/seated statue shove as terminal; true only on first breach."""
+        if self.armor_inplace_statue_push_breached:
+            return False
+        self.armor_inplace_statue_push_breached = True
         self.softlock_cap_frames = 0
         return True
 
