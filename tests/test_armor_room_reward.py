@@ -253,31 +253,36 @@ def test_pl79_still_rejects_one_shove_step_off_east() -> None:
         assert armor_vent_step_complete(step, near) is False
 
 
-def test_pl80_accepts_one_west_shove_step_and_rejects_two() -> None:
+def test_pl80_accepts_human_west_seat_box_and_rejects_outside() -> None:
     step = {"beat_id": "armor_vent_far"}
     base = _armor_state(
         **_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET),
         **_statue_fields("west", ARMOR_WEST_SCRIPT_TARGET),
     )
     assert armor_vent_step_complete(step, base) is True
-    for dx, dz in ((50, 0), (-50, 0), (0, 50), (0, -50), (50, -50)):
+    # Corners / extremes of the human-validated AABB.
+    for xz in (
+        (4845, 7086),
+        (4845, 7336),
+        (5195, 7086),
+        (5195, 7336),
+        (4895, 7336),
+        (4945, 7136),
+        (4895, 7086),
+    ):
         near = dict(base)
-        near.update(
-            _statue_fields(
-                "west",
-                (ARMOR_WEST_SCRIPT_TARGET[0] + dx, ARMOR_WEST_SCRIPT_TARGET[1] + dz),
-            )
-        )
-        assert armor_vent_step_complete(step, near) is True
-    for dx, dz in ((100, 0), (-100, 0), (0, 100), (0, -100)):
+        near.update(_statue_fields("west", xz))
+        assert armor_vent_step_complete(step, near) is True, xz
+    for xz in (
+        (4844, 7186),
+        (5196, 7186),
+        (4895, 7085),
+        (4895, 7337),
+        (4695, 7336),
+    ):
         far = dict(base)
-        far.update(
-            _statue_fields(
-                "west",
-                (ARMOR_WEST_SCRIPT_TARGET[0] + dx, ARMOR_WEST_SCRIPT_TARGET[1] + dz),
-            )
-        )
-        assert armor_vent_step_complete(step, far) is False
+        far.update(_statue_fields("west", xz))
+        assert armor_vent_step_complete(step, far) is False, xz
 
 
 def test_human_button_valid_west_seat_mints_pl80() -> None:
