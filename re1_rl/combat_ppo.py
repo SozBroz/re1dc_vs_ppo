@@ -322,6 +322,46 @@ class CombatEfficientPPO(MaskablePPO):
         """Attach a short freeze schedule (tick'd once per ``train()``)."""
         self._module_freeze = handle
 
+    def _demo_bc_aux(self) -> Any | None:
+        """Lazily build the human-demo BC term from ``RE1_BC_DEMO_DIR`` (None if unset).
+
+        Lazy so checkpoints loaded through ``MaskablePPO.load`` (no ``__init__``
+        kwargs) still pick it up; never pickled with the model.
+        """
+        if getattr(self, "_demo_bc_disabled", False):
+            return None
+        existing = getattr(self, "_demo_bc", None)
+        if existing is not None:
+            return existing
+        from re1_rl.demo_bc import DemoBCAux
+
+        obs_space = self.observation_space
+        if not isinstance(obs_space, spaces.Dict) or not isinstance(
+            self.action_space, spaces.Discrete
+        ):
+            self._demo_bc_disabled = True
+            return None
+        try:
+            from re1_rl.distributed.spaces import OBS_SCHEMA_VERSION
+
+            schema: int | None = int(OBS_SCHEMA_VERSION)
+        except ImportError:
+            schema = None
+        aux = DemoBCAux.from_env(
+            obs_shapes={k: tuple(sp.shape) for k, sp in obs_space.spaces.items()},
+            n_actions=int(self.action_space.n),
+            device=self.device,
+            obs_schema_version=schema,
+        )
+        if aux is None:
+            self._demo_bc_disabled = True
+            return None
+        self._demo_bc = aux
+        return aux
+
+    def _excluded_save_params(self) -> list[str]:
+        return [*super()._excluded_save_params(), "_demo_bc", "_demo_bc_disabled"]
+
     def _aux_batch(
         self, indices: np.ndarray
     ) -> tuple[th.Tensor | None, th.Tensor | None, th.Tensor | None]:
@@ -368,6 +408,12 @@ class CombatEfficientPPO(MaskablePPO):
         clip_fractions: list[float] = []
         aux_losses: list[float] = []
         aux_stats_acc: dict[str, list[float]] = {}
+        bc_stats_acc: dict[str, list[float]] = {}
+        demo_bc = self._demo_bc_aux()
+        if demo_bc is not None:
+            demo_bc.on_train_call()
+            if not demo_bc.active:
+                demo_bc = None
         continue_training = True
         optimizer_steps = 0
         minibatch_sizes: list[int] = []
@@ -484,6 +530,18 @@ class CombatEfficientPPO(MaskablePPO):
                                 float(v.detach()) if isinstance(v, th.Tensor) else v
                             )
 
+                if demo_bc is not None:
+                    # Demo batch has its own size: no policy-consistent ModDrop
+                    # mask applies, so present every modality for this forward.
+                    if isinstance(extractor, RE1CombatEfficientExtractor):
+                        extractor.set_mod_drop_batch(None)
+                    bc_out = demo_bc.loss(self.policy)
+                    if bc_out is not None:
+                        bc_loss, bc_stats = bc_out
+                        loss = loss + demo_bc.coef * bc_loss
+                        for k, v in bc_stats.items():
+                            bc_stats_acc.setdefault(k, []).append(float(v))
+
                 with th.no_grad():
                     log_ratio = log_prob - rollout_data.old_log_prob
                     approx_kl_div = th.mean((th.exp(log_ratio) - 1) - log_ratio).cpu().numpy()
@@ -543,6 +601,8 @@ class CombatEfficientPPO(MaskablePPO):
             self.logger.record("train/aux_coef", self.aux_coef)
             for k, vals in aux_stats_acc.items():
                 self.logger.record(k, float(np.mean(vals)))
+        for k, vals in bc_stats_acc.items():
+            self.logger.record(k, float(np.mean(vals)))
         if clip_range_vf is not None:
             self.logger.record("train/clip_range_vf", clip_range_vf)
         if u2w_snap:

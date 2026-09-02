@@ -11,6 +11,10 @@ set MAX_PENDING_STEPS=220000
 set MIN_HOST_FREE_GB=16
 
 call "%~dp0planner_loyal.env.cmd"
+REM Human demos (scripts/record_planner_demo.py) -> BC auxiliary term in PPO train().
+REM Hot-reloaded every RE1_BC_RELOAD_EVERY train calls; no restart needed for new demos.
+if "%RE1_BC_DEMO_DIR%"=="" set RE1_BC_DEMO_DIR=data\demos\planner_loyal
+if "%RE1_BC_COEF%"=="" set RE1_BC_COEF=0.5
 if not exist data\logs mkdir data\logs
 if not exist data\checkpoints mkdir data\checkpoints
 
