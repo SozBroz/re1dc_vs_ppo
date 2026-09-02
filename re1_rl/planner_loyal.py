@@ -9,8 +9,10 @@ Reward contract (imperator 2026-08-25):
   ``max_steps`` by 12m, and keep playing. The last authored chunk step ends
   the episode.
 - Divert (wrong room / unplanned pickup / unplanned box / typewriter save): -4, episode end.
-  COMBINE reshuffles (reload / herb mix / ammo merge) and scripted ``event``
-  grants (Barry acid, Speyer bazooka, …) are not pickups.
+  COMBINE reshuffles (reload / herb mix / ammo merge), scripted ``event``
+  grants (Barry acid, Speyer bazooka, …), and already-held *weapon* chamber
+  bumps are not pickups. Floor piles always divert unless the current step is
+  that ``acquire``.
 - Cell timer: flat 12 minutes only (no custom yawn_cell_timeouts.json times).
 - Armor room 205: ``armor_room_enter`` (pl78), exact east vent (pl79),
   exact east+west vents (pl80), then ``sun_crest`` acquire (pl81).
@@ -624,21 +626,19 @@ class PlannerLoyalQueue:
                 self.step_success_pending = True
                 return result
 
-        # Divert / complete: pickups. COMBINE, already-held qty bumps
-        # (reload of a gun they already have), leftover cinema after a minted
-        # acquire, and scripted event grants are not unplanned pickups.
-        # Box withdraw/deposit during use_box is also not a world pickup
-        # (pl71 100-box dies on handgun_bullets otherwise).
-        # trigger_cutscene (Richard): herbs / script grants in 20D must not
-        # divert before the cinema settles.
+        # Divert / complete: pickups. COMBINE, already-held *weapon* chamber
+        # bumps, leftover cinema after a minted acquire, and scripted ``event``
+        # grants (Barry acid, Speyer bazooka, …) are not world pickups.
+        # Floor piles (herbs, ammo boxes, ink, …) always divert unless this
+        # step is the matching ``acquire``. Box UI reshuffles are ``use_box``.
         gained = _inventory_gains(prev_state, state)
-        if gained and op not in {"use_box", "trigger_cutscene"}:
+        if gained and op != "use_box":
             want = str(step.get("pickup_id") or "")
             _, want_item, _ = _pickup_id_parts(want)
             matched = op == "acquire" and _pickup_matches_gain(want, gained)
             planned = {want_item} if matched else set()
             unexpected = gained - planned
-            unexpected -= _already_held_names(prev_state, self._start_held)
+            unexpected -= _already_held_weapon_names(prev_state, self._start_held)
             unexpected -= _combine_explained_gains(prev_state, state)
             unexpected -= unexpected & _event_grant_names(room)
             unexpected -= self._completed_acquire_names(room)
@@ -903,11 +903,32 @@ def _already_held_names(
     prev_state: dict[str, Any],
     start_held: set[str] | None = None,
 ) -> set[str]:
-    """Names already in inventory — a qty bump is not a new pickup."""
+    """Names already in inventory (legacy helper; prefer weapon-only filter)."""
     held = set(_inventory_held_names(prev_state))
     if start_held:
         held |= {canonical_item(str(name)) for name in start_held if name}
     return held
+
+
+def _already_held_weapon_names(
+    prev_state: dict[str, Any],
+    start_held: set[str] | None = None,
+) -> set[str]:
+    """Already-held guns may qty-bump (chamber) without counting as a pickup.
+
+    Floor piles of the same *consumable* name (second green herb, extra clip)
+    still divert — only weapon chamber refills are exempt here. COMBINE reloads
+    and ``event`` grants have their own exemptions.
+    """
+    from re1_rl.memory_map import ITEM_IDS, WEAPON_ITEM_IDS
+
+    weapon_names = {
+        canonical_item(str(ITEM_IDS[i]))
+        for i in WEAPON_ITEM_IDS
+        if i in ITEM_IDS and ITEM_IDS[i]
+    }
+    held = _already_held_names(prev_state, start_held)
+    return held & weapon_names
 
 
 def _inventory_gains(prev_state: dict[str, Any], state: dict[str, Any]) -> set[str]:

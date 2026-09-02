@@ -1607,7 +1607,8 @@ def test_richard_bleedout_diverts_without_confirmation():
     assert "unplanned_room" in str(result["divert_reason"])
 
 
-def test_richard_herb_pickup_does_not_divert():
+def test_richard_floor_herb_diverts_on_cutscene_leg():
+    """20D pillar herb is a floor pile, not a cutscene grant — divert."""
     q = PlannerLoyalQueue(
         {
             "chunk_id": "richard",
@@ -1638,8 +1639,28 @@ def test_richard_herb_pickup_does_not_divert():
         ],
     }
     result = q.evaluate_transition(prev_state=prev, state=cur)
-    assert result["divert"] is False
-    assert result["step_success"] is False
+    assert result["divert"] is True
+    assert "green_herb" in str(result["divert_reason"])
+
+
+def test_second_green_herb_diverts_when_already_holding_one():
+    q = PlannerLoyalQueue()
+    q.note_start_inventory(
+        {"room_id": "106", "inventory_slots": [("green_herb", 1)]}
+    )
+    result = q.evaluate_transition(
+        prev_state={
+            "room_id": "106",
+            "inventory_slots": [("green_herb", 1)],
+        },
+        state={
+            "room_id": "106",
+            "inventory_slots": [("green_herb", 1), ("green_herb", 1)],
+            "new_items": ["green_herb"],
+        },
+    )
+    assert result["divert"] is True
+    assert "unplanned_pickup" in str(result["divert_reason"])
 
 
 def test_dining_statue_completes_when_knocked():
