@@ -22,12 +22,13 @@ from re1_rl.key_items import KEYS_HELD_DIM
 from re1_rl.maps_files import MAPS_FILES_DIM
 from re1_rl.milestone_features import MILESTONE_DIM
 from re1_rl.named_state import NAMED_STATE_DIM
+from re1_rl.pushable_obs import PUSHABLES_DIM
 from re1_rl.room_signature import ENEMY_ROSTER_DIM
 from re1_rl.spatial_encoder import SPATIAL_DIM, VISITED_SHAPE
 from re1_rl.weapon_damage import LAST_ATTACK_DIM, WEAPON_CARD_DIM
 
 # Bump when observation Dict layout or ACTION_NAMES cardinality changes.
-OBS_SCHEMA_VERSION = 2
+OBS_SCHEMA_VERSION = 3
 
 
 def make_re1_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
@@ -55,6 +56,9 @@ def make_re1_spaces() -> tuple[spaces.Dict, spaces.Discrete]:
         "milestones": spaces.Box(0.0, 1.0, shape=(MILESTONE_DIM,), dtype="float32"),
         "maps_files": spaces.Box(0.0, 1.0, shape=(MAPS_FILES_DIM,), dtype="float32"),
         "named_state": spaces.Box(0.0, 1.0, shape=(NAMED_STATE_DIM,), dtype="float32"),
+        # Up to 2 pushables: live Jill→object compass + object→target remaining
+        # (armor statues / dining statue; zeros outside those puzzles).
+        "pushables": spaces.Box(-2.0, 2.0, shape=(PUSHABLES_DIM,), dtype="float32"),
     }
     from re1_rl.planner_loyal import (
         PLANNER_LOYAL_OMIT_OBS_KEYS,

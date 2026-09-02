@@ -91,21 +91,15 @@ make so far, and nothing in the guidebook-style obs helps.
   `train/bc_acc` climbs to ~1.0 on demo states the network can represent the
   policy from the current obs; if it plateaus well below, the obs do not
   disambiguate the human's choices and the change below becomes mandatory.
+- **`pushables` obs (schema v3, 2026-09-02):** up to 2 slots with Jill→object
+  compass + object→crumb-target remaining `(dx,dz,dist)` using the same vent
+  / dining targets the ±0.5 shove crumb pays on, plus `active` / `seated`
+  bits. Zero-init residual into the goal tower (`combat_efficient_extractor`).
+  Invalidates prior demos; re-record after the fleet is on schema 3.
 
 ### Add next (guidebook-compatible observation, small)
-- **Movable-object slots in `spatial`** (or a new small key): for the current
-  room's pushable objects, live `(Δx, Δz)` from Jill to the object and from
-  the object to its target site, plus a "pushing now" bit from
-  `game_state`. Both statues in 205, the dining 2F statue, the bar bookcase
-  fall out of the same encoding; the targets come from the almanac side
-  (Evil Resource room signature: "two statues, two vents"), not a
-  walkthrough. This is the room-signature/interactable channel the north
-  star already sanctions; it is not a puzzle macro. Requires an
-  `OBS_SCHEMA_VERSION` bump and re-recording demos, so do it *after* the
-  first BC round tells us whether it is needed.
-- While there, replace the wrapped `x_local`/`z_local` with room-local
-  coordinates normalised by the room AABB (from `data/doors_rdt.json`), so
-  position is unambiguous inside long rooms.
+- Room-AABB-normalised Jill coordinates (replace wrapped `x_local`/`z_local`)
+  so position is unambiguous inside long rooms. Separate from pushables.
 
 ### Consider, lower priority
 - **GAE λ ≈ 0.95 for shaped legs.** Keep MC for sparse rails if wanted, but

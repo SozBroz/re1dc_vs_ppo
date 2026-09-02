@@ -116,8 +116,8 @@ meta          0-d str    JSON: schema, obs_schema_version, n_actions, start_cell
 ## 5. Gotchas
 
 - **Observation schema changes invalidate demos.** Any change to the obs Dict
-  or `ACTION_NAMES` must bump `OBS_SCHEMA_VERSION`; old demos are then
-  skipped and must be re-recorded (the recorder stamps the current version).
+  or `ACTION_NAMES` must bump `OBS_SCHEMA_VERSION` (currently **3** after the
+  `pushables` slots); old demos are then skipped and must be re-recorded.
 - Record with the same env config the fleet trains with (the script mirrors
   `planner_loyal.env.cmd`; `RE1_CAMERA_WHITEN=0`, `RE1_LAYERED_GEOMETRY=0`).
   Speed (`--speed`) does not affect recorded actions or observations.

@@ -90,6 +90,7 @@ from re1_rl.key_items import KEY_ITEM_NAMES, KEYS_HELD_DIM, encode_keys_held
 from re1_rl.maps_files import MAPS_FILES_DIM, encode_maps_files_flags
 from re1_rl.milestone_features import MILESTONE_DIM, encode_milestones
 from re1_rl.named_state import NAMED_STATE_DIM, encode_named_state
+from re1_rl.pushable_obs import PUSHABLES_DIM, encode_pushables
 from re1_rl.room_signature import ENEMY_ROSTER_DIM, RoomEnemyRoster
 from re1_rl.spatial_encoder import (
     SPATIAL_DIM,
@@ -362,6 +363,8 @@ class RE1Env(gym.Env):
                 "maps_files": spaces.Box(0.0, 1.0, shape=(MAPS_FILES_DIM,), dtype=np.float32),
                 # Verified runtime bits only (no unmapped interaction_prompt).
                 "named_state": spaces.Box(0.0, 1.0, shape=(NAMED_STATE_DIM,), dtype=np.float32),
+                # Up to 2 pushables: Jill→object + object→crumb-target remaining.
+                "pushables": spaces.Box(-2.0, 2.0, shape=(PUSHABLES_DIM,), dtype=np.float32),
             }
         )
         self.action_space = spaces.Discrete(len(ACTION_NAMES))
@@ -1335,6 +1338,11 @@ class RE1Env(gym.Env):
             ),
             "maps_files": encode_maps_files_flags(state.get("maps_files_flags")),
             "named_state": encode_named_state(state),
+            "pushables": encode_pushables(
+                state,
+                queue=getattr(self, "_planner_loyal_queue", None),
+                planner=self._planner,
+            ),
         }
         from re1_rl.planner_loyal import apply_planner_loyal_obs
 

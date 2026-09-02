@@ -29,6 +29,7 @@ from re1_rl.modality_ablations import (
 )
 from re1_rl.modality_config import goal_film_enabled, mod_drop_enabled
 from re1_rl.named_state import NAMED_STATE_DIM
+from re1_rl.pushable_obs import PUSHABLES_DIM, PUSHABLES_OBS_KEY
 from re1_rl.obs_encoder import (
     BOX_DIM,
     GOAL_BASE_DIM,
@@ -450,6 +451,17 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
             nn.init.zeros_(self.planner_steps_proj[-1].bias)
         else:
             self.planner_steps_proj = None
+        # Zero-init residual: live statue XZ + crumb-target remaining (up to 2).
+        if PUSHABLES_OBS_KEY in observation_space.spaces:
+            self.pushables_proj = nn.Sequential(
+                nn.Linear(PUSHABLES_DIM, GOAL_TOWER_DIM),
+                nn.ReLU(),
+                nn.Linear(GOAL_TOWER_DIM, GOAL_TOWER_DIM),
+            )
+            nn.init.zeros_(self.pushables_proj[-1].weight)
+            nn.init.zeros_(self.pushables_proj[-1].bias)
+        else:
+            self.pushables_proj = None
         self.goal_lookahead_token = nn.Sequential(
             nn.Linear(GOAL_LOOKAHEAD_SLOT_DIM, 4),
             nn.ReLU(),
@@ -638,6 +650,11 @@ class RE1CombatEfficientExtractor(BaseFeaturesExtractor):
                 observations, "planner_steps", PLANNER_QUEUE_DIM
             )
             goal = goal + self.planner_steps_proj(planner_vec)
+        if self.pushables_proj is not None:
+            pushables = self._optional_tensor(
+                observations, PUSHABLES_OBS_KEY, PUSHABLES_DIM
+            )
+            goal = goal + self.pushables_proj(pushables)
 
         # Identity-init FiLM: γ(g)⊙h+β(g) on vision/spatial (goal fields intact).
         if (
