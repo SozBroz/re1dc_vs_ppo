@@ -210,6 +210,46 @@ def test_fast_cutscene_step_charges_min_decision_when_chunk_not_landed() -> None
     assert env._leg_replay.reward_only_leg_frames == 8
 
 
+def test_fast_cutscene_step_ticks_idle_clock_under_planner_loyal() -> None:
+    from re1_rl.leg_replay import new_leg_replay_buffer
+    from re1_rl.progress import ProgressTracker
+    from re1_rl.reward import CONTEMPT_GRACE_FRAMES, contempt_penalty_delta
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    env._planner_loyal_queue = MagicMock()
+    env._progress = ProgressTracker()
+    env._progress.note_stagnation_step(made_progress=False, step_frames=CONTEMPT_GRACE_FRAMES)
+    env._skip_session_frames = 600
+    env._leg_replay = new_leg_replay_buffer()
+    env.bridge.read_ram.return_value = {"player_hp": 96}
+
+    _, reward, _, _, info = env._fast_cutscene_step(9)
+
+    assert env._progress.stagnation_frames == CONTEMPT_GRACE_FRAMES + 600
+    expected = contempt_penalty_delta(CONTEMPT_GRACE_FRAMES, CONTEMPT_GRACE_FRAMES + 600)
+    assert expected < 0.0
+    assert info["reward_breakdown"]["softlock"] == pytest.approx(expected)
+    assert reward < info["reward_breakdown"]["step"]
+
+
+def test_fast_cutscene_step_leaves_idle_clock_alone_off_planner_loyal() -> None:
+    from re1_rl.leg_replay import new_leg_replay_buffer
+    from re1_rl.progress import ProgressTracker
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._skipping_flag = True
+    env._progress = ProgressTracker()
+    env._skip_session_frames = 600
+    env._leg_replay = new_leg_replay_buffer()
+    env.bridge.read_ram.return_value = {"player_hp": 96}
+
+    _, _, _, _, info = env._fast_cutscene_step(9)
+
+    assert env._progress.stagnation_frames == 0
+    assert "softlock" not in info["reward_breakdown"]
+
+
 def test_fast_cutscene_step_charges_step_penalty_for_skip_frames() -> None:
     from re1_rl.reward import step_penalty_for_frames
     from re1_rl.leg_replay import new_leg_replay_buffer

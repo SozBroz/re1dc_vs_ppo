@@ -1116,10 +1116,10 @@ def _compute_planner_loyal_reward(
 
     if progress is not None and not state.get("dead"):
         frames_before = progress.stagnation_frames
-        armor_progress = (
-            float(bd.get("armor_statue_progress") or 0.0) > 0.0
-            or float(bd.get("armor_approach") or 0.0) > 0.0
-        )
+        # Only a statue shove counts as progress. The approach potential is
+        # symmetric, so pacing toward/away would otherwise reset the idle clock
+        # for free.
+        armor_progress = float(bd.get("armor_statue_progress") or 0.0) > 0.0
         if bd.get("planner_step_success", 0.0) == 0.0:
             progress.note_stagnation_step(
                 made_progress=armor_progress,

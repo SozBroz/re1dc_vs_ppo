@@ -2672,6 +2672,11 @@ class RE1Env(gym.Env):
         progress = getattr(self, "_progress", None)
         if progress is not None and real_delta > 0:
             progress.note_leg_frames(real_delta)
+            idle_bd = self._bill_skip_idle_frames(real_delta)
+            if idle_bd:
+                self._merge_post_skip_breakdown(
+                    float(sum(idle_bd.values())) * REWARD_SCALE, idle_bd
+                )
         self._post_skip_replay_frames = int(
             getattr(self, "_post_skip_replay_frames", 0) or 0
         ) + int(real_delta)
@@ -3010,6 +3015,29 @@ class RE1Env(gym.Env):
         step = step_penalty_for_frames(bill, ref_frames=self.frame_skip)
         return float(step * REWARD_SCALE), {"step": step}, bill
 
+    def _bill_skip_idle_frames(self, frames: int) -> dict[str, float]:
+        """Planner-loyal: physically skipped frames also tick the idle clock.
+
+        Text boxes, doors and cutscenes run through the bg skip; without this
+        an interact→examine loop keeps paying the per-frame step cost and the
+        12 min cell wall but freezes the contempt ramp. Returns the contempt
+        delta (already accounted for in ``progress``) for the caller's bill.
+        """
+        progress = getattr(self, "_progress", None)
+        frames = max(0, int(frames))
+        if progress is None or frames <= 0 or not self._planner_loyal_active():
+            return {}
+        from re1_rl.reward import contempt_penalty_delta, softlock_frame_threshold
+
+        before = progress.stagnation_frames
+        progress.note_stagnation_step(made_progress=False, step_frames=frames)
+        softlock = contempt_penalty_delta(
+            before,
+            progress.stagnation_frames,
+            threshold=softlock_frame_threshold(progress),
+        )
+        return {"softlock": float(softlock)} if softlock else {}
+
     def _consume_async_skip_real_frames(self) -> int:
         """Return newly landed physical skip frames exactly once."""
         session = max(0, int(getattr(self, "_skip_session_frames", 0) or 0))
@@ -3110,6 +3138,8 @@ class RE1Env(gym.Env):
         progress = getattr(self, "_progress", None)
         if progress is not None and late_frames > 0:
             progress.note_leg_frames(late_frames)
+            for key, value in self._bill_skip_idle_frames(late_frames).items():
+                merged[key] = float(merged.get(key, 0.0)) + float(value)
         self._record_late_async_skip_frames(late_frames)
         _, late_bd, _ = self._bill_async_skip_step_penalty()
         if late_bd:
@@ -3210,6 +3240,12 @@ class RE1Env(gym.Env):
         progress = getattr(self, "_progress", None)
         if progress is not None and real_delta > 0:
             progress.note_leg_frames(real_delta)
+            idle_bd = self._bill_skip_idle_frames(real_delta)
+            if idle_bd:
+                skip_bd = dict(skip_bd)
+                for key, value in idle_bd.items():
+                    skip_bd[key] = float(skip_bd.get(key, 0.0)) + float(value)
+                skip_reward = float(skip_reward) + float(sum(idle_bd.values())) * REWARD_SCALE
         # Main-thread flush of door crossings noted by the bg skip worker.
         try:
             self._credit_async_skip_room_crossing()

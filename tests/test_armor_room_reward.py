@@ -505,6 +505,17 @@ def test_approach_potential_pays_toward_west_statue_and_telescopes() -> None:
     assert 0.3 < total <= ARMOR_APPROACH_BUDGET
 
 
+def test_approach_progress_does_not_reset_idle_clock() -> None:
+    q = _far_queue()
+    progress = ProgressTracker()
+    progress.note_stagnation_step(made_progress=False, step_frames=1000)
+    start = _pl79_spawn_state()
+    toward = _pl79_spawn_state(x=start["x"] - 350, step=2)
+    bd = _far_leg_reward(start, toward, q, progress)
+    assert bd["armor_approach"] > 0.0
+    assert progress.stagnation_frames > 1000
+
+
 def test_approach_potential_silent_while_pushing_and_off_far_step() -> None:
     from re1_rl.armor_room_puzzle import armor_approach_progress_reward
 
