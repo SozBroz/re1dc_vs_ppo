@@ -53,11 +53,17 @@ def test_buttons_to_action_walk_and_turn_uses_latch() -> None:
     probe._sticky.update(walking)  # noqa: SLF001
     got, _, _ = probe.apply(a, ACTION_BUTTON_MAP)
     assert got["up"] and got["left"]
-    # Releasing the turn while still walking: no single action clears left and
-    # keeps up, so the mapping takes noop (clear) and re-latches forward next step.
+    # Releasing the turn while still walking: forward clears left/right, keeps up.
     turning = _sticky(up=True, left=True)
-    assert buttons_to_action({"up": True}, turning, button_map=ACTION_BUTTON_MAP) == 0
-    assert buttons_to_action({"up": True}, empty_sticky(), button_map=ACTION_BUTTON_MAP) == 1
+    assert buttons_to_action({"up": True}, turning, button_map=ACTION_BUTTON_MAP) == 1
+    # Flip turn side while walking: turn_left clears right, keeps up.
+    turning_right = _sticky(up=True, right=True)
+    assert buttons_to_action({"up": True, "left": True}, turning_right, button_map=ACTION_BUTTON_MAP) == 3
+    # Run+turn → run straight (no noop).
+    running_turn = _sticky(up=True, left=True, square=True)
+    assert buttons_to_action(
+        {"up": True, "square": True}, running_turn, button_map=ACTION_BUTTON_MAP
+    ) == 5
     # Run -> walk drops square via forward.
     running = _sticky(up=True, square=True)
     assert buttons_to_action({"up": True}, running, button_map=ACTION_BUTTON_MAP) == 1

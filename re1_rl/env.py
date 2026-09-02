@@ -2766,6 +2766,7 @@ class RE1Env(gym.Env):
             state,
             skip_frames=skip_frames,
             peak_scene_flag=getattr(ram_skip, "last_skip_peak_scene_flag", None),
+            planner_loyal_queue=getattr(self, "_planner_loyal_queue", None),
         )
         note_yawn_spawn(
             self._planner,

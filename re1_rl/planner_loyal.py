@@ -14,6 +14,8 @@ Reward contract (imperator 2026-08-25):
 - Cell timer: flat 12 minutes only (no custom yawn_cell_timeouts.json times).
 - Armor room 205: ``armor_room_enter`` (pl78), exact east vent (pl79),
   exact east+west vents (pl80), then ``sun_crest`` acquire (pl81).
+- After sun crest: Richard bleedout first (starts ~6 min death timer), place
+  sun at 11A, dining 2F enter, then ``push_statue_2f`` end-anchor.
 """
 from __future__ import annotations
 
@@ -494,6 +496,7 @@ class PlannerLoyalQueue:
         box_opened: bool = False,
         box_closed: bool = False,
         typewriter_save_complete: bool = False,
+        progress: Any = None,
     ) -> dict[str, Any]:
         """Return reward flags for this env step under planner loyalty."""
         result = {
@@ -554,6 +557,21 @@ class PlannerLoyalQueue:
             )
             return result
 
+        # Mint Richard ledger on scripted 20D→204 dump (planner-loyal legs).
+        if progress is not None and room and prev_room and room != prev_room:
+            from re1_rl.richard_cutscene_checkpoint import (
+                note_richard_cutscene_room_transition,
+            )
+
+            note_richard_cutscene_room_transition(
+                None,
+                progress,
+                prev_room,
+                room,
+                state,
+                planner_loyal_queue=self,
+            )
+
         # Divert: unplanned room change. go_to_box may hop any door until dest.
         if room and prev_room and room != prev_room:
             if op == GO_TO_BOX_OP:
@@ -568,6 +586,17 @@ class PlannerLoyalQueue:
                     )
                 return result
             if op != "traverse":
+                # Richard cinema often dumps Pillar Passage → C passage.
+                if _richard_bleedout_complete(step, state, progress):
+                    result["step_success"] = True
+                    self._index += 1
+                    self.step_success_pending = True
+                    print(
+                        f"[planner_loyal] richard_bleedout "
+                        f"{prev_room}->{room}",
+                        flush=True,
+                    )
+                    return result
                 result["divert"] = True
                 result["divert_reason"] = f"unplanned_room:{prev_room}->{room}"
                 self.divert_reason = result["divert_reason"]
@@ -584,6 +613,16 @@ class PlannerLoyalQueue:
             self._index += 1
             self.step_success_pending = True
             return result
+
+        # Already in traverse destination (e.g. cinema left Jill in 204).
+        if op == "traverse":
+            edge = str(step.get("edge_id") or "")
+            expected = edge.split("->", 1)[1] if "->" in edge else ""
+            if expected and room == expected:
+                result["step_success"] = True
+                self._index += 1
+                self.step_success_pending = True
+                return result
 
         # Divert / complete: pickups. COMBINE, already-held qty bumps
         # (reload of a gun they already have), leftover cinema after a minted
@@ -629,6 +668,12 @@ class PlannerLoyalQueue:
             self.step_success_pending = True
             return result
 
+        if _dining_statue_step_complete(step, state):
+            result["step_success"] = True
+            self._index += 1
+            self.step_success_pending = True
+            return result
+
         # Objective / puzzle / cutscene / boss completion via story_use or flags.
         if op in {"objective", "do_puzzle", "trigger_cutscene", "boss"}:
             site = str(step.get("site_id") or "")
@@ -655,6 +700,15 @@ class PlannerLoyalQueue:
                 print(
                     f"[planner_loyal] alcove_swap site={site or story} "
                     f"room={room}",
+                    flush=True,
+                )
+                return result
+            if _richard_bleedout_complete(step, state, progress):
+                result["step_success"] = True
+                self._index += 1
+                self.step_success_pending = True
+                print(
+                    f"[planner_loyal] richard_bleedout room={room}",
                     flush=True,
                 )
                 return result
@@ -707,6 +761,37 @@ def _objective_story_matches(site: str, story: str) -> bool:
     if site and story and story == site:
         return True
     return bool(site in _ALCOVE_SWAP_SITES and story in _ALCOVE_SWAP_SITES)
+
+
+def _richard_bleedout_complete(
+    step: dict[str, Any],
+    state: dict[str, Any] | None,
+    progress: Any = None,
+) -> bool:
+    """True when current step is Richard bleedout and the cinema ledger fired."""
+    site = str(step.get("site_id") or "")
+    beat = str(step.get("beat_id") or "")
+    if site != "20D:richard" and beat != "richard_bleedout":
+        return False
+    snap = state or {}
+    if snap.get("richard_cutscene_confirmed"):
+        return True
+    from re1_rl.richard_cutscene_checkpoint import richard_cutscene_seen
+
+    return richard_cutscene_seen(progress)
+
+
+def _dining_statue_step_complete(
+    step: dict[str, Any],
+    state: dict[str, Any] | None,
+) -> bool:
+    site = str(step.get("site_id") or "")
+    beat = str(step.get("beat_id") or "")
+    if site != "dining_statue_knocked" and beat != "push_statue_2f":
+        return False
+    from re1_rl.dining_statue_puzzle import dining_statue_knocked_from_state
+
+    return dining_statue_knocked_from_state(state)
 
 
 _GALLERY_PORTRAIT_RE = re.compile(r"gallery_portrait_(\d+)$")

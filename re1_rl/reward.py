@@ -958,6 +958,7 @@ def _compute_planner_loyal_reward(
         box_opened=box_opened,
         box_closed=box_closed,
         typewriter_save_complete=bool(typewriter_save_complete),
+        progress=progress,
     )
     bd["heal_use_tax"] = float(loyal.get("heal_use_tax") or 0.0)
 
@@ -1237,6 +1238,7 @@ def compute_reward(
             box_opened=box_opened,
             box_closed=box_closed,
             typewriter_save_complete=bool(typewriter_save_complete),
+            progress=progress,
         )
         bd["heal_use_tax"] = float(loyal.get("heal_use_tax") or 0.0)
         if loyal.get("divert"):

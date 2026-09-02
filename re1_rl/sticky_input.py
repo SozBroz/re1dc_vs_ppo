@@ -57,10 +57,19 @@ class StickyInputState:
             pulse = dict(button_map.get(action, {}))
         else:
             btn = button_map.get(action, {})
-            if "up" in btn or "down" in btn:
+            has_fb = "up" in btn or "down" in btn
+            has_turn = "left" in btn or "right" in btn
+            if has_fb:
                 self._sticky["up"] = bool(btn.get("up"))
                 self._sticky["down"] = bool(btn.get("down"))
-            if "left" in btn or "right" in btn:
+                # Pure forward/back/run clears turn latches so the policy can
+                # go walk/run+turn → straight without an intervening noop.
+                if not has_turn:
+                    self._sticky["left"] = False
+                    self._sticky["right"] = False
+            if has_turn:
+                # turn_left/right flip the axis (clears the opposite side) and
+                # keep any latched forward/run.
                 self._sticky["left"] = bool(btn.get("left"))
                 self._sticky["right"] = bool(btn.get("right"))
             if action == 5:

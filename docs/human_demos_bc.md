@@ -30,9 +30,12 @@ What it does:
   through `env.step`. The observation Dict returned by the env and the legal
   action mask are stored with that action. Steps where only `noop` is legal
   (async cutscene/door skip owns the input) are not stored as decisions.
-- Terminals are the training ones: pl80 mint = success; `planner_divert`,
-  `armor_inplace_statue_push`, `armor_gas`, 12 min wall = fail. After each
-  episode it prints a tally and auto-resets to the pinned cell.
+- Terminals for this recorder: first planner-loyal **step** success for the
+  pinned leg (reward log shows `checkpoint_success` / `planner_step_success` —
+  that is the pay, not a Gym terminal; the env only ends when the whole chunk
+  finishes). Fail terminals still apply (`planner_divert`,
+  `armor_inplace_statue_push`, `armor_gas`, 12 min wall). After each episode it
+  prints a tally and auto-resets to the pinned cell.
 - Successful episodes are written to
   `data/demos/planner_loyal/plNN_<stamp>_ok.npz`; failures are discarded
   unless `--keep-failures` (then `_fail.npz`, ignored by the learner unless
@@ -46,15 +49,18 @@ Controls:
 | Run | Shift + W | Square + up |
 | Interact / push confirm | Z or E | Cross |
 | Aim / fire | R / F | R1 / R2 |
+| Stand still (noop; clears sticky) | Space | Circle |
 | Quit (discards current episode) | Esc or Q | — |
 
 Mapping details worth knowing when you play: the action space cannot express
 "walk + turn" in one step, so holding W+A becomes `forward` (latch up) then
 `turn_left` with the forward latch kept — the same two-step the policy must
-use. Releasing the turn while still walking maps to `noop` (clears latches)
-then `forward` again. Holding Cross sends `interact` (18-frame hold) every
-step. Pushing a statue is just repeated `forward`/`run_forward` into it
-(`re1_rl/pushable.py`, 8-frame hold in 205).
+use. Releasing the turn while still walking/running maps to `forward` /
+`run_forward` (clears the turn latch, keeps up/run). Flipping A↔D while
+holding W is a single `turn_left`/`turn_right` (opposite side cleared).
+Holding Cross sends `interact` (18-frame hold) every step. Pushing a statue
+is just repeated `forward`/`run_forward` into it (`re1_rl/pushable.py`,
+8-frame hold in 205).
 
 Aim for ~10 successes. Do not worry about speed; wasted steps are fine, but
 avoid actions you would not want the policy to copy (interact spam, pacing).

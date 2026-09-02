@@ -86,15 +86,23 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert any(s.get("edge_id") == "101->100" for s in steps)
     assert any(s.get("op") == "use_box" and s.get("room_id") == "100" for s in steps)
     assert any(s.get("edge_id") == "204->205" for s in steps)
-    assert [step["beat_id"] for step in steps[-4:]] == [
+    sun_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "sun_crest")
+    assert [step.get("beat_id") for step in steps[sun_i - 3 : sun_i + 1]] == [
         "armor_room_enter",
         "armor_vent_door",
         "armor_vent_far",
         "sun_crest",
     ]
-    assert steps[-1]["pickup_id"] == "205:sun_crest:1"
-    assert steps[-1]["beat_id"] == "sun_crest"
-    assert chunk["end_anchor_beat_id"] == "sun_crest"
+    assert steps[sun_i]["pickup_id"] == "205:sun_crest:1"
+    assert steps[sun_i + 1]["edge_id"] == "205->204"
+    assert steps[sun_i + 3]["beat_id"] == "richard_bleedout"
+    assert steps[sun_i + 3]["site_id"] == "20D:richard"
+    assert any(s.get("beat_id") == "place_sun_crest" for s in steps)
+    assert any(s.get("beat_id") == "dining_2f_enter" for s in steps)
+    assert steps[-1]["beat_id"] == "push_statue_2f"
+    assert steps[-1]["site_id"] == "dining_statue_knocked"
+    assert chunk["end_anchor_beat_id"] == "push_statue_2f"
+    assert chunk["leave_100"]["next_beat_this_loadout_is_for"] == "richard_bleedout"
     assert chunk["leave_100"]["held_on_exit"][2]["item"] == "armor_key"
     assert not any(
         str(r.get("item") or "") in {
@@ -1484,7 +1492,7 @@ def test_pl18_seek_lands_on_chemical_tail():
     q.seek(13)
     assert q.current is not None
     assert q.current["edge_id"] == "105->106"
-    assert q.end_anchor == "sun_crest"
+    assert q.end_anchor == "push_statue_2f"
     assert q._steps[23]["pickup_id"].startswith("118:chemical")
     assert q._steps[24]["op"] == "use_box"
     assert any(
@@ -1492,7 +1500,8 @@ def test_pl18_seek_lands_on_chemical_tail():
     )
     assert any(s.get("edge_id") == "101->100" for s in q._steps)
     assert any(s.get("edge_id") == "204->205" for s in q._steps)
-    assert q._steps[-1]["pickup_id"] == "205:sun_crest:1"
+    assert q._steps[75]["pickup_id"] == "205:sun_crest:1"
+    assert q._steps[-1]["beat_id"] == "push_statue_2f"
 
 
 def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):
@@ -1530,3 +1539,152 @@ def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):
     assert len(q._steps) == 2
     assert q.end_anchor == "b"
     assert q.current["edge_id"] == "105->106"
+
+
+def test_richard_bleedout_completes_on_confirmed_dump():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "richard",
+            "end_anchor_beat_id": "richard_bleedout",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "trigger_cutscene",
+                    "site_id": "20D:richard",
+                    "room_id": "20D",
+                    "beat_id": "richard_bleedout",
+                },
+                {"n": 2, "op": "traverse", "edge_id": "20D->204"},
+            ],
+        }
+    )
+    progress = ProgressTracker()
+    prev = {"room_id": "20D", "inventory": [], "inventory_slots": []}
+    cur = {
+        "room_id": "204",
+        "inventory": [],
+        "inventory_slots": [],
+        "richard_cutscene_confirmed": True,
+        "_skip_peak_scene_flag": 0x93,
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur, progress=progress)
+    assert result["step_success"] is True
+    assert result["divert"] is False
+    assert q.current["edge_id"] == "20D->204"
+    # Cinema already dumped Jill into 204 — traverse is a no-op.
+    already = q.evaluate_transition(
+        prev_state=cur, state=cur, progress=progress
+    )
+    assert already["step_success"] is True
+    assert q.done
+
+
+def test_richard_bleedout_diverts_without_confirmation():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "richard",
+            "end_anchor_beat_id": "richard_bleedout",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "trigger_cutscene",
+                    "site_id": "20D:richard",
+                    "room_id": "20D",
+                    "beat_id": "richard_bleedout",
+                }
+            ],
+        }
+    )
+    result = q.evaluate_transition(
+        prev_state={"room_id": "20D", "inventory": [], "inventory_slots": []},
+        state={"room_id": "204", "inventory": [], "inventory_slots": []},
+        progress=ProgressTracker(),
+    )
+    assert result["divert"] is True
+    assert "unplanned_room" in str(result["divert_reason"])
+
+
+def test_dining_statue_completes_when_knocked():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "statue",
+            "end_anchor_beat_id": "push_statue_2f",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "do_puzzle",
+                    "site_id": "dining_statue_knocked",
+                    "room_id": "202",
+                    "beat_id": "push_statue_2f",
+                }
+            ],
+        }
+    )
+    prev = {
+        "room_id": "202",
+        "dining_statue_knocked": False,
+        "inventory": [],
+        "inventory_slots": [],
+    }
+    cur = {
+        "room_id": "202",
+        "dining_statue_knocked": True,
+        "inventory": [],
+        "inventory_slots": [],
+    }
+    miss = q.evaluate_transition(prev_state=prev, state=prev)
+    assert miss["step_success"] is False
+    hit = q.evaluate_transition(prev_state=prev, state=cur)
+    assert hit["step_success"] is True
+    assert q.done
+
+
+def test_richard_skip_settled_on_planner_loyal_leg():
+    from re1_rl.richard_cutscene_checkpoint import (
+        RICHARD_CUTSCENE_KEY,
+        note_richard_cutscene_skip_settle,
+        richard_cutscene_skip_settled,
+    )
+
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "richard",
+            "end_anchor_beat_id": "richard_bleedout",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "trigger_cutscene",
+                    "site_id": "20D:richard",
+                    "room_id": "20D",
+                    "beat_id": "richard_bleedout",
+                }
+            ],
+        }
+    )
+    entry = {"room_id": "20D", "scene_flag": 0x91}
+    new = {"room_id": "20D", "scene_flag": 0x93}
+    assert richard_cutscene_skip_settled(
+        None,
+        entry,
+        new,
+        skip_frames=2984,
+        peak_scene_flag=0x93,
+        planner_loyal_queue=q,
+    )
+    progress = ProgressTracker()
+    note_richard_cutscene_skip_settle(
+        None,
+        progress,
+        entry,
+        new,
+        skip_frames=2984,
+        peak_scene_flag=0x93,
+        planner_loyal_queue=q,
+    )
+    assert RICHARD_CUTSCENE_KEY in progress.observed_cutscenes
+    result = q.evaluate_transition(
+        prev_state=entry,
+        state={**new, "richard_cutscene_confirmed": True},
+        progress=progress,
+    )
+    assert result["step_success"] is True

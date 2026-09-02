@@ -10,12 +10,15 @@ would have seen. Successful episodes (``checkpoint_success``) are written to
   python scripts/record_planner_demo.py --speed 150    # faster emu
   python scripts/record_planner_demo.py --keep-failures
 
-Keyboard: WASD move | Shift+W run | Z/E interact | R aim | F fire | Esc quit
-Gamepad (focus EmuHawk): stick / d-pad | Square run | Cross interact | R1 aim | R2 fire
+Keyboard: WASD move | Shift+W run | Z/E interact | R aim | F fire | Space noop/stop | Esc quit
+Gamepad (focus EmuHawk): stick / d-pad | Square run | Cross interact | R1 aim | R2 fire | Circle noop/stop
 
-Isolated BizHawk on port 5801 (not a fleet worker port). The episode ends on
-the same terminals as training (pl80 mint, divert, gas, timeout); it then
-auto-resets to the pinned cell after a short pause.
+Isolated BizHawk on port 5801 (not a fleet worker port). The recorder ends the
+episode on the first planner-loyal step success (the pinned leg, e.g. pl79→pl80),
+or on training fail terminals (divert, gas, timeout). Mid-chunk ``checkpoint_success``
+in the reward log is that step pay — the env itself only Gym-terminates when the
+whole chunk finishes, so the recorder treats the first step success as done.
+It then auto-resets to the pinned cell after a short pause.
 """
 
 from __future__ import annotations
@@ -97,7 +100,7 @@ def _launch_emuhawk(port: int, log_path: Path) -> subprocess.Popen[Any]:
 def _objective_id(env: Any) -> str:
     queue = getattr(env, "_planner_loyal_queue", None)
     if queue is not None:
-        step = queue.current() or {}
+        step = queue.current or {}
         return str(step.get("beat_id") or step.get("site_id") or step.get("id") or f"step{queue.index}")
     try:
         return str((env._planner.current_objective() or {}).get("checkpoint_id") or "?")
@@ -187,8 +190,10 @@ def main() -> int:
     print(
         f"\n[demo] start={start_cell} pin={pin_path.name} port={port} speed={args.speed}% "
         f"input={args.input} out={out_dir}\n"
-        "  Keyboard: WASD move | Shift+W run | Z/E interact | R aim | F fire | Esc quit\n"
-        "  Gamepad: focus EmuHawk - stick/d-pad | Square run | Cross interact | R1 aim | R2 fire\n"
+        "  Keyboard: WASD move | Shift+W run | Z/E interact | R aim | F fire | "
+        "Space = stand still (noop) | Esc quit\n"
+        "  Gamepad: focus EmuHawk - stick/d-pad | Square run | Cross interact | "
+        "R1 aim | R2 fire | Circle = stand still\n"
         "  Episode auto-resets on any terminal; successes are saved, failures "
         f"{'saved' if args.keep_failures else 'discarded'}.\n",
         flush=True,
@@ -223,9 +228,17 @@ def main() -> int:
                     buttons = _poll_play_buttons(
                         kb=kb, bridge=bridge, use_keyboard=use_keyboard, use_emuhawk_joypad=use_gamepad
                     )
-                    action = buttons_to_action(
-                        buttons, env._sticky_input.as_dict(), button_map=ACTION_BUTTON_MAP
-                    )
+                    # Space / Circle force noop so sticky walk/run latches clear even
+                    # if a stick axis is still slightly off-center.
+                    force_noop = bool(buttons.pop("circle", False))
+                    if kb is not None and kb.is_pressed("space"):
+                        force_noop = True
+                    if force_noop:
+                        action = 0
+                    else:
+                        action = buttons_to_action(
+                            buttons, env._sticky_input.as_dict(), button_map=ACTION_BUTTON_MAP
+                        )
                     if not mask[action]:
                         action = 0
                     episode.add(obs, action, mask)
@@ -246,10 +259,19 @@ def main() -> int:
                         flush=True,
                     )
                 last_action = action
-                if terminated or truncated:
-                    success = bool(env._progress.checkpoint_success)
+                # Planner-loyal only Gym-terminates when the *chunk* is done.
+                # One-leg demos hunt a single pinned step; its pay aliases to
+                # checkpoint_success / planner_step_success without ending the env.
+                step_ok = (
+                    float(bd.get("planner_step_success", 0.0) or 0.0) > 0.0
+                    or float(bd.get("checkpoint_success", 0.0) or 0.0) > 0.0
+                )
+                if terminated or truncated or step_ok:
+                    success = bool(step_ok) or bool(env._progress.checkpoint_success)
                     reason = info.get("episode_failure") or (
-                        "checkpoint_success" if success else "truncated"
+                        "planner_step_success" if step_ok else (
+                            "checkpoint_success" if success else "truncated"
+                        )
                     )
                     n_success += int(success)
                     print(

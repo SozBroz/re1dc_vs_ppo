@@ -77,6 +77,37 @@ def test_turn_keeps_forward_and_run() -> None:
     assert sticky["right"] is False
 
 
+def test_forward_clears_turn_keeps_walk() -> None:
+    s = StickyInputState()
+    _apply_action_input(s, _idx("forward"))
+    _apply_action_input(s, _idx("turn_right"))
+    sticky, _, _ = _apply_action_input(s, _idx("forward"))
+    assert sticky["up"] is True
+    assert sticky["left"] is False
+    assert sticky["right"] is False
+
+
+def test_run_forward_clears_turn_keeps_run() -> None:
+    s = StickyInputState()
+    _apply_action_input(s, _idx("run_forward"))
+    _apply_action_input(s, _idx("turn_left"))
+    sticky, _, _ = _apply_action_input(s, _idx("run_forward"))
+    assert sticky["up"] is True
+    assert sticky["square"] is True
+    assert sticky["left"] is False
+    assert sticky["right"] is False
+
+
+def test_turn_flip_clears_opposite_keeps_forward() -> None:
+    s = StickyInputState()
+    _apply_action_input(s, _idx("forward"))
+    _apply_action_input(s, _idx("turn_right"))
+    sticky, _, _ = _apply_action_input(s, _idx("turn_left"))
+    assert sticky["up"] is True
+    assert sticky["left"] is True
+    assert sticky["right"] is False
+
+
 def test_noop_clears_sticky() -> None:
     s = StickyInputState()
     s.apply(_idx("forward"), ACTION_BUTTON_MAP)

@@ -1,6 +1,6 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (76 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (92 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **Source of truth:** the live chunk JSON. Seed cells `pl00`–`pl05` are the opening crystals (same beats as yawn `cp00`–`cp05`); they are **not** minted from this chunk.
 
@@ -11,7 +11,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl05`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - One-way lock: `103->104` (tea room). `103->10C` is open. Do not walk `116->106` after the shotgun.
-- Chunk end-anchor: `sun_crest` (`pl81`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `push_statue_2f` (`pl97`). Mid-chunk success keeps the episode open.
 
 ## Summary table
 
@@ -99,6 +99,22 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 | `pl79` | 74 | `armor_vent_door` | `205` (ARMOR ROOM) | do_puzzle | `armor_vent_door` at `armor_vent_door` — east statue exactly on its vent |
 | `pl80` | 75 | `armor_vent_far` | `205` (ARMOR ROOM) | do_puzzle | `armor_vent_far` at `armor_vent_far` — both east and west statues exactly on their vents |
 | `pl81` | 76 | `sun_crest` | `205` (ARMOR ROOM) | acquire | Take `205:sun_crest:1` (activate center button, then take cabinet sun crest) |
+| `pl82` | 77 | `205->204` | `204` (C PASSAGE) | traverse | Walk `205->204` into `204` (C PASSAGE) |
+| `pl83` | 78 | `richard_approach` | `20D` (PILLAR PASSAGE) | traverse | Walk `204->20D` into `20D` (PILLAR PASSAGE) |
+| `pl84` | 79 | `richard_bleedout` | `20D` (PILLAR PASSAGE) | trigger_cutscene | `richard_bleedout` at `20D:richard` — start Richard death timer (~6 min real-time); kill time on place_sun + dining statue |
+| `pl85` | 80 | `20D->204` | `204` (C PASSAGE) | traverse | Walk `20D->204` into `204` (C PASSAGE) |
+| `pl86` | 81 | `204->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `204->207` into `207` (2F RIGHT STAIRS) |
+| `pl87` | 82 | `207->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `207->10B` into `10B` (1F RIGHT STAIRS) |
+| `pl88` | 83 | `10B->10A` | `10A` (BACK PASSAGE) | traverse | Walk `10B->10A` into `10A` (BACK PASSAGE) |
+| `pl89` | 84 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
+| `pl90` | 85 | `place_sun_crest` | `11A` (ROOFED PASSAGE) | objective | `place_sun_crest` at `sun_crest@11A_crest_slot` — place held sun_crest; burns Richard timer |
+| `pl91` | 86 | `11A->10A` | `10A` (BACK PASSAGE) | traverse | Walk `11A->10A` into `10A` (BACK PASSAGE) |
+| `pl92` | 87 | `10A->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `10A->10B` into `10B` (1F RIGHT STAIRS) |
+| `pl93` | 88 | `10B->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `10B->207` into `207` (2F RIGHT STAIRS) |
+| `pl94` | 89 | `207->204` | `204` (C PASSAGE) | traverse | Walk `207->204` into `204` (C PASSAGE) |
+| `pl95` | 90 | `204->203` | `203` (HALL 2F) | traverse | Walk `204->203` into `203` (HALL 2F) |
+| `pl96` | 91 | `dining_2f_enter` | `202` (DINING ROOM 2F) | traverse | Walk `203->202` into `202` (DINING ROOM 2F) |
+| `pl97` | 92 | `push_statue_2f` | `202` (DINING ROOM 2F) | do_puzzle | `push_statue_2f` at `dining_statue_knocked` — push balcony statue down; chunk end-anchor |
 
 ## Details
 
@@ -152,7 +168,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl06`–`pl81`)
+### Chunk cells (`pl06`–`pl97`)
 
 ### `pl06` — `106->105` (step 1)
 
@@ -162,7 +178,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `106->105` into `105` (DINING ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `106->105` into `105` (DINING ROOM).
-- **Success condition:** Enter room `105` via `106->105`. Any other door is `wrong_traverse:106->105 got <room>` (−4).
+- **Success condition:** Enter room `105` via `106->105` (already-there counts after cinema dump). Any other door is `wrong_traverse:106->105 got <room>` (−4).
 
 ### `pl07` — `105->104` (step 2)
 
@@ -172,7 +188,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `105->104` into `104` (TEA ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `105->104` into `104` (TEA ROOM).
-- **Success condition:** Enter room `104` via `105->104`. Any other door is `wrong_traverse:105->104 got <room>` (−4).
+- **Success condition:** Enter room `104` via `105->104` (already-there counts after cinema dump). Any other door is `wrong_traverse:105->104 got <room>` (−4).
 
 ### `pl08` — `104:handgun_bullets:1` (step 3)
 
@@ -202,7 +218,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `104->10F` into `10F` (BAR)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `104->10F` into `10F` (BAR).
-- **Success condition:** Enter room `10F` via `104->10F`. Any other door is `wrong_traverse:104->10F got <room>` (−4).
+- **Success condition:** Enter room `10F` via `104->10F` (already-there counts after cinema dump). Any other door is `wrong_traverse:104->10F got <room>` (−4).
 
 ### `pl11` — `music_notes` (step 6)
 
@@ -256,7 +272,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `10F->104` into `104` (TEA ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `10F->104` into `104` (TEA ROOM).
-- **Success condition:** Enter room `104` via `10F->104`. Any other door is `wrong_traverse:10F->104 got <room>` (−4).
+- **Success condition:** Enter room `104` via `10F->104` (already-there counts after cinema dump). Any other door is `wrong_traverse:10F->104 got <room>` (−4).
 
 ### `pl16` — `104->105` (step 11)
 
@@ -266,7 +282,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `104->105` into `105` (DINING ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `104->105` into `105` (DINING ROOM).
-- **Success condition:** Enter room `105` via `104->105`. Any other door is `wrong_traverse:104->105 got <room>` (−4).
+- **Success condition:** Enter room `105` via `104->105` (already-there counts after cinema dump). Any other door is `wrong_traverse:104->105 got <room>` (−4).
 
 ### `pl17` — `gold_emblem_fireplace` (step 12)
 
@@ -298,7 +314,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `105->106` into `106` (MAIN HALL)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `105->106` into `106` (MAIN HALL).
-- **Success condition:** Enter room `106` via `105->106`. Any other door is `wrong_traverse:105->106 got <room>` (−4).
+- **Success condition:** Enter room `106` via `105->106` (already-there counts after cinema dump). Any other door is `wrong_traverse:105->106 got <room>` (−4).
 
 ### `pl20` — `106->107` (step 15)
 
@@ -308,7 +324,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `106->107` into `107` (GALLERY)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `106->107` into `107` (GALLERY).
-- **Success condition:** Enter room `107` via `106->107`. Any other door is `wrong_traverse:106->107 got <room>` (−4).
+- **Success condition:** Enter room `107` via `106->107` (already-there counts after cinema dump). Any other door is `wrong_traverse:106->107 got <room>` (−4).
 
 ### `pl21` — `107->108` (step 16)
 
@@ -318,7 +334,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `107->108` into `108` (L PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `107->108` into `108` (L PASSAGE).
-- **Success condition:** Enter room `108` via `107->108`. Any other door is `wrong_traverse:107->108 got <room>` (−4).
+- **Success condition:** Enter room `108` via `107->108` (already-there counts after cinema dump). Any other door is `wrong_traverse:107->108 got <room>` (−4).
 
 ### `pl22` — `108:handgun_bullets:1` (step 17)
 
@@ -338,7 +354,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `108->109` into `109` (TRAP PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `108->109` into `109` (TRAP PASSAGE).
-- **Success condition:** Enter room `109` via `108->109`. Any other door is `wrong_traverse:108->109 got <room>` (−4).
+- **Success condition:** Enter room `109` via `108->109` (already-there counts after cinema dump). Any other door is `wrong_traverse:108->109 got <room>` (−4).
 
 ### `pl24` — `109:green_herb:1` (step 19)
 
@@ -358,7 +374,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `109->10A` into `10A` (BACK PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `109->10A` into `10A` (BACK PASSAGE).
-- **Success condition:** Enter room `10A` via `109->10A`. Any other door is `wrong_traverse:109->10A got <room>` (−4).
+- **Success condition:** Enter room `10A` via `109->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:109->10A got <room>` (−4).
 
 ### `pl26` — `10A->10B` (step 21)
 
@@ -368,7 +384,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `10A->10B` into `10B` (1F RIGHT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `10A->10B` into `10B` (1F RIGHT STAIRS).
-- **Success condition:** Enter room `10B` via `10A->10B`. Any other door is `wrong_traverse:10A->10B got <room>` (−4).
+- **Success condition:** Enter room `10B` via `10A->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->10B got <room>` (−4).
 
 ### `pl27` — `10B:green_herb:1` (step 22)
 
@@ -388,7 +404,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `10B->118` into `118` (STAIRS UNDER ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `10B->118` into `118` (STAIRS UNDER ROOM).
-- **Success condition:** Enter room `118` via `10B->118`. Any other door is `wrong_traverse:10B->118 got <room>` (−4).
+- **Success condition:** Enter room `118` via `10B->118` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->118 got <room>` (−4).
 
 ### `pl29` — `chemical` (step 24)
 
@@ -418,7 +434,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `118->10B` into `10B` (1F RIGHT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `118->10B` into `10B` (1F RIGHT STAIRS).
-- **Success condition:** Enter room `10B` via `118->10B`. Any other door is `wrong_traverse:118->10B got <room>` (−4).
+- **Success condition:** Enter room `10B` via `118->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:118->10B got <room>` (−4).
 
 ### `pl32` — `10B->10A` (step 27)
 
@@ -428,7 +444,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `10B->10A` into `10A` (BACK PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `10B->10A` into `10A` (BACK PASSAGE).
-- **Success condition:** Enter room `10A` via `10B->10A`. Any other door is `wrong_traverse:10B->10A got <room>` (−4).
+- **Success condition:** Enter room `10A` via `10B->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->10A got <room>` (−4).
 
 ### `pl33` — `10A->109` (step 28)
 
@@ -438,7 +454,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `10A->109` into `109` (TRAP PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `10A->109` into `109` (TRAP PASSAGE).
-- **Success condition:** Enter room `109` via `10A->109`. Any other door is `wrong_traverse:10A->109 got <room>` (−4).
+- **Success condition:** Enter room `109` via `10A->109` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->109 got <room>` (−4).
 
 ### `pl34` — `109->115` (step 29)
 
@@ -448,7 +464,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `109->115` into `115` (TRAP ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `109->115` into `115` (TRAP ROOM).
-- **Success condition:** Enter room `115` via `109->115`. Any other door is `wrong_traverse:109->115 got <room>` (−4).
+- **Success condition:** Enter room `115` via `109->115` (already-there counts after cinema dump). Any other door is `wrong_traverse:109->115 got <room>` (−4).
 
 ### `pl35` — `115->116` (step 30)
 
@@ -458,7 +474,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `115->116` into `116` (LIVING ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `115->116` into `116` (LIVING ROOM).
-- **Success condition:** Enter room `116` via `115->116`. Any other door is `wrong_traverse:115->116 got <room>` (−4).
+- **Success condition:** Enter room `116` via `115->116` (already-there counts after cinema dump). Any other door is `wrong_traverse:115->116 got <room>` (−4).
 
 ### `pl36` — `116:shotgun:1` (step 31)
 
@@ -478,7 +494,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `116->115` into `115` (TRAP ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `116->115` into `115` (TRAP ROOM).
-- **Success condition:** Enter room `115` via `116->115`. Any other door is `wrong_traverse:116->115 got <room>` (−4).
+- **Success condition:** Enter room `115` via `116->115` (already-there counts after cinema dump). Any other door is `wrong_traverse:116->115 got <room>` (−4).
 
 ### `pl38` — `115->109` (step 33)
 
@@ -488,7 +504,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `115->109` into `109` (TRAP PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `115->109` into `109` (TRAP PASSAGE).
-- **Success condition:** Enter room `109` via `115->109`. Any other door is `wrong_traverse:115->109 got <room>` (−4).
+- **Success condition:** Enter room `109` via `115->109` (already-there counts after cinema dump). Any other door is `wrong_traverse:115->109 got <room>` (−4).
 
 ### `pl39` — `109->10A` (step 34)
 
@@ -498,7 +514,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `109->10A` into `10A` (BACK PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `109->10A` into `10A` (BACK PASSAGE).
-- **Success condition:** Enter room `10A` via `109->10A`. Any other door is `wrong_traverse:109->10A got <room>` (−4).
+- **Success condition:** Enter room `10A` via `109->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:109->10A got <room>` (−4).
 
 ### `pl40` — `gallery_enter` (step 35)
 
@@ -509,7 +525,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `10A->117` into `117` (LARGE GALLERY)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `10A->117` into `117` (LARGE GALLERY).
-- **Success condition:** Enter room `117` via `10A->117`. Any other door is `wrong_traverse:10A->117 got <room>` (−4).
+- **Success condition:** Enter room `117` via `10A->117` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->117 got <room>` (−4).
 
 ### `pl41` — `gallery_portrait_1` (step 36)
 
@@ -602,7 +618,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `117->10A` into `10A` (BACK PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `117->10A` into `10A` (BACK PASSAGE).
-- **Success condition:** Enter room `10A` via `117->10A`. Any other door is `wrong_traverse:117->10A got <room>` (−4).
+- **Success condition:** Enter room `10A` via `117->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:117->10A got <room>` (−4).
 
 ### `pl49` — `10A->11A` (step 44)
 
@@ -612,7 +628,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `10A->11A` into `11A` (ROOFED PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `10A->11A` into `11A` (ROOFED PASSAGE).
-- **Success condition:** Enter room `11A` via `10A->11A`. Any other door is `wrong_traverse:10A->11A got <room>` (−4).
+- **Success condition:** Enter room `11A` via `10A->11A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->11A got <room>` (−4).
 
 ### `pl50` — `place_star_crest` (step 45)
 
@@ -633,7 +649,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `11A->10A` into `10A` (BACK PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `11A->10A` into `10A` (BACK PASSAGE).
-- **Success condition:** Enter room `10A` via `11A->10A`. Any other door is `wrong_traverse:11A->10A got <room>` (−4).
+- **Success condition:** Enter room `10A` via `11A->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:11A->10A got <room>` (−4).
 
 ### `pl52` — `10A->10B` (step 47)
 
@@ -643,7 +659,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `10A->10B` into `10B` (1F RIGHT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `10A->10B` into `10B` (1F RIGHT STAIRS).
-- **Success condition:** Enter room `10B` via `10A->10B`. Any other door is `wrong_traverse:10A->10B got <room>` (−4).
+- **Success condition:** Enter room `10B` via `10A->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->10B got <room>` (−4).
 
 ### `pl53` — `10B->207` (step 48)
 
@@ -653,7 +669,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `10B->207` into `207` (2F RIGHT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `10B->207` into `207` (2F RIGHT STAIRS).
-- **Success condition:** Enter room `207` via `10B->207`. Any other door is `wrong_traverse:10B->207 got <room>` (−4).
+- **Success condition:** Enter room `207` via `10B->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->207 got <room>` (−4).
 
 ### `pl54` — `207->204` (step 49)
 
@@ -663,7 +679,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `207->204` into `204` (C PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `207->204` into `204` (C PASSAGE).
-- **Success condition:** Enter room `204` via `207->204`. Any other door is `wrong_traverse:207->204 got <room>` (−4).
+- **Success condition:** Enter room `204` via `207->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->204 got <room>` (−4).
 
 ### `pl55` — `204->203` (step 50)
 
@@ -673,7 +689,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `204->203` into `203` (HALL 2F)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `204->203` into `203` (HALL 2F).
-- **Success condition:** Enter room `203` via `204->203`. Any other door is `wrong_traverse:204->203 got <room>` (−4).
+- **Success condition:** Enter room `203` via `204->203` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->203 got <room>` (−4).
 
 ### `pl56` — `203->202` (step 51)
 
@@ -683,7 +699,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `203->202` into `202` (DINING ROOM 2F)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `203->202` into `202` (DINING ROOM 2F).
-- **Success condition:** Enter room `202` via `203->202`. Any other door is `wrong_traverse:203->202 got <room>` (−4).
+- **Success condition:** Enter room `202` via `203->202` (already-there counts after cinema dump). Any other door is `wrong_traverse:203->202 got <room>` (−4).
 
 ### `pl57` — `202->201` (step 52)
 
@@ -693,7 +709,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `202->201` into `201` (2F LEFT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `202->201` into `201` (2F LEFT STAIRS).
-- **Success condition:** Enter room `201` via `202->201`. Any other door is `wrong_traverse:202->201 got <room>` (−4).
+- **Success condition:** Enter room `201` via `202->201` (already-there counts after cinema dump). Any other door is `wrong_traverse:202->201 got <room>` (−4).
 
 ### `pl58` — `201->101` (step 53)
 
@@ -703,7 +719,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `201->101` into `101` (1F LEFT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `201->101` into `101` (1F LEFT STAIRS).
-- **Success condition:** Enter room `101` via `201->101`. Any other door is `wrong_traverse:201->101 got <room>` (−4).
+- **Success condition:** Enter room `101` via `201->101` (already-there counts after cinema dump). Any other door is `wrong_traverse:201->101 got <room>` (−4).
 
 ### `pl59` — `101->103` (step 54)
 
@@ -713,7 +729,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `101->103` into `103` (F PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `101->103` into `103` (F PASSAGE).
-- **Success condition:** Enter room `103` via `101->103`. Any other door is `wrong_traverse:101->103 got <room>` (−4).
+- **Success condition:** Enter room `103` via `101->103` (already-there counts after cinema dump). Any other door is `wrong_traverse:101->103 got <room>` (−4).
 
 ### `pl60` — `103->10C` (step 55)
 
@@ -723,7 +739,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `103->10C` into `10C` (GREEN HOUSE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `103->10C` into `10C` (GREEN HOUSE).
-- **Success condition:** Enter room `10C` via `103->10C`. Any other door is `wrong_traverse:103->10C got <room>` (−4).
+- **Success condition:** Enter room `10C` via `103->10C` (already-there counts after cinema dump). Any other door is `wrong_traverse:103->10C got <room>` (−4).
 
 ### `pl61` — `greenhouse_pump` (step 56)
 
@@ -775,7 +791,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `10C->103` into `103` (F PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `10C->103` into `103` (F PASSAGE).
-- **Success condition:** Enter room `103` via `10C->103`. Any other door is `wrong_traverse:10C->103 got <room>` (−4).
+- **Success condition:** Enter room `103` via `10C->103` (already-there counts after cinema dump). Any other door is `wrong_traverse:10C->103 got <room>` (−4).
 
 ### `pl66` — `103->101` (step 61)
 
@@ -785,7 +801,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `103->101` into `101` (1F LEFT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `103->101` into `101` (1F LEFT STAIRS).
-- **Success condition:** Enter room `101` via `103->101`. Any other door is `wrong_traverse:103->101 got <room>` (−4).
+- **Success condition:** Enter room `101` via `103->101` (already-there counts after cinema dump). Any other door is `wrong_traverse:103->101 got <room>` (−4).
 
 ### `pl67` — `101->102` (step 62)
 
@@ -795,7 +811,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `101->102` into `102` (VACANT ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `101->102` into `102` (VACANT ROOM).
-- **Success condition:** Enter room `102` via `101->102`. Any other door is `wrong_traverse:101->102 got <room>` (−4).
+- **Success condition:** Enter room `102` via `101->102` (already-there counts after cinema dump). Any other door is `wrong_traverse:101->102 got <room>` (−4).
 
 ### `pl68` — `102:handgun_bullets:1` (step 63)
 
@@ -825,7 +841,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `102->101` into `101` (1F LEFT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `102->101` into `101` (1F LEFT STAIRS).
-- **Success condition:** Enter room `101` via `102->101`. Any other door is `wrong_traverse:102->101 got <room>` (−4).
+- **Success condition:** Enter room `101` via `102->101` (already-there counts after cinema dump). Any other door is `wrong_traverse:102->101 got <room>` (−4).
 
 ### `pl71` — `101->100` (step 66)
 
@@ -835,7 +851,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `101->100` into `100` (SAVE ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `101->100` into `100` (SAVE ROOM).
-- **Success condition:** Enter room `100` via `101->100`. Any other door is `wrong_traverse:101->100 got <room>` (−4).
+- **Success condition:** Enter room `100` via `101->100` (already-there counts after cinema dump). Any other door is `wrong_traverse:101->100 got <room>` (−4).
 
 ### `pl72` — `use_box` (step 67)
 
@@ -854,7 +870,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `100->101` into `101` (1F LEFT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `100->101` into `101` (1F LEFT STAIRS).
-- **Success condition:** Enter room `101` via `100->101`. Any other door is `wrong_traverse:100->101 got <room>` (−4).
+- **Success condition:** Enter room `101` via `100->101` (already-there counts after cinema dump). Any other door is `wrong_traverse:100->101 got <room>` (−4).
 
 ### `pl74` — `101->201` (step 69)
 
@@ -864,7 +880,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `101->201` into `201` (2F LEFT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `101->201` into `201` (2F LEFT STAIRS).
-- **Success condition:** Enter room `201` via `101->201`. Any other door is `wrong_traverse:101->201 got <room>` (−4).
+- **Success condition:** Enter room `201` via `101->201` (already-there counts after cinema dump). Any other door is `wrong_traverse:101->201 got <room>` (−4).
 
 ### `pl75` — `201->202` (step 70)
 
@@ -874,7 +890,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `201->202` into `202` (DINING ROOM 2F)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `201->202` into `202` (DINING ROOM 2F).
-- **Success condition:** Enter room `202` via `201->202`. Any other door is `wrong_traverse:201->202 got <room>` (−4).
+- **Success condition:** Enter room `202` via `201->202` (already-there counts after cinema dump). Any other door is `wrong_traverse:201->202 got <room>` (−4).
 
 ### `pl76` — `202->203` (step 71)
 
@@ -884,7 +900,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `202->203` into `203` (HALL 2F)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `202->203` into `203` (HALL 2F).
-- **Success condition:** Enter room `203` via `202->203`. Any other door is `wrong_traverse:202->203 got <room>` (−4).
+- **Success condition:** Enter room `203` via `202->203` (already-there counts after cinema dump). Any other door is `wrong_traverse:202->203 got <room>` (−4).
 
 ### `pl77` — `203->204` (step 72)
 
@@ -894,7 +910,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `203->204` into `204` (C PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `203->204` into `204` (C PASSAGE).
-- **Success condition:** Enter room `204` via `203->204`. Any other door is `wrong_traverse:203->204 got <room>` (−4).
+- **Success condition:** Enter room `204` via `203->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:203->204 got <room>` (−4).
 
 ### `pl78` — `armor_room_enter` (step 73)
 
@@ -905,7 +921,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Objective:** Walk `204->205` into `205` (ARMOR ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `204->205` into `205` (ARMOR ROOM).
-- **Success condition:** Enter room `205` via `204->205`. Any other door is `wrong_traverse:204->205 got <room>` (−4).
+- **Success condition:** Enter room `205` via `204->205` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->205 got <room>` (−4).
 
 ### `pl79` — `armor_vent_door` (step 74)
 
@@ -942,4 +958,176 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Items gained:** `sun_crest`
 - **How to achieve:** Take `205:sun_crest:1` (activate center button, then take cabinet sun crest).
 - **Success condition:** Inventory gains `205:sun_crest:1` while this step is current
+
+### `pl82` — `205->204` (step 77)
+
+- **Room:** `204` (C PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `205->204`
+- **Note:** leave armor room toward Richard / crest / dining
+- **Objective:** Walk `205->204` into `204` (C PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `205->204` into `204` (C PASSAGE).
+- **Success condition:** Enter room `204` via `205->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:205->204 got <room>` (−4).
+
+### `pl83` — `richard_approach` (step 78)
+
+- **Room:** `20D` (PILLAR PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `204->20D`
+- **Beat:** `richard_approach`
+- **Note:** armor_key gate into Pillar Passage
+- **Objective:** Walk `204->20D` into `20D` (PILLAR PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `204->20D` into `20D` (PILLAR PASSAGE).
+- **Success condition:** Enter room `20D` via `204->20D` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->20D got <room>` (−4).
+
+### `pl84` — `richard_bleedout` (step 79)
+
+- **Room:** `20D` (PILLAR PASSAGE)
+- **Op:** `trigger_cutscene`
+- **Site:** `20D:richard`
+- **Beat:** `richard_bleedout`
+- **Note:** start Richard death timer (~6 min real-time); kill time on place_sun + dining statue
+- **Objective:** `richard_bleedout` at `20D:richard` — start Richard death timer (~6 min real-time); kill time on place_sun + dining statue
+- **Items gained:** _(none)_
+- **How to achieve:** `richard_bleedout` at `20D:richard` — start Richard death timer (~6 min real-time); kill time on place_sun + dining statue.
+- **Success condition:** Mint `20D:richard` via long scripted skip in Pillar Passage (or confirmed 20D→204 dump). Starts Richard's ~6 min death timer.
+
+### `pl85` — `20D->204` (step 80)
+
+- **Room:** `204` (C PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `20D->204`
+- **Note:** exit Pillar Passage after cinema (no-op if script already dumped to 204)
+- **Objective:** Walk `20D->204` into `204` (C PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `20D->204` into `204` (C PASSAGE).
+- **Success condition:** Enter room `204` via `20D->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:20D->204 got <room>` (−4).
+
+### `pl86` — `204->207` (step 81)
+
+- **Room:** `207` (2F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `204->207`
+- **Objective:** Walk `204->207` into `207` (2F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `204->207` into `207` (2F RIGHT STAIRS).
+- **Success condition:** Enter room `207` via `204->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->207 got <room>` (−4).
+
+### `pl87` — `207->10B` (step 82)
+
+- **Room:** `10B` (1F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `207->10B`
+- **Objective:** Walk `207->10B` into `10B` (1F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `207->10B` into `10B` (1F RIGHT STAIRS).
+- **Success condition:** Enter room `10B` via `207->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->10B got <room>` (−4).
+
+### `pl88` — `10B->10A` (step 83)
+
+- **Room:** `10A` (BACK PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `10B->10A`
+- **Objective:** Walk `10B->10A` into `10A` (BACK PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10B->10A` into `10A` (BACK PASSAGE).
+- **Success condition:** Enter room `10A` via `10B->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->10A got <room>` (−4).
+
+### `pl89` — `10A->11A` (step 84)
+
+- **Room:** `11A` (ROOFED PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `10A->11A`
+- **Objective:** Walk `10A->11A` into `11A` (ROOFED PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10A->11A` into `11A` (ROOFED PASSAGE).
+- **Success condition:** Enter room `11A` via `10A->11A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->11A got <room>` (−4).
+
+### `pl90` — `place_sun_crest` (step 85)
+
+- **Room:** `11A` (ROOFED PASSAGE)
+- **Op:** `objective`
+- **Site:** `sun_crest@11A_crest_slot`
+- **Beat:** `place_sun_crest`
+- **Note:** place held sun_crest; burns Richard timer
+- **Objective:** `place_sun_crest` at `sun_crest@11A_crest_slot` — place held sun_crest; burns Richard timer
+- **Items gained:** _(none)_
+- **How to achieve:** `place_sun_crest` at `sun_crest@11A_crest_slot` — place held sun_crest; burns Richard timer.
+- **Success condition:** `story_use_success` == `sun_crest@11A_crest_slot` in room `11A`
+
+### `pl91` — `11A->10A` (step 86)
+
+- **Room:** `10A` (BACK PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `11A->10A`
+- **Objective:** Walk `11A->10A` into `10A` (BACK PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `11A->10A` into `10A` (BACK PASSAGE).
+- **Success condition:** Enter room `10A` via `11A->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:11A->10A got <room>` (−4).
+
+### `pl92` — `10A->10B` (step 87)
+
+- **Room:** `10B` (1F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `10A->10B`
+- **Objective:** Walk `10A->10B` into `10B` (1F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10A->10B` into `10B` (1F RIGHT STAIRS).
+- **Success condition:** Enter room `10B` via `10A->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->10B got <room>` (−4).
+
+### `pl93` — `10B->207` (step 88)
+
+- **Room:** `207` (2F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `10B->207`
+- **Objective:** Walk `10B->207` into `207` (2F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10B->207` into `207` (2F RIGHT STAIRS).
+- **Success condition:** Enter room `207` via `10B->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->207 got <room>` (−4).
+
+### `pl94` — `207->204` (step 89)
+
+- **Room:** `204` (C PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `207->204`
+- **Objective:** Walk `207->204` into `204` (C PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `207->204` into `204` (C PASSAGE).
+- **Success condition:** Enter room `204` via `207->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->204 got <room>` (−4).
+
+### `pl95` — `204->203` (step 90)
+
+- **Room:** `203` (HALL 2F)
+- **Op:** `traverse`
+- **Edge:** `204->203`
+- **Objective:** Walk `204->203` into `203` (HALL 2F)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `204->203` into `203` (HALL 2F).
+- **Success condition:** Enter room `203` via `204->203` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->203 got <room>` (−4).
+
+### `pl96` — `dining_2f_enter` (step 91)
+
+- **Room:** `202` (DINING ROOM 2F)
+- **Op:** `traverse`
+- **Edge:** `203->202`
+- **Beat:** `dining_2f_enter`
+- **Note:** Dining Room 2F
+- **Objective:** Walk `203->202` into `202` (DINING ROOM 2F)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `203->202` into `202` (DINING ROOM 2F).
+- **Success condition:** Enter room `202` via `203->202` (already-there counts after cinema dump). Any other door is `wrong_traverse:203->202 got <room>` (−4).
+
+### `pl97` — `push_statue_2f` (step 92)
+
+- **Room:** `202` (DINING ROOM 2F)
+- **Op:** `do_puzzle`
+- **Site:** `dining_statue_knocked`
+- **Beat:** `push_statue_2f`
+- **Note:** push balcony statue down; chunk end-anchor
+- **Objective:** `push_statue_2f` at `dining_statue_knocked` — push balcony statue down; chunk end-anchor
+- **Items gained:** _(none)_
+- **How to achieve:** `push_statue_2f` at `dining_statue_knocked` — push balcony statue down; chunk end-anchor.
+- **Success condition:** Room `202` and dining balcony statue knocked (`dining_statue_flag` bit 0x10 / `dining_statue_knocked`)
 

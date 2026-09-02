@@ -23,9 +23,17 @@ def richard_scene_flag_shows_script(scene_flag: int) -> bool:
     return (int(scene_flag) & 0xF1) == 0x91
 
 
-def _on_richard_cutscene_leg(planner: Any) -> bool:
-    obj = planner.current_objective() or {}
-    return str(obj.get("checkpoint_id") or "") == RICHARD_CUTSCENE_CHECKPOINT_ID
+def _on_richard_cutscene_leg(planner: Any, planner_loyal_queue: Any = None) -> bool:
+    obj = planner.current_objective() or {} if planner is not None else {}
+    if str(obj.get("checkpoint_id") or "") == RICHARD_CUTSCENE_CHECKPOINT_ID:
+        return True
+    step = getattr(planner_loyal_queue, "current", None) or {}
+    if not isinstance(step, dict):
+        return False
+    return (
+        str(step.get("beat_id") or "") == "richard_bleedout"
+        or str(step.get("site_id") or "") == RICHARD_CUTSCENE_KEY
+    )
 
 
 def richard_cutscene_seen(progress: Any) -> bool:
@@ -48,9 +56,10 @@ def note_richard_cutscene_room_transition(
     prev_room: str,
     room: str,
     state: dict[str, Any] | None = None,
+    planner_loyal_queue: Any = None,
 ) -> None:
     """Confirm a 20D→204 crossing only when its skip saw the 20D script."""
-    if progress is None or not _on_richard_cutscene_leg(planner):
+    if progress is None or not _on_richard_cutscene_leg(planner, planner_loyal_queue):
         return
     if str(prev_room or "").upper() != RICHARD_PILLAR_ROOM:
         return
@@ -73,9 +82,10 @@ def richard_cutscene_skip_settled(
     *,
     skip_frames: int,
     peak_scene_flag: int | None = None,
+    planner_loyal_queue: Any = None,
 ) -> bool:
     """True only for Richard's long scripted session wholly inside 20D."""
-    if not _on_richard_cutscene_leg(planner):
+    if not _on_richard_cutscene_leg(planner, planner_loyal_queue):
         return False
     entry = entry_prev or {}
     if str(entry.get("room_id") or "").upper() != RICHARD_PILLAR_ROOM:
@@ -103,6 +113,7 @@ def note_richard_cutscene_skip_settle(
     *,
     skip_frames: int,
     peak_scene_flag: int | None = None,
+    planner_loyal_queue: Any = None,
 ) -> None:
     """Record ``20D:richard`` after the genuine same-room scripted session."""
     if progress is None:
@@ -113,6 +124,7 @@ def note_richard_cutscene_skip_settle(
         new_state,
         skip_frames=skip_frames,
         peak_scene_flag=peak_scene_flag,
+        planner_loyal_queue=planner_loyal_queue,
     ):
         return
     progress.observe_cutscene(RICHARD_CUTSCENE_KEY)
@@ -144,10 +156,11 @@ def should_suppress_wrong_room(
     prev_room: str,
     room: str,
     state: dict[str, Any] | None,
+    planner_loyal_queue: Any = None,
 ) -> bool:
     """Suppress wrong-room only on the script-confirmed merged 20D→204 skip."""
     return bool(
-        _on_richard_cutscene_leg(planner)
+        _on_richard_cutscene_leg(planner, planner_loyal_queue)
         and str(prev_room or "").upper() == RICHARD_PILLAR_ROOM
         and str(room or "").upper() == RICHARD_SCRIPTED_EXIT_ROOM
         and (state or {}).get("richard_cutscene_confirmed")

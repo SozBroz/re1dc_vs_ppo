@@ -35,9 +35,10 @@ DEMO_SCHEMA_VERSION = 1
 OBS_PREFIX = "obs__"
 ATTACK_ACTION = 7
 NOOP_ACTION = 0
-# Candidate movement actions in tie-break order. ``noop`` first so that a
-# stale turn latch is cleared (then re-latched next step) rather than kept.
-_MOVE_CANDIDATES = (NOOP_ACTION, 1, 5, 2, 3, 4)
+# Candidate movement actions in tie-break order. Prefer ``forward``/
+# ``run_forward`` (which clear turn latches) over ``noop`` when the human
+# releases a turn while still walking/running.
+_MOVE_CANDIDATES = (1, 5, 2, 3, 4, NOOP_ACTION)
 
 
 def desired_sticky(buttons: dict[str, bool]) -> dict[str, bool]:

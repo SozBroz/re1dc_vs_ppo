@@ -36,17 +36,15 @@ def _planner() -> WaypointPlanner:
 
 def test_live_chunk_restores_two_strict_vent_helpers() -> None:
     q = PlannerLoyalQueue()
-    beats = [s.get("beat_id") for s in q._steps[-4:]]
-    assert beats == [
-        "armor_room_enter",
-        "armor_vent_door",
-        "armor_vent_far",
-        "sun_crest",
-    ]
-    assert q._steps[-1]["pickup_id"] == "205:sun_crest:1"
-    assert q._steps[-3]["n"] == 74
-    assert q._steps[-2]["n"] == 75
-    assert q._steps[-1]["n"] == 76
+    by_beat = {s.get("beat_id"): s for s in q._steps if s.get("beat_id")}
+    assert by_beat["armor_room_enter"]["n"] == 73
+    assert by_beat["armor_vent_door"]["n"] == 74
+    assert by_beat["armor_vent_far"]["n"] == 75
+    assert by_beat["sun_crest"]["n"] == 76
+    assert by_beat["sun_crest"]["pickup_id"] == "205:sun_crest:1"
+    assert by_beat["richard_bleedout"]["site_id"] == "20D:richard"
+    assert q.end_anchor == "push_statue_2f"
+    assert q._steps[-1]["beat_id"] == "push_statue_2f"
 
 
 def test_east_shove_toward_pays_and_away_is_punished() -> None:
