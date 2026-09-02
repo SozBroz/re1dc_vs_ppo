@@ -1442,13 +1442,6 @@ def capture_successor_cell(
             )
             _mark_capture_ineligible(env, "leg_kills")
             return None
-        if bool(getattr(env, "_heading_restore_failed", False)):
-            print(
-                f"[yawn_capture] reject heading_restore cp={cid}",
-                flush=True,
-            )
-            _mark_capture_ineligible(env, "heading_restore")
-            return None
         progress.restore_claimed_leg_kills_for_sidecar()
     # First climb to 203 has no cinema at this story beat — do not require 203:.
     next_checkpoint = planner.step_by_seq(completed + 2)

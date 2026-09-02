@@ -17,7 +17,7 @@ These are the largest remaining emulator wins. They stay parked until we can pro
 
 | Item | Where | Expected win | Gate |
 |------|--------|--------------|------|
-| Batch RAM-gated combat macros (`bridge.step(n=1)` per frame) | `knife_macro.py`, `attack_macro.py` | 10–100× fewer socket RTTs on attack actions | A/B kill, dry-fire, facing restore, death abort, and `replay_leg` vs incumbent tapes |
+| Batch RAM-gated combat macros (`bridge.step(n=1)` per frame) | `knife_macro.py`, `attack_macro.py` | 10–100× fewer socket RTTs on attack actions | A/B kill, dry-fire, death abort, and `replay_leg` vs incumbent tapes |
 | Batch `read_knife_hooks` inside knife loops | `knife_macro.py` | Many 3-field RTTs per swing | Same combat/replay parity |
 | Fewer attack-pin MMF screenshots | `frame_ring.py` `AttackFramePins` | 2–4 captures per combat step | Obs pin channels stay entry/windup/swing/end |
 | Event-driven cutscene skip (drop 3 ms poll) | `env.py` `_bg_skip_worker` | Idle CPU + lock fights across ~56 actors | `skip_frames` on new tapes stay honest; old tapes still replay |

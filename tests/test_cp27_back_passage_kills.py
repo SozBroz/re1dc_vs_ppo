@@ -16,7 +16,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from re1_rl.planner import WaypointPlanner
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import RAILS_CHECKPOINT_REWARD
-from re1_rl.yawn_rails import capture_successor_cell, yawn_capture_ineligible_reason
+from re1_rl.yawn_rails import capture_successor_cell
 
 YAWN_ROUTE = PROJECT_ROOT / "data" / "yawn_checkpoint_route.json"
 _ROUTE = json.loads(YAWN_ROUTE.read_text(encoding="utf-8"))
@@ -154,53 +154,3 @@ def test_capture_uses_claim_snapshot_after_live_kills_cleared(
     assert proposal is not None
     assert proposal["checkpoint_id"] == "crow_gallery_enter_117"
     assert dumped["leg_kills_by_room"] == {"10A": 2}
-
-
-def test_kill_gated_capture_rejects_failed_heading_restore(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("RE1_YAWN_RAILS_SYNC", "0")
-    bridge = MagicMock()
-    bridge.save_savestate.side_effect = lambda path: Path(path).write_bytes(b"state")
-    planner = _planner("crow_gallery_enter_117")
-    planner._index = int(_ROUTE_INDEX["crow_gallery_enter_117"]) + 1
-    progress = ProgressTracker()
-    progress.leg_kills_by_room["10A"] = 2
-    env = SimpleNamespace(
-        project_root=tmp_path,
-        _stage={
-            "mode": "yawn_rails",
-            "cells_manifest": "states/yawn_rails/manifest.json",
-            "route_id": "test",
-        },
-        _planner=planner,
-        bridge=bridge,
-        _macro_active=False,
-        _heading_restore_failed=True,
-        _progress=progress,
-        _step_count=400,
-        _read_state=lambda track_items=False: _state("117"),
-    )
-    monkeypatch.setattr(
-        "re1_rl.yawn_rails.dump_episode_sidecar",
-        lambda *_args, **_kwargs: {"schema_version": 1},
-    )
-    assert (
-        capture_successor_cell(
-            env,
-            _state("117"),
-            {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
-        )
-        is None
-    )
-    assert yawn_capture_ineligible_reason(env) == "heading_restore"
-    bridge.save_savestate.assert_not_called()
-
-    env._heading_restore_failed = False
-    proposal = capture_successor_cell(
-        env,
-        _state("117"),
-        {"checkpoint_success": RAILS_CHECKPOINT_REWARD},
-    )
-    assert proposal is not None
-    assert proposal["checkpoint_id"] == "crow_gallery_enter_117"
