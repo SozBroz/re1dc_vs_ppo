@@ -1,6 +1,6 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (92 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (91 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **Source of truth:** the live chunk JSON. Seed cells `pl00`–`pl05` are the opening crystals (same beats as yawn `cp00`–`cp05`); they are **not** minted from this chunk.
 
@@ -11,7 +11,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl05`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - One-way lock: `103->104` (tea room). `103->10C` is open. Do not walk `116->106` after the shotgun.
-- Chunk end-anchor: `push_statue_2f` (`pl97`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `push_statue_2f` (`pl96`). Mid-chunk success keeps the episode open.
 
 ## Summary table
 
@@ -101,20 +101,19 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 | `pl81` | 76 | `sun_crest` | `205` (ARMOR ROOM) | acquire | Take `205:sun_crest:1` (activate center button, then take cabinet sun crest) |
 | `pl82` | 77 | `205->204` | `204` (C PASSAGE) | traverse | Walk `205->204` into `204` (C PASSAGE) |
 | `pl83` | 78 | `richard_approach` | `20D` (PILLAR PASSAGE) | traverse | Walk `204->20D` into `20D` (PILLAR PASSAGE) |
-| `pl84` | 79 | `richard_bleedout` | `20D` (PILLAR PASSAGE) | trigger_cutscene | `richard_bleedout` at `20D:richard` — start Richard death timer (~6 min real-time); kill time on place_sun + dining statue |
-| `pl85` | 80 | `20D->204` | `204` (C PASSAGE) | traverse | Walk `20D->204` into `204` (C PASSAGE) |
-| `pl86` | 81 | `204->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `204->207` into `207` (2F RIGHT STAIRS) |
-| `pl87` | 82 | `207->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `207->10B` into `10B` (1F RIGHT STAIRS) |
-| `pl88` | 83 | `10B->10A` | `10A` (BACK PASSAGE) | traverse | Walk `10B->10A` into `10A` (BACK PASSAGE) |
-| `pl89` | 84 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
-| `pl90` | 85 | `place_sun_crest` | `11A` (ROOFED PASSAGE) | objective | `place_sun_crest` at `sun_crest@11A_crest_slot` — place held sun_crest; burns Richard timer |
-| `pl91` | 86 | `11A->10A` | `10A` (BACK PASSAGE) | traverse | Walk `11A->10A` into `10A` (BACK PASSAGE) |
-| `pl92` | 87 | `10A->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `10A->10B` into `10B` (1F RIGHT STAIRS) |
-| `pl93` | 88 | `10B->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `10B->207` into `207` (2F RIGHT STAIRS) |
-| `pl94` | 89 | `207->204` | `204` (C PASSAGE) | traverse | Walk `207->204` into `204` (C PASSAGE) |
-| `pl95` | 90 | `204->203` | `203` (HALL 2F) | traverse | Walk `204->203` into `203` (HALL 2F) |
-| `pl96` | 91 | `dining_2f_enter` | `202` (DINING ROOM 2F) | traverse | Walk `203->202` into `202` (DINING ROOM 2F) |
-| `pl97` | 92 | `push_statue_2f` | `202` (DINING ROOM 2F) | do_puzzle | `push_statue_2f` at `dining_statue_knocked` — push balcony statue down; chunk end-anchor |
+| `pl84` | 79 | `richard_bleedout` | `20D` (PILLAR PASSAGE) | trigger_cutscene | `richard_bleedout` at `20D:richard` — start ~6 min Richard timer; cinema dumps to 204 — no pl84/pl85 mint |
+| `pl85` | 80 | `204->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `204->207` into `207` (2F RIGHT STAIRS) |
+| `pl86` | 81 | `207->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `207->10B` into `10B` (1F RIGHT STAIRS) |
+| `pl87` | 82 | `10B->10A` | `10A` (BACK PASSAGE) | traverse | Walk `10B->10A` into `10A` (BACK PASSAGE) |
+| `pl88` | 83 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
+| `pl89` | 84 | `place_sun_crest` | `11A` (ROOFED PASSAGE) | objective | `place_sun_crest` at `sun_crest@11A_crest_slot` — place held sun_crest; burns Richard timer |
+| `pl90` | 85 | `11A->10A` | `10A` (BACK PASSAGE) | traverse | Walk `11A->10A` into `10A` (BACK PASSAGE) |
+| `pl91` | 86 | `10A->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `10A->10B` into `10B` (1F RIGHT STAIRS) |
+| `pl92` | 87 | `10B->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `10B->207` into `207` (2F RIGHT STAIRS) |
+| `pl93` | 88 | `207->204` | `204` (C PASSAGE) | traverse | Walk `207->204` into `204` (C PASSAGE) |
+| `pl94` | 89 | `204->203` | `203` (HALL 2F) | traverse | Walk `204->203` into `203` (HALL 2F) |
+| `pl95` | 90 | `dining_2f_enter` | `202` (DINING ROOM 2F) | traverse | Walk `203->202` into `202` (DINING ROOM 2F) |
+| `pl96` | 91 | `push_statue_2f` | `202` (DINING ROOM 2F) | do_puzzle | `push_statue_2f` at `dining_statue_knocked` — push balcony statue down; chunk end-anchor |
 
 ## Details
 
@@ -168,7 +167,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl06`–`pl97`)
+### Chunk cells (`pl06`–`pl96`)
 
 ### `pl06` — `106->105` (step 1)
 
@@ -988,34 +987,25 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Op:** `trigger_cutscene`
 - **Site:** `20D:richard`
 - **Beat:** `richard_bleedout`
-- **Note:** start Richard death timer (~6 min real-time); kill time on place_sun + dining statue
-- **Objective:** `richard_bleedout` at `20D:richard` — start Richard death timer (~6 min real-time); kill time on place_sun + dining statue
+- **Capture:** `false` (queue advance only; no `plNN` cell)
+- **Note:** start ~6 min Richard timer; cinema dumps to 204 — no pl84/pl85 mint
+- **Objective:** `richard_bleedout` at `20D:richard` — start ~6 min Richard timer; cinema dumps to 204 — no pl84/pl85 mint
 - **Items gained:** _(none)_
-- **How to achieve:** `richard_bleedout` at `20D:richard` — start Richard death timer (~6 min real-time); kill time on place_sun + dining statue.
-- **Success condition:** Mint `20D:richard` via long scripted skip in Pillar Passage (or confirmed 20D→204 dump). Starts Richard's ~6 min death timer.
+- **How to achieve:** `richard_bleedout` at `20D:richard` — start ~6 min Richard timer; cinema dumps to 204 — no pl84/pl85 mint.
+- **Success condition:** Mint `20D:richard` via long scripted skip in Pillar Passage (or confirmed 20D→204 dump). Starts Richard's ~6 min death timer. ``capture:false`` — no pl cell; cinema already dumps to C passage.
 
-### `pl85` — `20D->204` (step 80)
-
-- **Room:** `204` (C PASSAGE)
-- **Op:** `traverse`
-- **Edge:** `20D->204`
-- **Note:** exit Pillar Passage after cinema (no-op if script already dumped to 204)
-- **Objective:** Walk `20D->204` into `204` (C PASSAGE)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `20D->204` into `204` (C PASSAGE).
-- **Success condition:** Enter room `204` via `20D->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:20D->204 got <room>` (−4).
-
-### `pl86` — `204->207` (step 81)
+### `pl85` — `204->207` (step 80)
 
 - **Room:** `207` (2F RIGHT STAIRS)
 - **Op:** `traverse`
 - **Edge:** `204->207`
+- **Note:** leave C passage after Richard dump
 - **Objective:** Walk `204->207` into `207` (2F RIGHT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `204->207` into `207` (2F RIGHT STAIRS).
 - **Success condition:** Enter room `207` via `204->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->207 got <room>` (−4).
 
-### `pl87` — `207->10B` (step 82)
+### `pl86` — `207->10B` (step 81)
 
 - **Room:** `10B` (1F RIGHT STAIRS)
 - **Op:** `traverse`
@@ -1025,7 +1015,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `207->10B` into `10B` (1F RIGHT STAIRS).
 - **Success condition:** Enter room `10B` via `207->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->10B got <room>` (−4).
 
-### `pl88` — `10B->10A` (step 83)
+### `pl87` — `10B->10A` (step 82)
 
 - **Room:** `10A` (BACK PASSAGE)
 - **Op:** `traverse`
@@ -1035,7 +1025,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `10B->10A` into `10A` (BACK PASSAGE).
 - **Success condition:** Enter room `10A` via `10B->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->10A got <room>` (−4).
 
-### `pl89` — `10A->11A` (step 84)
+### `pl88` — `10A->11A` (step 83)
 
 - **Room:** `11A` (ROOFED PASSAGE)
 - **Op:** `traverse`
@@ -1045,7 +1035,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `10A->11A` into `11A` (ROOFED PASSAGE).
 - **Success condition:** Enter room `11A` via `10A->11A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->11A got <room>` (−4).
 
-### `pl90` — `place_sun_crest` (step 85)
+### `pl89` — `place_sun_crest` (step 84)
 
 - **Room:** `11A` (ROOFED PASSAGE)
 - **Op:** `objective`
@@ -1057,7 +1047,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** `place_sun_crest` at `sun_crest@11A_crest_slot` — place held sun_crest; burns Richard timer.
 - **Success condition:** `story_use_success` == `sun_crest@11A_crest_slot` in room `11A`
 
-### `pl91` — `11A->10A` (step 86)
+### `pl90` — `11A->10A` (step 85)
 
 - **Room:** `10A` (BACK PASSAGE)
 - **Op:** `traverse`
@@ -1067,7 +1057,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `11A->10A` into `10A` (BACK PASSAGE).
 - **Success condition:** Enter room `10A` via `11A->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:11A->10A got <room>` (−4).
 
-### `pl92` — `10A->10B` (step 87)
+### `pl91` — `10A->10B` (step 86)
 
 - **Room:** `10B` (1F RIGHT STAIRS)
 - **Op:** `traverse`
@@ -1077,7 +1067,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `10A->10B` into `10B` (1F RIGHT STAIRS).
 - **Success condition:** Enter room `10B` via `10A->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->10B got <room>` (−4).
 
-### `pl93` — `10B->207` (step 88)
+### `pl92` — `10B->207` (step 87)
 
 - **Room:** `207` (2F RIGHT STAIRS)
 - **Op:** `traverse`
@@ -1087,7 +1077,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `10B->207` into `207` (2F RIGHT STAIRS).
 - **Success condition:** Enter room `207` via `10B->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->207 got <room>` (−4).
 
-### `pl94` — `207->204` (step 89)
+### `pl93` — `207->204` (step 88)
 
 - **Room:** `204` (C PASSAGE)
 - **Op:** `traverse`
@@ -1097,7 +1087,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `207->204` into `204` (C PASSAGE).
 - **Success condition:** Enter room `204` via `207->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->204 got <room>` (−4).
 
-### `pl95` — `204->203` (step 90)
+### `pl94` — `204->203` (step 89)
 
 - **Room:** `203` (HALL 2F)
 - **Op:** `traverse`
@@ -1107,7 +1097,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `204->203` into `203` (HALL 2F).
 - **Success condition:** Enter room `203` via `204->203` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->203 got <room>` (−4).
 
-### `pl96` — `dining_2f_enter` (step 91)
+### `pl95` — `dining_2f_enter` (step 90)
 
 - **Room:** `202` (DINING ROOM 2F)
 - **Op:** `traverse`
@@ -1119,7 +1109,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `203->202` into `202` (DINING ROOM 2F).
 - **Success condition:** Enter room `202` via `203->202` (already-there counts after cinema dump). Any other door is `wrong_traverse:203->202 got <room>` (−4).
 
-### `pl97` — `push_statue_2f` (step 92)
+### `pl96` — `push_statue_2f` (step 91)
 
 - **Room:** `202` (DINING ROOM 2F)
 - **Op:** `do_puzzle`

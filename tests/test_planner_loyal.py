@@ -97,9 +97,13 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[sun_i + 1]["edge_id"] == "205->204"
     assert steps[sun_i + 3]["beat_id"] == "richard_bleedout"
     assert steps[sun_i + 3]["site_id"] == "20D:richard"
+    assert steps[sun_i + 3].get("capture") is False
+    assert not any(s.get("edge_id") == "20D->204" for s in steps)
+    assert steps[sun_i + 4]["edge_id"] == "204->207"
     assert any(s.get("beat_id") == "place_sun_crest" for s in steps)
     assert any(s.get("beat_id") == "dining_2f_enter" for s in steps)
     assert steps[-1]["beat_id"] == "push_statue_2f"
+    assert steps[-1]["n"] == 91
     assert steps[-1]["site_id"] == "dining_statue_knocked"
     assert chunk["end_anchor_beat_id"] == "push_statue_2f"
     assert chunk["leave_100"]["next_beat_this_loadout_is_for"] == "richard_bleedout"
@@ -1156,7 +1160,7 @@ def test_finish_capture_hook_records_step_and_does_not_stick(monkeypatch, tmp_pa
     progress = ProgressTracker(leg_span=1)
     progress.checkpoint_success = True
 
-    def _fake_capture(env, state, breakdown):
+    def _fake_capture(env, state, breakdown, **kwargs):
         return {
             "source": "planner_loyal",
             "checkpoint_index": 6,
@@ -1545,7 +1549,7 @@ def test_richard_bleedout_completes_on_confirmed_dump():
     q = PlannerLoyalQueue(
         {
             "chunk_id": "richard",
-            "end_anchor_beat_id": "richard_bleedout",
+            "end_anchor_beat_id": "leave_c",
             "steps": [
                 {
                     "n": 1,
@@ -1553,8 +1557,9 @@ def test_richard_bleedout_completes_on_confirmed_dump():
                     "site_id": "20D:richard",
                     "room_id": "20D",
                     "beat_id": "richard_bleedout",
+                    "capture": False,
                 },
-                {"n": 2, "op": "traverse", "edge_id": "20D->204"},
+                {"n": 2, "op": "traverse", "edge_id": "204->207"},
             ],
         }
     )
@@ -1570,13 +1575,11 @@ def test_richard_bleedout_completes_on_confirmed_dump():
     result = q.evaluate_transition(prev_state=prev, state=cur, progress=progress)
     assert result["step_success"] is True
     assert result["divert"] is False
-    assert q.current["edge_id"] == "20D->204"
-    # Cinema already dumped Jill into 204 — traverse is a no-op.
-    already = q.evaluate_transition(
-        prev_state=cur, state=cur, progress=progress
-    )
-    assert already["step_success"] is True
-    assert q.done
+    assert q.current["edge_id"] == "204->207"
+    # Dump already left Jill in 204 — next hop is 204->207, not auto-complete.
+    stay = q.evaluate_transition(prev_state=cur, state=cur, progress=progress)
+    assert stay["step_success"] is False
+    assert not q.done
 
 
 def test_richard_bleedout_diverts_without_confirmation():

@@ -726,10 +726,20 @@ def planner_loyal_quality_beats(
     return lift_planner_loyal_quality(new) > lift_planner_loyal_quality(old)
 
 
+def _nearest_predecessor_slot(root: Path, slot: int) -> int | None:
+    """Closest lower slot with a loadable state (skips capture:false holes)."""
+    for pred in range(int(slot) - 1, TRAINING_START_INDEX - 1, -1):
+        if (cell_slot_dir(root, pred) / CELL_STATE_NAME).is_file():
+            return int(pred)
+    return None
+
+
 def capture_planner_loyal_cell(
     env: Any,
     state: dict[str, Any],
     breakdown: dict[str, float],
+    *,
+    completed_index: int | None = None,
 ) -> dict[str, Any] | None:
     """Mint a thin ``plNN`` cell for the just-completed planner step."""
     queue = getattr(env, "_planner_loyal_queue", None)
@@ -739,9 +749,21 @@ def capture_planner_loyal_cell(
         if float(breakdown.get("planner_step_success", 0.0) or 0.0) <= 0.0:
             return None
 
-    completed = max(0, int(queue.index) - 1)
+    if completed_index is None:
+        completed = max(0, int(queue.index) - 1)
+    else:
+        completed = max(0, int(completed_index))
     n_steps = len(getattr(queue, "_steps", []) or [])
     is_final = n_steps > 0 and completed >= n_steps - 1
+    steps = getattr(queue, "_steps", []) or []
+    step = dict(steps[completed]) if 0 <= completed < len(steps) else {}
+    if step.get("capture") is False:
+        print(
+            f"[planner_loyal] skip_capture step={completed + 1} "
+            f"beat={step.get('beat_id') or step.get('site_id')}",
+            flush=True,
+        )
+        return None
     slot = slot_index_for_completed_step(completed)
     tip = cell_slot_dir(planner_loyal_root(env.project_root), TRAINING_START_INDEX)
     if not (tip / CELL_STATE_NAME).is_file():
@@ -751,17 +773,16 @@ def capture_planner_loyal_cell(
             flush=True,
         )
         return None
-    if slot > TRAINING_START_INDEX + 1:
-        pred = cell_slot_dir(planner_loyal_root(env.project_root), slot - 1)
-        if not (pred / CELL_STATE_NAME).is_file():
-            print(
-                f"[planner_loyal] reject missing_predecessor "
-                f"{cell_dir_name(slot)} need={cell_dir_name(slot - 1)}",
-                flush=True,
-            )
-            return None
-
     root = planner_loyal_root(env.project_root)
+    pred_slot = _nearest_predecessor_slot(root, slot)
+    if slot > TRAINING_START_INDEX and pred_slot is None:
+        print(
+            f"[planner_loyal] reject missing_predecessor "
+            f"{cell_dir_name(slot)} need>={cell_dir_name(TRAINING_START_INDEX)}",
+            flush=True,
+        )
+        return None
+
     dest = cell_slot_dir(root, slot)
     staging = root / ".staging" / f"{cell_dir_name(slot)}_{os.getpid()}"
     if staging.exists():
@@ -771,10 +792,8 @@ def capture_planner_loyal_cell(
     state_path = staging / CELL_STATE_NAME
     sidecar_path = staging / CELL_SIDECAR_NAME
     pred_almanac: dict[str, dict[str, int]] = {}
-    if slot > TRAINING_START_INDEX:
-        pred_almanac = _almanac_from_cell_dir(
-            cell_slot_dir(planner_loyal_root(env.project_root), slot - 1)
-        )
+    if pred_slot is not None and pred_slot >= TRAINING_START_INDEX:
+        pred_almanac = _almanac_from_cell_dir(cell_slot_dir(root, pred_slot))
     kill_audit = planner_loyal_kill_audit(
         getattr(env, "_progress", None), pred_almanac
     )

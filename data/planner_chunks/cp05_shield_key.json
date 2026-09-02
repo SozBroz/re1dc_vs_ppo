@@ -4,7 +4,7 @@
   "chunk_id": "cp05_shield_key",
   "source": "phase1_pass1_council",
   "end_anchor_beat_id": "push_statue_2f",
-  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). 103->104 is the one-way tea-room lock. After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, then 10C greens, then armor_key. After armor_key: leftover 10C reds, 101->102 clip+lockpick-desk shells, 102->101->100. Then use_box in 100 (leave_100: no heals on exit — incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) and walk 100->101->201->202->203->204->205. In 205 take 205:sun_crest:1. No intermediate vent PLs or shove crumbs. After sun_crest: Richard bleedout FIRST (starts the ~6 min death timer — kill time on the rest of the chunk), then place_sun_crest at 11A, then dining 2F enter + push_statue_2f.",
+  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). 103->104 is the one-way tea-room lock. After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, then 10C greens, then armor_key. After armor_key: leftover 10C reds, 101->102 clip+lockpick-desk shells, 102->101->100. Then use_box in 100 (leave_100: no heals on exit — incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) and walk 100->101->201->202->203->204->205. In 205 take 205:sun_crest:1. No intermediate vent PLs or shove crumbs. After sun_crest: Richard bleedout FIRST (capture:false — cinema dumps to C passage 204, no pl84/pl85 cells), then place_sun_crest at 11A, then dining 2F enter + push_statue_2f.",
   "leave_118": {
     "banked_in_box": [
       {"item": "shield_key", "qty": 1, "why": "attic only; bank to free a slot"},
@@ -45,7 +45,7 @@
       {"item": null, "qty": 0, "slot": 8}
     ],
     "next_beat_this_loadout_is_for": "richard_bleedout",
-    "why": "Beretta+30 for 203. Armor_key for 204->205 and 204->20D (Richard). After sun_crest, trigger Richard FIRST to start the ~6 min timer, then place sun + dining statue while it burns. No heals on exit. Acid_rounds banked. Shield_key and knife stay boxed.",
+    "why": "Beretta+30 for 203. Armor_key for 204->205 and 204->20D (Richard). After sun_crest, trigger Richard FIRST (no cell mint; dump lands in 204) to start the ~6 min timer, then place sun + dining statue while it burns. No heals on exit. Acid_rounds banked. Shield_key and knife stay boxed.",
     "withdraw_from_box": [
       {"item": "handgun_bullets", "qty": 15, "why": "combat kit"},
       {"item": "handgun_bullets", "qty": 15, "why": "combat kit"}
@@ -130,19 +130,18 @@
     {"n": 76, "op": "acquire", "pickup_id": "205:sun_crest:1", "room_id": "205", "beat_id": "sun_crest", "note": "activate center button, then take cabinet sun crest"},
     {"n": 77, "op": "traverse", "edge_id": "205->204", "note": "leave armor room toward Richard / crest / dining"},
     {"n": 78, "op": "traverse", "edge_id": "204->20D", "beat_id": "richard_approach", "note": "armor_key gate into Pillar Passage"},
-    {"n": 79, "op": "trigger_cutscene", "site_id": "20D:richard", "room_id": "20D", "beat_id": "richard_bleedout", "note": "start Richard death timer (~6 min real-time); kill time on place_sun + dining statue"},
-    {"n": 80, "op": "traverse", "edge_id": "20D->204", "note": "exit Pillar Passage after cinema (no-op if script already dumped to 204)"},
-    {"n": 81, "op": "traverse", "edge_id": "204->207"},
-    {"n": 82, "op": "traverse", "edge_id": "207->10B"},
-    {"n": 83, "op": "traverse", "edge_id": "10B->10A"},
-    {"n": 84, "op": "traverse", "edge_id": "10A->11A"},
-    {"n": 85, "op": "objective", "site_id": "sun_crest@11A_crest_slot", "room_id": "11A", "beat_id": "place_sun_crest", "note": "place held sun_crest; burns Richard timer"},
-    {"n": 86, "op": "traverse", "edge_id": "11A->10A"},
-    {"n": 87, "op": "traverse", "edge_id": "10A->10B"},
-    {"n": 88, "op": "traverse", "edge_id": "10B->207"},
-    {"n": 89, "op": "traverse", "edge_id": "207->204"},
-    {"n": 90, "op": "traverse", "edge_id": "204->203"},
-    {"n": 91, "op": "traverse", "edge_id": "203->202", "beat_id": "dining_2f_enter", "note": "Dining Room 2F"},
-    {"n": 92, "op": "do_puzzle", "site_id": "dining_statue_knocked", "room_id": "202", "beat_id": "push_statue_2f", "note": "push balcony statue down; chunk end-anchor"}
+    {"n": 79, "op": "trigger_cutscene", "site_id": "20D:richard", "room_id": "20D", "beat_id": "richard_bleedout", "capture": false, "note": "start ~6 min Richard timer; cinema dumps to 204 — no pl84/pl85 mint"},
+    {"n": 80, "op": "traverse", "edge_id": "204->207", "note": "leave C passage after Richard dump"},
+    {"n": 81, "op": "traverse", "edge_id": "207->10B"},
+    {"n": 82, "op": "traverse", "edge_id": "10B->10A"},
+    {"n": 83, "op": "traverse", "edge_id": "10A->11A"},
+    {"n": 84, "op": "objective", "site_id": "sun_crest@11A_crest_slot", "room_id": "11A", "beat_id": "place_sun_crest", "note": "place held sun_crest; burns Richard timer"},
+    {"n": 85, "op": "traverse", "edge_id": "11A->10A"},
+    {"n": 86, "op": "traverse", "edge_id": "10A->10B"},
+    {"n": 87, "op": "traverse", "edge_id": "10B->207"},
+    {"n": 88, "op": "traverse", "edge_id": "207->204"},
+    {"n": 89, "op": "traverse", "edge_id": "204->203"},
+    {"n": 90, "op": "traverse", "edge_id": "203->202", "beat_id": "dining_2f_enter", "note": "Dining Room 2F"},
+    {"n": 91, "op": "do_puzzle", "site_id": "dining_statue_knocked", "room_id": "202", "beat_id": "push_statue_2f", "note": "push balcony statue down; chunk end-anchor"}
   ]
 }

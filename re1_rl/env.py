@@ -1380,6 +1380,13 @@ class RE1Env(gym.Env):
                 float(breakdown.get("checkpoint_success", 0.0)) > 0.0
                 or float(breakdown.get("planner_step_success", 0.0)) > 0.0
             ):
+                queue = getattr(self, "_planner_loyal_queue", None)
+                completed = max(0, int(getattr(queue, "index", 1) or 1) - 1)
+                steps = getattr(queue, "_steps", []) if queue is not None else []
+                step = steps[completed] if 0 <= completed < len(steps) else {}
+                # Non-capturing beats (e.g. Richard dump) advance the queue only.
+                if isinstance(step, dict) and step.get("capture") is False:
+                    return
                 self._arm_checkpoint_freeze()
             return
         from re1_rl.pb_capture import maybe_capture_pb, pb_capture_enabled, pb_root_dir
@@ -1502,11 +1509,27 @@ class RE1Env(gym.Env):
         if float(breakdown.get("checkpoint_success", 0.0) or 0.0) <= 0.0:
             if float(breakdown.get("planner_step_success", 0.0) or 0.0) <= 0.0:
                 return None
-        completed = max(0, int(queue.index) - 1)
+        # Prefer the index frozen at success — Richard's dump can advance the
+        # queue again before the decision-frame capture runs.
+        frozen = getattr(self, "_checkpoint_capture_index", None)
+        if frozen is not None:
+            try:
+                completed = int(frozen)
+            except (TypeError, ValueError):
+                completed = max(0, int(queue.index) - 1)
+        else:
+            completed = max(0, int(queue.index) - 1)
         step = None
         steps = getattr(queue, "_steps", [])
         if 0 <= completed < len(steps):
             step = dict(steps[completed])
+        if step is not None and step.get("capture") is False:
+            print(
+                f"[planner_loyal] skip_capture step={completed + 1} "
+                f"beat={step.get('beat_id') or step.get('site_id')}",
+                flush=True,
+            )
+            return None
         self._planner_loyal_last_success = {
             "chunk_id": queue.chunk_id,
             "completed_index": completed,
@@ -1514,7 +1537,9 @@ class RE1Env(gym.Env):
             "op": (step or {}).get("op"),
             "step": step,
         }
-        return capture_planner_loyal_cell(self, state, breakdown)
+        return capture_planner_loyal_cell(
+            self, state, breakdown, completed_index=completed
+        )
 
     def _finish_checkpoint_capture(
         self, state: dict[str, Any], breakdown: dict[str, float]

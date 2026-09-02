@@ -43,8 +43,10 @@ def test_live_chunk_restores_two_strict_vent_helpers() -> None:
     assert by_beat["sun_crest"]["n"] == 76
     assert by_beat["sun_crest"]["pickup_id"] == "205:sun_crest:1"
     assert by_beat["richard_bleedout"]["site_id"] == "20D:richard"
+    assert by_beat["richard_bleedout"].get("capture") is False
     assert q.end_anchor == "push_statue_2f"
     assert q._steps[-1]["beat_id"] == "push_statue_2f"
+    assert not any(s.get("edge_id") == "20D->204" for s in q._steps)
 
 
 def test_east_shove_toward_pays_and_away_is_punished() -> None:
