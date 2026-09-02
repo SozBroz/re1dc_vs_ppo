@@ -1607,6 +1607,41 @@ def test_richard_bleedout_diverts_without_confirmation():
     assert "unplanned_room" in str(result["divert_reason"])
 
 
+def test_richard_herb_pickup_does_not_divert():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "richard",
+            "end_anchor_beat_id": "richard_bleedout",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "trigger_cutscene",
+                    "site_id": "20D:richard",
+                    "room_id": "20D",
+                    "beat_id": "richard_bleedout",
+                    "capture": False,
+                }
+            ],
+        }
+    )
+    prev = {
+        "room_id": "20D",
+        "inventory": ["armor_key"],
+        "inventory_slots": [{"item": "armor_key", "qty": 1}],
+    }
+    cur = {
+        "room_id": "20D",
+        "inventory": ["armor_key", "green_herb"],
+        "inventory_slots": [
+            {"item": "armor_key", "qty": 1},
+            {"item": "green_herb", "qty": 1},
+        ],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is False
+
+
 def test_dining_statue_completes_when_knocked():
     q = PlannerLoyalQueue(
         {

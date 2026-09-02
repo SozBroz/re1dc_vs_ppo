@@ -85,9 +85,29 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def slot_index_for_completed_step(completed_step_index: int) -> int:
-    """Map a completed planner-queue step to the next plNN slot."""
-    return int(TRAINING_START_INDEX) + 1 + int(completed_step_index)
+def slot_index_for_completed_step(
+    completed_step_index: int,
+    steps: list[dict[str, Any]] | None = None,
+) -> int:
+    """Map a completed planner-queue step to the next plNN slot.
+
+    Steps with ``capture: false`` do not consume a slot (Richard bleedout), so
+    the following capturing hop after ``pl83`` is ``pl84`` (``204->207``).
+    """
+    idx = int(completed_step_index)
+    if not steps:
+        return int(TRAINING_START_INDEX) + 1 + idx
+    cap = 0
+    for i, step in enumerate(steps):
+        if isinstance(step, dict) and step.get("capture") is False:
+            if i == idx:
+                # Caller should not mint these; keep a deterministic fallback.
+                return int(TRAINING_START_INDEX) + 1 + cap
+            continue
+        if i == idx:
+            return int(TRAINING_START_INDEX) + 1 + cap
+        cap += 1
+    return int(TRAINING_START_INDEX) + 1 + idx
 
 
 def _strip_fat_artifacts(cell_dir: Path) -> None:
@@ -764,7 +784,7 @@ def capture_planner_loyal_cell(
             flush=True,
         )
         return None
-    slot = slot_index_for_completed_step(completed)
+    slot = slot_index_for_completed_step(completed, steps)
     tip = cell_slot_dir(planner_loyal_root(env.project_root), TRAINING_START_INDEX)
     if not (tip / CELL_STATE_NAME).is_file():
         print(

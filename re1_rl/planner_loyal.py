@@ -629,8 +629,10 @@ class PlannerLoyalQueue:
         # acquire, and scripted event grants are not unplanned pickups.
         # Box withdraw/deposit during use_box is also not a world pickup
         # (pl71 100-box dies on handgun_bullets otherwise).
+        # trigger_cutscene (Richard): herbs / script grants in 20D must not
+        # divert before the cinema settles.
         gained = _inventory_gains(prev_state, state)
-        if gained and op != "use_box":
+        if gained and op not in {"use_box", "trigger_cutscene"}:
             want = str(step.get("pickup_id") or "")
             _, want_item, _ = _pickup_id_parts(want)
             matched = op == "acquire" and _pickup_matches_gain(want, gained)

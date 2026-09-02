@@ -33,6 +33,14 @@ def test_slot_mapping() -> None:
     assert slot_index_for_completed_step(0) == TRAINING_START_INDEX + 1
     assert slot_index_for_completed_step(1) == TRAINING_START_INDEX + 2
     assert cell_dir_name(5) == "pl05"
+    steps = [
+        {"n": 1, "op": "traverse", "edge_id": "204->20D"},
+        {"n": 2, "op": "trigger_cutscene", "capture": False},
+        {"n": 3, "op": "traverse", "edge_id": "204->207"},
+    ]
+    assert slot_index_for_completed_step(0, steps) == TRAINING_START_INDEX + 1
+    # capture:false does not consume a slot — next capturing hop reuses it.
+    assert slot_index_for_completed_step(2, steps) == TRAINING_START_INDEX + 2
 
 
 def test_bootstrap_crystals_tip_exists() -> None:
