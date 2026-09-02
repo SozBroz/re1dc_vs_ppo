@@ -67,8 +67,24 @@ powershell -File fleet\local\ship_demos.ps1
 
 Commits `data/demos/planner_loyal/*.npz`, pushes, `git pull` on WH3, and
 lists the demo dir on WH3. The learner rescans the directory every
-`RE1_BC_RELOAD_EVERY` (20) train calls and prints
+`RE1_BC_RELOAD_EVERY` train calls and prints
 `[demo_bc] loaded N decisions from K demo(s)`; **no restart needed**.
+
+Cadence gotcha: the WH3 planner-loyal learner runs **one `train()` per sync
+interval (~6 min)**, so `RE1_BC_RELOAD_EVERY=20` (the code default) meant a
+~2 h rescan. The WH3 launcher now sets `RE1_BC_RELOAD_EVERY=1` (a rescan is a
+cheap directory stat); a learner started before that change keeps the 20-call
+cadence until its next restart. Each `train()` runs ~4 epochs × ~30
+minibatches, and every minibatch adds a `RE1_BC_BATCH` (128) demo batch, so
+one update is roughly 8–10 passes over a ~1.8k-decision demo set at
+`RE1_BC_COEF` — already a strong pull. To check it engaged on WH3:
+
+```powershell
+ssh sshuser@192.168.0.229 "cd /d C:\Users\sshuser\re1_rl && findstr /C:\"[demo_bc]\" data\logs\learner_wh3_planner_loyal.log"
+```
+
+and watch the `train/bc_loss` / `train/bc_acc` / `train/bc_n` keys in
+`logs/training_metrics_planner_loyal_shield_key.jsonl` (one record per update).
 
 ## 3. How training uses them
 

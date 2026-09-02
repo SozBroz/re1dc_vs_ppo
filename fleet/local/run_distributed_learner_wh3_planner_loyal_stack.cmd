@@ -13,8 +13,11 @@ set MIN_HOST_FREE_GB=16
 call "%~dp0planner_loyal.env.cmd"
 REM Human demos (scripts/record_planner_demo.py) -> BC auxiliary term in PPO train().
 REM Hot-reloaded every RE1_BC_RELOAD_EVERY train calls; no restart needed for new demos.
+REM This learner runs one train() per SYNC_INTERVAL_S (~6 min), so the default 20 would
+REM mean a ~2 h rescan; the rescan is a cheap dir stat, so check every train call.
 if "%RE1_BC_DEMO_DIR%"=="" set RE1_BC_DEMO_DIR=data\demos\planner_loyal
 if "%RE1_BC_COEF%"=="" set RE1_BC_COEF=0.5
+if "%RE1_BC_RELOAD_EVERY%"=="" set RE1_BC_RELOAD_EVERY=1
 if not exist data\logs mkdir data\logs
 if not exist data\checkpoints mkdir data\checkpoints
 
