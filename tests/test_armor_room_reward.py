@@ -413,3 +413,147 @@ def test_inplace_push_applies_terminal_penalty() -> None:
     )
     assert progress.armor_inplace_statue_push_breached is True
     assert bd["armor_statue_progress"] == 0.0
+
+
+def _far_queue() -> PlannerLoyalQueue:
+    q = PlannerLoyalQueue()
+    idx = next(
+        i for i, s in enumerate(q._steps) if s.get("beat_id") == "armor_vent_far"
+    )
+    q.seek(idx)
+    return q
+
+
+def _pl79_spawn_state(**overrides: object) -> dict:
+    """Jill jammed against the seated east statue, facing it (live pl79 pose)."""
+    state = _armor_state(
+        x=14345,
+        z=6518,
+        facing=2048,
+        **_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET),
+    )
+    state.update(overrides)
+    return state
+
+
+def _far_leg_reward(prev: dict, cur: dict, q, progress) -> dict:
+    _total, bd = compute_reward(
+        prev,
+        cur,
+        _planner(),
+        progress=progress,
+        planner_loyal_queue=q,
+        return_breakdown=True,
+    )
+    return bd
+
+
+def test_approach_baseline_fixed_on_first_far_leg_step_only() -> None:
+    q = _far_queue()
+    progress = ProgressTracker()
+    start = _pl79_spawn_state()
+    toward = _pl79_spawn_state(x=start["x"] - 350, step=2)
+    _far_leg_reward(start, toward, q, progress)
+    ref = progress.armor_far_approach_reference
+    assert ref is not None and ref > 5000.0
+    _far_leg_reward(toward, _pl79_spawn_state(x=start["x"] - 700, step=3), q, progress)
+    assert progress.armor_far_approach_reference == ref
+    # Not baselined while the east leg is current.
+    east_q = PlannerLoyalQueue()
+    idx = next(
+        i for i, s in enumerate(east_q._steps) if s.get("beat_id") == "armor_vent_door"
+    )
+    east_q.seek(idx)
+    fresh = ProgressTracker()
+    bd = _far_leg_reward(_armor_state(), _armor_state(x=15800, step=2), east_q, fresh)
+    assert fresh.armor_far_approach_reference is None
+    assert bd["armor_approach"] == 0.0
+
+
+def test_approach_potential_pays_toward_west_statue_and_telescopes() -> None:
+    from re1_rl.armor_room_puzzle import (
+        ARMOR_APPROACH_BUDGET,
+        ARMOR_APPROACH_STEP,
+        armor_approach_progress_reward,
+    )
+
+    q = _far_queue()
+    progress = ProgressTracker()
+    start = _pl79_spawn_state()
+    toward = _pl79_spawn_state(x=start["x"] - 350, step=2)
+    bd = _far_leg_reward(start, toward, q, progress)
+    assert progress.armor_far_approach_reference is not None
+    assert 0.0 < bd["armor_approach"] <= ARMOR_APPROACH_STEP
+    away = _pl79_spawn_state(x=start["x"] + 350, step=2)
+    assert armor_approach_progress_reward(
+        start, away, q, progress.armor_far_approach_reference
+    ) < 0.0
+    # Walk from spawn to the west approach dock in small hops: total <= 0.5.
+    total = 0.0
+    prev = start
+    for k in range(1, 41):
+        frac = k / 40.0
+        cur = _pl79_spawn_state(
+            x=int(start["x"] + (ARMOR_WEST_APPROACH_XZ[0] - start["x"]) * frac),
+            z=int(start["z"] + (ARMOR_WEST_APPROACH_XZ[1] - start["z"]) * frac),
+            step=k + 1,
+        )
+        total += armor_approach_progress_reward(
+            prev, cur, q, progress.armor_far_approach_reference
+        )
+        prev = cur
+    assert 0.3 < total <= ARMOR_APPROACH_BUDGET
+
+
+def test_approach_potential_silent_while_pushing_and_off_far_step() -> None:
+    from re1_rl.armor_room_puzzle import armor_approach_progress_reward
+
+    q = _far_queue()
+    start = _pl79_spawn_state()
+    toward = _pl79_spawn_state(x=start["x"] - 350, step=2)
+    ref = 5000.0
+    assert armor_approach_progress_reward(start, toward, q, None) == 0.0
+    pushing = dict(toward, game_state=PUSH_GAME_STATE)
+    assert armor_approach_progress_reward(start, pushing, q, ref) == 0.0
+    east_q = PlannerLoyalQueue()
+    idx = next(
+        i for i, s in enumerate(east_q._steps) if s.get("beat_id") == "armor_vent_door"
+    )
+    east_q.seek(idx)
+    assert armor_approach_progress_reward(start, toward, east_q, ref) == 0.0
+
+
+def test_gas_damage_in_205_is_terminal_and_zeros_positives() -> None:
+    from re1_rl.armor_room_puzzle import ARMOR_GAS_DAMAGE_PENALTY
+
+    q = _far_queue()
+    progress = ProgressTracker()
+    prev = _pl79_spawn_state(hp=96)
+    gassed = _pl79_spawn_state(hp=90, x=14345 - 350, step=2)
+    bd = _far_leg_reward(prev, gassed, q, progress)
+    assert bd["armor_gas"] == pytest.approx(-ARMOR_GAS_DAMAGE_PENALTY)
+    assert progress.armor_gas_breached is True
+    assert bd["armor_approach"] == 0.0
+    assert bd["hp"] < 0.0
+    # Second breach never re-pays.
+    bd2 = _far_leg_reward(gassed, _pl79_spawn_state(hp=84, step=3), q, progress)
+    assert bd2.get("armor_gas", 0.0) == 0.0
+
+
+def test_gas_detector_ignores_other_rooms_heals_and_death() -> None:
+    from re1_rl.armor_room_puzzle import armor_gas_damage_detected
+
+    prev = _pl79_spawn_state(hp=96)
+    assert armor_gas_damage_detected(prev, _pl79_spawn_state(hp=90)) is True
+    assert armor_gas_damage_detected(prev, _pl79_spawn_state(hp=96)) is False
+    assert armor_gas_damage_detected(prev, _pl79_spawn_state(hp=100)) is False
+    assert (
+        armor_gas_damage_detected(prev, _pl79_spawn_state(hp=0, dead=True))
+        is False
+    )
+    hall_prev = dict(prev, room_id="204")
+    assert armor_gas_damage_detected(hall_prev, _pl79_spawn_state(hp=90)) is False
+    assert (
+        armor_gas_damage_detected(prev, _pl79_spawn_state(hp=90, room_id="204"))
+        is False
+    )

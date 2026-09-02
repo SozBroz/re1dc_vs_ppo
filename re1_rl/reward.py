@@ -920,7 +920,12 @@ def _compute_planner_loyal_reward(
     bd = _planner_loyal_breakdown_template()
     bd["step"] = STEP_PENALTY * step_scale
     from re1_rl.armor_room_puzzle import (
+        ARMOR_GAS_DAMAGE_PENALTY,
         ARMOR_INPLACE_STATUE_PUSH_PENALTY,
+        armor_approach_progress_reward,
+        armor_approach_reference,
+        armor_far_leg_active,
+        armor_gas_damage_detected,
         armor_inplace_statue_push_detected,
         armor_statue_progress_reward,
     )
@@ -931,11 +936,21 @@ def _compute_planner_loyal_reward(
         planner_loyal_queue,
         progress,
     )
+    if progress is not None and armor_far_leg_active(planner_loyal_queue, state):
+        reference = progress.baseline_armor_far_approach(
+            armor_approach_reference(prev_state)
+        )
+        bd["armor_approach"] = armor_approach_progress_reward(
+            prev_state, state, planner_loyal_queue, reference
+        )
     if progress is not None and armor_inplace_statue_push_detected(
         prev_state, state, planner_loyal_queue
     ):
         if progress.breach_armor_inplace_statue_push():
             bd["armor_inplace_statue_push"] = -float(ARMOR_INPLACE_STATUE_PUSH_PENALTY)
+    if progress is not None and armor_gas_damage_detected(prev_state, state):
+        if progress.breach_armor_gas():
+            bd["armor_gas"] = -float(ARMOR_GAS_DAMAGE_PENALTY)
 
     loyal = planner_loyal_queue.evaluate_transition(
         prev_state=prev_state,
@@ -1011,6 +1026,7 @@ def _compute_planner_loyal_reward(
         and not progress.wrong_room_breached
         and not progress.gallery_wrong_breached
         and not progress.armor_inplace_statue_push_breached
+        and not progress.armor_gas_breached
     ):
         progress.note_leg_frames(int(state.get("step_emulated_frames") or 0))
         if (
@@ -1092,6 +1108,7 @@ def _compute_planner_loyal_reward(
         or progress.cell_timeout_breached
         or progress.gallery_wrong_breached
         or progress.armor_inplace_statue_push_breached
+        or progress.armor_gas_breached
     ):
         for term, value in tuple(bd.items()):
             if value > 0.0:
@@ -1099,7 +1116,10 @@ def _compute_planner_loyal_reward(
 
     if progress is not None and not state.get("dead"):
         frames_before = progress.stagnation_frames
-        armor_progress = float(bd.get("armor_statue_progress") or 0.0) > 0.0
+        armor_progress = (
+            float(bd.get("armor_statue_progress") or 0.0) > 0.0
+            or float(bd.get("armor_approach") or 0.0) > 0.0
+        )
         if bd.get("planner_step_success", 0.0) == 0.0:
             progress.note_stagnation_step(
                 made_progress=armor_progress,

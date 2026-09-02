@@ -1111,6 +1111,7 @@ class RE1Env(gym.Env):
         shotgun_return_failure = self._progress.shotgun_return_breached
         gallery_wrong_failure = self._progress.gallery_wrong_breached
         armor_inplace_push_failure = self._progress.armor_inplace_statue_push_breached
+        armor_gas_failure = self._progress.armor_gas_breached
         capture_ineligible_failure = self._progress.capture_ineligible_breached
         cell_timeout_failure = self._progress.cell_timeout_breached
         box_pollution = getattr(self, "_episode_failure_override", None)
@@ -1135,6 +1136,7 @@ class RE1Env(gym.Env):
             or shotgun_return_failure
             or gallery_wrong_failure
             or armor_inplace_push_failure
+            or armor_gas_failure
             or bool(box_pollution)
             or capture_ineligible_failure
             or cell_timeout_failure
@@ -1149,6 +1151,7 @@ class RE1Env(gym.Env):
                 or shotgun_return_failure
                 or gallery_wrong_failure
                 or armor_inplace_push_failure
+                or armor_gas_failure
                 or box_pollution
                 or capture_ineligible_failure
                 or cell_timeout_failure
@@ -1170,6 +1173,8 @@ class RE1Env(gym.Env):
             reason = "gallery_wrong_portrait"
         elif armor_inplace_push_failure:
             reason = "armor_inplace_statue_push"
+        elif armor_gas_failure:
+            reason = "armor_gas"
         elif box_pollution:
             reason = str(box_pollution)
         elif capture_ineligible_failure:
@@ -3059,6 +3064,7 @@ class RE1Env(gym.Env):
             or bool(getattr(progress, "capture_ineligible_breached", False))
             or bool(getattr(progress, "gallery_wrong_breached", False))
             or bool(getattr(progress, "armor_inplace_statue_push_breached", False))
+            or bool(getattr(progress, "armor_gas_breached", False))
         )
         if blocked:
             return False

@@ -101,6 +101,11 @@ class ProgressTracker:
     gallery_needs_reentry: bool = False
     gallery_wrong_breached: bool = False
     armor_inplace_statue_push_breached: bool = False
+    # Armor room 205: HP loss with no enemies is the vent gas — terminal.
+    armor_gas_breached: bool = False
+    # Jill-to-west-statue distance on the first ``armor_vent_far`` step
+    # (approach potential baseline). Not persisted on sidecars.
+    armor_far_approach_reference: float | None = None
     dining_statue_rewarded: bool = False
     # Armor room 205: each poison-vent seat claimed once per episode while
     # pushing (pl79 door, pl80 far). Not persisted on sidecars.
@@ -727,6 +732,20 @@ class ProgressTracker:
         self.armor_inplace_statue_push_breached = True
         self.softlock_cap_frames = 0
         return True
+
+    def breach_armor_gas(self) -> bool:
+        """Mark armor-room gas damage as terminal; true only on first breach."""
+        if self.armor_gas_breached:
+            return False
+        self.armor_gas_breached = True
+        self.softlock_cap_frames = 0
+        return True
+
+    def baseline_armor_far_approach(self, reference: float | None) -> float | None:
+        """Fix the approach-potential baseline on the first far-vent step."""
+        if self.armor_far_approach_reference is None and reference is not None:
+            self.armor_far_approach_reference = float(reference)
+        return self.armor_far_approach_reference
 
     def claim_dining_statue_bonus(
         self,

@@ -97,6 +97,17 @@ ARMOR_STATUE_PROGRESS_BUDGET = 4.0
 ARMOR_STATUE_MOVE_THRESHOLD = 25
 ARMOR_INPLACE_STATUE_PUSH_PENALTY = 4.0
 
+# pl79->80 spawn (and any agent-minted pl79) leaves Jill jammed against the
+# seated east statue facing it; the first forward-ish action re-shoves it
+# (-4 terminal). Imperator 2026-09-01: a +0.5 potential on Jill's distance to
+# the west statue (walking away from it is punished symmetrically) pays for
+# turning off the east statue and crossing the room.
+ARMOR_APPROACH_BUDGET = 0.5
+ARMOR_APPROACH_STEP = 0.1
+# Any HP loss in 205 is the poison gas (button pressed with a vent open).
+# Imperator 2026-09-01: terminal, same magnitude as the other puzzle fails.
+ARMOR_GAS_DAMAGE_PENALTY = 4.0
+
 FACING_FULL_CIRCLE = 4096.0
 DIST_NORM = 4096.0
 
@@ -480,6 +491,85 @@ def armor_inplace_statue_push_detected(
         if seated and _statue_moved(prev_state, state, prefix):
             return True
     return False
+
+
+def armor_far_leg_active(
+    queue: Any, state: dict[str, Any] | None
+) -> bool:
+    """True while the current planner step is ``armor_vent_far`` in room 205."""
+    if not state or str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return False
+    return armor_vent_index(_step_from_queue(queue)) == 1
+
+
+def armor_approach_phi(distance: float, reference: float) -> float:
+    ref = max(float(reference), 1.0)
+    raw = ARMOR_APPROACH_BUDGET * (1.0 - max(float(distance), 0.0) / ref)
+    return float(np.clip(raw, -ARMOR_APPROACH_BUDGET, ARMOR_APPROACH_BUDGET))
+
+
+def armor_approach_progress_reward(
+    prev_state: dict[str, Any] | None,
+    state: dict[str, Any] | None,
+    queue: Any,
+    reference: float | None,
+) -> float:
+    """Potential on Jill's distance to the live west statue (far-vent leg only).
+
+    ``reference`` is the distance when the leg began (baselined by the caller
+    on the first far-vent step, so it works from the pl79 reset and after an
+    in-episode pl78->79 completion alike, wherever pl79 was minted). The
+    potential telescopes to at most +0.5 over the whole approach; retreating
+    toward the door pays it back. Zero while a shove is active — the statue
+    moves with Jill then.
+    """
+    if reference is None or not prev_state or not state:
+        return 0.0
+    if not armor_far_leg_active(queue, state):
+        return 0.0
+    if str(prev_state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return 0.0
+    if armor_pushing(prev_state) or armor_pushing(state):
+        return 0.0
+    prev_west = _named_statue_xz(prev_state, "west")
+    west = _named_statue_xz(state, "west")
+    if prev_west is None or west is None:
+        return 0.0
+    raw = armor_approach_phi(_dist_to(state, west), reference) - armor_approach_phi(
+        _dist_to(prev_state, prev_west), reference
+    )
+    return float(np.clip(raw, -ARMOR_APPROACH_STEP, ARMOR_APPROACH_STEP))
+
+
+def armor_approach_reference(state: dict[str, Any] | None) -> float | None:
+    """Jill-to-west-statue distance used to baseline the approach potential."""
+    if not state:
+        return None
+    west = _named_statue_xz(state, "west")
+    if west is None:
+        return None
+    return float(_dist_to(state, west))
+
+
+def armor_gas_damage_detected(
+    prev_state: dict[str, Any] | None,
+    state: dict[str, Any] | None,
+) -> bool:
+    """HP dropped while Jill stayed in 205: only the vent gas does that.
+
+    Death on the same step is left to the ordinary death terminal.
+    """
+    if not prev_state or not state:
+        return False
+    if str(prev_state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return False
+    if str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return False
+    if state.get("dead"):
+        return False
+    prev_hp = int(prev_state.get("hp", 0) or 0)
+    hp = int(state.get("hp", 0) or 0)
+    return prev_hp > 0 and hp < prev_hp
 
 
 def encode_armor_statue_compass(
