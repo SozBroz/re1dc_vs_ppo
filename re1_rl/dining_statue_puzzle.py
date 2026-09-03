@@ -100,29 +100,58 @@ def dining_statue_nav_target(state: dict[str, Any]) -> tuple[float, float]:
     return (float(drop[0]), float(drop[1]))
 
 
-def statue_202_active(planner: Any, state: dict[str, Any] | None) -> bool:
+DINING_STATUE_BEAT_ID = "push_statue_2f"
+DINING_STATUE_SITE_ID = "dining_statue_knocked"
+
+
+def _dining_statue_step(step: dict[str, Any] | None) -> bool:
+    """True for yawn ``statue_202`` or planner-loyal ``push_statue_2f``."""
+    if not isinstance(step, dict):
+        return False
+    if str(step.get("checkpoint_id") or "") == DINING_STATUE_CHECKPOINT_ID:
+        return True
+    beat = str(step.get("beat_id") or "")
+    site = str(step.get("site_id") or "")
+    return beat == DINING_STATUE_BEAT_ID or site == DINING_STATUE_SITE_ID
+
+
+def statue_202_active(
+    planner: Any,
+    state: dict[str, Any] | None,
+    *,
+    queue: Any = None,
+) -> bool:
     if not state or str(state.get("room_id", "")) != DINING_STATUE_ROOM_ID:
         return False
     if dining_statue_knocked_from_state(state):
         return False
     step = None
-    if planner is not None and hasattr(planner, "current_objective"):
+    if queue is not None:
+        step = getattr(queue, "current", None)
+    elif planner is not None and hasattr(planner, "current_objective"):
         step = planner.current_objective()
-    if not isinstance(step, dict):
-        return False
-    return str(step.get("checkpoint_id", "")) == DINING_STATUE_CHECKPOINT_ID
+    return _dining_statue_step(step)
+
+
+def dining_statue_goal_target(state: dict[str, Any] | None) -> tuple[float, float] | None:
+    """Jill compass target while the dining shove crumb is live (statue nav XZ)."""
+    if not state:
+        return None
+    return dining_statue_nav_target(state)
 
 
 def encode_dining_statue_compass(
     state: dict[str, Any],
     planner: Any = None,
+    *,
+    queue: Any = None,
 ) -> np.ndarray | None:
     """Egocentric compass toward the drop line (or final shove).
 
     Returns ``(dx_n, dz_n, dist_n, sin, cos)`` in the same units as the door
     compass, or ``None`` when this checkpoint is not active.
     """
-    if not statue_202_active(planner, state):
+    if not statue_202_active(planner, state, queue=queue):
         return None
     tx, tz = dining_statue_nav_target(state)
     dx = tx - float(state.get("x", 0))
@@ -162,6 +191,8 @@ def dining_statue_progress_reward(
     prev_state: dict[str, Any] | None,
     state: dict[str, Any] | None,
     planner: Any = None,
+    *,
+    queue: Any = None,
 ) -> float:
     """Clipped potential on live statue→nav-target distance.
 
@@ -171,9 +202,9 @@ def dining_statue_progress_reward(
     """
     if not prev_state or not state:
         return 0.0
-    if not statue_202_active(planner, state):
+    if not statue_202_active(planner, state, queue=queue):
         return 0.0
-    if not statue_202_active(planner, prev_state):
+    if not statue_202_active(planner, prev_state, queue=queue):
         return 0.0
     d0 = _statue_dist_to_nav_target(prev_state)
     d1 = _statue_dist_to_nav_target(state)

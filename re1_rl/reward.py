@@ -936,6 +936,13 @@ def _compute_planner_loyal_reward(
         planner_loyal_queue,
         progress,
     )
+    from re1_rl.dining_statue_puzzle import dining_statue_progress_reward
+
+    bd["dining_statue_progress"] = dining_statue_progress_reward(
+        prev_state,
+        state,
+        queue=planner_loyal_queue,
+    )
     if progress is not None and armor_far_leg_active(planner_loyal_queue, state):
         reference = progress.baseline_armor_far_approach(
             armor_approach_reference(prev_state)
@@ -1121,9 +1128,10 @@ def _compute_planner_loyal_reward(
         # symmetric, so pacing toward/away would otherwise reset the idle clock
         # for free.
         armor_progress = float(bd.get("armor_statue_progress") or 0.0) > 0.0
+        dining_progress = float(bd.get("dining_statue_progress") or 0.0) > 0.0
         if bd.get("planner_step_success", 0.0) == 0.0:
             progress.note_stagnation_step(
-                made_progress=armor_progress,
+                made_progress=armor_progress or dining_progress,
                 step_frames=step_frames,
             )
         bd["softlock"] = contempt_penalty_delta(

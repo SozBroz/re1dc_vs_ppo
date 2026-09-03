@@ -18,6 +18,8 @@ Reward contract (imperator 2026-08-25):
   exact east+west vents (pl80), then ``sun_crest`` acquire (pl81).
 - After sun crest: Richard bleedout first (starts ~6 min death timer), place
   sun at 11A, dining 2F enter, then ``push_statue_2f`` end-anchor.
+- Dining 2F (pl95): same ±0.5 shove crumb + ``pushables`` / goal compass as
+  yawn ``statue_202`` (gated on ``push_statue_2f`` / ``dining_statue_knocked``).
 """
 from __future__ import annotations
 
@@ -25,6 +27,7 @@ import hashlib
 import json
 import os
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +72,7 @@ PLANNER_LOYAL_SCALAR_KEYS: frozenset[str] = frozenset(
         "armor_inplace_statue_push",
         "armor_approach",
         "armor_gas",
+        "dining_statue_progress",
     }
 )
 
@@ -966,6 +970,29 @@ def _id_qty_slots_equal(
     return _pad(left) == _pad(right)
 
 
+def _id_qty_nonempty_bag(
+    slots: list[tuple[int, int]],
+) -> Counter[tuple[int, int]]:
+    """Multiset of occupied slots — ignores empty holes (game may pack left)."""
+    bag: Counter[tuple[int, int]] = Counter()
+    for iid, qty in slots:
+        iid_i = int(iid) & 0xFF
+        qty_i = int(qty)
+        if iid_i and qty_i > 0:
+            bag[(iid_i, qty_i)] += 1
+    return bag
+
+
+def _id_qty_combine_match(
+    planned: list[tuple[int, int]],
+    observed: list[tuple[int, int]],
+) -> bool:
+    """True when planned COMBINE matches live inventory (holes or packed)."""
+    if _id_qty_slots_equal(planned, observed):
+        return True
+    return _id_qty_nonempty_bag(planned) == _id_qty_nonempty_bag(observed)
+
+
 def _combine_explained_gains(
     prev_state: dict[str, Any],
     state: dict[str, Any],
@@ -983,7 +1010,7 @@ def _combine_explained_gains(
             if planned is None:
                 continue
             new_inv, _dest, _product = planned
-            if _id_qty_slots_equal(new_inv, cur_inv):
+            if _id_qty_combine_match(new_inv, cur_inv):
                 return _inventory_gains(prev_state, state)
     return set()
 
@@ -1279,6 +1306,14 @@ def encode_planner_loyal_goal(
 
             if armor_statue_active(queue, state):
                 target_xz = armor_statue_goal_target(state)
+        elif room == "202":
+            from re1_rl.dining_statue_puzzle import (
+                dining_statue_goal_target,
+                statue_202_active,
+            )
+
+            if statue_202_active(None, state, queue=queue):
+                target_xz = dining_statue_goal_target(state)
         if target_xz is None:
             target_xz = _planner_step_target_xz(step, item_positions=item_positions)
         if target_xz is not None:

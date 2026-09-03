@@ -82,6 +82,39 @@ def test_armor_pl80_slots_live_and_crumb_target() -> None:
     assert west[3] > 0.0
 
 
+def test_dining_pl95_pushables_live_on_loyal_queue() -> None:
+    from re1_rl.dining_statue_puzzle import DINING_STATUE_DROP_XZ
+
+    queue = SimpleNamespace(
+        current={
+            "beat_id": "push_statue_2f",
+            "site_id": "dining_statue_knocked",
+            "op": "do_puzzle",
+            "room_id": "202",
+        }
+    )
+    state = {
+        "room_id": "202",
+        "x": 16000,
+        "z": 3000,
+        "facing": 0,
+        "dining_statue_knocked": False,
+        "dining_statue_x": 19000,
+        "dining_statue_z": 3452,
+    }
+    v = encode_pushables(state, queue=queue)
+    slot = v[:PUSHABLE_SLOT_DIM]
+    assert slot[0] == 1.0
+    assert slot[9] == 1.0  # active
+    rem_dx = (DINING_STATUE_DROP_XZ[0] - 19000) / 4096.0
+    rem_dz = (DINING_STATUE_DROP_XZ[1] - 3452) / 4096.0
+    assert slot[6] == np.float32(np.clip(rem_dx, -2.0, 2.0))
+    assert slot[7] == np.float32(np.clip(rem_dz, -2.0, 2.0))
+    # Enter-only step must not light pushables.
+    queue.current = {"beat_id": "dining_2f_enter", "op": "traverse", "edge_id": "203->202"}
+    assert float(encode_pushables(state, queue=queue).sum()) == 0.0
+
+
 def test_spaces_include_pushables() -> None:
     assert OBS_SCHEMA_VERSION == 3
     obs, _ = make_re1_spaces()

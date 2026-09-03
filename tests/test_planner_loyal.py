@@ -232,6 +232,40 @@ def test_combine_herb_mix_does_not_divert_on_traverse():
     assert result["step_success"] is False
 
 
+def test_combine_herb_mix_packed_slots_does_not_divert():
+    """Live COMBINE often packs remaining items left over the empty hole."""
+    q = PlannerLoyalQueue()
+    prev = {
+        "room_id": "100",
+        "inventory_slots": [
+            ("green_herb", 1),
+            ("red_herb", 1),
+            ("beretta", 15),
+            ("armor_key", 1),
+            ("", 0),
+            ("", 0),
+            ("", 0),
+            ("", 0),
+        ],
+    }
+    cur = {
+        "room_id": "100",
+        "inventory_slots": [
+            ("mixed_herbs_gr", 1),
+            ("beretta", 15),
+            ("armor_key", 1),
+            ("", 0),
+            ("", 0),
+            ("", 0),
+            ("", 0),
+            ("", 0),
+        ],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result.get("divert_reason") is None
+
+
 def test_shotgun_after_unique_acquire_does_not_divert():
     q = PlannerLoyalQueue(
         {

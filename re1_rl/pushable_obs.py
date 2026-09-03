@@ -115,7 +115,9 @@ def encode_pushables(
             )
         return v
 
-    if room == DINING_STATUE_ROOM_ID and statue_202_active(planner, state):
+    if room == DINING_STATUE_ROOM_ID and statue_202_active(
+        planner, state, queue=queue
+    ):
         obj = _live_statue_xz(state)
         if obj is None:
             return v

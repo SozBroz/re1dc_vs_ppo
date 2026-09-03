@@ -234,3 +234,58 @@ def test_statue_progress_off_when_not_statue_checkpoint() -> None:
     far = _pushing_statue_state(dining_statue_x=23000, dining_statue_z=3452)
     closer = _pushing_statue_state(dining_statue_x=19000, dining_statue_z=3452)
     assert dining_statue_progress_reward(far, closer, planner) == 0.0
+
+
+def test_planner_loyal_push_statue_activates_progress() -> None:
+    from types import SimpleNamespace
+
+    from re1_rl.dining_statue_puzzle import DINING_STATUE_PROGRESS_STEP
+
+    queue = SimpleNamespace(
+        current={
+            "beat_id": "push_statue_2f",
+            "site_id": "dining_statue_knocked",
+            "op": "do_puzzle",
+            "room_id": "202",
+        }
+    )
+    far = _pushing_statue_state(dining_statue_x=23000, dining_statue_z=3452)
+    closer = _pushing_statue_state(dining_statue_x=19000, dining_statue_z=3452)
+    assert dining_statue_progress_reward(far, closer, queue=queue) == pytest.approx(
+        DINING_STATUE_PROGRESS_STEP
+    )
+    # Wrong beat: crumb off.
+    queue.current = {"beat_id": "dining_2f_enter", "op": "traverse", "room_id": "202"}
+    assert dining_statue_progress_reward(far, closer, queue=queue) == 0.0
+
+
+def test_planner_loyal_reward_pays_dining_statue_progress() -> None:
+    from re1_rl.planner_loyal import PlannerLoyalQueue
+
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "statue",
+            "end_anchor_beat_id": "push_statue_2f",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "do_puzzle",
+                    "site_id": "dining_statue_knocked",
+                    "room_id": "202",
+                    "beat_id": "push_statue_2f",
+                }
+            ],
+        }
+    )
+    progress = ProgressTracker()
+    prev = _pushing_statue_state(dining_statue_x=23000, dining_statue_z=3452)
+    cur = _pushing_statue_state(dining_statue_x=19000, dining_statue_z=3452, step=2)
+    _total, bd = compute_reward(
+        prev,
+        cur,
+        make_planner(),
+        progress=progress,
+        planner_loyal_queue=q,
+        return_breakdown=True,
+    )
+    assert bd["dining_statue_progress"] == pytest.approx(DINING_STATUE_PROGRESS_STEP)
