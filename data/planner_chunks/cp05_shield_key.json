@@ -3,8 +3,8 @@
   "checkpoint_id": "barry_hall_return_106",
   "chunk_id": "cp05_shield_key",
   "source": "phase1_pass1_council",
-  "end_anchor_beat_id": "push_statue_2f",
-  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). 103->104 is the one-way tea-room lock. After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, then 10C greens, then armor_key. After armor_key: leftover 10C reds, 101->102 clip+lockpick-desk shells, 102->101->100. Then use_box in 100 (leave_100: no heals on exit — incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) and walk 100->101->201->202->203->204->205. In 205 take 205:sun_crest:1. No intermediate vent PLs or shove crumbs. After sun_crest: Richard bleedout FIRST (capture:false — cinema dumps to C passage 204, no pl84/pl85 cells), then place_sun_crest at 11A, then dining 2F enter + push_statue_2f.",
+  "end_anchor_beat_id": "wind_crest",
+  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). Tea-room lock: 104->103 stays locked until 103->104 is traversed once (this chunk never opens it). After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, then 10C greens, then armor_key. After armor_key: leftover 10C reds, 101->102 clip+lockpick-desk shells, 102->101->100. Then use_box in 100 (leave_100: no heals on exit — incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) and walk 100->101->201->202->203->204->205. In 205 take 205:sun_crest:1. No intermediate vent PLs or shove crumbs. After sun_crest: Richard bleedout FIRST (capture:false — cinema dumps to C passage 204, no pl84/pl85 cells), then place_sun_crest at 11A, then dining 2F enter + push_statue_2f. After statue: 202->203->106->105 take blue jewel, backtrack 105->106->203->202->201->101->103 (skip vacant 102 — already looted), 103->10D tiger eye + wind_crest.",
   "leave_118": {
     "banked_in_box": [
       {"item": "shield_key", "qty": 1, "why": "attic only; bank to free a slot"},
@@ -142,6 +142,19 @@
     {"n": 88, "op": "traverse", "edge_id": "207->204"},
     {"n": 89, "op": "traverse", "edge_id": "204->203"},
     {"n": 90, "op": "traverse", "edge_id": "203->202", "beat_id": "dining_2f_enter", "note": "Dining Room 2F"},
-    {"n": 91, "op": "do_puzzle", "site_id": "dining_statue_knocked", "room_id": "202", "beat_id": "push_statue_2f", "note": "push balcony statue down; chunk end-anchor"}
+    {"n": 91, "op": "do_puzzle", "site_id": "dining_statue_knocked", "room_id": "202", "beat_id": "push_statue_2f", "note": "push balcony statue down; blue jewel drops to dining hall 105"},
+    {"n": 92, "op": "traverse", "edge_id": "202->203", "note": "leave Dining 2F toward main hall / jewel"},
+    {"n": 93, "op": "traverse", "edge_id": "203->106"},
+    {"n": 94, "op": "traverse", "edge_id": "106->105"},
+    {"n": 95, "op": "acquire", "pickup_id": "105:blue_jewel:1", "room_id": "105", "beat_id": "blue_jewel", "note": "statue drop puts jewel in dining hall 105 (not 202)"},
+    {"n": 96, "op": "traverse", "edge_id": "105->106", "note": "back out; 104->103 still locked — do not tea-cut"},
+    {"n": 97, "op": "traverse", "edge_id": "106->203"},
+    {"n": 98, "op": "traverse", "edge_id": "203->202"},
+    {"n": 99, "op": "traverse", "edge_id": "202->201"},
+    {"n": 100, "op": "traverse", "edge_id": "201->101"},
+    {"n": 101, "op": "traverse", "edge_id": "101->103", "note": "skip 102 vacant — clip+shells already taken"},
+    {"n": 102, "op": "traverse", "edge_id": "103->10D", "beat_id": "tiger_room_enter", "note": "Tiger Statue Room"},
+    {"n": 103, "op": "objective", "site_id": "blue_jewel@10D_tiger_eye", "room_id": "10D", "beat_id": "tiger_jewel", "note": "insert blue jewel in tiger eye"},
+    {"n": 104, "op": "acquire", "pickup_id": "10D:wind_crest:1", "room_id": "10D", "beat_id": "wind_crest", "note": "chunk end-anchor"}
   ]
 }

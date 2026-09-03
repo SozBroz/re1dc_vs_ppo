@@ -1,6 +1,6 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (91 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (104 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **Source of truth:** the live chunk JSON. Seed cells `pl00`–`pl05` are the opening crystals (same beats as yawn `cp00`–`cp05`); they are **not** minted from this chunk.
 
@@ -10,8 +10,8 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - Training starts: every minted `pl05+` (pin file `data/planner_loyal_reset_pin.env`; blank = uniform).
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl05`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
-- One-way lock: `103->104` (tea room). `103->10C` is open. Do not walk `116->106` after the shotgun.
-- Chunk end-anchor: `push_statue_2f` (`pl95`). Mid-chunk success keeps the episode open.
+- Tea-room lock: `104->103` stays locked until `103->104` is done once (this chunk never opens it). `103->10C` / `103->10D` are open. Do not walk `116->106` after the shotgun. Vacant `102` clip+shells are taken on the armor-key return; skip re-loot.
+- Chunk end-anchor: `wind_crest` (`pl108`). Mid-chunk success keeps the episode open.
 
 ## Summary table
 
@@ -113,7 +113,20 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 | `pl92` | 88 | `207->204` | `204` (C PASSAGE) | traverse | Walk `207->204` into `204` (C PASSAGE) |
 | `pl93` | 89 | `204->203` | `203` (HALL 2F) | traverse | Walk `204->203` into `203` (HALL 2F) |
 | `pl94` | 90 | `dining_2f_enter` | `202` (DINING ROOM 2F) | traverse | Walk `203->202` into `202` (DINING ROOM 2F) |
-| `pl95` | 91 | `push_statue_2f` | `202` (DINING ROOM 2F) | do_puzzle | `push_statue_2f` at `dining_statue_knocked` — push balcony statue down; chunk end-anchor |
+| `pl95` | 91 | `push_statue_2f` | `202` (DINING ROOM 2F) | do_puzzle | `push_statue_2f` at `dining_statue_knocked` — push balcony statue down; blue jewel drops to dining hall 105 |
+| `pl96` | 92 | `202->203` | `203` (HALL 2F) | traverse | Walk `202->203` into `203` (HALL 2F) |
+| `pl97` | 93 | `203->106` | `106` (MAIN HALL) | traverse | Walk `203->106` into `106` (MAIN HALL) |
+| `pl98` | 94 | `106->105` | `105` (DINING ROOM) | traverse | Walk `106->105` into `105` (DINING ROOM) |
+| `pl99` | 95 | `blue_jewel` | `105` (DINING ROOM) | acquire | Take `105:blue_jewel:1` (statue drop puts jewel in dining hall 105 (not 202)) |
+| `pl100` | 96 | `105->106` | `106` (MAIN HALL) | traverse | Walk `105->106` into `106` (MAIN HALL) |
+| `pl101` | 97 | `106->203` | `203` (HALL 2F) | traverse | Walk `106->203` into `203` (HALL 2F) |
+| `pl102` | 98 | `203->202` | `202` (DINING ROOM 2F) | traverse | Walk `203->202` into `202` (DINING ROOM 2F) |
+| `pl103` | 99 | `202->201` | `201` (2F LEFT STAIRS) | traverse | Walk `202->201` into `201` (2F LEFT STAIRS) |
+| `pl104` | 100 | `201->101` | `101` (1F LEFT STAIRS) | traverse | Walk `201->101` into `101` (1F LEFT STAIRS) |
+| `pl105` | 101 | `101->103` | `103` (F PASSAGE) | traverse | Walk `101->103` into `103` (F PASSAGE) |
+| `pl106` | 102 | `tiger_room_enter` | `10D` (TIGER STATUE ROOM) | traverse | Walk `103->10D` into `10D` (TIGER STATUE ROOM) |
+| `pl107` | 103 | `tiger_jewel` | `10D` (TIGER STATUE ROOM) | objective | `tiger_jewel` at `blue_jewel@10D_tiger_eye` — insert blue jewel in tiger eye |
+| `pl108` | 104 | `wind_crest` | `10D` (TIGER STATUE ROOM) | acquire | Take `10D:wind_crest:1` (chunk end-anchor) |
 
 ## Details
 
@@ -167,7 +180,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl06`–`pl95`)
+### Chunk cells (`pl06`–`pl108`)
 
 ### `pl06` — `106->105` (step 1)
 
@@ -1115,9 +1128,150 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Op:** `do_puzzle`
 - **Site:** `dining_statue_knocked`
 - **Beat:** `push_statue_2f`
-- **Note:** push balcony statue down; chunk end-anchor
-- **Objective:** `push_statue_2f` at `dining_statue_knocked` — push balcony statue down; chunk end-anchor
+- **Note:** push balcony statue down; blue jewel drops to dining hall 105
+- **Objective:** `push_statue_2f` at `dining_statue_knocked` — push balcony statue down; blue jewel drops to dining hall 105
 - **Items gained:** _(none)_
-- **How to achieve:** `push_statue_2f` at `dining_statue_knocked` — push balcony statue down; chunk end-anchor.
+- **How to achieve:** `push_statue_2f` at `dining_statue_knocked` — push balcony statue down; blue jewel drops to dining hall 105.
 - **Success condition:** Room `202` and dining balcony statue knocked (`dining_statue_flag` bit 0x10 / `dining_statue_knocked`)
+
+### `pl96` — `202->203` (step 92)
+
+- **Room:** `203` (HALL 2F)
+- **Op:** `traverse`
+- **Edge:** `202->203`
+- **Note:** leave Dining 2F toward main hall / jewel
+- **Objective:** Walk `202->203` into `203` (HALL 2F)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `202->203` into `203` (HALL 2F).
+- **Success condition:** Enter room `203` via `202->203` (already-there counts after cinema dump). Any other door is `wrong_traverse:202->203 got <room>` (−4).
+
+### `pl97` — `203->106` (step 93)
+
+- **Room:** `106` (MAIN HALL)
+- **Op:** `traverse`
+- **Edge:** `203->106`
+- **Objective:** Walk `203->106` into `106` (MAIN HALL)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `203->106` into `106` (MAIN HALL).
+- **Success condition:** Enter room `106` via `203->106` (already-there counts after cinema dump). Any other door is `wrong_traverse:203->106 got <room>` (−4).
+
+### `pl98` — `106->105` (step 94)
+
+- **Room:** `105` (DINING ROOM)
+- **Op:** `traverse`
+- **Edge:** `106->105`
+- **Objective:** Walk `106->105` into `105` (DINING ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `106->105` into `105` (DINING ROOM).
+- **Success condition:** Enter room `105` via `106->105` (already-there counts after cinema dump). Any other door is `wrong_traverse:106->105 got <room>` (−4).
+
+### `pl99` — `blue_jewel` (step 95)
+
+- **Room:** `105` (DINING ROOM)
+- **Op:** `acquire`
+- **Pickup:** `105:blue_jewel:1`
+- **Beat:** `blue_jewel`
+- **Note:** statue drop puts jewel in dining hall 105 (not 202)
+- **Objective:** Take `105:blue_jewel:1` (statue drop puts jewel in dining hall 105 (not 202))
+- **Items gained:** `blue_jewel`
+- **How to achieve:** Take `105:blue_jewel:1` (statue drop puts jewel in dining hall 105 (not 202)).
+- **Success condition:** Inventory gains `105:blue_jewel:1` while this step is current
+
+### `pl100` — `105->106` (step 96)
+
+- **Room:** `106` (MAIN HALL)
+- **Op:** `traverse`
+- **Edge:** `105->106`
+- **Note:** back out; 104->103 still locked — do not tea-cut
+- **Objective:** Walk `105->106` into `106` (MAIN HALL)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `105->106` into `106` (MAIN HALL).
+- **Success condition:** Enter room `106` via `105->106` (already-there counts after cinema dump). Any other door is `wrong_traverse:105->106 got <room>` (−4).
+
+### `pl101` — `106->203` (step 97)
+
+- **Room:** `203` (HALL 2F)
+- **Op:** `traverse`
+- **Edge:** `106->203`
+- **Objective:** Walk `106->203` into `203` (HALL 2F)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `106->203` into `203` (HALL 2F).
+- **Success condition:** Enter room `203` via `106->203` (already-there counts after cinema dump). Any other door is `wrong_traverse:106->203 got <room>` (−4).
+
+### `pl102` — `203->202` (step 98)
+
+- **Room:** `202` (DINING ROOM 2F)
+- **Op:** `traverse`
+- **Edge:** `203->202`
+- **Objective:** Walk `203->202` into `202` (DINING ROOM 2F)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `203->202` into `202` (DINING ROOM 2F).
+- **Success condition:** Enter room `202` via `203->202` (already-there counts after cinema dump). Any other door is `wrong_traverse:203->202 got <room>` (−4).
+
+### `pl103` — `202->201` (step 99)
+
+- **Room:** `201` (2F LEFT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `202->201`
+- **Objective:** Walk `202->201` into `201` (2F LEFT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `202->201` into `201` (2F LEFT STAIRS).
+- **Success condition:** Enter room `201` via `202->201` (already-there counts after cinema dump). Any other door is `wrong_traverse:202->201 got <room>` (−4).
+
+### `pl104` — `201->101` (step 100)
+
+- **Room:** `101` (1F LEFT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `201->101`
+- **Objective:** Walk `201->101` into `101` (1F LEFT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `201->101` into `101` (1F LEFT STAIRS).
+- **Success condition:** Enter room `101` via `201->101` (already-there counts after cinema dump). Any other door is `wrong_traverse:201->101 got <room>` (−4).
+
+### `pl105` — `101->103` (step 101)
+
+- **Room:** `103` (F PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `101->103`
+- **Note:** skip 102 vacant — clip+shells already taken
+- **Objective:** Walk `101->103` into `103` (F PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `101->103` into `103` (F PASSAGE).
+- **Success condition:** Enter room `103` via `101->103` (already-there counts after cinema dump). Any other door is `wrong_traverse:101->103 got <room>` (−4).
+
+### `pl106` — `tiger_room_enter` (step 102)
+
+- **Room:** `10D` (TIGER STATUE ROOM)
+- **Op:** `traverse`
+- **Edge:** `103->10D`
+- **Beat:** `tiger_room_enter`
+- **Note:** Tiger Statue Room
+- **Objective:** Walk `103->10D` into `10D` (TIGER STATUE ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `103->10D` into `10D` (TIGER STATUE ROOM).
+- **Success condition:** Enter room `10D` via `103->10D` (already-there counts after cinema dump). Any other door is `wrong_traverse:103->10D got <room>` (−4).
+
+### `pl107` — `tiger_jewel` (step 103)
+
+- **Room:** `10D` (TIGER STATUE ROOM)
+- **Op:** `objective`
+- **Site:** `blue_jewel@10D_tiger_eye`
+- **Beat:** `tiger_jewel`
+- **Note:** insert blue jewel in tiger eye
+- **Objective:** `tiger_jewel` at `blue_jewel@10D_tiger_eye` — insert blue jewel in tiger eye
+- **Items gained:** _(none)_
+- **How to achieve:** `tiger_jewel` at `blue_jewel@10D_tiger_eye` — insert blue jewel in tiger eye.
+- **Success condition:** `story_use_success` == `blue_jewel@10D_tiger_eye` in room `10D`
+
+### `pl108` — `wind_crest` (step 104)
+
+- **Room:** `10D` (TIGER STATUE ROOM)
+- **Op:** `acquire`
+- **Pickup:** `10D:wind_crest:1`
+- **Beat:** `wind_crest`
+- **Note:** chunk end-anchor
+- **Objective:** Take `10D:wind_crest:1` (chunk end-anchor)
+- **Items gained:** `wind_crest`
+- **How to achieve:** Take `10D:wind_crest:1` (chunk end-anchor).
+- **Success condition:** Inventory gains `10D:wind_crest:1` while this step is current
 

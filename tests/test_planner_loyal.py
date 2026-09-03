@@ -102,10 +102,22 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[sun_i + 4]["edge_id"] == "204->207"
     assert any(s.get("beat_id") == "place_sun_crest" for s in steps)
     assert any(s.get("beat_id") == "dining_2f_enter" for s in steps)
-    assert steps[-1]["beat_id"] == "push_statue_2f"
-    assert steps[-1]["n"] == 91
-    assert steps[-1]["site_id"] == "dining_statue_knocked"
-    assert chunk["end_anchor_beat_id"] == "push_statue_2f"
+    assert any(s.get("beat_id") == "push_statue_2f" for s in steps)
+    statue_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "push_statue_2f")
+    assert steps[statue_i]["n"] == 91
+    assert steps[statue_i]["site_id"] == "dining_statue_knocked"
+    assert steps[statue_i + 1]["edge_id"] == "202->203"
+    assert steps[statue_i + 4]["pickup_id"] == "105:blue_jewel:1"
+    assert steps[statue_i + 5]["edge_id"] == "105->106"
+    assert steps[statue_i + 10]["edge_id"] == "101->103"
+    assert steps[statue_i + 11]["edge_id"] == "103->10D"
+    assert steps[statue_i + 12]["site_id"] == "blue_jewel@10D_tiger_eye"
+    assert steps[-1]["beat_id"] == "wind_crest"
+    assert steps[-1]["n"] == 104
+    assert steps[-1]["pickup_id"] == "10D:wind_crest:1"
+    assert chunk["end_anchor_beat_id"] == "wind_crest"
+    assert not any(s.get("edge_id") == "105->104" for s in steps[statue_i:])
+    assert not any(s.get("edge_id") == "104->103" for s in steps)
     assert chunk["leave_100"]["next_beat_this_loadout_is_for"] == "richard_bleedout"
     assert chunk["leave_100"]["held_on_exit"][2]["item"] == "armor_key"
     assert not any(
@@ -1530,7 +1542,7 @@ def test_pl18_seek_lands_on_chemical_tail():
     q.seek(13)
     assert q.current is not None
     assert q.current["edge_id"] == "105->106"
-    assert q.end_anchor == "push_statue_2f"
+    assert q.end_anchor == "wind_crest"
     assert q._steps[23]["pickup_id"].startswith("118:chemical")
     assert q._steps[24]["op"] == "use_box"
     assert any(
@@ -1539,7 +1551,8 @@ def test_pl18_seek_lands_on_chemical_tail():
     assert any(s.get("edge_id") == "101->100" for s in q._steps)
     assert any(s.get("edge_id") == "204->205" for s in q._steps)
     assert q._steps[75]["pickup_id"] == "205:sun_crest:1"
-    assert q._steps[-1]["beat_id"] == "push_statue_2f"
+    assert q._steps[90]["beat_id"] == "push_statue_2f"
+    assert q._steps[-1]["beat_id"] == "wind_crest"
 
 
 def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):
@@ -1729,6 +1742,76 @@ def test_dining_statue_completes_when_knocked():
     assert miss["step_success"] is False
     hit = q.evaluate_transition(prev_state=prev, state=cur)
     assert hit["step_success"] is True
+    assert q.done
+
+
+def test_dining_statue_completes_on_knock_even_with_room_change():
+    """Yawn ``state_flag`` pays knock; unplanned_room must not block it."""
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "statue",
+            "end_anchor_beat_id": "push_statue_2f",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "do_puzzle",
+                    "site_id": "dining_statue_knocked",
+                    "room_id": "202",
+                    "beat_id": "push_statue_2f",
+                }
+            ],
+        }
+    )
+    prev = {
+        "room_id": "202",
+        "dining_statue_knocked": False,
+        "inventory": [],
+        "inventory_slots": [],
+    }
+    cur = {
+        "room_id": "201",
+        "dining_statue_knocked": True,
+        "inventory": [],
+        "inventory_slots": [],
+    }
+    hit = q.evaluate_transition(prev_state=prev, state=cur)
+    assert hit["step_success"] is True
+    assert not hit["divert"]
+    assert q.done
+
+
+def test_dining_statue_completes_on_knock_despite_benign_inventory_edge():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "statue",
+            "end_anchor_beat_id": "push_statue_2f",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "do_puzzle",
+                    "site_id": "dining_statue_knocked",
+                    "room_id": "202",
+                    "beat_id": "push_statue_2f",
+                }
+            ],
+        }
+    )
+    prev = {
+        "room_id": "202",
+        "dining_statue_knocked": False,
+        "inventory": [],
+        "inventory_slots": [],
+    }
+    cur = {
+        "room_id": "202",
+        "dining_statue_knocked": True,
+        "inventory": ["green_herb"],
+        "inventory_slots": [("green_herb", 1)],
+        "new_items": ["green_herb"],
+    }
+    hit = q.evaluate_transition(prev_state=prev, state=cur)
+    assert hit["step_success"] is True
+    assert not hit["divert"]
     assert q.done
 
 

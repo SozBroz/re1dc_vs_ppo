@@ -44,8 +44,9 @@ def test_live_chunk_restores_two_strict_vent_helpers() -> None:
     assert by_beat["sun_crest"]["pickup_id"] == "205:sun_crest:1"
     assert by_beat["richard_bleedout"]["site_id"] == "20D:richard"
     assert by_beat["richard_bleedout"].get("capture") is False
-    assert q.end_anchor == "push_statue_2f"
-    assert q._steps[-1]["beat_id"] == "push_statue_2f"
+    assert q.end_anchor == "wind_crest"
+    assert q._steps[-1]["beat_id"] == "wind_crest"
+    assert any(s.get("beat_id") == "push_statue_2f" for s in q._steps)
     assert not any(s.get("edge_id") == "20D->204" for s in q._steps)
 
 

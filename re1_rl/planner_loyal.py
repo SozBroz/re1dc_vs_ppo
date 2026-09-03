@@ -578,6 +578,27 @@ class PlannerLoyalQueue:
                 planner_loyal_queue=self,
             )
 
+        # RAM-flag puzzle completions (yawn ``state_flag`` path) must win over
+        # unplanned_room / pickup gates — knock often shares a step with a
+        # cinema room dump or inventory flicker.
+        from re1_rl.armor_room_puzzle import armor_vent_step_complete
+
+        if armor_vent_step_complete(step, state):
+            result["step_success"] = True
+            self._index += 1
+            self.step_success_pending = True
+            return result
+
+        if _dining_statue_step_complete(step, state):
+            result["step_success"] = True
+            self._index += 1
+            self.step_success_pending = True
+            print(
+                f"[planner_loyal] push_statue_2f knocked room={room}",
+                flush=True,
+            )
+            return result
+
         # Divert: unplanned room change. go_to_box may hop any door until dest.
         if room and prev_room and room != prev_room:
             if op == GO_TO_BOX_OP:
@@ -651,7 +672,11 @@ class PlannerLoyalQueue:
                     result["divert"] = True
                     result["divert_reason"] = f"unplanned_pickup:{sorted(unexpected)}"
                     self.divert_reason = result["divert_reason"]
-                return result
+                    return result
+                # Benign inventory edge (cinema grant, slot decode flicker) on a
+                # puzzle leg — fall through to RAM-flag completion above.
+                if op not in {"do_puzzle", "objective", "trigger_cutscene", "boss"}:
+                    return result
             if not matched:
                 if unexpected:
                     result["divert"] = True
@@ -664,20 +689,6 @@ class PlannerLoyalQueue:
             self._index += 1
             self.step_success_pending = True
             self._rebuild_satisfied_pickups()
-            return result
-
-        from re1_rl.armor_room_puzzle import armor_vent_step_complete
-
-        if armor_vent_step_complete(step, state):
-            result["step_success"] = True
-            self._index += 1
-            self.step_success_pending = True
-            return result
-
-        if _dining_statue_step_complete(step, state):
-            result["step_success"] = True
-            self._index += 1
-            self.step_success_pending = True
             return result
 
         # Objective / puzzle / cutscene / boss completion via story_use or flags.
