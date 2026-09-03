@@ -112,11 +112,24 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[statue_i + 10]["edge_id"] == "101->103"
     assert steps[statue_i + 11]["edge_id"] == "103->10D"
     assert steps[statue_i + 12]["site_id"] == "blue_jewel@10D_tiger_eye"
-    assert steps[-1]["beat_id"] == "wind_crest"
-    assert steps[-1]["n"] == 106
-    assert steps[-1]["pickup_id"] == "10D:wind_crest:1"
-    assert chunk["end_anchor_beat_id"] == "wind_crest"
-    assert not any(s.get("edge_id") == "105->104" for s in steps[statue_i:])
+    assert steps[statue_i + 13]["pickup_id"] == "10D:wind_crest:1"
+    assert steps[statue_i + 13]["beat_id"] == "wind_crest"
+    # Resource-first place_wind tail (pl110 Muse): 10E loot, 103->104 unlock, 111 shells, art→11A.
+    assert steps[-1]["beat_id"] == "place_wind_crest"
+    assert steps[-1]["n"] == 123
+    assert steps[-1]["site_id"] == "wind_crest@11A_crest_slot"
+    assert chunk["end_anchor_beat_id"] == "place_wind_crest"
+    wind_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "wind_crest")
+    assert steps[wind_i]["n"] == 106
+    assert steps[wind_i + 1]["edge_id"] == "10D->103"
+    assert steps[wind_i + 2]["edge_id"] == "103->10E"
+    assert steps[wind_i + 3]["pickup_id"] == "10E:handgun_bullets:1"
+    assert steps[wind_i + 4]["pickup_id"] == "10E:shotgun_shells:2"
+    assert not any(s.get("edge_id") == "103->104" for s in steps[: wind_i + 1])
+    assert any(s.get("edge_id") == "103->104" for s in steps[wind_i + 1 :])
+    assert any(s.get("pickup_id") == "111:shotgun_shells:2" for s in steps[wind_i:])
+    assert not any(s.get("edge_id") == "111->112" for s in steps)  # skip wardrobe without herb
+    assert not any(s.get("edge_id") == "105->104" for s in steps[statue_i:wind_i + 1])
     assert not any(s.get("edge_id") == "104->103" for s in steps)
     assert chunk["leave_100"]["next_beat_this_loadout_is_for"] == "richard_bleedout"
     assert chunk["leave_100"]["held_on_exit"][2]["item"] == "armor_key"
@@ -136,7 +149,6 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert any(s.get("edge_id") == "10A->117" for s in steps)
     assert not any(s.get("edge_id") == "116->106" for s in steps)
     assert any(s.get("edge_id") == "103->10C" for s in steps)
-    assert not any(s.get("edge_id") == "103->104" for s in steps)
     portraits = [
         s.get("beat_id") for s in steps if str(s.get("beat_id") or "").startswith("gallery_portrait_")
     ]
@@ -1551,7 +1563,7 @@ def test_pl18_seek_lands_on_chemical_tail():
     q.seek(13)
     assert q.current is not None
     assert q.current["edge_id"] == "105->106"
-    assert q.end_anchor == "wind_crest"
+    assert q.end_anchor == "place_wind_crest"
     assert q._steps[23]["pickup_id"].startswith("118:chemical")
     assert q._steps[24]["op"] == "use_box"
     assert any(
@@ -1559,9 +1571,12 @@ def test_pl18_seek_lands_on_chemical_tail():
     )
     assert any(s.get("edge_id") == "101->100" for s in q._steps)
     assert any(s.get("edge_id") == "204->205" for s in q._steps)
-    assert q._steps[75]["pickup_id"] == "205:sun_crest:1"
-    assert q._steps[90]["beat_id"] == "push_statue_2f"
-    assert q._steps[-1]["beat_id"] == "wind_crest"
+    by_beat = {s.get("beat_id"): s for s in q._steps if s.get("beat_id")}
+    assert by_beat["sun_crest"]["pickup_id"] == "205:sun_crest:1"
+    assert by_beat["push_statue_2f"]["n"] == 93
+    assert by_beat["wind_crest"]["n"] == 106
+    assert by_beat["place_wind_crest"]["n"] == 123
+    assert q._steps[-1]["beat_id"] == "place_wind_crest"
 
 
 def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):

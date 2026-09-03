@@ -37,15 +37,17 @@ def _planner() -> WaypointPlanner:
 def test_live_chunk_restores_two_strict_vent_helpers() -> None:
     q = PlannerLoyalQueue()
     by_beat = {s.get("beat_id"): s for s in q._steps if s.get("beat_id")}
-    assert by_beat["armor_room_enter"]["n"] == 73
-    assert by_beat["armor_vent_door"]["n"] == 74
-    assert by_beat["armor_vent_far"]["n"] == 75
-    assert by_beat["sun_crest"]["n"] == 76
+    assert by_beat["armor_room_enter"]["n"] == 75
+    assert by_beat["armor_vent_door"]["n"] == 76
+    assert by_beat["armor_vent_far"]["n"] == 77
+    assert by_beat["sun_crest"]["n"] == 78
     assert by_beat["sun_crest"]["pickup_id"] == "205:sun_crest:1"
     assert by_beat["richard_bleedout"]["site_id"] == "20D:richard"
     assert by_beat["richard_bleedout"].get("capture") is False
-    assert q.end_anchor == "wind_crest"
-    assert q._steps[-1]["beat_id"] == "wind_crest"
+    assert q.end_anchor == "place_wind_crest"
+    assert q._steps[-1]["beat_id"] == "place_wind_crest"
+    assert any(s.get("beat_id") == "wind_crest" for s in q._steps)
+    assert any(s.get("beat_id") == "place_wind_crest" for s in q._steps)
     assert any(s.get("beat_id") == "push_statue_2f" for s in q._steps)
     assert not any(s.get("edge_id") == "20D->204" for s in q._steps)
 

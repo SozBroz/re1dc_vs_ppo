@@ -1,6 +1,6 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (106 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (123 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **Source of truth:** the live chunk JSON. Seed cells `pl00`–`pl05` are the opening crystals (same beats as yawn `cp00`–`cp05`); they are **not** minted from this chunk.
 
@@ -11,7 +11,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl05`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - Tea-room lock: `104->103` stays locked until `103->104` is done once (this chunk never opens it). `103->10C` / `103->10D` are open. Do not walk `116->106` after the shotgun. Vacant `102` clip+shells are taken on the armor-key return; skip re-loot.
-- Chunk end-anchor: `wind_crest` (`pl110`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `place_wind_crest` (`pl127`). Mid-chunk success keeps the episode open.
 
 ## Summary table
 
@@ -128,7 +128,24 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 | `pl107` | 103 | `101->103` | `103` (F PASSAGE) | traverse | Walk `101->103` into `103` (F PASSAGE) |
 | `pl108` | 104 | `tiger_room_enter` | `10D` (TIGER STATUE ROOM) | traverse | Walk `103->10D` into `10D` (TIGER STATUE ROOM) |
 | `pl109` | 105 | `tiger_jewel` | `10D` (TIGER STATUE ROOM) | objective | `tiger_jewel` at `blue_jewel@10D_tiger_eye` — insert blue jewel in tiger eye |
-| `pl110` | 106 | `wind_crest` | `10D` (TIGER STATUE ROOM) | acquire | Take `10D:wind_crest:1` (chunk end-anchor) |
+| `pl110` | 106 | `wind_crest` | `10D` (TIGER STATUE ROOM) | acquire | Take `10D:wind_crest:1` (acquire wind crest; continue to place_wind resource tail) |
+| `pl111` | 107 | `10D->103` | `103` (F PASSAGE) | traverse | Walk `10D->103` into `103` (F PASSAGE) |
+| `pl112` | 108 | `employee_room_enter` | `10E` (EMPLOYEE ROOM) | traverse | Walk `103->10E` into `10E` (EMPLOYEE ROOM) |
+| `pl113` | 109 | `10E:handgun_bullets:1` | `10E` (EMPLOYEE ROOM) | acquire | Take `10E:handgun_bullets:1` |
+| `pl114` | 110 | `10E:shotgun_shells:2` | `10E` (EMPLOYEE ROOM) | acquire | Take `10E:shotgun_shells:2` |
+| `pl115` | 111 | `10E->103` | `103` (F PASSAGE) | traverse | Walk `10E->103` into `103` (F PASSAGE) |
+| `pl116` | 112 | `tea_unlock_103_104` | `104` (TEA ROOM) | traverse | Walk `103->104` into `104` (TEA ROOM) |
+| `pl117` | 113 | `104->105` | `105` (DINING ROOM) | traverse | Walk `104->105` into `105` (DINING ROOM) |
+| `pl118` | 114 | `105->106` | `106` (MAIN HALL) | traverse | Walk `105->106` into `106` (MAIN HALL) |
+| `pl119` | 115 | `dressing_room_enter` | `111` (DRESSING ROOM) | traverse | Walk `106->111` into `111` (DRESSING ROOM) |
+| `pl120` | 116 | `111:shotgun_shells:2` | `111` (DRESSING ROOM) | acquire | Take `111:shotgun_shells:2` |
+| `pl121` | 117 | `111->106` | `106` (MAIN HALL) | traverse | Walk `111->106` into `106` (MAIN HALL) |
+| `pl122` | 118 | `106->107` | `107` (GALLERY) | traverse | Walk `106->107` into `107` (GALLERY) |
+| `pl123` | 119 | `107->108` | `108` (L PASSAGE) | traverse | Walk `107->108` into `108` (L PASSAGE) |
+| `pl124` | 120 | `108->109` | `109` (TRAP PASSAGE) | traverse | Walk `108->109` into `109` (TRAP PASSAGE) |
+| `pl125` | 121 | `109->10A` | `10A` (BACK PASSAGE) | traverse | Walk `109->10A` into `10A` (BACK PASSAGE) |
+| `pl126` | 122 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
+| `pl127` | 123 | `place_wind_crest` | `11A` (ROOFED PASSAGE) | objective | `place_wind_crest` at `wind_crest@11A_crest_slot` — chunk end-anchor |
 
 ## Details
 
@@ -182,7 +199,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl06`–`pl110`)
+### Chunk cells (`pl06`–`pl127`)
 
 ### `pl06` — `106->105` (step 1)
 
@@ -1295,9 +1312,189 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Op:** `acquire`
 - **Pickup:** `10D:wind_crest:1`
 - **Beat:** `wind_crest`
-- **Note:** chunk end-anchor
-- **Objective:** Take `10D:wind_crest:1` (chunk end-anchor)
+- **Note:** acquire wind crest; continue to place_wind resource tail
+- **Objective:** Take `10D:wind_crest:1` (acquire wind crest; continue to place_wind resource tail)
 - **Items gained:** `wind_crest`
-- **How to achieve:** Take `10D:wind_crest:1` (chunk end-anchor).
+- **How to achieve:** Take `10D:wind_crest:1` (acquire wind crest; continue to place_wind resource tail).
 - **Success condition:** Inventory gains `10D:wind_crest:1` while this step is current
+
+### `pl111` — `10D->103` (step 107)
+
+- **Room:** `103` (F PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `10D->103`
+- **Note:** exit tiger room after wind_crest
+- **Objective:** Walk `10D->103` into `103` (F PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10D->103` into `103` (F PASSAGE).
+- **Success condition:** Enter room `103` via `10D->103` (already-there counts after cinema dump). Any other door is `wrong_traverse:10D->103 got <room>` (−4).
+
+### `pl112` — `employee_room_enter` (step 108)
+
+- **Room:** `10E` (EMPLOYEE ROOM)
+- **Op:** `traverse`
+- **Edge:** `103->10E`
+- **Beat:** `employee_room_enter`
+- **Note:** Employee Room / keeper ammo
+- **Objective:** Walk `103->10E` into `10E` (EMPLOYEE ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `103->10E` into `10E` (EMPLOYEE ROOM).
+- **Success condition:** Enter room `10E` via `103->10E` (already-there counts after cinema dump). Any other door is `wrong_traverse:103->10E got <room>` (−4).
+
+### `pl113` — `10E:handgun_bullets:1` (step 109)
+
+- **Room:** `10E` (EMPLOYEE ROOM)
+- **Op:** `acquire`
+- **Pickup:** `10E:handgun_bullets:1`
+- **Objective:** Take `10E:handgun_bullets:1`
+- **Items gained:** `handgun_bullets`
+- **How to achieve:** Take `10E:handgun_bullets:1`.
+- **Success condition:** Inventory gains `10E:handgun_bullets:1` while this step is current
+
+### `pl114` — `10E:shotgun_shells:2` (step 110)
+
+- **Room:** `10E` (EMPLOYEE ROOM)
+- **Op:** `acquire`
+- **Pickup:** `10E:shotgun_shells:2`
+- **Objective:** Take `10E:shotgun_shells:2`
+- **Items gained:** `shotgun_shells`
+- **How to achieve:** Take `10E:shotgun_shells:2`.
+- **Success condition:** Inventory gains `10E:shotgun_shells:2` while this step is current
+
+### `pl115` — `10E->103` (step 111)
+
+- **Room:** `103` (F PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `10E->103`
+- **Objective:** Walk `10E->103` into `103` (F PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10E->103` into `103` (F PASSAGE).
+- **Success condition:** Enter room `103` via `10E->103` (already-there counts after cinema dump). Any other door is `wrong_traverse:10E->103 got <room>` (−4).
+
+### `pl116` — `tea_unlock_103_104` (step 112)
+
+- **Room:** `104` (TEA ROOM)
+- **Op:** `traverse`
+- **Edge:** `103->104`
+- **Beat:** `tea_unlock_103_104`
+- **Note:** first 103->104 after wind; opens tea both ways
+- **Objective:** Walk `103->104` into `104` (TEA ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `103->104` into `104` (TEA ROOM).
+- **Success condition:** Enter room `104` via `103->104` (already-there counts after cinema dump). Any other door is `wrong_traverse:103->104 got <room>` (−4).
+
+### `pl117` — `104->105` (step 113)
+
+- **Room:** `105` (DINING ROOM)
+- **Op:** `traverse`
+- **Edge:** `104->105`
+- **Objective:** Walk `104->105` into `105` (DINING ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `104->105` into `105` (DINING ROOM).
+- **Success condition:** Enter room `105` via `104->105` (already-there counts after cinema dump). Any other door is `wrong_traverse:104->105 got <room>` (−4).
+
+### `pl118` — `105->106` (step 114)
+
+- **Room:** `106` (MAIN HALL)
+- **Op:** `traverse`
+- **Edge:** `105->106`
+- **Objective:** Walk `105->106` into `106` (MAIN HALL)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `105->106` into `106` (MAIN HALL).
+- **Success condition:** Enter room `106` via `105->106` (already-there counts after cinema dump). Any other door is `wrong_traverse:105->106 got <room>` (−4).
+
+### `pl119` — `dressing_room_enter` (step 115)
+
+- **Room:** `111` (DRESSING ROOM)
+- **Op:** `traverse`
+- **Edge:** `106->111`
+- **Beat:** `dressing_room_enter`
+- **Note:** armor_key door; dressing ammo
+- **Objective:** Walk `106->111` into `111` (DRESSING ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `106->111` into `111` (DRESSING ROOM).
+- **Success condition:** Enter room `111` via `106->111` (already-there counts after cinema dump). Any other door is `wrong_traverse:106->111 got <room>` (−4).
+
+### `pl120` — `111:shotgun_shells:2` (step 116)
+
+- **Room:** `111` (DRESSING ROOM)
+- **Op:** `acquire`
+- **Pickup:** `111:shotgun_shells:2`
+- **Objective:** Take `111:shotgun_shells:2`
+- **Items gained:** `shotgun_shells`
+- **How to achieve:** Take `111:shotgun_shells:2`.
+- **Success condition:** Inventory gains `111:shotgun_shells:2` while this step is current
+
+### `pl121` — `111->106` (step 117)
+
+- **Room:** `106` (MAIN HALL)
+- **Op:** `traverse`
+- **Edge:** `111->106`
+- **Objective:** Walk `111->106` into `106` (MAIN HALL)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `111->106` into `106` (MAIN HALL).
+- **Success condition:** Enter room `106` via `111->106` (already-there counts after cinema dump). Any other door is `wrong_traverse:111->106 got <room>` (−4).
+
+### `pl122` — `106->107` (step 118)
+
+- **Room:** `107` (GALLERY)
+- **Op:** `traverse`
+- **Edge:** `106->107`
+- **Note:** art room / gallery circuit toward 11A
+- **Objective:** Walk `106->107` into `107` (GALLERY)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `106->107` into `107` (GALLERY).
+- **Success condition:** Enter room `107` via `106->107` (already-there counts after cinema dump). Any other door is `wrong_traverse:106->107 got <room>` (−4).
+
+### `pl123` — `107->108` (step 119)
+
+- **Room:** `108` (L PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `107->108`
+- **Objective:** Walk `107->108` into `108` (L PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `107->108` into `108` (L PASSAGE).
+- **Success condition:** Enter room `108` via `107->108` (already-there counts after cinema dump). Any other door is `wrong_traverse:107->108 got <room>` (−4).
+
+### `pl124` — `108->109` (step 120)
+
+- **Room:** `109` (TRAP PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `108->109`
+- **Objective:** Walk `108->109` into `109` (TRAP PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `108->109` into `109` (TRAP PASSAGE).
+- **Success condition:** Enter room `109` via `108->109` (already-there counts after cinema dump). Any other door is `wrong_traverse:108->109 got <room>` (−4).
+
+### `pl125` — `109->10A` (step 121)
+
+- **Room:** `10A` (BACK PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `109->10A`
+- **Objective:** Walk `109->10A` into `10A` (BACK PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `109->10A` into `10A` (BACK PASSAGE).
+- **Success condition:** Enter room `10A` via `109->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:109->10A got <room>` (−4).
+
+### `pl126` — `10A->11A` (step 122)
+
+- **Room:** `11A` (ROOFED PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `10A->11A`
+- **Objective:** Walk `10A->11A` into `11A` (ROOFED PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10A->11A` into `11A` (ROOFED PASSAGE).
+- **Success condition:** Enter room `11A` via `10A->11A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->11A got <room>` (−4).
+
+### `pl127` — `place_wind_crest` (step 123)
+
+- **Room:** `11A` (ROOFED PASSAGE)
+- **Op:** `objective`
+- **Site:** `wind_crest@11A_crest_slot`
+- **Beat:** `place_wind_crest`
+- **Note:** chunk end-anchor
+- **Objective:** `place_wind_crest` at `wind_crest@11A_crest_slot` — chunk end-anchor
+- **Items gained:** _(none)_
+- **How to achieve:** `place_wind_crest` at `wind_crest@11A_crest_slot` — chunk end-anchor.
+- **Success condition:** `story_use_success` == `wind_crest@11A_crest_slot` in room `11A`
 

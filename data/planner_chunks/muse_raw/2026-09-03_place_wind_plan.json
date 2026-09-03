@@ -1,0 +1,208 @@
+{
+  "why_prev_rejected": "short \u2014 skipped 10E/111/112 first-floor loot",
+  "resource_plan": "loot 10E handgun+shotgun, then first floor 103->104->105->106, side 106->111->112 for dressing/wardrobe ammo, then art circuit 106->107->108->109->10A->11A to place wind. Prioritise shotgun kit and handgun top-up; HP 36 is covered by box herbs, so ammo first. Operator note: skip 112 entirely unless acquiring 112:green_herb; this plan keeps box herbs and omits wardrobe.",
+  "why_103_104_now": "operator unlocked first 103->104 after wind, allowing tea room entry for resource walk before crest placement",
+  "kit_plan": "beretta + 13 handgun bullets already; acquire shotgun shells from 10E and 111 to make shotgun a kit, add handgun bullets from 10E. Free slots limited to 3, so take 10E handgun, 10E shotgun, 111 shotgun. Box retains 2 green herbs for HP caution.",
+  "next_chunk": {
+    "why": "resource-first walk from 10D to 11A via 10E, 103->104 first floor, 111/112 side ammo, art room circuit, ending on place_wind_crest",
+    "end_anchor_beat_id": "place_wind_crest",
+    "steps": [
+      {
+        "beat_id": null,
+        "edge_id": "10D->103",
+        "id": "s1",
+        "n": 1,
+        "note": "back to F passage",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "103->10E",
+        "id": "s2",
+        "n": 2,
+        "note": "enter employee room with lockpick",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": null,
+        "id": "s3",
+        "n": 3,
+        "note": "10E handgun bullets",
+        "op": "acquire",
+        "pickup_id": "10E:handgun_bullets:1",
+        "room_id": "10E",
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": null,
+        "id": "s4",
+        "n": 4,
+        "note": "10E shotgun shells",
+        "op": "acquire",
+        "pickup_id": "10E:shotgun_shells:2",
+        "room_id": "10E",
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "10E->103",
+        "id": "s5",
+        "n": 5,
+        "note": "return to F passage",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "103->104",
+        "id": "s6",
+        "n": 6,
+        "note": "operator unlocked 103->104",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "104->105",
+        "id": "s7",
+        "n": 7,
+        "note": "tea to dining",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "105->106",
+        "id": "s8",
+        "n": 8,
+        "note": "dining to main hall",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "106->111",
+        "id": "s9",
+        "n": 9,
+        "note": "main hall to dressing room with armor_key",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": null,
+        "id": "s10",
+        "n": 10,
+        "note": "111 shotgun shells locked desk",
+        "op": "acquire",
+        "pickup_id": "111:shotgun_shells:2",
+        "room_id": "111",
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "111->106",
+        "id": "s11",
+        "n": 11,
+        "note": "back to main hall",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "106->107",
+        "id": "s12",
+        "n": 12,
+        "note": "main hall to gallery",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "107->108",
+        "id": "s13",
+        "n": 13,
+        "note": "gallery to L passage with lockpick",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "108->109",
+        "id": "s14",
+        "n": 14,
+        "note": "L passage to trap passage",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "109->10A",
+        "id": "s15",
+        "n": 15,
+        "note": "trap passage to back passage",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": null,
+        "edge_id": "10A->11A",
+        "id": "s16",
+        "n": 16,
+        "note": "back passage to roofed passage",
+        "op": "traverse",
+        "pickup_id": null,
+        "room_id": null,
+        "site_id": null
+      },
+      {
+        "beat_id": "place_wind_crest",
+        "edge_id": null,
+        "id": "s17",
+        "n": 17,
+        "note": "place wind crest at 11A",
+        "op": "objective",
+        "pickup_id": null,
+        "room_id": "11A",
+        "site_id": "wind_crest@11A_crest_slot"
+      }
+    ]
+  },
+  "beat_order": [
+    "place_wind_crest",
+    "attic_enter",
+    "yawn_intro",
+    "yawn_1",
+    "moon_crest",
+    "place_moon_crest"
+  ],
+  "operator_edit": "removed pointless 111->112->111 (no herb acquire)"
+}

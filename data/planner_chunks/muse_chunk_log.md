@@ -52,3 +52,35 @@ Append one section per Muse `next_chunk`. Live queue is `cp05_shield_key.json` (
 | 24 | acquire | 118:chemical:1 | 10 |
 
 Muse remaining beat_order after this: gallery portraits → star_crest → greenhouse_pump → armor_key → … → four crests at 11A.
+
+## 2026-09-03 — place_wind_crest (pl110)
+
+- **Tip:** pl110, room 10D, wind_crest held, HP 36 Caution. cp05 end-anchor wind_crest complete (chunk_final).
+- **Model:** muse-glimmer (resource-first pass2; operator rejected 2F skip)
+- **End anchor:** `place_wind_crest`
+- **Why:** Loot 10E + unlock tea 103->104 + first-floor 111 shells + art circuit to 11A before attic/Yawn.
+- **Raw:** `muse_raw/2026-09-03_place_wind.json`
+- **Pinned as:** `cp05_shield_key.json` steps 107–123
+- **Operator edits:** stripped pointless 111->112->111 (no herb acquire); box herbs cover HP.
+
+| n | op | what |
+|---|---|---|
+| 107 | traverse | 10D→103 |
+| 108 | traverse | 103→10E |
+| 109 | acquire | 10E:handgun_bullets:1 |
+| 110 | acquire | 10E:shotgun_shells:2 |
+| 111 | traverse | 10E→103 |
+| 112 | traverse | 103→104 (tea unlock) |
+| 113 | traverse | 104→105 |
+| 114 | traverse | 105→106 |
+| 115 | traverse | 106→111 |
+| 116 | acquire | 111:shotgun_shells:2 |
+| 117 | traverse | 111→106 |
+| 118 | traverse | 106→107 |
+| 119 | traverse | 107→108 |
+| 120 | traverse | 108→109 |
+| 121 | traverse | 109→10A |
+| 122 | traverse | 10A→11A |
+| 123 | objective | wind_crest@11A_crest_slot (place_wind_crest) |
+
+Muse beat_order after this: attic_enter → yawn_intro → yawn_1 → moon_crest → place_moon_crest.
