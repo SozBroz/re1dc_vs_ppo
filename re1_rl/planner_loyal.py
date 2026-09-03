@@ -666,7 +666,12 @@ class PlannerLoyalQueue:
             unexpected -= _already_held_weapon_names(prev_state, self._start_held)
             unexpected -= _combine_explained_gains(prev_state, state)
             unexpected -= unexpected & _event_grant_names(room)
-            unexpected -= self._completed_acquire_names(room)
+            # Leftover cinema after a minted acquire (key/weapon) is not a
+            # pickup. Stackable floor piles (herbs/ammo) are never exempt —
+            # each scripted acquire is one pile; extras divert.
+            unexpected -= (
+                self._completed_acquire_names(room) - _ON_PATH_PILE_ITEMS
+            )
             if op != "acquire":
                 if unexpected:
                     result["divert"] = True

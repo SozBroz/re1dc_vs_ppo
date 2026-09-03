@@ -104,7 +104,7 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert any(s.get("beat_id") == "dining_2f_enter" for s in steps)
     assert any(s.get("beat_id") == "push_statue_2f" for s in steps)
     statue_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "push_statue_2f")
-    assert steps[statue_i]["n"] == 91
+    assert steps[statue_i]["n"] == 93
     assert steps[statue_i]["site_id"] == "dining_statue_knocked"
     assert steps[statue_i + 1]["edge_id"] == "202->203"
     assert steps[statue_i + 4]["pickup_id"] == "105:blue_jewel:1"
@@ -113,7 +113,7 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[statue_i + 11]["edge_id"] == "103->10D"
     assert steps[statue_i + 12]["site_id"] == "blue_jewel@10D_tiger_eye"
     assert steps[-1]["beat_id"] == "wind_crest"
-    assert steps[-1]["n"] == 104
+    assert steps[-1]["n"] == 106
     assert steps[-1]["pickup_id"] == "10D:wind_crest:1"
     assert chunk["end_anchor_beat_id"] == "wind_crest"
     assert not any(s.get("edge_id") == "105->104" for s in steps[statue_i:])
@@ -150,9 +150,18 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[crest_i + 2]["edge_id"] == "10A->11A"
     assert steps[crest_i + 3]["site_id"] == "star_crest@11A_crest_slot"
     pump_i = next(i for i, s in enumerate(steps) if s.get("site_id") == "chemical@10C_greenhouse_pump")
-    herb_i = next(i for i, s in enumerate(steps) if s.get("pickup_id") == "10C:green_herb:2")
     armor_i = next(i for i, s in enumerate(steps) if str(s.get("pickup_id") or "").startswith("10C:armor_key"))
-    assert pump_i < herb_i < armor_i
+    herb_ids = [
+        s.get("pickup_id")
+        for s in steps[armor_i + 1 : armor_i + 5]
+    ]
+    assert herb_ids == [
+        "10C:red_herb:3a",
+        "10C:green_herb:2a",
+        "10C:red_herb:3b",
+        "10C:green_herb:2b",
+    ]
+    assert pump_i < armor_i
     assert steps[pump_i - 1]["edge_id"] == "103->10C"
     assert any(s.get("edge_id") == "106->107" for s in steps)
     assert "108:handgun_bullets:1" in pickups
@@ -1688,6 +1697,65 @@ def test_richard_floor_herb_diverts_on_cutscene_leg():
     result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["divert"] is True
     assert "green_herb" in str(result["divert_reason"])
+
+
+def test_10c_third_green_herb_diverts_after_two_scripted():
+    """Bench allows exactly 2 greens; a 3rd same-name pile is stuff / divert."""
+    q = PlannerLoyalQueue()
+    green_b = next(
+        i for i, s in enumerate(q._steps) if s.get("pickup_id") == "10C:green_herb:2b"
+    )
+    q.seek(green_b + 1)  # past both greens; current is 10C->103
+    assert q.current.get("edge_id") == "10C->103"
+    prev = {
+        "room_id": "10C",
+        "inventory_slots": [
+            ("beretta", 15),
+            ("shotgun", 0),
+            ("armor_key", 1),
+            ("red_herb", 1),
+            ("green_herb", 1),
+            ("red_herb", 1),
+            ("green_herb", 1),
+            ("", 0),
+        ],
+    }
+    cur = {
+        "room_id": "10C",
+        "inventory_slots": [
+            ("beretta", 15),
+            ("shotgun", 0),
+            ("armor_key", 1),
+            ("red_herb", 1),
+            ("green_herb", 1),
+            ("red_herb", 1),
+            ("green_herb", 1),
+            ("green_herb", 1),
+        ],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is True
+    assert "green_herb" in str(result["divert_reason"])
+
+
+def test_10c_rgrg_order_completes_each_pile():
+    q = PlannerLoyalQueue()
+    armor_i = next(
+        i
+        for i, s in enumerate(q._steps)
+        if str(s.get("pickup_id") or "").startswith("10C:armor_key")
+    )
+    q.seek(armor_i + 1)
+    held = [("beretta", 15), ("shotgun", 0), ("armor_key", 1)]
+    for want in ("red_herb", "green_herb", "red_herb", "green_herb"):
+        assert q.current.get("op") == "acquire"
+        prev = {"room_id": "10C", "inventory_slots": list(held) + [("", 0)] * (8 - len(held))}
+        held = held + [(want, 1)]
+        cur = {"room_id": "10C", "inventory_slots": list(held) + [("", 0)] * (8 - len(held))}
+        result = q.evaluate_transition(prev_state=prev, state=cur)
+        assert result["step_success"] is True, (want, result)
+        assert result["divert"] is False
+    assert q.current.get("edge_id") == "10C->103"
 
 
 def test_second_green_herb_diverts_when_already_holding_one():
