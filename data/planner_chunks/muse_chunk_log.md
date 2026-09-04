@@ -58,10 +58,10 @@ Muse remaining beat_order after this: gallery portraits → star_crest → green
 - **Tip:** pl110, room 10D, wind_crest held, HP 36 Caution. cp05 end-anchor wind_crest complete (chunk_final).
 - **Model:** muse-glimmer (resource-first pass2; operator rejected 2F skip)
 - **End anchor:** `place_wind_crest`
-- **Why:** Loot 10E + unlock tea 103->104 + first-floor 111 shells + art circuit to 11A before attic/Yawn.
+- **Why:** Loot 10E + unlock tea 103->104 + first-floor 111 shelf clip + desk shells + art circuit to 11A before attic/Yawn.
 - **Raw:** `muse_raw/2026-09-03_place_wind.json`
-- **Pinned as:** `cp05_shield_key.json` steps 107–123
-- **Operator edits:** stripped pointless 111->112->111 (no herb acquire); box herbs cover HP.
+- **Pinned as:** `cp05_shield_key.json` steps 107–124
+- **Operator edits:** stripped pointless 111->112->111 (no herb acquire); box herbs cover HP. 2026-09-04: also acquire `111:handgun_bullets:1` (shelf) before desk shells.
 
 | n | op | what |
 |---|---|---|
@@ -74,13 +74,14 @@ Muse remaining beat_order after this: gallery portraits → star_crest → green
 | 113 | traverse | 104→105 |
 | 114 | traverse | 105→106 |
 | 115 | traverse | 106→111 |
-| 116 | acquire | 111:shotgun_shells:2 |
-| 117 | traverse | 111→106 |
-| 118 | traverse | 106→107 |
-| 119 | traverse | 107→108 |
-| 120 | traverse | 108→109 |
-| 121 | traverse | 109→10A |
-| 122 | traverse | 10A→11A |
-| 123 | objective | wind_crest@11A_crest_slot (place_wind_crest) |
+| 116 | acquire | 111:handgun_bullets:1 |
+| 117 | acquire | 111:shotgun_shells:2 |
+| 118 | traverse | 111→106 |
+| 119 | traverse | 106→107 |
+| 120 | traverse | 107→108 |
+| 121 | traverse | 108→109 |
+| 122 | traverse | 109→10A |
+| 123 | traverse | 10A→11A |
+| 124 | objective | wind_crest@11A_crest_slot (place_wind_crest) |
 
 Muse beat_order after this: attic_enter → yawn_intro → yawn_1 → moon_crest → place_moon_crest.

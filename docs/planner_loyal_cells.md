@@ -1,6 +1,6 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (123 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (124 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **Source of truth:** the live chunk JSON. Seed cells `pl00`–`pl05` are the opening crystals (same beats as yawn `cp00`–`cp05`); they are **not** minted from this chunk.
 
@@ -11,7 +11,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl05`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - Tea-room lock: `104->103` stays locked until `103->104` is done once (this chunk never opens it). `103->10C` / `103->10D` are open. Do not walk `116->106` after the shotgun. Vacant `102` clip+shells are taken on the armor-key return; skip re-loot.
-- Chunk end-anchor: `place_wind_crest` (`pl127`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `place_wind_crest` (`pl128`). Mid-chunk success keeps the episode open.
 
 ## Summary table
 
@@ -138,14 +138,15 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 | `pl117` | 113 | `104->105` | `105` (DINING ROOM) | traverse | Walk `104->105` into `105` (DINING ROOM) |
 | `pl118` | 114 | `105->106` | `106` (MAIN HALL) | traverse | Walk `105->106` into `106` (MAIN HALL) |
 | `pl119` | 115 | `dressing_room_enter` | `111` (DRESSING ROOM) | traverse | Walk `106->111` into `111` (DRESSING ROOM) |
-| `pl120` | 116 | `111:shotgun_shells:2` | `111` (DRESSING ROOM) | acquire | Take `111:shotgun_shells:2` |
-| `pl121` | 117 | `111->106` | `106` (MAIN HALL) | traverse | Walk `111->106` into `106` (MAIN HALL) |
-| `pl122` | 118 | `106->107` | `107` (GALLERY) | traverse | Walk `106->107` into `107` (GALLERY) |
-| `pl123` | 119 | `107->108` | `108` (L PASSAGE) | traverse | Walk `107->108` into `108` (L PASSAGE) |
-| `pl124` | 120 | `108->109` | `109` (TRAP PASSAGE) | traverse | Walk `108->109` into `109` (TRAP PASSAGE) |
-| `pl125` | 121 | `109->10A` | `10A` (BACK PASSAGE) | traverse | Walk `109->10A` into `10A` (BACK PASSAGE) |
-| `pl126` | 122 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
-| `pl127` | 123 | `place_wind_crest` | `11A` (ROOFED PASSAGE) | objective | `place_wind_crest` at `wind_crest@11A_crest_slot` — chunk end-anchor |
+| `pl120` | 116 | `111:handgun_bullets:1` | `111` (DRESSING ROOM) | acquire | Take `111:handgun_bullets:1` (shelf clip) |
+| `pl121` | 117 | `111:shotgun_shells:2` | `111` (DRESSING ROOM) | acquire | Take `111:shotgun_shells:2` (locked desk; one shell clip) |
+| `pl122` | 118 | `111->106` | `106` (MAIN HALL) | traverse | Walk `111->106` into `106` (MAIN HALL) |
+| `pl123` | 119 | `106->107` | `107` (GALLERY) | traverse | Walk `106->107` into `107` (GALLERY) |
+| `pl124` | 120 | `107->108` | `108` (L PASSAGE) | traverse | Walk `107->108` into `108` (L PASSAGE) |
+| `pl125` | 121 | `108->109` | `109` (TRAP PASSAGE) | traverse | Walk `108->109` into `109` (TRAP PASSAGE) |
+| `pl126` | 122 | `109->10A` | `10A` (BACK PASSAGE) | traverse | Walk `109->10A` into `10A` (BACK PASSAGE) |
+| `pl127` | 123 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
+| `pl128` | 124 | `place_wind_crest` | `11A` (ROOFED PASSAGE) | objective | `place_wind_crest` at `wind_crest@11A_crest_slot` — chunk end-anchor |
 
 ## Details
 
@@ -199,7 +200,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl06`–`pl127`)
+### Chunk cells (`pl06`–`pl128`)
 
 ### `pl06` — `106->105` (step 1)
 
@@ -1409,23 +1410,35 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **Op:** `traverse`
 - **Edge:** `106->111`
 - **Beat:** `dressing_room_enter`
-- **Note:** armor_key door; dressing ammo
+- **Note:** armor_key door; dressing ammo (shelf clip + desk shells)
 - **Objective:** Walk `106->111` into `111` (DRESSING ROOM)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `106->111` into `111` (DRESSING ROOM).
 - **Success condition:** Enter room `111` via `106->111` (already-there counts after cinema dump). Any other door is `wrong_traverse:106->111 got <room>` (−4).
 
-### `pl120` — `111:shotgun_shells:2` (step 116)
+### `pl120` — `111:handgun_bullets:1` (step 116)
+
+- **Room:** `111` (DRESSING ROOM)
+- **Op:** `acquire`
+- **Pickup:** `111:handgun_bullets:1`
+- **Note:** shelf clip
+- **Objective:** Take `111:handgun_bullets:1` (shelf clip)
+- **Items gained:** `handgun_bullets`
+- **How to achieve:** Take `111:handgun_bullets:1` (shelf clip).
+- **Success condition:** Inventory gains `111:handgun_bullets:1` while this step is current
+
+### `pl121` — `111:shotgun_shells:2` (step 117)
 
 - **Room:** `111` (DRESSING ROOM)
 - **Op:** `acquire`
 - **Pickup:** `111:shotgun_shells:2`
-- **Objective:** Take `111:shotgun_shells:2`
+- **Note:** locked desk; one shell clip
+- **Objective:** Take `111:shotgun_shells:2` (locked desk; one shell clip)
 - **Items gained:** `shotgun_shells`
-- **How to achieve:** Take `111:shotgun_shells:2`.
+- **How to achieve:** Take `111:shotgun_shells:2` (locked desk; one shell clip).
 - **Success condition:** Inventory gains `111:shotgun_shells:2` while this step is current
 
-### `pl121` — `111->106` (step 117)
+### `pl122` — `111->106` (step 118)
 
 - **Room:** `106` (MAIN HALL)
 - **Op:** `traverse`
@@ -1435,7 +1448,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `111->106` into `106` (MAIN HALL).
 - **Success condition:** Enter room `106` via `111->106` (already-there counts after cinema dump). Any other door is `wrong_traverse:111->106 got <room>` (−4).
 
-### `pl122` — `106->107` (step 118)
+### `pl123` — `106->107` (step 119)
 
 - **Room:** `107` (GALLERY)
 - **Op:** `traverse`
@@ -1446,7 +1459,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `106->107` into `107` (GALLERY).
 - **Success condition:** Enter room `107` via `106->107` (already-there counts after cinema dump). Any other door is `wrong_traverse:106->107 got <room>` (−4).
 
-### `pl123` — `107->108` (step 119)
+### `pl124` — `107->108` (step 120)
 
 - **Room:** `108` (L PASSAGE)
 - **Op:** `traverse`
@@ -1456,7 +1469,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `107->108` into `108` (L PASSAGE).
 - **Success condition:** Enter room `108` via `107->108` (already-there counts after cinema dump). Any other door is `wrong_traverse:107->108 got <room>` (−4).
 
-### `pl124` — `108->109` (step 120)
+### `pl125` — `108->109` (step 121)
 
 - **Room:** `109` (TRAP PASSAGE)
 - **Op:** `traverse`
@@ -1466,7 +1479,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `108->109` into `109` (TRAP PASSAGE).
 - **Success condition:** Enter room `109` via `108->109` (already-there counts after cinema dump). Any other door is `wrong_traverse:108->109 got <room>` (−4).
 
-### `pl125` — `109->10A` (step 121)
+### `pl126` — `109->10A` (step 122)
 
 - **Room:** `10A` (BACK PASSAGE)
 - **Op:** `traverse`
@@ -1476,7 +1489,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `109->10A` into `10A` (BACK PASSAGE).
 - **Success condition:** Enter room `10A` via `109->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:109->10A got <room>` (−4).
 
-### `pl126` — `10A->11A` (step 122)
+### `pl127` — `10A->11A` (step 123)
 
 - **Room:** `11A` (ROOFED PASSAGE)
 - **Op:** `traverse`
@@ -1486,7 +1499,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - **How to achieve:** Walk `10A->11A` into `11A` (ROOFED PASSAGE).
 - **Success condition:** Enter room `11A` via `10A->11A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->11A got <room>` (−4).
 
-### `pl127` — `place_wind_crest` (step 123)
+### `pl128` — `place_wind_crest` (step 124)
 
 - **Room:** `11A` (ROOFED PASSAGE)
 - **Op:** `objective`

@@ -429,7 +429,7 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": false,
-        "notes": "on shelf"
+        "notes": "on shelf; one handgun clip"
       },
       {
         "name": "shotgun_shells",
@@ -437,7 +437,7 @@
         "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "locked desk",
+        "notes": "locked desk; one shell clip",
         "gate": {
           "type": "item",
           "requires": [
@@ -729,14 +729,6 @@
         "key_item": true,
         "in_inventory_table": true,
         "notes": "on shelf"
-      },
-      {
-        "name": "shotgun_shells",
-        "item_id": 12,
-        "count": 1,
-        "key_item": false,
-        "in_inventory_table": true,
-        "notes": "optional"
       }
     ]
   },

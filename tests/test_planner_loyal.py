@@ -114,9 +114,10 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[statue_i + 12]["site_id"] == "blue_jewel@10D_tiger_eye"
     assert steps[statue_i + 13]["pickup_id"] == "10D:wind_crest:1"
     assert steps[statue_i + 13]["beat_id"] == "wind_crest"
-    # Resource-first place_wind tail (pl110 Muse): 10E loot, 103->104 unlock, 111 shells, art→11A.
+    # Resource-first place_wind tail (pl110 Muse): 10E loot, 103->104 unlock,
+    # 111 shelf clip + desk shells, art→11A.
     assert steps[-1]["beat_id"] == "place_wind_crest"
-    assert steps[-1]["n"] == 123
+    assert steps[-1]["n"] == 124
     assert steps[-1]["site_id"] == "wind_crest@11A_crest_slot"
     assert chunk["end_anchor_beat_id"] == "place_wind_crest"
     wind_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "wind_crest")
@@ -127,6 +128,7 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[wind_i + 4]["pickup_id"] == "10E:shotgun_shells:2"
     assert not any(s.get("edge_id") == "103->104" for s in steps[: wind_i + 1])
     assert any(s.get("edge_id") == "103->104" for s in steps[wind_i + 1 :])
+    assert any(s.get("pickup_id") == "111:handgun_bullets:1" for s in steps[wind_i:])
     assert any(s.get("pickup_id") == "111:shotgun_shells:2" for s in steps[wind_i:])
     assert not any(s.get("edge_id") == "111->112" for s in steps)  # skip wardrobe without herb
     assert not any(s.get("edge_id") == "105->104" for s in steps[statue_i:wind_i + 1])
@@ -248,6 +250,36 @@ def test_combine_reload_does_not_divert_on_traverse():
     assert result["divert"] is False
     assert result["step_success"] is False
     assert q.current["edge_id"] == "106->105"
+
+
+def test_combine_reload_full_ammo_dump_packed_does_not_divert():
+    """Emptying the reserve stack into the chamber must not look like a pickup.
+
+    Live COMBINE often packs the emptied ammo hole left; qty-only chamber
+    bumps are also covered by the already-held weapon exemption.
+    """
+    q = PlannerLoyalQueue()
+    prev = {
+        "room_id": "106",
+        "inventory_slots": [
+            ("beretta", 0),
+            ("handgun_bullets", 15),
+            ("knife", 0),
+            ("ink_ribbon", 1),
+        ],
+    }
+    cur = {
+        "room_id": "106",
+        "inventory_slots": [
+            ("beretta", 15),
+            ("knife", 0),
+            ("ink_ribbon", 1),
+        ],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result.get("divert_reason") is None
+    assert result["step_success"] is False
 
 
 def test_combine_herb_mix_does_not_divert_on_traverse():
@@ -1575,7 +1607,7 @@ def test_pl18_seek_lands_on_chemical_tail():
     assert by_beat["sun_crest"]["pickup_id"] == "205:sun_crest:1"
     assert by_beat["push_statue_2f"]["n"] == 93
     assert by_beat["wind_crest"]["n"] == 106
-    assert by_beat["place_wind_crest"]["n"] == 123
+    assert by_beat["place_wind_crest"]["n"] == 124
     assert q._steps[-1]["beat_id"] == "place_wind_crest"
 
 
