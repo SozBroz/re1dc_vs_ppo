@@ -42,7 +42,14 @@ DEFAULT_EMUHAWK_HUNG_S = 30.0
 
 
 def _pid_not_responding(pid: int | None) -> bool:
-    """True when a Windows process has a visible hung window (Not Responding)."""
+    """True when a Windows process has a visible hung window (Not Responding).
+
+    C-RE1 lockstep blocks the SDL/main thread on pad WaitForSingleObject between
+    STEPs, so IsHungAppWindow false-triggers and the watchdog death-spirals
+    visible workers. Skip the check on the recomp bridge.
+    """
+    if os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower() == "recomp":
+        return False
     if os.name != "nt" or not pid:
         return False
     try:
