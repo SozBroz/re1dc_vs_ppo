@@ -8,6 +8,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.memory_map import (
+    CUTSCENE_TURBO_RESTORE,
+    CUTSCENE_TURBO_VALUE,
     GAME_MODE,
     IN_CONTROL_MASK,
     MESSAGE_FLAG,
@@ -463,6 +465,17 @@ def test_install_engine_patches() -> None:
     assert not bridge.cleared_patches
     assert bridge.patches_always
     assert bridge.patches_turbo is not None
+    assert bridge.patches_turbo["on_value"] == CUTSCENE_TURBO_VALUE
+    assert bridge.patches_turbo["off_value"] == CUTSCENE_TURBO_RESTORE
+
+
+def test_install_engine_patches_cutscene_turbo_off() -> None:
+    bridge = FakeBridge()
+    RamSkipper(bridge, cutscene_turbo=False).install_engine_patches()
+    assert bridge.patches_always
+    assert bridge.patches_turbo is not None
+    assert bridge.patches_turbo["on_value"] == CUTSCENE_TURBO_RESTORE
+    assert bridge.patches_turbo["off_value"] == CUTSCENE_TURBO_RESTORE
 
 
 def test_clear_engine_patches() -> None:

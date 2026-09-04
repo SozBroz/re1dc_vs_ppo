@@ -403,6 +403,12 @@ class RE1Env(gym.Env):
             self.bridge,
             use_engine_patches=True,
             cutscene_speed=6400,
+            # C-RE1: keep door-skip, never NOP the cinema VBlank wait.
+            # Savestates can carry 0x2400; apply_patches still writes 0x0044.
+            cutscene_turbo=(
+                os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower()
+                != "recomp"
+            ),
         )
         self._items = ItemTracker(todo=[])
         self._box_cache: list[tuple[int, int]] | None = None

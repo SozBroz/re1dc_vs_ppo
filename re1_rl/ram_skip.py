@@ -194,6 +194,7 @@ class RamSkipper:
         skip_chunk: int = DEFAULT_SKIP_CHUNK,
         use_engine_patches: bool = True,
         invisible_during_skip: bool = True,
+        cutscene_turbo: bool = True,
     ) -> None:
         self.bridge = bridge
         self.training_speed = int(training_speed)
@@ -201,6 +202,9 @@ class RamSkipper:
         self.skip_chunk = int(skip_chunk)
         self.use_engine_patches = bool(use_engine_patches)
         self.invisible_during_skip = bool(invisible_during_skip)
+        # False: still register the turbo slot so apply_patches writes the
+        # original halfword (clears turbo baked into a loadstate).
+        self.cutscene_turbo = bool(cutscene_turbo)
         # Mid-skip peaks from Lua fast_forward (Kenneth 0x84, dialogue msg, …).
         self.last_skip_peak_scene_flag: int | None = None
         self.last_skip_peak_msg_flag: int | None = None
@@ -229,12 +233,15 @@ class RamSkipper:
                 self.last_skip_peak_msg_flag = pm
 
     def install_engine_patches(self) -> None:
-        """Door-skip + in-engine cutscene turbo (re-applied every frame by Lua)."""
+        """Door-skip + optional cutscene turbo (re-applied every frame)."""
+        turbo_on = (
+            CUTSCENE_TURBO_VALUE if self.cutscene_turbo else CUTSCENE_TURBO_RESTORE
+        )
         self.bridge.set_patches(
             [(DOOR_SKIP_PATCH_ADDR, "u16", DOOR_SKIP_PATCH_VALUE)],
             {
                 "addr": CUTSCENE_TURBO_ADDR,
-                "on_value": CUTSCENE_TURBO_VALUE,
+                "on_value": turbo_on,
                 "off_value": CUTSCENE_TURBO_RESTORE,
                 "mode_addr": GAME_MODE,
                 "mask": IN_CONTROL_MASK,
