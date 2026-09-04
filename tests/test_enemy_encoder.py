@@ -101,17 +101,24 @@ def test_proprio_player_world_velocity():
 
 
 def test_enemy_table_fields_mapped() -> None:
-    """HP/x/z/active at slot offsets -> decode with in-room + combat flags."""
+    """WORK-base HP/x/z/occupied -> decode with in-room + combat flags."""
     fields = enemy_table_fields()
-    assert len(fields) == 16 * len({"hp", "type_id", "x", "z", "active_byte"})
+    assert len(fields) == 16 * len(
+        {"occupied", "header", "hp", "type_id", "x", "z", "active_byte"}
+    )
+    from re1_rl.memory_map import ENEMY_WORK_BASE
+
+    assert any(addr == ENEMY_WORK_BASE for _, addr, _ in fields)
     ram = {
         "player_x": 7000,
         "player_z": 15000,
+        "enemy0_occupied": 33,
         "enemy0_hp": 46,
         "enemy0_type_id": 1,
         "enemy0_x": 3150,
         "enemy0_z": 13400,
         "enemy0_active_byte": 0,
+        "enemy1_occupied": 33,
         "enemy1_hp": 54,
         "enemy1_type_id": 2,
         # Pool park (~30000) stays outside ENEMY_POOL_COORD_ABS_MAX (29000).
@@ -122,6 +129,7 @@ def test_enemy_table_fields_mapped() -> None:
     for i in range(6):
         if i not in (0, 1):
             ram[f"enemy{i}_hp"] = 0
+            ram[f"enemy{i}_occupied"] = 0
     decoded = decode_enemy_table(ram)
     assert len(decoded) == 2
     by_slot = {int(e["slot"]): e for e in decoded}
@@ -135,6 +143,28 @@ def test_enemy_table_fields_mapped() -> None:
     assert by_slot[1]["combat_near"] == 0
     assert by_slot[1]["knife_near"] == 0
     assert by_slot[1]["alive"] == 0
+
+
+def test_unoccupied_slot_not_combat_near() -> None:
+    """WORK occupied==0 kills stale HP ghosts (tiger-room phantom)."""
+    ram = {
+        "player_x": 4012,
+        "player_z": 5386,
+        "enemy0_occupied": 0,
+        "enemy0_hp": 23,
+        "enemy0_type_id": 0x0F,
+        "enemy0_x": 2924,
+        "enemy0_z": 16999,
+        "enemy0_active_byte": 0,
+    }
+    for i in range(1, 6):
+        ram[f"enemy{i}_hp"] = 0
+        ram[f"enemy{i}_occupied"] = 0
+    decoded = decode_enemy_table(ram)
+    assert len(decoded) == 1
+    assert decoded[0]["alive"] == 0
+    assert decoded[0]["combat_near"] == 0
+    assert combat_enemy_count(decoded) == 0
 
 
 def test_knife_near_tighter_than_gun_band() -> None:

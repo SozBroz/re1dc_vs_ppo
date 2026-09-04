@@ -271,20 +271,22 @@ CUTSCENE_TURBO_RESTORE = 0x0044
 MESSAGE_FLAG = 0x800C8665
 MESSAGE_FLAG_MASK = 0x80
 
-# --- Enemy table [CONFIRMED 2026-07-12 live fire hunt] ---
-# Gameshark "First Zombie Has Infinite Health" / "Zombie Health (House)" use
-# 0x800C532C. Live beretta fire on QuickSave1 (room 202): u16 there drops by
-# ~12 per hit; second living enemy at +0x18C tracks the same. MediaKite ASL
-# heap map 0x801141FC was WRONG (never changed on hits) — combat rewards were
-# silent because decode_enemy_table read garbage there.
-ENEMY_TABLE_BASE: int | None = 0x800C532C
+# --- Enemy WORK table (07b / 08h / 08aa — default as of C-RE1 cutover) ---
+# Entity WORK starts at 0x800C52A4 (func_8005C70C). HP is WORK+0x88 =
+# 0x800C532C (the old "ENEMY_TABLE_BASE" Gameshark address). World X/Z are
+# s32 at WORK+0x34/+0x3C — the old HP-relative s16s at +0xDE/+0xE0 are NOT
+# pose (stale park / hunt leftovers). Occupied@WORK+0==0 means the slot is
+# not in the update loop → not alive (kills tiger-room phantom fire).
+ENEMY_WORK_BASE = 0x800C52A4
+ENEMY_HP_BASE = 0x800C532C  # WORK+0x88; kept for docs / GS cross-ref
+ENEMY_TABLE_BASE: int | None = ENEMY_WORK_BASE
 ENEMY_SLOT_STRIDE = 0x18C  # confirmed: GS first zombie + second slot
 ENEMY_TABLE_SLOTS = 6
 # Yawn's body is ~14 collision parts in extra table rows (hp@0 often 0xFFFF).
 # RAM-read width; decode still uses 6 slots outside room 210.
 ENEMY_TABLE_SCAN_SLOTS = 16
-# Per-slot HP at struct base (ASL / GS). Cap rejects empty-slot garbage
-# (0xFFFF) and keeps Yawn (~3050 on spawn cinema QS5 / 210) visible.
+# Per-slot HP. Cap rejects empty-slot garbage (0xFFFF) and keeps Yawn
+# (~3050 on spawn cinema QS5 / 210) visible.
 ENEMY_HP_MAX_PLAUSIBLE = 4000
 # Off-map pool slots park near ~(30000, 30000); courtyard Cerberus live near
 # ~27000 (hub-door classify 300/304). Cap sits between those and the park.
@@ -295,15 +297,19 @@ ENEMY_POOL_COORD_ABS_MAX = 29000
 # (~700–1500) so mid-room melee stays legal.
 ENEMY_COMBAT_NEAR_DIST = 20000
 ENEMY_KNIFE_COMBAT_NEAR_DIST = 5000
+# WORK-relative fields. x/z emitted as u32 (Lua/BizHawk); sign-extended in
+# decode_enemy_table. type_id stays at HP+5 (=WORK+0x8D) for yawn_part.
 ENEMY_FIELD_OFFSETS: dict[str, tuple[int, str]] = {
-    "hp": (0, "u16"),
+    "occupied": (0x00, "u8"),
+    "header": (0x01, "u8"),
+    "hp": (0x88, "u16"),
     # Runtime kind byte (hub-door classify 2026-07-23): wasp=0x0A, adder=0x0B,
     # shark=0x0D, plant42=0x10, black_tiger=0x14. Not classic EMD model IDs;
     # 0x0F appears on Tyrant and also Cerberus/stale pool — do not treat as unique.
-    "type_id": (0x05, "u8"),
-    "x": (0xDE, "s16"),
-    "z": (0xE0, "s16"),
-    "active_byte": (0xEC, "u8"),
+    "type_id": (0x8D, "u8"),
+    "x": (0x34, "u32"),
+    "z": (0x3C, "u32"),
+    "active_byte": (0x174, "u8"),
 }
 
 
@@ -333,13 +339,21 @@ def enemy_table_fields() -> list[tuple[str, int, str]]:
     return fields
 
 
-def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
-    """[{x, z, hp, alive, in_room, combat_near, ...}] from enemy table RAM.
+def _u32_as_s32(value: int) -> int:
+    v = int(value) & 0xFFFFFFFF
+    return v - 0x100000000 if v >= 0x80000000 else v
 
-    Room ``210`` Yawn: raw ``hp@0`` ~3050 is translated to wiki-scale logical
+
+def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
+    """[{x, z, hp, alive, in_room, combat_near, ...}] from enemy WORK RAM.
+
+    Room ``210`` Yawn: raw ``hp`` ~3050 is translated to wiki-scale logical
     HP (attic 120) via :mod:`re1_rl.yawn_hp` so spatial ``hp/255`` stays sane.
     Extra 0xFFFF body-part rows are kept for combat pay (``yawn_part``) but
     marked not-alive so they do not fill spatial / attack-mask slots.
+
+    ``occupied`` (WORK+0): missing key defaults to occupied (synthetic tests);
+    ``occupied==0`` forces not-alive / not combat_near (stale pool ghosts).
     """
     from re1_rl.yawn_hp import YAWN_RAM_TYPE_ID, YAWN_ROOM, apply_yawn_hp_translate
 
@@ -354,9 +368,16 @@ def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
     )
     for slot in range(n_slots):
         vals = {f: int(ram.get(f"enemy{slot}_{f}", 0)) for f in ENEMY_FIELD_OFFSETS}
+        # Synthetic unit tests omit occupied → treat as live.
+        if f"enemy{slot}_occupied" not in ram:
+            vals["occupied"] = 1
+        occ = int(vals.get("occupied", 0))
+        vals["occupied_flag"] = 1 if occ != 0 else 0
         hp = vals.get("hp", 0)
-        x = int(vals.get("x", 0))
-        z = int(vals.get("z", 0))
+        x = _u32_as_s32(int(vals.get("x", 0)))
+        z = _u32_as_s32(int(vals.get("z", 0)))
+        vals["x"] = x
+        vals["z"] = z
         in_room = enemy_coords_in_room_band(x, z)
         is_yawn_part = (
             room_code == YAWN_ROOM
@@ -371,7 +392,12 @@ def decode_enemy_table(ram: dict[str, int | float]) -> list[dict[str, int]]:
         combat_near = in_room and dist < ENEMY_COMBAT_NEAR_DIST
         knife_near = in_room and dist < ENEMY_KNIFE_COMBAT_NEAR_DIST
         vals["slot"] = slot
-        if is_yawn_part:
+        if occ == 0 and not is_yawn_part:
+            vals["alive"] = 0
+            vals["in_room"] = 1 if in_room else 0
+            vals["combat_near"] = 0
+            vals["knife_near"] = 0
+        elif is_yawn_part:
             vals["yawn_part"] = 1
             vals["alive"] = 0
             vals["in_room"] = 1
