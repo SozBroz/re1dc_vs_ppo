@@ -454,10 +454,18 @@
       {
         "name": "green_herb",
         "item_id": 68,
-        "count": 2,
+        "count": 1,
         "key_item": false,
         "in_inventory_table": true,
-        "notes": "SE corner"
+        "notes": "SE corner plant 1/2"
+      },
+      {
+        "name": "green_herb",
+        "item_id": 68,
+        "count": 1,
+        "key_item": false,
+        "in_inventory_table": true,
+        "notes": "SE corner plant 2/2"
       },
       {
         "name": "ink_ribbon",

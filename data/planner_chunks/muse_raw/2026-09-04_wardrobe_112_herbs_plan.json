@@ -1,0 +1,193 @@
+{
+  "why_prev_rejected": "111 exited to 106 without wardrobe 112 green herbs",
+  "wardrobe_plan": "111 shells then 111->112 take 112:green_herb:1 (count 2) then 112->111->106",
+  "kit_plan": "ammo from 10E+111 plus two greens from 112 before art circuit",
+  "next_chunk": {
+    "why": "Complete place_wind_crest with mandatory wardrobe 112 herb pickup and on-path ammo from 10E and 111 before art circuit to 11A.",
+    "end_anchor_beat_id": "place_wind_crest",
+    "steps": [
+      {
+        "n": 1,
+        "op": "traverse",
+        "edge_id": "10D->103",
+        "id": "s1",
+        "beat_id": null,
+        "note": "10D to F passage"
+      },
+      {
+        "n": 2,
+        "op": "traverse",
+        "edge_id": "103->10E",
+        "id": "s2",
+        "beat_id": null,
+        "note": "F passage to employee room"
+      },
+      {
+        "n": 3,
+        "op": "acquire",
+        "room_id": "10E",
+        "pickup_id": "10E:handgun_bullets:1",
+        "id": "s3",
+        "beat_id": null,
+        "note": "on bed"
+      },
+      {
+        "n": 4,
+        "op": "acquire",
+        "room_id": "10E",
+        "pickup_id": "10E:shotgun_shells:2",
+        "id": "s4",
+        "beat_id": null,
+        "note": "in closet"
+      },
+      {
+        "n": 5,
+        "op": "traverse",
+        "edge_id": "10E->103",
+        "id": "s5",
+        "beat_id": null,
+        "note": "back to F passage"
+      },
+      {
+        "n": 6,
+        "op": "traverse",
+        "edge_id": "103->104",
+        "id": "s6",
+        "beat_id": null,
+        "note": "tea unlock"
+      },
+      {
+        "n": 7,
+        "op": "traverse",
+        "edge_id": "104->105",
+        "id": "s7",
+        "beat_id": null,
+        "note": "tea to dining"
+      },
+      {
+        "n": 8,
+        "op": "traverse",
+        "edge_id": "105->106",
+        "id": "s8",
+        "beat_id": null,
+        "note": "dining to main hall"
+      },
+      {
+        "n": 9,
+        "op": "traverse",
+        "edge_id": "106->111",
+        "id": "s9",
+        "beat_id": null,
+        "note": "main hall to dressing room"
+      },
+      {
+        "n": 10,
+        "op": "acquire",
+        "room_id": "111",
+        "pickup_id": "111:handgun_bullets:1",
+        "id": "s10",
+        "beat_id": null,
+        "note": "shelf clip"
+      },
+      {
+        "n": 11,
+        "op": "acquire",
+        "room_id": "111",
+        "pickup_id": "111:shotgun_shells:2",
+        "id": "s11",
+        "beat_id": null,
+        "note": "locked desk"
+      },
+      {
+        "n": 12,
+        "op": "traverse",
+        "edge_id": "111->112",
+        "id": "s12",
+        "beat_id": null,
+        "note": "dressing to wardrobe"
+      },
+      {
+        "n": 13,
+        "op": "acquire",
+        "room_id": "112",
+        "pickup_id": "112:green_herb:1",
+        "id": "s13",
+        "beat_id": null,
+        "note": "SE corner count 2"
+      },
+      {
+        "n": 14,
+        "op": "traverse",
+        "edge_id": "112->111",
+        "id": "s14",
+        "beat_id": null,
+        "note": "wardrobe back to dressing"
+      },
+      {
+        "n": 15,
+        "op": "traverse",
+        "edge_id": "111->106",
+        "id": "s15",
+        "beat_id": null,
+        "note": "dressing to main hall"
+      },
+      {
+        "n": 16,
+        "op": "traverse",
+        "edge_id": "106->107",
+        "id": "s16",
+        "beat_id": null,
+        "note": "main hall to gallery"
+      },
+      {
+        "n": 17,
+        "op": "traverse",
+        "edge_id": "107->108",
+        "id": "s17",
+        "beat_id": null,
+        "note": "gallery to L passage"
+      },
+      {
+        "n": 18,
+        "op": "traverse",
+        "edge_id": "108->109",
+        "id": "s18",
+        "beat_id": null,
+        "note": "L passage to trap passage"
+      },
+      {
+        "n": 19,
+        "op": "traverse",
+        "edge_id": "109->10A",
+        "id": "s19",
+        "beat_id": null,
+        "note": "trap passage to back passage"
+      },
+      {
+        "n": 20,
+        "op": "traverse",
+        "edge_id": "10A->11A",
+        "id": "s20",
+        "beat_id": null,
+        "note": "back passage to roofed passage"
+      },
+      {
+        "n": 21,
+        "op": "objective",
+        "room_id": "11A",
+        "site_id": "wind_crest@11A_crest_slot",
+        "id": "s21",
+        "beat_id": "place_wind_crest",
+        "note": "place wind crest"
+      }
+    ]
+  },
+  "beat_order": [
+    "place_wind_crest",
+    "attic_enter",
+    "yawn_intro",
+    "yawn_1",
+    "moon_crest",
+    "place_moon_crest"
+  ]
+}

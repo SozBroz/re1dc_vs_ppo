@@ -115,9 +115,9 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[statue_i + 13]["pickup_id"] == "10D:wind_crest:1"
     assert steps[statue_i + 13]["beat_id"] == "wind_crest"
     # Resource-first place_wind tail (pl110 Muse): 10E loot, 103->104 unlock,
-    # 111 shelf clip + desk shells, art→11A.
+    # 111 clips, wardrobe 112 greens, art→11A.
     assert steps[-1]["beat_id"] == "place_wind_crest"
-    assert steps[-1]["n"] == 124
+    assert steps[-1]["n"] == 128
     assert steps[-1]["site_id"] == "wind_crest@11A_crest_slot"
     assert chunk["end_anchor_beat_id"] == "place_wind_crest"
     wind_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "wind_crest")
@@ -130,7 +130,17 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert any(s.get("edge_id") == "103->104" for s in steps[wind_i + 1 :])
     assert any(s.get("pickup_id") == "111:handgun_bullets:1" for s in steps[wind_i:])
     assert any(s.get("pickup_id") == "111:shotgun_shells:2" for s in steps[wind_i:])
-    assert not any(s.get("edge_id") == "111->112" for s in steps)  # skip wardrobe without herb
+    shells_i = next(
+        i for i, s in enumerate(steps) if s.get("pickup_id") == "111:shotgun_shells:2"
+    )
+    assert steps[shells_i + 1]["edge_id"] == "111->112"
+    assert steps[shells_i + 2]["pickup_id"] == "112:green_herb:1"
+    assert steps[shells_i + 3]["pickup_id"] == "112:green_herb:2"
+    assert steps[shells_i + 4]["edge_id"] == "112->111"
+    assert steps[shells_i + 5]["edge_id"] == "111->106"
+    assert not any(
+        s.get("pickup_id", "").startswith("112:ink") for s in steps
+    )  # skip ink ribbons
     assert not any(s.get("edge_id") == "105->104" for s in steps[statue_i:wind_i + 1])
     assert not any(s.get("edge_id") == "104->103" for s in steps)
     assert chunk["leave_100"]["next_beat_this_loadout_is_for"] == "richard_bleedout"
@@ -1607,7 +1617,7 @@ def test_pl18_seek_lands_on_chemical_tail():
     assert by_beat["sun_crest"]["pickup_id"] == "205:sun_crest:1"
     assert by_beat["push_statue_2f"]["n"] == 93
     assert by_beat["wind_crest"]["n"] == 106
-    assert by_beat["place_wind_crest"]["n"] == 124
+    assert by_beat["place_wind_crest"]["n"] == 128
     assert q._steps[-1]["beat_id"] == "place_wind_crest"
 
 

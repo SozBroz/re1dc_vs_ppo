@@ -58,10 +58,10 @@ Muse remaining beat_order after this: gallery portraits → star_crest → green
 - **Tip:** pl110, room 10D, wind_crest held, HP 36 Caution. cp05 end-anchor wind_crest complete (chunk_final).
 - **Model:** muse-glimmer (resource-first pass2; operator rejected 2F skip)
 - **End anchor:** `place_wind_crest`
-- **Why:** Loot 10E + unlock tea 103->104 + first-floor 111 shelf clip + desk shells + art circuit to 11A before attic/Yawn.
-- **Raw:** `muse_raw/2026-09-03_place_wind.json`
-- **Pinned as:** `cp05_shield_key.json` steps 107–124
-- **Operator edits:** stripped pointless 111->112->111 (no herb acquire); box herbs cover HP. 2026-09-04: also acquire `111:handgun_bullets:1` (shelf) before desk shells.
+- **Why:** Loot 10E + unlock tea 103->104 + first-floor 111 ammo + wardrobe 112 greens + art circuit to 11A before attic/Yawn.
+- **Raw:** `muse_raw/2026-09-03_place_wind.json` (base); wardrobe herb patch via Muse 2026-09-04 (`_tmp/pl111_muse_wardrobe_herbs_response.json`)
+- **Pinned as:** `cp05_shield_key.json` steps 107–128
+- **Operator edits:** 2026-09-04: acquire `111:handgun_bullets:1` before desk shells; after shells go `111->112` take **both** wardrobe greens (`112:green_herb:1` then `:2`), return `112->111->106` (skip ink).
 
 | n | op | what |
 |---|---|---|
@@ -76,12 +76,16 @@ Muse remaining beat_order after this: gallery portraits → star_crest → green
 | 115 | traverse | 106→111 |
 | 116 | acquire | 111:handgun_bullets:1 |
 | 117 | acquire | 111:shotgun_shells:2 |
-| 118 | traverse | 111→106 |
-| 119 | traverse | 106→107 |
-| 120 | traverse | 107→108 |
-| 121 | traverse | 108→109 |
-| 122 | traverse | 109→10A |
-| 123 | traverse | 10A→11A |
-| 124 | objective | wind_crest@11A_crest_slot (place_wind_crest) |
+| 118 | traverse | 111→112 |
+| 119 | acquire | 112:green_herb:1 |
+| 120 | acquire | 112:green_herb:2 |
+| 121 | traverse | 112→111 |
+| 122 | traverse | 111→106 |
+| 123 | traverse | 106→107 |
+| 124 | traverse | 107→108 |
+| 125 | traverse | 108→109 |
+| 126 | traverse | 109→10A |
+| 127 | traverse | 10A→11A |
+| 128 | objective | wind_crest@11A_crest_slot (place_wind_crest) |
 
 Muse beat_order after this: attic_enter → yawn_intro → yawn_1 → moon_crest → place_moon_crest.

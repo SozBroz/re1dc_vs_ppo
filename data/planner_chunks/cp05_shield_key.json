@@ -4,7 +4,7 @@
   "chunk_id": "cp05_shield_key",
   "source": "phase1_pass1_council+muse_pl110_resources",
   "end_anchor_beat_id": "place_wind_crest",
-  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). Tea-room lock: 104->103 stays locked until 103->104 is traversed once (this chunk never opens it). After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, armor_key, then exactly two red + two green bench herbs in order red/green/red/green (floor has 4G+2R \u2014 a 3rd green or red is divert). Merge to GR before 102 so clip+shells fit; 102->101->100 use_box (leave_100: no heals on exit \u2014 incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) then 100->101->201->202->203->204->205. In 205 take 205:sun_crest:1. After sun_crest: Richard bleedout FIRST (capture:false \u2014 cinema dumps to C passage 204, no pl84/pl85 cells), then place_sun_crest at 11A, then dining 2F enter + push_statue_2f. After statue: 202->203->106->105 take blue jewel, backtrack 105->106->203->202->201->101->103 (skip vacant 102 \u2014 already looted), 103->10D tiger eye + wind_crest. After wind_crest in 10D: loot 10E clip+shells, unlock tea via 103->104, first-floor 104->105->106, dressing 111 shelf clip + locked-desk shells (one of each; skip 112 unless taking herb), art circuit 106->107->108->109->10A->11A, place_wind_crest. Tip cell pl110.",
+  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). Tea-room lock: 104->103 stays locked until 103->104 is traversed once (this chunk never opens it). After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, armor_key, then exactly two red + two green bench herbs in order red/green/red/green (floor has 4G+2R \u2014 a 3rd green or red is divert). Merge to GR before 102 so clip+shells fit; 102->101->100 use_box (leave_100: no heals on exit \u2014 incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) then 100->101->201->202->203->204->205. In 205 take 205:sun_crest:1. After sun_crest: Richard bleedout FIRST (capture:false \u2014 cinema dumps to C passage 204, no pl84/pl85 cells), then place_sun_crest at 11A, then dining 2F enter + push_statue_2f. After statue: 202->203->106->105 take blue jewel, backtrack 105->106->203->202->201->101->103 (skip vacant 102 \u2014 already looted), 103->10D tiger eye + wind_crest. After wind_crest in 10D: loot 10E clip+shells, unlock tea via 103->104, first-floor 104->105->106, dressing 111 shelf clip + locked-desk shells (one of each), then 111->112 take both SE green herbs (112:green_herb:1 then :2), return 112->111->106, art circuit 106->107->108->109->10A->11A, place_wind_crest. Tip cell pl110.",
   "leave_118": {
     "banked_in_box": [
       {
@@ -238,7 +238,8 @@
     {
       "n": 15,
       "op": "traverse",
-      "edge_id": "106->107"
+      "edge_id": "106->107",
+      "note": "art room / gallery circuit toward 11A"
     },
     {
       "n": 16,
@@ -778,106 +779,181 @@
       "n": 107,
       "op": "traverse",
       "edge_id": "10D->103",
-      "note": "exit tiger room after wind_crest"
+      "id": "s1",
+      "beat_id": null,
+      "note": "10D to F passage"
     },
     {
       "n": 108,
       "op": "traverse",
       "edge_id": "103->10E",
-      "beat_id": "employee_room_enter",
-      "note": "Employee Room / keeper ammo"
+      "id": "s2",
+      "beat_id": null,
+      "note": "F passage to employee room"
     },
     {
       "n": 109,
       "op": "acquire",
+      "room_id": "10E",
       "pickup_id": "10E:handgun_bullets:1",
-      "room_id": "10E"
+      "id": "s3",
+      "beat_id": null,
+      "note": "on bed"
     },
     {
       "n": 110,
       "op": "acquire",
+      "room_id": "10E",
       "pickup_id": "10E:shotgun_shells:2",
-      "room_id": "10E"
+      "id": "s4",
+      "beat_id": null,
+      "note": "in closet"
     },
     {
       "n": 111,
       "op": "traverse",
-      "edge_id": "10E->103"
+      "edge_id": "10E->103",
+      "id": "s5",
+      "beat_id": null,
+      "note": "back to F passage"
     },
     {
       "n": 112,
       "op": "traverse",
       "edge_id": "103->104",
+      "id": "s6",
       "beat_id": "tea_unlock_103_104",
       "note": "first 103->104 after wind; opens tea both ways"
     },
     {
       "n": 113,
       "op": "traverse",
-      "edge_id": "104->105"
+      "edge_id": "104->105",
+      "id": "s7",
+      "beat_id": null,
+      "note": "tea to dining"
     },
     {
       "n": 114,
       "op": "traverse",
-      "edge_id": "105->106"
+      "edge_id": "105->106",
+      "id": "s8",
+      "beat_id": null,
+      "note": "dining to main hall"
     },
     {
       "n": 115,
       "op": "traverse",
       "edge_id": "106->111",
+      "id": "s9",
       "beat_id": "dressing_room_enter",
-      "note": "armor_key door; dressing ammo (shelf clip + desk shells)"
+      "note": "armor_key door; dressing ammo then wardrobe herbs"
     },
     {
       "n": 116,
       "op": "acquire",
-      "pickup_id": "111:handgun_bullets:1",
       "room_id": "111",
+      "pickup_id": "111:handgun_bullets:1",
+      "id": "s10",
+      "beat_id": null,
       "note": "shelf clip"
     },
     {
       "n": 117,
       "op": "acquire",
-      "pickup_id": "111:shotgun_shells:2",
       "room_id": "111",
+      "pickup_id": "111:shotgun_shells:2",
+      "id": "s11",
+      "beat_id": null,
       "note": "locked desk; one shell clip"
     },
     {
       "n": 118,
       "op": "traverse",
-      "edge_id": "111->106"
+      "edge_id": "111->112",
+      "id": "s12",
+      "beat_id": null,
+      "note": "wardrobe for both SE green herbs"
     },
     {
       "n": 119,
-      "op": "traverse",
-      "edge_id": "106->107",
-      "note": "art room / gallery circuit toward 11A"
+      "op": "acquire",
+      "room_id": "112",
+      "pickup_id": "112:green_herb:1",
+      "id": "s13",
+      "beat_id": null,
+      "note": "SE corner plant 1/2"
     },
     {
       "n": 120,
-      "op": "traverse",
-      "edge_id": "107->108"
+      "op": "acquire",
+      "room_id": "112",
+      "pickup_id": "112:green_herb:2",
+      "beat_id": null,
+      "note": "SE corner plant 2/2"
     },
     {
       "n": 121,
       "op": "traverse",
-      "edge_id": "108->109"
+      "edge_id": "112->111",
+      "id": "s14",
+      "beat_id": null,
+      "note": "return from wardrobe"
     },
     {
       "n": 122,
       "op": "traverse",
-      "edge_id": "109->10A"
+      "edge_id": "111->106",
+      "id": "s15",
+      "beat_id": null,
+      "note": "dressing to main hall"
     },
     {
       "n": 123,
       "op": "traverse",
-      "edge_id": "10A->11A"
+      "edge_id": "106->107",
+      "id": "s16",
+      "beat_id": null,
+      "note": "art room / gallery circuit toward 11A"
     },
     {
       "n": 124,
+      "op": "traverse",
+      "edge_id": "107->108",
+      "id": "s17",
+      "beat_id": null,
+      "note": "gallery to L passage"
+    },
+    {
+      "n": 125,
+      "op": "traverse",
+      "edge_id": "108->109",
+      "id": "s18",
+      "beat_id": null,
+      "note": "L passage to trap passage"
+    },
+    {
+      "n": 126,
+      "op": "traverse",
+      "edge_id": "109->10A",
+      "id": "s19",
+      "beat_id": null,
+      "note": "trap passage to back passage"
+    },
+    {
+      "n": 127,
+      "op": "traverse",
+      "edge_id": "10A->11A",
+      "id": "s20",
+      "beat_id": null,
+      "note": "back passage to roofed passage"
+    },
+    {
+      "n": 128,
       "op": "objective",
-      "site_id": "wind_crest@11A_crest_slot",
       "room_id": "11A",
+      "site_id": "wind_crest@11A_crest_slot",
+      "id": "s21",
       "beat_id": "place_wind_crest",
       "note": "chunk end-anchor"
     }
