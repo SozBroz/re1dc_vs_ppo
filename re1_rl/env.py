@@ -2019,9 +2019,9 @@ class RE1Env(gym.Env):
                     flush=True,
                 )
                 pb_bundle = None
-            elif state_path.name == CELL_STATE_NAME:
+            elif state_path.name in (CELL_STATE_NAME, "cell.pst"):
                 # Go-Explore / Yawn cells use cell.State / cell.sidecar.json
-                # (not champion.*). Hash-check Yawn rows when the catalog
+                # (not champion.*). C-RE1 grafts use cell.pst + same sidecar. Hash-check Yawn rows when the catalog
                 # published state_sha256 so a dirty local file cannot load.
                 if is_slot_locked(slot_dir):
                     print(
@@ -2077,6 +2077,49 @@ class RE1Env(gym.Env):
         if pb_bundle is not None:
             sp = Path(pb_bundle["state_path"])
             state_path = sp if sp.is_absolute() else self.project_root / sp
+        elif getattr(self, "_planner_loyal_queue", None) is not None:
+            # Never soft-fall to stage init (pre-Kenneth / Barry stretch) —
+            # that poisons planner-loyal with early-game episodes while the
+            # queue may still think it is mid-chunk. Prefer the lockpick tip.
+            from re1_rl.planner_loyal_cells import training_start_paths
+
+            tip = training_start_paths(self.project_root)
+            if tip["state"].is_file() and tip["sidecar"].is_file():
+                tip_meta: dict[str, Any] = {}
+                if tip["meta"].is_file():
+                    try:
+                        tip_meta = json.loads(tip["meta"].read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        tip_meta = {}
+                pb_bundle = {
+                    "source": "planner_loyal_tip_fallback",
+                    "state_path": str(tip["state"]),
+                    "sidecar_path": str(tip["sidecar"]),
+                    "checkpoint_id": tip_meta.get("checkpoint_id")
+                    or "barry_hall_return_106",
+                    "checkpoint_index": int(
+                        tip_meta.get("checkpoint_index")
+                        if tip_meta.get("checkpoint_index") is not None
+                        else 5
+                    ),
+                    "room_id": tip_meta.get("room_id") or "106",
+                    "state_sha256": tip_meta.get("state_sha256"),
+                    "sidecar_sha256": tip_meta.get("sidecar_sha256"),
+                    "planner_step_index": tip_meta.get("planner_step_index"),
+                }
+                state_path = tip["state"]
+                print(
+                    "[planner_loyal] refused sampled cell; "
+                    "falling back to pl05 tip (not stage init)",
+                    flush=True,
+                )
+            else:
+                state_path = self.project_root / self._stage["init_savestate"]
+                print(
+                    "[planner_loyal] refused sampled cell and tip missing; "
+                    "falling back to stage init",
+                    flush=True,
+                )
         else:
             state_path = self.project_root / self._stage["init_savestate"]
         self.bridge.load_savestate(str(state_path))

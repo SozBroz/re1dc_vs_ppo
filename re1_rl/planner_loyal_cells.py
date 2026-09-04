@@ -42,6 +42,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PLANNER_LOYAL_REL = "states/planner_loyal"
 CRYSTALS_REL = "backups/Crystals_in_time"
 _ROOT_ENV = "RE1_PLANNER_LOYAL_CELLS_ROOT"
+_RECOMP_CELLS_ENV = "RE1_RECOMP_CELLS"
+_RECOMP_STATE_NAME = "cell.pst"
 
 # Crystals cp00..cp05 → planner-loyal pl00..pl05
 SEED_SOURCE_MAX = 5  # inclusive; barry_hall_return_106
@@ -67,6 +69,20 @@ def planner_loyal_root(project_root: Path | str | None = None) -> Path:
         path = Path(raw)
         return path if path.is_absolute() else (Path(project_root or ROOT) / path)
     return Path(project_root or ROOT) / DEFAULT_PLANNER_LOYAL_REL
+
+
+def recomp_cells_enabled() -> bool:
+    return os.environ.get(_RECOMP_CELLS_ENV, "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def cell_state_filename() -> str:
+    """BizHawk thin cells use cell.State; C-RE1 grafts use cell.pst."""
+    return _RECOMP_STATE_NAME if recomp_cells_enabled() else CELL_STATE_NAME
 
 
 def cell_dir_name(index: int) -> str:
@@ -215,13 +231,26 @@ def _scan_cells(dest_root: Path) -> list[dict[str, Any]]:
         except ValueError:
             continue
         meta_p = path / CELL_META_NAME
-        state_p = path / CELL_STATE_NAME
+        state_name = cell_state_filename()
+        state_p = path / state_name
         sidecar_p = path / CELL_SIDECAR_NAME
         if not state_p.is_file() or not sidecar_p.is_file():
             continue
         meta: dict[str, Any] = {}
         if meta_p.is_file():
             meta = json.loads(meta_p.read_text(encoding="utf-8"))
+        # Prefer absolute paths when cells root is overridden (recomp grafts).
+        root = dest_root.resolve()
+        state_rel = str(state_p.resolve())
+        side_rel = str(sidecar_p.resolve())
+        try:
+            state_rel = str(state_p.resolve().relative_to(root.parent.parent))
+            side_rel = str(sidecar_p.resolve().relative_to(root.parent.parent))
+        except ValueError:
+            pass
+        if recomp_cells_enabled():
+            state_rel = str(state_p.resolve())
+            side_rel = str(sidecar_p.resolve())
         rows.append(
             {
                 "checkpoint_index": idx,
@@ -231,11 +260,11 @@ def _scan_cells(dest_root: Path) -> list[dict[str, Any]]:
                 "training_start": idx >= TRAINING_START_INDEX,
                 "chunk_id": meta.get("chunk_id"),
                 "planner_step_index": meta.get("planner_step_index"),
-                "state_path": f"{DEFAULT_PLANNER_LOYAL_REL}/cells/{path.name}/{CELL_STATE_NAME}",
-                "sidecar_path": f"{DEFAULT_PLANNER_LOYAL_REL}/cells/{path.name}/{CELL_SIDECAR_NAME}",
+                "state_path": state_rel,
+                "sidecar_path": side_rel,
                 "state_sha256": meta.get("state_sha256"),
                 "sidecar_sha256": meta.get("sidecar_sha256"),
-                "bytes": meta.get("bytes"),
+                "bytes": meta.get("bytes") or state_p.stat().st_size,
             }
         )
     rows.sort(key=lambda r: int(r["checkpoint_index"]))
@@ -532,7 +561,7 @@ def iter_training_start_cells(
             continue
         if not cell_has_remaining_planner_step(row, n_steps):
             continue
-        state_p = root / "cells" / cell_dir_name(int(row["checkpoint_index"])) / CELL_STATE_NAME
+        state_p = root / "cells" / cell_dir_name(int(row["checkpoint_index"])) / cell_state_filename()
         sidecar_p = state_p.with_name(CELL_SIDECAR_NAME)
         if state_p.is_file() and sidecar_p.is_file():
             out.append(row)
@@ -577,7 +606,7 @@ def sample_training_start_cell(
     return {
         **pick,
         "cell_dir": slot,
-        "state": slot / CELL_STATE_NAME,
+        "state": slot / cell_state_filename(),
         "sidecar": slot / CELL_SIDECAR_NAME,
         "meta": slot / CELL_META_NAME,
     }
@@ -749,7 +778,7 @@ def planner_loyal_quality_beats(
 def _nearest_predecessor_slot(root: Path, slot: int) -> int | None:
     """Closest lower slot with a loadable state (skips capture:false holes)."""
     for pred in range(int(slot) - 1, TRAINING_START_INDEX - 1, -1):
-        if (cell_slot_dir(root, pred) / CELL_STATE_NAME).is_file():
+        if (cell_slot_dir(root, pred) / cell_state_filename()).is_file():
             return int(pred)
     return None
 
@@ -786,7 +815,7 @@ def capture_planner_loyal_cell(
         return None
     slot = slot_index_for_completed_step(completed, steps)
     tip = cell_slot_dir(planner_loyal_root(env.project_root), TRAINING_START_INDEX)
-    if not (tip / CELL_STATE_NAME).is_file():
+    if not (tip / cell_state_filename()).is_file():
         print(
             f"[planner_loyal] reject missing training tip "
             f"{cell_dir_name(TRAINING_START_INDEX)}",
@@ -809,7 +838,7 @@ def capture_planner_loyal_cell(
         shutil.rmtree(staging, ignore_errors=True)
     staging.mkdir(parents=True, exist_ok=True)
 
-    state_path = staging / CELL_STATE_NAME
+    state_path = staging / cell_state_filename()
     sidecar_path = staging / CELL_SIDECAR_NAME
     pred_almanac: dict[str, dict[str, int]] = {}
     if pred_slot is not None and pred_slot >= TRAINING_START_INDEX:
@@ -932,7 +961,7 @@ def capture_planner_loyal_cell(
         "training_start": True,
         "quality": quality,
         "kills": kill_audit,
-        "state_path": str(dest / CELL_STATE_NAME),
+        "state_path": str(dest / cell_state_filename()),
         "sidecar_path": str(dest / CELL_SIDECAR_NAME),
         "meta_path": str(dest / CELL_META_NAME),
     }
@@ -946,7 +975,7 @@ def capture_planner_loyal_cell(
                 checkpoint_id=checkpoint_id,
                 room_id=room_id,
                 quality=quality,
-                state_path=dest / CELL_STATE_NAME,
+                state_path=dest / cell_state_filename(),
                 sidecar_path=dest / CELL_SIDECAR_NAME,
                 worker_id=os.environ.get("MACHINE_NAME"),
             )
@@ -983,7 +1012,7 @@ def training_start_paths(project_root: Path | str | None = None) -> dict[str, Pa
     return {
         "root": root,
         "cell_dir": slot,
-        "state": slot / CELL_STATE_NAME,
+        "state": slot / cell_state_filename(),
         "sidecar": slot / CELL_SIDECAR_NAME,
         "meta": slot / CELL_META_NAME,
     }

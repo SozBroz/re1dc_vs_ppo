@@ -305,7 +305,6 @@ def make_env(
     """Factory executed INSIDE the subprocess worker."""
 
     def _init():
-        from re1_rl.bizhawk_bridge import BizHawkClient
         from re1_rl.env import RE1Env
 
         def _phase(label: str) -> None:
@@ -317,70 +316,105 @@ def make_env(
         _phase(f"port {port}: starting bridge")
         # keyed by port (not rank) so concurrent runs never share files
         shot = str(PROJECT_ROOT / "data" / f"_frame_{port}.png")
-        bridge = BizHawkClient(
-            port=port,
-            # WH2 boots 28 emulators through one scheduled desktop session.
-            # TCP connects before ROM/Lua initialization finishes, and the
-            # first hello can legitimately take several minutes under that
-            # startup load. Runtime stalls are handled by the actor watchdog.
-            timeout=300.0,
-            connect_timeout=75.0,
-            screenshot_path=shot,
-            screenshot_mmf=screenshot_mmf,
-        )
-        bridge.start_server()
+        use_recomp = os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower() == "recomp"
+        if use_recomp:
+            eco = Path(os.environ.get("RE1_RECOMP_ROOT", r"D:\re1_recomp")) / "ecosystem" / "py"
+            recomp_py = Path(os.environ.get("RE1_RECOMP_ROOT", r"D:\re1_recomp")) / "py"
+            for p in (eco, recomp_py):
+                s = str(p)
+                if s not in sys.path:
+                    sys.path.insert(0, s)
+            from bridge_factory import make_recomp_bridge  # type: ignore
 
-        # Keep every launch distinct. The old 15s cap released ranks 15+ in one
-        # burst, which can wedge all BizHawk instances before Lua starts.
-        stagger_s = _actor_startup_stagger_s(rank)
-        if stagger_s:
-            _phase(f"stagger {stagger_s:.0f}s")
-        time.sleep(stagger_s)
-        _phase("launching EmuHawk")
-        emuhawk_cmd = [
-            str(EMUHAWK),
-            str(ROM),
-            f"--lua={LUA}",
-            "--socket_ip=127.0.0.1",
-            f"--socket_port={port}",
-        ]
-        if headless:
-            # --gdi: skip OpenGL/D3D init that can hang before SocketServer.Connect
-            # on headless/autologon boxes. --chromeless: less UI chrome.
-            emuhawk_cmd.extend(["--gdi", "--chromeless"])
-        # Do NOT redirect stdout/stderr: WinForms ShowDialog needs UserInteractive.
-        detach_console = os.environ.get(
-            "RE1_EMUHAWK_DETACH_CONSOLE", ""
-        ).strip().lower() in {"1", "true", "yes", "on"}
-        try:
-            proc = _launch_emuhawk(
-                emuhawk_cmd, detach_console=detach_console
-            )
-        except BaseException:
-            bridge.close()
-            raise
-        try:
-            # Port→PID claim so the grid tiler can place this window by rank/port
-            # (not HWND discovery order). Title stamp marks the memlog env ★ MEMLOG.
-            # PID→port claim only (file). Do NOT SetWindowText here — touching the
-            # BizHawk UI thread during Lua connect/set_speed wedges the bridge.
-            try:
-                from re1_rl.window_grid import claim_emu_port
-
-                claim_emu_port(int(proc.pid), int(port), project_root=PROJECT_ROOT)
-            except (OSError, ValueError, TypeError) as exc:
-                _phase(f"port claim skipped: {exc!r}")
-
-            _phase("waiting for Lua client")
-            bridge.wait_for_client(progress=_phase)
+            # SHM tag = port; base-port must stay outside 5555-5900 / 8765.
+            bridge = make_recomp_bridge(port=port, work_slot=max(0, min(11, rank % 12)), timeout=300.0)
+            bridge.start_server()
+            stagger_s = _actor_startup_stagger_s(rank)
+            if stagger_s:
+                _phase(f"stagger {stagger_s:.0f}s")
+            time.sleep(stagger_s)
+            _phase("launching C-RE1 recomp")
+            bridge.wait_for_client(progress=_phase, headless=headless)
             _phase("connected; set_speed")
             bridge.set_speed(training_speed)
+            proc = getattr(getattr(bridge, "client", None), "proc", None)
+            if proc is not None and getattr(proc, "pid", None):
+                try:
+                    from re1_rl.window_grid import claim_emu_port
 
+                    claim_emu_port(int(proc.pid), int(port), project_root=PROJECT_ROOT)
+                    _phase(f"recomp pid={proc.pid} claimed for tiler")
+                except (OSError, ValueError, TypeError) as exc:
+                    _phase(f"port claim skipped: {exc!r}")
+            else:
+                proc = None
+        else:
+            from re1_rl.bizhawk_bridge import BizHawkClient
+
+            bridge = BizHawkClient(
+                port=port,
+                timeout=300.0,
+                connect_timeout=75.0,
+                screenshot_path=shot,
+                screenshot_mmf=screenshot_mmf,
+            )
+            bridge.start_server()
+
+            # Keep every launch distinct. The old 15s cap released ranks 15+ in one
+            # burst, which can wedge all BizHawk instances before Lua starts.
+            stagger_s = _actor_startup_stagger_s(rank)
+            if stagger_s:
+                _phase(f"stagger {stagger_s:.0f}s")
+            time.sleep(stagger_s)
+            _phase("launching EmuHawk")
+            emuhawk_cmd = [
+                str(EMUHAWK),
+                str(ROM),
+                f"--lua={LUA}",
+                "--socket_ip=127.0.0.1",
+                f"--socket_port={port}",
+            ]
+            if headless:
+                # --gdi: skip OpenGL/D3D init that can hang before SocketServer.Connect
+                # on headless/autologon boxes. --chromeless: less UI chrome.
+                emuhawk_cmd.extend(["--gdi", "--chromeless"])
+            # Do NOT redirect stdout/stderr: WinForms ShowDialog needs UserInteractive.
+            detach_console = os.environ.get(
+                "RE1_EMUHAWK_DETACH_CONSOLE", ""
+            ).strip().lower() in {"1", "true", "yes", "on"}
+            try:
+                proc = _launch_emuhawk(
+                    emuhawk_cmd, detach_console=detach_console
+                )
+            except BaseException:
+                bridge.close()
+                raise
+            try:
+                # Port→PID claim so the grid tiler can place this window by rank/port
+                # (not HWND discovery order). Title stamp marks the memlog env ★ MEMLOG.
+                # PID→port claim only (file). Do NOT SetWindowText here — touching the
+                # BizHawk UI thread during Lua connect/set_speed wedges the bridge.
+                try:
+                    from re1_rl.window_grid import claim_emu_port
+
+                    claim_emu_port(int(proc.pid), int(port), project_root=PROJECT_ROOT)
+                except (OSError, ValueError, TypeError) as exc:
+                    _phase(f"port claim skipped: {exc!r}")
+
+                _phase("waiting for Lua client")
+                bridge.wait_for_client(progress=_phase)
+                _phase("connected; set_speed")
+                bridge.set_speed(training_speed)
+            except BaseException:
+                _stop_owned_emuhawk(proc, bridge)
+                raise
+
+        try:
             env = RE1Env(
                 curriculum_path=PROJECT_ROOT / curriculum,
                 bridge=bridge,
                 project_root=PROJECT_ROOT,
-                async_cutscene_skip=async_cutscene_skip,
+                async_cutscene_skip=(async_cutscene_skip and not use_recomp),
                 camera_whiten=False,
             )
             env._ram_skip.training_speed = training_speed
@@ -388,19 +422,26 @@ def make_env(
             env._ram_skip.skip_chunk = skip_chunk
             env._ram_skip.invisible_during_skip = headless
             env.knife_echo_joypad = False
-            env._emuhawk_pid = int(proc.pid)
+            if proc is not None:
+                env._emuhawk_pid = int(proc.pid)
             # Attach rank on the optional step memlogger (pking top-right diag).
             if getattr(env, "_step_diag", None) is not None:
                 env._step_diag.rank = int(rank)
 
-            # Ensure the owned EmuHawk dies with the env (instance-level hook).
+            # Ensure the owned emulator dies with the env (instance-level hook).
             orig_close = env.close
 
             def close_with_emu():
                 try:
                     orig_close()
                 finally:
-                    _stop_owned_emuhawk(proc, bridge)
+                    if proc is not None:
+                        _stop_owned_emuhawk(proc, bridge)
+                    else:
+                        try:
+                            bridge.close()
+                        except Exception:
+                            pass
 
             env.close = close_with_emu
             if capture_checkpoints:
@@ -414,7 +455,13 @@ def make_env(
             _phase("env ready")
             return env
         except BaseException:
-            _stop_owned_emuhawk(proc, bridge)
+            if proc is not None:
+                _stop_owned_emuhawk(proc, bridge)
+            else:
+                try:
+                    bridge.close()
+                except Exception:
+                    pass
             raise
 
     return _init

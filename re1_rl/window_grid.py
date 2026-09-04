@@ -590,7 +590,18 @@ def _best_hwnd_for_pid(
             and user32.IsWindowVisible(hwnd)
         ):
             return int(hwnd)
-    return None
+    # C-RE1 / SDL hosts are not WinForms BizHawk — take largest visible frame.
+    fallback: tuple[int, int] | None = None
+    for hwnd in hwnds:
+        if _is_skipped_emu_hwnd(hwnd) or not user32.IsWindowVisible(hwnd):
+            continue
+        _, _, w, h = _window_outer_rect(hwnd)
+        if h < 180 or _hwnd_area(hwnd) < 25_000:
+            continue
+        area = _hwnd_area(hwnd)
+        if fallback is None or area > fallback[0]:
+            fallback = (area, int(hwnd))
+    return None if fallback is None else fallback[1]
 
 
 def _normalize_window_for_tile(hwnd: int) -> None:
