@@ -31,6 +31,7 @@ from re1_rl.memory_map import (
     OPENING_GAMEPLAY_TEASER_GAME_STATE,
     OPENING_GAMEPLAY_TEASER_GAME_MODE,
     OPENING_TEASER_ROOM_IDS,
+    SCRIPTED_DEATH_HP,
     player_died,
 )
 from re1_rl.ram_skip import (
@@ -220,11 +221,18 @@ def death_continue_from_ram(ram: dict[str, int | float]) -> bool:
 
 
 def death_room_overlay_from_ram(ram: dict[str, int | float]) -> bool:
-    """True when the engine shows the death room view before the title escape."""
-    return (
-        int(ram.get("game_state", 0)) == DEATH_ROOM_OVERLAY_GAME_STATE
-        and int(ram.get("game_mode", 0)) == IN_CONTROL_MASK
-    )
+    """True when the engine shows the death room view before the title escape.
+
+    ``game_state == 0x80800001`` also flickers on some ordinary door loads
+    (e.g. dressing ``111→112`` wardrobe) while HP is still fine — requiring an
+    HP death/sentinel avoids false episode kills that block pl122+.
+    """
+    if int(ram.get("game_state", 0)) != DEATH_ROOM_OVERLAY_GAME_STATE:
+        return False
+    if int(ram.get("game_mode", 0)) != IN_CONTROL_MASK:
+        return False
+    hp = int(ram.get("player_hp", 0))
+    return hp <= 0 or hp == int(SCRIPTED_DEATH_HP)
 
 
 def title_mode_select_from_ram(ram: dict[str, int | float]) -> bool:

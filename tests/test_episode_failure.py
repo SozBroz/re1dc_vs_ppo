@@ -104,16 +104,27 @@ def test_title_mode_select_after_death() -> None:
 
 
 def test_death_room_overlay_quick_save3() -> None:
-    ram = _ram(
+    # Overlay gs alone is not death — door loads (111→112) share that gs with live HP.
+    live = _ram(
         player_hp=96,
         game_state=DEATH_ROOM_OVERLAY_GAME_STATE,
         game_mode=IN_CONTROL_MASK,
         room_id=19,
         scene_flag=0x80,
     )
-    assert death_room_overlay_from_ram(ram) is True
+    assert death_room_overlay_from_ram(live) is False
+    assert episode_failure_reason(live, episode_start_hp=96, prev_hp=96) is None
+
+    dead = _ram(
+        player_hp=0,
+        game_state=DEATH_ROOM_OVERLAY_GAME_STATE,
+        game_mode=IN_CONTROL_MASK,
+        room_id=19,
+        scene_flag=0x80,
+    )
+    assert death_room_overlay_from_ram(dead) is True
     assert (
-        episode_failure_reason(ram, episode_start_hp=96, prev_hp=96)
+        episode_failure_reason(dead, episode_start_hp=96, prev_hp=96)
         == "death_room_overlay"
     )
 
@@ -153,10 +164,10 @@ def test_live_quicksave_probe_signatures() -> None:
         episode_failure_reason(ram0, episode_start_hp=96, prev_hp=96)
         == "title_mode_select"
     )
-    assert (
-        episode_failure_reason(ram3, episode_start_hp=96, prev_hp=96)
-        == "death_room_overlay"
-    )
+    # QS3 carries death-overlay game_state with live HP — same signature as the
+    # 111→112 door flicker; do not treat as episode death without HP evidence.
+    assert death_room_overlay_from_ram(ram3) is False
+    assert episode_failure_reason(ram3, episode_start_hp=96, prev_hp=96) is None
 
 
 def test_hp_death() -> None:
