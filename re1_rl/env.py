@@ -2259,6 +2259,31 @@ class RE1Env(gym.Env):
                     flush=True,
                 )
                 state_path = self.project_root / self._stage["init_savestate"]
+                # C-RE1 only loads .pst; BizHawk .State fallback would NotImplemented
+                # and kill the actor. Prefer a grafted quiet cell when on recomp.
+                if (
+                    str(state_path).lower().endswith(".state")
+                    or os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower()
+                    == "recomp"
+                ):
+                    recomp_root = Path(
+                        os.environ.get("RE1_RECOMP_ROOT", r"D:\re1_recomp")
+                    )
+                    pst_fallback = (
+                        recomp_root
+                        / "ecosystem"
+                        / "states"
+                        / "recomp_pl"
+                        / "cells"
+                        / "pl05"
+                        / "cell.pst"
+                    )
+                    if pst_fallback.is_file():
+                        state_path = pst_fallback
+                        print(
+                            f"[pb] recomp fresh fallback -> {state_path}",
+                            flush=True,
+                        )
                 self.bridge.load_savestate(str(state_path))
                 self._sticky_input.reset()
                 self._prev_action = None
