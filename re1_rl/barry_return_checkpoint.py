@@ -80,13 +80,20 @@ def kenneth_skip_settled(
 
 
 def note_kenneth_live_scene(progress: Any, state: dict[str, Any] | None) -> str | None:
-    """Write the flag as soon as room 104 shows a scripted scene bit."""
+    """Write the flag as soon as room 104 shows a scripted scene bit.
+
+    C-RE1 turbo skip settles idle ``0x80``; the 0x84 peak only exists mid-skip
+    and is stamped on ``_skip_peak_scene_flag``.
+    """
+    peak = (state or {}).get("_skip_peak_scene_flag")
+    if peak is None:
+        peak = int((state or {}).get("scene_flag", 0) or 0)
     return note_kenneth_cutscene_skip_settle(
         progress,
         None,
         state,
         skip_frames=0,
-        peak_scene_flag=int((state or {}).get("scene_flag", 0) or 0),
+        peak_scene_flag=int(peak or 0),
     )
 
 

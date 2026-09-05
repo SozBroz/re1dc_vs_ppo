@@ -225,6 +225,14 @@ def test_note_kenneth_latches_zero_frame_peak_script() -> None:
     )
 
 
+def test_live_scene_uses_skip_peak_when_settle_is_idle() -> None:
+    progress = ProgressTracker()
+    settle = _state("104", cam_id=4, scene_flag=0x80)
+    settle["_skip_peak_scene_flag"] = 0x84
+    assert note_kenneth_live_scene(progress, settle) == "104:4:s0"
+    assert "104:4:s0" in progress.observed_cutscenes
+
+
 def test_live_tea_room_script_writes_kenneth_flag() -> None:
     planner = _planner("barry_return_105")
     progress = ProgressTracker()

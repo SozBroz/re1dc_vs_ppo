@@ -1116,6 +1116,35 @@ def test_planner_loyal_dining_return_without_kenneth_is_terminal() -> None:
     assert reward == pytest.approx(STEP_PENALTY + PLANNER_DIVERT_PENALTY)
 
 
+def test_planner_loyal_kenneth_skip_peak_unlocks_dining_return() -> None:
+    """C-RE1 turbo Kenneth settles idle 0x80; mid-skip 0x84 still writes 104:*:sN."""
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    q.seek(2)
+    progress = ProgressTracker()
+    idle = {
+        "room_id": "104",
+        "cam_id": 4,
+        "scene_flag": 0x80,
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+        "_skip_peak_scene_flag": 0x84,
+    }
+    _reward(idle, idle, q, progress=progress)
+    assert "104:4:s0" in progress.observed_cutscenes
+    dining = {
+        "room_id": "105",
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+    }
+    _reward_total, bd = _reward(idle, dining, q, progress=progress)
+    assert bd["planner_divert"] == 0.0
+    assert bd["planner_step_success"] > 0.0
+    assert q.divert_reason is None
+
+
 def test_planner_loyal_dining_return_after_kenneth_completes() -> None:
     opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
     q = PlannerLoyalQueue(chunk_path=opening)
@@ -1128,6 +1157,40 @@ def test_planner_loyal_dining_return_after_kenneth_completes() -> None:
     assert bd["planner_divert"] == 0.0
     assert bd["planner_step_success"] > 0.0
     assert q.divert_reason is None
+
+
+def test_planner_loyal_wesker_bounce_skip_kills_without_settle_in_hall() -> None:
+    """105→106→105 turbo bounce still trips the Kenneth gate."""
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    progress = ProgressTracker()
+    prev = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {
+        "room_id": "105",
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+        "_skip_peak_room": "106",
+    }
+    reward, bd = _reward(prev, cur, q, progress=progress)
+    assert progress.kenneth_gate_breached is True
+    assert bd["main_hall_before_kenneth"] == MAIN_HALL_BEFORE_KENNETH_PENALTY
+    assert bd["planner_divert"] == 0.0
+    assert reward == pytest.approx(STEP_PENALTY + MAIN_HALL_BEFORE_KENNETH_PENALTY)
+    terminated, _truncated, reason = RE1Env._termination_flags(
+        SimpleNamespace(
+            _stage={"mode": "planner_loyal", "max_steps": 3000},
+            _progress=progress,
+            _checkpoint_captured=False,
+            _episode_failure_override=None,
+            _planner_loyal_queue=q,
+            _step_count=3,
+            _episode_truncated=lambda: False,
+        ),
+        {"dead": False},
+    )
+    assert terminated is True
+    assert reason == "main_hall_before_kenneth"
 
 
 def test_planner_loyal_kenneth_gate_allows_hall_after_tea_room_flag() -> None:

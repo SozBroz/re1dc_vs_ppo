@@ -977,6 +977,7 @@ def _compute_planner_loyal_reward(
             rewarded_cutscenes=(
                 progress.observed_cutscenes | progress.rewarded_cutscenes
             ),
+            peak_room=state.get("_skip_peak_room"),
         ):
             new_kenneth_gate_breach = progress.breach_kenneth_gate()
             if new_kenneth_gate_breach:
@@ -1355,6 +1356,7 @@ def compute_reward(
                 progress.observed_cutscenes | progress.rewarded_cutscenes
             ),
             visited_rooms=progress.visited_rooms,
+            peak_room=state.get("_skip_peak_room"),
         )
         if illegal_main_hall and not state.get("dead"):
             new_kenneth_gate_breach = progress.breach_kenneth_gate()

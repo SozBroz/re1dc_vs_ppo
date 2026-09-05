@@ -171,14 +171,21 @@ def illegal_main_hall_before_kenneth_transition(
     *,
     rewarded_cutscenes: Collection[str] | None,
     visited_rooms: Collection[str] | None = None,
+    peak_room: str | None = None,
 ) -> bool:
     """True on a transition *into* Main Hall (106) before Kenneth paid.
 
     Does not fire for starting/resetting in 106, remaining in 106, or entering
     106 after the canonical tea-room Kenneth beat (``104:*:sN``) has paid.
+
+    Turbo skip can bounce Wesker 105→106→105 inside one chunk so settle never
+    shows 106. ``peak_room`` from mid-skip RAM still counts as entering 106.
     """
     del visited_rooms
-    if str(room) != MAIN_HALL_ROOM:
+    dest = str(room or "")
+    peak = str(peak_room or "").strip().upper()
+    entered = dest == MAIN_HALL_ROOM or peak == MAIN_HALL_ROOM
+    if not entered:
         return False
     prev = str(prev_room or "")
     if not prev or prev == MAIN_HALL_ROOM:

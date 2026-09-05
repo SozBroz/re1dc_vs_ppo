@@ -58,7 +58,12 @@ SKIP_POLL_RAM_FIELDS: list[tuple[str, int, str]] = [
     ("game_mode", GAME_MODE, "u8"),
     ("msg_flag", MESSAGE_FLAG, "u8"),
     ("scene_flag", SCENE_FLAG, "u8"),
+    ("stage_id", STAGE_ID, "u8"),
+    ("room_id", ROOM_ID, "u8"),
 ]
+
+# Wesker/Barry hall cinema; skip settle can land back in dining.
+_MAIN_HALL_ROOM = "106"
 
 SKIP_POLL_FIELDS: list[tuple[str, int, str]] = [
     ("game_mode", GAME_MODE, "u8"),
@@ -208,13 +213,27 @@ class RamSkipper:
         # Mid-skip peaks from Lua fast_forward (Kenneth 0x84, dialogue msg, …).
         self.last_skip_peak_scene_flag: int | None = None
         self.last_skip_peak_msg_flag: int | None = None
+        self.last_skip_peak_room: str | None = None
 
     def clear_skip_script_peaks(self) -> None:
         self.last_skip_peak_scene_flag = None
         self.last_skip_peak_msg_flag = None
+        self.last_skip_peak_room = None
+
+    def note_skip_peak_room(self, room: str | None) -> None:
+        """Latch Main Hall if turbo skip visits 106 mid-chunk."""
+        code = str(room or "").strip().upper()
+        if code == _MAIN_HALL_ROOM:
+            self.last_skip_peak_room = code
 
     def note_skip_script_peaks(
-        self, *, peak_scene_flag: int | None = None, peak_msg_flag: int | None = None
+        self,
+        *,
+        peak_scene_flag: int | None = None,
+        peak_msg_flag: int | None = None,
+        peak_room: str | None = None,
+        stage_id: int | None = None,
+        room_id: int | None = None,
     ) -> None:
         """Accumulate script evidence across skip chunks for cutscene qualify."""
         from re1_rl.cutscene_reward import scene_flag_shows_script
@@ -231,6 +250,10 @@ class RamSkipper:
             cur_m = self.last_skip_peak_msg_flag
             if cur_m is None or (pm != 0 and int(cur_m) == 0):
                 self.last_skip_peak_msg_flag = pm
+        if peak_room:
+            self.note_skip_peak_room(peak_room)
+        elif stage_id is not None and room_id is not None:
+            self.note_skip_peak_room(room_code(int(stage_id), int(room_id)))
 
     def install_engine_patches(self) -> None:
         """Door-skip + optional cutscene turbo (re-applied every frame)."""
@@ -279,9 +302,13 @@ class RamSkipper:
         burned = 0
         death_abort = False
         # Seed peaks from the pre-burn poll (session may start already on 0x84).
+        # Do not clear last_skip_peak_room here: async skip calls this once
+        # per chunk and the Wesker bounce must survive until settle.
         self.note_skip_script_peaks(
             peak_scene_flag=int(ram.get("scene_flag", 0) or 0),
             peak_msg_flag=int(ram.get("msg_flag", 0) or 0),
+            stage_id=ram.get("stage_id"),
+            room_id=ram.get("room_id"),
         )
         while burned < max_frames:
             ram = self.bridge.read_ram(SKIP_POLL_RAM_FIELDS)
@@ -290,6 +317,8 @@ class RamSkipper:
             self.note_skip_script_peaks(
                 peak_scene_flag=int(ram.get("scene_flag", 0) or 0),
                 peak_msg_flag=int(ram.get("msg_flag", 0) or 0),
+                stage_id=ram.get("stage_id"),
+                room_id=ram.get("room_id"),
             )
             res = self.bridge.fast_forward(
                 min(max(1, int(chunk)), max_frames - burned),
@@ -305,10 +334,15 @@ class RamSkipper:
                 death_hp_addr=PLAYER_HP,
                 abort_on_zero_hp=True,
             )
-            if "peak_scene_flag" in res or "peak_msg_flag" in res:
+            if (
+                "peak_scene_flag" in res
+                or "peak_msg_flag" in res
+                or "peak_room" in res
+            ):
                 self.note_skip_script_peaks(
                     peak_scene_flag=res.get("peak_scene_flag"),
                     peak_msg_flag=res.get("peak_msg_flag"),
+                    peak_room=res.get("peak_room"),
                 )
             step_burned = int(res["burned"])
             burned += step_burned

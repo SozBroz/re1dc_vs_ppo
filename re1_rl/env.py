@@ -1944,6 +1944,10 @@ class RE1Env(gym.Env):
         self._skip_frames_charged = 0
         self._pending_skip_room_crossings = []
         self._pending_episode_failure = None
+        try:
+            self._ram_skip.clear_skip_script_peaks()
+        except AttributeError:
+            pass
         # Flush PPO/sticky carry before any post-load frames advance. Worker
         # samples the next action only after this reset returns.
         self._sticky_input.reset()
@@ -2657,6 +2661,17 @@ class RE1Env(gym.Env):
             peak_msg_flag=getattr(ram_skip, "last_skip_peak_msg_flag", None),
         )
 
+    def _attach_skip_peak_room(self, state: dict[str, Any] | None) -> None:
+        """Stamp mid-skip hall room + scene peak onto the settle state."""
+        if not state:
+            return
+        peak = getattr(self._ram_skip, "last_skip_peak_room", None)
+        if peak:
+            state["_skip_peak_room"] = str(peak)
+        peak_sf = getattr(self._ram_skip, "last_skip_peak_scene_flag", None)
+        if peak_sf is not None:
+            state["_skip_peak_scene_flag"] = int(peak_sf)
+
     def _merge_post_skip_breakdown(
         self, reward: float, bd: dict[str, float]
     ) -> None:
@@ -2706,6 +2721,11 @@ class RE1Env(gym.Env):
             return False
         if state.get("dead"):
             return False
+        peak = None
+        if state:
+            peak = state.get("_skip_peak_room")
+        if not peak:
+            peak = getattr(self._ram_skip, "last_skip_peak_room", None)
         return illegal_main_hall_before_kenneth_transition(
             str(prev_state.get("room_id", "") or ""),
             str(state.get("room_id", "") or ""),
@@ -2714,6 +2734,7 @@ class RE1Env(gym.Env):
                 | self._progress.rewarded_cutscenes
             ),
             visited_rooms=self._progress.visited_rooms,
+            peak_room=peak,
         )
 
     def _illegal_main_hall_failure_reason(
@@ -2840,6 +2861,7 @@ class RE1Env(gym.Env):
             crossing["_skip_peak_scene_flag"] = getattr(
                 ram_skip, "last_skip_peak_scene_flag", None
             )
+            self._attach_skip_peak_room(crossing)
             self._attach_richard_transition_evidence(entry, crossing)
             crossing["cutscene_key"] = None
             # Physical skip time is billed once by _bill_async_skip_step_penalty
@@ -2912,6 +2934,7 @@ class RE1Env(gym.Env):
 
         state = self._read_state(track_items=True)
         state = dict(state)
+        self._attach_skip_peak_room(state)
         inv_after = None
         inv_before = getattr(self, "_inventory_before_skip", None)
         entry_prev = getattr(self, "_cutscene_skip_entry_prev", None) or self._prev_state
@@ -5437,6 +5460,8 @@ class RE1Env(gym.Env):
         self._record_leg_replay_step(action, int(step_emulated_frames))
         frame_obs = self.bridge.build_frame_stack()
         state = self._read_state()
+        if skipped > 0:
+            self._attach_skip_peak_room(state)
         macro_pins = self._refresh_anim_history_before_obs(state)
         state["anim_history"] = list(getattr(self, "_anim_history", []))
         if macro_pins:

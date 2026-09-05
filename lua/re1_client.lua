@@ -783,6 +783,15 @@ local function handle_command(cmd)
         -- idle 0x80 at both Python endpoints; qualify needs mid-skip evidence.
         local peak_scene_flag = 0
         local peak_msg_flag = 0
+        -- STAGE_ID 0x800C8660 / ROOM_ID 0x800C8661 — Wesker bounce 105→106→105.
+        local stage_off = ps1_to_mainram(0x800C8660)
+        local room_off = ps1_to_mainram(0x800C8661)
+        local function room_code()
+            local st = memory.readbyte(stage_off, "MainRAM")
+            local rm = memory.readbyte(room_off, "MainRAM")
+            return string.format("%d%02X", st + 1, rm)
+        end
+        local peak_room = room_code()
         if scene_off then
             peak_scene_flag = memory.readbyte(scene_off, "MainRAM")
         end
@@ -805,6 +814,10 @@ local function handle_command(cmd)
                 elseif peak_msg_flag == 0 then
                     peak_msg_flag = mf
                 end
+            end
+            local rc = room_code()
+            if rc == "106" then
+                peak_room = rc
             end
         end
         note_peaks()
@@ -884,6 +897,7 @@ local function handle_command(cmd)
             scene_active = scene,
             peak_scene_flag = peak_scene_flag,
             peak_msg_flag = peak_msg_flag,
+            peak_room = peak_room,
             death_abort = death_abort,
             frame = emu.framecount(),
         }

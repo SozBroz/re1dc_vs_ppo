@@ -287,8 +287,20 @@ def test_illegal_main_hall_gate_irreversibly_disables_positive_rewards() -> None
     assert illegal_main_hall_before_kenneth_transition(
         "105", "106", rewarded_cutscenes=set()
     )
+    assert illegal_main_hall_before_kenneth_transition(
+        "105", "105", rewarded_cutscenes=set(), peak_room="106"
+    )
+    assert not illegal_main_hall_before_kenneth_transition(
+        "105", "105", rewarded_cutscenes=set(), peak_room="105"
+    )
     assert not illegal_main_hall_before_kenneth_transition(
         "105", "106", rewarded_cutscenes=AFTER_KENNETH
+    )
+    assert not illegal_main_hall_before_kenneth_transition(
+        "105", "105", rewarded_cutscenes=AFTER_KENNETH, peak_room="106"
+    )
+    assert not illegal_main_hall_before_kenneth_transition(
+        "106", "105", rewarded_cutscenes=set(), peak_room="106"
     )
     assert ILLEGAL_MAIN_HALL_FAILURE_REASON == "main_hall_before_kenneth"
     from re1_rl.cutscene_reward import (
@@ -318,6 +330,17 @@ def test_illegal_main_hall_gate_irreversibly_disables_positive_rewards() -> None
     assert bd["new_room"] == 0.0
     assert "106" not in progress.visited_rooms
     assert progress.kenneth_gate_breached
+
+    bounce = ProgressTracker()
+    bounce.seed_spawn_room("105")
+    bounce_cur = make_state(room="105", cam_id=0, hp=96)
+    bounce_cur["_skip_peak_room"] = "106"
+    _, bounce_bd = compute_reward(
+        prev, bounce_cur, make_planner(), progress=bounce, return_breakdown=True
+    )
+    assert bounce_bd[ILLEGAL_MAIN_HALL_FAILURE_REASON] == -0.05
+    assert "106" not in bounce.visited_rooms
+    assert bounce.kenneth_gate_breached
 
     # The penalty is one-shot, but the positive-reward poison is permanent.
     _, repeated = compute_reward(

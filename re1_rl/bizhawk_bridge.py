@@ -525,7 +525,7 @@ class BizHawkClient:
         resp = self._request(req)
         if not resp.get("ok"):
             raise RuntimeError(resp.get("error", "fast_forward failed"))
-        return {
+        out: dict[str, int | bool | str] = {
             "burned": int(resp.get("burned", 0)),
             "mode": int(resp.get("mode", 0)),
             "in_control": bool(resp.get("in_control", False)),
@@ -534,6 +534,13 @@ class BizHawkClient:
             "death_abort": bool(resp.get("death_abort", False)),
             "frame": int(resp.get("frame", -1)),
         }
+        if "peak_scene_flag" in resp:
+            out["peak_scene_flag"] = int(resp.get("peak_scene_flag") or 0)
+        if "peak_msg_flag" in resp:
+            out["peak_msg_flag"] = int(resp.get("peak_msg_flag") or 0)
+        if resp.get("peak_room"):
+            out["peak_room"] = str(resp.get("peak_room"))
+        return out
 
     def load_savestate(self, path: str) -> None:
         self._request({"cmd": "loadstate", "path": path})

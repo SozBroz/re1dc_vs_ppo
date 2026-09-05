@@ -428,6 +428,37 @@ def test_kenneth_scene_skip_burns_frames() -> None:
     assert skipper.last_skip_peak_scene_flag == 0x84
 
 
+def test_note_skip_peak_room_latches_main_hall() -> None:
+    skipper = RamSkipper(FakeBridge(), training_speed=100, cutscene_speed=6400)
+    skipper.note_skip_script_peaks(stage_id=0, room_id=5)
+    assert skipper.last_skip_peak_room is None
+    skipper.note_skip_script_peaks(peak_room="106")
+    skipper.note_skip_script_peaks(peak_room="105")
+    assert skipper.last_skip_peak_room == "106"
+    skipper.clear_skip_script_peaks()
+    assert skipper.last_skip_peak_room is None
+
+
+def test_skip_uncontrolled_latches_hall_between_chunks() -> None:
+    class HallBounceBridge(FakeBridge):
+        def read_ram(self, fields):
+            ram = super().read_ram(fields)
+            ram["stage_id"] = 0
+            ram["room_id"] = 6 if 8 <= self.frame < 24 else 5
+            return ram
+
+        def fast_forward(self, max_frames: int, **kwargs):
+            res = super().fast_forward(max_frames, **kwargs)
+            res["peak_room"] = "106" if 8 <= self.frame < 24 else "105"
+            return res
+
+    bridge = HallBounceBridge(uncontrolled_frames=32)
+    skipper = RamSkipper(bridge, training_speed=100, cutscene_speed=6400)
+    burned, _ = skipper.skip_uncontrolled(max_frames=600, chunk=8)
+    assert burned == 32
+    assert skipper.last_skip_peak_room == "106"
+
+
 def test_note_skip_script_peaks_prefers_kenneth_scene() -> None:
     skipper = RamSkipper(FakeBridge(), training_speed=100, cutscene_speed=6400)
     skipper.note_skip_script_peaks(peak_scene_flag=0x80, peak_msg_flag=0x00)

@@ -427,6 +427,45 @@ def test_skip_crossing_queues_kenneth_failure_for_fast_step() -> None:
     assert not env._skipping_flag
 
 
+def test_wesker_bounce_settle_queues_kenneth_failure() -> None:
+    """C-RE1 turbo can land back in 105; mid-skip 106 still ends the episode."""
+    from re1_rl.cutscene_reward import ILLEGAL_MAIN_HALL_FAILURE_REASON
+    from re1_rl.progress import ProgressTracker
+    from re1_rl.reward import compute_reward
+    from tests.test_scaffolding import make_planner
+
+    env = _stub_env(async_cutscene_skip=True)
+    env._progress = ProgressTracker()
+    env._progress.first_visit("105")
+    env._planner = make_planner()
+    env._ram_skip.last_skip_peak_room = "106"
+    env._attach_skip_peak_room = RE1Env._attach_skip_peak_room.__get__(env, RE1Env)
+    env._queue_kenneth_gate_failure_if_needed = (
+        RE1Env._queue_kenneth_gate_failure_if_needed.__get__(env, RE1Env)
+    )
+    prev = {
+        "room_id": "105",
+        "hp": 96,
+        "in_control": True,
+        "inventory": [],
+        "inventory_slots": [],
+    }
+    settle = dict(prev)
+    env._attach_skip_peak_room(settle)
+    assert settle["_skip_peak_room"] == "106"
+    compute_reward(
+        prev,
+        settle,
+        env._planner,
+        progress=env._progress,
+        return_breakdown=True,
+    )
+    env._queue_kenneth_gate_failure_if_needed()
+    assert env._progress.kenneth_gate_breached
+    assert env._pending_episode_failure == ILLEGAL_MAIN_HALL_FAILURE_REASON
+    assert "106" not in env._progress.visited_rooms
+
+
 def test_fast_cutscene_step_polls_hp_when_cache_stale() -> None:
     env = _stub_env(async_cutscene_skip=True)
     env._skipping_flag = True
