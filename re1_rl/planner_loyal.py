@@ -260,14 +260,6 @@ class PlannerLoyalQueue:
             return None
         return self._steps[self._index]
 
-
-def read_queue_current(queue: PlannerLoyalQueue) -> dict[str, Any]:
-    """Return the current step dict. ``current`` is a property, not a method."""
-    cur = getattr(queue, "current", None)
-    if callable(cur):
-        cur = cur()
-    return cur or {}
-
     @property
     def done(self) -> bool:
         return self._index >= len(self._steps)
@@ -791,6 +783,14 @@ def read_queue_current(queue: PlannerLoyalQueue) -> dict[str, Any]:
                 return result
 
         return result
+
+
+def read_queue_current(queue: PlannerLoyalQueue) -> dict[str, Any]:
+    """Return the current step dict. ``current`` is a property, not a method."""
+    cur = getattr(queue, "current", None)
+    if callable(cur):
+        cur = cur()
+    return cur or {}
 
 
 def _ink_ribbon_consumed(prev_state: dict[str, Any], state: dict[str, Any]) -> bool:
