@@ -30,6 +30,7 @@ from re1_rl.planner_loyal import (
     load_chunk,
     planner_loyal_enabled,
     prune_route_admin_goal,
+    read_queue_current,
     validate_planner_loyal_chunk,
 )
 from re1_rl.room_graph import RoomGraph
@@ -191,6 +192,14 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert "108:handgun_bullets:1" in pickups
     enter_108 = next(i for i, s in enumerate(steps) if s.get("edge_id") == "107->108")
     assert steps[enter_108 + 1]["pickup_id"] == "108:handgun_bullets:1"
+
+
+def test_read_queue_current_is_step_dict_not_callable():
+    q = PlannerLoyalQueue()
+    assert not callable(q.current)
+    cur = read_queue_current(q)
+    assert isinstance(cur, dict)
+    assert cur.get("edge_id") == "106->105"
 
 
 def test_opening_chunk_emblem_acquire_is_first_step():

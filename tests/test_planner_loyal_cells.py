@@ -309,6 +309,12 @@ def test_cells_from_another_chunk_only_qualify_at_the_tip(
     assert [int(row["checkpoint_index"]) for row in starts] == [6, 7]
     assert seek_index_after_cell(starts[0], "cp05_shield_key") == 0
     assert seek_index_after_cell(starts[1], "cp05_shield_key") == 1
+    # An explicit pin overrides the chunk filter (seek falls to the slot rule).
+    _write_pin(tmp_path, "RE1_PLANNER_RESET_PIN_INDEX=3\n")
+    pinned = iter_training_start_cells(tmp_path)
+    assert [int(row["checkpoint_index"]) for row in pinned] == [3]
+    assert seek_index_after_cell(pinned[0], "cp05_shield_key") == 0
+    _write_pin(tmp_path, "RE1_PLANNER_RESET_PIN_INDEX=\n")
 
     # Under the opening chunk the same tree yields pl01..pl05 (pl06 is final).
     opening = _write_chunk(

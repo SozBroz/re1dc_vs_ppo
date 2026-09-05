@@ -638,7 +638,16 @@ def iter_training_start_cells(
     skipped_foreign = 0
     for row in _scan_cells(root):
         idx = int(row["checkpoint_index"])
-        if _chunk_mismatch(row, live_id) and idx != TRAINING_START_INDEX:
+        # Only this runtime's payload is loadable (scan lists both runtimes).
+        state_p = root / "cells" / cell_dir_name(idx) / cell_state_filename()
+        sidecar_p = state_p.with_name(CELL_SIDECAR_NAME)
+        if not (state_p.is_file() and sidecar_p.is_file()):
+            continue
+        if (
+            _chunk_mismatch(row, live_id)
+            and idx != TRAINING_START_INDEX
+            and idx not in pinned  # explicit pin wins; seek falls to slot rule
+        ):
             skipped_foreign += 1
             continue
         if idx < TRAINING_START_INDEX and not (
@@ -648,10 +657,7 @@ def iter_training_start_cells(
             continue
         if not cell_has_remaining_planner_step(row, n_steps, live_id):
             continue
-        state_p = root / "cells" / cell_dir_name(idx) / cell_state_filename()
-        sidecar_p = state_p.with_name(CELL_SIDECAR_NAME)
-        if state_p.is_file() and sidecar_p.is_file():
-            out.append(row)
+        out.append(row)
     if skipped_foreign:
         print(
             f"[planner_loyal] skipped {skipped_foreign} cells minted by "

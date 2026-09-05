@@ -253,6 +253,10 @@ _DEATH_FAILURE_REASONS = frozenset(
 # OPTIONS / legacy CONFIG traps: dismiss and keep the episode alive (never
 # hard-reset — dismiss_options_menu is the recovery path).
 _OPTIONS_MENU_REASONS = frozenset({"options_menu", "pause_or_options_menu"})
+# Triangle-cancel cannot close some C-RE1 pause overlays; retrying burns ~300
+# frames per step and keeps sending need so the stale watchdog never fires.
+_ITEM_MENU_DISMISS_FAIL_LIMIT = 2
+_ITEM_MENU_STUCK_REASON = "item_menu_stuck"
 
 
 def _prune_square_pillarbox(square: np.ndarray) -> np.ndarray:
@@ -420,6 +424,7 @@ class RE1Env(gym.Env):
         self._box_list_cursor = 0
         self._box_inv_trusted_at_cursor = False
         self._episode_failure_override: str | None = None
+        self._item_menu_dismiss_fails = 0
         self._use_phase = 0
         self._inventory_before_use: list[tuple[int, int]] | None = None
         self._equip_phase = 0
@@ -1975,7 +1980,10 @@ class RE1Env(gym.Env):
         pb_bundle = resolve_pb_bundle(opts)
         # Planner-loyal: sample tip + opened non-final CPs; seek queue past completed steps.
         if getattr(self, "_planner_loyal_queue", None) is not None:
-            from re1_rl.planner_loyal_cells import sample_training_start_cell
+            from re1_rl.planner_loyal_cells import (
+                TRAINING_START_INDEX as _PL_TIP,
+                sample_training_start_cell,
+            )
 
             picked = sample_training_start_cell(self.project_root)
             if picked is not None and picked["state"].is_file() and picked["sidecar"].is_file():
@@ -1997,7 +2005,7 @@ class RE1Env(gym.Env):
                         if meta.get("checkpoint_index") is not None
                         else picked.get("checkpoint_index")
                         if picked.get("checkpoint_index") is not None
-                        else 5
+                        else _PL_TIP
                     ),
                     "room_id": meta.get("room_id")
                     or picked.get("room_id")
@@ -2005,6 +2013,7 @@ class RE1Env(gym.Env):
                     "state_sha256": meta.get("state_sha256"),
                     "sidecar_sha256": meta.get("sidecar_sha256"),
                     "planner_step_index": meta.get("planner_step_index"),
+                    "chunk_id": meta.get("chunk_id"),
                 }
                 print(
                     f"[planner_loyal] reset tip={picked['cell_dir'].name} "
@@ -2087,7 +2096,10 @@ class RE1Env(gym.Env):
             # Never soft-fall to stage init (pre-Kenneth / Barry stretch) —
             # that poisons planner-loyal with early-game episodes while the
             # queue may still think it is mid-chunk. Prefer the lockpick tip.
-            from re1_rl.planner_loyal_cells import training_start_paths
+            from re1_rl.planner_loyal_cells import (
+                TRAINING_START_INDEX as _PL_TIP,
+                training_start_paths,
+            )
 
             tip = training_start_paths(self.project_root)
             if tip["state"].is_file() and tip["sidecar"].is_file():
@@ -2106,17 +2118,18 @@ class RE1Env(gym.Env):
                     "checkpoint_index": int(
                         tip_meta.get("checkpoint_index")
                         if tip_meta.get("checkpoint_index") is not None
-                        else 5
+                        else _PL_TIP
                     ),
                     "room_id": tip_meta.get("room_id") or "106",
                     "state_sha256": tip_meta.get("state_sha256"),
                     "sidecar_sha256": tip_meta.get("sidecar_sha256"),
                     "planner_step_index": tip_meta.get("planner_step_index"),
+                    "chunk_id": tip_meta.get("chunk_id"),
                 }
                 state_path = tip["state"]
                 print(
-                    "[planner_loyal] refused sampled cell; "
-                    "falling back to pl05 tip (not stage init)",
+                    f"[planner_loyal] refused sampled cell; "
+                    f"falling back to {tip['cell_dir'].name} tip (not stage init)",
                     flush=True,
                 )
             else:
@@ -2170,6 +2183,7 @@ class RE1Env(gym.Env):
         self._box_list_cursor = 0
         self._box_inv_trusted_at_cursor = False
         self._episode_failure_override = None
+        self._item_menu_dismiss_fails = 0
         self._last_attack_obs = empty_last_attack()
         self._last_skip_frames = 0
         self._last_settled_skip_frames = 0
@@ -2213,22 +2227,36 @@ class RE1Env(gym.Env):
             self._planner_loyal_queue.reset()
             self._planner_loyal_last_success = None
             # Frontier starts resume mid-chunk after the completed step.
-            seek_raw = None
-            if isinstance(pb_bundle, dict):
-                seek_raw = pb_bundle.get("planner_step_index")
-            if seek_raw is None and isinstance(pb_bundle, dict):
-                # Tip pl05 has no completed planner step yet.
-                idx = pb_bundle.get("checkpoint_index")
-                if idx is not None and int(idx) > 5:
-                    seek_raw = int(idx) - 6
-            if seek_raw is not None:
+            # Tip/fresh cells (planner_step_index None/-1, slot <= tip) seek 0;
+            # a cell minted by another chunk falls back to the slot rule.
+            if isinstance(pb_bundle, dict) and (
+                pb_bundle.get("planner_step_index") is not None
+                or pb_bundle.get("checkpoint_index") is not None
+            ):
+                from re1_rl.planner_loyal_cells import seek_index_after_cell
+
                 try:
-                    self._planner_loyal_queue.seek(int(seek_raw) + 1)
+                    self._planner_loyal_queue.seek(
+                        seek_index_after_cell(
+                            pb_bundle, self._planner_loyal_queue.chunk_id
+                        )
+                    )
                 except (TypeError, ValueError):
                     pass
+            from re1_rl.planner_loyal import read_queue_current
+
+            cur = read_queue_current(self._planner_loyal_queue)
+            want = (
+                cur.get("beat_id")
+                or cur.get("edge_id")
+                or cur.get("pickup_id")
+                or cur.get("op")
+                or "done"
+            )
             print(
                 f"[planner_loyal] queue_seek index={self._planner_loyal_queue.index} "
-                f"done={int(self._planner_loyal_queue.done)}",
+                f"done={int(self._planner_loyal_queue.done)} "
+                f"want={want} chunk={self._planner_loyal_queue.chunk_id}",
                 flush=True,
             )
         self._box_opened_this_step = False
@@ -2256,56 +2284,79 @@ class RE1Env(gym.Env):
                     f"PB sidecar missing (State alone is not enough): {sidecar_path}"
                 )
             sidecar = load_sidecar_json(sidecar_path)
+            keep_graft = (
+                os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower()
+                == "recomp"
+                and str(state_path).lower().endswith(".pst")
+            )
             if not bundle_room_matches_sidecar(state.get("room_id"), sidecar):
-                print(
-                    f"[pb] State/sidecar room mismatch "
-                    f"ram={state.get('room_id')!r} "
-                    f"captured={sidecar.get('captured_room_id')!r}; "
-                    f"reloading fresh init_savestate",
-                    flush=True,
-                )
-                state_path = self.project_root / self._stage["init_savestate"]
-                # C-RE1 only loads .pst; BizHawk .State fallback would NotImplemented
-                # and kill the actor. Prefer a grafted quiet cell when on recomp.
-                if (
-                    str(state_path).lower().endswith(".state")
-                    or os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower()
-                    == "recomp"
-                ):
-                    recomp_root = Path(
-                        os.environ.get("RE1_RECOMP_ROOT", r"D:\re1_recomp")
+                if keep_graft:
+                    print(
+                        f"[pb] graft room decode mismatch; keeping pst "
+                        f"ram={state.get('room_id')!r} "
+                        f"captured={sidecar.get('captured_room_id')!r}",
+                        flush=True,
                     )
-                    pst_fallback = (
-                        recomp_root
-                        / "ecosystem"
-                        / "states"
-                        / "recomp_pl"
-                        / "cells"
-                        / "pl05"
-                        / "cell.pst"
+                    apply_episode_sidecar(self, sidecar, reset_softlock=True)
+                    state = self._read_state(track_items=True)
+                    self._seed_episode_hp(state)
+                    rooms = sorted(self._progress.visited_rooms)
+                    print(
+                        f"[pb] reset applied sidecar visited={rooms} "
+                        f"bundle_id={sidecar.get('bundle_id')} "
+                        f"state={pb_bundle.get('state_path')}",
+                        flush=True,
                     )
-                    if pst_fallback.is_file():
-                        state_path = pst_fallback
-                        print(
-                            f"[pb] recomp fresh fallback -> {state_path}",
-                            flush=True,
+                else:
+                    print(
+                        f"[pb] State/sidecar room mismatch "
+                        f"ram={state.get('room_id')!r} "
+                        f"captured={sidecar.get('captured_room_id')!r}; "
+                        f"reloading fresh init_savestate",
+                        flush=True,
+                    )
+                    state_path = self.project_root / self._stage["init_savestate"]
+                    # C-RE1 only loads .pst; BizHawk .State fallback would
+                    # NotImplemented and kill the actor.
+                    if (
+                        str(state_path).lower().endswith(".state")
+                        or os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower()
+                        == "recomp"
+                    ):
+                        recomp_root = Path(
+                            os.environ.get("RE1_RECOMP_ROOT", r"D:\re1_recomp")
                         )
-                self.bridge.load_savestate(str(state_path))
-                self._sticky_input.reset()
-                self._prev_action = None
-                self.bridge.clear_latched_input()
-                self.bridge.frameadvance(1)
-                if self._ram_skip.use_engine_patches:
-                    self._ram_skip.install_engine_patches()
-                self._skip_uncontrolled()
-                self.bridge.clear_latched_input()
-                self._progress = ProgressTracker(leg_span=self._leg_span)
-                self._visited.reset()
-                self._box_cache = None
-                state = self._read_state(track_items=True)
-                self._seed_episode_progress(state)
-                self._episode_history.reset(str(state.get("room_id", "")), step=0)
-                pb_bundle = None
+                        pst_fallback = (
+                            recomp_root
+                            / "ecosystem"
+                            / "states"
+                            / "recomp_pl"
+                            / "cells"
+                            / "pl05"
+                            / "cell.pst"
+                        )
+                        if pst_fallback.is_file():
+                            state_path = pst_fallback
+                            print(
+                                f"[pb] recomp fresh fallback -> {state_path}",
+                                flush=True,
+                            )
+                    self.bridge.load_savestate(str(state_path))
+                    self._sticky_input.reset()
+                    self._prev_action = None
+                    self.bridge.clear_latched_input()
+                    self.bridge.frameadvance(1)
+                    if self._ram_skip.use_engine_patches:
+                        self._ram_skip.install_engine_patches()
+                    self._skip_uncontrolled()
+                    self.bridge.clear_latched_input()
+                    self._progress = ProgressTracker(leg_span=self._leg_span)
+                    self._visited.reset()
+                    self._box_cache = None
+                    state = self._read_state(track_items=True)
+                    self._seed_episode_progress(state)
+                    self._episode_history.reset(str(state.get("room_id", "")), step=0)
+                    pb_bundle = None
             else:
                 apply_episode_sidecar(self, sidecar, reset_softlock=True)
                 state = self._read_state(track_items=True)
@@ -2331,6 +2382,8 @@ class RE1Env(gym.Env):
         self._prev_hp = state["hp"]
         if getattr(self, "_planner_loyal_queue", None) is not None:
             self._planner_loyal_queue.note_start_inventory(state)
+            if os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower() == "recomp":
+                state = self._settle_recomp_planner_start(state)
         cell_minted = None
         if str(self._stage.get("mode") or "") == "yawn_rails":
             from re1_rl.yawn_rails_sync import (
@@ -2368,6 +2421,13 @@ class RE1Env(gym.Env):
                 state=state,
             )
         self._start_bg_skip()
+        try:
+            rgb = self.bridge.screenshot()
+            if self.bridge.emulated_frame >= 0:
+                self.bridge.frame_ring.store_rgb(self.bridge.emulated_frame, rgb)
+            frame_obs = self.bridge.build_frame_stack()
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            pass
 
         obs = self._build_obs(frame_obs, state)
         info = {
@@ -2379,6 +2439,22 @@ class RE1Env(gym.Env):
         if pb_bundle is not None:
             info["pb_bundle"] = pb_bundle
         return obs, info
+
+    def _settle_recomp_planner_start(self, state: dict[str, Any]) -> dict[str, Any]:
+        """Eat C-RE1 graft room/inventory flicker before the first policy step."""
+        last = state
+        for _ in range(8):
+            try:
+                self.bridge.frameadvance(1)
+                last = self._read_state(track_items=True)
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                break
+        self._prev_state = last
+        self._prev_hp = last.get("hp")
+        queue = getattr(self, "_planner_loyal_queue", None)
+        if queue is not None:
+            queue.note_start_inventory(last)
+        return last
 
     def _seed_episode_hp(self, state: dict[str, Any]) -> None:
         """HP bookkeeping only (PB restore — sidecar owns progress trackers)."""
@@ -3773,6 +3849,17 @@ class RE1Env(gym.Env):
             self._sticky_input.reset()
         return True
 
+    def _note_item_menu_dismiss_result(self, recovered: bool) -> None:
+        """Trip a terminal after repeated C-RE1 item-menu dismiss failures."""
+        if recovered:
+            self._item_menu_dismiss_fails = 0
+            return
+        n = int(getattr(self, "_item_menu_dismiss_fails", 0)) + 1
+        self._item_menu_dismiss_fails = n
+        if n >= _ITEM_MENU_DISMISS_FAIL_LIMIT:
+            self._episode_failure_override = _ITEM_MENU_STUCK_REASON
+            self._pending_episode_failure = _ITEM_MENU_STUCK_REASON
+
     def _dismiss_non_box_pause_menu_if_safe(self) -> bool:
         """Triangle-close leftover ITEM/document pause; never touch box or Yes/No."""
         from re1_rl.item_box_ui_macro import probe_box_ui_open
@@ -3781,7 +3868,14 @@ class RE1Env(gym.Env):
             pause_menu_modal_from_ram,
         )
 
+        if getattr(self, "_pending_episode_failure", None) == _ITEM_MENU_STUCK_REASON:
+            return False
+        if int(getattr(self, "_item_menu_dismiss_fails", 0)) >= (
+            _ITEM_MENU_DISMISS_FAIL_LIMIT
+        ):
+            return False
         if not self._probe_item_inventory_menu():
+            self._item_menu_dismiss_fails = 0
             return False
         try:
             if probe_box_ui_open(self.bridge):
@@ -3819,7 +3913,9 @@ class RE1Env(gym.Env):
                 f"[item_menu_dismiss_fail] port={port} report={report}",
                 flush=True,
             )
-        return (not still), report
+        recovered = not still
+        self._note_item_menu_dismiss_result(recovered)
+        return recovered, report
 
     def _skip_uncontrolled(self, max_frames: int | None = None) -> tuple[int, bool]:
         """Wait at turbo speed until player control returns (doors, cutscenes)."""
@@ -5094,6 +5190,9 @@ class RE1Env(gym.Env):
                     if self._dismiss_non_box_pause_menu_if_safe():
                         self._skipping_flag = False
                         menu_reason = self._probe_outside_gameplay()
+        stuck_menu = self._flush_pending_episode_failure(action)
+        if stuck_menu is not None:
+            return stuck_menu
         if menu_reason in _OPTIONS_MENU_REASONS:
             options_step = self._recover_options_menu(action)
             if options_step is not None:

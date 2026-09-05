@@ -38,8 +38,9 @@ from re1_rl.distributed.worker_client import WorkerClient
 from re1_rl.training_progress import TrainingProgressTracker
 
 
-DEFAULT_ACTOR_STALE_TIMEOUT_S = 360.0
+DEFAULT_ACTOR_STALE_TIMEOUT_S = 720.0
 DEFAULT_EMUHAWK_HUNG_S = 30.0
+DEFAULT_ACTOR_RECOVER_COOLDOWN_S = 45.0
 
 
 def _pid_not_responding(pid: int | None) -> bool:
@@ -797,6 +798,15 @@ def run_async_worker_loop(
             )
         ),
     )
+    recover_cooldown_s = max(
+        0.0,
+        float(
+            os.environ.get(
+                "RE1_ACTOR_RECOVER_COOLDOWN_S",
+                str(DEFAULT_ACTOR_RECOVER_COOLDOWN_S),
+            )
+        ),
+    )
     health_lock = threading.Lock()
     healthy_actor_count = 0
 
@@ -935,6 +945,7 @@ def run_async_worker_loop(
         for conn in parent_conns:
             conn.send({"t": "start"})
         last_actor_activity = [time.monotonic()] * actor_count
+        last_recover_at = [0.0] * actor_count
         hung_since: list[float | None] = [None] * actor_count
         healthy_indices: set[int] = set()
         _set_healthy_actor_count(0)
@@ -1124,20 +1135,27 @@ def run_async_worker_loop(
                 # One rank per pass. Recovering N in parallel restampedes
                 # EmuHawk and, because this loop also serves inference,
                 # makes every other rank look silent.
-                target = stale_indices[:1]
-                hung_hit = [ranks[index] for index in target if index in hung_indices]
-                if hung_hit:
-                    log(
-                        machine_name,
-                        f"actor watchdog emuhawk hung ranks={hung_hit} "
-                        f"(>{hung_timeout_s:.0f}s Not Responding)",
+                ready = [
+                    index
+                    for index in stale_indices
+                    if (now - last_recover_at[index]) >= recover_cooldown_s
+                ]
+                if ready:
+                    target = ready[:1]
+                    last_recover_at[target[0]] = now
+                    hung_hit = [ranks[index] for index in target if index in hung_indices]
+                    if hung_hit:
+                        log(
+                            machine_name,
+                            f"actor watchdog emuhawk hung ranks={hung_hit} "
+                            f"(>{hung_timeout_s:.0f}s Not Responding)",
+                        )
+                    blocked_at = time.monotonic()
+                    _recover_actor_indices(target)
+                    _credit_parent_block(
+                        last_actor_activity, time.monotonic() - blocked_at
                     )
-                blocked_at = time.monotonic()
-                _recover_actor_indices(target)
-                _credit_parent_block(
-                    last_actor_activity, time.monotonic() - blocked_at
-                )
-                continue
+                    continue
 
             if policy.policy_version <= 0:
                 time.sleep(0.1)
