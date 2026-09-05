@@ -34,14 +34,14 @@ from re1_rl.progress import ProgressTracker
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_slot_numbering_pl00_fresh_pl08_tip_pl09_live() -> None:
+def test_slot_numbering_pl00_fresh_pl06_tip_pl07_live() -> None:
     assert FRESH_START_INDEX == 0
-    assert TRAINING_START_INDEX == 8
+    assert TRAINING_START_INDEX == 6
     assert SEED_SLOT_OFFSET == 1
     assert cell_dir_name(FRESH_START_INDEX) == "pl00"
-    assert cell_dir_name(TRAINING_START_INDEX) == "pl08"
-    # Live chunk (cp05_shield_key) completed step 0 = 106->105 mints pl09.
-    assert slot_index_for_completed_step(0) == 9
+    assert cell_dir_name(TRAINING_START_INDEX) == "pl06"
+    # Live chunk (cp05_shield_key) completed step 0 = 106->105 mints pl07.
+    assert slot_index_for_completed_step(0) == 7
     assert slot_index_for_completed_step(0) == TRAINING_START_INDEX + 1
     assert slot_index_for_completed_step(1) == TRAINING_START_INDEX + 2
     steps = [
@@ -60,14 +60,14 @@ def test_slot_numbering_pl00_fresh_pl08_tip_pl09_live() -> None:
     assert slot_index_for_completed_step(1, opening) == 2
 
 
-def test_opening_chunk_slots_are_pl01_to_pl08() -> None:
+def test_opening_chunk_slots_are_pl01_to_pl06() -> None:
     path = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
     chunk = json.loads(path.read_text(encoding="utf-8"))
     steps = chunk["steps"]
-    assert [s["slot_index"] for s in steps] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert [s["slot_index"] for s in steps] == [1, 2, 3, 4, 5, 6]
     assert steps[0]["pickup_id"] == "105:emblem:1"
-    assert steps[2]["pickup_id"] == "104:handgun_bullets:1"
-    assert steps[3]["pickup_id"] == "104:handgun_bullets:2"
+    assert steps[1]["edge_id"] == "105->104"
+    assert steps[2]["edge_id"] == "104->105"
     assert steps[-1]["edge_id"] == "203->106"
     assert steps[-1]["slot_index"] == TRAINING_START_INDEX
     for i in range(len(steps)):
@@ -78,18 +78,18 @@ def test_fresh_start_seeks_to_first_step() -> None:
     row = {"checkpoint_index": 0, "planner_step_index": -1, "training_start": True}
     assert seek_index_after_cell(row) == 0
     assert seek_index_after_cell({"checkpoint_index": TRAINING_START_INDEX}) == 0
-    assert seek_index_after_cell({"checkpoint_index": 9, "planner_step_index": 0}) == 1
-    assert seek_index_after_cell({"checkpoint_index": 10}) == 2
+    assert seek_index_after_cell({"checkpoint_index": 7, "planner_step_index": 0}) == 1
+    assert seek_index_after_cell({"checkpoint_index": 8}) == 2
 
 
 def test_seek_ignores_step_index_from_another_chunk() -> None:
     # Lockpick tip minted by the opening chunk is the live tip: seek 0.
     tip = {
         "checkpoint_index": TRAINING_START_INDEX,
-        "planner_step_index": 7,
+        "planner_step_index": 5,
         "chunk_id": "opening_to_lockpick",
     }
-    assert seek_index_after_cell(tip, "opening_to_lockpick") == 8
+    assert seek_index_after_cell(tip, "opening_to_lockpick") == 6
     assert seek_index_after_cell(tip, "cp05_shield_key") == 0
     live = {"checkpoint_index": 9, "planner_step_index": 2, "chunk_id": "cp05_shield_key"}
     assert seek_index_after_cell(live, "cp05_shield_key") == 3
@@ -102,6 +102,7 @@ def test_bootstrap_crystals_shifts_cp_to_pl_plus_one(
     crystals = PROJECT_ROOT / "backups" / "Crystals_in_time" / "cp05" / "cell.State"
     if not crystals.is_file():
         pytest.skip("Crystals archive absent")
+    monkeypatch.delenv("RE1_RECOMP_CELLS", raising=False)
     monkeypatch.setenv(
         "RE1_PLANNER_LOYAL_CELLS_ROOT", str(tmp_path / "states" / "planner_loyal")
     )
@@ -112,25 +113,22 @@ def test_bootstrap_crystals_shifts_cp_to_pl_plus_one(
     assert [row["checkpoint_index"] for row in result["copied"]] == [1, 2, 3, 4, 5, 6]
     root = planner_loyal_root(tmp_path)
     assert not (root / "cells" / "pl00").exists()  # fresh start is installed by hand
-    crystal_tip = root / "cells" / "pl06"
-    assert (crystal_tip / CELL_STATE_NAME).is_file()
-    meta = json.loads((crystal_tip / "meta.json").read_text(encoding="utf-8"))
+    tip = training_start_paths(tmp_path)
+    assert tip["cell_dir"].name == "pl06"
+    assert tip["state"].is_file() and tip["sidecar"].is_file()
+    meta = json.loads(tip["meta"].read_text(encoding="utf-8"))
     assert meta["checkpoint_index"] == 6
     assert meta["source"]["checkpoint"] == "cp05"
-    assert meta["training_start"] is False
+    assert meta["training_start"] is True
     assert json.loads((root / "cells" / "pl01" / "meta.json").read_text())["training_start"] is False
     assert (root / "manifest.json").is_file()
-    assert not (crystal_tip / "leg_replay.json").is_file()
+    assert not (tip["cell_dir"] / "leg_replay.json").is_file()
     # Existing slots are never rewritten without --force.
-    (crystal_tip / "meta.json").write_text(
-        '{"checkpoint_index": 6, "marker": 1}\n', encoding="utf-8"
-    )
+    (tip["meta"]).write_text('{"checkpoint_index": 6, "marker": 1}\n', encoding="utf-8")
     bootstrap_from_crystals(
         tmp_path, crystals_root=PROJECT_ROOT / "backups" / "Crystals_in_time"
     )
-    assert json.loads((crystal_tip / "meta.json").read_text(encoding="utf-8")).get(
-        "marker"
-    ) == 1
+    assert json.loads(tip["meta"].read_text(encoding="utf-8")).get("marker") == 1
 
 
 def test_installed_pl00_fresh_start_is_coherent() -> None:

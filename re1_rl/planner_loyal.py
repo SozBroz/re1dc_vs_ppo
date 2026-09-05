@@ -13,8 +13,8 @@ Reward contract (imperator 2026-08-25):
   grants (Barry acid, Speyer bazooka, …), and already-held *weapon* chamber
   bumps are not pickups. Floor piles always divert unless the current step is
   that exact ``acquire``. Extra items on an acquire (chemical plus a clip)
-  are also a divert. Dining return and ``105->106`` still require both
-  Kenneth clips (30 spare) so the Wesker cinema cannot despawn them first.
+  are also a divert. Opening remint does not take the 104 clips — the live
+  chunk comes back for them.
 - Cell timer: flat 12 minutes only (no custom yawn_cell_timeouts.json times).
 - Armor room 205: ``armor_room_enter`` (pl78), exact east vent (pl79),
   exact east+west vents (pl80), then ``sun_crest`` acquire (pl81).
@@ -709,22 +709,6 @@ class PlannerLoyalQueue:
                 result["divert_reason"] = "barry_return_before_kenneth"
                 self.divert_reason = result["divert_reason"]
                 return result
-            from re1_rl.barry_return_checkpoint import (
-                BARRY_RETURN_BEFORE_TEA_CLIPS,
-                MAIN_HALL_BEFORE_TEA_CLIPS,
-                tea_room_clips_in_inventory,
-            )
-
-            if edge == "104->105" and not tea_room_clips_in_inventory(state):
-                result["divert"] = True
-                result["divert_reason"] = BARRY_RETURN_BEFORE_TEA_CLIPS
-                self.divert_reason = result["divert_reason"]
-                return result
-            if edge == "105->106" and not tea_room_clips_in_inventory(state):
-                result["divert"] = True
-                result["divert_reason"] = MAIN_HALL_BEFORE_TEA_CLIPS
-                self.divert_reason = result["divert_reason"]
-                return result
             # Correct traverse completed.
             result["step_success"] = True
             self._index += 1
@@ -737,23 +721,6 @@ class PlannerLoyalQueue:
             expected = edge.split("->", 1)[1] if "->" in edge else ""
             if expected and room == expected:
                 if edge == "104->105" and not _kenneth_seen(progress):
-                    return result
-                from re1_rl.barry_return_checkpoint import (
-                    BARRY_RETURN_BEFORE_TEA_CLIPS,
-                    MAIN_HALL_BEFORE_TEA_CLIPS,
-                    tea_room_clips_in_inventory,
-                )
-
-                if edge in {"104->105", "105->106"} and not tea_room_clips_in_inventory(
-                    state
-                ):
-                    result["divert"] = True
-                    result["divert_reason"] = (
-                        BARRY_RETURN_BEFORE_TEA_CLIPS
-                        if edge == "104->105"
-                        else MAIN_HALL_BEFORE_TEA_CLIPS
-                    )
-                    self.divert_reason = result["divert_reason"]
                     return result
                 result["step_success"] = True
                 self._index += 1

@@ -209,7 +209,7 @@ def test_opening_chunk_emblem_acquire_is_first_step():
     assert q.current["pickup_id"] == "105:emblem:1"
     # pl00 is the fresh-start tip; emblem is the first minted slot.
     assert q.current["slot_index"] == 1
-    assert [s["slot_index"] for s in q._steps] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert [s["slot_index"] for s in q._steps] == [1, 2, 3, 4, 5, 6]
     prev = {"room_id": "105", "inventory_slots": [("beretta", 15), ("knife", 0)]}
     q.note_start_inventory(prev)
     result = q.evaluate_transition(
@@ -1091,7 +1091,7 @@ def test_planner_loyal_dining_return_without_kenneth_is_terminal() -> None:
     """104→105 before 104:*:sN is a divert; the cinema must play first."""
     opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
     q = PlannerLoyalQueue(chunk_path=opening)
-    q.seek(4)  # 104->105
+    q.seek(2)  # 104->105
     progress = ProgressTracker()
     prev = {"room_id": "104", "inventory_slots": [], "hp": 96, "in_control": True}
     cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
@@ -1120,14 +1120,13 @@ def test_planner_loyal_kenneth_skip_peak_unlocks_dining_return() -> None:
     """C-RE1 turbo Kenneth settles idle 0x80; mid-skip 0x84 still writes 104:*:sN."""
     opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
     q = PlannerLoyalQueue(chunk_path=opening)
-    q.seek(4)
+    q.seek(2)
     progress = ProgressTracker()
-    clips = [("handgun_bullets", 30)]
     idle = {
         "room_id": "104",
         "cam_id": 4,
         "scene_flag": 0x80,
-        "inventory_slots": clips,
+        "inventory_slots": [],
         "hp": 96,
         "in_control": True,
         "_skip_peak_scene_flag": 0x84,
@@ -1136,7 +1135,7 @@ def test_planner_loyal_kenneth_skip_peak_unlocks_dining_return() -> None:
     assert "104:4:s0" in progress.observed_cutscenes
     dining = {
         "room_id": "105",
-        "inventory_slots": clips,
+        "inventory_slots": [],
         "hp": 96,
         "in_control": True,
     }
@@ -1149,20 +1148,19 @@ def test_planner_loyal_kenneth_skip_peak_unlocks_dining_return() -> None:
 def test_planner_loyal_dining_return_after_kenneth_completes() -> None:
     opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
     q = PlannerLoyalQueue(chunk_path=opening)
-    q.seek(4)
+    q.seek(2)
     progress = ProgressTracker()
     progress.observe_cutscene("104:0:s0")
-    clips = [("handgun_bullets", 30)]
-    prev = {"room_id": "104", "inventory_slots": clips, "hp": 96, "in_control": True}
-    cur = {"room_id": "105", "inventory_slots": clips, "hp": 96, "in_control": True}
+    prev = {"room_id": "104", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
     _reward_total, bd = _reward(prev, cur, q, progress=progress)
     assert bd["planner_divert"] == 0.0
     assert bd["planner_step_success"] > 0.0
     assert q.divert_reason is None
 
 
-def test_planner_loyal_tea_room_clips_divert_until_their_acquire() -> None:
-    """Clips are legal only on the acquire step, not on 105->104 / 104->105."""
+def test_opening_tea_room_clips_divert_until_live_acquire() -> None:
+    """Opening 105->104 is a walk. Live chunk comes back for the 104 piles."""
     opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
     q = PlannerLoyalQueue(chunk_path=opening)
     q.seek(1)  # 105->104 kenneth
@@ -1176,18 +1174,6 @@ def test_planner_loyal_tea_room_clips_divert_until_their_acquire() -> None:
     )
     assert result["divert"] is True
     assert "handgun_bullets" in str(result["divert_reason"])
-    q = PlannerLoyalQueue(chunk_path=opening)
-    q.seek(2)  # 104:handgun_bullets:1
-    result = q.evaluate_transition(
-        prev_state={"room_id": "104", "inventory_slots": [("beretta", 15)]},
-        state={
-            "room_id": "104",
-            "inventory_slots": [("beretta", 15), ("handgun_bullets", 15)],
-            "new_items": ["handgun_bullets"],
-        },
-    )
-    assert result["divert"] is False
-    assert result["step_success"] is True
 
 
 def test_acquire_plus_extra_ammo_is_unplanned_pickup() -> None:
@@ -1210,61 +1196,6 @@ def test_acquire_plus_extra_ammo_is_unplanned_pickup() -> None:
     assert result["divert"] is True
     assert "handgun_bullets" in str(result["divert_reason"])
     assert result["step_success"] is False
-
-
-def test_planner_loyal_dining_return_without_tea_clips_is_terminal() -> None:
-    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
-    q = PlannerLoyalQueue(chunk_path=opening)
-    q.seek(4)
-    progress = ProgressTracker()
-    progress.observe_cutscene("104:0:s0")
-    prev = {"room_id": "104", "inventory_slots": [], "hp": 96, "in_control": True}
-    cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
-    reward, bd = _reward(prev, cur, q, progress=progress)
-    assert bd["planner_divert"] == PLANNER_DIVERT_PENALTY
-    assert q.divert_reason == "barry_return_before_tea_clips"
-    terminated, _truncated, reason = RE1Env._termination_flags(
-        SimpleNamespace(
-            _stage={"mode": "planner_loyal", "max_steps": 3000},
-            _progress=progress,
-            _checkpoint_captured=False,
-            _episode_failure_override=None,
-            _planner_loyal_queue=q,
-            _step_count=3,
-            _episode_truncated=lambda: False,
-        ),
-        {"dead": False},
-    )
-    assert terminated is True
-    assert reason == "barry_return_before_tea_clips"
-    assert reward == pytest.approx(STEP_PENALTY + PLANNER_DIVERT_PENALTY)
-
-
-def test_planner_loyal_hall_without_tea_clips_is_terminal() -> None:
-    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
-    q = PlannerLoyalQueue(chunk_path=opening)
-    q.seek(5)
-    progress = ProgressTracker()
-    progress.observe_cutscene("104:0:s0")
-    prev = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
-    cur = {"room_id": "106", "inventory_slots": [], "hp": 96, "in_control": True}
-    _reward_total, bd = _reward(prev, cur, q, progress=progress)
-    assert bd["planner_divert"] == PLANNER_DIVERT_PENALTY
-    assert q.divert_reason == "main_hall_before_tea_clips"
-    terminated, _truncated, reason = RE1Env._termination_flags(
-        SimpleNamespace(
-            _stage={"mode": "planner_loyal", "max_steps": 3000},
-            _progress=progress,
-            _checkpoint_captured=False,
-            _episode_failure_override=None,
-            _planner_loyal_queue=q,
-            _step_count=3,
-            _episode_truncated=lambda: False,
-        ),
-        {"dead": False},
-    )
-    assert terminated is True
-    assert reason == "main_hall_before_tea_clips"
 
 
 def test_planner_loyal_wesker_bounce_skip_kills_without_settle_in_hall() -> None:
@@ -1304,12 +1235,11 @@ def test_planner_loyal_wesker_bounce_skip_kills_without_settle_in_hall() -> None
 def test_planner_loyal_kenneth_gate_allows_hall_after_tea_room_flag() -> None:
     opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
     q = PlannerLoyalQueue(chunk_path=opening)
-    q.seek(5)  # 105->106 after Kenneth
+    q.seek(3)  # 105->106 after Kenneth
     progress = ProgressTracker()
     progress.observe_cutscene("104:0:s0")
-    clips = [("handgun_bullets", 30)]
-    prev = {"room_id": "105", "inventory_slots": clips, "hp": 96, "in_control": True}
-    cur = {"room_id": "106", "inventory_slots": clips, "hp": 96, "in_control": True}
+    prev = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "106", "inventory_slots": [], "hp": 96, "in_control": True}
     _reward_total, bd = _reward(prev, cur, q, progress=progress)
     assert progress.kenneth_gate_breached is False
     assert bd["main_hall_before_kenneth"] == 0.0

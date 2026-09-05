@@ -2,9 +2,9 @@
   "schema_version": 1,
   "checkpoint_id": "fresh_start_105",
   "chunk_id": "opening_to_lockpick",
-  "source": "fresh_start_pl00_pl08_remint",
+  "source": "fresh_start_pl00_pl06_remint",
   "end_anchor_beat_id": "barry_hall_return_106",
-  "notes": "Pking-only opening remint from the dining-105 fresh start (pl00, no emblem; installed by hand, never minted here). Do not prepend onto cp05_shield_key. Explicit slot_index writes pl01 emblem, pl02 tea room, pl03/pl04 Kenneth clips, pl05 dining return, pl06 hall, pl07 upper hall, pl08 lockpick tip. Live step 0 (106->105) mints pl09. Lockpick is Barry's 203->106 grant, not its own step. Floor piles only on their acquire step.",
+  "notes": "Pking-only opening remint from the dining-105 fresh start (pl00, no emblem; installed by hand, never minted here). Do not prepend onto cp05_shield_key — that would shift live step indices. Explicit slot_index writes pl01 emblem .. pl06 lockpick; pl06 is the live-chunk tip and live step 0 (106->105) mints pl07. Lockpick is Barry's 203->106 grant, not its own step. Do not acquire 104 clips here — live chunk comes back for them.",
   "steps": [
     {
       "n": 1,
@@ -22,45 +22,31 @@
     },
     {
       "n": 3,
-      "op": "acquire",
-      "pickup_id": "104:handgun_bullets:1",
-      "beat_id": "kenneth_104",
+      "op": "traverse",
+      "edge_id": "104->105",
+      "beat_id": "barry_return_105",
       "slot_index": 3
     },
     {
       "n": 4,
-      "op": "acquire",
-      "pickup_id": "104:handgun_bullets:2",
-      "beat_id": "kenneth_104",
+      "op": "traverse",
+      "edge_id": "105->106",
+      "beat_id": "main_hall_106",
       "slot_index": 4
     },
     {
       "n": 5,
       "op": "traverse",
-      "edge_id": "104->105",
-      "beat_id": "barry_return_105",
+      "edge_id": "106->203",
+      "beat_id": "upper_hall_203",
       "slot_index": 5
     },
     {
       "n": 6,
       "op": "traverse",
-      "edge_id": "105->106",
-      "beat_id": "main_hall_106",
-      "slot_index": 6
-    },
-    {
-      "n": 7,
-      "op": "traverse",
-      "edge_id": "106->203",
-      "beat_id": "upper_hall_203",
-      "slot_index": 7
-    },
-    {
-      "n": 8,
-      "op": "traverse",
       "edge_id": "203->106",
       "beat_id": "barry_hall_return_106",
-      "slot_index": 8
+      "slot_index": 6
     }
   ]
 }

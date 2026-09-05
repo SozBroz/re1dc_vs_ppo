@@ -2,15 +2,14 @@
 
 Slot numbering (C-RE1 / recomp era): ``pl00`` is the dining-105 fresh
 start (no emblem; ``planner_step_index`` -1, seek 0). The opening chunk
-(``opening_to_lockpick``) mints ``pl01`` emblem .. ``pl08`` Barry lockpick
-via explicit ``slot_index`` (Kenneth clips are ``pl03``/``pl04``). The live
-chunk (``cp05_shield_key``) starts from the ``pl08`` tip and its completed
-step 0 (``106->105``) mints ``pl09``.
+(``opening_to_lockpick``) mints ``pl01`` emblem .. ``pl06`` Barry lockpick
+via explicit ``slot_index``. The live chunk (``cp05_shield_key``) starts
+from the ``pl06`` tip and its completed step 0 (``106->105``) mints ``pl07``.
 Legacy BizHawk ``cell.State`` cells in the same tree keep their old
 numbering (``pl05`` tip, ``pl06`` = step 0); their ``planner_step_index``
 meta still seeks the queue correctly.
 
-Training starts: every loadable cell at the tip (``pl08``) and later that
+Training starts: every loadable cell at the tip (``pl06``) and later that
 still has a remaining planner step, plus ``training_start: true`` cells
 (``pl00`` and opening remints) and pinned slots. A cell minted by another
 chunk still qualifies when that chunk file is on disk — reset switches
@@ -18,7 +17,7 @@ onto it. The cell that completed the last authored step is not a start.
 
 Optional hot-reload pin (read every reset, no worker restart after the
 code is loaded): ``data/planner_loyal_reset_pin.env`` or
-``RE1_PLANNER_RESET_PIN_FILE``. Blank knobs keep the full ``pl08+``
+``RE1_PLANNER_RESET_PIN_FILE``. Blank knobs keep the full ``pl06+``
 pool. ``RE1_PLANNER_RESET_PIN_INDEX`` wins over
 ``RE1_PLANNER_RESET_PIN_RANGE`` over ``RE1_PLANNER_RESET_PIN_WEIGHTS``
 over ``RE1_PLANNER_RESET_PIN_SET``. Exclusive pins that match no minted
@@ -54,8 +53,8 @@ _RECOMP_STATE_NAME = "cell.pst"
 
 # Crystals cp00..cp05 → planner-loyal pl01..pl06 (legacy map; pl00 = fresh start)
 SEED_SOURCE_MAX = 5  # inclusive; barry_hall_return_106
-TRAINING_START_INDEX = 8  # earliest live-chunk start (lockpick tip after clips)
-SEED_SLOT_OFFSET = 1  # crystals cpNN → pl(NN+1); not tied to the live tip
+TRAINING_START_INDEX = 6  # earliest live-chunk start (lockpick tip)
+SEED_SLOT_OFFSET = TRAINING_START_INDEX - SEED_SOURCE_MAX  # cpNN → pl(NN+1)
 FRESH_START_INDEX = 0  # dining-105 fresh start, planner_step_index -1
 
 _PIN_INDEX_ENV = "RE1_PLANNER_RESET_PIN_INDEX"
@@ -658,7 +657,7 @@ def cell_has_remaining_planner_step(
 def iter_training_start_cells(
     project_root: Path | str | None = None,
 ) -> list[dict[str, Any]]:
-    """Loadable starts: tip (``pl08``) and later cells with a next step,
+    """Loadable starts: tip (``pl06``) and later cells with a next step,
     plus ``training_start: true`` cells (``pl00`` / opening remints) and
     pinned slots.
 
