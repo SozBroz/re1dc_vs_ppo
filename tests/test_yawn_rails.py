@@ -493,6 +493,7 @@ def _barry_slots(*, beretta_qty: int = 15, spray: bool = True) -> list[tuple[str
     if spray:
         slots.append(("first_aid_spray_alt", 1))
     slots.append(("emblem", 1))
+    slots.append(("handgun_bullets", 30))
     return slots
 
 
@@ -2516,12 +2517,19 @@ def test_barry_return_capture_ignores_kenneth(
         _step_count=300,
         _read_state=lambda track_items=False: _state(
             "105",
-            inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"],
+            inventory=[
+                "knife",
+                "beretta",
+                "first_aid_spray_alt",
+                "emblem",
+                "handgun_bullets",
+            ],
             inventory_slots=[
                 ("knife", 1),
                 ("beretta", 15),
                 ("first_aid_spray_alt", 1),
                 ("emblem", 1),
+                ("handgun_bullets", 30),
             ],
         ),
     )
@@ -2535,12 +2543,19 @@ def test_barry_return_capture_ignores_kenneth(
     )
     barry_state = _state(
         "105",
-        inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"],
+        inventory=[
+            "knife",
+            "beretta",
+            "first_aid_spray_alt",
+            "emblem",
+            "handgun_bullets",
+        ],
         inventory_slots=[
             ("knife", 1),
             ("beretta", 15),
             ("first_aid_spray_alt", 1),
             ("emblem", 1),
+            ("handgun_bullets", 30),
         ],
     )
     proposal = capture_successor_cell(

@@ -1,11 +1,10 @@
-"""Surgical cp02 (``barry_return_105``): Kenneth flag, heal spray, then dining.
+"""Surgical cp02 (``barry_return_105``): Kenneth, clips, heal spray, then dining.
 
 CP02 success is 104→105 after the tea-room Kenneth ledger (``104:*:sN``)
-while still holding the Jill start heal spray (``first_aid_spray_alt`` from
-cp01 — already in inventory, must not be used). Entering dining from the tea
-room before Kenneth, or without the spray after Kenneth, fails the episode.
-Generic cutscene keys still do not gate capture or overwrite. Timeout is the
-other fail. Ammo and Barry-dialogue mints are not part of this cell.
+while still holding the Jill start heal spray and both Kenneth-body clips
+(30 spare ``handgun_bullets``). Those piles despawn once the Wesker/Barry
+hall cinema plays. Entering dining from the tea room before Kenneth, without
+the spray, or without both clips, fails the episode.
 """
 
 from __future__ import annotations
@@ -25,6 +24,11 @@ BARRY_RETURN_CHECKPOINT_ID = "barry_return_105"
 BARRY_RETURN_ROOM = "105"
 BARRY_RETURN_FROM_ROOM = "104"
 BARRY_RETURN_HEAL_SPRAY = "first_aid_spray_alt"
+TEA_ROOM_CLIP_ITEM = "handgun_bullets"
+TEA_ROOM_CLIP_QTY = 30
+TEA_ROOM_CLIP_BEATS = frozenset({"kenneth_104", "barry_return_105"})
+MAIN_HALL_BEFORE_TEA_CLIPS = "main_hall_before_tea_clips"
+BARRY_RETURN_BEFORE_TEA_CLIPS = "barry_return_before_tea_clips"
 
 
 def heal_spray_in_inventory(state: dict[str, Any] | None) -> bool:
@@ -37,8 +41,27 @@ def heal_spray_in_inventory(state: dict[str, Any] | None) -> bool:
     return BARRY_RETURN_HEAL_SPRAY in inv
 
 
+def tea_room_clips_in_inventory(state: dict[str, Any] | None) -> bool:
+    """True when both Kenneth-body clips are held (30 spare handgun rounds)."""
+    totals: dict[str, int] = {}
+    for entry in (state or {}).get("inventory_slots") or []:
+        if isinstance(entry, dict):
+            name = entry.get("name") or entry.get("item")
+            qty = int(entry.get("qty", 0) or 0)
+        elif isinstance(entry, (list, tuple)) and entry:
+            name = entry[0]
+            qty = int(entry[1]) if len(entry) > 1 else 0
+        else:
+            continue
+        if not name:
+            continue
+        key = canonical_item(str(name))
+        totals[key] = totals.get(key, 0) + max(qty, 0)
+    return int(totals.get(TEA_ROOM_CLIP_ITEM, 0) or 0) >= TEA_ROOM_CLIP_QTY
+
+
 def barry_return_capture_inventory_ok(state: dict[str, Any] | None) -> bool:
-    return heal_spray_in_inventory(state)
+    return heal_spray_in_inventory(state) and tea_room_clips_in_inventory(state)
 
 
 def _on_barry_return_leg(planner: Any) -> bool:
@@ -139,7 +162,7 @@ def fail_barry_return_if_unmet(
     room_id: str = "",
     state: dict[str, Any] | None = None,
 ) -> bool:
-    """Dining from the tea room without Kenneth or heal spray kills the episode."""
+    """Dining from the tea room without Kenneth, clips, or spray kills the episode."""
     if progress is None or planner is None:
         return False
     if not _on_barry_return_leg(planner):
@@ -151,7 +174,7 @@ def fail_barry_return_if_unmet(
     if not progress.leg_entered_from(BARRY_RETURN_ROOM, {BARRY_RETURN_FROM_ROOM}):
         return False
     if _leg_kenneth_seen(progress):
-        should_fail = not heal_spray_in_inventory(state)
+        should_fail = not barry_return_capture_inventory_ok(state)
     else:
         should_fail = True
     if not should_fail:

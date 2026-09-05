@@ -40,12 +40,19 @@ def _state(room: str, **kw) -> dict:
         "cam_id": 2,
         "character_id": 1,
         "in_control": True,
-        "inventory": ["knife", "beretta", "first_aid_spray_alt", "emblem"],
+        "inventory": [
+            "knife",
+            "beretta",
+            "first_aid_spray_alt",
+            "emblem",
+            "handgun_bullets",
+        ],
         "inventory_slots": [
             ("knife", 1),
             ("beretta", 15),
             ("first_aid_spray_alt", 1),
             ("emblem", 1),
+            ("handgun_bullets", 30),
         ],
         "dead": False,
         "step": 1,
@@ -96,12 +103,13 @@ def test_kenneth_then_dining_return_ignores_ammo_when_spray_held() -> None:
     progress.note_leg_cutscene("104:4:s0")
     bare = _state(
         "105",
-        inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"],
+        inventory=["knife", "beretta", "first_aid_spray_alt", "emblem", "handgun_bullets"],
         inventory_slots=[
             ("knife", 1),
             ("beretta", 14),
             ("first_aid_spray_alt", 1),
             ("emblem", 1),
+            ("handgun_bullets", 30),
         ],
     )
     _, bd = compute_reward(
@@ -115,6 +123,34 @@ def test_kenneth_then_dining_return_ignores_ammo_when_spray_held() -> None:
     assert bd["checkpoint_success"] > 0.0
     assert bd["checkpoint_capture_ineligible"] == 0.0
     assert not progress.capture_ineligible_breached
+
+
+def test_dining_without_tea_clips_after_kenneth_kills_episode() -> None:
+    planner = _planner("barry_return_105")
+    progress = ProgressTracker()
+    progress.observe_cutscene("104:0:s0")
+    progress.note_leg_cutscene("104:0:s0")
+    progress.note_leg_room_transition("104", "105")
+    _, bd = compute_reward(
+        _state("104"),
+        _state(
+            "105",
+            inventory=["knife", "beretta", "first_aid_spray_alt", "emblem"],
+            inventory_slots=[
+                ("knife", 1),
+                ("beretta", 15),
+                ("first_aid_spray_alt", 1),
+                ("emblem", 1),
+            ],
+        ),
+        planner,
+        progress=progress,
+        rails_mode=True,
+        return_breakdown=True,
+    )
+    assert bd["checkpoint_success"] == 0.0
+    assert bd["checkpoint_capture_ineligible"] == RAILS_CAPTURE_INELIGIBLE_PENALTY
+    assert progress.capture_ineligible_breached
 
 
 def test_dining_without_heal_spray_after_kenneth_kills_episode() -> None:

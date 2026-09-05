@@ -1382,11 +1382,15 @@ def capture_successor_cell(
     from re1_rl.yawn_box_prep_checkpoint import yawn_box_prep_capture_room_ok
 
     if cid == BARRY_RETURN_CHECKPOINT_ID and not barry_return_capture_inventory_ok(state):
-        print(
-            f"[yawn_capture] reject missing_heal_spray cp={cid}",
-            flush=True,
+        from re1_rl.barry_return_checkpoint import heal_spray_in_inventory
+
+        why = (
+            "missing_heal_spray"
+            if not heal_spray_in_inventory(state)
+            else "missing_tea_clips"
         )
-        _mark_capture_ineligible(env, "missing_heal_spray")
+        print(f"[yawn_capture] reject {why} cp={cid}", flush=True)
+        _mark_capture_ineligible(env, why)
         return None
 
     def _scripted_exit_capture_ok(

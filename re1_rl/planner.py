@@ -348,9 +348,26 @@ class WaypointPlanner:
         if cond_type == "room_enter":
             return str(state.get("room_id", "")) == str(cond.get("room_id", wp_room))
         if cond_type == "has_item":
-            inv = {canonical_item(str(x)) for x in state.get("inventory", [])}
             want = canonical_item(str(cond.get("item", "")))
-            return bool(want) and want in inv
+            if not want:
+                return False
+            min_qty = cond.get("min_qty")
+            if min_qty is None:
+                inv = {canonical_item(str(x)) for x in state.get("inventory", [])}
+                return want in inv
+            total = 0
+            for entry in state.get("inventory_slots") or []:
+                if isinstance(entry, dict):
+                    name = entry.get("name") or entry.get("item")
+                    qty = int(entry.get("qty", 0) or 0)
+                elif isinstance(entry, (list, tuple)) and entry:
+                    name = entry[0]
+                    qty = int(entry[1]) if len(entry) > 1 else 0
+                else:
+                    continue
+                if name and canonical_item(str(name)) == want:
+                    total += max(qty, 0)
+            return total >= int(min_qty)
         if cond_type == "inventory_ammo_exact":
             try:
                 want = int(cond.get("qty"))

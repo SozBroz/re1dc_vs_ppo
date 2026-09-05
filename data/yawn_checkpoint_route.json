@@ -43,7 +43,8 @@
     "objective": "Enter Dining after the Kenneth cutscene",
     "action_type": "navigate",
     "required_items": [
-      "first_aid_spray_alt"
+      "first_aid_spray_alt",
+      "handgun_bullets"
     ],
     "items_gained": [],
     "success_condition": {
@@ -64,6 +65,11 @@
         {
           "type": "has_item",
           "item": "first_aid_spray_alt"
+        },
+        {
+          "type": "has_item",
+          "item": "handgun_bullets",
+          "min_qty": 30
         }
       ]
     }
