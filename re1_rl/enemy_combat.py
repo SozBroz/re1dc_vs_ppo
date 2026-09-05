@@ -24,9 +24,13 @@ CROW_IDLE_ACTIVE_BYTE = 0x04
 CROW_FLYING_ACTIVE_BYTE = 0x1C
 # Live cp27 / room 117: kind@0x05=0x0D with active_byte 0x00 (not 0x04/0x1C).
 GALLERY_CROW_RAM_TYPE_ID = 0x0D
+# C-RE1 WORK+0x01 header is the EMD model (crow = EM1005). type_id@0x8D is
+# not a species key there — live 107 idle crows show t15 (0x0F).
+GALLERY_CROW_RAM_HEADER = 5
 GALLERY_CROW_ROOMS: frozenset[str] = frozenset({"107", "117", "212"})
-# Exclusive crow combat rooms (no paid fauna spawns in almanac).
-CROW_ONLY_COMBAT_ROOMS: frozenset[str] = frozenset({"117"})
+# Exclusive crow combat rooms (no paid fauna on the first-visit almanac).
+# 107 return-visit zombie in room_enemies.json is unverified.
+CROW_ONLY_COMBAT_ROOMS: frozenset[str] = GALLERY_CROW_ROOMS
 
 # Cerberus / zombie-dog (hub-door classify + dog_attack_ram_trace 2026-07).
 # kind@0x05 is shared with Tyrant/Yawn — pair with HP band + active_byte.
@@ -203,6 +207,9 @@ def is_crow_combat_entity(meta: dict[str, Any]) -> bool:
     name = str(meta.get("type_name") or meta.get("enemy_type") or "").lower()
     if name == "crow":
         return True
+    header = meta.get("header", meta.get("model_id"))
+    if header is not None and int(header) == GALLERY_CROW_RAM_HEADER:
+        return True
     ab = meta.get("active_byte")
     return ab is not None and int(ab) in CROW_ACTIVE_BYTES
 
@@ -214,6 +221,9 @@ def _crow_meta_from_enemy(ent: dict[str, Any]) -> dict[str, Any]:
         meta["type_name"] = str(name)
     if "active_byte" in ent:
         meta["active_byte"] = int(ent["active_byte"])
+    header = ent.get("header", ent.get("model_id"))
+    if header is not None:
+        meta["header"] = int(header)
     return meta
 
 
@@ -227,7 +237,7 @@ def is_crow_enemy(
         return False
     if is_crow_combat_entity(_crow_meta_from_enemy(ent)):
         return True
-    rid = str(room_id or "").upper()
+    rid = str(room_id or "").strip().upper()
     if rid not in GALLERY_CROW_ROOMS:
         return False
     tid = ent.get("type_id")
@@ -468,7 +478,7 @@ def paid_combat_enemy_count(
     Gallery crows are excluded (zero combat pay). Crow-only rooms (117) mask
     attack even when RAM active_byte/type tags are missing.
     """
-    rid = str(room_id or "").upper()
+    rid = str(room_id or "").strip().upper()
     if rid in CROW_ONLY_COMBAT_ROOMS:
         if combat_enemy_count(enemies, knife=knife) > 0:
             return 0

@@ -949,6 +949,28 @@ def test_paid_combat_enemy_count_skips_crows() -> None:
     ]
     assert paid_combat_enemy_count(gallery_crows, room_id="117") == 0
     assert paid_combat_enemy_count(gallery_crows, knife=True, room_id="117") == 0
+    # C-RE1 idle 107 crows: type_id@0x8D is 0x0F (not a species key), header=5.
+    cre1_idle = {
+        "slot": 0,
+        "hp": 69,
+        "type_id": 0x0F,
+        "header": 5,
+        "active_byte": 0x00,
+        "in_room": 1,
+        "combat_near": 1,
+        "knife_near": 1,
+    }
+    assert is_crow_combat_entity({"header": 5, "type_id": 0x0F, "active_byte": 0})
+    assert is_crow_enemy(cre1_idle, room_id="107")
+    assert is_passive_crow_enemy(cre1_idle, room_id="107")
+    assert paid_combat_enemy_count([cre1_idle], room_id="107") == 0
+    # Same row without header still masks: 107 is crow-only.
+    untagged = {**cre1_idle}
+    del untagged["header"]
+    assert not is_crow_combat_entity(
+        {"type_id": 0x0F, "active_byte": 0}
+    )
+    assert paid_combat_enemy_count([untagged], room_id="107") == 0
 
 
 def test_pool_ghost_fingerprints_are_exact_coords() -> None:
@@ -1180,4 +1202,91 @@ def test_courtyard_dead_dog_masks_until_hunter_active() -> None:
     assert not is_inactive_kind_for_attack_mask(hunter)
     assert paid_combat_enemy_count(
         [dead, hunter, parked[1]], room_id="11A", for_attack_mask=True
+    ) == 1
+
+
+def test_l_passage_sleeping_dog_masks_attack_until_wake() -> None:
+    """108 dogs: occupied/combat_near off until wake, then the gun band opens."""
+    sleeping = {
+        "slot": 0,
+        "hp": 100,
+        "type_id": 0x0F,
+        "active_byte": 0,
+        "occupied": 0,
+        "x": 12369,
+        "z": 3925,
+        "alive": 0,
+        "in_room": 1,
+        "combat_near": 0,
+        "knife_near": 0,
+    }
+    woke = {
+        **sleeping,
+        "occupied": 1,
+        "alive": 1,
+        "combat_near": 1,
+        "active_byte": 0x2C,
+    }
+    assert paid_combat_enemy_count([sleeping], room_id="108", for_attack_mask=True) == 0
+    assert paid_combat_enemy_count([woke], room_id="108", for_attack_mask=True) == 1
+    assert not is_dead_cerberus_enemy(woke)
+
+
+def test_live_pl_dog_and_zombie_headers_are_not_crows() -> None:
+    """C-RE1 pl22/pl33/pl50: dogs header=2, 10A zombie header=17, not crow 5."""
+    dog_108 = {
+        "slot": 1,
+        "hp": 99,
+        "header": 2,
+        "type_id": 0x0F,
+        "active_byte": 0x00,
+        "x": 28400,
+        "z": 16900,
+        "in_room": 1,
+        "combat_near": 1,
+        "knife_near": 1,
+    }
+    dog_11a = {
+        "slot": 0,
+        "hp": 120,
+        "header": 2,
+        "type_id": 0x0F,
+        "active_byte": 0x00,
+        "x": 6441,
+        "z": 24810,
+        "in_room": 1,
+        "combat_near": 1,
+        "knife_near": 0,
+    }
+    zombie_10a = {
+        "slot": 1,
+        "hp": 88,
+        "header": 17,
+        "type_id": 0x0F,
+        "active_byte": 0x00,
+        "x": 3023,
+        "z": 6864,
+        "in_room": 1,
+        "combat_near": 1,
+        "knife_near": 1,
+    }
+    bleed_crow = {
+        "slot": 1,
+        "hp": 38,
+        "header": 5,
+        "type_id": 0x0D,
+        "active_byte": 0x00,
+        "x": 18500,
+        "z": 10200,
+        "in_room": 1,
+        "combat_near": 1,
+        "knife_near": 0,
+    }
+    assert not is_crow_enemy(dog_108, room_id="108")
+    assert not is_crow_enemy(dog_11a, room_id="11A")
+    assert not is_crow_enemy(zombie_10a, room_id="10A")
+    assert paid_combat_enemy_count([dog_108], room_id="108", for_attack_mask=True) == 1
+    assert paid_combat_enemy_count([zombie_10a], room_id="10A", for_attack_mask=True) == 1
+    assert paid_combat_enemy_count(
+        [dog_11a, bleed_crow], room_id="11A", for_attack_mask=True
     ) == 1
