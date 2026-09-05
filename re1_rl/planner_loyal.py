@@ -630,6 +630,30 @@ class PlannerLoyalQueue:
             )
             return result
 
+        # Piano USE can lose music_notes and spawn gold_emblem on one frame.
+        # Pickup used to fire first and kill piano_play before pl13 could mint.
+        if op in {"objective", "do_puzzle", "trigger_cutscene", "boss"}:
+            site = str(step.get("site_id") or "")
+            story = str(state.get("story_use_success") or "")
+            story_hit = _objective_story_matches(site, story)
+            if story_hit and (
+                story not in _ALCOVE_SWAP_SITES
+                or "emblem" not in _inventory_held_names(state)
+            ):
+                result["step_success"] = True
+                self._index += 1
+                self.step_success_pending = True
+                return result
+            if _bar_piano_notes_consumed(step, prev_state, state):
+                result["step_success"] = True
+                self._index += 1
+                self.step_success_pending = True
+                print(
+                    f"[planner_loyal] piano_play notes_used room={room}",
+                    flush=True,
+                )
+                return result
+
         # Floor piles before traverse complete. Same-frame ammo on a walk
         # step used to be swallowed by the dest-room return below.
         gained = _inventory_gains(prev_state, state)
@@ -827,6 +851,23 @@ def _objective_story_matches(site: str, story: str) -> bool:
     if site and story and story == site:
         return True
     return bool(site in _ALCOVE_SWAP_SITES and story in _ALCOVE_SWAP_SITES)
+
+
+def _bar_piano_notes_consumed(
+    step: dict[str, Any],
+    prev_state: dict[str, Any],
+    state: dict[str, Any],
+) -> bool:
+    """True when piano_play's music notes left inventory in the bar."""
+    site = str(step.get("site_id") or "")
+    beat = str(step.get("beat_id") or "")
+    if site != "music_notes@10F_piano" and beat != "piano_play":
+        return False
+    if str(state.get("room_id") or "") != "10F":
+        return False
+    return "music_notes" in _inventory_held_names(
+        prev_state
+    ) and "music_notes" not in _inventory_held_names(state)
 
 
 def _richard_bleedout_complete(

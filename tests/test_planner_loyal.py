@@ -665,6 +665,122 @@ def test_unique_key_acquire_qty_zero_file_slot():
     assert q.current["op"] == "objective"
 
 
+def test_piano_play_completes_when_notes_leave_inventory() -> None:
+    """USE can settle after skip; notes leaving 10F is the piano mint."""
+    q = PlannerLoyalQueue()
+    q.seek(6)  # piano_play
+    assert q.current["site_id"] == "music_notes@10F_piano"
+    q.note_start_inventory(
+        {
+            "inventory_slots": [
+                ("knife", 1),
+                ("beretta", 15),
+                ("emblem", 1),
+                ("music_notes", 0),
+            ]
+        }
+    )
+    prev = {
+        "room_id": "10F",
+        "inventory_slots": [
+            ("knife", 1),
+            ("beretta", 15),
+            ("emblem", 1),
+            ("music_notes", 0),
+        ],
+    }
+    cur = {
+        "room_id": "10F",
+        "inventory_slots": [
+            ("knife", 1),
+            ("beretta", 15),
+            ("emblem", 1),
+        ],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is True
+    assert q.current["pickup_id"] == "10F:gold_emblem:2"
+
+
+def test_piano_play_survives_same_frame_gold_emblem() -> None:
+    """Live fail: gold_emblem pickup gate ran before piano_play could mint."""
+    q = PlannerLoyalQueue()
+    q.seek(6)
+    q.note_start_inventory(
+        {
+            "inventory_slots": [
+                ("knife", 1),
+                ("beretta", 15),
+                ("emblem", 1),
+                ("music_notes", 0),
+            ]
+        }
+    )
+    prev = {
+        "room_id": "10F",
+        "inventory_slots": [
+            ("knife", 1),
+            ("beretta", 15),
+            ("emblem", 1),
+            ("music_notes", 0),
+        ],
+    }
+    cur = {
+        "room_id": "10F",
+        "inventory_slots": [
+            ("knife", 1),
+            ("beretta", 15),
+            ("emblem", 1),
+            ("gold_emblem", 1),
+        ],
+        "story_use_success": "music_notes@10F_piano",
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is True
+    assert q.divert_reason is None
+    assert q.current["pickup_id"] == "10F:gold_emblem:2"
+
+
+def test_piano_play_gold_without_notes_use_still_diverts() -> None:
+    q = PlannerLoyalQueue()
+    q.seek(6)
+    q.note_start_inventory(
+        {
+            "inventory_slots": [
+                ("knife", 1),
+                ("beretta", 15),
+                ("emblem", 1),
+                ("music_notes", 0),
+            ]
+        }
+    )
+    prev = {
+        "room_id": "10F",
+        "inventory_slots": [
+            ("knife", 1),
+            ("beretta", 15),
+            ("emblem", 1),
+            ("music_notes", 0),
+        ],
+    }
+    cur = {
+        "room_id": "10F",
+        "inventory_slots": [
+            ("knife", 1),
+            ("beretta", 15),
+            ("emblem", 1),
+            ("music_notes", 0),
+            ("gold_emblem", 1),
+        ],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is True
+    assert result["step_success"] is False
+    assert q.divert_reason == "unplanned_pickup:['gold_emblem']"
+
+
 def test_alcove_swap_completes_on_wooden_emblem_loss():
     """Yawn place_emblem_10F: wooden gone in 10F, gold still held."""
     q = PlannerLoyalQueue()
