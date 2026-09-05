@@ -235,6 +235,28 @@ def test_note_kenneth_skip_settle_from_dining_door() -> None:
     )
 
 
+def test_note_kenneth_ignores_door_cam_script_peak() -> None:
+    """105→104 door skip can peak 0x84 on cam 0; that is not Kenneth."""
+    progress = ProgressTracker()
+    entry = _state("105", cam_id=2, scene_flag=0x80)
+    door = _state("104", cam_id=0, scene_flag=0x80)
+    assert (
+        note_kenneth_cutscene_skip_settle(
+            progress, entry, door, skip_frames=80, peak_scene_flag=0x84
+        )
+        is None
+    )
+    assert not progress.observed_cutscenes
+    assert not progress.leg_observed_cutscenes
+    assert note_kenneth_live_scene(
+        progress,
+        {
+            **_state("104", cam_id=0, scene_flag=0x80),
+            "_skip_peak_scene_flag": 0x84,
+        },
+    ) is None
+
+
 def test_note_kenneth_ignores_idle_tea_room_skip() -> None:
     progress = ProgressTracker()
     entry = _state("105", cam_id=2, scene_flag=0x80)

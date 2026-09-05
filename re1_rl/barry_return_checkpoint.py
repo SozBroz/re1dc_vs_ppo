@@ -95,6 +95,10 @@ def kenneth_skip_settled(
     del skip_frames
     if str((new_state or {}).get("room_id") or "") != TEA_ROOM:
         return False
+    # Cam 0 is the tea-room door. A door skip can peak 0x84 without the
+    # Kenneth cinema; that used to write 104:0:s0 and unlock 104→105.
+    if int((new_state or {}).get("cam_id", 0) or 0) == 0:
+        return False
     del entry_prev
     settle_sf = int((new_state or {}).get("scene_flag", 0) or 0)
     if scene_flag_shows_script(settle_sf):

@@ -1161,6 +1161,21 @@ def test_planner_loyal_dining_return_after_kenneth_completes() -> None:
     assert q.current["edge_id"] == "105->106"
 
 
+def test_planner_loyal_door_cam_flag_does_not_unlock_dining_return() -> None:
+    """This-leg 104:0:s0 is the tea-room door, not Kenneth."""
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    q.seek(2)
+    progress = ProgressTracker()
+    progress.note_leg_cutscene("104:0:s0")
+    prev = {"room_id": "104", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    _reward_total, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_divert"] == PLANNER_DIVERT_PENALTY
+    assert bd["planner_step_success"] == 0.0
+    assert q.divert_reason == "barry_return_before_kenneth"
+
+
 def test_planner_loyal_inherited_kenneth_flag_does_not_unlock_dining_return() -> None:
     """Predecessor sidecar 104:*:sN is history, not this-leg Kenneth (cp02 rule)."""
     opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"

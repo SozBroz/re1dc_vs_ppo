@@ -1004,7 +1004,12 @@ def _leg_kenneth_ledger(progress: Any) -> set[str]:
     """
     if progress is None:
         return set()
-    return set(getattr(progress, "leg_observed_cutscenes", None) or ())
+    # 104:0:sN is the tea-room door latch, not the cinema (104:4:sN).
+    return {
+        k
+        for k in (getattr(progress, "leg_observed_cutscenes", None) or ())
+        if not str(k).startswith("104:0:")
+    }
 
 
 def _leg_kenneth_seen(progress: Any) -> bool:
