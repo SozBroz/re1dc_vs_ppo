@@ -1,17 +1,24 @@
 """Planner-loyal cell archive under ``states/planner_loyal``.
 
-Seed cells ``pl00``..``pl05`` are copied from ``backups/Crystals_in_time``
-(cp00..cp05) through Main Hall + Barry lockpick (``barry_hall_return_106``).
+Slot numbering (C-RE1 / recomp era): ``pl00`` is the dining-105 fresh
+start (no emblem; ``planner_step_index`` -1, seek 0). The opening chunk
+(``opening_to_lockpick``) mints ``pl01`` emblem .. ``pl06`` Barry lockpick
+via explicit ``slot_index``. The live chunk (``cp05_shield_key``) starts
+from the ``pl06`` tip and its completed step 0 (``106->105``) mints ``pl07``.
+Legacy BizHawk ``cell.State`` cells in the same tree keep their old
+numbering (``pl05`` tip, ``pl06`` = step 0); their ``planner_step_index``
+meta still seeks the queue correctly.
 
-Training starts: every loadable cell at ``pl05`` and later that still has
-a remaining planner step in the live chunk. The cell that completed the
-last authored step is not a start (episode already ended there).
-``pl00``..``pl04`` stay archive-only. Synced cells missing the
-``training_start`` flag still count — the slot index is enough.
+Training starts: every loadable cell at the tip (``pl06``) and later that
+still has a remaining planner step in the live chunk, plus any cell whose
+meta says ``training_start: true`` (``pl00``) or whose slot is pinned.
+The cell that completed the last authored step is not a start (episode
+already ended there). Synced cells missing the ``training_start`` flag
+still count — the slot index is enough.
 
 Optional hot-reload pin (read every reset, no worker restart after the
 code is loaded): ``data/planner_loyal_reset_pin.env`` or
-``RE1_PLANNER_RESET_PIN_FILE``. Blank knobs keep the full ``pl05+``
+``RE1_PLANNER_RESET_PIN_FILE``. Blank knobs keep the full ``pl06+``
 pool. ``RE1_PLANNER_RESET_PIN_INDEX`` wins over
 ``RE1_PLANNER_RESET_PIN_RANGE`` over ``RE1_PLANNER_RESET_PIN_WEIGHTS``
 over ``RE1_PLANNER_RESET_PIN_SET``. Exclusive pins that match no minted
@@ -45,9 +52,11 @@ _ROOT_ENV = "RE1_PLANNER_LOYAL_CELLS_ROOT"
 _RECOMP_CELLS_ENV = "RE1_RECOMP_CELLS"
 _RECOMP_STATE_NAME = "cell.pst"
 
-# Crystals cp00..cp05 → planner-loyal pl00..pl05
+# Crystals cp00..cp05 → planner-loyal pl01..pl06 (pl00 = fresh start)
 SEED_SOURCE_MAX = 5  # inclusive; barry_hall_return_106
-TRAINING_START_INDEX = 5  # earliest training start (lockpick tip)
+TRAINING_START_INDEX = 6  # earliest live-chunk start (lockpick tip)
+SEED_SLOT_OFFSET = TRAINING_START_INDEX - SEED_SOURCE_MAX  # cpNN → pl(NN+1)
+FRESH_START_INDEX = 0  # dining-105 fresh start, planner_step_index -1
 
 _PIN_INDEX_ENV = "RE1_PLANNER_RESET_PIN_INDEX"
 _PIN_RANGE_ENV = "RE1_PLANNER_RESET_PIN_RANGE"
@@ -85,6 +94,19 @@ def cell_state_filename() -> str:
     return _RECOMP_STATE_NAME if recomp_cells_enabled() else CELL_STATE_NAME
 
 
+def _slot_payload_path(slot: Path) -> Path | None:
+    """Prefer this runtime's payload; keep the other so rewrite_manifest
+    does not drop BizHawk ``cell.State`` cells when a C-RE1 worker scans."""
+    preferred = slot / cell_state_filename()
+    if preferred.is_file():
+        return preferred
+    other_name = (
+        CELL_STATE_NAME if cell_state_filename() == _RECOMP_STATE_NAME else _RECOMP_STATE_NAME
+    )
+    other = slot / other_name
+    return other if other.is_file() else None
+
+
 def cell_dir_name(index: int) -> str:
     return f"pl{int(index):02d}"
 
@@ -111,6 +133,10 @@ def slot_index_for_completed_step(
     the following capturing hop after ``pl83`` is ``pl84`` (``204->207``).
     """
     idx = int(completed_step_index)
+    if steps and 0 <= idx < len(steps):
+        raw = steps[idx].get("slot_index") if isinstance(steps[idx], dict) else None
+        if raw is not None:
+            return int(raw)
     if not steps:
         return int(TRAINING_START_INDEX) + 1 + idx
     cap = 0
@@ -140,7 +166,11 @@ def bootstrap_from_crystals(
     through_index: int = SEED_SOURCE_MAX,
     force: bool = False,
 ) -> dict[str, Any]:
-    """Copy Crystals ``cp00``..``cp{through}`` into thin ``states/planner_loyal`` cells."""
+    """Copy Crystals ``cp00``..``cp{through}`` into thin ``states/planner_loyal`` cells.
+
+    ``cpNN`` lands in ``pl(NN + SEED_SLOT_OFFSET)`` so the lockpick tip is
+    ``pl06``. Existing slots are left untouched unless ``force``.
+    """
     root = Path(project_root or ROOT)
     crystals = Path(crystals_root) if crystals_root else root / CRYSTALS_REL
     dest_root = planner_loyal_root(root)
@@ -152,32 +182,29 @@ def bootstrap_from_crystals(
         src = crystals / f"cp{src_i:02d}"
         if not (src / CELL_STATE_NAME).is_file():
             raise FileNotFoundError(f"missing Crystals cell: {src / CELL_STATE_NAME}")
-        dst = cell_slot_dir(dest_root, src_i)
+        slot_i = src_i + SEED_SLOT_OFFSET
+        dst = cell_slot_dir(dest_root, slot_i)
         if dst.exists() and not force:
-            meta_path = dst / CELL_META_NAME
-            if meta_path.is_file():
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            else:
-                meta = {}
-        else:
-            if dst.exists():
-                shutil.rmtree(dst)
-            dst.mkdir(parents=True, exist_ok=True)
-            for name in _THIN_ONLY_NAMES:
-                src_f = src / name
-                if src_f.is_file():
-                    shutil.copy2(src_f, dst / name)
-            meta = json.loads((dst / CELL_META_NAME).read_text(encoding="utf-8"))
+            # Never rewrite a live slot's meta (it may hold a minted cell).
+            continue
+        if dst.exists():
+            shutil.rmtree(dst)
+        dst.mkdir(parents=True, exist_ok=True)
+        for name in _THIN_ONLY_NAMES:
+            src_f = src / name
+            if src_f.is_file():
+                shutil.copy2(src_f, dst / name)
+        meta = json.loads((dst / CELL_META_NAME).read_text(encoding="utf-8"))
 
         _strip_fat_artifacts(dst)
         meta["route_id"] = ROUTE_ID
-        meta["checkpoint_index"] = src_i
+        meta["checkpoint_index"] = slot_i
         meta["source"] = {
             "archive": "Crystals_in_time",
             "checkpoint": f"cp{src_i:02d}",
         }
-        # Tip pl05 is the earliest start; earlier seeds stay status/archive only.
-        meta["training_start"] = src_i == TRAINING_START_INDEX
+        # Tip pl06 is the earliest live start; earlier seeds stay archive only.
+        meta["training_start"] = slot_i == TRAINING_START_INDEX
         state_p = dst / CELL_STATE_NAME
         sidecar_p = dst / CELL_SIDECAR_NAME
         if state_p.is_file():
@@ -190,12 +217,12 @@ def bootstrap_from_crystals(
         )
         copied.append(
             {
-                "checkpoint_index": src_i,
+                "checkpoint_index": slot_i,
                 "checkpoint_id": meta.get("checkpoint_id"),
                 "room_id": meta.get("room_id"),
                 "training_start": bool(meta.get("training_start")),
-                "state_path": f"{DEFAULT_PLANNER_LOYAL_REL}/cells/{cell_dir_name(src_i)}/{CELL_STATE_NAME}",
-                "sidecar_path": f"{DEFAULT_PLANNER_LOYAL_REL}/cells/{cell_dir_name(src_i)}/{CELL_SIDECAR_NAME}",
+                "state_path": f"{DEFAULT_PLANNER_LOYAL_REL}/cells/{cell_dir_name(slot_i)}/{CELL_STATE_NAME}",
+                "sidecar_path": f"{DEFAULT_PLANNER_LOYAL_REL}/cells/{cell_dir_name(slot_i)}/{CELL_SIDECAR_NAME}",
             }
         )
 
@@ -231,10 +258,9 @@ def _scan_cells(dest_root: Path) -> list[dict[str, Any]]:
         except ValueError:
             continue
         meta_p = path / CELL_META_NAME
-        state_name = cell_state_filename()
-        state_p = path / state_name
+        state_p = _slot_payload_path(path)
         sidecar_p = path / CELL_SIDECAR_NAME
-        if not state_p.is_file() or not sidecar_p.is_file():
+        if state_p is None or not sidecar_p.is_file():
             continue
         meta: dict[str, Any] = {}
         if meta_p.is_file():
@@ -257,9 +283,15 @@ def _scan_cells(dest_root: Path) -> list[dict[str, Any]]:
                 "checkpoint_id": meta.get("checkpoint_id") or path.name,
                 "room_id": meta.get("room_id"),
                 "quality": meta.get("quality") or [],
-                "training_start": idx >= TRAINING_START_INDEX,
+                # Slot >= tip counts even when synced meta dropped the flag;
+                # an explicit true (pl00 fresh start) counts below the tip.
+                "training_start": (
+                    idx >= TRAINING_START_INDEX
+                    or meta.get("training_start") is True
+                ),
                 "chunk_id": meta.get("chunk_id"),
                 "planner_step_index": meta.get("planner_step_index"),
+                "runtime": meta.get("runtime"),
                 "state_path": state_rel,
                 "sidecar_path": side_rel,
                 "state_sha256": meta.get("state_sha256"),
@@ -454,7 +486,7 @@ def _apply_reset_pin(
         return pinned
     print(
         f"[planner_loyal] reset_pin miss allowed={sorted(allowed)}; "
-        "using unpinned pl05+ pool",
+        f"using unpinned {cell_dir_name(TRAINING_START_INDEX)}+ pool",
         flush=True,
     )
     return cells
@@ -518,22 +550,60 @@ def _sample_training_start(
     return rng.choice(cells)
 
 
-def _live_chunk_n_steps(project_root: Path | str | None = None) -> int | None:
+def _live_chunk(project_root: Path | str | None = None) -> dict[str, Any] | None:
     try:
         from re1_rl.planner_loyal import load_chunk, resolve_chunk_path
 
         path = resolve_chunk_path(project_root)
         if not path.is_file():
             return None
-        return len(load_chunk(path).get("steps") or [])
+        return load_chunk(path)
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return None
 
 
-def seek_index_after_cell(row: dict[str, Any]) -> int:
-    """Queue index after reset from this cell (0 = first chunk step)."""
+def _live_chunk_n_steps(project_root: Path | str | None = None) -> int | None:
+    chunk = _live_chunk(project_root)
+    if chunk is None:
+        return None
+    return len(chunk.get("steps") or [])
+
+
+def live_chunk_id(project_root: Path | str | None = None) -> str | None:
+    chunk = _live_chunk(project_root)
+    if chunk is None:
+        return None
+    raw = chunk.get("chunk_id")
+    return str(raw) if raw else None
+
+
+def _chunk_mismatch(row: dict[str, Any], live_id: str | None) -> bool:
+    """Cell minted by a different chunk than the one loaded now."""
+    own = row.get("chunk_id")
+    return bool(own) and bool(live_id) and str(own) != str(live_id)
+
+
+def _row_runtime_matches(row: dict[str, Any]) -> bool:
+    """Meta written for the other runtime (pl00 meta describes the C-RE1
+    cell.pst; a BizHawk worker sharing the dir must not treat it as a start)."""
+    runtime = str(row.get("runtime") or "").strip().lower()
+    if not runtime:
+        return True
+    return (runtime == "recomp") == recomp_cells_enabled()
+
+
+def seek_index_after_cell(
+    row: dict[str, Any],
+    live_id: str | None = None,
+) -> int:
+    """Queue index after reset from this cell (0 = first chunk step).
+
+    ``planner_step_index`` is only meaningful for the chunk that minted the
+    cell; under another chunk (``pl06`` lockpick tip minted by the opening
+    chunk, then loaded by the live chunk) fall back to the slot rule.
+    """
     raw = row.get("planner_step_index")
-    if raw is not None:
+    if raw is not None and not _chunk_mismatch(row, live_id):
         return int(raw) + 1
     slot = int(row.get("checkpoint_index") or 0)
     if slot <= TRAINING_START_INDEX:
@@ -542,29 +612,52 @@ def seek_index_after_cell(row: dict[str, Any]) -> int:
 
 
 def cell_has_remaining_planner_step(
-    row: dict[str, Any], n_steps: int | None
+    row: dict[str, Any],
+    n_steps: int | None,
+    live_id: str | None = None,
 ) -> bool:
     if not n_steps:
         return True
-    return seek_index_after_cell(row) < int(n_steps)
+    return seek_index_after_cell(row, live_id) < int(n_steps)
 
 
 def iter_training_start_cells(
     project_root: Path | str | None = None,
 ) -> list[dict[str, Any]]:
-    """Loadable cells from the tip (``pl05``) that still have a next step."""
+    """Loadable starts: tip (``pl06``) and later cells with a next step,
+    plus ``training_start: true`` cells (``pl00``) and pinned slots.
+
+    Cells minted by another chunk only qualify at the tip slot (seek 0);
+    mid-chunk step indices do not transfer between chunks.
+    """
     root = planner_loyal_root(project_root)
     n_steps = _live_chunk_n_steps(project_root)
+    live_id = live_chunk_id(project_root)
+    pinned = reset_pin_allowed_indices(project_root) or set()
     out: list[dict[str, Any]] = []
+    skipped_foreign = 0
     for row in _scan_cells(root):
-        if int(row["checkpoint_index"]) < TRAINING_START_INDEX:
+        idx = int(row["checkpoint_index"])
+        if _chunk_mismatch(row, live_id) and idx != TRAINING_START_INDEX:
+            skipped_foreign += 1
             continue
-        if not cell_has_remaining_planner_step(row, n_steps):
+        if idx < TRAINING_START_INDEX and not (
+            (row.get("training_start") is True or idx in pinned)
+            and _row_runtime_matches(row)
+        ):
             continue
-        state_p = root / "cells" / cell_dir_name(int(row["checkpoint_index"])) / cell_state_filename()
+        if not cell_has_remaining_planner_step(row, n_steps, live_id):
+            continue
+        state_p = root / "cells" / cell_dir_name(idx) / cell_state_filename()
         sidecar_p = state_p.with_name(CELL_SIDECAR_NAME)
         if state_p.is_file() and sidecar_p.is_file():
             out.append(row)
+    if skipped_foreign:
+        print(
+            f"[planner_loyal] skipped {skipped_foreign} cells minted by "
+            f"another chunk (live={live_id})",
+            flush=True,
+        )
     if out:
         return _apply_reset_pin(out, project_root)
     # Fallback: tip even if meta flag drifted.
@@ -775,6 +868,16 @@ def planner_loyal_quality_beats(
     return lift_planner_loyal_quality(new) > lift_planner_loyal_quality(old)
 
 
+def _preserve_foreign_state(dest: Path, staging: Path) -> None:
+    """Carry the other runtime's state file (cell.State vs cell.pst) into
+    the replacement so a C-RE1 mint never deletes a BizHawk cell."""
+    own = cell_state_filename()
+    for name in (CELL_STATE_NAME, _RECOMP_STATE_NAME):
+        src = dest / name
+        if name != own and src.is_file() and not (staging / name).exists():
+            shutil.move(str(src), str(staging / name))
+
+
 def _nearest_predecessor_slot(root: Path, slot: int) -> int | None:
     """Closest lower slot with a loadable state (skips capture:false holes)."""
     for pred in range(int(slot) - 1, TRAINING_START_INDEX - 1, -1):
@@ -790,7 +893,10 @@ def capture_planner_loyal_cell(
     *,
     completed_index: int | None = None,
 ) -> dict[str, Any] | None:
-    """Mint a thin ``plNN`` cell for the just-completed planner step."""
+    """Mint a thin ``plNN`` cell for the just-completed planner step.
+
+    ``pl00`` (fresh start) is never minted here; it is installed by hand.
+    """
     queue = getattr(env, "_planner_loyal_queue", None)
     if queue is None:
         return None
@@ -815,7 +921,9 @@ def capture_planner_loyal_cell(
         return None
     slot = slot_index_for_completed_step(completed, steps)
     tip = cell_slot_dir(planner_loyal_root(env.project_root), TRAINING_START_INDEX)
-    if not (tip / cell_state_filename()).is_file():
+    # Opening remint (pl01–pl06) writes the seed slots; does not need the
+    # lockpick tip. Live-chunk mints (pl07+) still require pl06 on disk.
+    if slot > TRAINING_START_INDEX and not (tip / cell_state_filename()).is_file():
         print(
             f"[planner_loyal] reject missing training tip "
             f"{cell_dir_name(TRAINING_START_INDEX)}",
@@ -890,7 +998,9 @@ def capture_planner_loyal_cell(
         leg_frames = 0
     quality = list(attach_leg_frames(quality, leg_frames))
 
-    if dest.exists():
+    # Quality-beats-old only against a cell of the same runtime; a legacy
+    # BizHawk cell.State sharing the slot dir is a different numbering.
+    if dest.exists() and (dest / cell_state_filename()).is_file():
         old_meta_p = dest / CELL_META_NAME
         old_q: list[Any] = []
         if old_meta_p.is_file():
@@ -943,6 +1053,7 @@ def capture_planner_loyal_cell(
     )
 
     if dest.exists():
+        _preserve_foreign_state(dest, staging)
         shutil.rmtree(dest, ignore_errors=True)
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(staging), str(dest))

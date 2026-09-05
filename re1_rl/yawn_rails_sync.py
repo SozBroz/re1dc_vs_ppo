@@ -31,6 +31,8 @@ from re1_rl.go_explore_merge import (
     make_cell_bundle_zip,
 )
 
+CELL_PST_NAME = "cell.pst"
+
 DEFAULT_YAWN_RAILS_REL = "states/yawn_rails"
 STORE_FILENAME = "store.json"
 MANIFEST_FILENAME = "manifest.json"
@@ -39,8 +41,9 @@ _SYNC_ENV = "RE1_YAWN_RAILS_SYNC"
 _PREFIX_ENV = "RE1_YAWN_CELL_PREFIX"
 _LOCK_NAME = "cells.sync.lock"
 _STALE_LOCK_S = 180.0
-# Planner-loyal seed tip (pl05); never prune these when using ``pl`` prefix.
-_PLANNER_SEED_MAX_INDEX = 5
+# Planner-loyal seed tip (pl06; pl00 = fresh start); never prune these when
+# using ``pl`` prefix.
+_PLANNER_SEED_MAX_INDEX = 6
 
 
 def yawn_rails_sync_enabled() -> bool:
@@ -250,11 +253,27 @@ def sha256_file(path: Path | str) -> str:
     return hexdigest
 
 
+def slot_state_path(slot: Path | str) -> Path | None:
+    """BizHawk thin cells use ``cell.State``; C-RE1 grafts use ``cell.pst``.
+
+    Prefer ``cell.pst`` when both exist so a leftover BizHawk State cannot
+    shadow the file the recomp bridge actually loads.
+    """
+    dest = Path(slot)
+    pst = dest / CELL_PST_NAME
+    if pst.is_file():
+        return pst
+    state = dest / CELL_STATE_NAME
+    if state.is_file():
+        return state
+    return None
+
+
 def slot_content_shas(slot: Path | str) -> tuple[str, str] | None:
     dest = Path(slot)
-    state_p = dest / CELL_STATE_NAME
+    state_p = slot_state_path(dest)
     side_p = dest / CELL_SIDECAR_NAME
-    if not state_p.is_file() or not side_p.is_file():
+    if state_p is None or not side_p.is_file():
         return None
     return sha256_file(state_p), sha256_file(side_p)
 
@@ -295,12 +314,30 @@ def yawn_cell_pb_bundle(chosen: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _incoming_state_name(names: set[str]) -> str | None:
+    """Prefer ``cell.pst`` when both payload names are present."""
+    if CELL_PST_NAME in names:
+        return CELL_PST_NAME
+    if CELL_STATE_NAME in names:
+        return CELL_STATE_NAME
+    return None
+
+
+def _bundle_state_name(bundle_bytes: bytes) -> str:
+    try:
+        names = set(zipfile.ZipFile(io.BytesIO(bundle_bytes)).namelist())
+    except zipfile.BadZipFile:
+        return CELL_STATE_NAME
+    return _incoming_state_name(names) or CELL_STATE_NAME
+
+
 def promote_cell_files(incoming: Path | str, dest: Path | str) -> None:
     """Replace live cell files in place. Never ``rmtree`` the destination dir.
 
     Windows cannot atomically swap a non-empty directory; deleting dest first
     leaves a missing-slot window and mixed GET /bundle reads. File ``os.replace``
     is atomic. Payload first, ``meta.json`` last.
+    Accepts BizHawk ``cell.State`` or C-RE1 ``cell.pst``.
     """
     from re1_rl.win_fs_retry import replace_retry
 
@@ -308,10 +345,11 @@ def promote_cell_files(incoming: Path | str, dest: Path | str) -> None:
     dest = Path(dest)
     dest.mkdir(parents=True, exist_ok=True)
     incoming_names = {p.name for p in incoming.iterdir() if p.is_file()}
-    if CELL_STATE_NAME not in incoming_names or CELL_SIDECAR_NAME not in incoming_names:
+    if _incoming_state_name(incoming_names) is None or CELL_SIDECAR_NAME not in incoming_names:
         raise FileNotFoundError(f"incoming cell missing State/sidecar: {incoming}")
     for name in (
         CELL_STATE_NAME,
+        CELL_PST_NAME,
         CELL_SIDECAR_NAME,
         CELL_REPLAY_NAME,
         CELL_POLICY_NAME,
@@ -475,16 +513,16 @@ def try_install_yawn_cell(
         return False
     if idx > 0:
         pred = cell_slot_dir(root, idx - 1)
-        if not (pred / CELL_STATE_NAME).is_file():
+        if slot_state_path(pred) is None:
             print(
                 f"[yawn_install] reject missing_predecessor "
                 f"cp{idx:02d} need=cp{idx - 1:02d}",
                 flush=True,
             )
             return False
-    state_src = Path(staged_dir) / CELL_STATE_NAME
+    state_src = slot_state_path(staged_dir)
     side_src = Path(staged_dir) / CELL_SIDECAR_NAME
-    if not state_src.is_file() or not side_src.is_file():
+    if state_src is None or not side_src.is_file():
         return False
     try:
         new_side = json.loads(side_src.read_text(encoding="utf-8-sig"))
@@ -506,7 +544,7 @@ def try_install_yawn_cell(
             shutil.rmtree(incoming, ignore_errors=True)
         incoming.mkdir(parents=True, exist_ok=True)
         try:
-            shutil.copy2(state_src, incoming / CELL_STATE_NAME)
+            shutil.copy2(state_src, incoming / state_src.name)
             shutil.copy2(side_src, incoming / CELL_SIDECAR_NAME)
             replay_src = Path(staged_dir) / CELL_REPLAY_NAME
             if replay_src.is_file():
@@ -551,7 +589,7 @@ def try_install_yawn_cell(
         rel = yawn_rails_rel_path()
         install_row.setdefault(
             "state_path",
-            f"{rel}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}",
+            f"{rel}/cells/{cell_dir_name(idx)}/{state_src.name}",
         )
         install_row.setdefault(
             "sidecar_path",
@@ -622,21 +660,51 @@ def pack_cell_bundle(
     meta: dict[str, Any] | None = None,
     replay: dict[str, Any] | bytes | str | None = None,
     policy: bytes | None = None,
+    state_name: str = CELL_STATE_NAME,
 ) -> bytes:
-    """Zip ``cell.State`` + ``cell.sidecar.json`` (+ optional meta / replay / policy)."""
+    """Zip ``cell.State`` or ``cell.pst`` + sidecar (+ optional meta / replay / policy)."""
     if isinstance(sidecar, (bytes, bytearray)):
         side_obj = json.loads(bytes(sidecar).decode("utf-8"))
     elif isinstance(sidecar, str):
         side_obj = json.loads(sidecar)
     else:
         side_obj = dict(sidecar)
-    return make_cell_bundle_zip(
-        state_bytes=state_bytes,
-        sidecar=side_obj,
-        meta=meta,
-        replay=replay,
-        policy=policy,
-    )
+    name = str(state_name or CELL_STATE_NAME)
+    if name not in {CELL_STATE_NAME, CELL_PST_NAME}:
+        name = CELL_STATE_NAME
+    if name == CELL_STATE_NAME:
+        return make_cell_bundle_zip(
+            state_bytes=state_bytes,
+            sidecar=side_obj,
+            meta=meta,
+            replay=replay,
+            policy=policy,
+        )
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(name, state_bytes)
+        zf.writestr(
+            CELL_SIDECAR_NAME,
+            json.dumps(side_obj, indent=2, sort_keys=True) + "\n",
+        )
+        if meta is not None:
+            zf.writestr(
+                CELL_META_NAME,
+                json.dumps(meta, indent=2, sort_keys=True) + "\n",
+            )
+        if replay is not None:
+            if isinstance(replay, (bytes, bytearray)):
+                replay_text = bytes(replay).decode("utf-8")
+            elif isinstance(replay, str):
+                replay_text = replay
+            else:
+                replay_text = json.dumps(replay, separators=(",", ":")) + "\n"
+            if not replay_text.endswith("\n"):
+                replay_text += "\n"
+            zf.writestr(CELL_REPLAY_NAME, replay_text)
+        if policy:
+            zf.writestr(CELL_POLICY_NAME, bytes(policy))
+    return buf.getvalue()
 
 
 def build_capture_proposal(
@@ -695,15 +763,19 @@ def build_capture_proposal(
         if key in (capacity or {})
     }
     meta.update(capacity_meta)
+    state_name = Path(state_path).name
+    if state_name not in {CELL_STATE_NAME, CELL_PST_NAME}:
+        state_name = CELL_STATE_NAME
     blob = pack_cell_bundle(
         state_bytes=state_bytes,
         sidecar=sidecar,
         meta=meta,
         replay=replay,
         policy=policy,
+        state_name=state_name,
     )
     with zipfile.ZipFile(io.BytesIO(blob)) as zf:
-        state_sha = _sha256_bytes(zf.read(CELL_STATE_NAME))
+        state_sha = _sha256_bytes(zf.read(state_name))
         side_sha = _sha256_bytes(zf.read(CELL_SIDECAR_NAME))
     return {
         "route_id": str(route_id),
@@ -843,8 +915,10 @@ class YawnRailsCellStore:
         rel = yawn_rails_rel_path()
         for idx in sorted(self.cells):
             row = dict(self.cells[idx])
+            payload = slot_state_path(cell_slot_dir(self.root, idx))
+            payload_name = payload.name if payload is not None else CELL_STATE_NAME
             row["state_path"] = (
-                f"{rel}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}"
+                f"{rel}/cells/{cell_dir_name(idx)}/{payload_name}"
             )
             row["sidecar_path"] = (
                 f"{rel}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}"
@@ -1010,7 +1084,8 @@ class YawnRailsCellStore:
             "sidecar_sha256": side_sha,
             "bytes": len(bundle_bytes),
             "state_path": (
-                f"{yawn_rails_rel_path()}/cells/{cell_dir_name(idx)}/{CELL_STATE_NAME}"
+                f"{yawn_rails_rel_path()}/cells/{cell_dir_name(idx)}/"
+                f"{_bundle_state_name(bundle_bytes)}"
             ),
             "sidecar_path": (
                 f"{yawn_rails_rel_path()}/cells/{cell_dir_name(idx)}/{CELL_SIDECAR_NAME}"
@@ -1053,11 +1128,12 @@ class YawnRailsCellStore:
         except zipfile.BadZipFile:
             return False, "bad_zip", None, None
         names = set(zf.namelist())
-        if CELL_STATE_NAME not in names:
+        state_name = _incoming_state_name(names)
+        if state_name is None:
             return False, "missing_state", None, None
         if CELL_SIDECAR_NAME not in names:
             return False, "missing_sidecar", None, None
-        state_bytes = zf.read(CELL_STATE_NAME)
+        state_bytes = zf.read(state_name)
         side_bytes = zf.read(CELL_SIDECAR_NAME)
         state_sha = _sha256_bytes(state_bytes)
         side_sha = _sha256_bytes(side_bytes)
@@ -1201,19 +1277,20 @@ class YawnRailsCellStore:
             return None
         with yawn_cells_locked(self.root, holder="yawn_pack_bundle"):
             d = cell_slot_dir(self.root, idx)
-            if not (d / CELL_STATE_NAME).is_file():
+            state_p = slot_state_path(d)
+            if state_p is None:
                 for alt in ("pl", "cp"):
                     cand = Path(self.root) / "cells" / f"{alt}{int(idx):02d}"
-                    if (cand / CELL_STATE_NAME).is_file():
+                    state_p = slot_state_path(cand)
+                    if state_p is not None:
                         d = cand
                         break
-            state_p = d / CELL_STATE_NAME
             side_p = d / CELL_SIDECAR_NAME
-            if not state_p.is_file() or not side_p.is_file():
+            if state_p is None or not side_p.is_file():
                 return None
             buf = io.BytesIO()
             with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-                zf.write(state_p, CELL_STATE_NAME)
+                zf.write(state_p, state_p.name)
                 zf.write(side_p, CELL_SIDECAR_NAME)
                 meta_p = d / CELL_META_NAME
                 if meta_p.is_file():

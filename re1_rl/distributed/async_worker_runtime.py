@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import os
+import sys
 import queue
 import subprocess
 import threading
@@ -594,6 +595,26 @@ def _flush_local_epoch(
     return retained, capacity_full
 
 
+def _kill_local_recomp_exes() -> None:
+    """Drop leftover C-RE1 windows on this box (one recomp worker per host)."""
+    if os.name != "nt":
+        return
+    try:
+        subprocess.run(
+            [
+                "taskkill",
+                "/IM",
+                "Resident_Evil_Director_s_Cut_Recompiled.exe",
+                "/F",
+            ],
+            check=False,
+            capture_output=True,
+            timeout=15.0,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
 def _cleanup_worker_port_emuhawks(
     base_port: int,
     n_envs: int,
@@ -632,6 +653,8 @@ def _cleanup_worker_port_emuhawks(
                 path.unlink(missing_ok=True)
             except OSError:
                 pass
+    if os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower() == "recomp":
+        _kill_local_recomp_exes()
 
 
 def _shutdown_actors(
@@ -731,6 +754,7 @@ def run_async_worker_loop(
         f"eval_only={eval_only})",
     )
     root = Path(project_root) if project_root else Path.cwd()
+    _cleanup_worker_port_emuhawks(int(base_port), actor_count, project_root=root)
     best_log = root / "data" / "logs" / f"best_rooms_{machine_name}.jsonl"
     progress = TrainingProgressTracker(
         prefix=f"progress:{machine_name}",
@@ -740,6 +764,10 @@ def run_async_worker_loop(
     local_steps = 0
     stop_flag = mp.Value("b", False)
     ctx = mp.get_context("spawn")
+    try:
+        mp.set_executable(sys.executable)
+    except (OSError, AttributeError, RuntimeError):
+        pass
     processes: list[mp.Process] = []
     parent_conns: list[Connection] = []
     actor_emu_pids: list[int | None] = []

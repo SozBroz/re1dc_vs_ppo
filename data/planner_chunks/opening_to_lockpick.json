@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "checkpoint_id": "fresh_start_105",
+  "chunk_id": "opening_to_lockpick",
+  "source": "fresh_start_pl00_pl06_remint",
+  "end_anchor_beat_id": "barry_hall_return_106",
+  "notes": "Pking-only opening remint from the dining-105 fresh start (pl00, no emblem; installed by hand, never minted here). Do not prepend onto cp05_shield_key — that would shift live step indices. Explicit slot_index writes pl01 emblem .. pl06 lockpick; pl06 is the live-chunk tip and live step 0 (106->105) mints pl07. Lockpick is Barry's 203->106 grant, not its own step.",
+  "steps": [
+    {
+      "n": 1,
+      "op": "acquire",
+      "pickup_id": "105:emblem:1",
+      "beat_id": "emblem_105",
+      "slot_index": 1
+    },
+    {
+      "n": 2,
+      "op": "traverse",
+      "edge_id": "105->104",
+      "beat_id": "kenneth_104",
+      "slot_index": 2
+    },
+    {
+      "n": 3,
+      "op": "traverse",
+      "edge_id": "104->105",
+      "beat_id": "barry_return_105",
+      "slot_index": 3
+    },
+    {
+      "n": 4,
+      "op": "traverse",
+      "edge_id": "105->106",
+      "beat_id": "main_hall_106",
+      "slot_index": 4
+    },
+    {
+      "n": 5,
+      "op": "traverse",
+      "edge_id": "106->203",
+      "beat_id": "upper_hall_203",
+      "slot_index": 5
+    },
+    {
+      "n": 6,
+      "op": "traverse",
+      "edge_id": "203->106",
+      "beat_id": "barry_hall_return_106",
+      "slot_index": 6
+    }
+  ]
+}

@@ -413,3 +413,26 @@ def test_reset_skips_cell_when_state_sha_mismatches(tmp_path: Path) -> None:
     )
     bundle = yawn_cell_pb_bundle(row)
     assert bundle["state_sha256"] == good_sha
+
+
+def test_slot_content_shas_prefers_cell_pst(tmp_path: Path) -> None:
+    """C-RE1 grafts store bytes in cell.pst; leftover cell.State must not win."""
+    from re1_rl.yawn_rails_sync import slot_content_shas, slot_matches_content
+
+    cell = tmp_path / "pl112"
+    cell.mkdir()
+    (cell / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+    pst_bytes = b"PST_GRAFT"
+    (cell / "cell.pst").write_bytes(pst_bytes)
+    (cell / "cell.State").write_bytes(b"OLD_BIZHAWK")
+    pst_sha = hashlib.sha256(pst_bytes).hexdigest()
+    shas = slot_content_shas(cell)
+    assert shas is not None
+    assert shas[0] == pst_sha
+    assert slot_matches_content(cell, state_sha256=pst_sha)
+
+    pst_only = tmp_path / "pl070"
+    pst_only.mkdir()
+    (pst_only / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+    (pst_only / "cell.pst").write_bytes(pst_bytes)
+    assert slot_matches_content(pst_only, state_sha256=pst_sha)

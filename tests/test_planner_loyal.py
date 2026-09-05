@@ -193,6 +193,28 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[enter_108 + 1]["pickup_id"] == "108:handgun_bullets:1"
 
 
+def test_opening_chunk_emblem_acquire_is_first_step():
+    path = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=path)
+    assert q.current["pickup_id"] == "105:emblem:1"
+    # pl00 is the fresh-start tip; emblem is the first minted slot.
+    assert q.current["slot_index"] == 1
+    assert [s["slot_index"] for s in q._steps] == [1, 2, 3, 4, 5, 6]
+    prev = {"room_id": "105", "inventory_slots": [("beretta", 15), ("knife", 0)]}
+    q.note_start_inventory(prev)
+    result = q.evaluate_transition(
+        prev_state=prev,
+        state={
+            "room_id": "105",
+            "inventory_slots": [("beretta", 15), ("knife", 0), ("emblem", 1)],
+            "new_items": ["emblem"],
+        },
+    )
+    assert result["divert"] is False
+    assert result["step_success"] is True
+    assert q.current["edge_id"] == "105->104"
+
+
 def test_queue_pops_on_correct_traverse():
     q = PlannerLoyalQueue()
     assert q.current["edge_id"] == "106->105"
@@ -211,6 +233,61 @@ def test_queue_divert_on_wrong_room():
     assert result["divert"] is True
 
 
+def test_ammo_on_traverse_into_tea_room_diverts():
+    q = PlannerLoyalQueue()
+    first = q.evaluate_transition(
+        prev_state={"room_id": "106", "inventory_slots": [("beretta", 15)]},
+        state={"room_id": "105", "inventory_slots": [("beretta", 15)]},
+    )
+    assert first["step_success"] is True
+    assert q.current["edge_id"] == "105->104"
+    result = q.evaluate_transition(
+        prev_state={"room_id": "105", "inventory_slots": [("beretta", 15)]},
+        state={
+            "room_id": "104",
+            "inventory_slots": [("beretta", 15), ("handgun_bullets", 15)],
+            "new_items": ["handgun_bullets"],
+        },
+    )
+    assert result["divert"] is True
+    assert "handgun_bullets" in str(result["divert_reason"])
+    assert result["step_success"] is False
+    assert q.current["edge_id"] == "105->104"
+
+
+def test_ammo_while_already_in_traverse_dest_diverts():
+    q = PlannerLoyalQueue()
+    q.seek(1)
+    assert q.current["edge_id"] == "105->104"
+    result = q.evaluate_transition(
+        prev_state={"room_id": "104", "inventory_slots": [("beretta", 15)]},
+        state={
+            "room_id": "104",
+            "inventory_slots": [("beretta", 15), ("handgun_bullets", 15)],
+            "new_items": ["handgun_bullets"],
+        },
+    )
+    assert result["divert"] is True
+    assert "handgun_bullets" in str(result["divert_reason"])
+    assert result["step_success"] is False
+
+
+def test_clean_traverse_into_tea_room_still_completes():
+    q = PlannerLoyalQueue()
+    q.evaluate_transition(
+        prev_state={"room_id": "106", "inventory_slots": [("beretta", 15)]},
+        state={"room_id": "105", "inventory_slots": [("beretta", 15)]},
+    )
+    result = q.evaluate_transition(
+        prev_state={"room_id": "105", "inventory_slots": [("beretta", 15)]},
+        state={"room_id": "104", "inventory_slots": [("beretta", 15)]},
+    )
+    assert result["divert"] is False
+    assert result["step_success"] is True
+    assert q.current["op"] == "acquire"
+    assert q.current["pickup_id"] == "104:handgun_bullets:1"
+
+
 def test_ink_ribbon_pickup_diverts_on_traverse():
     q = PlannerLoyalQueue()
     prev = {"room_id": "106", "inventory_slots": []}
@@ -224,6 +301,36 @@ def test_ink_ribbon_pickup_diverts_on_traverse():
     assert "unplanned_pickup" in str(result["divert_reason"])
     assert result["step_success"] is False
     assert q.current["edge_id"] == "106->105"
+
+
+def test_start_inventory_decode_hole_does_not_divert():
+    q = PlannerLoyalQueue()
+    q.note_start_inventory(
+        {"room_id": "10B", "inventory_slots": [("beretta", 15), ("armor_key", 1)]}
+    )
+    result = q.evaluate_transition(
+        prev_state={"room_id": "10B", "inventory_slots": []},
+        state={
+            "room_id": "10B",
+            "inventory_slots": [("beretta", 15), ("armor_key", 1)],
+        },
+    )
+    assert result["divert"] is False
+
+
+def test_first_eval_room_flicker_into_start_does_not_divert():
+    q = PlannerLoyalQueue()
+    q.note_start_inventory({"room_id": "10F", "inventory_slots": []})
+    result = q.evaluate_transition(
+        prev_state={"room_id": "100", "inventory_slots": []},
+        state={"room_id": "10F", "inventory_slots": []},
+    )
+    assert result["divert"] is False
+    later = q.evaluate_transition(
+        prev_state={"room_id": "10F", "inventory_slots": []},
+        state={"room_id": "107", "inventory_slots": []},
+    )
+    assert later["divert"] is True
 
 
 def test_already_held_beretta_qty_bump_does_not_divert():

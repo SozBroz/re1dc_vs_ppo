@@ -219,6 +219,7 @@ class PlannerLoyalQueue:
         self._index = 0
         self.step_success_pending = False
         self.divert_reason = None
+        self._absorb_start_flicker = True
         self._start_held = set()
         self._start_qty_totals = {}
         self._start_room = ""
@@ -271,6 +272,7 @@ class PlannerLoyalQueue:
         self._index = 0
         self.step_success_pending = False
         self.divert_reason = None
+        self._absorb_start_flicker = True
         self._start_held = set()
         self._start_qty_totals = {}
         self._start_room = ""
@@ -284,6 +286,7 @@ class PlannerLoyalQueue:
         # Presence, not qty: files/notes often occupy a slot with qty 0.
         self._start_held = set(_inventory_held_names(state))
         self._start_room = str(state.get("room_id") or "").strip().upper()
+        self._absorb_start_flicker = True
         self._start_gallery_progress = int(state.get("gallery_progress", 0) or 0)
         self._start_gallery_solved = bool(state.get("gallery_puzzle_solved", False))
 
@@ -293,6 +296,7 @@ class PlannerLoyalQueue:
         self._index = max(0, min(int(index), n))
         self.step_success_pending = False
         self.divert_reason = None
+        self._absorb_start_flicker = True
         self._rebuild_satisfied_pickups()
 
     def _rebuild_satisfied_pickups(self) -> None:
@@ -524,6 +528,21 @@ class PlannerLoyalQueue:
         op = str(step.get("op") or "")
         prev_room = str(prev_state.get("room_id") or "")
         room = str(state.get("room_id") or "")
+        absorb = bool(getattr(self, "_absorb_start_flicker", False))
+        if absorb:
+            self._absorb_start_flicker = False
+            start_room = str(getattr(self, "_start_room", "") or "")
+            if (
+                room
+                and prev_room
+                and room != prev_room
+                and (
+                    (start_room and room == start_room)
+                    or _looks_like_room_decode_glitch(prev_room)
+                    or _looks_like_room_decode_glitch(room)
+                )
+            ):
+                prev_room = room
 
         # Heal-use tax from inventory disappearance of heal items (not box).
         tax = _heal_use_tax(prev_state, state)
@@ -599,6 +618,46 @@ class PlannerLoyalQueue:
             )
             return result
 
+        # Floor piles before traverse complete. Same-frame ammo on a walk
+        # step used to be swallowed by the dest-room return below.
+        gained = _inventory_gains(prev_state, state)
+        if gained and op != "use_box":
+            want = str(step.get("pickup_id") or "")
+            _, want_item, _ = _pickup_id_parts(want)
+            matched = op == "acquire" and _pickup_matches_gain(want, gained)
+            planned = {want_item} if matched else set()
+            unexpected = gained - planned
+            unexpected -= _already_held_weapon_names(prev_state, self._start_held)
+            if absorb:
+                prev_held = _inventory_held_names(prev_state)
+                unexpected -= (self._start_held - prev_held) & gained
+            unexpected -= _combine_explained_gains(prev_state, state)
+            unexpected -= unexpected & _event_grant_names(room)
+            unexpected -= (
+                self._completed_acquire_names(room) - _ON_PATH_PILE_ITEMS
+            )
+            # Floor piles always count, even if a chamber qty-bump also fired.
+            unexpected |= gained & _ON_PATH_PILE_ITEMS
+            if unexpected and op != "acquire":
+                result["divert"] = True
+                result["divert_reason"] = f"unplanned_pickup:{sorted(unexpected)}"
+                self.divert_reason = result["divert_reason"]
+                return result
+            if op == "acquire":
+                if not matched:
+                    if unexpected:
+                        result["divert"] = True
+                        result["divert_reason"] = (
+                            f"wrong_pickup want={want} got={sorted(gained)}"
+                        )
+                        self.divert_reason = result["divert_reason"]
+                    return result
+                result["step_success"] = True
+                self._index += 1
+                self.step_success_pending = True
+                self._rebuild_satisfied_pickups()
+                return result
+
         # Divert: unplanned room change. go_to_box may hop any door until dest.
         if room and prev_room and room != prev_room:
             if op == GO_TO_BOX_OP:
@@ -650,51 +709,6 @@ class PlannerLoyalQueue:
                 self._index += 1
                 self.step_success_pending = True
                 return result
-
-        # Divert / complete: pickups. COMBINE, already-held *weapon* chamber
-        # bumps, leftover cinema after a minted acquire, and scripted ``event``
-        # grants (Barry acid, Speyer bazooka, …) are not world pickups.
-        # Floor piles (herbs, ammo boxes, ink, …) always divert unless this
-        # step is the matching ``acquire``. Box UI reshuffles are ``use_box``.
-        gained = _inventory_gains(prev_state, state)
-        if gained and op != "use_box":
-            want = str(step.get("pickup_id") or "")
-            _, want_item, _ = _pickup_id_parts(want)
-            matched = op == "acquire" and _pickup_matches_gain(want, gained)
-            planned = {want_item} if matched else set()
-            unexpected = gained - planned
-            unexpected -= _already_held_weapon_names(prev_state, self._start_held)
-            unexpected -= _combine_explained_gains(prev_state, state)
-            unexpected -= unexpected & _event_grant_names(room)
-            # Leftover cinema after a minted acquire (key/weapon) is not a
-            # pickup. Stackable floor piles (herbs/ammo) are never exempt —
-            # each scripted acquire is one pile; extras divert.
-            unexpected -= (
-                self._completed_acquire_names(room) - _ON_PATH_PILE_ITEMS
-            )
-            if op != "acquire":
-                if unexpected:
-                    result["divert"] = True
-                    result["divert_reason"] = f"unplanned_pickup:{sorted(unexpected)}"
-                    self.divert_reason = result["divert_reason"]
-                    return result
-                # Benign inventory edge (cinema grant, slot decode flicker) on a
-                # puzzle leg — fall through to RAM-flag completion above.
-                if op not in {"do_puzzle", "objective", "trigger_cutscene", "boss"}:
-                    return result
-            if not matched:
-                if unexpected:
-                    result["divert"] = True
-                    result["divert_reason"] = (
-                        f"wrong_pickup want={want} got={sorted(gained)}"
-                    )
-                    self.divert_reason = result["divert_reason"]
-                return result
-            result["step_success"] = True
-            self._index += 1
-            self.step_success_pending = True
-            self._rebuild_satisfied_pickups()
-            return result
 
         # Objective / puzzle / cutscene / boss completion via story_use or flags.
         if op in {"objective", "do_puzzle", "trigger_cutscene", "boss"}:
@@ -949,6 +963,16 @@ def _already_held_weapon_names(
     }
     held = _already_held_names(prev_state, start_held)
     return held & weapon_names
+
+
+def _looks_like_room_decode_glitch(room: str) -> bool:
+    """True for non-SRR tokens (1600, 12960) seen on C-RE1 graft loads."""
+    token = str(room or "").strip().upper()
+    if len(token) != 3:
+        return True
+    if token[0] not in "1234567":
+        return True
+    return any(ch not in "0123456789ABCDEF" for ch in token[1:])
 
 
 def _inventory_gains(prev_state: dict[str, Any], state: dict[str, Any]) -> set[str]:
