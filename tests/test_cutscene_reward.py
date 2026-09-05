@@ -291,6 +291,21 @@ def test_illegal_main_hall_gate_irreversibly_disables_positive_rewards() -> None
         "105", "106", rewarded_cutscenes=AFTER_KENNETH
     )
     assert ILLEGAL_MAIN_HALL_FAILURE_REASON == "main_hall_before_kenneth"
+    from re1_rl.cutscene_reward import (
+        ILLEGAL_DINING_RETURN_FAILURE_REASON,
+        illegal_dining_return_before_kenneth_transition,
+    )
+
+    assert illegal_dining_return_before_kenneth_transition(
+        "104", "105", rewarded_cutscenes=set()
+    )
+    assert not illegal_dining_return_before_kenneth_transition(
+        "104", "105", rewarded_cutscenes=AFTER_KENNETH
+    )
+    assert not illegal_dining_return_before_kenneth_transition(
+        "105", "105", rewarded_cutscenes=set()
+    )
+    assert ILLEGAL_DINING_RETURN_FAILURE_REASON == "barry_return_before_kenneth"
 
     progress = ProgressTracker()
     progress.seed_spawn_room("105")

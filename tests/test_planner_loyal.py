@@ -1087,6 +1087,49 @@ def test_planner_loyal_kenneth_gate_kills_fresh_start_hall() -> None:
     assert reason == "main_hall_before_kenneth"
 
 
+def test_planner_loyal_dining_return_without_kenneth_is_terminal() -> None:
+    """104→105 before 104:*:sN is a divert; the cinema must play first."""
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    q.seek(2)  # 104->105
+    progress = ProgressTracker()
+    prev = {"room_id": "104", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    reward, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_divert"] == PLANNER_DIVERT_PENALTY
+    assert bd["planner_step_success"] == 0.0
+    assert q.divert_reason == "barry_return_before_kenneth"
+    terminated, _truncated, reason = RE1Env._termination_flags(
+        SimpleNamespace(
+            _stage={"mode": "planner_loyal", "max_steps": 3000},
+            _progress=progress,
+            _checkpoint_captured=False,
+            _episode_failure_override=None,
+            _planner_loyal_queue=q,
+            _step_count=3,
+            _episode_truncated=lambda: False,
+        ),
+        {"dead": False},
+    )
+    assert terminated is True
+    assert reason == "barry_return_before_kenneth"
+    assert reward == pytest.approx(STEP_PENALTY + PLANNER_DIVERT_PENALTY)
+
+
+def test_planner_loyal_dining_return_after_kenneth_completes() -> None:
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    q.seek(2)
+    progress = ProgressTracker()
+    progress.observe_cutscene("104:0:s0")
+    prev = {"room_id": "104", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    _reward_total, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_divert"] == 0.0
+    assert bd["planner_step_success"] > 0.0
+    assert q.divert_reason is None
+
+
 def test_planner_loyal_kenneth_gate_allows_hall_after_tea_room_flag() -> None:
     opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
     q = PlannerLoyalQueue(chunk_path=opening)

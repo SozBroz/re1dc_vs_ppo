@@ -1178,7 +1178,10 @@ class RE1Env(gym.Env):
             divert = getattr(
                 getattr(self, "_planner_loyal_queue", None), "divert_reason", None
             )
-            reason = "planner_divert" if divert else "wrong_room"
+            if divert == "barry_return_before_kenneth":
+                reason = "barry_return_before_kenneth"
+            else:
+                reason = "planner_divert" if divert else "wrong_room"
         elif forbidden_item_failure:
             reason = "forbidden_item"
         elif shotgun_return_failure:

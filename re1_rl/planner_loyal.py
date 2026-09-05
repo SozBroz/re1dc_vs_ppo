@@ -695,6 +695,11 @@ class PlannerLoyalQueue:
                 result["divert_reason"] = f"wrong_traverse:{edge} got {room}"
                 self.divert_reason = result["divert_reason"]
                 return result
+            if _dining_return_before_kenneth(prev_room, room, progress):
+                result["divert"] = True
+                result["divert_reason"] = "barry_return_before_kenneth"
+                self.divert_reason = result["divert_reason"]
+                return result
             # Correct traverse completed.
             result["step_success"] = True
             self._index += 1
@@ -706,6 +711,8 @@ class PlannerLoyalQueue:
             edge = str(step.get("edge_id") or "")
             expected = edge.split("->", 1)[1] if "->" in edge else ""
             if expected and room == expected:
+                if edge == "104->105" and not _kenneth_seen(progress):
+                    return result
                 result["step_success"] = True
                 self._index += 1
                 self.step_success_pending = True
@@ -972,6 +979,36 @@ def _already_held_weapon_names(
     }
     held = _already_held_names(prev_state, start_held)
     return held & weapon_names
+
+
+def _kenneth_ledgers(progress: Any) -> set[str]:
+    if progress is None:
+        return set()
+    return (
+        set(getattr(progress, "observed_cutscenes", None) or ())
+        | set(getattr(progress, "rewarded_cutscenes", None) or ())
+        | set(getattr(progress, "leg_observed_cutscenes", None) or ())
+    )
+
+
+def _kenneth_seen(progress: Any) -> bool:
+    from re1_rl.cutscene_reward import kenneth_cutscene_seen
+
+    return kenneth_cutscene_seen(_kenneth_ledgers(progress))
+
+
+def _dining_return_before_kenneth(
+    prev_room: str, room: str, progress: Any
+) -> bool:
+    from re1_rl.cutscene_reward import (
+        illegal_dining_return_before_kenneth_transition,
+    )
+
+    return illegal_dining_return_before_kenneth_transition(
+        prev_room,
+        room,
+        rewarded_cutscenes=_kenneth_ledgers(progress),
+    )
 
 
 def _looks_like_room_decode_glitch(room: str) -> bool:

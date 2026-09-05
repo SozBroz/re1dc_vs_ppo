@@ -29,8 +29,10 @@ MAX_SAME_ROOM_CUTSCENE_INDEX = 4
 KENNETH_CUTSCENE_MILESTONE = "104:0"
 MAIN_HALL_ROOM = "106"
 TEA_ROOM = "104"
+DINING_ROOM = "105"
 # Telemetry key for soft pre-Kenneth Main Hall entry penalty (no episode end).
 ILLEGAL_MAIN_HALL_FAILURE_REASON = "main_hall_before_kenneth"
+ILLEGAL_DINING_RETURN_FAILURE_REASON = "barry_return_before_kenneth"
 
 OPENING_PHASES_NO_REWARD: frozenset[str] = frozenset(
     {
@@ -180,6 +182,24 @@ def illegal_main_hall_before_kenneth_transition(
         return False
     prev = str(prev_room or "")
     if not prev or prev == MAIN_HALL_ROOM:
+        return False
+    return not kenneth_cutscene_seen(rewarded_cutscenes)
+
+
+def illegal_dining_return_before_kenneth_transition(
+    prev_room: str,
+    room: str,
+    *,
+    rewarded_cutscenes: Collection[str] | None,
+) -> bool:
+    """True on tea-room 104 → dining 105 before Kenneth ``104:*:sN``.
+
+    Walking back through the tea-room door without the cinema is the cp02
+    fail. Does not fire when starting/staying in 105, or after Kenneth.
+    """
+    if str(room) != DINING_ROOM:
+        return False
+    if str(prev_room or "") != TEA_ROOM:
         return False
     return not kenneth_cutscene_seen(rewarded_cutscenes)
 
