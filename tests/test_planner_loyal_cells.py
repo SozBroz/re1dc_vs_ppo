@@ -25,6 +25,7 @@ from re1_rl.planner_loyal_cells import (
     planner_loyal_quality_beats,
     planner_loyal_root,
     sample_training_start_cell,
+    reset_chunk_id_for_cell,
     seek_index_after_cell,
     slot_index_for_completed_step,
     training_start_paths,
@@ -91,6 +92,14 @@ def test_seek_ignores_step_index_from_another_chunk() -> None:
     }
     assert seek_index_after_cell(tip, "opening_to_lockpick") == 6
     assert seek_index_after_cell(tip, "cp05_shield_key") == 0
+    assert reset_chunk_id_for_cell(tip, "cp05_shield_key") == "cp05_shield_key"
+    assert (
+        reset_chunk_id_for_cell(
+            {"checkpoint_index": 0, "chunk_id": "opening_to_lockpick"},
+            "cp05_shield_key",
+        )
+        == "opening_to_lockpick"
+    )
     live = {"checkpoint_index": 9, "planner_step_index": 2, "chunk_id": "cp05_shield_key"}
     assert seek_index_after_cell(live, "cp05_shield_key") == 3
     assert seek_index_after_cell(live, None) == 3
@@ -454,6 +463,43 @@ def test_opening_remints_are_starts_when_their_chunk_file_exists(
         2,
         TRAINING_START_INDEX,
     ]
+
+
+def test_opening_remint_pl06_is_live_106_to_105_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both chunk files on disk (fleet). Opening-final pl06 still seeks 106->105."""
+    _clear_pin_env(monkeypatch)
+    live = _write_chunk(tmp_path, "cp05_shield_key", ["106->105", "105->104"])
+    opening = _write_chunk(
+        tmp_path,
+        "opening_to_lockpick",
+        ["105:emblem", "105->104", "104->105", "105->106", "106->203", "203->106"],
+    )
+    monkeypatch.setenv("RE1_PLANNER_CHUNK", str(live))
+    chunks = tmp_path / "data" / "planner_chunks"
+    chunks.mkdir(parents=True, exist_ok=True)
+    (chunks / "opening_to_lockpick.json").write_text(
+        opening.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    (chunks / "cp05_shield_key.json").write_text(
+        live.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    _write_cell(
+        tmp_path,
+        TRAINING_START_INDEX,
+        meta={
+            "planner_step_index": 5,
+            "chunk_id": "opening_to_lockpick",
+            "chunk_final": True,
+            "training_start": True,
+        },
+    )
+    starts = iter_training_start_cells(tmp_path)
+    assert [int(row["checkpoint_index"]) for row in starts] == [TRAINING_START_INDEX]
+    tip = starts[0]
+    assert reset_chunk_id_for_cell(tip, "cp05_shield_key") == "cp05_shield_key"
+    assert seek_index_after_cell(tip, "cp05_shield_key") == 0
 
 
 def _clear_pin_env(monkeypatch: pytest.MonkeyPatch) -> None:

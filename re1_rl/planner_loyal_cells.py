@@ -625,6 +625,27 @@ def _row_runtime_matches(row: dict[str, Any]) -> bool:
     return (runtime == "recomp") == recomp_cells_enabled()
 
 
+def reset_chunk_id_for_cell(
+    row: dict[str, Any],
+    live_id: str | None = None,
+) -> str | None:
+    """Chunk the reset queue should load.
+
+    The lockpick tip (``pl06``) is the live-chunk start even when the
+    opening remint tagged it ``opening_to_lockpick`` / ``chunk_final``.
+    Opening cells below the tip keep their own file so seek 0 is emblem.
+    """
+    live = str(live_id or "").strip() or None
+    try:
+        slot = int(row.get("checkpoint_index"))
+    except (TypeError, ValueError):
+        slot = None
+    if slot == TRAINING_START_INDEX:
+        return live
+    own = str(row.get("chunk_id") or "").strip()
+    return own or live
+
+
 def seek_index_after_cell(
     row: dict[str, Any],
     live_id: str | None = None,
@@ -694,12 +715,15 @@ def iter_training_start_cells(
             and _row_runtime_matches(row)
         ):
             continue
-        check_id = str(row.get("chunk_id") or "") if (foreign and own_ok) else live_id
-        check_n = (
-            _n_steps_for_chunk_id(check_id, project_root)
-            if (foreign and own_ok)
-            else n_steps
-        )
+        if idx == TRAINING_START_INDEX:
+            check_id = live_id
+            check_n = n_steps
+        elif foreign and own_ok:
+            check_id = str(row.get("chunk_id") or "")
+            check_n = _n_steps_for_chunk_id(check_id, project_root)
+        else:
+            check_id = live_id
+            check_n = n_steps
         if not cell_has_remaining_planner_step(row, check_n, check_id):
             continue
         out.append(row)

@@ -2247,8 +2247,17 @@ class RE1Env(gym.Env):
                     PlannerLoyalQueue,
                     chunk_path_for_id,
                 )
+                from re1_rl.planner_loyal_cells import (
+                    live_chunk_id,
+                    reset_chunk_id_for_cell,
+                )
 
-                want_chunk = str(pb_bundle.get("chunk_id") or "").strip()
+                want_chunk = str(
+                    reset_chunk_id_for_cell(
+                        pb_bundle, live_chunk_id(self.project_root)
+                    )
+                    or ""
+                ).strip()
                 if (
                     want_chunk
                     and want_chunk != str(self._planner_loyal_queue.chunk_id)
