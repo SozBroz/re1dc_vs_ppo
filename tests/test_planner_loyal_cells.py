@@ -13,8 +13,10 @@ from re1_rl.go_explore_merge import CELL_SIDECAR_NAME, CELL_STATE_NAME
 from re1_rl.planner_loyal import chunk_path_for_id
 from re1_rl.planner_loyal_cells import (
     FRESH_START_INDEX,
+    PIN_WEIGHT_LATEST_KEY,
     SEED_SLOT_OFFSET,
     TRAINING_START_INDEX,
+    _parse_pin_weights,
     bootstrap_from_crystals,
     cell_dir_name,
     cell_has_remaining_planner_step,
@@ -618,6 +620,61 @@ def test_reset_pin_weights_rest_and_exclusive(
     )
     exclusive = _sample_counts(tmp_path, n=80)
     assert set(exclusive) == {TRAINING_START_INDEX, 11}
+
+
+def test_parse_pin_weights_bare_index_is_exclusive() -> None:
+    assert _parse_pin_weights("18") == {18: 1.0}
+    assert _parse_pin_weights("18:100") == {18: 1.0}
+
+
+def test_parse_pin_weights_latest_and_rest() -> None:
+    mix = _parse_pin_weights("latest:40,rest:60")
+    assert mix is not None
+    assert mix[PIN_WEIGHT_LATEST_KEY] == pytest.approx(0.4)
+    assert mix["rest"] == pytest.approx(0.6)
+    for alias in ("newest:40,rest:60", "front:40,rest:60", "frontier:40,rest:60"):
+        parsed = _parse_pin_weights(alias)
+        assert parsed is not None
+        assert parsed[PIN_WEIGHT_LATEST_KEY] == pytest.approx(0.4)
+        assert parsed["rest"] == pytest.approx(0.6)
+    assert _parse_pin_weights("latest") == {PIN_WEIGHT_LATEST_KEY: 1.0}
+    for alias in ("newest", "front", "frontier"):
+        assert _parse_pin_weights(alias) == {PIN_WEIGHT_LATEST_KEY: 1.0}
+
+
+def test_reset_pin_weights_bare_index_samples_that_cell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_pin_env(monkeypatch)
+    _seed_starts(tmp_path)
+    _write_pin(tmp_path, "RE1_PLANNER_RESET_PIN_WEIGHTS=11\n")
+    counts = _sample_counts(tmp_path, n=80)
+    assert set(counts) == {11}
+
+
+def test_reset_pin_weights_latest_tracks_newest_cell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_pin_env(monkeypatch)
+    _seed_starts(tmp_path)
+    _write_pin(tmp_path, "RE1_PLANNER_RESET_PIN_WEIGHTS=latest:100\n")
+    assert set(_sample_counts(tmp_path, n=80)) == {13}
+    _write_pin(tmp_path, "RE1_PLANNER_RESET_PIN_WEIGHTS=latest\n")
+    assert set(_sample_counts(tmp_path, n=80)) == {13}
+    _write_cell(tmp_path, 14)
+    assert set(_sample_counts(tmp_path, n=80)) == {14}
+
+
+def test_reset_pin_weights_latest_mixes_with_rest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_pin_env(monkeypatch)
+    _seed_starts(tmp_path)
+    _write_pin(tmp_path, "RE1_PLANNER_RESET_PIN_WEIGHTS=latest:50,rest:50\n")
+    counts = _sample_counts(tmp_path)
+    assert 150 <= counts[13] <= 250
+    assert counts[TRAINING_START_INDEX] > 20 and counts[10] > 20 and counts[11] > 20
+    assert counts[13] + counts[TRAINING_START_INDEX] + counts[10] + counts[11] == 400
 
 
 def test_recomp_mint_replacement_keeps_bizhawk_state(

@@ -24,6 +24,9 @@ over ``RE1_PLANNER_RESET_PIN_SET``. Exclusive pins that match no minted
 start fall back to the unpinned pool.
 ``SET`` plus ``SET_WEIGHT=0.5`` (or ``WEIGHTS=54:50,rest:50``) puts that
 fraction on the named cells and the remainder on the other minted starts.
+``WEIGHTS=latest:40,rest:60`` puts 40% on the newest loadable start
+(re-resolved every reset as cells mint) and 60% uniform on the rest.
+A bare ``WEIGHTS=18`` is 100% ``pl18``.
 
 Captures are always thin: ``cell.State`` + sidecar + ``meta.json`` with a
 quality vector for healthier-thin comparison. No ``leg_replay`` / ``leg_policy``.
@@ -65,6 +68,8 @@ _PIN_WEIGHTS_ENV = "RE1_PLANNER_RESET_PIN_WEIGHTS"
 _PIN_FILE_ENV = "RE1_PLANNER_RESET_PIN_FILE"
 _DEFAULT_PIN_FILE = "data/planner_loyal_reset_pin.env"
 _PIN_REST_KEYS = frozenset({"rest", "uniform", "pool"})
+PIN_WEIGHT_LATEST_KEY = "latest"
+_LATEST_PIN_ALIASES = frozenset({"latest", "newest", "front", "frontier"})
 
 MANIFEST_FILENAME = "manifest.json"
 ROUTE_ID = "planner_loyal_v1"
@@ -408,8 +413,27 @@ def _pin_set_weight(project_root: Path | str | None = None) -> float | None:
     return _parse_pin_weight_value(raw)
 
 
+def _parse_pin_key(token: str) -> int | str | None:
+    left_token = token.strip().lower()
+    if left_token in _PIN_REST_KEYS:
+        return "rest"
+    if left_token in _LATEST_PIN_ALIASES:
+        return PIN_WEIGHT_LATEST_KEY
+    try:
+        idx = int(left_token, 10)
+    except ValueError:
+        return None
+    if idx < 0:
+        return None
+    return idx
+
+
 def _parse_pin_weights(raw: str) -> dict[int | str, float] | None:
-    """``54:50,rest:50`` or ``5:0.25,11:0.25``. Values normalize to 1."""
+    """``11:50,rest:50``, ``latest:40,rest:60``, or bare ``18`` / ``latest``.
+
+    Values normalize to 1. A bare index or latest alias is weight 1.0
+    (exclusive after normalize). Unknown bare tokens are ignored.
+    """
     weights: dict[int | str, float] = {}
     for part in raw.replace(";", ",").split(","):
         token = part.strip()
@@ -420,6 +444,10 @@ def _parse_pin_weights(raw: str) -> dict[int | str, float] | None:
                 left, right = token.split(sep, 1)
                 break
         else:
+            key = _parse_pin_key(token)
+            if key is None or key == "rest":
+                continue
+            weights[key] = weights.get(key, 0.0) + 1.0
             continue
         try:
             value = float(right.strip().rstrip("%"))
@@ -427,18 +455,9 @@ def _parse_pin_weights(raw: str) -> dict[int | str, float] | None:
             continue
         if value <= 0.0:
             continue
-        left_token = left.strip().lower()
-        key: int | str
-        if left_token in _PIN_REST_KEYS:
-            key = "rest"
-        else:
-            try:
-                idx = int(left_token, 10)
-            except ValueError:
-                continue
-            if idx < 0:
-                continue
-            key = idx
+        key = _parse_pin_key(left)
+        if key is None:
+            continue
         weights[key] = weights.get(key, 0.0) + value
     if not weights:
         return None
@@ -491,17 +510,28 @@ def _apply_reset_pin(
     return cells
 
 
+def _latest_reset_cell_index(cells: list[dict[str, Any]]) -> int | None:
+    """Newest loadable start among ``cells`` (re-resolved every sample)."""
+    if not cells:
+        return None
+    return max(int(row["checkpoint_index"]) for row in cells)
+
+
 def _sample_from_pin_weights(
     cells: list[dict[str, Any]],
     weights: dict[int | str, float],
     rng: random.Random,
 ) -> dict[str, Any]:
     by_index = {int(row["checkpoint_index"]): row for row in cells}
-    named = {
-        idx: float(weight)
-        for idx, weight in weights.items()
-        if isinstance(idx, int) and idx in by_index
-    }
+    latest_idx = _latest_reset_cell_index(cells)
+    named: dict[int, float] = {}
+    for key, weight in weights.items():
+        if key == PIN_WEIGHT_LATEST_KEY:
+            if latest_idx is None or latest_idx not in by_index:
+                continue
+            named[latest_idx] = named.get(latest_idx, 0.0) + float(weight)
+        elif isinstance(key, int) and key in by_index:
+            named[key] = named.get(key, 0.0) + float(weight)
     rest_w = float(weights.get("rest") or 0.0)
     others = [row for row in cells if int(row["checkpoint_index"]) not in named]
     if rest_w > 0.0 and others:
