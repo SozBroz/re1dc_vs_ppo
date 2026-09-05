@@ -702,6 +702,12 @@ def _actor_process(
     memlog_directory: str | None = None,
 ) -> None:
     from scripts.train_parallel import make_env
+    from re1_rl.pending_combat_reattribute import (
+        COMBAT_PAY_KEYS,
+        combat_pay_from_breakdown,
+        is_armed_attack,
+        reattribute_pending_combat,
+    )
     from re1_rl.training_progress import slim_progress_info
 
     try:
@@ -770,6 +776,7 @@ def _actor_process(
     episode_infos: list[dict[str, Any]] = []
     step_i = 0
     horizon_policy_version = 0
+    pending_fire_steps: list[int] = []
     memlog_control = None
     memlog_telemetry = None
 
@@ -797,6 +804,7 @@ def _actor_process(
         step_i = 0
         episode_infos = []
         horizon_policy_version = 0
+        pending_fire_steps.clear()
 
     def _emit_rollout(n: int) -> None:
         assert obs_bufs is not None and mask_bufs is not None
@@ -901,6 +909,34 @@ def _actor_process(
             except (AttributeError, TypeError, ValueError):
                 pass
             obs, rew, done, trunc, info = env.step(action)
+            audit = (info or {}).get("combat_audit") or {}
+            credited = bool(audit.get("credited_from_pending"))
+            pay = (
+                combat_pay_from_breakdown((info or {}).get("reward_breakdown"))
+                if credited
+                else 0.0
+            )
+            rew, moved, target = reattribute_pending_combat(
+                fire_queue=pending_fire_steps,
+                current_index=step_i,
+                reward=float(rew),
+                rewards=rewards,
+                credited_from_pending=credited,
+                combat_pay=pay,
+            )
+            if moved > 0.0 and info is not None:
+                info = dict(info)
+                breakdown = dict(info.get("reward_breakdown") or {})
+                for key in COMBAT_PAY_KEYS:
+                    if float(breakdown.get(key) or 0.0) > 0.0:
+                        breakdown[key] = 0.0
+                info["reward_breakdown"] = breakdown
+                info["reattributed_combat_pay"] = moved
+                info["reattributed_combat_to_step"] = target
+                audit = dict(audit)
+                audit["reattributed_combat_pay"] = moved
+                audit["reattributed_combat_to_step"] = target
+                info["combat_audit"] = audit
             if _footage_env is not None:
                 try:
                     _footage_env.append(
@@ -945,6 +981,9 @@ def _actor_process(
             # frozen obs). Post-skip credit lands on the next live control step.
             if info.get("cutscene_skip") and not (done or trunc):
                 continue
+
+            if is_armed_attack(action, info):
+                pending_fire_steps.append(int(step_i))
 
             assert obs_bufs is not None and mask_bufs is not None
             for key in obs_bufs:
