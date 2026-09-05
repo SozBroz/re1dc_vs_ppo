@@ -959,6 +959,29 @@ def _compute_planner_loyal_reward(
         if progress.breach_armor_gas():
             bd["armor_gas"] = -float(ARMOR_GAS_DAMAGE_PENALTY)
 
+    prev_room = str(prev_state.get("room_id", "") or "")
+    room = str(state.get("room_id", "") or "")
+    new_kenneth_gate_breach = False
+    if progress is not None and not state.get("dead"):
+        from re1_rl.barry_return_checkpoint import note_kenneth_live_scene
+        from re1_rl.cutscene_reward import (
+            illegal_main_hall_before_kenneth_transition,
+        )
+
+        # Mark 104:*:sN before the hall check so a legal post-Kenneth
+        # 105→106 (opening step 4) is not false-killed.
+        note_kenneth_live_scene(progress, state)
+        if illegal_main_hall_before_kenneth_transition(
+            prev_room,
+            room,
+            rewarded_cutscenes=(
+                progress.observed_cutscenes | progress.rewarded_cutscenes
+            ),
+        ):
+            new_kenneth_gate_breach = progress.breach_kenneth_gate()
+            if new_kenneth_gate_breach:
+                bd["main_hall_before_kenneth"] = MAIN_HALL_BEFORE_KENNETH_PENALTY
+
     loyal = planner_loyal_queue.evaluate_transition(
         prev_state=prev_state,
         state=state,
@@ -969,7 +992,20 @@ def _compute_planner_loyal_reward(
     )
     bd["heal_use_tax"] = float(loyal.get("heal_use_tax") or 0.0)
 
-    if loyal.get("divert"):
+    if new_kenneth_gate_breach:
+        # Kenneth owns this death. Do not also stack planner_divert −4.
+        for key in (
+            "planner_step_success",
+            "checkpoint_success",
+            "planner_divert",
+            "wrong_room",
+            "enemy_damage",
+            "enemy_kill",
+            "hp",
+            "weapon_reload",
+        ):
+            bd[key] = 0.0
+    elif loyal.get("divert"):
         bd["planner_divert"] = PLANNER_DIVERT_PENALTY
         bd["wrong_room"] = PLANNER_DIVERT_PENALTY
         if progress is not None and hasattr(progress, "breach_wrong_room"):
@@ -1035,6 +1071,7 @@ def _compute_planner_loyal_reward(
         and not progress.gallery_wrong_breached
         and not progress.armor_inplace_statue_push_breached
         and not progress.armor_gas_breached
+        and not progress.kenneth_gate_breached
     ):
         progress.note_leg_frames(int(state.get("step_emulated_frames") or 0))
         if (
@@ -1117,6 +1154,7 @@ def _compute_planner_loyal_reward(
         or progress.gallery_wrong_breached
         or progress.armor_inplace_statue_push_breached
         or progress.armor_gas_breached
+        or progress.kenneth_gate_breached
     ):
         for term, value in tuple(bd.items()):
             if value > 0.0:

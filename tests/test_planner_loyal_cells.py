@@ -10,6 +10,7 @@ import pytest
 
 from re1_rl.go_explore_archive import LEG_FRAMES_SENTINEL
 from re1_rl.go_explore_merge import CELL_SIDECAR_NAME, CELL_STATE_NAME
+from re1_rl.planner_loyal import chunk_path_for_id
 from re1_rl.planner_loyal_cells import (
     FRESH_START_INDEX,
     SEED_SLOT_OFFSET,
@@ -202,6 +203,31 @@ def test_pl00_fresh_start_flag_counts_below_tip(
     assert [int(row["checkpoint_index"]) for row in iter_training_start_cells(tmp_path)] == [0]
     pick = sample_training_start_cell(tmp_path, rng=random.Random(1))
     assert pick is not None and pick["cell_dir"].name == "pl00"
+
+
+def test_pl00_opening_chunk_stays_a_start_under_live_chunk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """pl00 is opening_to_lockpick; live default is cp05_shield_key."""
+    _clear_pin_env(monkeypatch)
+    monkeypatch.delenv("RE1_PLANNER_CHUNK", raising=False)
+    monkeypatch.delenv("RE1_RECOMP_CELLS", raising=False)
+    _write_cell(
+        tmp_path,
+        0,
+        meta={
+            "checkpoint_id": "fresh_start_105",
+            "planner_step_index": -1,
+            "training_start": True,
+            "chunk_id": "opening_to_lockpick",
+        },
+    )
+    _write_cell(tmp_path, 6, meta={"chunk_id": "cp05_shield_key"})
+    starts = iter_training_start_cells(tmp_path)
+    assert [int(row["checkpoint_index"]) for row in starts] == [0, 6]
+    opening = chunk_path_for_id("opening_to_lockpick", PROJECT_ROOT)
+    assert opening is not None
+    assert opening.name == "opening_to_lockpick.json"
 
 
 def test_pinned_index_below_tip_is_a_legal_start(

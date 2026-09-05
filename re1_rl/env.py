@@ -2229,6 +2229,28 @@ class RE1Env(gym.Env):
             # Frontier starts resume mid-chunk after the completed step.
             # Tip/fresh cells (planner_step_index None/-1, slot <= tip) seek 0;
             # a cell minted by another chunk falls back to the slot rule.
+            # pl00 carries opening_to_lockpick — switch onto that file so
+            # seek 0 is emblem, not live 106->105 already-there.
+            if isinstance(pb_bundle, dict):
+                from re1_rl.planner_loyal import (
+                    PlannerLoyalQueue,
+                    chunk_path_for_id,
+                )
+
+                want_chunk = str(pb_bundle.get("chunk_id") or "").strip()
+                if (
+                    want_chunk
+                    and want_chunk != str(self._planner_loyal_queue.chunk_id)
+                ):
+                    chunk_path = chunk_path_for_id(want_chunk, self.project_root)
+                    if chunk_path is not None:
+                        self._planner_loyal_queue = PlannerLoyalQueue(
+                            chunk_path=chunk_path
+                        )
+                        print(
+                            f"[planner_loyal] switched chunk id={want_chunk}",
+                            flush=True,
+                        )
             if isinstance(pb_bundle, dict) and (
                 pb_bundle.get("planner_step_index") is not None
                 or pb_bundle.get("checkpoint_index") is not None

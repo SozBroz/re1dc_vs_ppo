@@ -436,3 +436,37 @@ def test_slot_content_shas_prefers_cell_pst(tmp_path: Path) -> None:
     (pst_only / "cell.sidecar.json").write_text("{}", encoding="utf-8")
     (pst_only / "cell.pst").write_bytes(pst_bytes)
     assert slot_matches_content(pst_only, state_sha256=pst_sha)
+
+
+def test_drop_checkpoints_skips_fresh_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RE1_PLANNER_LOYAL", "1")
+    store = YawnRailsCellStore(tmp_path / "learner_pl")
+    prop0 = _write_local_cell(tmp_path / "cap0", idx=0)
+    prop1 = _write_local_cell(tmp_path / "cap1", idx=1)
+    assert store.ingest_proposals([prop0, prop1])
+    assert 0 in store.cells and 1 in store.cells
+    dropped = store.drop_checkpoints([0, 1])
+    assert dropped == [1]
+    assert 0 in store.cells
+    assert 1 not in store.cells
+    assert (tmp_path / "learner_pl" / "cells" / "pl00").is_dir()
+    assert not (tmp_path / "learner_pl" / "cells" / "pl01").is_dir()
+
+
+def test_prune_stale_removes_planner_loyal_dirs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RE1_PLANNER_LOYAL", "1")
+    cells = tmp_path / "states" / "planner_loyal" / "cells"
+    (cells / "pl00").mkdir(parents=True)
+    (cells / "pl01").mkdir()
+    (cells / "cp02").mkdir()
+    from re1_rl.yawn_rails_worker_cache import prune_stale_yawn_cells
+
+    removed = prune_stale_yawn_cells(tmp_path, {0})
+    assert removed == 1
+    assert (cells / "pl00").is_dir()
+    assert not (cells / "pl01").is_dir()
+    assert (cells / "cp02").is_dir()

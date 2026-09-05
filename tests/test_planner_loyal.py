@@ -37,6 +37,7 @@ from re1_rl.room_graph import RoomGraph
 from re1_rl.progress import ProgressTracker
 from re1_rl.reward import (
     CHECKPOINT_MAX_STEPS_EXTENSION,
+    MAIN_HALL_BEFORE_KENNETH_PENALTY,
     STEP_PENALTY,
     WEAPON_RELOAD_REWARD,
     compute_reward,
@@ -1056,6 +1057,48 @@ def test_reward_wrong_room_pays_minus_four_and_is_terminal():
     )
     assert terminated is True
     assert reason == "planner_divert"
+
+
+def test_planner_loyal_kenneth_gate_kills_fresh_start_hall() -> None:
+    """105→106 before 104:*:sN is the Kenneth gate, not a generic divert."""
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    progress = ProgressTracker()
+    prev = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "106", "inventory_slots": [], "hp": 96, "in_control": True}
+    reward, bd = _reward(prev, cur, q, progress=progress)
+    assert progress.kenneth_gate_breached is True
+    assert bd["main_hall_before_kenneth"] == MAIN_HALL_BEFORE_KENNETH_PENALTY
+    assert bd["planner_divert"] == 0.0
+    assert reward == pytest.approx(STEP_PENALTY + MAIN_HALL_BEFORE_KENNETH_PENALTY)
+    terminated, _truncated, reason = RE1Env._termination_flags(
+        SimpleNamespace(
+            _stage={"mode": "planner_loyal", "max_steps": 3000},
+            _progress=progress,
+            _checkpoint_captured=False,
+            _episode_failure_override=None,
+            _planner_loyal_queue=q,
+            _step_count=3,
+            _episode_truncated=lambda: False,
+        ),
+        {"dead": False},
+    )
+    assert terminated is True
+    assert reason == "main_hall_before_kenneth"
+
+
+def test_planner_loyal_kenneth_gate_allows_hall_after_tea_room_flag() -> None:
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    q.seek(3)  # 105->106 after Kenneth
+    progress = ProgressTracker()
+    progress.observe_cutscene("104:0:s0")
+    prev = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "106", "inventory_slots": [], "hp": 96, "in_control": True}
+    _reward_total, bd = _reward(prev, cur, q, progress=progress)
+    assert progress.kenneth_gate_breached is False
+    assert bd["main_hall_before_kenneth"] == 0.0
+    assert bd["planner_step_success"] > 0.0
 
 
 def test_reward_wrong_gallery_portrait_pays_minus_four_and_is_terminal():

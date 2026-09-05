@@ -16,6 +16,7 @@ from re1_rl.yawn_rails_sync import (
     DEFAULT_YAWN_RAILS_REL,
     MANIFEST_FILENAME,
     cell_dir_name,
+    cell_dir_prefix,
     cell_slot_dir,
     promote_cell_files,
     slot_content_shas,
@@ -163,10 +164,11 @@ def prune_stale_yawn_cells(
         if not p.is_dir() or p.name.startswith("."):
             continue
         name = p.name
-        if not name.startswith("cp"):
+        prefix = cell_dir_prefix()
+        if not name.startswith(prefix):
             continue
         try:
-            idx = int(name[2:], 10)
+            idx = int(name[len(prefix) :], 10)
         except ValueError:
             continue
         if idx not in valid_indices:

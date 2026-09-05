@@ -1005,6 +1005,36 @@ class YawnRailsCellStore:
                 pass
         return accepted
 
+    def drop_checkpoints(self, indices: list[int] | tuple[int, ...]) -> list[int]:
+        """Remove slots from the store and delete their cell dirs."""
+        want = []
+        for raw in indices:
+            try:
+                idx = int(raw)
+            except (TypeError, ValueError):
+                continue
+            if idx > 0:
+                want.append(idx)
+        dropped: list[int] = []
+        if not want:
+            return dropped
+        with self._lock:
+            with yawn_cells_locked(self.root, holder="yawn_drop_checkpoints"):
+                self._load()
+                for idx in want:
+                    if idx in self.cells:
+                        del self.cells[idx]
+                        dropped.append(idx)
+                    slot = cell_slot_dir(self.root, idx)
+                    if slot.is_dir():
+                        shutil.rmtree(slot, ignore_errors=True)
+                        if idx not in dropped:
+                            dropped.append(idx)
+                if dropped:
+                    self.archive_version += 1
+                    self._persist_unlocked()
+        return dropped
+
     def _reject(self, reason: str) -> None:
         self.rejected += 1
         self.last_rejects.append(reason)

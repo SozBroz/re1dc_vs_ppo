@@ -646,6 +646,7 @@ def iter_training_start_cells(
         if (
             _chunk_mismatch(row, live_id)
             and idx != TRAINING_START_INDEX
+            and idx != FRESH_START_INDEX
             and idx not in pinned  # explicit pin wins; seek falls to slot rule
         ):
             skipped_foreign += 1

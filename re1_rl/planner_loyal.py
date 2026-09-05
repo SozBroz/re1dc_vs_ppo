@@ -73,6 +73,7 @@ PLANNER_LOYAL_SCALAR_KEYS: frozenset[str] = frozenset(
         "armor_approach",
         "armor_gas",
         "dining_statue_progress",
+        "main_hall_before_kenneth",
     }
 )
 
@@ -1412,6 +1413,30 @@ def resolve_chunk_path(project_root: Path | str | None = None) -> Path:
         return path
     root = Path(project_root) if project_root is not None else ROOT
     return root / path
+
+
+def chunk_path_for_id(
+    chunk_id: str,
+    project_root: Path | str | None = None,
+) -> Path | None:
+    """Resolve ``chunk_id`` to a file under ``data/planner_chunks``."""
+    want = str(chunk_id or "").strip()
+    if not want:
+        return None
+    root = Path(project_root) if project_root is not None else ROOT
+    chunk_dir = root / "data" / "planner_chunks"
+    if not chunk_dir.is_dir():
+        return None
+    for path in sorted(chunk_dir.glob("*.json")):
+        if ".pre_" in path.name:
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, TypeError):
+            continue
+        if str(data.get("chunk_id") or "") == want:
+            return path
+    return None
 
 
 def _route_admin_goal_indices() -> tuple[int, ...]:
