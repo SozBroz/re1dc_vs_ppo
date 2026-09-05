@@ -12,9 +12,9 @@ Reward contract (imperator 2026-08-25):
   COMBINE reshuffles (reload / herb mix / ammo merge), scripted ``event``
   grants (Barry acid, Speyer bazooka, …), and already-held *weapon* chamber
   bumps are not pickups. Floor piles always divert unless the current step is
-  that ``acquire``, except tea-room Kenneth clips (``104`` ``handgun_bullets``)
-  on ``kenneth_104`` / ``barry_return_105``. Those piles despawn after the
-  Wesker/Barry hall cinema; dining return and ``105->106`` require both (30).
+  that exact ``acquire``. Extra items on an acquire (chemical plus a clip)
+  are also a divert. Dining return and ``105->106`` still require both
+  Kenneth clips (30 spare) so the Wesker cinema cannot despawn them first.
 - Cell timer: flat 12 minutes only (no custom yawn_cell_timeouts.json times).
 - Armor room 205: ``armor_room_enter`` (pl78), exact east vent (pl79),
   exact east+west vents (pl80), then ``sun_crest`` acquire (pl81).
@@ -574,6 +574,15 @@ class PlannerLoyalQueue:
         # inventory rising edge is gone. Numbered ammo piles still need a qty
         # edge (same sibling rule as reset skip).
         if self._unique_acquire_now_held(state):
+            want = str(step.get("pickup_id") or "")
+            _, want_item, _ = _pickup_id_parts(want)
+            extras = _inventory_gains(prev_state, state) - {want_item}
+            extras &= _ON_PATH_PILE_ITEMS
+            if extras:
+                result["divert"] = True
+                result["divert_reason"] = f"unplanned_pickup:{sorted(extras)}"
+                self.divert_reason = result["divert_reason"]
+                return result
             result["step_success"] = True
             self._index += 1
             self.step_success_pending = True
@@ -640,25 +649,18 @@ class PlannerLoyalQueue:
                 self._completed_acquire_names(room) - _ON_PATH_PILE_ITEMS
             )
             # Floor piles always count, even if a chamber qty-bump also fired.
-            unexpected |= gained & _ON_PATH_PILE_ITEMS
-            from re1_rl.barry_return_checkpoint import TEA_ROOM_CLIP_BEATS
-
-            beat = str(step.get("beat_id") or "")
-            if room == "104" and beat in TEA_ROOM_CLIP_BEATS:
-                unexpected -= {"handgun_bullets"}
-            if unexpected and op != "acquire":
+            unexpected |= (gained & _ON_PATH_PILE_ITEMS) - planned
+            if unexpected:
                 result["divert"] = True
-                result["divert_reason"] = f"unplanned_pickup:{sorted(unexpected)}"
+                result["divert_reason"] = (
+                    f"wrong_pickup want={want} got={sorted(gained)}"
+                    if op == "acquire" and not matched
+                    else f"unplanned_pickup:{sorted(unexpected)}"
+                )
                 self.divert_reason = result["divert_reason"]
                 return result
             if op == "acquire":
                 if not matched:
-                    if unexpected:
-                        result["divert"] = True
-                        result["divert_reason"] = (
-                            f"wrong_pickup want={want} got={sorted(gained)}"
-                        )
-                        self.divert_reason = result["divert_reason"]
                     return result
                 result["step_success"] = True
                 self._index += 1
