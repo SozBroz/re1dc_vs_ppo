@@ -1146,17 +1146,97 @@ def test_planner_loyal_kenneth_skip_peak_unlocks_dining_return() -> None:
 
 
 def test_planner_loyal_dining_return_after_kenneth_completes() -> None:
+    """This-leg 104:*:sN unlocks 104→105 with no clips in inventory."""
     opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
     q = PlannerLoyalQueue(chunk_path=opening)
     q.seek(2)
     progress = ProgressTracker()
-    progress.observe_cutscene("104:0:s0")
+    progress.note_leg_cutscene("104:4:s0")
     prev = {"room_id": "104", "inventory_slots": [], "hp": 96, "in_control": True}
     cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
     _reward_total, bd = _reward(prev, cur, q, progress=progress)
     assert bd["planner_divert"] == 0.0
     assert bd["planner_step_success"] > 0.0
     assert q.divert_reason is None
+    assert q.current["edge_id"] == "105->106"
+
+
+def test_planner_loyal_inherited_kenneth_flag_does_not_unlock_dining_return() -> None:
+    """Predecessor sidecar 104:*:sN is history, not this-leg Kenneth (cp02 rule)."""
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    q.seek(2)  # 104->105
+    progress = ProgressTracker()
+    progress.observe_cutscene("104:4:s0")
+    progress.rewarded_cutscenes.add("104:4:s0")
+    assert not progress.leg_observed_cutscenes
+    prev = {"room_id": "104", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    reward, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_divert"] == PLANNER_DIVERT_PENALTY
+    assert bd["planner_step_success"] == 0.0
+    assert q.divert_reason == "barry_return_before_kenneth"
+    assert q.current["edge_id"] == "104->105"
+    assert reward == pytest.approx(STEP_PENALTY + PLANNER_DIVERT_PENALTY)
+    terminated, _truncated, reason = RE1Env._termination_flags(
+        SimpleNamespace(
+            _stage={"mode": "planner_loyal", "max_steps": 3000},
+            _progress=progress,
+            _checkpoint_captured=False,
+            _episode_failure_override=None,
+            _planner_loyal_queue=q,
+            _step_count=3,
+            _episode_truncated=lambda: False,
+        ),
+        {"dead": False},
+    )
+    assert terminated is True
+    assert reason == "barry_return_before_kenneth"
+
+
+def test_planner_loyal_already_in_dining_without_leg_kenneth_diverts() -> None:
+    """Already-in-dest 104->105 with no this-leg Kenneth is terminal, not a silent wait."""
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    q.seek(2)  # 104->105
+    progress = ProgressTracker()
+    progress.observe_cutscene("104:4:s0")  # inherited only
+    prev = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    reward, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_divert"] == PLANNER_DIVERT_PENALTY
+    assert bd["planner_step_success"] == 0.0
+    assert q.divert_reason == "barry_return_before_kenneth"
+    assert reward == pytest.approx(STEP_PENALTY + PLANNER_DIVERT_PENALTY)
+    terminated, _truncated, reason = RE1Env._termination_flags(
+        SimpleNamespace(
+            _stage={"mode": "planner_loyal", "max_steps": 3000},
+            _progress=progress,
+            _checkpoint_captured=False,
+            _episode_failure_override=None,
+            _planner_loyal_queue=q,
+            _step_count=3,
+            _episode_truncated=lambda: False,
+        ),
+        {"dead": False},
+    )
+    assert terminated is True
+    assert reason == "barry_return_before_kenneth"
+
+
+def test_planner_loyal_already_in_dining_with_leg_kenneth_completes() -> None:
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    q.seek(2)
+    progress = ProgressTracker()
+    progress.note_leg_cutscene("104:4:s0")
+    prev = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "105", "inventory_slots": [], "hp": 96, "in_control": True}
+    _reward_total, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_divert"] == 0.0
+    assert bd["planner_step_success"] > 0.0
+    assert q.divert_reason is None
+    assert q.current["edge_id"] == "105->106"
 
 
 def test_opening_tea_room_clips_divert_until_live_acquire() -> None:
@@ -1173,6 +1253,7 @@ def test_opening_tea_room_clips_divert_until_live_acquire() -> None:
         },
     )
     assert result["divert"] is True
+    assert "unplanned_pickup" in str(result["divert_reason"])
     assert "handgun_bullets" in str(result["divert_reason"])
 
 

@@ -720,7 +720,12 @@ class PlannerLoyalQueue:
             edge = str(step.get("edge_id") or "")
             expected = edge.split("->", 1)[1] if "->" in edge else ""
             if expected and room == expected:
-                if edge == "104->105" and not _kenneth_seen(progress):
+                if edge == "104->105" and not _leg_kenneth_seen(progress):
+                    # Standing in dining with no this-leg Kenneth is the cp02
+                    # fail whether or not the 104→105 edge was observed.
+                    result["divert"] = True
+                    result["divert_reason"] = "barry_return_before_kenneth"
+                    self.divert_reason = result["divert_reason"]
                     return result
                 result["step_success"] = True
                 self._index += 1
@@ -990,20 +995,22 @@ def _already_held_weapon_names(
     return held & weapon_names
 
 
-def _kenneth_ledgers(progress: Any) -> set[str]:
+def _leg_kenneth_ledger(progress: Any) -> set[str]:
+    """THIS-LEG Kenneth evidence only (yawn cp02 rule, 2026-08-17).
+
+    A predecessor sidecar's ``observed_cutscenes`` / ``rewarded_cutscenes``
+    is inherited history, not proof the cinema replayed on this reset. Cells
+    minted from a false ``104:*:sN`` latch used to unlock dining return here.
+    """
     if progress is None:
         return set()
-    return (
-        set(getattr(progress, "observed_cutscenes", None) or ())
-        | set(getattr(progress, "rewarded_cutscenes", None) or ())
-        | set(getattr(progress, "leg_observed_cutscenes", None) or ())
-    )
+    return set(getattr(progress, "leg_observed_cutscenes", None) or ())
 
 
-def _kenneth_seen(progress: Any) -> bool:
+def _leg_kenneth_seen(progress: Any) -> bool:
     from re1_rl.cutscene_reward import kenneth_cutscene_seen
 
-    return kenneth_cutscene_seen(_kenneth_ledgers(progress))
+    return kenneth_cutscene_seen(_leg_kenneth_ledger(progress))
 
 
 def _dining_return_before_kenneth(
@@ -1016,7 +1023,7 @@ def _dining_return_before_kenneth(
     return illegal_dining_return_before_kenneth_transition(
         prev_room,
         room,
-        rewarded_cutscenes=_kenneth_ledgers(progress),
+        rewarded_cutscenes=_leg_kenneth_ledger(progress),
     )
 
 
