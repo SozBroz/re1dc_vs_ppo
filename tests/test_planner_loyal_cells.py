@@ -354,6 +354,63 @@ def test_cells_from_another_chunk_only_qualify_at_the_tip(
     assert [seek_index_after_cell(r, "opening_to_lockpick") for r in starts] == [1, 2, 3, 4, 5]
 
 
+def test_opening_remints_are_starts_when_their_chunk_file_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Live shield-key must still reset from opening remints (pl01+)."""
+    _clear_pin_env(monkeypatch)
+    live = _write_chunk(tmp_path, "cp05_shield_key", ["106->105", "105->104"])
+    monkeypatch.setenv("RE1_PLANNER_CHUNK", str(live))
+    chunks = tmp_path / "data" / "planner_chunks"
+    chunks.mkdir(parents=True)
+    (chunks / "opening_to_lockpick.json").write_text(
+        json.dumps(
+            {
+                "chunk_id": "opening_to_lockpick",
+                "steps": [
+                    {"n": 1, "op": "acquire", "pickup_id": "105:emblem:1"},
+                    {"n": 2, "op": "traverse", "edge_id": "105->104"},
+                    {"n": 3, "op": "traverse", "edge_id": "104->105"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (chunks / "cp05_shield_key.json").write_text(
+        live.read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    _write_cell(
+        tmp_path,
+        0,
+        meta={
+            "planner_step_index": -1,
+            "chunk_id": "opening_to_lockpick",
+            "training_start": True,
+        },
+    )
+    _write_cell(
+        tmp_path,
+        1,
+        meta={
+            "planner_step_index": 0,
+            "chunk_id": "opening_to_lockpick",
+            "training_start": True,
+        },
+    )
+    _write_cell(
+        tmp_path,
+        2,
+        meta={
+            "planner_step_index": 1,
+            "chunk_id": "opening_to_lockpick",
+            "training_start": True,
+        },
+    )
+    _write_cell(tmp_path, 6, meta={"chunk_id": "cp05_shield_key"})
+    starts = iter_training_start_cells(tmp_path)
+    assert [int(row["checkpoint_index"]) for row in starts] == [0, 1, 2, 6]
+
+
 def _clear_pin_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in (
         "RE1_PLANNER_RESET_PIN_INDEX",

@@ -10,11 +10,10 @@ numbering (``pl05`` tip, ``pl06`` = step 0); their ``planner_step_index``
 meta still seeks the queue correctly.
 
 Training starts: every loadable cell at the tip (``pl06``) and later that
-still has a remaining planner step in the live chunk, plus any cell whose
-meta says ``training_start: true`` (``pl00``) or whose slot is pinned.
-The cell that completed the last authored step is not a start (episode
-already ended there). Synced cells missing the ``training_start`` flag
-still count — the slot index is enough.
+still has a remaining planner step, plus ``training_start: true`` cells
+(``pl00`` and opening remints) and pinned slots. A cell minted by another
+chunk still qualifies when that chunk file is on disk — reset switches
+onto it. The cell that completed the last authored step is not a start.
 
 Optional hot-reload pin (read every reset, no worker restart after the
 code is loaded): ``data/planner_loyal_reset_pin.env`` or
@@ -583,6 +582,40 @@ def _chunk_mismatch(row: dict[str, Any], live_id: str | None) -> bool:
     return bool(own) and bool(live_id) and str(own) != str(live_id)
 
 
+def _n_steps_for_chunk_id(
+    chunk_id: str | None,
+    project_root: Path | str | None = None,
+) -> int | None:
+    want = str(chunk_id or "").strip()
+    if not want:
+        return None
+    try:
+        from re1_rl.planner_loyal import chunk_path_for_id, load_chunk
+
+        path = chunk_path_for_id(want, project_root)
+        if path is None or not path.is_file():
+            return None
+        return len(load_chunk(path).get("steps") or [])
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
+def _own_chunk_resolvable(
+    row: dict[str, Any],
+    project_root: Path | str | None = None,
+) -> bool:
+    own = str(row.get("chunk_id") or "").strip()
+    if not own:
+        return False
+    try:
+        from re1_rl.planner_loyal import chunk_path_for_id
+
+        path = chunk_path_for_id(own, project_root)
+    except (OSError, TypeError, ValueError):
+        return False
+    return path is not None and path.is_file()
+
+
 def _row_runtime_matches(row: dict[str, Any]) -> bool:
     """Meta written for the other runtime (pl00 meta describes the C-RE1
     cell.pst; a BizHawk worker sharing the dir must not treat it as a start)."""
@@ -625,10 +658,12 @@ def iter_training_start_cells(
     project_root: Path | str | None = None,
 ) -> list[dict[str, Any]]:
     """Loadable starts: tip (``pl06``) and later cells with a next step,
-    plus ``training_start: true`` cells (``pl00``) and pinned slots.
+    plus ``training_start: true`` cells (``pl00`` / opening remints) and
+    pinned slots.
 
-    Cells minted by another chunk only qualify at the tip slot (seek 0);
-    mid-chunk step indices do not transfer between chunks.
+    Cells minted by another chunk qualify when that chunk file is on disk
+    (reset switches onto it). Orphan foreign cells still only pass at the
+    tip / fresh-start / explicit pin.
     """
     root = planner_loyal_root(project_root)
     n_steps = _live_chunk_n_steps(project_root)
@@ -643,8 +678,11 @@ def iter_training_start_cells(
         sidecar_p = state_p.with_name(CELL_SIDECAR_NAME)
         if not (state_p.is_file() and sidecar_p.is_file()):
             continue
+        foreign = _chunk_mismatch(row, live_id)
+        own_ok = _own_chunk_resolvable(row, project_root)
         if (
-            _chunk_mismatch(row, live_id)
+            foreign
+            and not own_ok
             and idx != TRAINING_START_INDEX
             and idx != FRESH_START_INDEX
             and idx not in pinned  # explicit pin wins; seek falls to slot rule
@@ -656,7 +694,13 @@ def iter_training_start_cells(
             and _row_runtime_matches(row)
         ):
             continue
-        if not cell_has_remaining_planner_step(row, n_steps, live_id):
+        check_id = str(row.get("chunk_id") or "") if (foreign and own_ok) else live_id
+        check_n = (
+            _n_steps_for_chunk_id(check_id, project_root)
+            if (foreign and own_ok)
+            else n_steps
+        )
+        if not cell_has_remaining_planner_step(row, check_n, check_id):
             continue
         out.append(row)
     if skipped_foreign:
