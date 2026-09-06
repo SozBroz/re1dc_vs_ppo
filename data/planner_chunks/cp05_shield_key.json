@@ -97,7 +97,7 @@
         "why": "not a kit"
       }
     ],
-    "free_slots_on_exit": 3,
+    "free_slots_on_exit": 4,
     "held_on_exit": [
       {
         "item": "beretta",
@@ -120,9 +120,10 @@
         "slot": 4
       },
       {
-        "item": "handgun_bullets",
-        "qty": 15,
-        "slot": 5
+        "item": "shotgun_shells",
+        "qty": 0,
+        "slot": 5,
+        "why": "102 leftover may stay; room 100 cannot bank shells"
       },
       {
         "item": null,
@@ -141,17 +142,12 @@
       }
     ],
     "next_beat_this_loadout_is_for": "richard_bleedout",
-    "why": "Beretta+30 for 203. Armor_key for 204->205 and 204->20D (Richard). After sun_crest, trigger Richard FIRST (no cell mint; dump lands in 204) to start the ~6 min timer, then place sun + dining statue while it burns. No heals on exit. Acid_rounds banked. Shield_key and knife stay boxed.",
+    "why": "Beretta+15 for 203. Armor_key for 204->205 and 204->20D (Richard). Leftover 102 shells may stay (room 100 cannot deposit them). After sun_crest, trigger Richard FIRST (no cell mint; dump lands in 204) to start the ~6 min timer, then place sun + dining statue while it burns. No heals on exit. Acid_rounds banked. Shield_key and knife stay boxed.",
     "withdraw_from_box": [
       {
         "item": "handgun_bullets",
         "qty": 15,
-        "why": "combat kit"
-      },
-      {
-        "item": "handgun_bullets",
-        "qty": 15,
-        "why": "combat kit"
+        "why": "combat kit; one clip is enough"
       }
     ]
   },

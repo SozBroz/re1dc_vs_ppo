@@ -344,7 +344,12 @@ def test_leave_100_deposits_any_incoming_heal() -> None:
     from re1_rl.item_box import can_deposit
 
     q = PlannerLoyalQueue()
-    q.seek(66)
+    idx = next(
+        i
+        for i, step in enumerate(q._steps)
+        if step.get("op") == "use_box" and step.get("room_id") == "100"
+    )
+    q.seek(idx)
     assert q.current is not None
     assert q.current["op"] == "use_box"
     assert q.current.get("room_id") == "100"
@@ -371,8 +376,21 @@ def test_leave_100_deposits_any_incoming_heal() -> None:
             inv, box, slot, room_id="100", allowed_key_ids=q.allowed_banked_key_ids()
         )
         assert ok, (slot, reason)
+    fifteen = [(0x02, 0), (0x03, 0), (0x34, 1), (0x0B, 15)] + [(0, 0)] * 4
+    assert inventory_matches_target(fifteen, target)
+    # Extra HG is still fine; leftover 102 shells stay (room 100 cannot bank them).
+    with_shells = [
+        (0x02, 0),
+        (0x03, 6),
+        (0x34, 1),
+        (0x0B, 15),
+        (0x0C, 15),
+    ] + [(0, 0)] * 3
+    assert inventory_matches_target(with_shells, target)
     cleaned = [(0x02, 0), (0x03, 0), (0x34, 1), (0x0B, 15), (0x0B, 15)] + [(0, 0)] * 3
     assert inventory_matches_target(cleaned, target)
+    empty_ammo = [(0x02, 0), (0x03, 0), (0x34, 1)] + [(0, 0)] * 5
+    assert inventory_matches_target(empty_ammo, target) is False
 
 
 def test_go_to_box_encodes_as_use_box_one_hot() -> None:
