@@ -229,6 +229,7 @@ class PlannerLoyalQueue:
         self._start_gallery_progress = 0
         self._start_gallery_solved = False
         self._satisfied_pickups: set[str] = set()
+        self.pending_capture_indices: list[int] = []
 
     def reload_if_stale(self, project_root: Path | str | None = None) -> bool:
         """Re-read the chunk file. True when bytes or path changed."""
@@ -282,6 +283,7 @@ class PlannerLoyalQueue:
         self._start_gallery_progress = 0
         self._start_gallery_solved = False
         self._satisfied_pickups = set()
+        self.pending_capture_indices = []
 
     def note_start_inventory(self, state: dict[str, Any]) -> None:
         """Snapshot episode-start inventory (sidecar / live RAM after reset)."""
@@ -300,7 +302,24 @@ class PlannerLoyalQueue:
         self.step_success_pending = False
         self.divert_reason = None
         self._absorb_start_flicker = True
+        self.pending_capture_indices = []
         self._rebuild_satisfied_pickups()
+
+    def _mark_step_success(self) -> None:
+        """Flag success and queue this step for a ``plNN`` mint."""
+        self.step_success_pending = True
+        completed = int(self._index) - 1
+        if completed < 0:
+            return
+        step = self._steps[completed] if completed < len(self._steps) else {}
+        if isinstance(step, dict) and step.get("capture") is False:
+            return
+        pending = getattr(self, "pending_capture_indices", None)
+        if pending is None:
+            self.pending_capture_indices = []
+            pending = self.pending_capture_indices
+        if completed not in pending:
+            pending.append(completed)
 
     def _rebuild_satisfied_pickups(self) -> None:
         satisfied: set[str] = set()
@@ -313,13 +332,23 @@ class PlannerLoyalQueue:
         self._satisfied_pickups = satisfied
 
     def _completed_acquire_names(self, room: str) -> set[str]:
-        """Item names already minted in this room — leftover cinema is not a pickup."""
+        """Already-minted names whose leftover cinema is not a new pickup.
+
+        Unique keys (shield_key, gold_emblem, …) are room-agnostic: box-close
+        or USE cinema can re-show them after the episode has left the mint
+        room. Numbered piles stay room-scoped so a later clip is still a pile.
+        """
         names: set[str] = set()
         room = str(room or "")
         for pickup_id in self._satisfied_pickups:
             step_room, item, _pile = _pickup_id_parts(pickup_id)
-            if item and (not step_room or step_room == room):
-                names.add(item)
+            if not item:
+                continue
+            if item in _ON_PATH_PILE_ITEMS:
+                if not step_room or step_room == room:
+                    names.add(item)
+                continue
+            names.add(item)
         return names
 
     def _acquire_sibling_pile_ids(self, room: str, item: str) -> list[str]:
@@ -385,6 +414,48 @@ class PlannerLoyalQueue:
         if item in self._start_held:
             return False
         return item in _inventory_held_names(state)
+
+    def _current_step_is_ink_ribbon_acquire(self) -> bool:
+        step = self.current or {}
+        if str(step.get("op") or "") != "acquire":
+            return False
+        _, item, _ = _pickup_id_parts(str(step.get("pickup_id") or ""))
+        return item == "ink_ribbon"
+
+    def _completed_ink_ribbon_acquire(self) -> bool:
+        for i, step in enumerate(self._steps):
+            if i >= int(self._index):
+                break
+            if str(step.get("op") or "") != "acquire":
+                continue
+            _, item, _ = _pickup_id_parts(str(step.get("pickup_id") or ""))
+            if item == "ink_ribbon":
+                return True
+        return False
+
+    def _unplanned_ink_ribbon_reason(
+        self,
+        prev_state: dict[str, Any],
+        state: dict[str, Any],
+    ) -> str | None:
+        """Ink ribbons are never on the live chunk. Pickup or leftover hold is a divert.
+
+        Rising-edge used to be skipped during ``use_box`` and swallowed by a
+        same-frame unique-key acquire, which left agents in the typewriter
+        save prompt with no planned exit.
+        """
+        from re1_rl.typewriter_save import count_ink_ribbons
+
+        planned_now = self._current_step_is_ink_ribbon_acquire()
+        if "ink_ribbon" in _inventory_gains(prev_state, state) and not planned_now:
+            return "unplanned_pickup:['ink_ribbon']"
+        if int(count_ink_ribbons(state)) <= 0:
+            return None
+        if "ink_ribbon" in self._start_held:
+            return None
+        if planned_now or self._completed_ink_ribbon_acquire():
+            return None
+        return "unplanned_pickup:['ink_ribbon']"
 
     def _skip_satisfied_acquires(self) -> None:
         """Skip acquire steps already satisfied at episode start."""
@@ -561,6 +632,13 @@ class PlannerLoyalQueue:
             self.divert_reason = result["divert_reason"]
             return result
 
+        ribbon_reason = self._unplanned_ink_ribbon_reason(prev_state, state)
+        if ribbon_reason:
+            result["divert"] = True
+            result["divert_reason"] = ribbon_reason
+            self.divert_reason = ribbon_reason
+            return result
+
         # Divert: unplanned box open.
         if box_opened and op != "use_box":
             result["divert"] = True
@@ -585,7 +663,7 @@ class PlannerLoyalQueue:
                 return result
             result["step_success"] = True
             self._index += 1
-            self.step_success_pending = True
+            self._mark_step_success()
             self._rebuild_satisfied_pickups()
             print(
                 f"[planner_loyal] unique_acquire {step.get('pickup_id')} "
@@ -617,13 +695,13 @@ class PlannerLoyalQueue:
         if armor_vent_step_complete(step, state):
             result["step_success"] = True
             self._index += 1
-            self.step_success_pending = True
+            self._mark_step_success()
             return result
 
         if _dining_statue_step_complete(step, state):
             result["step_success"] = True
             self._index += 1
-            self.step_success_pending = True
+            self._mark_step_success()
             print(
                 f"[planner_loyal] push_statue_2f knocked room={room}",
                 flush=True,
@@ -642,16 +720,25 @@ class PlannerLoyalQueue:
             ):
                 result["step_success"] = True
                 self._index += 1
-                self.step_success_pending = True
+                self._mark_step_success()
                 return result
-            if _bar_piano_notes_consumed(step, prev_state, state):
+            if _objective_site_item_consumed(step, prev_state, state):
                 result["step_success"] = True
                 self._index += 1
-                self.step_success_pending = True
-                print(
-                    f"[planner_loyal] piano_play notes_used room={room}",
-                    flush=True,
-                )
+                self._mark_step_success()
+                site = str(step.get("site_id") or "")
+                if site == "music_notes@10F_piano" or str(
+                    step.get("beat_id") or ""
+                ) == "piano_play":
+                    print(
+                        f"[planner_loyal] piano_play notes_used room={room}",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"[planner_loyal] objective_consumed {site} room={room}",
+                        flush=True,
+                    )
                 return result
 
         # Floor piles before traverse complete. Same-frame ammo on a walk
@@ -688,7 +775,7 @@ class PlannerLoyalQueue:
                     return result
                 result["step_success"] = True
                 self._index += 1
-                self.step_success_pending = True
+                self._mark_step_success()
                 self._rebuild_satisfied_pickups()
                 return result
 
@@ -699,7 +786,7 @@ class PlannerLoyalQueue:
                 if room == dest:
                     result["step_success"] = True
                     self._index += 1
-                    self.step_success_pending = True
+                    self._mark_step_success()
                     print(
                         f"[planner_loyal] go_to_box arrived {dest} from {prev_room}",
                         flush=True,
@@ -710,7 +797,7 @@ class PlannerLoyalQueue:
                 if _richard_bleedout_complete(step, state, progress):
                     result["step_success"] = True
                     self._index += 1
-                    self.step_success_pending = True
+                    self._mark_step_success()
                     print(
                         f"[planner_loyal] richard_bleedout "
                         f"{prev_room}->{room}",
@@ -736,7 +823,7 @@ class PlannerLoyalQueue:
             # Correct traverse completed.
             result["step_success"] = True
             self._index += 1
-            self.step_success_pending = True
+            self._mark_step_success()
             return result
 
         # Already in traverse destination (e.g. cinema left Jill in 204).
@@ -753,7 +840,7 @@ class PlannerLoyalQueue:
                     return result
                 result["step_success"] = True
                 self._index += 1
-                self.step_success_pending = True
+                self._mark_step_success()
                 return result
 
         # Objective / puzzle / cutscene / boss completion via story_use or flags.
@@ -767,7 +854,7 @@ class PlannerLoyalQueue:
             ):
                 result["step_success"] = True
                 self._index += 1
-                self.step_success_pending = True
+                self._mark_step_success()
                 if story in _ALCOVE_SWAP_SITES or site in _ALCOVE_SWAP_SITES:
                     print(
                         f"[planner_loyal] alcove_swap site={site or story} "
@@ -778,7 +865,7 @@ class PlannerLoyalQueue:
             if self._alcove_swap_complete(prev_state, state):
                 result["step_success"] = True
                 self._index += 1
-                self.step_success_pending = True
+                self._mark_step_success()
                 print(
                     f"[planner_loyal] alcove_swap site={site or story} "
                     f"room={room}",
@@ -788,7 +875,7 @@ class PlannerLoyalQueue:
             if _richard_bleedout_complete(step, state, progress):
                 result["step_success"] = True
                 self._index += 1
-                self.step_success_pending = True
+                self._mark_step_success()
                 print(
                     f"[planner_loyal] richard_bleedout room={room}",
                     flush=True,
@@ -799,7 +886,7 @@ class PlannerLoyalQueue:
             ):
                 result["step_success"] = True
                 self._index += 1
-                self.step_success_pending = True
+                self._mark_step_success()
                 return result
             portrait = _gallery_portrait_index(step)
             if portrait is not None and room == "117":
@@ -809,7 +896,7 @@ class PlannerLoyalQueue:
                 if completed_steps(raw) >= portrait:
                     result["step_success"] = True
                     self._index += 1
-                    self.step_success_pending = True
+                    self._mark_step_success()
                     return result
         if op == "use_box":
             target = self.box_target_held()
@@ -820,12 +907,12 @@ class PlannerLoyalQueue:
                 if inventory_matches_target(slots, target) and box_closed:
                     result["step_success"] = True
                     self._index += 1
-                    self.step_success_pending = True
+                    self._mark_step_success()
                 return result
             if box_opened:
                 result["step_success"] = True
                 self._index += 1
-                self.step_success_pending = True
+                self._mark_step_success()
                 return result
 
         return result
@@ -853,6 +940,49 @@ def _objective_story_matches(site: str, story: str) -> bool:
     return bool(site in _ALCOVE_SWAP_SITES and story in _ALCOVE_SWAP_SITES)
 
 
+_SITE_ROOM_RE = re.compile(r"^([0-9A-Fa-f]{3})")
+
+
+def _objective_site_item(step: dict[str, Any]) -> str:
+    site = str(step.get("site_id") or "")
+    if "@" not in site:
+        return ""
+    return canonical_item(site.split("@", 1)[0])
+
+
+def _objective_site_room(step: dict[str, Any]) -> str:
+    room = str(step.get("room_id") or "").strip()
+    if room:
+        return room
+    site = str(step.get("site_id") or "")
+    if "@" not in site:
+        return ""
+    match = _SITE_ROOM_RE.match(site.split("@", 1)[1])
+    return match.group(1).upper() if match else ""
+
+
+def _objective_site_item_consumed(
+    step: dict[str, Any],
+    prev_state: dict[str, Any],
+    state: dict[str, Any],
+) -> bool:
+    """True when the objective's site item left inventory in that room.
+
+    Keep-playing after a walk mint often sees USE settle (item gone, reward
+    spawn in the same frame) before ``story_use_success`` is set. Piano
+    already used this rising-edge; fireplace / crests / pump need it too.
+    """
+    item = _objective_site_item(step)
+    room = _objective_site_room(step)
+    if not item or not room:
+        return False
+    if str(state.get("room_id") or "") != room:
+        return False
+    return item in _inventory_held_names(
+        prev_state
+    ) and item not in _inventory_held_names(state)
+
+
 def _bar_piano_notes_consumed(
     step: dict[str, Any],
     prev_state: dict[str, Any],
@@ -863,11 +993,7 @@ def _bar_piano_notes_consumed(
     beat = str(step.get("beat_id") or "")
     if site != "music_notes@10F_piano" and beat != "piano_play":
         return False
-    if str(state.get("room_id") or "") != "10F":
-        return False
-    return "music_notes" in _inventory_held_names(
-        prev_state
-    ) and "music_notes" not in _inventory_held_names(state)
+    return _objective_site_item_consumed(step, prev_state, state)
 
 
 def _richard_bleedout_complete(

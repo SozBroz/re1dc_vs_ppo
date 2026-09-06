@@ -1517,47 +1517,67 @@ class RE1Env(gym.Env):
 
     def _maybe_capture_planner_loyal_cell(
         self, state: dict[str, Any], breakdown: dict[str, float]
-    ) -> dict[str, Any] | None:
-        """Mint a ``states/planner_loyal`` cell for the completed planner step."""
-        from re1_rl.planner_loyal_cells import capture_planner_loyal_cell
+    ) -> list[dict[str, Any]]:
+        """Mint every completed ``plNN`` queued since the last capture flush."""
+        from re1_rl.planner_loyal_cells import (
+            capture_planner_loyal_cell,
+            cell_slot_dir,
+            cell_state_filename,
+            planner_loyal_root,
+            slot_index_for_completed_step,
+        )
 
         queue = getattr(self, "_planner_loyal_queue", None)
         if queue is None:
-            return None
+            return []
         if float(breakdown.get("checkpoint_success", 0.0) or 0.0) <= 0.0:
             if float(breakdown.get("planner_step_success", 0.0) or 0.0) <= 0.0:
-                return None
-        # Prefer the index frozen at success — Richard's dump can advance the
-        # queue again before the decision-frame capture runs.
+                return []
+        # Same-room acquires (102 clip then shells) used to overwrite the
+        # frozen index, so only the later walk-out minted.
+        pending = list(getattr(queue, "pending_capture_indices", None) or [])
         frozen = getattr(self, "_checkpoint_capture_index", None)
         if frozen is not None:
             try:
-                completed = int(frozen)
+                frozen_i = int(frozen)
             except (TypeError, ValueError):
-                completed = max(0, int(queue.index) - 1)
-        else:
-            completed = max(0, int(queue.index) - 1)
-        step = None
+                frozen_i = None
+            else:
+                if frozen_i not in pending:
+                    pending.append(frozen_i)
+        if not pending:
+            pending = [max(0, int(queue.index) - 1)]
         steps = getattr(queue, "_steps", [])
-        if 0 <= completed < len(steps):
-            step = dict(steps[completed])
-        if step is not None and step.get("capture") is False:
-            print(
-                f"[planner_loyal] skip_capture step={completed + 1} "
-                f"beat={step.get('beat_id') or step.get('site_id')}",
-                flush=True,
+        minted: list[dict[str, Any]] = []
+        leftover: list[int] = []
+        root = planner_loyal_root(self.project_root)
+        for completed in pending:
+            step = dict(steps[completed]) if 0 <= completed < len(steps) else {}
+            if step.get("capture") is False:
+                print(
+                    f"[planner_loyal] skip_capture step={completed + 1} "
+                    f"beat={step.get('beat_id') or step.get('site_id')}",
+                    flush=True,
+                )
+                continue
+            self._planner_loyal_last_success = {
+                "chunk_id": queue.chunk_id,
+                "completed_index": completed,
+                "room_id": state.get("room_id"),
+                "op": step.get("op"),
+                "step": step,
+            }
+            rec = capture_planner_loyal_cell(
+                self, state, breakdown, completed_index=completed
             )
-            return None
-        self._planner_loyal_last_success = {
-            "chunk_id": queue.chunk_id,
-            "completed_index": completed,
-            "room_id": state.get("room_id"),
-            "op": (step or {}).get("op"),
-            "step": step,
-        }
-        return capture_planner_loyal_cell(
-            self, state, breakdown, completed_index=completed
-        )
+            if rec is not None:
+                minted.append(rec)
+                continue
+            slot = slot_index_for_completed_step(completed, steps)
+            if not (cell_slot_dir(root, slot) / cell_state_filename()).is_file():
+                leftover.append(completed)
+        queue.pending_capture_indices = leftover
+        return minted
 
     def _finish_checkpoint_capture(
         self, state: dict[str, Any], breakdown: dict[str, float]
@@ -1566,24 +1586,32 @@ class RE1Env(gym.Env):
 
         queue = getattr(self, "_planner_loyal_queue", None)
         if queue is not None:
-            yr_prop = self._maybe_capture_planner_loyal_cell(state, breakdown)
+            yr_props = self._maybe_capture_planner_loyal_cell(state, breakdown)
         else:
-            yr_prop = capture_successor_cell(self, state, breakdown)
-        if yr_prop is not None:
-            pending_yr = getattr(self, "_yawn_rails_capture_pending", None)
-            if pending_yr is None:
-                self._yawn_rails_capture_pending = []
-                pending_yr = self._yawn_rails_capture_pending
-            pending_yr.append(yr_prop)
-            from re1_rl.yawn_rails_immediate_ingest import offer_immediate_yawn_ingest
+            rec = capture_successor_cell(self, state, breakdown)
+            yr_props = [rec] if rec is not None else []
+        pending_yr = getattr(self, "_yawn_rails_capture_pending", None)
+        if pending_yr is None:
+            self._yawn_rails_capture_pending = []
+            pending_yr = self._yawn_rails_capture_pending
+        from re1_rl.yawn_rails_immediate_ingest import offer_immediate_yawn_ingest
 
+        for yr_prop in yr_props:
+            pending_yr.append(yr_prop)
             offer_immediate_yawn_ingest(yr_prop)
         if queue is None:
             self._apply_yawn_capture_ineligibility_penalty(breakdown)
-        self._checkpoint_freeze_pending = False
-        self._checkpoint_capture_index = None
-        if self._progress is not None:
-            self._progress.checkpoint_freeze_pending = False
+        leftover = list(getattr(queue, "pending_capture_indices", None) or []) if queue else []
+        if leftover:
+            self._checkpoint_freeze_pending = True
+            self._checkpoint_capture_index = leftover[-1]
+            if self._progress is not None:
+                self._progress.checkpoint_freeze_pending = True
+        else:
+            self._checkpoint_freeze_pending = False
+            self._checkpoint_capture_index = None
+            if self._progress is not None:
+                self._progress.checkpoint_freeze_pending = False
         ineligible = bool(
             getattr(self._progress, "capture_ineligible_breached", False)
         )

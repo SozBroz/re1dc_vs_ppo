@@ -147,6 +147,17 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert not any(s.get("edge_id") == "104->103" for s in steps)
     assert chunk["leave_100"]["next_beat_this_loadout_is_for"] == "richard_bleedout"
     assert chunk["leave_100"]["held_on_exit"][2]["item"] == "armor_key"
+    assert (
+        sum(
+            int(r.get("qty") or 0)
+            for r in chunk["leave_100"]["held_on_exit"]
+            if r.get("item") == "handgun_bullets"
+        )
+        == 15
+    )
+    assert chunk["leave_100"]["withdraw_from_box"] == [
+        {"item": "handgun_bullets", "qty": 15, "why": "combat kit; one clip is enough"}
+    ]
     assert not any(
         str(r.get("item") or "") in {
             "green_herb",
@@ -313,6 +324,70 @@ def test_ink_ribbon_pickup_diverts_on_traverse():
     assert q.current["edge_id"] == "106->105"
 
 
+def test_ink_ribbon_pickup_diverts_during_use_box():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "test",
+            "steps": [
+                {"n": 1, "op": "use_box", "room_id": "118"},
+                {"n": 2, "op": "traverse", "edge_id": "118->10B"},
+            ],
+        }
+    )
+    q.note_start_inventory(
+        {"room_id": "118", "inventory_slots": [("knife", 1), ("chemical", 1)]}
+    )
+    result = q.evaluate_transition(
+        prev_state={
+            "room_id": "118",
+            "inventory_slots": [("knife", 1), ("chemical", 1)],
+        },
+        state={
+            "room_id": "118",
+            "inventory_slots": [("knife", 1), ("chemical", 1), ("ink_ribbon", 2)],
+            "new_items": ["ink_ribbon"],
+        },
+    )
+    assert result["divert"] is True
+    assert result["divert_reason"] == "unplanned_pickup:['ink_ribbon']"
+
+
+def test_ink_ribbon_pickup_diverts_during_unique_acquire():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "test",
+            "steps": [
+                {"n": 1, "op": "acquire", "pickup_id": "118:chemical:1", "room_id": "118"},
+                {"n": 2, "op": "traverse", "edge_id": "118->10B"},
+            ],
+        }
+    )
+    q.note_start_inventory({"room_id": "118", "inventory_slots": [("knife", 1)]})
+    result = q.evaluate_transition(
+        prev_state={"room_id": "118", "inventory_slots": [("knife", 1)]},
+        state={
+            "room_id": "118",
+            "inventory_slots": [("knife", 1), ("chemical", 1), ("ink_ribbon", 2)],
+            "new_items": ["chemical", "ink_ribbon"],
+        },
+    )
+    assert result["divert"] is True
+    assert result["divert_reason"] == "unplanned_pickup:['ink_ribbon']"
+    assert result["step_success"] is False
+
+
+def test_held_unplanned_ink_ribbon_diverts_without_rising_edge():
+    q = PlannerLoyalQueue()
+    q.note_start_inventory({"room_id": "106", "inventory_slots": [("knife", 1)]})
+    slots = [("knife", 1), ("ink_ribbon", 2)]
+    result = q.evaluate_transition(
+        prev_state={"room_id": "106", "inventory_slots": slots},
+        state={"room_id": "106", "inventory_slots": slots},
+    )
+    assert result["divert"] is True
+    assert result["divert_reason"] == "unplanned_pickup:['ink_ribbon']"
+
+
 def test_start_inventory_decode_hole_does_not_divert():
     q = PlannerLoyalQueue()
     q.note_start_inventory(
@@ -359,6 +434,80 @@ def test_already_held_beretta_qty_bump_does_not_divert():
             "new_items": ["beretta"],
         },
     )
+    assert result["divert"] is False
+    assert result["step_success"] is False
+
+
+def _108_fire_states(chamber_before: int, chamber_after: int, **extra):
+    prev = {
+        "room_id": "108",
+        "inventory_slots": [
+            ("beretta", chamber_before),
+            ("handgun_bullets", 30),
+            ("knife", 0),
+        ],
+    }
+    cur = {
+        "room_id": "108",
+        "inventory_slots": [
+            ("beretta", chamber_after),
+            ("handgun_bullets", 30),
+            ("knife", 0),
+        ],
+    }
+    cur.update(extra)
+    return prev, cur
+
+
+def test_firing_beretta_in_108_does_not_divert_or_mint_clip():
+    """Spending a chambered round is a qty loss, not a floor-pile pickup.
+
+    Historical hole: any inventory delta (including fire) looked like an
+    unplanned beretta/ammo gain and killed the episode versus the PL bag.
+    """
+    q = PlannerLoyalQueue()
+    idx = next(
+        i
+        for i, step in enumerate(q._steps)
+        if step.get("pickup_id") == "108:handgun_bullets:1"
+    )
+    q.seek(idx)
+    q.note_start_inventory(
+        {"room_id": "108", "inventory_slots": [("beretta", 15), ("handgun_bullets", 30)]}
+    )
+    prev, cur = _108_fire_states(15, 14)
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is False
+    assert q.current["pickup_id"] == "108:handgun_bullets:1"
+
+    prev, cur = _108_fire_states(15, 14, new_items=["beretta"])
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is False
+
+
+def test_firing_last_round_and_autoreload_in_108_do_not_divert():
+    q = PlannerLoyalQueue()
+    idx = next(
+        i for i, step in enumerate(q._steps) if step.get("edge_id") == "108->109"
+    )
+    q.seek(idx)
+    prev, cur = _108_fire_states(1, 0)
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is False
+
+    prev = {
+        "room_id": "108",
+        "inventory_slots": [("beretta", 1), ("handgun_bullets", 30), ("knife", 0)],
+    }
+    cur = {
+        "room_id": "108",
+        "inventory_slots": [("beretta", 15), ("handgun_bullets", 16), ("knife", 0)],
+        "new_items": ["beretta"],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
     assert result["divert"] is False
     assert result["step_success"] is False
 
@@ -741,6 +890,88 @@ def test_piano_play_survives_same_frame_gold_emblem() -> None:
     assert result["step_success"] is True
     assert q.divert_reason is None
     assert q.current["pickup_id"] == "10F:gold_emblem:2"
+
+
+def test_fireplace_use_mints_when_gold_leaves_even_if_shield_key_spawns() -> None:
+    """Keep-playing after 104->105: gold USE often spawns shield_key before story_use."""
+    q = PlannerLoyalQueue()
+    q.seek(11)  # gold_emblem@105_fireplace
+    assert q.current["site_id"] == "gold_emblem@105_fireplace"
+    q.note_start_inventory(
+        {
+            "room_id": "105",
+            "inventory_slots": [
+                ("knife", 1),
+                ("beretta", 15),
+                ("gold_emblem", 1),
+            ],
+        }
+    )
+    result = q.evaluate_transition(
+        prev_state={
+            "room_id": "105",
+            "inventory_slots": [
+                ("knife", 1),
+                ("beretta", 15),
+                ("gold_emblem", 1),
+            ],
+        },
+        state={
+            "room_id": "105",
+            "inventory_slots": [
+                ("knife", 1),
+                ("beretta", 15),
+                ("shield_key", 1),
+            ],
+        },
+    )
+    assert result["divert"] is False
+    assert result["step_success"] is True
+    assert q.current["pickup_id"] == "105:shield_key:2"
+
+
+def test_star_crest_use_mints_when_crest_leaves_inventory() -> None:
+    q = PlannerLoyalQueue()
+    q.seek(44)  # place_star_crest
+    assert q.current["site_id"] == "star_crest@11A_crest_slot"
+    held = [
+        ("knife", 1),
+        ("shotgun", 3),
+        ("star_crest", 1),
+        ("chemical", 1),
+    ]
+    after = [
+        ("knife", 1),
+        ("shotgun", 3),
+        ("chemical", 1),
+    ]
+    q.note_start_inventory({"room_id": "11A", "inventory_slots": held})
+    result = q.evaluate_transition(
+        prev_state={"room_id": "11A", "inventory_slots": held},
+        state={"room_id": "11A", "inventory_slots": after},
+    )
+    assert result["divert"] is False
+    assert result["step_success"] is True
+    assert q.current["edge_id"] == "11A->10A"
+
+
+def test_minted_shield_key_flicker_in_later_room_is_not_a_pickup() -> None:
+    """Box-close cinema can re-show shield_key after leave_118. Not a new pile."""
+    q = PlannerLoyalQueue()
+    q.seek(25)  # 118->10B; satisfied pickups include 105:shield_key
+    assert q.current["edge_id"] == "118->10B"
+    q.note_start_inventory(
+        {"room_id": "118", "inventory_slots": [("knife", 1)]}
+    )
+    result = q.evaluate_transition(
+        prev_state={"room_id": "118", "inventory_slots": [("knife", 1)]},
+        state={
+            "room_id": "118",
+            "inventory_slots": [("knife", 1), ("shield_key", 1)],
+        },
+    )
+    assert result["divert"] is False
+    assert result["step_success"] is False
 
 
 def test_piano_play_gold_without_notes_use_still_diverts() -> None:
@@ -1861,6 +2092,147 @@ def test_finish_capture_ends_episode_on_chunk_complete(monkeypatch, tmp_path):
     terminated, _trunc, reason = RE1Env._termination_flags(env, {"dead": False})
     assert terminated is True
     assert reason == "planner_chunk_complete"
+
+
+def test_same_room_acquires_queue_every_pl_for_capture():
+    """Clip then shells then the door must each stay queued for a cell mint."""
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "test_102",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "acquire",
+                    "pickup_id": "102:handgun_bullets:1",
+                    "room_id": "102",
+                },
+                {
+                    "n": 2,
+                    "op": "acquire",
+                    "pickup_id": "102:shotgun_shells:2",
+                    "room_id": "102",
+                },
+                {"n": 3, "op": "traverse", "edge_id": "102->101"},
+            ],
+        }
+    )
+    q.note_start_inventory({"room_id": "102", "inventory_slots": [("beretta", 0)]})
+    clip = q.evaluate_transition(
+        prev_state={"room_id": "102", "inventory_slots": [("beretta", 0)]},
+        state={
+            "room_id": "102",
+            "inventory_slots": [("beretta", 0), ("handgun_bullets", 15)],
+            "new_items": ["handgun_bullets"],
+        },
+    )
+    assert clip["step_success"] is True
+    shells = q.evaluate_transition(
+        prev_state={
+            "room_id": "102",
+            "inventory_slots": [("beretta", 0), ("handgun_bullets", 15)],
+        },
+        state={
+            "room_id": "102",
+            "inventory_slots": [
+                ("beretta", 0),
+                ("handgun_bullets", 15),
+                ("shotgun_shells", 15),
+            ],
+            "new_items": ["shotgun_shells"],
+        },
+    )
+    assert shells["step_success"] is True
+    walk = q.evaluate_transition(
+        prev_state={
+            "room_id": "102",
+            "inventory_slots": [
+                ("beretta", 0),
+                ("handgun_bullets", 15),
+                ("shotgun_shells", 15),
+            ],
+        },
+        state={
+            "room_id": "101",
+            "inventory_slots": [
+                ("beretta", 0),
+                ("handgun_bullets", 15),
+                ("shotgun_shells", 15),
+            ],
+        },
+    )
+    assert walk["step_success"] is True
+    assert q.pending_capture_indices == [0, 1, 2]
+
+
+def test_capture_false_richard_is_not_queued_for_a_pl():
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "test_richard",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "trigger_cutscene",
+                    "site_id": "20D:richard",
+                    "room_id": "20D",
+                    "beat_id": "richard_bleedout",
+                    "capture": False,
+                },
+                {"n": 2, "op": "traverse", "edge_id": "204->207"},
+            ],
+        }
+    )
+    result = q.evaluate_transition(
+        prev_state={"room_id": "20D", "inventory_slots": []},
+        state={
+            "room_id": "204",
+            "inventory_slots": [],
+            "richard_cutscene_confirmed": True,
+        },
+    )
+    assert result["step_success"] is True
+    assert q.pending_capture_indices == []
+
+
+def test_finish_capture_flushes_every_pending_pl(monkeypatch, tmp_path):
+    captured: list[int] = []
+
+    def _fake_capture(env, state, breakdown, **kwargs):
+        captured.append(int(kwargs.get("completed_index")))
+        return {
+            "source": "planner_loyal",
+            "completed_index": kwargs.get("completed_index"),
+        }
+
+    monkeypatch.setattr(
+        "re1_rl.planner_loyal_cells.capture_planner_loyal_cell", _fake_capture
+    )
+    q = PlannerLoyalQueue()
+    q._index = 3
+    q.pending_capture_indices = [0, 1, 2]
+    progress = ProgressTracker(leg_span=1)
+    progress.checkpoint_success = True
+    env = SimpleNamespace(
+        project_root=str(tmp_path),
+        _planner_loyal_queue=q,
+        _progress=progress,
+        _checkpoint_freeze_pending=True,
+        _checkpoint_captured=False,
+        _macro_active=True,
+        _yawn_rails_capture_pending=None,
+        _apply_yawn_capture_ineligibility_penalty=lambda _bd: None,
+        _planner_loyal_last_success=None,
+    )
+    env._maybe_capture_planner_loyal_cell = (
+        lambda state, breakdown: RE1Env._maybe_capture_planner_loyal_cell(
+            env, state, breakdown
+        )
+    )
+    RE1Env._finish_checkpoint_capture(
+        env, {"room_id": "101"}, {"checkpoint_success": 8.0}
+    )
+    assert captured == [0, 1, 2]
+    assert q.pending_capture_indices == []
+    assert len(env._yawn_rails_capture_pending) == 3
 
 
 def test_combat_extractor_fuses_planner_steps_without_changing_features_dim():
