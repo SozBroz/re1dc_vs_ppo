@@ -272,6 +272,22 @@ def test_apply_live_hop_score_zeros_legacy() -> None:
     assert report["S"] == FAIL_SCORE_DIVERT
 
 
+def test_apply_live_keeps_checkpoint_success_capture_gate() -> None:
+    """Live hop_score must not clear the mint/freeze gate."""
+    meters = PlannerHopMeters.begin({"room_id": "106", "enemies": [], "hp": 96})
+    bd = {
+        "planner_step_success": 8.0,
+        "checkpoint_success": 8.0,
+        "hop_score": 0.0,
+    }
+    apply_live_hop_score(
+        bd, meters, outcome="planner_step_success", failure=None
+    )
+    assert bd["planner_step_success"] == 0.0  # reward channel replaced
+    assert bd["checkpoint_success"] == 8.0  # capture gate retained
+    assert bd["hop_score"] > 0.0
+
+
 def test_resolve_shadow_outcome_truncated_is_timeout() -> None:
     outcome, failure = resolve_shadow_outcome(
         episode_failure=None,

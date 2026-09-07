@@ -653,8 +653,11 @@ def resolve_shadow_outcome(
 def zero_live_replaced_channels(bd: dict[str, float]) -> None:
     for key in LIVE_REPLACED_SCALAR_KEYS:
         bd[key] = 0.0
-    # Telemetry aliases that mirrored terminals.
-    for key in ("wrong_room", "checkpoint_success", "checkpoint_timeout"):
+    # Telemetry aliases that mirrored terminals into the scalar path.
+    # Do NOT clear checkpoint_success: it is a capture/freeze gate
+    # (PLANNER_LOYAL_TELEMETRY_KEYS), not a reward channel. Zeroing it under
+    # live hop-score prevented every mint after hop success.
+    for key in ("wrong_room", "checkpoint_timeout"):
         if key in bd:
             bd[key] = 0.0
 
