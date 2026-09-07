@@ -119,10 +119,9 @@ BERETTA_BOSS_DAMAGE_SCALE = 0.1
 # 0.5 stays under the cheapest repeat dump (10 beretta misses to go 15→5:
 # spend 0.40 + base miss-waste ~0.267). Hits are not this farm — they are combat.
 WEAPON_RELOAD_REWARD = 0.5
-# Shotgun vs cerberus is brutally ammo-inefficient in RE1 DC — steer to handgun.
-SHOTGUN_DOG_HIT_PENALTY = -1.4
 # Magnum / bazooka on fodder (dog or zombie) — keep heavy ammo for bosses.
-HEAVY_WEAPON_FODDER_HIT_PENALTY = -2.0
+# Per-hit tax is half that weapon's base missed-round tax (set below after
+# MISS_TAX_CLIP_SIZE / ATTACK_MISS_TAX_SCALE).
 HEAVY_WEAPON_FODDER_IDS: frozenset[int] = frozenset(
     {
         0x04,  # colt python dumdum
@@ -181,6 +180,15 @@ MISS_TAX_CLIP_SIZE: dict[int, int] = {
     0x09: 6,   # bazooka flame
     0x0A: 6,   # rocket launcher
 }
+
+# Shotgun-dog / heavy-fodder hit tax = ½ base missed-round tax for that weapon.
+# Magnum and bazooka share clip size 6 → same magnitude.
+SHOTGUN_DOG_HIT_PENALTY = -0.5 * (
+    AMMO_PICKUP_BONUS / float(MISS_TAX_CLIP_SIZE[0x03]) * ATTACK_MISS_TAX_SCALE
+)
+HEAVY_WEAPON_FODDER_HIT_PENALTY = -0.5 * (
+    AMMO_PICKUP_BONUS / float(MISS_TAX_CLIP_SIZE[0x05]) * ATTACK_MISS_TAX_SCALE
+)
 
 REWARD_SCALE = 1.0
 
@@ -450,7 +458,7 @@ def combat_overkill_penalty(state: dict[str, Any]) -> float:
 
 
 def shotgun_dog_hit_penalty(state: dict[str, Any]) -> float:
-    """Flat tax when a shotgun shell damages a cerberus (per combat event)."""
+    """Half-miss tax per shotgun shell that damages a cerberus."""
     from re1_rl.attack_macro import SHOTGUN_WEAPON_ID
 
     wid = _combat_ammo_weapon_id(state)
@@ -469,11 +477,11 @@ def shotgun_dog_hit_penalty(state: dict[str, Any]) -> float:
             hits += 1
     if hits <= 0:
         return 0.0
-    return SHOTGUN_DOG_HIT_PENALTY * float(hits)
+    return float(SHOTGUN_DOG_HIT_PENALTY) * float(hits)
 
 
 def heavy_weapon_fodder_hit_penalty(state: dict[str, Any]) -> float:
-    """−2 per magnum/bazooka hit on a dog or zombie."""
+    """Half-miss tax per magnum/bazooka hit on a dog or zombie."""
     wid = _combat_ammo_weapon_id(state)
     if int(wid) not in HEAVY_WEAPON_FODDER_IDS:
         return 0.0
@@ -490,7 +498,9 @@ def heavy_weapon_fodder_hit_penalty(state: dict[str, Any]) -> float:
             hits += 1
     if hits <= 0:
         return 0.0
-    return HEAVY_WEAPON_FODDER_HIT_PENALTY * float(hits)
+    # Weapon-specific half-miss (magnum/bazooka share the same base miss tax).
+    per_hit = 0.5 * float(ammo_waste_per_missed_round(int(wid)))
+    return per_hit * float(hits)
 
 
 # Legacy aliases (all rails off-path / leave-target is now terminal -4).

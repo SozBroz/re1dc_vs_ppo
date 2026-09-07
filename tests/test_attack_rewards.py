@@ -286,7 +286,9 @@ def test_breakdown_keys_present() -> None:
 
 
 def test_shotgun_dog_hit_penalty_per_event() -> None:
-    assert SHOTGUN_DOG_HIT_PENALTY == pytest.approx(-1.4)
+    assert SHOTGUN_DOG_HIT_PENALTY == pytest.approx(
+        0.5 * ammo_waste_per_missed_round(0x03)
+    )
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -329,7 +331,9 @@ def test_shotgun_zombie_hit_no_dog_penalty() -> None:
 
 
 def test_magnum_zombie_hit_pays_heavy_fodder_penalty() -> None:
-    assert HEAVY_WEAPON_FODDER_HIT_PENALTY == pytest.approx(-2.0)
+    assert HEAVY_WEAPON_FODDER_HIT_PENALTY == pytest.approx(
+        0.5 * ammo_waste_per_missed_round(0x05)
+    )
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
