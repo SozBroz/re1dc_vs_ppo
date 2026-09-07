@@ -2192,6 +2192,9 @@ class RE1Env(gym.Env):
                     "chunk_id": tip_meta.get("chunk_id"),
                 }
                 state_path = tip["state"]
+                # Keep hop-score / episode tip labels honest when the sampled
+                # cell was refused (sha mismatch, locked, incomplete, …).
+                self._planner_loyal_tip = str(tip["cell_dir"].name)
                 print(
                     f"[planner_loyal] refused sampled cell; "
                     f"falling back to {tip['cell_dir'].name} tip (not stage init)",
