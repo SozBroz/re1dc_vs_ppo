@@ -318,11 +318,11 @@ def test_success_floor_constant() -> None:
 
 
 def test_compose_hop_learning_target_negative_overpowers_positive_s() -> None:
-    # Shotgun-dog class tax vs typical success S.
+    # Any negative local on a positive hop overrides S on that step.
     assert compose_hop_learning_target(0.96, -1.4) == pytest.approx(-1.4)
     assert compose_hop_learning_target(0.96, -0.96) == pytest.approx(-0.96)
-    # Smaller local tax still adds with S.
-    assert compose_hop_learning_target(0.96, -0.20) == pytest.approx(0.76)
+    assert compose_hop_learning_target(0.96, -0.20) == pytest.approx(-0.20)
+    assert compose_hop_learning_target(0.96, -0.029) == pytest.approx(-0.029)
     # Never let a positive local override a negative hop outcome.
     assert compose_hop_learning_target(-1.0, 0.50) == pytest.approx(-0.50)
     assert compose_hop_learning_target(-1.0, -0.20) == pytest.approx(-1.20)

@@ -195,13 +195,13 @@ def compose_hop_learning_target(S: float, L: float) -> float:
     """Per-step learning target from terminal hop score ``S`` and local ``L``.
 
     Default is ``S + L`` (γ_outcome=1 broadcast + γ_local=0). When a negative
-    local tax is at least as large as a *positive* ``S``, return ``L`` alone so
-    the misuse signal is not washed out by a successful hop (e.g. shotgun-dog
-    ``-1.4`` vs ``S≈+0.96``). Positive locals never override a negative ``S``.
+    local tax lands on a *positive* hop outcome, the local **overrides** ``S``
+    on that step only (``Y = L``) so misuse is not washed out by success.
+    Positive locals never override a negative ``S``.
     """
     s = float(S)
     loc = float(L)
-    if loc < 0.0 and s > 0.0 and (-loc) >= s:
+    if loc < 0.0 and s > 0.0:
         return loc
     return s + loc
 
