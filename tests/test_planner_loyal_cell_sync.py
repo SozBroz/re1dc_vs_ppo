@@ -103,3 +103,29 @@ def test_ingest_new_planner_cell(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     accepted = store.ingest_proposals([prop])
     assert accepted == ["pl11"]
     assert (tmp_path / "cells" / "pl11" / "cell.State").is_file()
+
+
+def test_manifest_reconciles_stale_sidecar_sha(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sidecar rewrite without store update must not poison worker pulls forever."""
+    monkeypatch.setenv("RE1_PLANNER_LOYAL", "1")
+    monkeypatch.delenv("RE1_YAWN_CELL_PREFIX", raising=False)
+    prop = _cell(tmp_path, 54)
+    store = YawnRailsCellStore(tmp_path)
+    assert store.ingest_proposals([prop]) == ["pl54"]
+    cell = tmp_path / "cells" / "pl54"
+    side = cell / "cell.sidecar.json"
+    side.write_text(json.dumps({"checkpoint_index": 54, "rewritten": True}) + "\n")
+    # Poison advertised sidecar hash (what workers were rejecting on).
+    store.cells[54]["sidecar_sha256"] = "deadbeef" * 8
+    store._persist_unlocked()
+    ver0 = int(store.archive_version)
+    man = store.build_manifest(since_version=0)
+    assert int(man["archive_version"]) == ver0 + 1
+    row = next(c for c in man["cells"] if int(c["checkpoint_index"]) == 54)
+    from re1_rl.yawn_rails_sync import slot_content_shas
+
+    got_state, got_side = slot_content_shas(cell)
+    assert row["state_sha256"] == got_state
+    assert row["sidecar_sha256"] == got_side
