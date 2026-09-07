@@ -141,6 +141,22 @@ LIVE_REPLACED_SCALAR_KEYS = frozenset(
     }
 )
 
+# Localized γ≈0 taxes that remain in the scalar stream under live hop-score.
+HOP_LOCAL_SCALAR_KEYS = frozenset(
+    {
+        "attack_miss",
+        "ammo_waste",
+        "combat_overkill",
+        "shotgun_dog_hit",
+        "heavy_weapon_fodder_hit",
+        "attack_dry_fire",
+        "attack_macro_failure",
+        "armor_statue_progress",
+        "armor_approach",
+        "dining_statue_progress",
+    }
+)
+
 _MODE_ENV = "RE1_PLANNER_HOP_SCORE_V1"
 
 
@@ -163,6 +179,31 @@ def hop_score_mode() -> str:
 
 def hop_score_shadow_enabled() -> bool:
     return hop_score_mode() in {"shadow", "live"}
+
+
+def hop_local_reward_from_bd(bd: dict[str, float] | None) -> float:
+    """Sum localized γ≈0 channels still present under live hop-score."""
+    if not bd:
+        return 0.0
+    total = 0.0
+    for key in HOP_LOCAL_SCALAR_KEYS:
+        total += float(bd.get(key, 0.0) or 0.0)
+    return float(total)
+
+
+def compose_hop_learning_target(S: float, L: float) -> float:
+    """Per-step learning target from terminal hop score ``S`` and local ``L``.
+
+    Default is ``S + L`` (γ_outcome=1 broadcast + γ_local=0). When a negative
+    local tax is at least as large as a *positive* ``S``, return ``L`` alone so
+    the misuse signal is not washed out by a successful hop (e.g. shotgun-dog
+    ``-1.4`` vs ``S≈+0.96``). Positive locals never override a negative ``S``.
+    """
+    s = float(S)
+    loc = float(L)
+    if loc < 0.0 and s > 0.0 and (-loc) >= s:
+        return loc
+    return s + loc
 
 
 def hop_score_live_enabled() -> bool:

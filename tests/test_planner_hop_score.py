@@ -15,6 +15,7 @@ from re1_rl.planner_hop_score import (
     PLANNER_DEFAULT_TIMEOUT_FRAMES,
     PlannerHopMeters,
     apply_live_hop_score,
+    compose_hop_learning_target,
     count_scorable_hostiles,
     format_hop_score_shadow_line,
     hop_score_live_enabled,
@@ -314,3 +315,15 @@ def test_format_line_includes_raw_math(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_success_floor_constant() -> None:
     assert HOP_SUCCESS_FLOOR == 0.20
+
+
+def test_compose_hop_learning_target_negative_overpowers_positive_s() -> None:
+    # Shotgun-dog class tax vs typical success S.
+    assert compose_hop_learning_target(0.96, -1.4) == pytest.approx(-1.4)
+    assert compose_hop_learning_target(0.96, -0.96) == pytest.approx(-0.96)
+    # Smaller local tax still adds with S.
+    assert compose_hop_learning_target(0.96, -0.20) == pytest.approx(0.76)
+    # Never let a positive local override a negative hop outcome.
+    assert compose_hop_learning_target(-1.0, 0.50) == pytest.approx(-0.50)
+    assert compose_hop_learning_target(-1.0, -0.20) == pytest.approx(-1.20)
+    assert compose_hop_learning_target(0.96, 0.0) == pytest.approx(0.96)

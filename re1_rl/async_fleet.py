@@ -1001,6 +1001,25 @@ def _actor_process(
             log_probs[step_i] = logprob
             rewards[step_i] = float(rew)
             dones[step_i] = bool(done or trunc)
+            if bool(done or trunc):
+                try:
+                    from re1_rl.planner_hop_score import (
+                        compose_hop_learning_target,
+                        hop_score_live_enabled,
+                    )
+
+                    if hop_score_live_enabled():
+                        br = (info or {}).get("reward_breakdown") or {}
+                        S = float(br.get("hop_score") or 0.0)
+                        # Env scalar is L (+ S on the terminal step). Peel S so
+                        # the buffer is pure local L, then write Y_t = compose(S, L).
+                        rewards[step_i] = float(rewards[step_i]) - S
+                        for _t in range(int(step_i) + 1):
+                            rewards[_t] = compose_hop_learning_target(
+                                S, float(rewards[_t])
+                            )
+                except Exception:
+                    pass
             step_i += 1
 
             if done or trunc:

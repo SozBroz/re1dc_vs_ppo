@@ -175,15 +175,45 @@ def compute_episode_mc_returns(
     *,
     gamma: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Monte Carlo returns per episode segment (backward), then advantages."""
-    n_steps, _n_envs = rewards.shape
-    returns = np.empty_like(rewards, dtype=np.float32)
-    not_done = (~np.asarray(dones, dtype=bool)).astype(np.float32, copy=False)
+    """Monte Carlo returns per episode segment (backward), then advantages.
+
+    Under live planner hop-score, the actor rewrites each *completed* episode's
+    reward buffer to per-step learning targets
+    ``Y_t = compose_hop_learning_target(S, L_t)`` before emit. Those segments
+    use identity returns (not γ-discounted sums). Incomplete horizon tails still
+    use standard MC + bootstrap.
+    """
+    from re1_rl.planner_hop_score import hop_score_live_enabled
+
+    rewards_f = np.asarray(rewards, dtype=np.float32)
+    values_f = np.asarray(values, dtype=np.float32)
+    dones_b = np.asarray(dones, dtype=bool)
+    n_steps, n_envs = rewards_f.shape
+    returns = np.empty_like(rewards_f, dtype=np.float32)
+
+    if hop_score_live_enabled():
+        last_v = np.asarray(last_values, dtype=np.float32).reshape(-1)
+        for e in range(n_envs):
+            start = 0
+            for t in range(n_steps):
+                if not bool(dones_b[t, e]):
+                    continue
+                returns[start : t + 1, e] = rewards_f[start : t + 1, e]
+                start = t + 1
+            if start < n_steps:
+                g = float(last_v[e])
+                for t in range(n_steps - 1, start - 1, -1):
+                    g = float(rewards_f[t, e]) + float(gamma) * g
+                    returns[t, e] = g
+        advantages = returns - values_f
+        return returns, advantages
+
+    not_done = (~dones_b).astype(np.float32, copy=False)
     g = np.asarray(last_values, dtype=np.float32)
     for t in range(n_steps - 1, -1, -1):
-        g = np.asarray(rewards[t], dtype=np.float32) + float(gamma) * g * not_done[t]
+        g = np.asarray(rewards_f[t], dtype=np.float32) + float(gamma) * g * not_done[t]
         returns[t] = g
-    advantages = returns - values
+    advantages = returns - values_f
     return returns, advantages
 
 
