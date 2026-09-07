@@ -1479,6 +1479,20 @@ def _planner_op_objective_index(op: str) -> int | None:
     return idx
 
 
+def _star_crest_awaiting_end_of_life(
+    step: dict[str, Any], state: dict[str, Any]
+) -> bool:
+    """True while hunting 117 star_crest before the slot-8 death painting."""
+    if str(step.get("op") or "") != "acquire":
+        return False
+    room, item, _pile = _pickup_id_parts(str(step.get("pickup_id") or ""))
+    if item != "star_crest" or (room and room != "117"):
+        return False
+    if bool(state.get("gallery_puzzle_solved")):
+        return False
+    return "star_crest" not in _inventory_held_names(state)
+
+
 def _planner_step_target_xz(
     step: dict[str, Any],
     *,
@@ -1590,6 +1604,13 @@ def encode_planner_loyal_goal(
                 target_xz = dining_statue_goal_target(state)
         if target_xz is None:
             target_xz = _planner_step_target_xz(step, item_positions=item_positions)
+        if _star_crest_awaiting_end_of_life(step, state):
+            from re1_rl.gallery_puzzle import GALLERY_FINAL_SWITCH_TARGET
+
+            target_xz = (
+                float(GALLERY_FINAL_SWITCH_TARGET[0]),
+                float(GALLERY_FINAL_SWITCH_TARGET[1]),
+            )
         if target_xz is not None:
             v[5:10] = encoder._compass_to_xz(state, target_xz[0], target_xz[1])
             v[21] = 1.0
@@ -1619,6 +1640,9 @@ def encode_planner_loyal_goal(
             digest = hashlib.md5(site_id.encode("utf-8")).digest()
             slot[12] = int.from_bytes(digest[:2], "big") / 65535.0
 
+    from re1_rl.gallery_puzzle import encode_gallery_hint
+
+    v[23:27] = encode_gallery_hint(state)
     remaining = 1.0 if cell_time_remaining is None else float(cell_time_remaining)
     v[CELL_TIME_REMAINING_INDEX] = float(np.clip(remaining, 0.0, 1.0))
     return v

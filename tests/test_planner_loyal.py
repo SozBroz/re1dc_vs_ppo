@@ -15,6 +15,7 @@ from re1_rl.gallery_puzzle import (
     GALLERY_STEP_VALUES,
     GALLERY_TARGETS,
     GALLERY_WRONG_PORTRAIT_PENALTY,
+    encode_gallery_hint,
 )
 from re1_rl.planner import WaypointPlanner
 from re1_rl.planner_loyal import (
@@ -2416,6 +2417,60 @@ def test_encode_planner_loyal_goal_music_notes_compass():
     assert goal[11] > 0.0  # obj_pickup for acquire step
     assert goal[21] > 0.0
     assert goal[GOAL_BASE_DIM] > 0.0  # lookahead slot mask
+
+
+def test_encode_planner_loyal_goal_star_crest_points_at_end_of_life():
+    """pl47→48: compass + gallery hint aim at slot 8, not the RDT crest pile."""
+    from re1_rl.obs_encoder import GOAL_FIELDS, ObsEncoder
+    from re1_rl.planner_loyal import encode_planner_loyal_goal
+    from re1_rl.spatial_encoder import ItemPositions
+
+    graph = RoomGraph(PROJECT_ROOT / "data" / "doors_empirical.json")
+    encoder = ObsEncoder(PROJECT_ROOT / "data" / "rooms.json", graph)
+    positions = ItemPositions(PROJECT_ROOT / "data" / "item_positions.json")
+    pile = positions.get("117", "star_crest")
+    assert pile is not None
+    assert pile != GALLERY_FINAL_SWITCH_TARGET
+
+    q = PlannerLoyalQueue()
+    crest_i = next(
+        i
+        for i, step in enumerate(q.remaining)
+        if str(step.get("pickup_id") or "").startswith("117:star_crest")
+    )
+    q.seek(crest_i)
+    assert q.current["beat_id"] == "star_crest"
+
+    # pl47 spawn is the old man; hunting crest has not clicked death yet.
+    state = {
+        "room_id": "117",
+        "x": GALLERY_TARGETS[5][0],
+        "z": GALLERY_TARGETS[5][1],
+        "facing": 0,
+        "inventory": [],
+        "gallery_progress": GALLERY_STEP_VALUES[-1],
+        "gallery_puzzle_solved": False,
+    }
+    goal = encode_planner_loyal_goal(
+        encoder, graph, state, q, item_positions=positions
+    )
+    gallery_i = next(
+        i for i, (name, _desc) in enumerate(GOAL_FIELDS) if name == "gallery_bearing_sin"
+    )
+    eol = encoder._compass_to_xz(state, *GALLERY_FINAL_SWITCH_TARGET)
+    pile_compass = encoder._compass_to_xz(state, pile[0], pile[1])
+    assert np.allclose(goal[5:10], eol, atol=1e-5)
+    assert not np.allclose(goal[5:10], pile_compass, atol=1e-3)
+    assert np.allclose(goal[gallery_i : gallery_i + 4], encode_gallery_hint(state))
+    assert goal[gallery_i + 2] > 0.5  # still a room away from slot 8
+    assert goal[11] > 0.0  # obj_pickup
+
+    solved = dict(state)
+    solved["gallery_puzzle_solved"] = True
+    after = encode_planner_loyal_goal(
+        encoder, graph, solved, q, item_positions=positions
+    )
+    assert np.allclose(after[5:10], pile_compass, atol=1e-5)
 
 
 def test_validate_planner_loyal_stage_fail_closed():
