@@ -195,6 +195,21 @@ def scored_kill_count(state: dict[str, Any]) -> int:
     return max(0, int(state.get("enemy_kills", 0) or 0))
 
 
+def _scored_kill_events(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Paid kill events (same filters as ``scored_kill_count``)."""
+    events = state.get("combat_events")
+    if not events:
+        return []
+    out: list[dict[str, Any]] = []
+    for ev in events:
+        if not ev.get("killed"):
+            continue
+        if ev.get("reward_denied") or ev.get("is_crow"):
+            continue
+        out.append(ev)
+    return out
+
+
 def raw_vanish_kill_count(
     prev_state: dict[str, Any],
     state: dict[str, Any],
@@ -271,6 +286,9 @@ class PlannerHopMeters:
     steps: int = 0
     settled: bool = False
     last_report: dict[str, Any] = field(default_factory=dict)
+    # (room_id, slot) already credited this hop — blocks death-anim / get-up
+    # flicker from counting the same hostile twice (pl26 10A K=3 with E=2).
+    _killed_slots: set[tuple[str, int]] = field(default_factory=set)
 
     @classmethod
     def begin(
@@ -325,8 +343,23 @@ class PlannerHopMeters:
 
         self.h_used += _heal_units_used(prev_state, state)
 
-        scored = scored_kill_count(state)
-        self.k_scored += scored
+        room = str(state.get("room_id", "") or "")
+        scored_events = _scored_kill_events(state)
+        if scored_events:
+            for ev in scored_events:
+                slot = ev.get("slot")
+                if slot is None:
+                    # Legacy / incomplete event: count once, cannot dedup.
+                    self.k_scored += 1
+                    continue
+                key = (room, int(slot))
+                if key in self._killed_slots:
+                    continue
+                self._killed_slots.add(key)
+                self.k_scored += 1
+        else:
+            # Fallback when combat_events were stripped but enemy_kills remains.
+            self.k_scored += scored_kill_count(state)
         raw = raw_vanish_kill_count(prev_state, state)
         self.k_raw_vanish += raw
         bogus = room_transition_bogus_kills(prev_state, state)

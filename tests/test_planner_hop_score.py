@@ -107,6 +107,7 @@ def test_success_score_partial_clear() -> None:
             ],
             "combat_events": [
                 {
+                    "slot": 0,
                     "killed": True,
                     "reward_denied": False,
                     "is_crow": False,
@@ -143,6 +144,60 @@ def test_success_score_partial_clear() -> None:
     assert report["K_transition_bogus"] == 2
     assert report["q_kill"] == pytest.approx(1.0 / 3.0)
     assert 0.25 < report["S"] < 4.0
+
+
+def test_same_slot_kill_flicker_counts_once() -> None:
+    """Death-anim / get-up must not credit the same 10A zombie twice."""
+    start = {
+        "room_id": "10A",
+        "hp": 96,
+        "enemies": [
+            {"slot": 0, "hp": 40, "alive": True, "type_name": "zombie"},
+            {"slot": 1, "hp": 40, "alive": True, "type_name": "zombie"},
+        ],
+    }
+    meters = PlannerHopMeters.begin(start, tip="pl26", budget_frames=21600)
+    assert meters.e_start == 2
+
+    def _kill_step(slot: int, enemies: list[dict]) -> None:
+        meters.note_step(
+            {"room_id": "10A", "hp": 96, "enemies": enemies},
+            {
+                "room_id": "10A",
+                "hp": 96,
+                "step_emulated_frames": 8,
+                "ammo_spent": 0,
+                "enemies": [
+                    {**e, "hp": 0, "alive": False} if int(e["slot"]) == slot else e
+                    for e in enemies
+                ],
+                "combat_events": [
+                    {
+                        "slot": slot,
+                        "killed": True,
+                        "reward_denied": False,
+                        "is_crow": False,
+                        "damage": 40,
+                    }
+                ],
+                "enemy_kills": 1,
+                "inventory_slots": [],
+            },
+        )
+
+    alive = list(start["enemies"])
+    _kill_step(0, alive)
+    # Flicker: slot 0 briefly looks alive then dies again.
+    flickered = [
+        {"slot": 0, "hp": 5, "alive": True, "type_name": "zombie"},
+        {"slot": 1, "hp": 40, "alive": True, "type_name": "zombie"},
+    ]
+    _kill_step(0, flickered)
+    _kill_step(1, flickered)
+    report = meters.settle(outcome="planner_timeout", failure="planner_timeout")
+    assert report["K"] == 2
+    assert report["K_raw_vanish"] >= 3
+    assert report["E_start"] == 2
 
 
 def test_fail_timeout_worse_than_divert() -> None:
