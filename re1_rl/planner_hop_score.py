@@ -1,7 +1,12 @@
-"""Planner-loyal hop score (shadow telemetry + future live settlement).
+"""Planner-loyal hop score (±1 band): shadow telemetry + live settlement.
 
-Shadow mode computes the redesign score without changing learning rewards.
-Live mode (``RE1_PLANNER_HOP_SCORE_V1=1``) is not wired yet.
+Live mode (``RE1_PLANNER_HOP_SCORE_V1=1`` / ``live``):
+  S_success = S_base + B_kill with S_base in [0.20, 1.00];
+  only kills (budget 2) may push above +1 (up to +1.50).
+  divert -0.50, death -1.00, timeout -1.25.
+
+Clipping is applied only when composing Q / B_kill. Raw (unclipped)
+qualities and clip flags are always logged so overshoots are visible.
 """
 
 from __future__ import annotations
@@ -22,13 +27,16 @@ PLANNER_BOSS_TIMEOUT_FRAMES = 12 * 60 * 60  # 43200 = 12 min
 PLANNER_DEFAULT_MAX_STEPS = PLANNER_DEFAULT_TIMEOUT_FRAMES // 8  # 2700
 PLANNER_BOSS_MAX_STEPS = PLANNER_BOSS_TIMEOUT_FRAMES // 8  # 5400
 
-HOP_SUCCESS_FLOOR = 0.25
-HOP_SUCCESS_SPAN = 3.75
-W_HP = 0.30
-W_AMMO = 0.25
-W_KILL = 0.25
-W_HEAL = 0.10
+# ±1 success band (kill overshoot separate).
+HOP_SUCCESS_FLOOR = 0.20
+HOP_SUCCESS_SPAN = 0.80
+W_HP = 0.40
+W_AMMO = 0.35
+W_HEAL = 0.15
 W_TIME = 0.10
+# Kill is NOT in Q — additive overshoot only.
+K_BUDGET = 2  # kills for full B_kill
+B_KILL_MAX = 0.50
 
 HP_BAND_LO = 1
 HP_BAND_HI = 96
@@ -63,8 +71,12 @@ HEAL_UNITS: dict[str, float] = {
     "mixed_herbs_grb": 1.20,
 }
 
-FAIL_SCORE_DEFAULT = -4.0
-FAIL_SCORE_TIMEOUT = -6.0
+FAIL_SCORE_DIVERT = -0.50
+FAIL_SCORE_DEATH = -1.00
+FAIL_SCORE_TIMEOUT = -1.25
+# Back-compat aliases for older call sites / tests.
+FAIL_SCORE_DEFAULT = FAIL_SCORE_DIVERT
+
 TIMEOUT_FAILURES = frozenset(
     {
         "planner_timeout",
@@ -81,6 +93,23 @@ DEATH_FAILURES = frozenset(
         "dead",
     }
 )
+DIVERT_FAILURES = frozenset(
+    {
+        "planner_divert",
+        "wrong_room",
+        "gallery_wrong",
+        "armor_gas",
+        "armor_inplace_statue_push",
+        "main_hall_before_kenneth",
+        "barry_return_before_kenneth",
+        "capture_invalid",
+        "forbidden_item",
+        "shotgun_return",
+        "unplanned_box",
+        "unplanned_typewriter_save",
+        "death_screen_ui",
+    }
+)
 SUCCESS_OUTCOMES = frozenset(
     {
         "hop_success",
@@ -90,33 +119,54 @@ SUCCESS_OUTCOMES = frozenset(
     }
 )
 
+# Dense / terminal keys replaced by hop_score under live.
+LIVE_REPLACED_SCALAR_KEYS = frozenset(
+    {
+        "planner_step_success",
+        "planner_divert",
+        "planner_timeout",
+        "death",
+        "enemy_damage",
+        "enemy_kill",
+        "hp",
+        "ammo_spend",
+        "heal_use_tax",
+        "weapon_reload",
+        "step",
+        "softlock",
+        "gallery_wrong",
+        "armor_gas",
+        "armor_inplace_statue_push",
+        "main_hall_before_kenneth",
+    }
+)
+
 _MODE_ENV = "RE1_PLANNER_HOP_SCORE_V1"
 
 
 def hop_score_mode() -> str:
-    """Return ``off`` / ``shadow`` / ``live``.
-
-    Default for planner-loyal workers is ``shadow`` so we collect end-of-hop
-    telemetry without changing rewards. Set ``0`` to disable, ``1`` for live
-    (not implemented yet — still behaves as shadow).
-    """
+    """Return ``off`` / ``shadow`` / ``live``."""
     raw = (os.environ.get(_MODE_ENV) or "").strip().lower()
     if raw in {"0", "false", "off", "no"}:
         return "off"
     if raw in {"1", "true", "on", "live"}:
-        # Live settlement is not hooked into reward yet; keep computing.
         return "live"
     if raw == "shadow":
         return "shadow"
     from re1_rl.planner_loyal import planner_loyal_enabled
 
     if planner_loyal_enabled():
-        return "shadow"
+        # Fleet default is live ±1 settlement; set shadow explicitly to meter-only.
+        return "live"
     return "off"
 
 
 def hop_score_shadow_enabled() -> bool:
     return hop_score_mode() in {"shadow", "live"}
+
+
+def hop_score_live_enabled() -> bool:
+    return hop_score_mode() == "live"
 
 
 def current_step_is_boss(queue: Any) -> bool:
@@ -267,9 +317,17 @@ def _heal_units_used(prev_state: dict[str, Any], state: dict[str, Any]) -> float
     return used
 
 
+def _clip_flag(name: str, raw: float) -> str | None:
+    if raw < 0.0:
+        return f"{name}_lo"
+    if raw > 1.0:
+        return f"{name}_hi"
+    return None
+
+
 @dataclass
 class PlannerHopMeters:
-    """Per-hop gross meters for shadow / future live hop score."""
+    """Per-hop gross meters for shadow / live hop score."""
 
     tip: str = ""
     room_start: str = ""
@@ -349,7 +407,6 @@ class PlannerHopMeters:
             for ev in scored_events:
                 slot = ev.get("slot")
                 if slot is None:
-                    # Legacy / incomplete event: count once, cannot dedup.
                     self.k_scored += 1
                     continue
                 key = (room, int(slot))
@@ -358,49 +415,113 @@ class PlannerHopMeters:
                 self._killed_slots.add(key)
                 self.k_scored += 1
         else:
-            # Fallback when combat_events were stripped but enemy_kills remains.
             self.k_scored += scored_kill_count(state)
         raw = raw_vanish_kill_count(prev_state, state)
         self.k_raw_vanish += raw
         bogus = room_transition_bogus_kills(prev_state, state)
         self.k_transition_bogus += bogus
 
-    def qualities(self) -> dict[str, float]:
-        q_hp = _clip01(1.0 - float(self.d_hp) / HP_DENOM)
+    def quality_bundle(self) -> dict[str, Any]:
+        """Raw + clipped qualities, Q, B_kill, and clip flags (no silent cover-up)."""
         b_ammo = B_AMMO_BOSS if self.boss else B_AMMO_DEFAULT
-        q_ammo = _clip01(1.0 - float(self.a_spent) / float(b_ammo))
+        q_hp_raw = 1.0 - float(self.d_hp) / HP_DENOM
+        q_ammo_raw = 1.0 - float(self.a_spent) / float(b_ammo)
+        q_heal_raw = 1.0 - float(self.h_used) / 1.0
+        q_time_raw = 1.0 - float(self.frames) / float(self.budget_frames)
+
+        q_hp = _clip01(q_hp_raw)
+        q_ammo = _clip01(q_ammo_raw)
+        q_heal = _clip01(q_heal_raw)
+        q_time = _clip01(q_time_raw)
+
+        clip_flags: list[str] = []
+        for name, raw in (
+            ("q_hp", q_hp_raw),
+            ("q_ammo", q_ammo_raw),
+            ("q_heal", q_heal_raw),
+            ("q_time", q_time_raw),
+        ):
+            flag = _clip_flag(name, raw)
+            if flag:
+                clip_flags.append(flag)
+
+        q_kill_ratio_raw = (
+            float(self.k_scored) / float(K_BUDGET) if int(self.e_start) > 0 else 0.0
+        )
         if int(self.e_start) <= 0:
-            q_kill = 1.0
+            b_kill_raw = 0.0
+            b_kill = 0.0
         else:
-            q_kill = _clip01(float(self.k_scored) / float(self.e_start))
-        q_heal = _clip01(1.0 - float(self.h_used) / 1.0)
-        q_time = _clip01(1.0 - float(self.frames) / float(self.budget_frames))
+            b_kill_raw = float(B_KILL_MAX) * float(q_kill_ratio_raw)
+            b_kill = float(B_KILL_MAX) * _clip01(q_kill_ratio_raw)
+            if q_kill_ratio_raw > 1.0:
+                clip_flags.append("B_kill_hi")
+            elif q_kill_ratio_raw < 0.0:
+                clip_flags.append("B_kill_lo")
+
+        # Legacy name in logs: fraction of kill budget used (clipped).
+        q_kill = 0.0 if int(self.e_start) <= 0 else _clip01(q_kill_ratio_raw)
+
+        q_mix = (
+            W_HP * q_hp
+            + W_AMMO * q_ammo
+            + W_HEAL * q_heal
+            + W_TIME * q_time
+        )
+        q_mix_raw = (
+            W_HP * q_hp_raw
+            + W_AMMO * q_ammo_raw
+            + W_HEAL * q_heal_raw
+            + W_TIME * q_time_raw
+        )
+        s_base = float(HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN * q_mix)
+        s_base_raw = float(HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN * q_mix_raw)
+
         return {
+            "q_hp_raw": q_hp_raw,
+            "q_ammo_raw": q_ammo_raw,
+            "q_heal_raw": q_heal_raw,
+            "q_time_raw": q_time_raw,
+            "q_kill_raw": q_kill_ratio_raw,
             "q_hp": q_hp,
             "q_ammo": q_ammo,
-            "q_kill": q_kill,
             "q_heal": q_heal,
             "q_time": q_time,
+            "q_kill": q_kill,
+            "Q_raw": q_mix_raw,
+            "Q": q_mix,
+            "B_kill_raw": b_kill_raw,
+            "B_kill": b_kill,
+            "S_base_raw": s_base_raw,
+            "S_base": s_base,
+            "clip_flags": clip_flags,
+            "B_ammo": float(b_ammo),
+            "K_budget": int(K_BUDGET),
+        }
+
+    def qualities(self) -> dict[str, float]:
+        b = self.quality_bundle()
+        return {
+            "q_hp": float(b["q_hp"]),
+            "q_ammo": float(b["q_ammo"]),
+            "q_kill": float(b["q_kill"]),
+            "q_heal": float(b["q_heal"]),
+            "q_time": float(b["q_time"]),
         }
 
     def success_score(self) -> float:
-        q = self.qualities()
-        mixed = (
-            W_HP * q["q_hp"]
-            + W_AMMO * q["q_ammo"]
-            + W_KILL * q["q_kill"]
-            + W_HEAL * q["q_heal"]
-            + W_TIME * q["q_time"]
-        )
-        return float(HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN * mixed)
+        b = self.quality_bundle()
+        return float(b["S_base"] + b["B_kill"])
 
     def fail_score(self, reason: str | None) -> float:
         key = str(reason or "").strip().lower()
         if key in TIMEOUT_FAILURES:
             return float(FAIL_SCORE_TIMEOUT)
         if key in DEATH_FAILURES:
-            return float(FAIL_SCORE_DEFAULT)
-        return float(FAIL_SCORE_DEFAULT)
+            return float(FAIL_SCORE_DEATH)
+        if key in DIVERT_FAILURES:
+            return float(FAIL_SCORE_DIVERT)
+        return float(FAIL_SCORE_DIVERT)
 
     def settle(
         self,
@@ -408,19 +529,19 @@ class PlannerHopMeters:
         outcome: str,
         failure: str | None = None,
     ) -> dict[str, Any]:
-        """Idempotent settlement; returns a JSON-friendly report."""
+        """Idempotent settlement; returns a JSON-friendly report with raw math."""
         if self.settled and self.last_report:
             return dict(self.last_report)
         outcome_key = str(outcome or "").strip().lower()
         fail_key = str(failure or "").strip().lower() or None
         success = outcome_key in SUCCESS_OUTCOMES and not fail_key
+        b = self.quality_bundle()
         if success:
-            s = self.success_score()
+            s = float(b["S_base"] + b["B_kill"])
             reason = outcome_key or "hop_success"
         else:
             reason = fail_key or outcome_key or "unknown"
             s = self.fail_score(reason)
-        q = self.qualities()
         report = {
             "mode": hop_score_mode(),
             "tip": self.tip,
@@ -429,17 +550,31 @@ class PlannerHopMeters:
             "outcome": reason,
             "success": bool(success),
             "S": round(float(s), 6),
-            "q_hp": round(q["q_hp"], 6),
-            "q_ammo": round(q["q_ammo"], 6),
-            "q_kill": round(q["q_kill"], 6),
-            "q_heal": round(q["q_heal"], 6),
-            "q_time": round(q["q_time"], 6),
+            "S_base": round(float(b["S_base"]), 6),
+            "S_base_raw": round(float(b["S_base_raw"]), 6),
+            "B_kill": round(float(b["B_kill"]), 6),
+            "B_kill_raw": round(float(b["B_kill_raw"]), 6),
+            "Q": round(float(b["Q"]), 6),
+            "Q_raw": round(float(b["Q_raw"]), 6),
+            "q_hp": round(float(b["q_hp"]), 6),
+            "q_ammo": round(float(b["q_ammo"]), 6),
+            "q_kill": round(float(b["q_kill"]), 6),
+            "q_heal": round(float(b["q_heal"]), 6),
+            "q_time": round(float(b["q_time"]), 6),
+            "q_hp_raw": round(float(b["q_hp_raw"]), 6),
+            "q_ammo_raw": round(float(b["q_ammo_raw"]), 6),
+            "q_kill_raw": round(float(b["q_kill_raw"]), 6),
+            "q_heal_raw": round(float(b["q_heal_raw"]), 6),
+            "q_time_raw": round(float(b["q_time_raw"]), 6),
+            "clip_flags": ",".join(b["clip_flags"]) if b["clip_flags"] else "-",
             "E_start": int(self.e_start),
             "K": int(self.k_scored),
+            "K_budget": int(b["K_budget"]),
             "K_raw_vanish": int(self.k_raw_vanish),
             "K_transition_bogus": int(self.k_transition_bogus),
             "D_hp": round(float(self.d_hp), 4),
             "A_spent": round(float(self.a_spent), 4),
+            "B_ammo": round(float(b["B_ammo"]), 4),
             "H_used": round(float(self.h_used), 4),
             "F_elapsed": int(self.frames),
             "F_budget": int(self.budget_frames),
@@ -451,23 +586,38 @@ class PlannerHopMeters:
 
 
 def format_hop_score_shadow_line(report: dict[str, Any]) -> str:
-    """One-line worker log for grepping ``[hop_score_shadow]``."""
+    """One-line worker log for grepping ``[hop_score_shadow]`` / live."""
+    tag = "[hop_score_live]" if hop_score_live_enabled() else "[hop_score_shadow]"
     return (
-        f"[hop_score_shadow] tip={report.get('tip')!r} "
+        f"{tag} tip={report.get('tip')!r} "
         f"outcome={report.get('outcome')!r} "
         f"S={float(report.get('S', 0.0)):.4f} "
+        f"S_base={float(report.get('S_base', 0.0)):.4f} "
+        f"S_base_raw={float(report.get('S_base_raw', 0.0)):.4f} "
+        f"B_kill={float(report.get('B_kill', 0.0)):.4f} "
+        f"B_kill_raw={float(report.get('B_kill_raw', 0.0)):.4f} "
+        f"Q={float(report.get('Q', 0.0)):.4f} "
+        f"Q_raw={float(report.get('Q_raw', 0.0)):.4f} "
         f"success={int(bool(report.get('success')))} "
         f"q_hp={float(report.get('q_hp', 0.0)):.4f} "
+        f"q_hp_raw={float(report.get('q_hp_raw', 0.0)):.4f} "
         f"q_ammo={float(report.get('q_ammo', 0.0)):.4f} "
+        f"q_ammo_raw={float(report.get('q_ammo_raw', 0.0)):.4f} "
         f"q_kill={float(report.get('q_kill', 0.0)):.4f} "
+        f"q_kill_raw={float(report.get('q_kill_raw', 0.0)):.4f} "
         f"q_heal={float(report.get('q_heal', 0.0)):.4f} "
+        f"q_heal_raw={float(report.get('q_heal_raw', 0.0)):.4f} "
         f"q_time={float(report.get('q_time', 0.0)):.4f} "
+        f"q_time_raw={float(report.get('q_time_raw', 0.0)):.4f} "
+        f"clip_flags={report.get('clip_flags', '-')!s} "
         f"E_start={int(report.get('E_start', 0) or 0)} "
         f"K={int(report.get('K', 0) or 0)} "
+        f"K_budget={int(report.get('K_budget', K_BUDGET) or K_BUDGET)} "
         f"K_raw={int(report.get('K_raw_vanish', 0) or 0)} "
         f"K_bogus_transition={int(report.get('K_transition_bogus', 0) or 0)} "
         f"D_hp={float(report.get('D_hp', 0.0)):.2f} "
         f"A_spent={float(report.get('A_spent', 0.0)):.4f} "
+        f"B_ammo={float(report.get('B_ammo', 0.0)):.4f} "
         f"H_used={float(report.get('H_used', 0.0)):.4f} "
         f"frames={int(report.get('F_elapsed', 0) or 0)}/"
         f"{int(report.get('F_budget', 0) or 0)} "
@@ -498,3 +648,50 @@ def resolve_shadow_outcome(
     if terminated:
         return "unknown", "unknown"
     return "ongoing", None
+
+
+def zero_live_replaced_channels(bd: dict[str, float]) -> None:
+    for key in LIVE_REPLACED_SCALAR_KEYS:
+        bd[key] = 0.0
+    # Telemetry aliases that mirrored terminals.
+    for key in ("wrong_room", "checkpoint_success", "checkpoint_timeout"):
+        if key in bd:
+            bd[key] = 0.0
+
+
+def apply_live_hop_score(
+    bd: dict[str, float],
+    meters: PlannerHopMeters | None,
+    *,
+    outcome: str,
+    failure: str | None = None,
+) -> dict[str, Any]:
+    """Settle meters into ``bd['hop_score']`` and zero replaced dense/terminals.
+
+    Idempotent if meters already settled. Always returns a report dict.
+    """
+    if meters is None:
+        # No meters: still apply constant fail/success floor from outcome.
+        fail_key = str(failure or outcome or "").strip().lower()
+        if fail_key in SUCCESS_OUTCOMES or (
+            failure is None and str(outcome).lower() in SUCCESS_OUTCOMES
+        ):
+            s = float(HOP_SUCCESS_FLOOR)
+            report: dict[str, Any] = {
+                "S": s,
+                "outcome": outcome,
+                "success": True,
+                "tip": "",
+            }
+        else:
+            tmp = PlannerHopMeters()
+            s = float(tmp.fail_score(failure or outcome))
+            report = {"S": s, "outcome": failure or outcome, "success": False, "tip": ""}
+        zero_live_replaced_channels(bd)
+        bd["hop_score"] = float(s)
+        return report
+
+    report = meters.settle(outcome=outcome, failure=failure)
+    zero_live_replaced_channels(bd)
+    bd["hop_score"] = float(report["S"])
+    return report

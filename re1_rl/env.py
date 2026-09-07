@@ -1130,11 +1130,16 @@ class RE1Env(gym.Env):
         cell_timeout_failure = self._progress.cell_timeout_breached
         box_pollution = getattr(self, "_episode_failure_override", None)
         planner_loyal = getattr(self, "_planner_loyal_queue", None) is not None
+        from re1_rl.planner_hop_score import hop_score_live_enabled
+
         planner_chunk_complete = (
             planner_loyal
             and getattr(self, "_planner_loyal_queue", None) is not None
-            and bool(self._planner_loyal_queue.done)
             and bool(getattr(self, "_checkpoint_captured", False))
+            and (
+                bool(self._planner_loyal_queue.done)
+                or hop_score_live_enabled()
+            )
         )
         checkpoint_success = (
             self._stage.get("mode") == "yawn_rails"
@@ -1207,7 +1212,16 @@ class RE1Env(gym.Env):
                 else "checkpoint_timeout"
             )
         elif planner_chunk_complete:
-            reason = "planner_chunk_complete"
+            # Live one-cell episodes end on any hop success; chunk-final keeps
+            # the legacy reason when the authored queue is fully done.
+            if (
+                hop_score_live_enabled()
+                and getattr(self, "_planner_loyal_queue", None) is not None
+                and not bool(self._planner_loyal_queue.done)
+            ):
+                reason = "planner_step_success"
+            else:
+                reason = "planner_chunk_complete"
         elif checkpoint_success:
             reason = "checkpoint_success"
         else:
@@ -1617,10 +1631,13 @@ class RE1Env(gym.Env):
         )
         # One-leg: checkpoint_success is true after the hunted cell, so the
         # episode ends here. play_through (leg_span>1) keeps going.
-        # Planner-loyal keeps the episode open for mid-chunk steps; the last
-        # authored step (queue.done) keeps capture flags so the episode ends.
+        # Legacy planner-loyal kept the episode open for mid-chunk hops; live
+        # ±1 hop-score is one cell = one episode (end on every hop success).
         if queue is not None:
-            if bool(queue.done):
+            from re1_rl.planner_hop_score import hop_score_live_enabled
+
+            end_episode = bool(queue.done) or hop_score_live_enabled()
+            if end_episode:
                 self._checkpoint_captured = True
                 if self._progress is not None:
                     self._progress.checkpoint_success = True
@@ -2593,6 +2610,7 @@ class RE1Env(gym.Env):
         """Settle shadow S into info + worker log; restart meters after mid-hop."""
         from re1_rl.planner_hop_score import (
             format_hop_score_shadow_line,
+            hop_score_live_enabled,
             hop_score_shadow_enabled,
             resolve_shadow_outcome,
         )
@@ -2614,8 +2632,15 @@ class RE1Env(gym.Env):
         )
         if mid_hop_success and failure is None:
             outcome = "planner_step_success"
-        report = meters.settle(outcome=outcome, failure=failure)
+        # Live path settles inside compute_reward / failure penalties so the
+        # scalar learns S same-step. Attach stays log + mid-hop meter restart.
+        if meters.settled and meters.last_report:
+            report = dict(meters.last_report)
+        else:
+            report = meters.settle(outcome=outcome, failure=failure)
         info["hop_score_shadow"] = report
+        if hop_score_live_enabled():
+            info["hop_score"] = report
         print(format_hop_score_shadow_line(report), flush=True)
         # Mid-chunk: next hop gets a fresh E_start from the post-success state.
         if mid_hop_success and not terminated and not truncated:
@@ -3691,6 +3716,18 @@ class RE1Env(gym.Env):
         return obs, float(skip_reward), False, truncated, info
 
     def _death_penalty(self) -> tuple[float, dict[str, float]]:
+        from re1_rl.planner_hop_score import (
+            apply_live_hop_score,
+            hop_score_live_enabled,
+        )
+
+        if hop_score_live_enabled() and self._planner_loyal_active():
+            bd: dict[str, float] = {"death": 0.0, "hop_score": 0.0}
+            meters = getattr(getattr(self, "_progress", None), "hop_meters", None)
+            report = apply_live_hop_score(
+                bd, meters, outcome="death", failure="death"
+            )
+            return float(bd["hop_score"]), bd
         breakdown = {"death": DEATH_PENALTY}
         return float(DEATH_PENALTY * REWARD_SCALE), breakdown
 
@@ -3698,6 +3735,17 @@ class RE1Env(gym.Env):
         self, reason: str
     ) -> tuple[float, dict[str, float]]:
         from re1_rl.cutscene_reward import ILLEGAL_MAIN_HALL_FAILURE_REASON
+        from re1_rl.planner_hop_score import (
+            apply_live_hop_score,
+            hop_score_live_enabled,
+        )
+
+        if hop_score_live_enabled() and self._planner_loyal_active():
+            bd: dict[str, float] = {"hop_score": 0.0}
+            meters = getattr(getattr(self, "_progress", None), "hop_meters", None)
+            fail = str(reason or "death")
+            apply_live_hop_score(bd, meters, outcome=fail, failure=fail)
+            return float(bd["hop_score"]), bd
 
         if reason == ILLEGAL_MAIN_HALL_FAILURE_REASON:
             breakdown = {
@@ -5877,12 +5925,16 @@ class RE1Env(gym.Env):
             info["gallery_flawless"] = not damage_taken
         mid_hop = False
         if self._planner_loyal_active():
+            from re1_rl.planner_hop_score import hop_score_live_enabled
+
             queue = getattr(self, "_planner_loyal_queue", None)
-            mid_hop = (
-                float(breakdown.get("planner_step_success", 0.0) or 0.0) > 0.0
-                and queue is not None
-                and not bool(getattr(queue, "done", False))
-            )
+            # Live ±1: hop success terminates the episode — no mid-chunk continue.
+            if not hop_score_live_enabled():
+                mid_hop = (
+                    float(breakdown.get("planner_step_success", 0.0) or 0.0) > 0.0
+                    and queue is not None
+                    and not bool(getattr(queue, "done", False))
+                )
         self._attach_hop_score_shadow(
             info,
             terminated=bool(terminated),

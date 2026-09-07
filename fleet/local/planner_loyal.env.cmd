@@ -6,6 +6,9 @@ call "%~dp0obs_raw.env.cmd"
 
 set RE1_PLANNER_LOYAL=1
 
+REM Live ±1 hop-score settlement (S_base + B_kill; divert -0.5 / death -1 / timeout -1.25).
+set RE1_PLANNER_HOP_SCORE_V1=1
+
 if "%RE1_PLANNER_CHUNK%"=="" set RE1_PLANNER_CHUNK=data\planner_chunks\cp05_shield_key.json
 
 set RE1_PLANNER_LOYAL_CELLS_ROOT=states\planner_loyal

@@ -69,6 +69,7 @@ PLANNER_LOYAL_SCALAR_KEYS: frozenset[str] = frozenset(
         "planner_step_success",
         "planner_divert",
         "planner_timeout",
+        "hop_score",
         "gallery_wrong",
         "armor_statue_progress",
         "armor_inplace_statue_push",
@@ -1056,7 +1057,11 @@ def _gallery_end_of_life_complete(
         return True
     prev_raw = int(prev_state.get("gallery_progress", 0) or 0)
     raw = int(state.get("gallery_progress", 0) or 0)
-    if raw != 0 or prev_raw != GALLERY_COMPLETE_PREV_RAW:
+    if prev_raw != GALLERY_COMPLETE_PREV_RAW:
+        return False
+    # BizHawk tests clear 2→0. Live C-RE1 writes 2→1 at the switch and stays
+    # at 1; 1 is not a portrait value. Either edge at the slot-8 AOT is done.
+    if raw not in (0, 1):
         return False
     near_now = near_gallery_final_switch(
         float(state.get("x", 0) or 0),

@@ -1053,11 +1053,19 @@ def _compute_planner_loyal_reward(
             )
         bd["planner_step_success"] = pay
         bd["checkpoint_success"] = pay
-        if progress is not None and planner_loyal_queue.done:
+        from re1_rl.planner_hop_score import hop_score_live_enabled
+
+        if progress is not None and (
+            planner_loyal_queue.done or hop_score_live_enabled()
+        ):
+            # Live ±1: every hop success ends the episode (one cell = one episode).
             if hasattr(progress, "claim_checkpoint_success"):
                 progress.claim_checkpoint_success()
+            if hop_score_live_enabled() and not planner_loyal_queue.done:
+                # Force terminal even when leg_span accounting would keep going.
+                progress.checkpoint_success = True
         elif progress is not None:
-            # Mid-chunk: keep playing with a fresh hop idle / max_steps budget.
+            # Legacy / shadow mid-chunk: keep playing with a fresh hop budget.
             progress.note_softlock_extension(hop_frames)
             progress.note_max_steps_extension(hop_steps)
             if hasattr(progress, "arm_cell_timeout"):
@@ -1200,6 +1208,61 @@ def _compute_planner_loyal_reward(
             progress.stagnation_frames,
             threshold=softlock_threshold,
         )
+
+    from re1_rl.planner_hop_score import (
+        apply_live_hop_score,
+        hop_score_live_enabled,
+        zero_live_replaced_channels,
+    )
+
+    if hop_score_live_enabled():
+        meters = getattr(progress, "hop_meters", None) if progress is not None else None
+        # Priority: death > timeout > divert-class > success (matches terminal ownership).
+        if state.get("dead") or float(bd.get("death", 0.0) or 0.0) < 0.0:
+            apply_live_hop_score(
+                bd, meters, outcome="death", failure="death"
+            )
+        elif float(bd.get("planner_timeout", 0.0) or 0.0) < 0.0 or (
+            progress is not None and progress.cell_timeout_breached
+        ):
+            apply_live_hop_score(
+                bd, meters, outcome="planner_timeout", failure="planner_timeout"
+            )
+        elif float(bd.get("main_hall_before_kenneth", 0.0) or 0.0) < 0.0:
+            apply_live_hop_score(
+                bd,
+                meters,
+                outcome="main_hall_before_kenneth",
+                failure="main_hall_before_kenneth",
+            )
+        elif float(bd.get("gallery_wrong", 0.0) or 0.0) < 0.0:
+            apply_live_hop_score(
+                bd, meters, outcome="gallery_wrong", failure="gallery_wrong"
+            )
+        elif float(bd.get("armor_gas", 0.0) or 0.0) < 0.0:
+            apply_live_hop_score(
+                bd, meters, outcome="armor_gas", failure="armor_gas"
+            )
+        elif float(bd.get("armor_inplace_statue_push", 0.0) or 0.0) < 0.0:
+            apply_live_hop_score(
+                bd,
+                meters,
+                outcome="armor_inplace_statue_push",
+                failure="armor_inplace_statue_push",
+            )
+        elif float(bd.get("planner_divert", 0.0) or 0.0) < 0.0 or loyal.get("divert"):
+            apply_live_hop_score(
+                bd, meters, outcome="planner_divert", failure="planner_divert"
+            )
+        elif float(bd.get("planner_step_success", 0.0) or 0.0) > 0.0 or loyal.get(
+            "step_success"
+        ):
+            apply_live_hop_score(
+                bd, meters, outcome="planner_step_success", failure=None
+            )
+        else:
+            # Non-terminal live step: still strip dense channels folded into S.
+            zero_live_replaced_channels(bd)
 
     reward = scalarize_planner_loyal_reward(bd)
     if return_breakdown:
@@ -1357,13 +1420,18 @@ def compute_reward(
             bd["checkpoint_success"] = pay
             if progress is not None and hasattr(progress, "claim_checkpoint_success"):
                 progress.claim_checkpoint_success()
-            # Mid-chunk: reset a fresh hop wall for the next planner step.
+            from re1_rl.planner_hop_score import hop_score_live_enabled
+
+            # Mid-chunk: reset a fresh hop wall only when not live one-cell mode.
             if (
                 progress is not None
                 and not planner_loyal_queue.done
+                and not hop_score_live_enabled()
                 and hasattr(progress, "arm_cell_timeout")
             ):
                 progress.arm_cell_timeout(hop_frames)
+            if hop_score_live_enabled() and progress is not None:
+                progress.checkpoint_success = True
 
     prev_room = str(prev_state.get("room_id", ""))
     room = str(state.get("room_id", ""))
