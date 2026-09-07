@@ -51,7 +51,10 @@ DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     batch_size=2048,  # WH2 learner default; launchers may override (e.g. 3072)
     n_epochs=4,
     learning_rate=1e-4,
-    gamma=RL_GAMMA,
+    # Planner-loyal hop-score: one cell = one episode with a terminal S. Use
+    # γ=1 so the outcome is not time-decayed across the hop (effective γ_outcome).
+    # n_steps still sized from RL_GAMMA half-lives for rollout/bootstrap cuts.
+    gamma=1.0,
     ent_coef=0.02,
 )
 DEFAULT_SYNC_INTERVAL_S = 360.0
