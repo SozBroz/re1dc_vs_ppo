@@ -390,195 +390,203 @@
     },
     {
       "n": 42,
+      "op": "do_puzzle",
+      "site_id": "gallery_end_of_life",
+      "room_id": "117",
+      "beat_id": "gallery_end_of_life",
+      "note": "death painting / slot 8; spawns star crest"
+    },
+    {
+      "n": 43,
       "op": "acquire",
       "pickup_id": "117:star_crest:1",
       "room_id": "117",
       "beat_id": "star_crest"
     },
     {
-      "n": 43,
+      "n": 44,
       "op": "traverse",
       "edge_id": "117->10A"
     },
     {
-      "n": 44,
+      "n": 45,
       "op": "traverse",
       "edge_id": "10A->11A"
     },
     {
-      "n": 45,
+      "n": 46,
       "op": "objective",
       "site_id": "star_crest@11A_crest_slot",
       "room_id": "11A",
       "beat_id": "place_star_crest"
     },
     {
-      "n": 46,
+      "n": 47,
       "op": "traverse",
       "edge_id": "11A->10A"
     },
     {
-      "n": 47,
+      "n": 48,
       "op": "traverse",
       "edge_id": "10A->10B"
     },
     {
-      "n": 48,
+      "n": 49,
       "op": "traverse",
       "edge_id": "10B->207"
     },
     {
-      "n": 49,
+      "n": 50,
       "op": "traverse",
       "edge_id": "207->204"
     },
     {
-      "n": 50,
+      "n": 51,
       "op": "traverse",
       "edge_id": "204->203"
     },
     {
-      "n": 51,
+      "n": 52,
       "op": "traverse",
       "edge_id": "203->202"
     },
     {
-      "n": 52,
+      "n": 53,
       "op": "traverse",
       "edge_id": "202->201"
     },
     {
-      "n": 53,
+      "n": 54,
       "op": "traverse",
       "edge_id": "201->101"
     },
     {
-      "n": 54,
+      "n": 55,
       "op": "traverse",
       "edge_id": "101->103"
     },
     {
-      "n": 55,
+      "n": 56,
       "op": "traverse",
       "edge_id": "103->10C"
     },
     {
-      "n": 56,
+      "n": 57,
       "op": "objective",
       "site_id": "chemical@10C_greenhouse_pump",
       "room_id": "10C",
       "beat_id": "greenhouse_pump"
     },
     {
-      "n": 57,
+      "n": 58,
       "op": "acquire",
       "pickup_id": "10C:armor_key:1",
       "room_id": "10C",
       "beat_id": "armor_key"
     },
     {
-      "n": 58,
+      "n": 59,
       "op": "acquire",
       "pickup_id": "10C:red_herb:3a",
       "room_id": "10C",
       "note": "bench red 1/2"
     },
     {
-      "n": 59,
+      "n": 60,
       "op": "acquire",
       "pickup_id": "10C:green_herb:2a",
       "room_id": "10C",
       "note": "bench green 1/2"
     },
     {
-      "n": 60,
+      "n": 61,
       "op": "acquire",
       "pickup_id": "10C:red_herb:3b",
       "room_id": "10C",
       "note": "bench red 2/2"
     },
     {
-      "n": 61,
+      "n": 62,
       "op": "acquire",
       "pickup_id": "10C:green_herb:2b",
       "room_id": "10C",
       "note": "bench green 2/2; 3rd green/red = divert"
     },
     {
-      "n": 62,
+      "n": 63,
       "op": "traverse",
       "edge_id": "10C->103"
     },
     {
-      "n": 63,
+      "n": 64,
       "op": "traverse",
       "edge_id": "103->101"
     },
     {
-      "n": 64,
+      "n": 65,
       "op": "traverse",
       "edge_id": "101->102"
     },
     {
-      "n": 65,
+      "n": 66,
       "op": "acquire",
       "pickup_id": "102:handgun_bullets:1",
       "room_id": "102"
     },
     {
-      "n": 66,
+      "n": 67,
       "op": "acquire",
       "pickup_id": "102:shotgun_shells:2",
       "room_id": "102"
     },
     {
-      "n": 67,
+      "n": 68,
       "op": "traverse",
       "edge_id": "102->101"
     },
     {
-      "n": 68,
+      "n": 69,
       "op": "traverse",
       "edge_id": "101->100"
     },
     {
-      "n": 69,
+      "n": 70,
       "op": "use_box",
       "room_id": "100"
     },
     {
-      "n": 70,
+      "n": 71,
       "op": "traverse",
       "edge_id": "100->101"
     },
     {
-      "n": 71,
+      "n": 72,
       "op": "traverse",
       "edge_id": "101->201"
     },
     {
-      "n": 72,
+      "n": 73,
       "op": "traverse",
       "edge_id": "201->202"
     },
     {
-      "n": 73,
+      "n": 74,
       "op": "traverse",
       "edge_id": "202->203"
     },
     {
-      "n": 74,
+      "n": 75,
       "op": "traverse",
       "edge_id": "203->204"
     },
     {
-      "n": 75,
+      "n": 76,
       "op": "traverse",
       "edge_id": "204->205",
       "beat_id": "armor_room_enter"
     },
     {
-      "n": 76,
+      "n": 77,
       "op": "do_puzzle",
       "site_id": "armor_vent_door",
       "room_id": "205",
@@ -586,7 +594,7 @@
       "note": "east statue exactly on its vent"
     },
     {
-      "n": 77,
+      "n": 78,
       "op": "do_puzzle",
       "site_id": "armor_vent_far",
       "room_id": "205",
@@ -594,7 +602,7 @@
       "note": "both east and west statues exactly on their vents"
     },
     {
-      "n": 78,
+      "n": 79,
       "op": "acquire",
       "pickup_id": "205:sun_crest:1",
       "room_id": "205",
@@ -602,20 +610,20 @@
       "note": "activate center button, then take cabinet sun crest"
     },
     {
-      "n": 79,
+      "n": 80,
       "op": "traverse",
       "edge_id": "205->204",
       "note": "leave armor room toward Richard / crest / dining"
     },
     {
-      "n": 80,
+      "n": 81,
       "op": "traverse",
       "edge_id": "204->20D",
       "beat_id": "richard_approach",
       "note": "armor_key gate into Pillar Passage"
     },
     {
-      "n": 81,
+      "n": 82,
       "op": "trigger_cutscene",
       "site_id": "20D:richard",
       "room_id": "20D",
@@ -624,28 +632,28 @@
       "note": "start ~6 min Richard timer; cinema dumps to 204 \u2014 no cell mint"
     },
     {
-      "n": 82,
+      "n": 83,
       "op": "traverse",
       "edge_id": "204->207",
       "note": "leave C passage after Richard dump"
     },
     {
-      "n": 83,
+      "n": 84,
       "op": "traverse",
       "edge_id": "207->10B"
     },
     {
-      "n": 84,
+      "n": 85,
       "op": "traverse",
       "edge_id": "10B->10A"
     },
     {
-      "n": 85,
+      "n": 86,
       "op": "traverse",
       "edge_id": "10A->11A"
     },
     {
-      "n": 86,
+      "n": 87,
       "op": "objective",
       "site_id": "sun_crest@11A_crest_slot",
       "room_id": "11A",
@@ -653,39 +661,39 @@
       "note": "place held sun_crest; burns Richard timer"
     },
     {
-      "n": 87,
+      "n": 88,
       "op": "traverse",
       "edge_id": "11A->10A"
     },
     {
-      "n": 88,
+      "n": 89,
       "op": "traverse",
       "edge_id": "10A->10B"
     },
     {
-      "n": 89,
+      "n": 90,
       "op": "traverse",
       "edge_id": "10B->207"
     },
     {
-      "n": 90,
+      "n": 91,
       "op": "traverse",
       "edge_id": "207->204"
     },
     {
-      "n": 91,
+      "n": 92,
       "op": "traverse",
       "edge_id": "204->203"
     },
     {
-      "n": 92,
+      "n": 93,
       "op": "traverse",
       "edge_id": "203->202",
       "beat_id": "dining_2f_enter",
       "note": "Dining Room 2F"
     },
     {
-      "n": 93,
+      "n": 94,
       "op": "do_puzzle",
       "site_id": "dining_statue_knocked",
       "room_id": "202",
@@ -693,23 +701,23 @@
       "note": "push balcony statue down; blue jewel drops to dining hall 105"
     },
     {
-      "n": 94,
+      "n": 95,
       "op": "traverse",
       "edge_id": "202->203",
       "note": "leave Dining 2F toward main hall / jewel"
     },
     {
-      "n": 95,
+      "n": 96,
       "op": "traverse",
       "edge_id": "203->106"
     },
     {
-      "n": 96,
+      "n": 97,
       "op": "traverse",
       "edge_id": "106->105"
     },
     {
-      "n": 97,
+      "n": 98,
       "op": "acquire",
       "pickup_id": "105:blue_jewel:1",
       "room_id": "105",
@@ -717,46 +725,46 @@
       "note": "statue drop puts jewel in dining hall 105 (not 202)"
     },
     {
-      "n": 98,
+      "n": 99,
       "op": "traverse",
       "edge_id": "105->106",
       "note": "back out; 104->103 still locked \u2014 do not tea-cut"
     },
     {
-      "n": 99,
+      "n": 100,
       "op": "traverse",
       "edge_id": "106->203"
     },
     {
-      "n": 100,
+      "n": 101,
       "op": "traverse",
       "edge_id": "203->202"
     },
     {
-      "n": 101,
+      "n": 102,
       "op": "traverse",
       "edge_id": "202->201"
     },
     {
-      "n": 102,
+      "n": 103,
       "op": "traverse",
       "edge_id": "201->101"
     },
     {
-      "n": 103,
+      "n": 104,
       "op": "traverse",
       "edge_id": "101->103",
       "note": "skip 102 vacant \u2014 clip+shells already taken"
     },
     {
-      "n": 104,
+      "n": 105,
       "op": "traverse",
       "edge_id": "103->10D",
       "beat_id": "tiger_room_enter",
       "note": "Tiger Statue Room"
     },
     {
-      "n": 105,
+      "n": 106,
       "op": "objective",
       "site_id": "blue_jewel@10D_tiger_eye",
       "room_id": "10D",
@@ -764,7 +772,7 @@
       "note": "insert blue jewel in tiger eye"
     },
     {
-      "n": 106,
+      "n": 107,
       "op": "acquire",
       "pickup_id": "10D:wind_crest:1",
       "room_id": "10D",
@@ -772,7 +780,7 @@
       "note": "acquire wind crest; continue to place_wind resource tail"
     },
     {
-      "n": 107,
+      "n": 108,
       "op": "traverse",
       "edge_id": "10D->103",
       "id": "s1",
@@ -780,7 +788,7 @@
       "note": "10D to F passage"
     },
     {
-      "n": 108,
+      "n": 109,
       "op": "traverse",
       "edge_id": "103->10E",
       "id": "s2",
@@ -788,7 +796,7 @@
       "note": "F passage to employee room"
     },
     {
-      "n": 109,
+      "n": 110,
       "op": "acquire",
       "room_id": "10E",
       "pickup_id": "10E:handgun_bullets:1",
@@ -797,7 +805,7 @@
       "note": "on bed"
     },
     {
-      "n": 110,
+      "n": 111,
       "op": "acquire",
       "room_id": "10E",
       "pickup_id": "10E:shotgun_shells:2",
@@ -806,7 +814,7 @@
       "note": "in closet"
     },
     {
-      "n": 111,
+      "n": 112,
       "op": "traverse",
       "edge_id": "10E->103",
       "id": "s5",
@@ -814,7 +822,7 @@
       "note": "back to F passage"
     },
     {
-      "n": 112,
+      "n": 113,
       "op": "traverse",
       "edge_id": "103->104",
       "id": "s6",
@@ -822,7 +830,7 @@
       "note": "first 103->104 after wind; opens tea both ways"
     },
     {
-      "n": 113,
+      "n": 114,
       "op": "traverse",
       "edge_id": "104->105",
       "id": "s7",
@@ -830,7 +838,7 @@
       "note": "tea to dining"
     },
     {
-      "n": 114,
+      "n": 115,
       "op": "traverse",
       "edge_id": "105->106",
       "id": "s8",
@@ -838,7 +846,7 @@
       "note": "dining to main hall"
     },
     {
-      "n": 115,
+      "n": 116,
       "op": "traverse",
       "edge_id": "106->111",
       "id": "s9",
@@ -846,7 +854,7 @@
       "note": "armor_key door; dressing ammo then wardrobe herbs"
     },
     {
-      "n": 116,
+      "n": 117,
       "op": "acquire",
       "room_id": "111",
       "pickup_id": "111:handgun_bullets:1",
@@ -855,7 +863,7 @@
       "note": "shelf clip"
     },
     {
-      "n": 117,
+      "n": 118,
       "op": "acquire",
       "room_id": "111",
       "pickup_id": "111:shotgun_shells:2",
@@ -864,7 +872,7 @@
       "note": "locked desk; one shell clip"
     },
     {
-      "n": 118,
+      "n": 119,
       "op": "traverse",
       "edge_id": "111->112",
       "id": "s12",
@@ -872,7 +880,7 @@
       "note": "wardrobe for both SE green herbs"
     },
     {
-      "n": 119,
+      "n": 120,
       "op": "acquire",
       "room_id": "112",
       "pickup_id": "112:green_herb:1",
@@ -881,7 +889,7 @@
       "note": "SE corner plant 1/2"
     },
     {
-      "n": 120,
+      "n": 121,
       "op": "acquire",
       "room_id": "112",
       "pickup_id": "112:green_herb:2",
@@ -889,7 +897,7 @@
       "note": "SE corner plant 2/2"
     },
     {
-      "n": 121,
+      "n": 122,
       "op": "traverse",
       "edge_id": "112->111",
       "id": "s14",
@@ -897,7 +905,7 @@
       "note": "return from wardrobe"
     },
     {
-      "n": 122,
+      "n": 123,
       "op": "traverse",
       "edge_id": "111->106",
       "id": "s15",
@@ -905,7 +913,7 @@
       "note": "dressing to main hall"
     },
     {
-      "n": 123,
+      "n": 124,
       "op": "traverse",
       "edge_id": "106->107",
       "id": "s16",
@@ -913,7 +921,7 @@
       "note": "art room / gallery circuit toward 11A"
     },
     {
-      "n": 124,
+      "n": 125,
       "op": "traverse",
       "edge_id": "107->108",
       "id": "s17",
@@ -921,7 +929,7 @@
       "note": "gallery to L passage"
     },
     {
-      "n": 125,
+      "n": 126,
       "op": "traverse",
       "edge_id": "108->109",
       "id": "s18",
@@ -929,7 +937,7 @@
       "note": "L passage to trap passage"
     },
     {
-      "n": 126,
+      "n": 127,
       "op": "traverse",
       "edge_id": "109->10A",
       "id": "s19",
@@ -937,7 +945,7 @@
       "note": "trap passage to back passage"
     },
     {
-      "n": 127,
+      "n": 128,
       "op": "traverse",
       "edge_id": "10A->11A",
       "id": "s20",
@@ -945,7 +953,7 @@
       "note": "back passage to roofed passage"
     },
     {
-      "n": 128,
+      "n": 129,
       "op": "objective",
       "room_id": "11A",
       "site_id": "wind_crest@11A_crest_slot",

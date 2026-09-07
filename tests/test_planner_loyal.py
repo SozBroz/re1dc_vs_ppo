@@ -107,7 +107,7 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert any(s.get("beat_id") == "dining_2f_enter" for s in steps)
     assert any(s.get("beat_id") == "push_statue_2f" for s in steps)
     statue_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "push_statue_2f")
-    assert steps[statue_i]["n"] == 93
+    assert steps[statue_i]["n"] == 94
     assert steps[statue_i]["site_id"] == "dining_statue_knocked"
     assert steps[statue_i + 1]["edge_id"] == "202->203"
     assert steps[statue_i + 4]["pickup_id"] == "105:blue_jewel:1"
@@ -120,11 +120,11 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     # Resource-first place_wind tail (pl110 Muse): 10E loot, 103->104 unlock,
     # 111 clips, wardrobe 112 greens, art→11A.
     assert steps[-1]["beat_id"] == "place_wind_crest"
-    assert steps[-1]["n"] == 128
+    assert steps[-1]["n"] == 129
     assert steps[-1]["site_id"] == "wind_crest@11A_crest_slot"
     assert chunk["end_anchor_beat_id"] == "place_wind_crest"
     wind_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "wind_crest")
-    assert steps[wind_i]["n"] == 106
+    assert steps[wind_i]["n"] == 107
     assert steps[wind_i + 1]["edge_id"] == "10D->103"
     assert steps[wind_i + 2]["edge_id"] == "103->10E"
     assert steps[wind_i + 3]["pickup_id"] == "10E:handgun_bullets:1"
@@ -179,11 +179,12 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
         s.get("beat_id") for s in steps if str(s.get("beat_id") or "").startswith("gallery_portrait_")
     ]
     assert portraits == [f"gallery_portrait_{i}" for i in range(1, 7)]
-    assert not any(s.get("site_id") == "gallery_end_of_life" for s in steps)
+    assert any(s.get("site_id") == "gallery_end_of_life" for s in steps)
     crest_i = next(i for i, s in enumerate(steps) if str(s.get("pickup_id") or "").startswith("117:star_crest"))
     old_man = next(i for i, s in enumerate(steps) if s.get("beat_id") == "gallery_portrait_6")
     assert old_man < crest_i
-    assert steps[old_man + 1]["pickup_id"].startswith("117:star_crest")
+    assert steps[old_man + 1]["site_id"] == "gallery_end_of_life"
+    assert steps[old_man + 2]["pickup_id"].startswith("117:star_crest")
     assert steps[crest_i + 1]["edge_id"] == "117->10A"
     assert steps[crest_i + 2]["edge_id"] == "10A->11A"
     assert steps[crest_i + 3]["site_id"] == "star_crest@11A_crest_slot"
@@ -545,6 +546,7 @@ def test_combine_reload_full_ammo_dump_packed_does_not_divert():
             ("ink_ribbon", 1),
         ],
     }
+    q.note_start_inventory(prev)
     cur = {
         "room_id": "106",
         "inventory_slots": [
@@ -933,7 +935,7 @@ def test_fireplace_use_mints_when_gold_leaves_even_if_shield_key_spawns() -> Non
 
 def test_star_crest_use_mints_when_crest_leaves_inventory() -> None:
     q = PlannerLoyalQueue()
-    q.seek(44)  # place_star_crest
+    q.seek(45)  # place_star_crest
     assert q.current["site_id"] == "star_crest@11A_crest_slot"
     held = [
         ("knife", 1),
@@ -2473,6 +2475,43 @@ def test_encode_planner_loyal_goal_star_crest_points_at_end_of_life():
     assert np.allclose(after[5:10], pile_compass, atol=1e-5)
 
 
+def test_encode_planner_loyal_goal_end_of_life_is_use_item():
+    """After the insert, pl47 hunts gallery_end_of_life as obj_use_item at slot 8."""
+    from re1_rl.obs_encoder import ObsEncoder
+    from re1_rl.planner_loyal import encode_planner_loyal_goal
+    from re1_rl.spatial_encoder import ItemPositions
+
+    graph = RoomGraph(PROJECT_ROOT / "data" / "doors_empirical.json")
+    encoder = ObsEncoder(PROJECT_ROOT / "data" / "rooms.json", graph)
+    positions = ItemPositions(PROJECT_ROOT / "data" / "item_positions.json")
+
+    q = PlannerLoyalQueue()
+    eol_i = next(
+        i
+        for i, step in enumerate(q.remaining)
+        if step.get("beat_id") == "gallery_end_of_life"
+    )
+    q.seek(eol_i)
+    assert q.current["site_id"] == "gallery_end_of_life"
+
+    state = {
+        "room_id": "117",
+        "x": GALLERY_TARGETS[5][0],
+        "z": GALLERY_TARGETS[5][1],
+        "facing": 0,
+        "inventory": [],
+        "gallery_progress": GALLERY_STEP_VALUES[-1],
+        "gallery_puzzle_solved": False,
+    }
+    goal = encode_planner_loyal_goal(
+        encoder, graph, state, q, item_positions=positions
+    )
+    eol = encoder._compass_to_xz(state, *GALLERY_FINAL_SWITCH_TARGET)
+    assert np.allclose(goal[5:10], eol, atol=1e-5)
+    assert goal[12] > 0.0  # obj_use_item
+    assert goal[11] == 0.0  # not obj_pickup
+
+
 def test_validate_planner_loyal_stage_fail_closed():
     from re1_rl.planner_loyal import validate_planner_loyal_stage
 
@@ -2558,9 +2597,9 @@ def test_pl18_seek_lands_on_chemical_tail():
     assert any(s.get("edge_id") == "204->205" for s in q._steps)
     by_beat = {s.get("beat_id"): s for s in q._steps if s.get("beat_id")}
     assert by_beat["sun_crest"]["pickup_id"] == "205:sun_crest:1"
-    assert by_beat["push_statue_2f"]["n"] == 93
-    assert by_beat["wind_crest"]["n"] == 106
-    assert by_beat["place_wind_crest"]["n"] == 128
+    assert by_beat["push_statue_2f"]["n"] == 94
+    assert by_beat["wind_crest"]["n"] == 107
+    assert by_beat["place_wind_crest"]["n"] == 129
     assert q._steps[-1]["beat_id"] == "place_wind_crest"
 
 

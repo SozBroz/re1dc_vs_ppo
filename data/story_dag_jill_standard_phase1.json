@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "scope": "phase1_four_crests_mansion",
+  "goal_beat_ids": [
+    "place_star_crest",
+    "place_wind_crest",
+    "place_sun_crest",
+    "place_moon_crest"
+  ],
+  "notes": "Jill Standard any% glitchless Phase 1 only: obtain and place all four crests at 11A. Phases 2+ intentionally omitted. Source: .cursor/plans/llm_planner_skeleton.plan.md",
+  "frozen_opening_beat_ids": [
+    "opening_emblem",
+    "opening_kenneth",
+    "opening_barry_dining",
+    "opening_main_hall",
+    "opening_lockpick",
+    "opening_2f_explore",
+    "opening_barry_203_return"
+  ],
+  "beats": [
+    {"id": "opening_emblem", "type": "get", "room_id": "105", "item_or_site": "emblem", "requires": [], "chain": "frozen"},
+    {"id": "opening_kenneth", "type": "trigger_cutscene", "room_id": "104", "item_or_site": "104:kenneth", "requires": ["opening_emblem"], "chain": "frozen"},
+    {"id": "opening_barry_dining", "type": "trigger_cutscene", "room_id": "105", "item_or_site": "105:barry_dining", "requires": ["opening_kenneth"], "chain": "frozen"},
+    {"id": "opening_main_hall", "type": "navigate", "room_id": "106", "item_or_site": null, "requires": ["opening_barry_dining"], "chain": "frozen"},
+    {"id": "opening_lockpick", "type": "get", "room_id": "106", "item_or_site": "lockpick", "requires": ["opening_main_hall"], "chain": "frozen"},
+    {"id": "opening_2f_explore", "type": "navigate", "room_id": "203", "item_or_site": null, "requires": ["opening_lockpick"], "chain": "frozen"},
+    {"id": "opening_barry_203_return", "type": "trigger_cutscene", "room_id": "106", "item_or_site": "106:barry_203_return", "requires": ["opening_2f_explore"], "chain": "frozen"},
+
+    {"id": "music_notes", "type": "get", "room_id": "10F", "item_or_site": "music_notes", "requires": ["opening_emblem"], "chain": "1A_shield"},
+    {"id": "piano_play", "type": "use_key_item", "room_id": "10F", "item_or_site": "music_notes@10F_piano", "requires": ["music_notes"], "chain": "1A_shield"},
+    {"id": "gold_emblem", "type": "get", "room_id": "10F", "item_or_site": "gold_emblem", "requires": ["piano_play"], "chain": "1A_shield"},
+    {"id": "emblem_swap_alcove", "type": "use_key_item", "room_id": "10F", "item_or_site": "emblem@10F_alcove", "requires": ["gold_emblem"], "chain": "1A_shield"},
+    {"id": "gold_emblem_fireplace", "type": "use_key_item", "room_id": "105", "item_or_site": "gold_emblem@105_fireplace", "requires": ["emblem_swap_alcove"], "chain": "1A_shield"},
+    {"id": "shield_key", "type": "get", "room_id": "105", "item_or_site": "shield_key", "requires": ["gold_emblem_fireplace"], "chain": "1A_shield"},
+
+    {"id": "gallery_enter", "type": "navigate", "room_id": "117", "item_or_site": null, "requires": ["opening_lockpick"], "chain": "1B_star"},
+    {"id": "gallery_portrait_1", "type": "do_puzzle", "room_id": "117", "item_or_site": "gallery_portrait_1", "requires": ["gallery_enter"], "chain": "1B_star"},
+    {"id": "gallery_portrait_2", "type": "do_puzzle", "room_id": "117", "item_or_site": "gallery_portrait_2", "requires": ["gallery_portrait_1"], "chain": "1B_star"},
+    {"id": "gallery_portrait_3", "type": "do_puzzle", "room_id": "117", "item_or_site": "gallery_portrait_3", "requires": ["gallery_portrait_2"], "chain": "1B_star"},
+    {"id": "gallery_portrait_4", "type": "do_puzzle", "room_id": "117", "item_or_site": "gallery_portrait_4", "requires": ["gallery_portrait_3"], "chain": "1B_star"},
+    {"id": "gallery_portrait_5", "type": "do_puzzle", "room_id": "117", "item_or_site": "gallery_portrait_5", "requires": ["gallery_portrait_4"], "chain": "1B_star"},
+    {"id": "gallery_portrait_6", "type": "do_puzzle", "room_id": "117", "item_or_site": "gallery_portrait_6", "requires": ["gallery_portrait_5"], "chain": "1B_star"},
+    {"id": "gallery_end_of_life", "type": "do_puzzle", "room_id": "117", "item_or_site": "gallery_end_of_life", "requires": ["gallery_portrait_6"], "chain": "1B_star"},
+    {"id": "star_crest", "type": "get", "room_id": "117", "item_or_site": "star_crest", "requires": ["gallery_end_of_life"], "chain": "1B_star"},
+
+    {"id": "chemical", "type": "get", "room_id": "118", "item_or_site": "chemical", "requires": ["opening_barry_203_return"], "chain": "1C_sun"},
+    {"id": "greenhouse_pump", "type": "use_key_item", "room_id": "10C", "item_or_site": "chemical@10C_greenhouse_pump", "requires": ["chemical"], "chain": "1C_sun"},
+    {"id": "armor_key", "type": "get", "room_id": "10C", "item_or_site": "armor_key", "requires": ["greenhouse_pump"], "chain": "1C_sun"},
+    {"id": "armor_room_enter", "type": "navigate", "room_id": "205", "item_or_site": null, "requires": ["armor_key"], "chain": "1C_sun"},
+    {"id": "armor_room_statues", "type": "do_puzzle", "room_id": "205", "item_or_site": "armor_room_statues", "requires": ["armor_room_enter"], "chain": "1C_sun"},
+    {"id": "sun_crest", "type": "get", "room_id": "205", "item_or_site": "sun_crest", "requires": ["armor_room_statues"], "chain": "1C_sun"},
+
+    {"id": "dining_2f_enter", "type": "navigate", "room_id": "202", "item_or_site": null, "requires": ["opening_barry_203_return"], "chain": "1D_wind"},
+    {"id": "push_statue_2f", "type": "do_puzzle", "room_id": "202", "item_or_site": "dining_statue_knocked", "requires": ["dining_2f_enter"], "chain": "1D_wind"},
+    {"id": "blue_jewel", "type": "get", "room_id": "105", "item_or_site": "blue_jewel", "requires": ["push_statue_2f"], "chain": "1D_wind"},
+    {"id": "tiger_room_enter", "type": "navigate", "room_id": "10D", "item_or_site": null, "requires": ["blue_jewel"], "chain": "1D_wind"},
+    {"id": "tiger_jewel", "type": "use_key_item", "room_id": "10D", "item_or_site": "blue_jewel@10D_tiger_eye", "requires": ["blue_jewel"], "chain": "1D_wind"},
+    {"id": "wind_crest", "type": "get", "room_id": "10D", "item_or_site": "wind_crest", "requires": ["tiger_jewel"], "chain": "1D_wind"},
+
+    {"id": "richard_approach", "type": "navigate", "room_id": "20D", "item_or_site": null, "requires": ["armor_key"], "chain": "1E_richard", "notes": "204->20D is armor_key-gated"},
+    {"id": "richard_bleedout", "type": "trigger_cutscene", "room_id": "20D", "item_or_site": "20D:richard", "requires": ["richard_approach"], "chain": "1E_richard"},
+    {"id": "richard_timer_elapsed", "type": "world_flag", "room_id": null, "item_or_site": "richard_timer_elapsed", "requires": ["richard_bleedout"], "chain": "1E_richard", "notes": "State condition after bleedout; timer must be observed active then expired. Not a free action."},
+
+    {"id": "attic_enter", "type": "navigate", "room_id": "210", "item_or_site": null, "requires": ["shield_key", "richard_timer_elapsed"], "chain": "1F_moon", "notes": "Box staging is logistics authored as use_box steps, not a mandatory story beat."},
+    {"id": "yawn_intro", "type": "trigger_cutscene", "room_id": "210", "item_or_site": "210:yawn", "requires": ["attic_enter"], "chain": "1F_moon"},
+    {"id": "yawn_1", "type": "boss", "room_id": "210", "item_or_site": "yawn_1", "requires": ["yawn_intro"], "chain": "1F_moon"},
+    {"id": "moon_crest", "type": "get", "room_id": "210", "item_or_site": "moon_crest", "requires": ["yawn_1"], "chain": "1F_moon"},
+
+    {"id": "place_star_crest", "type": "use_key_item", "room_id": "11A", "item_or_site": "star_crest@11A_crest_slot", "requires": ["star_crest"], "chain": "1G_gate"},
+    {"id": "place_wind_crest", "type": "use_key_item", "room_id": "11A", "item_or_site": "wind_crest@11A_crest_slot", "requires": ["wind_crest"], "chain": "1G_gate"},
+    {"id": "place_sun_crest", "type": "use_key_item", "room_id": "11A", "item_or_site": "sun_crest@11A_crest_slot", "requires": ["sun_crest"], "chain": "1G_gate"},
+    {"id": "place_moon_crest", "type": "use_key_item", "room_id": "11A", "item_or_site": "moon_crest@11A_crest_slot", "requires": ["moon_crest"], "chain": "1G_gate"}
+  ]
+}
