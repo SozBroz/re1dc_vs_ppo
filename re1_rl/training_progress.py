@@ -226,6 +226,18 @@ class TrainingProgressTracker:
             f"fail={failure!r}{fail_extra} steps={num_timesteps}",
             flush=True,
         )
+        hop = info.get("hop_score_shadow")
+        if isinstance(hop, dict) and hop:
+            print(
+                f"[episode_hop_score] machine={self.machine_name} {worker_tag}"
+                f"tip={hop.get('tip')!r} outcome={hop.get('outcome')!r} "
+                f"S={float(hop.get('S', 0.0)):.4f} "
+                f"q_kill={float(hop.get('q_kill', 0.0)):.4f} "
+                f"E_start={int(hop.get('E_start', 0) or 0)} "
+                f"K={int(hop.get('K', 0) or 0)} "
+                f"K_bogus_transition={int(hop.get('K_transition_bogus', 0) or 0)}",
+                flush=True,
+            )
         if n_rooms > self.best_episode_n_rooms:
             self.best_episode_n_rooms = n_rooms
             self.best_episode_room_ids = list(rooms)

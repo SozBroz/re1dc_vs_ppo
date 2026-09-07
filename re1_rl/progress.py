@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 # Grenade launcher ammo types share one weapon slot; only the first variant
 # should count as a new-weapon pickup this episode.
@@ -78,6 +79,8 @@ class ProgressTracker:
     # Per-CP emulated-frame wall for the current hunt (0 = no per-cell timeout).
     cell_timeout_frames: int = 0
     leg_emulated_frames: int = 0
+    # Shadow / future hop-score meters (planner-loyal only).
+    hop_meters: Any = None
     cell_timeout_breached: bool = False
     timeout_table_root: str | None = None
     # Spawn room (usually dining 105): visited at reset; no +new_room payout —

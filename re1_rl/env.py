@@ -1745,6 +1745,13 @@ class RE1Env(gym.Env):
             "episode_failure": episode_failure,
         }
         info.update(self._episode_failure_context(episode_failure))
+        self._attach_hop_score_shadow(
+            info,
+            terminated=bool(terminated),
+            truncated=bool(truncated),
+            episode_failure=episode_failure,
+            breakdown=dict(gate),
+        )
         return obs, float(reward), bool(terminated), bool(truncated), info
 
     def _apply_yawn_capture_ineligibility_penalty(
@@ -1957,6 +1964,7 @@ class RE1Env(gym.Env):
         if getattr(self, "_planner_loyal_queue", None) is not None:
             self._route_start_index = 0
         self._yawn_allow_capture = bool(opts.get("allow_capture", True))
+        self._planner_loyal_tip = ""
         self._stop_bg_skip()
         self.bridge.hp_floor = 0
         if getattr(self, "_progress", None) is not None:
@@ -2059,6 +2067,7 @@ class RE1Env(gym.Env):
                     f"id={pb_bundle['checkpoint_id']}",
                     flush=True,
                 )
+                self._planner_loyal_tip = str(picked["cell_dir"].name)
         if pb_bundle is not None:
             sp = Path(pb_bundle["state_path"])
             state_path = sp if sp.is_absolute() else self.project_root / sp
@@ -2484,6 +2493,14 @@ class RE1Env(gym.Env):
         if getattr(self, "_planner_loyal_queue", None) is not None:
             self._route_start_index = 0
         self._arm_cell_timeout()
+        if (
+            self._planner_loyal_active()
+            and not str(getattr(self, "_planner_loyal_tip", "") or "")
+            and isinstance(pb_bundle, dict)
+            and pb_bundle.get("checkpoint_index") is not None
+        ):
+            self._planner_loyal_tip = f"pl{int(pb_bundle['checkpoint_index']):02d}"
+        self._begin_hop_score_meters(state)
         if getattr(self, "_typewriter_save_detector", None) is not None:
             # Sidecar/PB starts hold off save detect until control+ribbons stable.
             self._typewriter_save_detector.begin_episode(
@@ -2526,6 +2543,86 @@ class RE1Env(gym.Env):
             queue.note_start_inventory(last)
         return last
 
+    def _begin_hop_score_meters(self, state: dict[str, Any]) -> None:
+        """Start shadow hop-score meters after stable tip load (no reward change)."""
+        from re1_rl.planner_hop_score import (
+            PlannerHopMeters,
+            current_step_is_boss,
+            hop_score_shadow_enabled,
+            planner_timeout_frames,
+        )
+
+        if not self._planner_loyal_active() or not hop_score_shadow_enabled():
+            self._progress.hop_meters = None
+            return
+        queue = getattr(self, "_planner_loyal_queue", None)
+        boss = current_step_is_boss(queue)
+        tip = str(getattr(self, "_planner_loyal_tip", "") or "")
+        if not tip and isinstance(getattr(self, "_reset_options", None), dict):
+            tip = str(self._reset_options.get("checkpoint_id") or "")
+        budget = int(getattr(self._progress, "cell_timeout_frames", 0) or 0)
+        if budget <= 0:
+            budget = planner_timeout_frames(boss=boss)
+        self._progress.hop_meters = PlannerHopMeters.begin(
+            state,
+            tip=tip,
+            boss=boss,
+            budget_frames=budget,
+        )
+
+    def _note_hop_score_step(
+        self,
+        prev_state: dict[str, Any],
+        state: dict[str, Any],
+    ) -> None:
+        meters = getattr(self._progress, "hop_meters", None)
+        if meters is None:
+            return
+        meters.note_step(prev_state, state)
+
+    def _attach_hop_score_shadow(
+        self,
+        info: dict[str, Any],
+        *,
+        terminated: bool,
+        truncated: bool,
+        episode_failure: str | None,
+        breakdown: dict[str, float] | None = None,
+        mid_hop_success: bool = False,
+    ) -> None:
+        """Settle shadow S into info + worker log; restart meters after mid-hop."""
+        from re1_rl.planner_hop_score import (
+            format_hop_score_shadow_line,
+            hop_score_shadow_enabled,
+            resolve_shadow_outcome,
+        )
+
+        if not self._planner_loyal_active() or not hop_score_shadow_enabled():
+            return
+        meters = getattr(self._progress, "hop_meters", None)
+        if meters is None:
+            return
+        bd = breakdown or {}
+        should_settle = bool(terminated or truncated or mid_hop_success)
+        if not should_settle:
+            return
+        outcome, failure = resolve_shadow_outcome(
+            episode_failure=episode_failure,
+            terminated=terminated,
+            truncated=truncated,
+            breakdown=bd,
+        )
+        if mid_hop_success and failure is None:
+            outcome = "planner_step_success"
+        report = meters.settle(outcome=outcome, failure=failure)
+        info["hop_score_shadow"] = report
+        print(format_hop_score_shadow_line(report), flush=True)
+        # Mid-chunk: next hop gets a fresh E_start from the post-success state.
+        if mid_hop_success and not terminated and not truncated:
+            state = info.get("state")
+            if isinstance(state, dict):
+                self._begin_hop_score_meters(state)
+
     def _seed_episode_hp(self, state: dict[str, Any]) -> None:
         """HP bookkeeping only (PB restore — sidecar owns progress trackers)."""
         hp = int(state.get("hp", 0))
@@ -2541,11 +2638,19 @@ class RE1Env(gym.Env):
         )
 
         self._progress.timeout_table_root = str(self.project_root)
-        # Planner-loyal / flat-12m: plain 12 min — ignore yawn_cell_timeouts.json.
-        if (
-            getattr(self, "_planner_loyal_queue", None) is not None
-            or flat_cell_timeout_enabled()
-        ):
+        queue = getattr(self, "_planner_loyal_queue", None)
+        # Planner-loyal: 6 min default / 12 min boss (hop-score redesign).
+        if queue is not None:
+            from re1_rl.planner_hop_score import (
+                current_step_is_boss,
+                planner_timeout_frames,
+            )
+
+            frames = int(
+                planner_timeout_frames(boss=current_step_is_boss(queue))
+            )
+        elif flat_cell_timeout_enabled():
+            # Flat-12m yawn: plain 12 min — ignore yawn_cell_timeouts.json.
             frames = int(FLAT_CELL_TIMEOUT_FRAMES)
         else:
             frames = cell_timeout_frames_for_planner(self._planner, self.project_root)
@@ -2823,6 +2928,13 @@ class RE1Env(gym.Env):
                 "episode_failure": str(reason),
             }
             info.update(self._episode_failure_context(str(reason)))
+            self._attach_hop_score_shadow(
+                info,
+                terminated=True,
+                truncated=False,
+                episode_failure=str(reason),
+                breakdown=breakdown,
+            )
             self._record_leg_replay_reward(reward, breakdown)
             return obs, reward, True, False, info
         return self._episode_failure_step(action, reason=reason)
@@ -3474,6 +3586,13 @@ class RE1Env(gym.Env):
         if progress is not None:
             info["visited_rooms"] = sorted(progress.visited_rooms)
             info["n_rooms_visited"] = len(progress.visited_rooms)
+        self._attach_hop_score_shadow(
+            info,
+            terminated=bool(terminated),
+            truncated=bool(truncated),
+            episode_failure=episode_failure,
+            breakdown=merged,
+        )
         self._post_skip_reward = 0.0
         self._post_skip_bd = {}
         self._record_leg_replay_reward(reward, merged)
@@ -3696,6 +3815,13 @@ class RE1Env(gym.Env):
         loadout_sample = self._progress.pop_loadout_sample()
         if loadout_sample is not None:
             info["logistics_sample"] = loadout_sample
+        self._attach_hop_score_shadow(
+            info,
+            terminated=True,
+            truncated=False,
+            episode_failure=reason,
+            breakdown=breakdown,
+        )
         self._record_leg_replay_reward(reward, breakdown)
         return obs, reward, True, False, info
 
@@ -5574,6 +5700,7 @@ class RE1Env(gym.Env):
         for ev in state.get("combat_events") or []:
             if ev.get("killed"):
                 self._progress.note_almanac_kill(room_now, almanac_enemy_type(ev))
+        self._note_hop_score_step(self._prev_state, state)
         if combat_attack:
             self._fill_last_attack_obs(
                 self._prev_state,
@@ -5748,6 +5875,22 @@ class RE1Env(gym.Env):
             self._yawn_rails_capture_pending = []
         if breakdown.get("success_room", 0) > 0:
             info["gallery_flawless"] = not damage_taken
+        mid_hop = False
+        if self._planner_loyal_active():
+            queue = getattr(self, "_planner_loyal_queue", None)
+            mid_hop = (
+                float(breakdown.get("planner_step_success", 0.0) or 0.0) > 0.0
+                and queue is not None
+                and not bool(getattr(queue, "done", False))
+            )
+        self._attach_hop_score_shadow(
+            info,
+            terminated=bool(terminated),
+            truncated=bool(truncated),
+            episode_failure=episode_failure,
+            breakdown=breakdown,
+            mid_hop_success=mid_hop,
+        )
         self._forward_collision_stall = update_forward_collision_stall(
             self._prev_state,
             state,

@@ -622,9 +622,24 @@ def _key_item_return_blocked(
 
 
 def softlock_frame_threshold(progress: ProgressTracker | None) -> int:
-    """Idle truncate cap: 12 min from start and after room/key/weapon/use/cell."""
+    """Idle truncate cap: 12 min from start and after room/key/weapon/use/cell.
+
+    Planner-loyal uses the hop-score wall (6 min default / 12 min boss), aligned
+    with the armed cell timeout when present.
+    """
     if progress is None:
         return SOFTLOCK_PRE_KENNETH_FRAMES
+    from re1_rl.planner_loyal import planner_loyal_enabled
+
+    if planner_loyal_enabled():
+        from re1_rl.planner_hop_score import PLANNER_DEFAULT_TIMEOUT_FRAMES
+
+        armed = int(getattr(progress, "cell_timeout_frames", 0) or 0)
+        base = armed if armed > 0 else int(PLANNER_DEFAULT_TIMEOUT_FRAMES)
+        extended = int(getattr(progress, "softlock_cap_frames", 0) or 0)
+        if extended > 0:
+            return max(base, extended)
+        return base
     if progress.kenneth_gate_breached:
         return SOFTLOCK_PRE_KENNETH_FRAMES
     from re1_rl.cutscene_reward import kenneth_cutscene_seen
@@ -910,7 +925,11 @@ def _compute_planner_loyal_reward(
         PLANNER_TIMEOUT_PENALTY,
         scalarize_planner_loyal_reward,
     )
-    from re1_rl.yawn_cell_timeout import FLAT_CELL_TIMEOUT_FRAMES
+    from re1_rl.planner_hop_score import (
+        current_step_is_boss,
+        planner_max_steps_extension,
+        planner_timeout_frames,
+    )
 
     softlock_threshold = softlock_frame_threshold(progress)
     step_frames = int(state.get("step_emulated_frames", REFERENCE_STEP_FRAMES))
@@ -1022,8 +1041,11 @@ def _compute_planner_loyal_reward(
             bd[key] = 0.0
     elif loyal.get("step_success"):
         extra = int(state.get("step_emulated_frames") or 0)
+        boss = current_step_is_boss(planner_loyal_queue)
+        hop_frames = int(planner_timeout_frames(boss=boss))
+        hop_steps = int(planner_max_steps_extension(boss=boss))
         if progress is not None and int(progress.cell_timeout_frames) <= 0:
-            progress.arm_cell_timeout(int(FLAT_CELL_TIMEOUT_FRAMES))
+            progress.arm_cell_timeout(hop_frames)
         pay = float(PLANNER_STEP_SUCCESS_REWARD)
         if progress is not None and int(progress.cell_timeout_frames) > 0:
             pay = float(PLANNER_STEP_SUCCESS_REWARD) * float(
@@ -1035,11 +1057,11 @@ def _compute_planner_loyal_reward(
             if hasattr(progress, "claim_checkpoint_success"):
                 progress.claim_checkpoint_success()
         elif progress is not None:
-            # Mid-chunk: keep playing with a fresh 12m idle / max_steps budget.
-            progress.note_softlock_extension(SOFTLOCK_EXTENSION_FRAMES)
-            progress.note_max_steps_extension(CHECKPOINT_MAX_STEPS_EXTENSION)
+            # Mid-chunk: keep playing with a fresh hop idle / max_steps budget.
+            progress.note_softlock_extension(hop_frames)
+            progress.note_max_steps_extension(hop_steps)
             if hasattr(progress, "arm_cell_timeout"):
-                progress.arm_cell_timeout(int(FLAT_CELL_TIMEOUT_FRAMES))
+                progress.arm_cell_timeout(hop_frames)
                 progress.leg_emulated_frames = 0
 
     if progress is not None:
@@ -1311,12 +1333,20 @@ def compute_reward(
             ):
                 bd[key] = 0.0
         elif loyal.get("step_success"):
-            from re1_rl.yawn_cell_timeout import FLAT_CELL_TIMEOUT_FRAMES
+            from re1_rl.planner_hop_score import (
+                current_step_is_boss,
+                planner_timeout_frames,
+            )
 
             extra = int(state.get("step_emulated_frames") or 0)
+            hop_frames = int(
+                planner_timeout_frames(
+                    boss=current_step_is_boss(planner_loyal_queue)
+                )
+            )
             if progress is not None and int(progress.cell_timeout_frames) <= 0:
-                # Ensure a 12m wall so leftover scaling is defined.
-                progress.arm_cell_timeout(int(FLAT_CELL_TIMEOUT_FRAMES))
+                # Ensure a hop wall so leftover scaling is defined.
+                progress.arm_cell_timeout(hop_frames)
             pay = float(PLANNER_STEP_SUCCESS_REWARD)
             if progress is not None and int(progress.cell_timeout_frames) > 0:
                 # Full +8 at fresh budget; drops linearly with time used.
@@ -1327,13 +1357,13 @@ def compute_reward(
             bd["checkpoint_success"] = pay
             if progress is not None and hasattr(progress, "claim_checkpoint_success"):
                 progress.claim_checkpoint_success()
-            # Mid-chunk: reset a fresh 12m wall for the next planner step.
+            # Mid-chunk: reset a fresh hop wall for the next planner step.
             if (
                 progress is not None
                 and not planner_loyal_queue.done
                 and hasattr(progress, "arm_cell_timeout")
             ):
-                progress.arm_cell_timeout(int(FLAT_CELL_TIMEOUT_FRAMES))
+                progress.arm_cell_timeout(hop_frames)
 
     prev_room = str(prev_state.get("room_id", ""))
     room = str(state.get("room_id", ""))
