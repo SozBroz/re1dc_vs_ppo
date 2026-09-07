@@ -160,6 +160,7 @@ def prune_stale_yawn_cells(
     if not root.is_dir():
         return 0
     removed = 0
+    catalog_max = max(valid_indices) if valid_indices else None
     for p in root.iterdir():
         if not p.is_dir() or p.name.startswith("."):
             continue
@@ -172,6 +173,10 @@ def prune_stale_yawn_cells(
         except ValueError:
             continue
         if idx not in valid_indices:
+            # Learner catalog shorter than a restored local tree must not
+            # rmtree the tail. That is how pl49–pl86 disappeared.
+            if catalog_max is not None and idx > catalog_max:
+                continue
             shutil.rmtree(p, ignore_errors=True)
             removed += 1
     return removed
@@ -225,7 +230,7 @@ def poll_yawn_rails_manifest(
             except (KeyError, TypeError, ValueError):
                 continue
         rows: list[dict[str, Any]] = []
-        valid: set[int] = set()
+        catalog: set[int] = set()
         for row in remote_cells:
             if not isinstance(row, dict):
                 continue
@@ -233,6 +238,7 @@ def poll_yawn_rails_manifest(
                 idx = int(row["checkpoint_index"])
             except (KeyError, TypeError, ValueError):
                 continue
+            catalog.add(idx)
             want_state = str(row.get("state_sha256") or "") or None
             want_side = str(row.get("sidecar_sha256") or "") or None
             slot = cell_slot_dir(yawn_rails_root(project_root), idx)
@@ -257,11 +263,9 @@ def poll_yawn_rails_manifest(
                         sidecar_sha256=str(prev.get("sidecar_sha256") or "") or None,
                     ):
                         rows.append(dict(prev))
-                        valid.add(idx)
                 continue
             if not was_hit:
                 fetched += 1
-            valid.add(idx)
             out_row = {
                 "checkpoint_index": idx,
                 "checkpoint_id": row.get("checkpoint_id", ""),
@@ -292,7 +296,10 @@ def poll_yawn_rails_manifest(
                 },
             }
             rows.append(out_row)
-        pruned = prune_stale_yawn_cells(project_root, valid)
+        # Prune only against the full remote catalog — never against the
+        # subset that happened to download this poll. Failed fetches used to
+        # wipe SCP'd / previously-good mid-chain cells (pl52–pl73).
+        pruned = prune_stale_yawn_cells(project_root, catalog)
         local = {
             "schema_version": 1,
             "archive_version": remote_ver,

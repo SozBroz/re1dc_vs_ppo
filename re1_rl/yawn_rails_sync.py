@@ -937,19 +937,26 @@ class YawnRailsCellStore:
         replace_retry(tmp, self.manifest_path)
 
     def _backfill_file_hashes_unlocked(self) -> bool:
-        """Fill missing state/sidecar hashes from files already on disk."""
+        """Fill or refresh state/sidecar hashes from files already on disk.
+
+        Stale advertised sidecar SHAs (sidecar rewritten without a store
+        update) make workers reject every ``GET /bundle`` after download and
+        then prune the slot. Reconcile whenever disk disagrees.
+        """
         changed = False
         for idx, row in self.cells.items():
             if not isinstance(row, dict):
                 continue
-            if str(row.get("state_sha256") or "").strip() and str(
-                row.get("sidecar_sha256") or ""
-            ).strip():
-                continue
             shas = slot_content_shas(cell_slot_dir(self.root, idx))
             if shas is None:
                 continue
-            row["state_sha256"], row["sidecar_sha256"] = shas
+            got_state, got_side = shas
+            want_state = str(row.get("state_sha256") or "").strip()
+            want_side = str(row.get("sidecar_sha256") or "").strip()
+            if want_state == got_state and want_side == got_side:
+                continue
+            row["state_sha256"] = got_state
+            row["sidecar_sha256"] = got_side
             changed = True
         return changed
 
