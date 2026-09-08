@@ -74,15 +74,9 @@ if ($null -eq $new) {
 $polNew = Get-Status
 Write-Log "NEW_CKPT steps=$($new.Steps) saved_at=$($new.SavedAt) path=$($new.Path) policy=$(if ($polNew) { $polNew.policy_version } else { '?' })"
 
-Write-Log 'clear remote sync blockers (pin/env dirt)'
-foreach ($pair in @(
-  @{ H = $WH1; Cd = 'cd /d D:\re1_rl' },
-  @{ H = $WH2; Cd = 'cd /d C:\Users\sshuser\re1_rl' },
-  @{ H = $WH3; Cd = 'cd /d C:\Users\sshuser\re1_rl' }
-)) {
-  $cmd = "$($pair.Cd) && git checkout -- data/planner_loyal_reset_pin.env 2>nul & exit 0"
-  & ssh.exe -o ConnectTimeout=15 -o BatchMode=yes $pair.H $cmd | Out-Null
-}
+Write-Log 'clear remote sync blockers (pin file preserved — do not wipe pins)'
+# Intentionally do NOT git-checkout planner_loyal_reset_pin.env: pins are local
+# runtime config and must survive fleet restart so tips stay weighted/uniform.
 
 Write-Log '=== TEARDOWN ==='
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ROOT '_tmp\_stop_fleet_procs.ps1')

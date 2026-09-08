@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import random
 import threading
 from pathlib import Path
 from typing import Any
@@ -2049,8 +2050,35 @@ class RE1Env(gym.Env):
                 sample_training_start_cell,
             )
 
-            picked = sample_training_start_cell(self.project_root)
-            if picked is not None and picked["state"].is_file() and picked["sidecar"].is_file():
+            # Per-env RNG so cold-start resets do not correlate across actors.
+            tip_rng = getattr(self, "_planner_loyal_tip_rng", None)
+            if tip_rng is None:
+                import time as _time
+
+                port = int(getattr(self, "port", 0) or 0)
+                tip_rng = random.Random(
+                    (os.getpid() << 16)
+                    ^ (_time.time_ns() & 0xFFFFFFFF)
+                    ^ (port * 2654435761)
+                )
+                self._planner_loyal_tip_rng = tip_rng
+
+            refused: set[int] = set()
+            picked = None
+            for _attempt in range(12):
+                picked = sample_training_start_cell(
+                    self.project_root,
+                    rng=tip_rng,
+                    exclude_indices=refused or None,
+                )
+                if picked is None:
+                    break
+                if not (
+                    picked["state"].is_file() and picked["sidecar"].is_file()
+                ):
+                    refused.add(int(picked["checkpoint_index"]))
+                    picked = None
+                    continue
                 meta: dict[str, Any] = {}
                 if picked["meta"].is_file():
                     try:
@@ -2079,12 +2107,36 @@ class RE1Env(gym.Env):
                     "planner_step_index": meta.get("planner_step_index"),
                     "chunk_id": meta.get("chunk_id"),
                 }
+                # Pre-validate hashes here so we re-sample instead of all
+                # collapsing onto the pl06 tip fallback below.
+                want_state = str(pb_bundle.get("state_sha256") or "").strip()
+                if want_state:
+                    from re1_rl.yawn_rails_sync import slot_matches_content
+
+                    want_side = str(pb_bundle.get("sidecar_sha256") or "").strip()
+                    if not slot_matches_content(
+                        picked["cell_dir"],
+                        state_sha256=want_state,
+                        sidecar_sha256=want_side or None,
+                    ):
+                        refused.add(int(picked["checkpoint_index"]))
+                        picked = None
+                        pb_bundle = None
+                        continue
                 print(
                     f"[planner_loyal] reset tip={picked['cell_dir'].name} "
                     f"id={pb_bundle['checkpoint_id']}",
                     flush=True,
                 )
                 self._planner_loyal_tip = str(picked["cell_dir"].name)
+                break
+            if picked is None:
+                pb_bundle = None
+            if refused:
+                print(
+                    f"[planner_loyal] tip_resample refused={sorted(refused)}",
+                    flush=True,
+                )
         if pb_bundle is not None:
             sp = Path(pb_bundle["state_path"])
             state_path = sp if sp.is_absolute() else self.project_root / sp

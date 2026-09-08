@@ -705,8 +705,24 @@ def cell_has_remaining_planner_step(
     return seek_index_after_cell(row, live_id) < int(n_steps)
 
 
+def _row_content_matches(root: Path, row: dict[str, Any]) -> bool:
+    """False when meta advertises hashes that do not match on-disk bytes."""
+    want_state = str(row.get("state_sha256") or "").strip()
+    if not want_state:
+        return True
+    from re1_rl.yawn_rails_sync import slot_matches_content
+
+    slot = cell_slot_dir(root, int(row["checkpoint_index"]))
+    want_side = str(row.get("sidecar_sha256") or "").strip() or None
+    return slot_matches_content(
+        slot, state_sha256=want_state, sidecar_sha256=want_side
+    )
+
+
 def iter_training_start_cells(
     project_root: Path | str | None = None,
+    *,
+    exclude_indices: set[int] | frozenset[int] | None = None,
 ) -> list[dict[str, Any]]:
     """Loadable starts: tip (``pl06``) and later cells with a next step,
     plus ``training_start: true`` cells (``pl00`` / opening remints) and
@@ -715,15 +731,22 @@ def iter_training_start_cells(
     Cells minted by another chunk qualify when that chunk file is on disk
     (reset switches onto it). Orphan foreign cells still only pass at the
     tip / fresh-start / explicit pin.
+
+    Rows whose ``state_sha256`` / ``sidecar_sha256`` no longer match disk are
+    dropped so refuse→pl06 fallback does not collapse the fleet onto one tip.
     """
     root = planner_loyal_root(project_root)
     n_steps = _live_chunk_n_steps(project_root)
     live_id = live_chunk_id(project_root)
     pinned = reset_pin_allowed_indices(project_root) or set()
+    excluded = {int(x) for x in (exclude_indices or ())}
     out: list[dict[str, Any]] = []
     skipped_foreign = 0
+    skipped_hash = 0
     for row in _scan_cells(root):
         idx = int(row["checkpoint_index"])
+        if idx in excluded:
+            continue
         # Only this runtime's payload is loadable (scan lists both runtimes).
         state_p = root / "cells" / cell_dir_name(idx) / cell_state_filename()
         sidecar_p = state_p.with_name(CELL_SIDECAR_NAME)
@@ -756,11 +779,19 @@ def iter_training_start_cells(
             check_n = n_steps
         if not cell_has_remaining_planner_step(row, check_n, check_id):
             continue
+        if not _row_content_matches(root, row):
+            skipped_hash += 1
+            continue
         out.append(row)
     if skipped_foreign:
         print(
             f"[planner_loyal] skipped {skipped_foreign} cells minted by "
             f"another chunk (live={live_id})",
+            flush=True,
+        )
+    if skipped_hash:
+        print(
+            f"[planner_loyal] skipped {skipped_hash} cells with sha mismatch",
             flush=True,
         )
     if out:
@@ -793,8 +824,11 @@ def sample_training_start_cell(
     project_root: Path | str | None = None,
     *,
     rng: random.Random | None = None,
+    exclude_indices: set[int] | frozenset[int] | None = None,
 ) -> dict[str, Any] | None:
-    cells = iter_training_start_cells(project_root)
+    cells = iter_training_start_cells(
+        project_root, exclude_indices=exclude_indices
+    )
     if not cells:
         return None
     pick = _sample_training_start(cells, project_root, rng or random)

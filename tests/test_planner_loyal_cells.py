@@ -579,6 +579,31 @@ def test_reset_pin_set_and_unminted_fallback(
     ]
 
 
+def test_sample_training_start_excludes_and_skips_bad_hash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_pin_env(monkeypatch)
+    monkeypatch.delenv("RE1_PLANNER_CHUNK", raising=False)
+    monkeypatch.delenv("RE1_RECOMP_CELLS", raising=False)
+    _seed_starts(tmp_path)
+    # Stale hash must drop the cell from the pool.
+    bad = tmp_path / "states" / "planner_loyal" / "cells" / cell_dir_name(11)
+    meta = json.loads((bad / "meta.json").read_text(encoding="utf-8"))
+    meta["state_sha256"] = "deadbeef" * 8
+    (bad / "meta.json").write_text(json.dumps(meta) + "\n", encoding="utf-8")
+    starts = iter_training_start_cells(tmp_path)
+    assert 11 not in {int(r["checkpoint_index"]) for r in starts}
+    assert TRAINING_START_INDEX in {int(r["checkpoint_index"]) for r in starts}
+    # Exclude leaves the remaining pool intact.
+    pick = sample_training_start_cell(
+        tmp_path,
+        rng=random.Random(1),
+        exclude_indices={TRAINING_START_INDEX, 10},
+    )
+    assert pick is not None
+    assert int(pick["checkpoint_index"]) == 13
+
+
 def _sample_counts(root: Path, n: int = 400) -> Counter:
     rng = random.Random(0)
     counts: Counter = Counter()
