@@ -40,6 +40,8 @@ Yawn / go-explore stay on the 8-dim tuple; only planner-loyal mint compare uses 
 
 They often disagree. **`almanac_stretch`** is the lineage ground truth for “did this stretch add zombies/dogs/etc.” **`kills_paid`** can spike when combat rewards fire without a clean almanac delta, or when reward-side counting races the mint snapshot.
 
+**Kenneth (tea room `104`)** never counts: damage/kill pay is denied and the almanac skips him — the cutscene kills him either way, so shooting him is pure ammo waste.
+
 Healthy armor-room stretches (pl79→pl80) should show **`almanac_stretch=0`**. Most mints fleet-wide should be **0**, with occasional **1–2** on fight hops; **3** is rare; **>3** on `almanac_stretch` is worth investigating.
 
 ## What gets stored

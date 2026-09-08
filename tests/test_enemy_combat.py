@@ -478,6 +478,24 @@ def test_adder_room_301_and_shark_room_40e_deny() -> None:
         assert out.get("combat_reward_denied") is True, room
 
 
+def test_kenneth_tea_room_104_denies_combat_pay() -> None:
+    """Kenneth dies in the cutscene either way — no damage/kill credit in 104."""
+    prev = {
+        "room_id": "104",
+        "enemies": [{"slot": 0, "hp": 58, "enemy_type": "zombie"}],
+    }
+    cur = {
+        "room_id": "104",
+        "enemies": [{"slot": 0, "hp": 0, "enemy_type": "zombie"}],
+    }
+    out = apply_combat_step_fields(prev, cur, attack=True)
+    assert out["enemy_damage"] == 0
+    assert out["enemy_kills"] == 0
+    assert out.get("combat_reward_denied") is True
+    assert out["combat_events"] and out["combat_events"][0]["reward_denied"] is True
+    assert out["combat_events"][0]["killed"] is True
+
+
 def test_shark_type_name_denies_damage() -> None:
     prev = {
         "room_id": "40E",

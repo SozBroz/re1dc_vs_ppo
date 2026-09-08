@@ -5808,8 +5808,12 @@ class RE1Env(gym.Env):
         if enemy_kills > 0 and bool(state.get("in_control", True)):
             self._progress.note_leg_kills(room_now, enemy_kills)
         for ev in state.get("combat_events") or []:
-            if ev.get("killed"):
-                self._progress.note_almanac_kill(room_now, almanac_enemy_type(ev))
+            if not ev.get("killed"):
+                continue
+            # Denied fauna (Kenneth 104, wasps, crows, …) stay out of the ledger.
+            if ev.get("reward_denied") or ev.get("is_crow"):
+                continue
+            self._progress.note_almanac_kill(room_now, almanac_enemy_type(ev))
         self._note_hop_score_step(self._prev_state, state)
         if combat_attack:
             self._fill_last_attack_obs(

@@ -16,7 +16,9 @@ NO_COMBAT_REWARD_TYPE_NAMES: frozenset[str] = frozenset(
 # Exclusive rooms confirmed by hub-door classify (2026-07-23) until type_id
 # is wired. Expand only when a room is pest/shark-only (no paid fauna).
 # 408 honeycomb wasps; 301 water-gate adder swarm; 40E water-tank Neptunes.
-NO_COMBAT_REWARD_ROOMS: frozenset[str] = frozenset({"408", "301", "40E"})
+# 104 tea-room Kenneth: cutscene kills him either way — no damage/kill pay
+# (imperator 2026-09-08; stops ammo waste farming).
+NO_COMBAT_REWARD_ROOMS: frozenset[str] = frozenset({"408", "301", "40E", "104"})
 
 # Crow gallery pests: active_byte from live QS0 / room_enemies notes.
 CROW_ACTIVE_BYTES: frozenset[int] = frozenset({0x04, 0x1C})
