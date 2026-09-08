@@ -5,6 +5,10 @@ Live mode (``RE1_PLANNER_HOP_SCORE_V1=1`` / ``live``):
   only kills (budget 2) may push above +1 (up to +1.50).
   divert -0.50, death -1.00, timeout -1.25.
 
+  q_hp blends gross damage (``D_hp``) with absolute end HP vs Fine (96) so
+  Caution tips cannot score perfect HP without healing, and a full heal can
+  beat bare pickup despite ``H_used``.
+
 Clipping is applied only when composing Q / B_kill. Raw (unclipped)
 qualities and clip flags are always logged so overshoots are visible.
 """
@@ -34,6 +38,11 @@ W_HP = 0.40
 W_AMMO = 0.35
 W_HEAL = 0.15
 W_TIME = 0.10
+# Within q_hp: gross damage still counts, but end HP (Fine=96) must too —
+# otherwise Caution tips get perfect q_hp with D_hp=0 and healing is pure loss.
+# Abs share sized so Caution→Fine (+GR use) beats bare pickup on S.
+W_HP_DMG = 0.30
+W_HP_ABS = 0.70
 # Kill is NOT in Q — additive overshoot only.
 K_BUDGET = 2  # kills for full B_kill
 B_KILL_MAX = 0.50
@@ -389,6 +398,7 @@ class PlannerHopMeters:
     d_hp: float = 0.0
     a_spent: float = 0.0
     h_used: float = 0.0
+    hp_end: int = HP_BAND_HI
     k_scored: int = 0
     k_raw_vanish: int = 0
     k_transition_bogus: int = 0
@@ -415,6 +425,7 @@ class PlannerHopMeters:
             if budget_frames is not None
             else planner_timeout_frames(boss=boss)
         )
+        hp0 = int(state.get("hp", 0) or 0)
         return cls(
             tip=str(tip or ""),
             room_start=room,
@@ -424,6 +435,7 @@ class PlannerHopMeters:
                 list(state.get("enemies") or []),
                 room_id=room,
             ),
+            hp_end=hp0 if hp0 > 0 else HP_BAND_HI,
         )
 
     def note_step(
@@ -438,6 +450,8 @@ class PlannerHopMeters:
 
         prev_hp = int(prev_state.get("hp", 0) or 0)
         hp = int(state.get("hp", 0) or 0)
+        if hp > 0:
+            self.hp_end = hp
         if _hp_in_band(prev_hp) and _hp_in_band(hp) and hp < prev_hp:
             self.d_hp += float(prev_hp - hp)
 
@@ -476,7 +490,11 @@ class PlannerHopMeters:
     def quality_bundle(self) -> dict[str, Any]:
         """Raw + clipped qualities, Q, B_kill, and clip flags (no silent cover-up)."""
         b_ammo = B_AMMO_BOSS if self.boss else B_AMMO_DEFAULT
-        q_hp_raw = 1.0 - float(self.d_hp) / HP_DENOM
+        q_dmg_raw = 1.0 - float(self.d_hp) / HP_DENOM
+        q_abs_raw = float(min(max(0, int(self.hp_end)), HP_BAND_HI)) / float(
+            HP_BAND_HI
+        )
+        q_hp_raw = float(W_HP_DMG) * q_dmg_raw + float(W_HP_ABS) * q_abs_raw
         q_ammo_raw = 1.0 - float(self.a_spent) / float(b_ammo)
         q_heal_raw = 1.0 - float(self.h_used) / 1.0
         q_time_raw = 1.0 - float(self.frames) / float(self.budget_frames)
@@ -531,6 +549,8 @@ class PlannerHopMeters:
 
         return {
             "q_hp_raw": q_hp_raw,
+            "q_hp_dmg_raw": q_dmg_raw,
+            "q_hp_abs_raw": q_abs_raw,
             "q_ammo_raw": q_ammo_raw,
             "q_heal_raw": q_heal_raw,
             "q_time_raw": q_time_raw,
@@ -549,6 +569,7 @@ class PlannerHopMeters:
             "clip_flags": clip_flags,
             "B_ammo": float(b_ammo),
             "K_budget": int(K_BUDGET),
+            "hp_end": int(self.hp_end),
         }
 
     def qualities(self) -> dict[str, float]:
@@ -625,6 +646,9 @@ class PlannerHopMeters:
             "K_raw_vanish": int(self.k_raw_vanish),
             "K_transition_bogus": int(self.k_transition_bogus),
             "D_hp": round(float(self.d_hp), 4),
+            "hp_end": int(b.get("hp_end", self.hp_end)),
+            "q_hp_dmg_raw": round(float(b.get("q_hp_dmg_raw", 0.0)), 6),
+            "q_hp_abs_raw": round(float(b.get("q_hp_abs_raw", 0.0)), 6),
             "A_spent": round(float(self.a_spent), 4),
             "B_ammo": round(float(b["B_ammo"]), 4),
             "H_used": round(float(self.h_used), 4),
@@ -668,6 +692,7 @@ def format_hop_score_shadow_line(report: dict[str, Any]) -> str:
         f"K_raw={int(report.get('K_raw_vanish', 0) or 0)} "
         f"K_bogus_transition={int(report.get('K_transition_bogus', 0) or 0)} "
         f"D_hp={float(report.get('D_hp', 0.0)):.2f} "
+        f"hp_end={int(report.get('hp_end', 0) or 0)} "
         f"A_spent={float(report.get('A_spent', 0.0)):.4f} "
         f"B_ammo={float(report.get('B_ammo', 0.0)):.4f} "
         f"H_used={float(report.get('H_used', 0.0)):.4f} "

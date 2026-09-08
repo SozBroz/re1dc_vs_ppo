@@ -196,12 +196,35 @@ def test_raw_quality_logged_when_overshoot() -> None:
     meters = PlannerHopMeters.begin(
         {"room_id": "106", "enemies": [], "hp": 96}, budget_frames=100
     )
-    meters.d_hp = 200.0  # far past denom — clip would hide without raw
+    meters.d_hp = 400.0  # past denom even after end-HP blend
     meters.frames = 0
     report = meters.settle(outcome="hop_success")
+    assert report["q_hp_dmg_raw"] < 0.0
     assert report["q_hp_raw"] < 0.0
     assert report["q_hp"] == 0.0
     assert "q_hp_lo" in str(report["clip_flags"])
+
+
+def test_caution_full_heal_beats_bare_pickup() -> None:
+    """pl66-style: ending Fine after GR use must beat staying Caution with H_used=0."""
+    bare = PlannerHopMeters.begin(
+        {"room_id": "10C", "enemies": [], "hp": 30}, tip="pl66", budget_frames=21600
+    )
+    bare.hp_end = 30
+    bare.h_used = 0.0
+    bare.frames = 900
+    s_bare = bare.settle(outcome="planner_step_success")["S"]
+
+    healed = PlannerHopMeters.begin(
+        {"room_id": "10C", "enemies": [], "hp": 30}, tip="pl66", budget_frames=21600
+    )
+    healed.hp_end = 96
+    healed.h_used = 1.01  # mixed_herbs_gr
+    healed.frames = 900
+    s_heal = healed.settle(outcome="planner_step_success")["S"]
+
+    assert s_heal > s_bare
+    assert (s_heal - s_bare) >= 0.02
 
 
 def test_same_slot_kill_flicker_counts_once() -> None:
