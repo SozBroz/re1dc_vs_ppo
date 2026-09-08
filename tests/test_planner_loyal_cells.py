@@ -14,13 +14,16 @@ from re1_rl.planner_loyal import chunk_path_for_id
 from re1_rl.planner_loyal_cells import (
     FRESH_START_INDEX,
     PIN_WEIGHT_LATEST_KEY,
+    PLANNER_LOYAL_QUALITY_UNKNOWN as QUNK,
     SEED_SLOT_OFFSET,
     TRAINING_START_INDEX,
     _parse_pin_weights,
+    assemble_planner_loyal_quality,
     bootstrap_from_crystals,
     cell_dir_name,
     cell_has_remaining_planner_step,
     close_planner_loyal_stretch,
+    hop_score_to_milli,
     iter_training_start_cells,
     lift_planner_loyal_quality,
     planner_loyal_kill_audit,
@@ -30,6 +33,7 @@ from re1_rl.planner_loyal_cells import (
     reset_chunk_id_for_cell,
     seek_index_after_cell,
     slot_index_for_completed_step,
+    stitch_planner_loyal_quality,
     training_start_paths,
 )
 from re1_rl.progress import ProgressTracker
@@ -698,10 +702,10 @@ def test_recomp_mint_replacement_keeps_bizhawk_state(
 
 def test_planner_loyal_quality_drops_path_kills_dim() -> None:
     clean = (96, 75, 33, 11, 1, 0, -30, -40)
-    assert lift_planner_loyal_quality(clean) == (96, 75, 33, 11, 1, 0, -30, -40)
-    # 9-tuple with kills at index 2 (local remints).
-    assert lift_planner_loyal_quality((96, 75, 87, 33, 11, 1, 0, -30, -40)) == (
+    unk = QUNK
+    assert lift_planner_loyal_quality(clean) == (
         96,
+        unk,
         75,
         33,
         11,
@@ -709,10 +713,27 @@ def test_planner_loyal_quality_drops_path_kills_dim() -> None:
         0,
         -30,
         -40,
+        unk,
+        unk,
+    )
+    # 9-tuple with kills at index 2 (local remints) — strip insert, pad unknowns.
+    assert lift_planner_loyal_quality((96, 75, 87, 33, 11, 1, 0, -30, -40)) == (
+        96,
+        unk,
+        75,
+        33,
+        11,
+        1,
+        0,
+        -30,
+        -40,
+        unk,
+        unk,
     )
     # 9-tuple with kills at index 1 (shipped insert).
     assert lift_planner_loyal_quality((96, 4, 75, 33, 11, 1, 0, -30, -40)) == (
         96,
+        unk,
         75,
         33,
         11,
@@ -720,10 +741,13 @@ def test_planner_loyal_quality_drops_path_kills_dim() -> None:
         0,
         -30,
         -40,
+        unk,
+        unk,
     )
     # Truncated 8-tuple still carrying the insert (poison no longer at index 4).
     assert lift_planner_loyal_quality((96, 75, 3, 33, 11, 1, 0, -30)) == (
         96,
+        unk,
         75,
         33,
         11,
@@ -731,10 +755,34 @@ def test_planner_loyal_quality_drops_path_kills_dim() -> None:
         0,
         -30,
         -LEG_FRAMES_SENTINEL,
+        unk,
+        unk,
     )
-    # Fat kill dim must not beat a same HP/ammo remint.
+    # Fat kill dim must not beat a same HP/ammo remint after strip+pad.
     assert planner_loyal_quality_beats(clean, (96, 75, 87, 33, 11, 1, 0, -30, -40)) is False
     assert planner_loyal_quality_beats((96, 80, 33, 11, 1, 0, -30, -40), clean) is True
+
+
+def test_assemble_and_stitch_planner_loyal_quality() -> None:
+    base8 = [96, 75, 33, 11, 1, 0, -30, -40]
+    q = assemble_planner_loyal_quality(
+        base8, total_kills=10, stretch_kills=2, hop_score=1.234
+    )
+    assert q == [96, 10, 75, 33, 11, 1, 0, -30, -40, 2, 1234]
+    assert hop_score_to_milli(None) == QUNK
+    stitched = stitch_planner_loyal_quality(
+        base8, total_kills=10, stretch_kills=2, hop_score=None
+    )
+    assert stitched == [96, 10, 75, 33, 11, 1, 0, -30, -40, 2, QUNK]
+    # Already 11-dim: fill only provided unknowns / overrides.
+    keep = stitch_planner_loyal_quality(
+        [96, QUNK, 75, 33, 11, 1, 0, -30, -40, QUNK, QUNK],
+        total_kills=4,
+        stretch_kills=1,
+    )
+    assert keep == [96, 4, 75, 33, 11, 1, 0, -30, -40, 1, QUNK]
+    # Known total_kills beats unknown on lex compare.
+    assert planner_loyal_quality_beats(q, stitched) is True
 
 
 def test_planner_loyal_kill_audit_prefers_live_then_claim() -> None:

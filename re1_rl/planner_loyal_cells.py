@@ -865,7 +865,7 @@ def planner_loyal_kill_audit(
     progress: Any,
     predecessor_almanac: dict[str, dict[str, int]] | None = None,
 ) -> dict[str, Any]:
-    """What this stretch thinks it killed. Audit only — not a quality dim."""
+    """Stretch / cumulative kill ledgers for mint quality + sidecar audit."""
     empty = {
         "paid_stretch": 0,
         "paid_stretch_by_room": {},
@@ -904,6 +904,14 @@ def planner_loyal_kill_audit(
         "almanac_total": sum(sum(types.values()) for types in almanac_total.values()),
         "almanac_total_by_room": almanac_total,
     }
+
+
+# Lexicographic mint overwrite (higher better except already-negated dims):
+# (hp, total_kills, ammo, healing, slots, poison, -ink, -box, -frames,
+#  stretch_kills, hop_score_milli)
+PLANNER_LOYAL_QUALITY_LEN = 11
+PLANNER_LOYAL_QUALITY_UNKNOWN = -99999
+_HOP_SCORE_MILLI_SCALE = 1000
 
 
 def _fmt_room_kills(counts: dict[str, int]) -> str:
@@ -945,32 +953,180 @@ def _drop_kill_insert(vals: list[int]) -> list[int]:
     return [vals[0], vals[1], *vals[3:]]
 
 
-def lift_planner_loyal_quality(
-    raw: list[Any] | tuple[Any, ...] | None,
-) -> tuple[int, ...]:
-    """``(hp, ammo, healing, slots, poison, -ink, -box, -frames)``.
+def hop_score_to_milli(score: float | int | None) -> int:
+    """Scale terminal hop S into an int quality dim (higher better)."""
+    if score is None:
+        return PLANNER_LOYAL_QUALITY_UNKNOWN
+    try:
+        return int(round(float(score) * float(_HOP_SCORE_MILLI_SCALE)))
+    except (TypeError, ValueError):
+        return PLANNER_LOYAL_QUALITY_UNKNOWN
 
-    Path-kills is no longer a quality dim. Strip it from 9-tuples and from
-    8-tuples that still have the insert (poison shifted off index 4).
-    """
+
+def resolve_mint_hop_score(
+    breakdown: dict[str, Any] | None,
+    progress: Any,
+) -> float | None:
+    """Terminal hop S from the success mint step, or None if unknown."""
+    bd = breakdown if isinstance(breakdown, dict) else {}
+    raw = bd.get("hop_score")
+    if raw is not None:
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            pass
+    meters = getattr(progress, "hop_meters", None) if progress is not None else None
+    if meters is None:
+        return None
+    report = getattr(meters, "last_report", None) or {}
+    if isinstance(report, dict) and report.get("S") is not None:
+        try:
+            return float(report["S"])
+        except (TypeError, ValueError):
+            pass
+    try:
+        if bool(getattr(meters, "settled", False)):
+            return float(meters.success_score())
+    except (TypeError, ValueError, AttributeError):
+        pass
+    return None
+
+
+def assemble_planner_loyal_quality(
+    base8: list[Any] | tuple[Any, ...] | None,
+    *,
+    total_kills: int | None,
+    stretch_kills: int | None,
+    hop_score: float | int | None,
+) -> list[int]:
+    """Build the 11-dim mint quality list from an 8-dim base + kill/hop dims."""
     from re1_rl.go_explore_archive import normalize_quality
 
+    core = list(normalize_quality(base8))
+    tot = (
+        PLANNER_LOYAL_QUALITY_UNKNOWN
+        if total_kills is None
+        else max(0, int(total_kills))
+    )
+    stretch = (
+        PLANNER_LOYAL_QUALITY_UNKNOWN
+        if stretch_kills is None
+        else max(0, int(stretch_kills))
+    )
+    hop_milli = hop_score_to_milli(hop_score)
+    return [
+        int(core[0]),
+        tot,
+        int(core[1]),
+        int(core[2]),
+        int(core[3]),
+        int(core[4]),
+        int(core[5]),
+        int(core[6]),
+        int(core[7]),
+        stretch,
+        hop_milli,
+    ]
+
+
+def normalize_planner_loyal_quality(
+    raw: list[Any] | tuple[Any, ...] | None,
+) -> tuple[int, ...]:
+    """Pad/upgrade to 11 dims. Unknown new dims use ``PLANNER_LOYAL_QUALITY_UNKNOWN``."""
+    from re1_rl.go_explore_archive import (
+        LEG_FRAMES_QUALITY_INDEX,
+        LEG_FRAMES_SENTINEL,
+        normalize_quality,
+    )
+
     vals = [int(x) for x in list(raw or [])]
+    if len(vals) >= PLANNER_LOYAL_QUALITY_LEN:
+        out = vals[:PLANNER_LOYAL_QUALITY_LEN]
+        return tuple(int(x) for x in out)
+    # Strip historical path-kills insert before upgrading.
     if len(vals) >= 9:
         vals = _drop_kill_insert(vals)
     elif len(vals) == 8 and vals[4] not in (0, 1):
         vals = _drop_kill_insert(vals)
-    return tuple(normalize_quality(vals))
+    core = list(normalize_quality(vals))
+    # Legacy 8-tuples have no kill/hop dims — mark unknown so remints win ties.
+    return (
+        int(core[0]),
+        PLANNER_LOYAL_QUALITY_UNKNOWN,
+        int(core[1]),
+        int(core[2]),
+        int(core[3]),
+        int(core[4]),
+        int(core[5]),
+        int(core[6]),
+        int(core[LEG_FRAMES_QUALITY_INDEX])
+        if len(core) > LEG_FRAMES_QUALITY_INDEX
+        else -int(LEG_FRAMES_SENTINEL),
+        PLANNER_LOYAL_QUALITY_UNKNOWN,
+        PLANNER_LOYAL_QUALITY_UNKNOWN,
+    )
+
+
+def lift_planner_loyal_quality(
+    raw: list[Any] | tuple[Any, ...] | None,
+) -> tuple[int, ...]:
+    """``(hp, total_kills, ammo, healing, slots, poison, -ink, -box, -frames,
+    stretch_kills, hop_score_milli)``.
+    """
+    return normalize_planner_loyal_quality(raw)
 
 
 def planner_loyal_quality_beats(
     new: list[Any] | tuple[Any, ...] | None,
     old: list[Any] | tuple[Any, ...] | None,
 ) -> bool:
-    """True if *new* should replace *old* (HP, ammo, healing, then the rest)."""
+    """True if *new* should replace *old* (HP, total kills, ammo, then the rest)."""
     if old is None:
         return True
     return lift_planner_loyal_quality(new) > lift_planner_loyal_quality(old)
+
+
+def stitch_planner_loyal_quality(
+    raw: list[Any] | tuple[Any, ...] | None,
+    *,
+    total_kills: int | None = None,
+    stretch_kills: int | None = None,
+    hop_score: float | int | None = None,
+) -> list[int]:
+    """Upgrade/backfill to 11 dims. Unknown dims stay ``PLANNER_LOYAL_QUALITY_UNKNOWN``.
+
+    Known kill/hop values overwrite unknowns (and replace legacy padded unknowns
+    when stitching from sidecar audit). Already-known non-sentinel dims are kept
+    unless *total_kills* / *stretch_kills* / *hop_score* are explicitly provided.
+    """
+    vals = [int(x) for x in list(raw or [])]
+    if len(vals) >= PLANNER_LOYAL_QUALITY_LEN:
+        out = vals[:PLANNER_LOYAL_QUALITY_LEN]
+        if total_kills is not None:
+            out[1] = max(0, int(total_kills))
+        if stretch_kills is not None:
+            out[9] = max(0, int(stretch_kills))
+        if hop_score is not None:
+            out[10] = hop_score_to_milli(hop_score)
+        return [int(x) for x in out]
+
+    lifted = list(normalize_planner_loyal_quality(vals))
+    base8 = [
+        lifted[0],
+        lifted[2],
+        lifted[3],
+        lifted[4],
+        lifted[5],
+        lifted[6],
+        lifted[7],
+        lifted[8],
+    ]
+    return assemble_planner_loyal_quality(
+        base8,
+        total_kills=total_kills,
+        stretch_kills=stretch_kills,
+        hop_score=hop_score,
+    )
 
 
 def _preserve_foreign_state(dest: Path, staging: Path) -> None:
@@ -1101,7 +1257,14 @@ def capture_planner_loyal_cell(
         leg_frames = int(getattr(env, "_step_count", 0) or 0)
     except (TypeError, ValueError):
         leg_frames = 0
-    quality = list(attach_leg_frames(quality, leg_frames))
+    quality8 = list(attach_leg_frames(quality, leg_frames))
+    hop_s = resolve_mint_hop_score(breakdown, getattr(env, "_progress", None))
+    quality = assemble_planner_loyal_quality(
+        quality8,
+        total_kills=int(kill_audit.get("almanac_total") or 0),
+        stretch_kills=int(kill_audit.get("almanac_stretch") or 0),
+        hop_score=hop_s,
+    )
 
     # Quality-beats-old only against a cell of the same runtime; a legacy
     # BizHawk cell.State sharing the slot dir is a different numbering.
@@ -1149,6 +1312,7 @@ def capture_planner_loyal_cell(
         "training_start": True,
         "chunk_final": bool(is_final),
         "kills": kill_audit,
+        "hop_score": hop_s,
         "state_sha256": _sha256_file(state_path),
         "sidecar_sha256": _sha256_file(sidecar_path),
         "bytes": state_path.stat().st_size,
@@ -1212,6 +1376,7 @@ def capture_planner_loyal_cell(
         f"[planner_loyal] minted {cell_dir_name(slot)} "
         f"chunk={queue.chunk_id} step={completed} room={room_id} "
         f"final={int(is_final)} start=1 q={quality} "
+        f"hop={hop_s if hop_s is not None else 'na'} "
         f"kills_paid={kill_audit['paid_stretch']} "
         f"{_fmt_room_kills(kill_audit['paid_stretch_by_room'])} "
         f"almanac_stretch={kill_audit['almanac_stretch']} "
