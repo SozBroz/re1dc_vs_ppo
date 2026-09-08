@@ -171,7 +171,10 @@ def test_control_is_run_protected_and_updates_pause_speed(tmp_path: Path) -> Non
     assert skipper.cutscene_speed == 1200
 
 
-def test_telemetry_latest_schema_and_sparse_reward_events(tmp_path: Path) -> None:
+def test_telemetry_latest_schema_and_sparse_reward_events(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RE1_PLANNER_HOP_SCORE_V1", raising=False)
     bridge = _Bridge()
     control = MemlogControl(
         tmp_path,

@@ -966,6 +966,19 @@ def _actor_process(
                     )
                 except (TypeError, ValueError, AttributeError):
                     pass
+            if info:
+                slim_src = info
+                if done or trunc:
+                    slim_src = {**info, "actor_rank": rank}
+                episode_infos.append(slim_progress_info(slim_src))
+
+            # Exclude pure cutscene-skip ticks from the PPO buffer (zero reward,
+            # frozen obs). Post-skip credit lands on the next live control step.
+            # Memlog publishes *after* this filter so pending steps align 1:1 with
+            # hop Y_t / the PPO reward buffer (what the NN trains on).
+            if info.get("cutscene_skip") and not (done or trunc):
+                continue
+
             if memlog_telemetry is not None and memlog_control is not None:
                 telemetry_mask = masks_before
                 if telemetry_mask is None:
@@ -987,16 +1000,6 @@ def _actor_process(
                 )
                 if (done or trunc) and memlog_telemetry.should_shutdown():
                     memlog_control.request_shutdown()
-            if info:
-                slim_src = info
-                if done or trunc:
-                    slim_src = {**info, "actor_rank": rank}
-                episode_infos.append(slim_progress_info(slim_src))
-
-            # Exclude pure cutscene-skip ticks from the PPO buffer (zero reward,
-            # frozen obs). Post-skip credit lands on the next live control step.
-            if info.get("cutscene_skip") and not (done or trunc):
-                continue
 
             if is_armed_attack(action, info):
                 pending_fire_steps.append(int(step_i))

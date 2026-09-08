@@ -413,7 +413,14 @@ def _nominal_weapon_damage_max(weapon_id: int) -> int:
 
 
 def combat_overkill_penalty(state: dict[str, Any]) -> float:
-    """Penalty for wasted nominal damage on kills (scales like miss tax)."""
+    """Penalty for wasted weapon potential on a damaging hit (or kill).
+
+    ``wasted_fraction = clip((nominal_max - damage) / nominal_max, 0, 1)``
+    scaled like a miss tax. Covers classic overkill (finishing a low-HP
+    target) and under-performance (e.g. shotgun at long range dealing
+    heavily reduced HP damage). Applies to any damaging combat event, not
+    only kills. Damage above nominal scores zero waste.
+    """
     events = state.get("combat_events")
     if not events:
         return 0.0
@@ -432,9 +439,11 @@ def combat_overkill_penalty(state: dict[str, Any]) -> float:
     if wid == 0x01:
         per_miss = KNIFE_MISS_PENALTY
         for ev in events:
-            if ev.get("reward_denied") or not ev.get("killed"):
+            if ev.get("reward_denied"):
                 continue
-            damage = int(ev.get("damage", 0))
+            damage = int(ev.get("damage", 0) or 0)
+            if damage <= 0:
+                continue
             wasted = max(0, nominal - damage)
             if wasted <= 0:
                 continue
@@ -447,9 +456,11 @@ def combat_overkill_penalty(state: dict[str, Any]) -> float:
     if per_round == 0.0:
         return 0.0
     for ev in events:
-        if ev.get("reward_denied") or not ev.get("killed"):
+        if ev.get("reward_denied"):
             continue
-        damage = int(ev.get("damage", 0))
+        damage = int(ev.get("damage", 0) or 0)
+        if damage <= 0:
+            continue
         wasted = max(0, nominal - damage)
         if wasted <= 0:
             continue

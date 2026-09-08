@@ -277,6 +277,8 @@ class MemlogTelemetry:
             self._incumbent_quality = normalize_quality(
                 self._incumbent_row.get("quality")
             )
+        # Buffered until hop Y_t is known (episode end), then flushed as train targets.
+        self._pending_steps: list[dict[str, Any]] = []
 
     def heartbeat(self, control: MemlogControlState, *, horizon_step: int) -> None:
         payload = dict(self._latest)
@@ -318,6 +320,10 @@ class MemlogTelemetry:
             for k, v in (info.get("reward_breakdown") or {}).items()
         }
         self._episode_return += float(reward)
+        ep_idx = int(self._episode_index)
+        from re1_rl.planner_hop_score import hop_score_live_enabled
+
+        hop_live = hop_score_live_enabled()
         payload = {
             "schema_version": 1,
             "run_id": self.run_id,
@@ -325,7 +331,7 @@ class MemlogTelemetry:
             "heartbeat_unix_s": time.time(),
             "horizon_step": int(horizon_step),
             "n_steps": self.n_steps,
-            "episode_index": self._episode_index,
+            "episode_index": ep_idx,
             "episode_return": self._episode_return,
             "experiment": dict(self._experiment),
             "control": asdict(control),
@@ -357,39 +363,62 @@ class MemlogTelemetry:
                     for key in _INFO_KEYS
                     if key in info
                 },
+                "train_target_pending": bool(hop_live),
             },
         }
         self._latest = payload
         _atomic_json_best_effort(self.latest_path, payload)
+
+        audit = info.get("combat_audit") or {}
+        self._pending_steps.append(
+            {
+                "episode_index": ep_idx,
+                "episode_step": len(self._pending_steps),
+                "horizon_step": int(horizon_step),
+                "action": int(action),
+                "action_name": info.get("action_name"),
+                "room_id": info.get("room_id"),
+                "raw_reward": float(reward),
+                "raw_breakdown": dict(breakdown),
+                "combat_hp": audit.get("enemy_damage"),
+                "combat_events": list(audit.get("combat_events") or []),
+                "credited_from_pending": bool(audit.get("credited_from_pending")),
+            }
+        )
+
+        if not hop_live:
+            # Legacy path: emit raw sparse events immediately.
+            event_channels = {
+                key: value
+                for key, value in breakdown.items()
+                if key not in _IGNORED_EVENT_CHANNELS and value != 0.0
+            }
+            if event_channels:
+                event = {
+                    "run_id": self.run_id,
+                    "rank": self.rank,
+                    "time_unix_s": payload["heartbeat_unix_s"],
+                    "horizon_step": int(horizon_step),
+                    "reward": float(reward),
+                    "reward_breakdown": event_channels,
+                    "room_id": info.get("room_id"),
+                    "action": int(action),
+                    "action_name": info.get("action_name"),
+                }
+                if audit.get("combat_events") or audit.get("enemy_damage"):
+                    event["combat_hp"] = audit.get("enemy_damage")
+                    event["combat_events"] = audit.get("combat_events") or []
+                    event["credited_from_pending"] = bool(
+                        audit.get("credited_from_pending")
+                    )
+                self._append_event(event)
+            if done:
+                self._pending_steps.clear()
+
         if done:
             self._record_episode(info or {}, breakdown=breakdown)
             self._episode_return = 0.0
             self._episode_index += 1
-        event_channels = {
-            key: value
-            for key, value in breakdown.items()
-            if key not in _IGNORED_EVENT_CHANNELS and value != 0.0
-        }
-        if event_channels:
-            event = {
-                "run_id": self.run_id,
-                "rank": self.rank,
-                "time_unix_s": payload["heartbeat_unix_s"],
-                "horizon_step": int(horizon_step),
-                "reward": float(reward),
-                "reward_breakdown": event_channels,
-                "room_id": info.get("room_id"),
-                "action": int(action),
-                "action_name": info.get("action_name"),
-            }
-            audit = info.get("combat_audit") or {}
-            if audit.get("combat_events") or audit.get("enemy_damage"):
-                event["combat_hp"] = audit.get("enemy_damage")
-                event["combat_events"] = audit.get("combat_events") or []
-                event["credited_from_pending"] = bool(
-                    audit.get("credited_from_pending")
-                )
-            self._append_event(event)
 
     def _append_event(self, event: dict[str, Any]) -> None:
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -413,15 +442,17 @@ class MemlogTelemetry:
         report: dict[str, Any] | None = None,
         overridden_steps: list[int] | None = None,
     ) -> None:
-        """Record post-processed hop targets ``Y_t = compose(S, L_t)`` for one episode.
+        """Flush per-step train targets ``Y_t`` (what the NN learns) into events.
 
-        Logged so memlog/dashboard can verify sign-opposed override (e.g. shotgun
-        miss taxes displacing a positive ``S`` on fire steps).
+        Methodology: most steps share the same ``Y`` (= ``S`` when ``L=0``);
+        only tax/bonus steps differ. Events use ``reward=Y_t``, not raw env pay.
         """
         L = [float(x) for x in locals_L]
         Y = [float(x) for x in targets_Y]
         if len(L) != len(Y):
             raise ValueError("locals_L and targets_Y length mismatch")
+        pending = list(self._pending_steps)
+        self._pending_steps.clear()
         over = overridden_steps
         if over is None:
             over = [
@@ -429,14 +460,67 @@ class MemlogTelemetry:
                 for i, (loc, target) in enumerate(zip(L, Y))
                 if loc < 0.0 and float(S) > 0.0 and abs(target - loc) < 1e-9
             ]
+        # Distinct Y values (rounded) — should be ~1 for clean death, ~2+ with taxes.
+        rounded = [round(y, 6) for y in Y]
+        unique_Y = sorted({y for y in rounded})
+        from collections import Counter
+
+        y_counts = Counter(rounded)
+        now = time.time()
+        n = min(len(pending), len(Y))
+        for i in range(n):
+            stub = pending[i]
+            loc = float(L[i])
+            target = float(Y[i])
+            is_over = i in over or (
+                loc < 0.0 and float(S) > 0.0 and abs(target - loc) < 1e-9
+            )
+            bd: dict[str, float] = {
+                "hop_learning_target": target,
+                "hop_local": loc,
+                "hop_S": 0.0 if is_over else float(S),
+                "overridden": 1.0 if is_over else 0.0,
+            }
+            for key, value in (stub.get("raw_breakdown") or {}).items():
+                if key in _IGNORED_EVENT_CHANNELS:
+                    continue
+                if float(value) == 0.0:
+                    continue
+                bd[f"raw_{key}"] = float(value)
+            event = {
+                "run_id": self.run_id,
+                "rank": self.rank,
+                "time_unix_s": now,
+                "kind": "hop_train_step",
+                "tip": str(tip or ""),
+                "episode_index": stub.get("episode_index"),
+                "episode_step": int(stub.get("episode_step", i)),
+                "horizon_step": int(stub.get("horizon_step", i)),
+                "reward": target,
+                "reward_breakdown": bd,
+                "room_id": stub.get("room_id"),
+                "action": stub.get("action"),
+                "action_name": stub.get("action_name"),
+                "S": float(S),
+            }
+            if stub.get("combat_events") or stub.get("combat_hp"):
+                event["combat_hp"] = stub.get("combat_hp")
+                event["combat_events"] = stub.get("combat_events") or []
+                event["credited_from_pending"] = bool(
+                    stub.get("credited_from_pending")
+                )
+            self._append_event(event)
+
         event = {
             "run_id": self.run_id,
             "rank": self.rank,
-            "time_unix_s": time.time(),
+            "time_unix_s": now,
             "kind": "hop_learning_targets",
             "tip": str(tip or ""),
             "S": float(S),
             "n_steps": len(Y),
+            "n_pending_aligned": int(n),
+            "n_pending_mismatch": int(abs(len(pending) - len(Y))),
             "locals_L": L,
             "targets_Y": Y,
             "overridden_steps": list(over),
@@ -444,6 +528,9 @@ class MemlogTelemetry:
             "sum_Y": float(sum(Y)),
             "n_negative_L": int(sum(1 for x in L if x < 0.0)),
             "n_overridden": int(len(over)),
+            "unique_Y": unique_Y,
+            "n_unique_Y": int(len(unique_Y)),
+            "Y_value_counts": {str(k): int(v) for k, v in sorted(y_counts.items())},
         }
         if isinstance(report, dict):
             for key in (
@@ -459,9 +546,19 @@ class MemlogTelemetry:
                 if key in report:
                     event[key] = report[key]
         self._append_event(event)
-        # Mirror onto latest.json for live dashboard.
+        # Mirror onto latest.json for live dashboard (last step's train target).
         if isinstance(self._latest, dict):
             latest = dict(self._latest)
+            last_bd = {
+                "hop_learning_target": float(Y[-1]) if Y else 0.0,
+                "hop_local": float(L[-1]) if L else 0.0,
+                "hop_S": float(S),
+            }
+            post = dict(latest.get("post_step") or {})
+            post["reward"] = float(Y[-1]) if Y else post.get("reward", 0.0)
+            post["reward_breakdown"] = last_bd
+            post["train_target_pending"] = False
+            latest["post_step"] = post
             latest["hop_learning_targets"] = {
                 "tip": event["tip"],
                 "S": event["S"],
@@ -470,6 +567,9 @@ class MemlogTelemetry:
                 "sum_Y": event["sum_Y"],
                 "n_negative_L": event["n_negative_L"],
                 "n_overridden": event["n_overridden"],
+                "n_unique_Y": event["n_unique_Y"],
+                "unique_Y": event["unique_Y"],
+                "Y_value_counts": event["Y_value_counts"],
                 "overridden_steps": event["overridden_steps"],
                 "A_spent": event.get("A_spent"),
                 "q_ammo_raw": event.get("q_ammo_raw"),

@@ -642,6 +642,56 @@ def test_combat_overkill_no_penalty_on_efficient_kill() -> None:
     assert combat_overkill_penalty(cur) == 0.0
 
 
+def test_combat_overkill_shotgun_range_falloff_hit() -> None:
+    """Non-kill chip hit below shotgun nominal max = wasted potential."""
+    cur = make_state(hp=96, step=2)
+    cur["equipped_weapon_id"] = 0x03
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 12,
+            "killed": False,
+            "reward_denied": False,
+            "is_crow": False,
+        }
+    ]
+    per_round = ammo_waste_per_missed_round(0x03)
+    # Shotgun nominal max 25; dealt 12 → waste 13/25.
+    expected = (13 / 25.0) * per_round
+    assert combat_overkill_penalty(cur) == pytest.approx(expected)
+
+
+def test_combat_overkill_no_penalty_when_damage_meets_nominal() -> None:
+    cur = make_state(hp=96, step=2)
+    cur["equipped_weapon_id"] = 0x03
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 25,
+            "killed": False,
+            "reward_denied": False,
+            "is_crow": False,
+        }
+    ]
+    assert combat_overkill_penalty(cur) == 0.0
+
+
+def test_combat_overkill_no_penalty_when_damage_exceeds_nominal() -> None:
+    """Kill credit can exceed nominal (HP wipe); that is not under-potential."""
+    cur = make_state(hp=96, step=2)
+    cur["equipped_weapon_id"] = 0x03
+    cur["combat_events"] = [
+        {
+            "slot": 0,
+            "damage": 47,
+            "killed": True,
+            "reward_denied": False,
+            "is_crow": False,
+        }
+    ]
+    assert combat_overkill_penalty(cur) == 0.0
+
+
 def test_yawn_rails_keeps_combat_hit_positive_unscaled_against_miss_tax() -> None:
     planner = make_planner()
     prev = make_state(hp=96, step=1)
