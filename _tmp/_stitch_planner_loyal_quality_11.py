@@ -43,6 +43,7 @@ from re1_rl.planner_loyal_cells import (
     PLANNER_LOYAL_QUALITY_LEN,
     PLANNER_LOYAL_QUALITY_UNKNOWN,
     _almanac_delta,
+    _sha256_file,
     hop_score_to_milli,
     stitch_planner_loyal_quality,
 )
@@ -202,6 +203,8 @@ def regen_kills_root(root: Path, *, dry_run: bool) -> dict[str, int]:
         _write_json(side_p, side)
         if meta is not None:
             meta["kills"] = new_kills
+            # Sidecar bytes changed — keep load-time hash check in sync.
+            meta["sidecar_sha256"] = _sha256_file(side_p)
             _write_json(meta_p, meta)
         tallies["regen_wrote"] += 1
         print(
