@@ -323,7 +323,32 @@ def test_compose_hop_learning_target_negative_overpowers_positive_s() -> None:
     assert compose_hop_learning_target(0.96, -0.96) == pytest.approx(-0.96)
     assert compose_hop_learning_target(0.96, -0.20) == pytest.approx(-0.20)
     assert compose_hop_learning_target(0.96, -0.029) == pytest.approx(-0.029)
-    # Never let a positive local override a negative hop outcome.
+    # Positive locals stay additive with negative S unless statue-push override.
     assert compose_hop_learning_target(-1.0, 0.50) == pytest.approx(-0.50)
     assert compose_hop_learning_target(-1.0, -0.20) == pytest.approx(-1.20)
     assert compose_hop_learning_target(0.96, 0.0) == pytest.approx(0.96)
+
+
+def test_compose_hop_learning_target_positive_push_overrides_failed_s() -> None:
+    # pl82→83 / pl83→84: right-way statue shove on a failed hop overrides S.
+    assert compose_hop_learning_target(
+        -4.0, 0.50, positive_push_override=True
+    ) == pytest.approx(0.50)
+    assert compose_hop_learning_target(
+        -1.0, 0.25, positive_push_override=True
+    ) == pytest.approx(0.25)
+    # Without the push flag, still additive.
+    assert compose_hop_learning_target(
+        -4.0, 0.50, positive_push_override=False
+    ) == pytest.approx(-3.50)
+    # Push flag does not override a successful hop (stay additive).
+    assert compose_hop_learning_target(
+        0.96, 0.50, positive_push_override=True
+    ) == pytest.approx(1.46)
+    # Zero / non-positive local does not override even with the flag.
+    assert compose_hop_learning_target(
+        -4.0, 0.0, positive_push_override=True
+    ) == pytest.approx(-4.0)
+    assert compose_hop_learning_target(
+        -4.0, -0.20, positive_push_override=True
+    ) == pytest.approx(-4.20)

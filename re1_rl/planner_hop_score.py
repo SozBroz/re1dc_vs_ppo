@@ -191,17 +191,28 @@ def hop_local_reward_from_bd(bd: dict[str, float] | None) -> float:
     return float(total)
 
 
-def compose_hop_learning_target(S: float, L: float) -> float:
+def compose_hop_learning_target(
+    S: float,
+    L: float,
+    *,
+    positive_push_override: bool = False,
+) -> float:
     """Per-step learning target from terminal hop score ``S`` and local ``L``.
 
     Default is ``S + L`` (γ_outcome=1 broadcast + γ_local=0). When a negative
     local tax lands on a *positive* hop outcome, the local **overrides** ``S``
     on that step only (``Y = L``) so misuse is not washed out by success.
-    Positive locals never override a negative ``S``.
+
+    Symmetrically, on a *failed* hop (``S < 0``), a step that earned a positive
+    armor-statue push (``armor_statue_progress > 0`` on pl82→83 / pl83→84)
+    overrides the negative outcome broadcast with ``Y = L``. Other positive
+    locals stay additive with negative ``S``.
     """
     s = float(S)
     loc = float(L)
     if loc < 0.0 and s > 0.0:
+        return loc
+    if positive_push_override and loc > 0.0 and s < 0.0:
         return loc
     return s + loc
 

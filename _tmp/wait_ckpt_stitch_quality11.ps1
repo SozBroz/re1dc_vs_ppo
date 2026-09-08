@@ -108,11 +108,13 @@ if (@($shaP, $sha1, $sha2, $sha3) | Where-Object { $_ -ne $shaP }) {
 }
 
 Write-Log '=== REGEN KILLS + STITCH 11-DIM QUALITY (all machines) ==='
-& python $Stitch
+$PyLocal = Join-Path $ROOT 'venv\Scripts\python.exe'
+if (-not (Test-Path $PyLocal)) { $PyLocal = 'python' }
+& $PyLocal $Stitch
 if ($LASTEXITCODE -ne 0) { throw "pking regen+stitch failed ($LASTEXITCODE)" }
-Invoke-FleetSsh $WH1 'cd /d D:\re1_rl && set RE1_RL_ROOT=D:\re1_rl&& set RE1_RECOMP_ROOT=D:\re1_recomp&& python _tmp\_stitch_planner_loyal_quality_11.py'
-Invoke-FleetSsh $WH2 'cd /d C:\Users\sshuser\re1_rl && set RE1_RL_ROOT=C:\Users\sshuser\re1_rl&& set RE1_RECOMP_ROOT=C:\re1_recomp&& python _tmp\_stitch_planner_loyal_quality_11.py'
-Invoke-FleetSsh $WH3 'cd /d C:\Users\sshuser\re1_rl && set RE1_RL_ROOT=C:\Users\sshuser\re1_rl&& set RE1_RECOMP_ROOT=C:\re1_recomp&& python _tmp\_stitch_planner_loyal_quality_11.py'
+Invoke-FleetSsh $WH1 'cd /d D:\re1_rl && set RE1_RL_ROOT=D:\re1_rl&& set RE1_RECOMP_ROOT=D:\re1_recomp&& venv\Scripts\python.exe _tmp\_stitch_planner_loyal_quality_11.py'
+Invoke-FleetSsh $WH2 'cd /d C:\Users\sshuser\re1_rl && set RE1_RL_ROOT=C:\Users\sshuser\re1_rl&& set RE1_RECOMP_ROOT=C:\re1_recomp&& venv\Scripts\python.exe _tmp\_stitch_planner_loyal_quality_11.py'
+Invoke-FleetSsh $WH3 'cd /d C:\Users\sshuser\re1_rl && set RE1_RL_ROOT=C:\Users\sshuser\re1_rl&& set RE1_RECOMP_ROOT=C:\re1_recomp&& venv\Scripts\python.exe _tmp\_stitch_planner_loyal_quality_11.py'
 
 Write-Log '=== RESTART (skip teardown+sync; already done) ==='
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ROOT 'fleet\local\restart_planner_loyal_fleet.ps1') -SkipTeardown -SkipSync

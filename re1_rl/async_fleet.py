@@ -720,18 +720,29 @@ def _actor_process(
     except ImportError:
         pass
 
-    # Memlog actor (rank 4): hard-pin to pl74 via dedicated pin file so the
-    # dashboard watches pl74→75 without changing the fleet 74:10 mix.
+    # Memlog actor (rank 4): optional dedicated pin file via
+    # RE1_PLANNER_RESET_PIN_MEMLOG_FILE. When unset, memlog uses the same
+    # RE1_PLANNER_RESET_PIN_FILE as the rest of the fleet (no special pin).
     if memlog_directory is not None:
         memlog_pin = (os.environ.get("RE1_PLANNER_RESET_PIN_MEMLOG_FILE") or "").strip()
-        if not memlog_pin:
-            memlog_pin = "data/planner_loyal_reset_pin_memlog.env"
-        pin_path = Path(memlog_pin)
-        if not pin_path.is_absolute():
-            pin_path = PROJECT_ROOT / pin_path
-        if pin_path.is_file():
-            os.environ["RE1_PLANNER_RESET_PIN_FILE"] = str(pin_path)
-            print(f"[memlog] reset pin -> {pin_path}", flush=True)
+        if memlog_pin:
+            pin_path = Path(memlog_pin)
+            if not pin_path.is_absolute():
+                pin_path = PROJECT_ROOT / pin_path
+            if pin_path.is_file():
+                os.environ["RE1_PLANNER_RESET_PIN_FILE"] = str(pin_path)
+                print(f"[memlog] reset pin -> {pin_path}", flush=True)
+            else:
+                print(
+                    f"[memlog] RE1_PLANNER_RESET_PIN_MEMLOG_FILE missing: {pin_path}",
+                    flush=True,
+                )
+        else:
+            fleet_pin = (os.environ.get("RE1_PLANNER_RESET_PIN_FILE") or "").strip()
+            print(
+                f"[memlog] reset pin -> fleet ({fleet_pin or 'default'})",
+                flush=True,
+            )
 
     try:
         env = make_env(
@@ -789,6 +800,8 @@ def _actor_process(
     dones = np.zeros(n_steps, dtype=np.bool_)
     values = np.zeros(n_steps, dtype=np.float32)
     log_probs = np.zeros(n_steps, dtype=np.float32)
+    # Per-step: armor_statue_progress > 0 (pl82→83 / pl83→84 right-way shove).
+    push_override = np.zeros(n_steps, dtype=np.bool_)
     episode_infos: list[dict[str, Any]] = []
     step_i = 0
     horizon_policy_version = 0
@@ -817,6 +830,7 @@ def _actor_process(
         mod_drop_bufs = (
             np.ones((n_steps, MOD_DROP_DIM), dtype=np.float32) if use_mod_drop else None
         )
+        push_override.fill(False)
         step_i = 0
         episode_infos = []
         horizon_policy_version = 0
@@ -1017,6 +1031,10 @@ def _actor_process(
             log_probs[step_i] = logprob
             rewards[step_i] = float(rew)
             dones[step_i] = bool(done or trunc)
+            br_step = (info or {}).get("reward_breakdown") or {}
+            push_override[step_i] = (
+                float(br_step.get("armor_statue_progress") or 0.0) > 0.0
+            )
             if bool(done or trunc):
                 try:
                     from re1_rl.planner_hop_score import (
@@ -1033,10 +1051,17 @@ def _actor_process(
                         locals_L = [
                             float(rewards[_t]) for _t in range(int(step_i) + 1)
                         ]
+                        overridden_steps: list[int] = []
                         for _t in range(int(step_i) + 1):
-                            rewards[_t] = compose_hop_learning_target(
-                                S, float(locals_L[_t])
+                            loc = float(locals_L[_t])
+                            y = compose_hop_learning_target(
+                                S,
+                                loc,
+                                positive_push_override=bool(push_override[_t]),
                             )
+                            rewards[_t] = y
+                            if abs(loc) > 1e-9 and abs(y - loc) < 1e-9 and abs(S) > 1e-9:
+                                overridden_steps.append(int(_t))
                         if memlog_telemetry is not None:
                             report = (info or {}).get("hop_score") or (
                                 info or {}
@@ -1057,6 +1082,7 @@ def _actor_process(
                                 ],
                                 tip=tip,
                                 report=report if isinstance(report, dict) else None,
+                                overridden_steps=overridden_steps,
                             )
                 except Exception:
                     pass

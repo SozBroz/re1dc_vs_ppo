@@ -458,7 +458,9 @@ class MemlogTelemetry:
             over = [
                 i
                 for i, (loc, target) in enumerate(zip(L, Y))
-                if loc < 0.0 and float(S) > 0.0 and abs(target - loc) < 1e-9
+                if abs(loc) > 1e-9
+                and abs(float(S)) > 1e-9
+                and abs(target - loc) < 1e-9
             ]
         # Distinct Y values (rounded) — should be ~1 for clean death, ~2+ with taxes.
         rounded = [round(y, 6) for y in Y]
@@ -473,7 +475,9 @@ class MemlogTelemetry:
             loc = float(L[i])
             target = float(Y[i])
             is_over = i in over or (
-                loc < 0.0 and float(S) > 0.0 and abs(target - loc) < 1e-9
+                abs(loc) > 1e-9
+                and abs(float(S)) > 1e-9
+                and abs(target - loc) < 1e-9
             )
             bd: dict[str, float] = {
                 "hop_learning_target": target,
