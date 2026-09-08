@@ -107,9 +107,9 @@ if (@($shaP, $sha1, $sha2, $sha3) | Where-Object { $_ -ne $shaP }) {
   throw "SHA mismatch after sync"
 }
 
-Write-Log '=== STITCH 11-DIM QUALITY (all machines) ==='
+Write-Log '=== REGEN KILLS + STITCH 11-DIM QUALITY (all machines) ==='
 & python $Stitch
-if ($LASTEXITCODE -ne 0) { throw "pking stitch failed ($LASTEXITCODE)" }
+if ($LASTEXITCODE -ne 0) { throw "pking regen+stitch failed ($LASTEXITCODE)" }
 Invoke-FleetSsh $WH1 'cd /d D:\re1_rl && set RE1_RL_ROOT=D:\re1_rl&& set RE1_RECOMP_ROOT=D:\re1_recomp&& python _tmp\_stitch_planner_loyal_quality_11.py'
 Invoke-FleetSsh $WH2 'cd /d C:\Users\sshuser\re1_rl && set RE1_RL_ROOT=C:\Users\sshuser\re1_rl&& set RE1_RECOMP_ROOT=C:\re1_recomp&& python _tmp\_stitch_planner_loyal_quality_11.py'
 Invoke-FleetSsh $WH3 'cd /d C:\Users\sshuser\re1_rl && set RE1_RL_ROOT=C:\Users\sshuser\re1_rl&& set RE1_RECOMP_ROOT=C:\re1_recomp&& python _tmp\_stitch_planner_loyal_quality_11.py'

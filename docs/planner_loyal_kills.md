@@ -69,7 +69,7 @@ Full audit object:
 
 After mint, **`close_planner_loyal_stretch()`** clears paid stretch counters so the next pl hop starts fresh. Almanac totals stay cumulative.
 
-Existing cells minted before kill audit may still have sidecar `planner_loyal.kills` for stitch backfill; hop milli is usually unknown (`-99999`) until remint.
+Existing cells get kill audits regenerated from `enemies_killed_by_room` before the 11-dim quality stitch (`_tmp/_stitch_planner_loyal_quality_11.py`). hop milli is usually unknown (`-99999`) until remint.
 
 ## How to read a stretch
 
