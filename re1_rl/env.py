@@ -2055,11 +2055,18 @@ class RE1Env(gym.Env):
             if tip_rng is None:
                 import time as _time
 
-                port = int(getattr(self, "port", 0) or 0)
+                bridge = getattr(self, "bridge", None)
+                port = int(
+                    getattr(self, "port", 0)
+                    or getattr(bridge, "port", 0)
+                    or getattr(getattr(bridge, "client", None), "port", 0)
+                    or 0
+                )
                 tip_rng = random.Random(
                     (os.getpid() << 16)
                     ^ (_time.time_ns() & 0xFFFFFFFF)
                     ^ (port * 2654435761)
+                    ^ (id(self) & 0xFFFFFFFF)
                 )
                 self._planner_loyal_tip_rng = tip_rng
 
