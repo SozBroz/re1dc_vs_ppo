@@ -129,3 +129,35 @@ def test_manifest_reconciles_stale_sidecar_sha(
     got_state, got_side = slot_content_shas(cell)
     assert row["state_sha256"] == got_state
     assert row["sidecar_sha256"] == got_side
+
+
+def test_planner_loyal_keeps_11dim_quality_and_kill_lex(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sync must not truncate kills away or let ammo beat a higher kill count."""
+    monkeypatch.setenv("RE1_PLANNER_LOYAL", "1")
+    monkeypatch.delenv("RE1_YAWN_CELL_PREFIX", raising=False)
+    from re1_rl.yawn_rails_sync import store_quality_beats
+
+    q5 = [96, 5, 87, 0, 12, 1, 0, -30, -118, 0, 995]
+    q4 = [96, 4, 105, 0, 12, 1, 0, -30, -79, 0, -99999]
+    assert store_quality_beats(q5, q4) is True
+    assert store_quality_beats(q4, q5) is False
+
+    cell = tmp_path / "cells" / "pl45"
+    cell.mkdir(parents=True)
+    state = cell / "cell.pst"
+    side = cell / "cell.sidecar.json"
+    state.write_bytes(b"PST45")
+    side.write_text(json.dumps({"checkpoint_index": 45}) + "\n", encoding="utf-8")
+    prop = build_capture_proposal(
+        route_id="planner_loyal_v1",
+        checkpoint_index=45,
+        checkpoint_id="step45",
+        room_id="117",
+        quality=q5,
+        state_path=state,
+        sidecar_path=side,
+        worker_id="pking",
+    )
+    assert list(prop["quality"]) == q5

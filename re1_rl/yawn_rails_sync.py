@@ -505,12 +505,14 @@ def try_install_yawn_cell(
         LEG_FRAMES_SENTINEL,
     )
 
-    if int(new_q[LEG_FRAMES_QUALITY_INDEX]) == -int(LEG_FRAMES_SENTINEL):
-        print(
-            f"[yawn_install] reject sentinel_leg_frames cp{idx:02d}",
-            flush=True,
-        )
-        return False
+    # Planner-loyal 11-dim: frames live at index 8, not go-explore's [7].
+    if not _planner_loyal_enabled():
+        if int(new_q[LEG_FRAMES_QUALITY_INDEX]) == -int(LEG_FRAMES_SENTINEL):
+            print(
+                f"[yawn_install] reject sentinel_leg_frames cp{idx:02d}",
+                flush=True,
+            )
+            return False
     if idx > 0:
         pred = cell_slot_dir(root, idx - 1)
         if slot_state_path(pred) is None:
@@ -534,11 +536,10 @@ def try_install_yawn_cell(
         if not force:
             old_q = _existing_cell_quality(root, idx)
             if old_q is not None:
-                if not quality_beats(new_q, old_q):
+                if not _quality_beats_store(new_q, old_q):
                     return False
-                if not quality_replace_significant(new_q, old_q):
+                if not _quality_replace_ok(new_q, old_q):
                     return False
-
         incoming = dest.parent / f".incoming_{cell_dir_name(idx)}_{os.getpid()}"
         if incoming.exists():
             shutil.rmtree(incoming, ignore_errors=True)
@@ -626,11 +627,67 @@ def _as_quality(raw: Any) -> tuple[int, ...] | None:
     if not isinstance(raw, (list, tuple)) or len(raw) < 5:
         return None
     try:
+        if _planner_loyal_enabled():
+            from re1_rl.planner_loyal_cells import lift_planner_loyal_quality
+
+            return lift_planner_loyal_quality(raw)
         from re1_rl.go_explore_archive import normalize_quality
 
         return normalize_quality(raw)
     except (TypeError, ValueError):
         return None
+
+
+def _quality_beats_store(
+    new_q: list[int] | tuple[int, ...] | None,
+    old_q: list[int] | tuple[int, ...] | None,
+) -> bool:
+    """Lex compare for store ingest / install (planner-loyal 11-dim aware)."""
+    if old_q is None:
+        return True
+    if new_q is None:
+        return False
+    if _planner_loyal_enabled():
+        from re1_rl.planner_loyal_cells import planner_loyal_quality_beats
+
+        return planner_loyal_quality_beats(new_q, old_q)
+    return quality_beats(new_q, old_q)
+
+
+def _quality_replace_ok(
+    new_q: list[int] | tuple[int, ...] | None,
+    old_q: list[int] | tuple[int, ...] | None,
+) -> bool:
+    """Significance gate. Planner-loyal: any lex beat is enough (kills live at [1])."""
+    if old_q is None or new_q is None:
+        return True
+    if _planner_loyal_enabled():
+        return _quality_beats_store(new_q, old_q)
+    from re1_rl.go_explore_capture import quality_replace_significant
+
+    return quality_replace_significant(new_q, old_q)
+
+
+def store_quality_beats(
+    new_q: list[int] | tuple[int, ...] | None,
+    old_q: list[int] | tuple[int, ...] | None,
+) -> bool:
+    """Public alias for ingest / worker poll quality compare."""
+    return _quality_beats_store(new_q, old_q)
+
+
+def read_slot_quality(slot_dir: Path | str) -> tuple[int, ...] | None:
+    """Load normalized quality from ``slot_dir/meta.json``."""
+    meta_p = Path(slot_dir) / CELL_META_NAME
+    if not meta_p.is_file():
+        return None
+    try:
+        meta = json.loads(meta_p.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(meta, dict):
+        return None
+    return _as_quality(meta.get("quality"))
 
 
 def extract_yawn_rails_proposals(
@@ -739,9 +796,14 @@ def build_capture_proposal(
             policy = None
     from re1_rl.go_explore_archive import normalize_quality
 
-    q = list(normalize_quality(quality))
-    while len(q) < 5:
-        q.append(0)
+    if _planner_loyal_enabled():
+        from re1_rl.planner_loyal_cells import lift_planner_loyal_quality
+
+        q = list(lift_planner_loyal_quality(quality))
+    else:
+        q = list(normalize_quality(quality))
+        while len(q) < 5:
+            q.append(0)
     meta = {
         "route_id": str(route_id),
         "checkpoint_index": int(checkpoint_index),
@@ -1082,20 +1144,18 @@ class YawnRailsCellStore:
             if (
                 not capacity_upgrade
                 and old_q is not None
-                and not quality_beats(quality, old_q)
+                and not _quality_beats_store(quality, old_q)
             ):
                 self._reject(f"idx={idx}: quality_does_not_beat")
                 return None
-            from re1_rl.go_explore_capture import quality_replace_significant
 
             if (
                 not capacity_upgrade
                 and old_q is not None
-                and not quality_replace_significant(quality, old_q)
+                and not _quality_replace_ok(quality, old_q)
             ):
                 self._reject(f"idx={idx}: quality_not_significant")
                 return None
-
         bundle_bytes = self._decode_bundle(prop)
         if bundle_bytes is None:
             self._reject(f"idx={idx}: missing_bundle")

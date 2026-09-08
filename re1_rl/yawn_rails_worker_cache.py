@@ -19,8 +19,10 @@ from re1_rl.yawn_rails_sync import (
     cell_dir_prefix,
     cell_slot_dir,
     promote_cell_files,
+    read_slot_quality,
     slot_content_shas,
     slot_matches_content,
+    store_quality_beats,
     yawn_cells_locked,
     yawn_rails_root,
     yawn_rails_sync_enabled,
@@ -137,6 +139,22 @@ def ensure_yawn_bundle_cached(
                 loaded = {}
             if isinstance(loaded, dict):
                 meta = loaded
+        # Never clobber a locally better planner-loyal mint with a stale
+        # learner bundle (SHA-authoritative poll used to drop kill pass-forward).
+        local_q = read_slot_quality(dest)
+        incoming_q = read_slot_quality(incoming)
+        if (
+            local_q is not None
+            and incoming_q is not None
+            and store_quality_beats(local_q, incoming_q)
+        ):
+            print(
+                f"[yawn_poll] keep local {cell_id} "
+                f"local_q={list(local_q)} beats incoming_q={list(incoming_q)}",
+                flush=True,
+            )
+            shutil.rmtree(incoming, ignore_errors=True)
+            return dest
         meta["checkpoint_index"] = idx
         meta["state_sha256"] = got_state
         meta["sidecar_sha256"] = got_side
@@ -266,14 +284,34 @@ def poll_yawn_rails_manifest(
                 continue
             if not was_hit:
                 fetched += 1
+            # If we kept a better local cell, advertise local hashes/quality.
+            local_shas = slot_content_shas(slot)
+            kept_local = bool(
+                local_shas
+                and want_state
+                and local_shas[0] != want_state
+            )
+            local_q = read_slot_quality(slot) if kept_local else None
             out_row = {
                 "checkpoint_index": idx,
                 "checkpoint_id": row.get("checkpoint_id", ""),
                 "room_id": row.get("room_id", ""),
-                "quality": list(row.get("quality") or []),
+                "quality": (
+                    list(local_q)
+                    if local_q is not None
+                    else list(row.get("quality") or [])
+                ),
                 "bundle_sha256": row.get("bundle_sha256", ""),
-                "state_sha256": row.get("state_sha256", ""),
-                "sidecar_sha256": row.get("sidecar_sha256", ""),
+                "state_sha256": (
+                    local_shas[0]
+                    if kept_local and local_shas
+                    else row.get("state_sha256", "")
+                ),
+                "sidecar_sha256": (
+                    local_shas[1]
+                    if kept_local and local_shas
+                    else row.get("sidecar_sha256", "")
+                ),
                 "bytes": int(row.get("bytes") or 0),
                 "state_path": (
                     row.get("state_path")

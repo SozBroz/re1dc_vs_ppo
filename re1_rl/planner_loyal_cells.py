@@ -1244,18 +1244,30 @@ def capture_planner_loyal_cell(
     state_path = staging / cell_state_filename()
     sidecar_path = staging / CELL_SIDECAR_NAME
     pred_almanac: dict[str, dict[str, int]] = {}
+    pred_total = 0
     if pred_slot is not None and pred_slot >= TRAINING_START_INDEX:
-        pred_almanac = _almanac_from_cell_dir(cell_slot_dir(root, pred_slot))
+        pred_dir = cell_slot_dir(root, pred_slot)
+        pred_almanac = _almanac_from_cell_dir(pred_dir)
+        pred_total = sum(sum(types.values()) for types in pred_almanac.values())
     kill_audit = planner_loyal_kill_audit(
         getattr(env, "_progress", None), pred_almanac
     )
+    live_total = int(kill_audit.get("almanac_total") or 0)
+    if pred_total > 0 and live_total < pred_total:
+        print(
+            f"[planner_loyal] reject kill_regression {cell_dir_name(slot)} "
+            f"live={live_total} predecessor={cell_dir_name(pred_slot)} "
+            f"pred_total={pred_total}",
+            flush=True,
+        )
+        shutil.rmtree(staging, ignore_errors=True)
+        return None
     try:
         env.bridge.save_savestate(str(state_path))
     except (OSError, RuntimeError, ValueError, AttributeError, TypeError) as exc:
         print(f"[planner_loyal] save_savestate failed: {exc}", flush=True)
         shutil.rmtree(staging, ignore_errors=True)
         return None
-
     try:
         from re1_rl.pb_sidecar import dump_episode_sidecar, utc_now_iso
 
@@ -1300,28 +1312,6 @@ def capture_planner_loyal_cell(
         hop_score=hop_s,
     )
 
-    # Quality-beats-old only against a cell of the same runtime; a legacy
-    # BizHawk cell.State sharing the slot dir is a different numbering.
-    if dest.exists() and (dest / cell_state_filename()).is_file():
-        old_meta_p = dest / CELL_META_NAME
-        old_q: list[Any] = []
-        if old_meta_p.is_file():
-            try:
-                old_q = list(
-                    json.loads(old_meta_p.read_text(encoding="utf-8")).get("quality")
-                    or []
-                )
-            except (OSError, json.JSONDecodeError, TypeError):
-                old_q = []
-        if old_q and not planner_loyal_quality_beats(quality, old_q):
-            print(
-                f"[planner_loyal] reject quality {cell_dir_name(slot)} "
-                f"new={quality} old={old_q}",
-                flush=True,
-            )
-            shutil.rmtree(staging, ignore_errors=True)
-            return None
-
     last = getattr(env, "_planner_loyal_last_success", None) or {}
     step = None
     steps = getattr(queue, "_steps", [])
@@ -1355,14 +1345,38 @@ def capture_planner_loyal_cell(
         json.dumps(meta, indent=2) + "\n", encoding="utf-8"
     )
 
-    if dest.exists():
-        _preserve_foreign_state(dest, staging)
-        shutil.rmtree(dest, ignore_errors=True)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(staging), str(dest))
+    from re1_rl.yawn_rails_sync import yawn_cells_locked
+
+    with yawn_cells_locked(root, holder=f"planner_loyal_mint:{os.getpid()}"):
+        # Re-read incumbent under lock (poll/other workers can race).
+        if dest.exists() and (dest / cell_state_filename()).is_file():
+            old_meta_p = dest / CELL_META_NAME
+            old_q: list[Any] = []
+            if old_meta_p.is_file():
+                try:
+                    old_q = list(
+                        json.loads(old_meta_p.read_text(encoding="utf-8")).get(
+                            "quality"
+                        )
+                        or []
+                    )
+                except (OSError, json.JSONDecodeError, TypeError):
+                    old_q = []
+            if old_q and not planner_loyal_quality_beats(quality, old_q):
+                print(
+                    f"[planner_loyal] reject quality {cell_dir_name(slot)} "
+                    f"new={quality} old={old_q}",
+                    flush=True,
+                )
+                shutil.rmtree(staging, ignore_errors=True)
+                return None
+        if dest.exists():
+            _preserve_foreign_state(dest, staging)
+            shutil.rmtree(dest, ignore_errors=True)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(staging), str(dest))
     _strip_fat_artifacts(dest)
     rewrite_manifest(env.project_root)
-
     proposal: dict[str, Any] = {
         "source": "planner_loyal",
         "route_id": ROUTE_ID,
