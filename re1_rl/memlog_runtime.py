@@ -230,6 +230,9 @@ _INFO_KEYS = (
     "combat_audit",
     "magic_report",
     "logistics_sample",
+    "hop_score",
+    "hop_score_shadow",
+    "planner_loyal_tip",
 )
 _IGNORED_EVENT_CHANNELS = frozenset({"step", "softlock"})
 
@@ -399,6 +402,81 @@ class MemlogTelemetry:
             pass
         with self.events_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, separators=(",", ":"), allow_nan=False) + "\n")
+
+    def publish_hop_learning_episode(
+        self,
+        *,
+        S: float,
+        locals_L: list[float],
+        targets_Y: list[float],
+        tip: str = "",
+        report: dict[str, Any] | None = None,
+        overridden_steps: list[int] | None = None,
+    ) -> None:
+        """Record post-processed hop targets ``Y_t = compose(S, L_t)`` for one episode.
+
+        Logged so memlog/dashboard can verify sign-opposed override (e.g. shotgun
+        miss taxes displacing a positive ``S`` on fire steps).
+        """
+        L = [float(x) for x in locals_L]
+        Y = [float(x) for x in targets_Y]
+        if len(L) != len(Y):
+            raise ValueError("locals_L and targets_Y length mismatch")
+        over = overridden_steps
+        if over is None:
+            over = [
+                i
+                for i, (loc, target) in enumerate(zip(L, Y))
+                if loc < 0.0 and float(S) > 0.0 and abs(target - loc) < 1e-9
+            ]
+        event = {
+            "run_id": self.run_id,
+            "rank": self.rank,
+            "time_unix_s": time.time(),
+            "kind": "hop_learning_targets",
+            "tip": str(tip or ""),
+            "S": float(S),
+            "n_steps": len(Y),
+            "locals_L": L,
+            "targets_Y": Y,
+            "overridden_steps": list(over),
+            "sum_L": float(sum(L)),
+            "sum_Y": float(sum(Y)),
+            "n_negative_L": int(sum(1 for x in L if x < 0.0)),
+            "n_overridden": int(len(over)),
+        }
+        if isinstance(report, dict):
+            for key in (
+                "outcome",
+                "success",
+                "q_ammo",
+                "q_ammo_raw",
+                "A_spent",
+                "B_ammo",
+                "D_hp",
+                "K",
+            ):
+                if key in report:
+                    event[key] = report[key]
+        self._append_event(event)
+        # Mirror onto latest.json for live dashboard.
+        if isinstance(self._latest, dict):
+            latest = dict(self._latest)
+            latest["hop_learning_targets"] = {
+                "tip": event["tip"],
+                "S": event["S"],
+                "n_steps": event["n_steps"],
+                "sum_L": event["sum_L"],
+                "sum_Y": event["sum_Y"],
+                "n_negative_L": event["n_negative_L"],
+                "n_overridden": event["n_overridden"],
+                "overridden_steps": event["overridden_steps"],
+                "A_spent": event.get("A_spent"),
+                "q_ammo_raw": event.get("q_ammo_raw"),
+                "outcome": event.get("outcome"),
+            }
+            self._latest = latest
+            _atomic_json_best_effort(self.latest_path, latest)
 
     def episodes_completed(self) -> int:
         return int(self._episodes_completed)

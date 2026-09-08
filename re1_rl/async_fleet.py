@@ -720,6 +720,19 @@ def _actor_process(
     except ImportError:
         pass
 
+    # Memlog actor (rank 4): hard-pin to pl74 via dedicated pin file so the
+    # dashboard watches pl74→75 without changing the fleet 74:10 mix.
+    if memlog_directory is not None:
+        memlog_pin = (os.environ.get("RE1_PLANNER_RESET_PIN_MEMLOG_FILE") or "").strip()
+        if not memlog_pin:
+            memlog_pin = "data/planner_loyal_reset_pin_memlog.env"
+        pin_path = Path(memlog_pin)
+        if not pin_path.is_absolute():
+            pin_path = PROJECT_ROOT / pin_path
+        if pin_path.is_file():
+            os.environ["RE1_PLANNER_RESET_PIN_FILE"] = str(pin_path)
+            print(f"[memlog] reset pin -> {pin_path}", flush=True)
+
     try:
         env = make_env(
             rank,
@@ -1014,9 +1027,33 @@ def _actor_process(
                         # Env scalar is L (+ S on the terminal step). Peel S so
                         # the buffer is pure local L, then write Y_t = compose(S, L).
                         rewards[step_i] = float(rewards[step_i]) - S
+                        locals_L = [
+                            float(rewards[_t]) for _t in range(int(step_i) + 1)
+                        ]
                         for _t in range(int(step_i) + 1):
                             rewards[_t] = compose_hop_learning_target(
-                                S, float(rewards[_t])
+                                S, float(locals_L[_t])
+                            )
+                        if memlog_telemetry is not None:
+                            report = (info or {}).get("hop_score") or (
+                                info or {}
+                            ).get("hop_score_shadow")
+                            tip = ""
+                            if isinstance(report, dict):
+                                tip = str(report.get("tip") or "")
+                            if not tip:
+                                tip = str(
+                                    (info or {}).get("planner_loyal_tip") or ""
+                                )
+                            memlog_telemetry.publish_hop_learning_episode(
+                                S=S,
+                                locals_L=locals_L,
+                                targets_Y=[
+                                    float(rewards[_t])
+                                    for _t in range(int(step_i) + 1)
+                                ],
+                                tip=tip,
+                                report=report if isinstance(report, dict) else None,
                             )
                 except Exception:
                     pass
