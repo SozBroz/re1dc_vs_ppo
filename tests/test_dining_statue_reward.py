@@ -179,6 +179,27 @@ def test_statue_202_overrides_door_compass_toward_approach_pad() -> None:
     assert goal[5] < 0.0
 
 
+def test_statue_202_compass_ahead_when_facing_toward_minus_x() -> None:
+    """Facing 2048 ≈ -X; approach pad due west must read ahead after facing fix."""
+    from re1_rl.dining_statue_puzzle import DINING_STATUE_APPROACH_XZ
+
+    planner = _statue_planner()
+    pad = DINING_STATUE_APPROACH_XZ
+    state = make_state(
+        room="202",
+        x=pad[0] + 2000,
+        z=pad[1],
+        facing=2048,
+        dining_statue_x=20000,
+        dining_statue_z=3452,
+        dining_statue_knocked=False,
+    )
+    compass = encode_dining_statue_compass(state, planner)
+    assert compass is not None
+    assert float(compass[3]) == pytest.approx(0.0, abs=0.05)
+    assert float(compass[4]) == pytest.approx(1.0, abs=0.05)
+
+
 def test_statue_202_compass_off_when_knocked() -> None:
     planner = _statue_planner()
     state = make_state(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from re1_rl.armor_room_puzzle import (
@@ -18,6 +19,7 @@ from re1_rl.armor_room_puzzle import (
     armor_statue_progress_reward,
     armor_stable_statues_seated,
     armor_vent_step_complete,
+    encode_armor_statue_compass,
 )
 from re1_rl.planner import WaypointPlanner
 from re1_rl.planner_loyal import PlannerLoyalQueue, encode_planner_loyal_goal
@@ -159,10 +161,36 @@ def _assert_compass(
     target: tuple[int, int],
     beat_id: str,
 ) -> None:
-    goal, encoder = _goal(state, beat_id)
+    goal, _encoder = _goal(state, beat_id)
     assert goal[21] == 1.0
-    want = encoder._compass_to_xz(state, float(target[0]), float(target[1]))
+    q = PlannerLoyalQueue()
+    idx = next(i for i, s in enumerate(q._steps) if s.get("beat_id") == beat_id)
+    q.seek(idx)
+    want = encode_armor_statue_compass(state, q)
+    assert want is not None
     assert goal[5:10] == pytest.approx(want)
+    # World dx/dz still point at the pad; angular pair uses armor facing.
+    dx = float(target[0]) - float(state["x"])
+    dz = float(target[1]) - float(state["z"])
+    assert float(goal[5]) == pytest.approx(float(np.clip(dx / 4096.0, -2.0, 2.0)))
+    assert float(goal[6]) == pytest.approx(float(np.clip(dz / 4096.0, -2.0, 2.0)))
+
+
+def test_armor_statue_compass_ahead_when_facing_toward_minus_z() -> None:
+    """Facing 1024 ≈ -Z in RE1; target due -Z must read ahead (cos≈+1)."""
+    target = ARMOR_EAST_APPROACH_XZ
+    state = _armor_state(
+        x=target[0],
+        z=target[1] + 2000,
+        facing=1024,
+    )
+    q = PlannerLoyalQueue()
+    idx = next(i for i, s in enumerate(q._steps) if s.get("beat_id") == "armor_vent_door")
+    q.seek(idx)
+    compass = encode_armor_statue_compass(state, q)
+    assert compass is not None
+    assert float(compass[3]) == pytest.approx(0.0, abs=0.05)
+    assert float(compass[4]) == pytest.approx(1.0, abs=0.05)
 
 
 def test_crest_goal_guides_to_east_approach_then_push_endpoint() -> None:

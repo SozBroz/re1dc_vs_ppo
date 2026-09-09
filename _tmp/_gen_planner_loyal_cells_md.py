@@ -23,13 +23,15 @@ def dest_of(edge: str) -> str:
 
 
 SEED = [
-    (0, "emblem_105", "105", "acquire", "Pick up the wooden emblem", "emblem", None),
-    (1, "kenneth_104", "104", "traverse", "Enter the Tea Room (Kenneth)", None, "105->104"),
-    (2, "barry_return_105", "105", "traverse", "Return to Dining after Kenneth", None, "104->105"),
-    (3, "main_hall_106", "106", "traverse", "Reach Main Hall after Kenneth", None, "105->106"),
-    (4, "upper_hall_203", "203", "traverse", "Climb to Main Hall 2F", None, "106->203"),
-    (5, "barry_hall_return_106", "106", "traverse", "Return from 203 to Main Hall (lockpick tip)", None, "203->106"),
+    (0, "fresh_start_105", "105", "tip", "Dining fresh start, no emblem (installed, never minted)", None, None),
+    (1, "emblem_105", "105", "acquire", "Pick up the wooden emblem", "emblem", None),
+    (2, "kenneth_104", "104", "traverse", "Enter the Tea Room (Kenneth)", None, "105->104"),
+    (3, "barry_return_105", "105", "traverse", "Return to Dining after Kenneth", None, "104->105"),
+    (4, "main_hall_106", "106", "traverse", "Reach Main Hall after Kenneth", None, "105->106"),
+    (5, "upper_hall_203", "203", "traverse", "Climb to Main Hall 2F", None, "106->203"),
+    (6, "barry_hall_return_106", "106", "traverse", "Return from 203 to Main Hall (lockpick tip)", None, "203->106"),
 ]
+TIP_SLOT = 6
 
 
 def step_room(step: dict) -> str:
@@ -104,8 +106,9 @@ def success_for(step: dict) -> str:
         if beat.endswith("door"):
             return f"Room `205` and {east}"
         return (
-            f"Room `205`, {east}, and west OM-object target `(4895, 7186)` "
-            "within ±50 in all three agreeing mirrors; both are mandatory "
+            f"Room `205`, {east}, and west OM-object seat inside validated AABB "
+            "X `4845..5195` / Z `7086..7336` (covers QS `(4895, 7186)`); "
+            "both are mandatory "
             "(one shove-grid cell still covers the west vent AOT)"
         )
     if op == "do_puzzle" and (
@@ -145,7 +148,7 @@ def main() -> None:
     a("")
     n_steps = len(chunk["steps"])
     n_capturing = sum(1 for s in chunk["steps"] if s.get("capture") is not False)
-    last_slot = 5 + n_capturing
+    last_slot = TIP_SLOT + n_capturing
     end_anchor = str(chunk.get("end_anchor_beat_id") or "")
     a(
         "Generated from [`data/planner_chunks/cp05_shield_key.json`]"
@@ -155,9 +158,12 @@ def main() -> None:
     )
     a("")
     a(
-        "**Source of truth:** the live chunk JSON. Seed cells `pl00`–`pl05` are "
-        "the opening crystals (same beats as yawn `cp00`–`cp05`); they are "
-        "**not** minted from this chunk."
+        "**C-RE1 numbering (Sep 2026):** `pl00` is the dining fresh start "
+        "(no emblem). Opening remint is `pl01` emblem … `pl06` lockpick "
+        "(`opening_to_lockpick.json`). Live shield-key step 0 (`106->105`) "
+        "mints `pl07`. Watch `states/planner_loyal/cells/plNN/cell.pst` — "
+        "BizHawk `cell.State` is backed up under "
+        "`backups/planner_loyal_bizhawk_20260904/`."
     )
     a("")
     a(
@@ -167,16 +173,17 @@ def main() -> None:
     a("")
     a(
         "- Slot formula: capturing steps only — `capture:false` (Richard) does "
-        "not consume a `plNN`. After `pl85` (`204->20D`), next mint is `pl86` "
+        "not consume a `plNN`. After `pl86` (`204->20D`), next mint is `pl87` "
         "(`204->207`)."
     )
     a(
-        "- Training starts: every minted `pl05+` (pin file "
-        "`data/planner_loyal_reset_pin.env`; blank = uniform)."
+        "- Training starts: every minted `pl06+` plus `pl00` when it has "
+        "`cell.pst` (pin file `data/planner_loyal_reset_pin.env`; blank = "
+        "uniform over loadable C-RE1 cells, **not** pinned to `pl00`)."
     )
     a(
         "- After reset from a cell, the live step is `planner_step_index + 1` "
-        "(or first chunk step from `pl05`)."
+        "(or first chunk step from `pl06`)."
     )
     a(
         "- `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; "
@@ -194,13 +201,67 @@ def main() -> None:
         "Mid-chunk success keeps the episode open."
     )
     a("")
+    a("## What's minted / what it's stuck on")
+    a("")
+    cells_root = ROOT / "states" / "planner_loyal" / "cells"
+    minted: list[tuple[int, str]] = []
+    if cells_root.is_dir():
+        for path in sorted(cells_root.iterdir()):
+            if not path.is_dir() or not path.name.startswith("pl"):
+                continue
+            if not (path / "cell.pst").is_file():
+                continue
+            try:
+                idx = int(path.name[2:])
+            except ValueError:
+                continue
+            cid = path.name
+            meta_p = path / "meta.json"
+            if meta_p.is_file():
+                try:
+                    meta = json.loads(meta_p.read_text(encoding="utf-8"))
+                    cid = str(meta.get("checkpoint_id") or path.name)
+                except (OSError, json.JSONDecodeError):
+                    pass
+            minted.append((idx, cid))
+    if minted:
+        a(
+            "Live C-RE1 `cell.pst` on this machine: "
+            + ", ".join(f"`pl{i:02d}` ({cid})" for i, cid in minted)
+            + "."
+        )
+        nxt = minted[-1][0] + 1
+        a(
+            f"Highest minted is `pl{minted[-1][0]:02d}`. The fleet is **stuck "
+            f"trying to mint `pl{nxt:02d}`** (see the summary row for that "
+            "slot — that is the current objective)."
+        )
+    else:
+        a("No live `cell.pst` cells found under `states/planner_loyal/cells`.")
+    a("")
+    a(
+        "Logs (pking): `reset tip=` is the start cell; `queue_seek ... want=` "
+        "is the step they must finish; `fail='planner_divert' target=` / "
+        "`divert=` is why they died before minting. `minted pl` / "
+        "`reject quality pl` is a completed cell."
+    )
+    a("")
+    a("```powershell")
+    a("Get-ChildItem D:\\re1_rl\\states\\planner_loyal\\cells -Directory | % Name")
+    a(
+        "findstr /C:\"[planner_loyal] minted pl\" /C:\"reset tip=\" "
+        "/C:\"queue_seek\" /C:\"planner_divert\" "
+        "D:\\re1_rl\\data\\logs\\worker_pking-recomp.log"
+    )
+    a("```")
+    a("")
     a("## Summary table")
     a("")
     a("| Cell | Step n | Checkpoint ID | Room | Op | Objective |")
     a("|------|--------|---------------|------|----|-----------|")
 
     for idx, cid, room, op, obj, _gained, _edge in SEED:
-        tip = " (training tip)" if idx == 5 else ""
+        tip = " (training tip)" if idx == TIP_SLOT else ""
         a(
             f"| `pl{idx:02d}` | seed | `{cid}` | `{room}` ({rname(room)}) | "
             f"{op} | {obj}{tip} |"
@@ -217,7 +278,7 @@ def main() -> None:
             )
             continue
         cap_n += 1
-        slot = 5 + cap_n
+        slot = TIP_SLOT + cap_n
         a(
             f"| `pl{slot:02d}` | {n} | `{step_cid(step)}` | `{room}` "
             f"({rname(room)}) | {step['op']} | {objective_for(step)} |"
@@ -241,7 +302,7 @@ def main() -> None:
             a(f"- **Success:** acquire `{gained}` in `{room}`")
         a("")
 
-    a(f"### Chunk cells (`pl06`–`pl{last_slot:02d}`)")
+    a(f"### Chunk cells (`pl07`–`pl{last_slot:02d}`)")
     a("")
     # Slot numbers skip capture:false steps (same rule as runtime).
     cap_n = 0
@@ -250,7 +311,7 @@ def main() -> None:
         capture = step.get("capture") is not False
         if capture:
             cap_n += 1
-            slot = 5 + cap_n
+            slot = TIP_SLOT + cap_n
             title = f"`pl{slot:02d}` — `{step_cid(step)}` (step {n})"
         else:
             title = f"`(no cell)` — `{step_cid(step)}` (step {n}, capture:false)"

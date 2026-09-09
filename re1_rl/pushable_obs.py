@@ -43,7 +43,8 @@ def _compass(state: dict[str, Any], tx: float, tz: float) -> tuple[float, ...]:
     dx = float(tx) - float(state.get("x", 0) or 0)
     dz = float(tz) - float(state.get("z", 0) or 0)
     distance = math.hypot(dx, dz)
-    facing = 2.0 * math.pi * float(state.get("facing", 0) or 0) / FACING_FULL_CIRCLE
+    # Match armor/dining statue compass: RE1 facing is clockwise from +X.
+    facing = -2.0 * math.pi * float(state.get("facing", 0) or 0) / FACING_FULL_CIRCLE
     relative = math.atan2(dz, dx) - facing
     return (
         float(np.clip(dx / DIST_NORM, -2.0, 2.0)),

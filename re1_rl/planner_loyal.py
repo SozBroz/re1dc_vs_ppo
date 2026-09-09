@@ -1592,22 +1592,26 @@ def encode_planner_loyal_goal(
     elif room and (target_room is None or room == str(target_room)):
         target_xz = None
         if room == "205":
-            from re1_rl.armor_room_puzzle import (
-                armor_statue_active,
-                armor_statue_goal_target,
-            )
+            from re1_rl.armor_room_puzzle import encode_armor_statue_compass
 
-            if armor_statue_active(queue, state):
-                target_xz = armor_statue_goal_target(state)
+            # Use the armor-facing convention helper (negated facing), not
+            # generic door compass — N/S headings were 180° off for statues.
+            armor_compass = encode_armor_statue_compass(state, queue)
+            if armor_compass is not None:
+                v[5:10] = armor_compass
+                v[21] = 1.0
+                compass_set = True
         elif room == "202":
-            from re1_rl.dining_statue_puzzle import (
-                dining_statue_goal_target,
-                statue_202_active,
-            )
+            from re1_rl.dining_statue_puzzle import encode_dining_statue_compass
 
-            if statue_202_active(None, state, queue=queue):
-                target_xz = dining_statue_goal_target(state)
-        if target_xz is None:
+            dining_compass = encode_dining_statue_compass(
+                state, queue=queue
+            )
+            if dining_compass is not None:
+                v[5:10] = dining_compass
+                v[21] = 1.0
+                compass_set = True
+        if not compass_set:
             target_xz = _planner_step_target_xz(step, item_positions=item_positions)
         if _star_crest_awaiting_end_of_life(step, state):
             from re1_rl.gallery_puzzle import GALLERY_FINAL_SWITCH_TARGET
@@ -1616,7 +1620,8 @@ def encode_planner_loyal_goal(
                 float(GALLERY_FINAL_SWITCH_TARGET[0]),
                 float(GALLERY_FINAL_SWITCH_TARGET[1]),
             )
-        if target_xz is not None:
+            compass_set = False
+        if target_xz is not None and not compass_set:
             v[5:10] = encoder._compass_to_xz(state, target_xz[0], target_xz[1])
             v[21] = 1.0
             compass_set = True

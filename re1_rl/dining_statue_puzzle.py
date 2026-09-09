@@ -212,7 +212,9 @@ def encode_dining_statue_compass(
     dx = tx - float(state.get("x", 0))
     dz = tz - float(state.get("z", 0))
     distance = math.hypot(dx, dz)
-    facing = 2.0 * math.pi * float(state.get("facing", 0)) / FACING_FULL_CIRCLE
+    # RE1 facing is clockwise from +X. Negate to match armor_statue compass
+    # so a target ahead yields cos≈+1 (not 180° off on N/S headings).
+    facing = -2.0 * math.pi * float(state.get("facing", 0)) / FACING_FULL_CIRCLE
     relative = math.atan2(dz, dx) - facing
     return np.asarray(
         [
