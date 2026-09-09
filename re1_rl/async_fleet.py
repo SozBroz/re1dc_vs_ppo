@@ -800,7 +800,7 @@ def _actor_process(
     dones = np.zeros(n_steps, dtype=np.bool_)
     values = np.zeros(n_steps, dtype=np.float32)
     log_probs = np.zeros(n_steps, dtype=np.float32)
-    # Per-step: armor_statue_progress > 0 (pl82→83 / pl83→84 right-way shove).
+    # Per-step: right-way statue shove (armor pl82→84 or dining pl98→99).
     push_override = np.zeros(n_steps, dtype=np.bool_)
     episode_infos: list[dict[str, Any]] = []
     step_i = 0
@@ -1034,6 +1034,7 @@ def _actor_process(
             br_step = (info or {}).get("reward_breakdown") or {}
             push_override[step_i] = (
                 float(br_step.get("armor_statue_progress") or 0.0) > 0.0
+                or float(br_step.get("dining_statue_progress") or 0.0) > 0.0
             )
             if bool(done or trunc):
                 try:

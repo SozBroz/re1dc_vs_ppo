@@ -353,7 +353,7 @@ def test_compose_hop_learning_target_negative_overpowers_positive_s() -> None:
 
 
 def test_compose_hop_learning_target_positive_push_overrides_failed_s() -> None:
-    # pl82→83 / pl83→84: right-way statue shove on a failed hop overrides S.
+    # Armor / dining right-way statue shove on a failed hop overrides S.
     assert compose_hop_learning_target(
         -4.0, 0.50, positive_push_override=True
     ) == pytest.approx(0.50)

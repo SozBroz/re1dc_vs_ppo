@@ -2056,12 +2056,18 @@ class RE1Env(gym.Env):
                 import time as _time
 
                 bridge = getattr(self, "bridge", None)
-                port = int(
-                    getattr(self, "port", 0)
-                    or getattr(bridge, "port", 0)
-                    or getattr(getattr(bridge, "client", None), "port", 0)
+                # BizHawk uses numeric listen ports; recomp may stash an SHM
+                # tag string on ``bridge.port`` (e.g. ``pl98h``). Seed only.
+                raw_port = (
+                    getattr(self, "port", None)
+                    or getattr(bridge, "port", None)
+                    or getattr(getattr(bridge, "client", None), "port", None)
                     or 0
                 )
+                try:
+                    port = int(raw_port)
+                except (TypeError, ValueError):
+                    port = abs(hash(str(raw_port))) & 0xFFFFFFFF
                 tip_rng = random.Random(
                     (os.getpid() << 16)
                     ^ (_time.time_ns() & 0xFFFFFFFF)

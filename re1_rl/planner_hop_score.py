@@ -213,9 +213,10 @@ def compose_hop_learning_target(
     on that step only (``Y = L``) so misuse is not washed out by success.
 
     Symmetrically, on a *failed* hop (``S < 0``), a step that earned a positive
-    armor-statue push (``armor_statue_progress > 0`` on pl82→83 / pl83→84)
-    overrides the negative outcome broadcast with ``Y = L``. Other positive
-    locals stay additive with negative ``S``.
+    statue push (``armor_statue_progress > 0`` on pl82→84, or
+    ``dining_statue_progress > 0`` on pl98→99) overrides the negative outcome
+    broadcast with ``Y = L``. Other positive locals stay additive with negative
+    ``S``.
     """
     s = float(S)
     loc = float(L)
