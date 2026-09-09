@@ -962,9 +962,9 @@ def _compute_planner_loyal_reward(
     from re1_rl.armor_room_puzzle import (
         ARMOR_GAS_DAMAGE_PENALTY,
         ARMOR_INPLACE_STATUE_PUSH_PENALTY,
+        armor_approach_leg_active,
         armor_approach_progress_reward,
         armor_approach_reference,
-        armor_far_leg_active,
         armor_gas_damage_detected,
         armor_inplace_statue_push_detected,
         armor_statue_progress_reward,
@@ -976,20 +976,39 @@ def _compute_planner_loyal_reward(
         planner_loyal_queue,
         progress,
     )
-    from re1_rl.dining_statue_puzzle import dining_statue_progress_reward
+    from re1_rl.dining_statue_puzzle import (
+        dining_approach_progress_reward,
+        dining_approach_reference,
+        dining_statue_progress_reward,
+    )
 
     bd["dining_statue_progress"] = dining_statue_progress_reward(
         prev_state,
         state,
         queue=planner_loyal_queue,
     )
-    if progress is not None and armor_far_leg_active(planner_loyal_queue, state):
+    if progress is not None and armor_approach_leg_active(
+        planner_loyal_queue, state
+    ):
         reference = progress.baseline_armor_far_approach(
-            armor_approach_reference(prev_state)
+            armor_approach_reference(prev_state, planner_loyal_queue)
         )
         bd["armor_approach"] = armor_approach_progress_reward(
             prev_state, state, planner_loyal_queue, reference
         )
+    if progress is not None:
+        from re1_rl.dining_statue_puzzle import statue_202_active
+
+        if statue_202_active(None, state, queue=planner_loyal_queue):
+            dining_ref = progress.baseline_dining_approach(
+                dining_approach_reference(prev_state)
+            )
+            bd["dining_approach"] = dining_approach_progress_reward(
+                prev_state,
+                state,
+                queue=planner_loyal_queue,
+                reference=dining_ref,
+            )
     if progress is not None and armor_inplace_statue_push_detected(
         prev_state, state, planner_loyal_queue
     ):

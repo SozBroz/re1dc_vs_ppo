@@ -58,6 +58,10 @@ DINING_STATUE_PROGRESS_STEP = 0.5
 DINING_STATUE_PROGRESS_BUDGET = 10.0
 DINING_STATUE_PROGRESS_REF_DIST = 8000.0
 
+# Match armor approach shaping (Jill→statue walk potential before shove).
+DINING_APPROACH_BUDGET = 0.5
+DINING_APPROACH_STEP = 0.1
+
 FACING_FULL_CIRCLE = 4096.0
 DIST_NORM = 4096.0
 
@@ -278,3 +282,55 @@ def dining_statue_progress_reward(
     return float(
         np.clip(raw, -DINING_STATUE_PROGRESS_STEP, DINING_STATUE_PROGRESS_STEP)
     )
+
+
+def _jill_dist_to_live_statue(state: dict[str, Any]) -> float | None:
+    live = _live_statue_xz(state)
+    if live is None:
+        return None
+    jx = float(state.get("x", 0) or 0)
+    jz = float(state.get("z", 0) or 0)
+    return math.hypot(jx - live[0], jz - live[1])
+
+
+def dining_approach_phi(distance: float, reference: float) -> float:
+    ref = max(float(reference), 1.0)
+    raw = DINING_APPROACH_BUDGET * (1.0 - max(float(distance), 0.0) / ref)
+    return float(np.clip(raw, -DINING_APPROACH_BUDGET, DINING_APPROACH_BUDGET))
+
+
+def dining_approach_progress_reward(
+    prev_state: dict[str, Any] | None,
+    state: dict[str, Any] | None,
+    *,
+    planner: Any = None,
+    queue: Any = None,
+    reference: float | None = None,
+) -> float:
+    """Jill→dining statue walk potential on tip pl98 (push_statue_2f).
+
+    Same magnitudes as armor approach. Zero while shoving (statue progress
+    owns that) or when the knock tip is not active.
+    """
+    if reference is None or not prev_state or not state:
+        return 0.0
+    if not statue_202_active(planner, state, queue=queue):
+        return 0.0
+    if str(prev_state.get("room_id", "") or "") != DINING_STATUE_ROOM_ID:
+        return 0.0
+    if dining_statue_pushing(prev_state) or dining_statue_pushing(state):
+        return 0.0
+    if dining_statue_knocked_from_state(state):
+        return 0.0
+    d0 = _jill_dist_to_live_statue(prev_state)
+    d1 = _jill_dist_to_live_statue(state)
+    if d0 is None or d1 is None:
+        return 0.0
+    raw = dining_approach_phi(d1, reference) - dining_approach_phi(d0, reference)
+    return float(np.clip(raw, -DINING_APPROACH_STEP, DINING_APPROACH_STEP))
+
+
+def dining_approach_reference(state: dict[str, Any] | None) -> float | None:
+    if not state:
+        return None
+    return _jill_dist_to_live_statue(state)

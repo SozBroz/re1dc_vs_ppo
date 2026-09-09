@@ -319,3 +319,62 @@ def test_planner_loyal_reward_pays_dining_statue_progress() -> None:
         return_breakdown=True,
     )
     assert bd["dining_statue_progress"] == pytest.approx(DINING_STATUE_PROGRESS_STEP)
+
+def test_planner_loyal_pays_dining_approach_when_walking_toward_statue() -> None:
+    from re1_rl.dining_statue_puzzle import DINING_APPROACH_STEP
+    from re1_rl.planner_loyal import PlannerLoyalQueue
+
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "statue",
+            "end_anchor_beat_id": "push_statue_2f",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "do_puzzle",
+                    "site_id": "dining_statue_knocked",
+                    "room_id": "202",
+                    "beat_id": "push_statue_2f",
+                }
+            ],
+        }
+    )
+    progress = ProgressTracker()
+    prev = _statue_state(
+        x=22000,
+        z=3452,
+        dining_statue_x=18000,
+        dining_statue_z=3452,
+    )
+    cur = _statue_state(
+        x=21000,
+        z=3452,
+        dining_statue_x=18000,
+        dining_statue_z=3452,
+        step=2,
+    )
+    _total, bd = compute_reward(
+        prev,
+        cur,
+        make_planner(),
+        progress=progress,
+        planner_loyal_queue=q,
+        return_breakdown=True,
+    )
+    assert progress.dining_approach_reference is not None
+    assert 0.0 < bd["dining_approach"] <= DINING_APPROACH_STEP
+    push_prev = _pushing_statue_state(
+        x=21000, z=3452, dining_statue_x=18000, dining_statue_z=3452
+    )
+    push_cur = _pushing_statue_state(
+        x=20500, z=3452, dining_statue_x=17500, dining_statue_z=3452, step=3
+    )
+    _t2, bd2 = compute_reward(
+        push_prev,
+        push_cur,
+        make_planner(),
+        progress=progress,
+        planner_loyal_queue=q,
+        return_breakdown=True,
+    )
+    assert bd2["dining_approach"] == 0.0

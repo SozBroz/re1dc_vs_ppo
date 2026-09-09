@@ -545,16 +545,23 @@ def test_approach_baseline_fixed_on_first_far_leg_step_only() -> None:
     assert ref is not None and ref > 5000.0
     _far_leg_reward(toward, _pl79_spawn_state(x=start["x"] - 700, step=3), q, progress)
     assert progress.armor_far_approach_reference == ref
-    # Not baselined while the east leg is current.
+
+
+def test_east_door_leg_pays_approach_toward_east_statue() -> None:
+    from re1_rl.armor_room_puzzle import ARMOR_APPROACH_STEP
+
     east_q = PlannerLoyalQueue()
     idx = next(
         i for i, s in enumerate(east_q._steps) if s.get("beat_id") == "armor_vent_door"
     )
     east_q.seek(idx)
-    fresh = ProgressTracker()
-    bd = _far_leg_reward(_armor_state(), _armor_state(x=15800, step=2), east_q, fresh)
-    assert fresh.armor_far_approach_reference is None
-    assert bd["armor_approach"] == 0.0
+    progress = ProgressTracker()
+    # East statue still at rest; Jill walks toward it (+Z from south of vent).
+    start = _armor_state(x=14035, z=5600, **_statue_fields("east", (14035, 6190)))
+    toward = dict(start, z=5900, step=2)
+    bd = _far_leg_reward(start, toward, east_q, progress)
+    assert progress.armor_far_approach_reference is not None
+    assert 0.0 < bd["armor_approach"] <= ARMOR_APPROACH_STEP
 
 
 def test_approach_potential_pays_toward_west_statue_and_telescopes() -> None:
@@ -603,7 +610,7 @@ def test_approach_progress_does_not_reset_idle_clock() -> None:
     assert progress.stagnation_frames > 1000
 
 
-def test_approach_potential_silent_while_pushing_and_off_far_step() -> None:
+def test_approach_potential_silent_while_pushing_and_off_vent_step() -> None:
     from re1_rl.armor_room_puzzle import armor_approach_progress_reward
 
     q = _far_queue()
@@ -613,12 +620,13 @@ def test_approach_potential_silent_while_pushing_and_off_far_step() -> None:
     assert armor_approach_progress_reward(start, toward, q, None) == 0.0
     pushing = dict(toward, game_state=PUSH_GAME_STATE)
     assert armor_approach_progress_reward(start, pushing, q, ref) == 0.0
-    east_q = PlannerLoyalQueue()
+    # Non-vent step (sun crest) pays nothing.
+    crest_q = PlannerLoyalQueue()
     idx = next(
-        i for i, s in enumerate(east_q._steps) if s.get("beat_id") == "armor_vent_door"
+        i for i, s in enumerate(crest_q._steps) if s.get("beat_id") == "sun_crest"
     )
-    east_q.seek(idx)
-    assert armor_approach_progress_reward(start, toward, east_q, ref) == 0.0
+    crest_q.seek(idx)
+    assert armor_approach_progress_reward(start, toward, crest_q, ref) == 0.0
 
 
 def test_gas_damage_in_205_is_terminal_and_zeros_positives() -> None:

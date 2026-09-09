@@ -507,6 +507,24 @@ def armor_far_leg_active(
     return armor_vent_index(_step_from_queue(queue)) == 1
 
 
+def armor_door_leg_active(
+    queue: Any, state: dict[str, Any] | None
+) -> bool:
+    """True while the current planner step is ``armor_vent_door`` in room 205."""
+    if not state or str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return False
+    return armor_vent_index(_step_from_queue(queue)) == 0
+
+
+def armor_approach_leg_active(
+    queue: Any, state: dict[str, Any] | None
+) -> bool:
+    """True on either armor vent shove tip (door east or far west)."""
+    if not state or str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
+        return False
+    return armor_vent_index(_step_from_queue(queue)) in (0, 1)
+
+
 def armor_approach_phi(distance: float, reference: float) -> float:
     ref = max(float(reference), 1.0)
     raw = ARMOR_APPROACH_BUDGET * (1.0 - max(float(distance), 0.0) / ref)
@@ -519,42 +537,52 @@ def armor_approach_progress_reward(
     queue: Any,
     reference: float | None,
 ) -> float:
-    """Potential on Jill's distance to the live west statue (far-vent leg only).
+    """Potential on Jill→active statue distance (door=east, far=west).
 
-    ``reference`` is the distance when the leg began (baselined by the caller
-    on the first far-vent step, so it works from the pl79 reset and after an
-    in-episode pl78->79 completion alike, wherever pl79 was minted). The
-    potential telescopes to at most +0.5 over the whole approach; retreating
-    toward the door pays it back. Zero while a shove is active — the statue
-    moves with Jill then.
+    ``reference`` is the distance when the leg began. Telescopes to at most
+    +0.5 over the whole approach; retreating pays it back. Zero while shoving.
     """
     if reference is None or not prev_state or not state:
         return 0.0
-    if not armor_far_leg_active(queue, state):
+    idx = armor_vent_index(_step_from_queue(queue))
+    if idx not in (0, 1):
+        return 0.0
+    if str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
         return 0.0
     if str(prev_state.get("room_id", "") or "") != ARMOR_ROOM_ID:
         return 0.0
     if armor_pushing(prev_state) or armor_pushing(state):
         return 0.0
-    prev_west = _named_statue_xz(prev_state, "west")
-    west = _named_statue_xz(state, "west")
-    if prev_west is None or west is None:
+    prefix = "east" if idx == 0 else "west"
+    prev_obj = _named_statue_xz(prev_state, prefix)
+    obj = _named_statue_xz(state, prefix)
+    if prev_obj is None or obj is None:
         return 0.0
-    raw = armor_approach_phi(_dist_to(state, west), reference) - armor_approach_phi(
-        _dist_to(prev_state, prev_west), reference
+    raw = armor_approach_phi(_dist_to(state, obj), reference) - armor_approach_phi(
+        _dist_to(prev_state, prev_obj), reference
     )
     return float(np.clip(raw, -ARMOR_APPROACH_STEP, ARMOR_APPROACH_STEP))
 
 
-def armor_approach_reference(state: dict[str, Any] | None) -> float | None:
-    """Jill-to-west-statue distance used to baseline the approach potential."""
+def armor_approach_reference(
+    state: dict[str, Any] | None,
+    queue: Any = None,
+) -> float | None:
+    """Jill-to-active-statue distance used to baseline the approach potential."""
     if not state:
         return None
-    west = _named_statue_xz(state, "west")
-    if west is None:
+    idx = armor_vent_index(_step_from_queue(queue))
+    if idx not in (0, 1):
+        # Back-compat: callers that omit queue still mean west (far leg).
+        west = _named_statue_xz(state, "west")
+        if west is None:
+            return None
+        return float(_dist_to(state, west))
+    prefix = "east" if idx == 0 else "west"
+    obj = _named_statue_xz(state, prefix)
+    if obj is None:
         return None
-    return float(_dist_to(state, west))
-
+    return float(_dist_to(state, obj))
 
 def armor_gas_damage_detected(
     prev_state: dict[str, Any] | None,

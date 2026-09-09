@@ -109,6 +109,7 @@ class ProgressTracker:
     # Jill-to-west-statue distance on the first ``armor_vent_far`` step
     # (approach potential baseline). Not persisted on sidecars.
     armor_far_approach_reference: float | None = None
+    dining_approach_reference: float | None = None
     dining_statue_rewarded: bool = False
     # Armor room 205: each poison-vent seat claimed once per episode while
     # pushing (pl79 door, pl80 far). Not persisted on sidecars.
@@ -745,10 +746,19 @@ class ProgressTracker:
         return True
 
     def baseline_armor_far_approach(self, reference: float | None) -> float | None:
-        """Fix the approach-potential baseline on the first far-vent step."""
+        """Fix the armor approach-potential baseline on the first vent-leg step.
+
+        Used for both door (east) and far (west) tips; one tip per live hop.
+        """
         if self.armor_far_approach_reference is None and reference is not None:
             self.armor_far_approach_reference = float(reference)
         return self.armor_far_approach_reference
+
+    def baseline_dining_approach(self, reference: float | None) -> float | None:
+        """Fix the dining balcony approach baseline on the first pl98 step."""
+        if self.dining_approach_reference is None and reference is not None:
+            self.dining_approach_reference = float(reference)
+        return self.dining_approach_reference
 
     def claim_dining_statue_bonus(
         self,
