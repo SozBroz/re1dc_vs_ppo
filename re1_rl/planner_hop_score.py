@@ -405,6 +405,10 @@ class PlannerHopMeters:
     k_transition_bogus: int = 0
     frames: int = 0
     steps: int = 0
+    # Per-hop positive statue locals (subtle competence — not full hop success).
+    push_pos_sum: float = 0.0
+    push_pos_steps: int = 0
+    approach_pos_sum: float = 0.0
     settled: bool = False
     last_report: dict[str, Any] = field(default_factory=dict)
     # (room_id, slot) already credited this hop — blocks death-anim / get-up
@@ -487,6 +491,20 @@ class PlannerHopMeters:
         self.k_raw_vanish += raw
         bogus = room_transition_bogus_kills(prev_state, state)
         self.k_transition_bogus += bogus
+
+    def note_statue_locals(self, breakdown: dict[str, float] | None) -> None:
+        """Accumulate positive shove / approach crumbs for competence telemetry."""
+        if self.settled or not breakdown:
+            return
+        push = float(breakdown.get("armor_statue_progress") or 0.0) + float(
+            breakdown.get("dining_statue_progress") or 0.0
+        )
+        if push > 0.0:
+            self.push_pos_sum += push
+            self.push_pos_steps += 1
+        approach = float(breakdown.get("armor_approach") or 0.0)
+        if approach > 0.0:
+            self.approach_pos_sum += approach
 
     def quality_bundle(self) -> dict[str, Any]:
         """Raw + clipped qualities, Q, B_kill, and clip flags (no silent cover-up)."""
@@ -656,6 +674,9 @@ class PlannerHopMeters:
             "F_elapsed": int(self.frames),
             "F_budget": int(self.budget_frames),
             "steps": int(self.steps),
+            "push_pos": round(float(self.push_pos_sum), 4),
+            "push_n": int(self.push_pos_steps),
+            "approach_pos": round(float(self.approach_pos_sum), 4),
         }
         self.settled = True
         self.last_report = report
@@ -699,6 +720,9 @@ def format_hop_score_shadow_line(report: dict[str, Any]) -> str:
         f"H_used={float(report.get('H_used', 0.0)):.4f} "
         f"frames={int(report.get('F_elapsed', 0) or 0)}/"
         f"{int(report.get('F_budget', 0) or 0)} "
+        f"push_pos={float(report.get('push_pos', 0.0) or 0.0):.3f} "
+        f"push_n={int(report.get('push_n', 0) or 0)} "
+        f"approach_pos={float(report.get('approach_pos', 0.0) or 0.0):.3f} "
         f"boss={int(bool(report.get('boss')))}"
     )
 

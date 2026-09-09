@@ -334,6 +334,24 @@ def test_format_line_includes_raw_math(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "q_hp_raw=" in line
     assert "clip_flags=" in line
     assert "K_budget=" in line
+    assert "push_pos=" in line
+    assert "push_n=" in line
+    assert "approach_pos=" in line
+
+
+def test_note_statue_locals_accumulate_push_and_approach() -> None:
+    meters = PlannerHopMeters.begin({"room_id": "205", "enemies": [], "hp": 96}, tip="pl82")
+    meters.note_statue_locals({"armor_statue_progress": 0.5, "armor_approach": 0.0})
+    meters.note_statue_locals({"armor_statue_progress": 0.25, "armor_approach": 0.1})
+    meters.note_statue_locals({"armor_statue_progress": -0.5, "armor_approach": 0.05})
+    report = meters.settle(outcome="planner_divert", failure="planner_divert")
+    assert report["push_pos"] == pytest.approx(0.75)
+    assert report["push_n"] == 2
+    assert report["approach_pos"] == pytest.approx(0.15)
+    line = format_hop_score_shadow_line(report)
+    assert "push_pos=0.750" in line
+    assert "push_n=2" in line
+
 
 
 def test_success_floor_constant() -> None:

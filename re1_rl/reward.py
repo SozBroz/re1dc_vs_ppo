@@ -1208,6 +1208,14 @@ def _compute_planner_loyal_reward(
         or progress.armor_gas_breached
         or progress.kenneth_gate_breached
     ):
+        # Count shove crumbs before terminal wipe so competence telemetry
+        # still sees pushes that ended in gas / inplace / divert.
+        from re1_rl.planner_hop_score import hop_score_live_enabled as _hop_live
+
+        if _hop_live():
+            meters = getattr(progress, "hop_meters", None)
+            if meters is not None and hasattr(meters, "note_statue_locals"):
+                meters.note_statue_locals(bd)
         for term, value in tuple(bd.items()):
             if value > 0.0:
                 bd[term] = 0.0
@@ -1238,6 +1246,9 @@ def _compute_planner_loyal_reward(
 
     if hop_score_live_enabled():
         meters = getattr(progress, "hop_meters", None) if progress is not None else None
+        if meters is not None and hasattr(meters, "note_statue_locals"):
+            # Non-terminal steps (and terminals that did not wipe above).
+            meters.note_statue_locals(bd)
         # Priority: death > timeout > divert-class > success (matches terminal ownership).
         if state.get("dead") or float(bd.get("death", 0.0) or 0.0) < 0.0:
             apply_live_hop_score(
