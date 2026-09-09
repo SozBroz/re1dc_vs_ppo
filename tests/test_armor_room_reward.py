@@ -165,38 +165,26 @@ def _assert_compass(
     assert goal[5:10] == pytest.approx(want)
 
 
-def test_crest_goal_guides_to_east_vent_like_dining_nav() -> None:
-    """pl82→83: goal compass aims at the statue destination (east vent), not Jill pads."""
+def test_crest_goal_guides_to_east_approach_then_push_endpoint() -> None:
     _assert_compass(
-        _armor_state(), ARMOR_EAST_SCRIPT_TARGET, "armor_vent_door"
+        _armor_state(), ARMOR_EAST_APPROACH_XZ, "armor_vent_door"
     )
-    # Near the old approach pad still aims at the vent (object-centric).
     _assert_compass(
         _armor_state(x=ARMOR_EAST_APPROACH_XZ[0], z=ARMOR_EAST_APPROACH_XZ[1]),
-        ARMOR_EAST_SCRIPT_TARGET,
+        ARMOR_EAST_PUSH_ENDPOINT_XZ,
         "armor_vent_door",
     )
 
 
-def test_crest_goal_advances_to_west_nav_only_after_stable_east_target() -> None:
-    """pl83→84: west goal uses dining-style depth waypoint then vent."""
-    from re1_rl.armor_room_puzzle import ARMOR_STATUE_REST, armor_west_statue_nav_target
-
+def test_crest_goal_advances_to_west_only_after_stable_east_target() -> None:
     state = _armor_state(**_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET))
     assert armor_stable_statues_seated(state) == (True, False)
-    depth = (ARMOR_STATUE_REST[1][0], ARMOR_WEST_SCRIPT_TARGET[1])
-    assert armor_west_statue_nav_target(state) == (
-        float(depth[0]),
-        float(depth[1]),
-    )
-    _assert_compass(state, depth, "armor_vent_far")
-    # Depth-aligned west: compass switches to the vent seat.
+    _assert_compass(state, ARMOR_WEST_APPROACH_XZ, "armor_vent_far")
+    state.update(x=ARMOR_WEST_APPROACH_XZ[0], z=ARMOR_WEST_APPROACH_XZ[1])
+    _assert_compass(state, ARMOR_WEST_PUSH_ENDPOINT_XZ, "armor_vent_far")
+    state.update(x=16000, z=7300)
     state.update(**_statue_fields("west", (8795, ARMOR_WEST_SCRIPT_TARGET[1])))
-    assert armor_west_statue_nav_target(state) == (
-        float(ARMOR_WEST_SCRIPT_TARGET[0]),
-        float(ARMOR_WEST_SCRIPT_TARGET[1]),
-    )
-    _assert_compass(state, ARMOR_WEST_SCRIPT_TARGET, "armor_vent_far")
+    _assert_compass(state, ARMOR_WEST_LATERAL_APPROACH_XZ, "armor_vent_far")
 
 
 def test_crest_goal_points_to_button_after_both_stable_targets() -> None:

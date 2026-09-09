@@ -41,6 +41,16 @@ DINING_STATUE_DROP_XZ: tuple[int, int] = (16488, 3452)
 DINING_STATUE_FINAL_PUSH_XZ: tuple[int, int] = (16488, 4200)
 DINING_STATUE_DROP_RADIUS = 700.0
 
+# Jill stand pads — same language as armor vent pushes (approach → push endpoint).
+# Corridor shove is primarily −X along z≈3452; tip shove is +Z past the drop.
+# Pads sit slightly south of the statue path so Jill docks then drives the shove.
+DINING_STATUE_APPROACH_XZ: tuple[int, int] = (19000, 3180)
+DINING_STATUE_PUSH_ENDPOINT_XZ: tuple[int, int] = (16650, 3280)
+DINING_STATUE_TIP_APPROACH_XZ: tuple[int, int] = (16488, 3100)
+DINING_STATUE_TIP_PUSH_ENDPOINT_XZ: tuple[int, int] = (16488, 3800)
+# Match armor ``ARMOR_APPROACH_RADIUS``.
+DINING_STATUE_APPROACH_RADIUS = 384.0
+
 # Dense distance shaping on statue_202 (imperator 2026-08-09):
 # ±STEP per env step, potential telescopes to ~BUDGET over REF world units so a
 # full balcony shove lands near +10 instead of +0.5×step_count.
@@ -83,10 +93,11 @@ def _live_statue_xz(state: dict[str, Any]) -> tuple[float, float] | None:
 
 
 def dining_statue_nav_target(state: dict[str, Any]) -> tuple[float, float]:
-    """World XZ the policy should move/push toward on statue_202.
+    """World XZ the *statue* should move toward (pushable remaining / progress).
 
     Prefer the drop line until the live statue is already there; then aim past
-    the ledge so one more forward shove tips it.
+    the ledge so one more forward shove tips it. Jill's goal compass uses
+    ``dining_statue_goal_target`` (approach / push pads), matching armor vents.
     """
     drop = DINING_STATUE_DROP_XZ
     live = _live_statue_xz(state)
@@ -98,6 +109,26 @@ def dining_statue_nav_target(state: dict[str, Any]) -> tuple[float, float]:
             float(DINING_STATUE_FINAL_PUSH_XZ[1]),
         )
     return (float(drop[0]), float(drop[1]))
+
+
+def _jill_dist_to(state: dict[str, Any], target: tuple[float, float]) -> float:
+    return math.hypot(
+        float(state.get("x", 0) or 0) - float(target[0]),
+        float(state.get("z", 0) or 0) - float(target[1]),
+    )
+
+
+def _dining_pad_phase(
+    state: dict[str, Any],
+    approach: tuple[int, int],
+    push_endpoint: tuple[int, int],
+) -> tuple[float, float]:
+    """Armor-style: approach pad until near/pushing, then push endpoint."""
+    if dining_statue_pushing(state) or (
+        _jill_dist_to(state, approach) <= DINING_STATUE_APPROACH_RADIUS
+    ):
+        return float(push_endpoint[0]), float(push_endpoint[1])
+    return float(approach[0]), float(approach[1])
 
 
 DINING_STATUE_BEAT_ID = "push_statue_2f"
@@ -134,10 +165,31 @@ def statue_202_active(
 
 
 def dining_statue_goal_target(state: dict[str, Any] | None) -> tuple[float, float] | None:
-    """Jill compass target while the dining shove crumb is live (statue nav XZ)."""
+    """Jill compass target — armor-style approach / push pads (not statue XZ).
+
+    Corridor phase until the statue is near the drop line; then tip pads so the
+    last shove matches the final-push geometry.
+    """
     if not state:
         return None
-    return dining_statue_nav_target(state)
+    live = _live_statue_xz(state)
+    near_drop = False
+    if live is not None:
+        near_drop = (
+            math.hypot(live[0] - DINING_STATUE_DROP_XZ[0], live[1] - DINING_STATUE_DROP_XZ[1])
+            <= DINING_STATUE_DROP_RADIUS
+        )
+    if near_drop:
+        return _dining_pad_phase(
+            state,
+            DINING_STATUE_TIP_APPROACH_XZ,
+            DINING_STATUE_TIP_PUSH_ENDPOINT_XZ,
+        )
+    return _dining_pad_phase(
+        state,
+        DINING_STATUE_APPROACH_XZ,
+        DINING_STATUE_PUSH_ENDPOINT_XZ,
+    )
 
 
 def encode_dining_statue_compass(
@@ -146,14 +198,17 @@ def encode_dining_statue_compass(
     *,
     queue: Any = None,
 ) -> np.ndarray | None:
-    """Egocentric compass toward the drop line (or final shove).
+    """Egocentric compass toward Jill approach / push pads (armor convention).
 
     Returns ``(dx_n, dz_n, dist_n, sin, cos)`` in the same units as the door
     compass, or ``None`` when this checkpoint is not active.
     """
     if not statue_202_active(planner, state, queue=queue):
         return None
-    tx, tz = dining_statue_nav_target(state)
+    target = dining_statue_goal_target(state)
+    if target is None:
+        return None
+    tx, tz = target
     dx = tx - float(state.get("x", 0))
     dz = tz - float(state.get("z", 0))
     distance = math.hypot(dx, dz)

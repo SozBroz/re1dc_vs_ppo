@@ -56,9 +56,6 @@ def test_pushables_zero_outside_puzzle() -> None:
 
 def test_armor_pl80_slots_live_and_crumb_target() -> None:
     # East already on vent; west still at rest. Far-vent step → west is active.
-    # Remaining aims at dining-style depth waypoint (rest_x, vent_z), not full vent yet.
-    from re1_rl.armor_room_puzzle import ARMOR_STATUE_REST
-
     queue = SimpleNamespace(current={"beat_id": ARMOR_VENT_FAR_BEAT, "site_id": "armor_vent_far"})
     state = _armor_state(
         armor_east_statue_x=ARMOR_EAST_SCRIPT_TARGET[0],
@@ -76,47 +73,13 @@ def test_armor_pl80_slots_live_and_crumb_target() -> None:
     assert west[9] == 1.0  # west pays ±0.5 on shove
     assert east[10] == 1.0  # east seated on vent
     assert west[10] == 0.0
-    depth = (ARMOR_STATUE_REST[1][0], ARMOR_WEST_SCRIPT_TARGET[1])
-    rem_dx = (depth[0] - 8795) / 4096.0
-    rem_dz = (depth[1] - 7886) / 4096.0
+    # Remaining west→vent matches ARMOR_WEST_SCRIPT_TARGET - live west.
+    rem_dx = (ARMOR_WEST_SCRIPT_TARGET[0] - 8795) / 4096.0
+    rem_dz = (ARMOR_WEST_SCRIPT_TARGET[1] - 7886) / 4096.0
     assert west[6] == np.float32(np.clip(rem_dx, -2.0, 2.0))
     assert west[7] == np.float32(np.clip(rem_dz, -2.0, 2.0))
     # Jill→west compass distance is positive.
     assert west[3] > 0.0
-
-
-def test_armor_goal_and_pushable_remaining_share_nav_target() -> None:
-    """Dining parity: goal[5:10] target == active pushable remaining target."""
-    import pytest
-
-    from re1_rl.armor_room_puzzle import (
-        ARMOR_VENT_DOOR_BEAT,
-        armor_slot_statue_nav_target,
-        armor_statue_goal_target,
-    )
-    from re1_rl.obs_encoder import ObsEncoder
-    from re1_rl.planner_loyal import PlannerLoyalQueue, encode_planner_loyal_goal
-    from re1_rl.room_graph import RoomGraph
-
-    queue = PlannerLoyalQueue()
-    idx = next(
-        i for i, s in enumerate(queue._steps) if s.get("beat_id") == ARMOR_VENT_DOOR_BEAT
-    )
-    queue.seek(idx)
-    state = _armor_state()
-    nav = armor_statue_goal_target(state)
-    assert nav == (
-        float(ARMOR_EAST_SCRIPT_TARGET[0]),
-        float(ARMOR_EAST_SCRIPT_TARGET[1]),
-    )
-    assert armor_slot_statue_nav_target(state, prefix="east", seated=False) == nav
-
-    root = Path(__file__).resolve().parents[1]
-    graph = RoomGraph(root / "data" / "doors_empirical.json")
-    encoder = ObsEncoder(root / "data" / "rooms.json", graph)
-    goal = encode_planner_loyal_goal(encoder, graph, state, queue)
-    want = encoder._compass_to_xz(state, nav[0], nav[1])
-    assert goal[5:10] == pytest.approx(want)
 
 
 def test_dining_pl95_pushables_live_on_loyal_queue() -> None:

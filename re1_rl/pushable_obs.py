@@ -14,10 +14,11 @@ from typing import Any
 import numpy as np
 
 from re1_rl.armor_room_puzzle import (
+    ARMOR_EAST_SCRIPT_TARGET,
     ARMOR_ROOM_ID,
+    ARMOR_WEST_SCRIPT_TARGET,
     _named_statue_xz,
     _step_from_queue,
-    armor_slot_statue_nav_target,
     armor_stable_statues_seated,
     armor_statue_active,
     armor_vent_index,
@@ -96,22 +97,19 @@ def encode_pushables(
     if room == ARMOR_ROOM_ID and armor_statue_active(queue, state):
         east_seated, west_seated = armor_stable_statues_seated(state)
         active_idx = armor_vent_index(_step_from_queue(queue))
-        for slot, prefix, seated in (
-            (0, "east", east_seated),
-            (1, "west", west_seated),
+        for slot, prefix, target, seated in (
+            (0, "east", ARMOR_EAST_SCRIPT_TARGET, east_seated),
+            (1, "west", ARMOR_WEST_SCRIPT_TARGET, west_seated),
         ):
             obj = _named_statue_xz(state, prefix)
             if obj is None:
                 continue
-            target = armor_slot_statue_nav_target(
-                state, prefix=prefix, seated=seated
-            )
             _write_slot(
                 v,
                 slot,
                 state=state,
                 obj=obj,
-                target=target,
+                target=(float(target[0]), float(target[1])),
                 active=active_idx == slot,
                 seated=seated,
             )

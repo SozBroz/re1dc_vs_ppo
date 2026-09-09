@@ -146,28 +146,37 @@ def test_nav_target_is_drop_until_statue_arrives() -> None:
     )
 
 
-def test_statue_202_overrides_door_compass_toward_drop() -> None:
+def test_statue_202_overrides_door_compass_toward_approach_pad() -> None:
+    """Goal compass uses Jill approach pads (armor language), not statue drop XZ."""
+    from re1_rl.dining_statue_puzzle import (
+        DINING_STATUE_APPROACH_XZ,
+        dining_statue_goal_target,
+    )
+
     enc = ObsEncoder(ROOMS, RoomGraph(DOORS))
     planner = _statue_planner()
     assert planner.current_objective()["checkpoint_id"] == "statue_202"
-    # East of the drop line, facing west-ish (2048) — drop should be ahead.
+    # Far from approach pad, statue still mid-corridor.
     state = make_state(
         room="202",
-        x=20000,
+        x=22000,
         z=3452,
         facing=2048,
         dining_statue_x=20000,
         dining_statue_z=3452,
         dining_statue_knocked=False,
     )
+    assert dining_statue_goal_target(state) == (
+        float(DINING_STATUE_APPROACH_XZ[0]),
+        float(DINING_STATUE_APPROACH_XZ[1]),
+    )
     compass = encode_dining_statue_compass(state, planner)
     assert compass is not None
     goal = enc.encode_goal(state, planner)
     assert goal[5:10] == pytest.approx(compass)
     assert goal[21] == pytest.approx(1.0)
-    # Drop X is west of player → negative dx.
+    # Approach pad is west of this Jill pose → negative dx.
     assert goal[5] < 0.0
-    assert goal[7] > 0.0
 
 
 def test_statue_202_compass_off_when_knocked() -> None:
