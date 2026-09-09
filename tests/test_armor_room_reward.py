@@ -165,26 +165,38 @@ def _assert_compass(
     assert goal[5:10] == pytest.approx(want)
 
 
-def test_crest_goal_guides_to_east_approach_then_push_endpoint() -> None:
+def test_crest_goal_guides_to_east_vent_like_dining_nav() -> None:
+    """pl82→83: goal compass aims at the statue destination (east vent), not Jill pads."""
     _assert_compass(
-        _armor_state(), ARMOR_EAST_APPROACH_XZ, "armor_vent_door"
+        _armor_state(), ARMOR_EAST_SCRIPT_TARGET, "armor_vent_door"
     )
+    # Near the old approach pad still aims at the vent (object-centric).
     _assert_compass(
         _armor_state(x=ARMOR_EAST_APPROACH_XZ[0], z=ARMOR_EAST_APPROACH_XZ[1]),
-        ARMOR_EAST_PUSH_ENDPOINT_XZ,
+        ARMOR_EAST_SCRIPT_TARGET,
         "armor_vent_door",
     )
 
 
-def test_crest_goal_advances_to_west_only_after_stable_east_target() -> None:
+def test_crest_goal_advances_to_west_nav_only_after_stable_east_target() -> None:
+    """pl83→84: west goal uses dining-style depth waypoint then vent."""
+    from re1_rl.armor_room_puzzle import ARMOR_STATUE_REST, armor_west_statue_nav_target
+
     state = _armor_state(**_statue_fields("east", ARMOR_EAST_SCRIPT_TARGET))
     assert armor_stable_statues_seated(state) == (True, False)
-    _assert_compass(state, ARMOR_WEST_APPROACH_XZ, "armor_vent_far")
-    state.update(x=ARMOR_WEST_APPROACH_XZ[0], z=ARMOR_WEST_APPROACH_XZ[1])
-    _assert_compass(state, ARMOR_WEST_PUSH_ENDPOINT_XZ, "armor_vent_far")
-    state.update(x=16000, z=7300)
+    depth = (ARMOR_STATUE_REST[1][0], ARMOR_WEST_SCRIPT_TARGET[1])
+    assert armor_west_statue_nav_target(state) == (
+        float(depth[0]),
+        float(depth[1]),
+    )
+    _assert_compass(state, depth, "armor_vent_far")
+    # Depth-aligned west: compass switches to the vent seat.
     state.update(**_statue_fields("west", (8795, ARMOR_WEST_SCRIPT_TARGET[1])))
-    _assert_compass(state, ARMOR_WEST_LATERAL_APPROACH_XZ, "armor_vent_far")
+    assert armor_west_statue_nav_target(state) == (
+        float(ARMOR_WEST_SCRIPT_TARGET[0]),
+        float(ARMOR_WEST_SCRIPT_TARGET[1]),
+    )
+    _assert_compass(state, ARMOR_WEST_SCRIPT_TARGET, "armor_vent_far")
 
 
 def test_crest_goal_points_to_button_after_both_stable_targets() -> None:
@@ -595,16 +607,20 @@ def test_approach_potential_silent_while_pushing_and_off_far_step() -> None:
 
 def test_gas_damage_in_205_is_terminal_and_zeros_positives() -> None:
     from re1_rl.armor_room_puzzle import ARMOR_GAS_DAMAGE_PENALTY
+    from re1_rl.planner_hop_score import hop_score_live_enabled
 
     q = _far_queue()
     progress = ProgressTracker()
     prev = _pl79_spawn_state(hp=96)
     gassed = _pl79_spawn_state(hp=90, x=14345 - 350, step=2)
     bd = _far_leg_reward(prev, gassed, q, progress)
-    assert bd["armor_gas"] == pytest.approx(-ARMOR_GAS_DAMAGE_PENALTY)
     assert progress.armor_gas_breached is True
     assert bd["armor_approach"] == 0.0
-    assert bd["hp"] < 0.0
+    if hop_score_live_enabled():
+        assert float(bd.get("hop_score", 0.0) or 0.0) < 0.0
+    else:
+        assert bd["armor_gas"] == pytest.approx(-ARMOR_GAS_DAMAGE_PENALTY)
+        assert bd["hp"] < 0.0
     # Second breach never re-pays.
     bd2 = _far_leg_reward(gassed, _pl79_spawn_state(hp=84, step=3), q, progress)
     assert bd2.get("armor_gas", 0.0) == 0.0

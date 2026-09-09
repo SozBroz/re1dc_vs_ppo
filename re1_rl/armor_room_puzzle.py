@@ -270,10 +270,32 @@ def armor_stable_statues_seated(state: dict[str, Any] | None) -> tuple[bool, boo
     )
 
 
-def armor_statue_goal_target(
+def armor_west_statue_nav_target(
+    state: dict[str, Any] | None,
+) -> tuple[float, float]:
+    """West statue destination (dining-style drop → final).
+
+    Until the statue's Z is in the seat band, aim the depth waypoint
+    ``(rest_x, vent_z)``. Once depth-aligned, aim the vent seat itself.
+    """
+    vent = ARMOR_WEST_SCRIPT_TARGET
+    rest = ARMOR_STATUE_REST[1]
+    depth = (float(rest[0]), float(vent[1]))
+    west = _named_statue_xz(state, "west") if state else None
+    if not armor_west_depth_aligned(west):
+        return depth
+    return float(vent[0]), float(vent[1])
+
+
+def armor_statue_nav_target_xz(
     state: dict[str, Any] | None,
 ) -> tuple[float, float] | None:
-    """Phase-aware compass target; supplies guidance only and never pays reward."""
+    """Object-centric statue destination for compass + pushable remaining.
+
+    Matches dining ``dining_statue_nav_target``: Jill's goal compass and the
+    active pushable's remaining vector both point at where the *statue*
+    should go (vent / depth waypoint / button), not at Jill approach pads.
+    """
     if not state or str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
         return None
     if armor_puzzle_ready_from_state(state) or armor_sun_crest_held(state):
@@ -281,34 +303,31 @@ def armor_statue_goal_target(
 
     east_seated, west_seated = armor_stable_statues_seated(state)
     if not east_seated:
-        target = (
-            ARMOR_EAST_PUSH_ENDPOINT_XZ
-            if armor_pushing(state)
-            or _dist_to(state, ARMOR_EAST_APPROACH_XZ) <= ARMOR_APPROACH_RADIUS
-            else ARMOR_EAST_APPROACH_XZ
-        )
-        return float(target[0]), float(target[1])
+        return float(ARMOR_EAST_SCRIPT_TARGET[0]), float(ARMOR_EAST_SCRIPT_TARGET[1])
     if not west_seated:
-        west = _named_statue_xz(state, "west")
-        depth_aligned = armor_west_depth_aligned(west)
-        if depth_aligned:
-            target = (
-                ARMOR_WEST_LATERAL_PUSH_ENDPOINT_XZ
-                if armor_pushing(state)
-                or _dist_to(state, ARMOR_WEST_LATERAL_APPROACH_XZ)
-                <= ARMOR_APPROACH_RADIUS
-                else ARMOR_WEST_LATERAL_APPROACH_XZ
-            )
-        else:
-            target = (
-                ARMOR_WEST_PUSH_ENDPOINT_XZ
-                if armor_pushing(state)
-                or _dist_to(state, ARMOR_WEST_APPROACH_XZ)
-                <= ARMOR_APPROACH_RADIUS
-                else ARMOR_WEST_APPROACH_XZ
-            )
-        return float(target[0]), float(target[1])
+        return armor_west_statue_nav_target(state)
     return float(ARMOR_BUTTON_XZ[0]), float(ARMOR_BUTTON_XZ[1])
+
+
+def armor_statue_goal_target(
+    state: dict[str, Any] | None,
+) -> tuple[float, float] | None:
+    """Jill compass target while an armor vent shove is live (statue nav XZ)."""
+    return armor_statue_nav_target_xz(state)
+
+
+def armor_slot_statue_nav_target(
+    state: dict[str, Any] | None,
+    *,
+    prefix: str,
+    seated: bool,
+) -> tuple[float, float]:
+    """Per-slot remaining target for ``encode_pushables`` (dining parity)."""
+    if prefix == "east":
+        return float(ARMOR_EAST_SCRIPT_TARGET[0]), float(ARMOR_EAST_SCRIPT_TARGET[1])
+    if seated:
+        return float(ARMOR_WEST_SCRIPT_TARGET[0]), float(ARMOR_WEST_SCRIPT_TARGET[1])
+    return armor_west_statue_nav_target(state)
 
 
 def armor_vents_seated(state: dict[str, Any] | None, progress: Any = None) -> list[bool]:
@@ -391,11 +410,11 @@ def armor_statue_nav_target(
     queue: Any = None,
     progress: Any = None,
 ) -> tuple[float, float] | None:
-    """World XZ for the phase-aware approach/push/button compass."""
+    """World XZ for the dining-style statue destination compass."""
     del progress
     if not armor_statue_active(queue, state):
         return None
-    return armor_statue_goal_target(state)
+    return armor_statue_nav_target_xz(state)
 
 
 def armor_statue_progress_phi(remaining: float, reference: float) -> float:
@@ -411,7 +430,12 @@ def armor_statue_progress_reward(
     queue: Any = None,
     progress: Any = None,
 ) -> float:
-    """Shove-only object potential: toward the exact seat pays; away is punished."""
+    """Shove-only object potential toward the dining-style nav target.
+
+    Closer → up to ``+PROGRESS_STEP``; farther → down to ``-PROGRESS_STEP``.
+    Nav-target switches (west depth → vent) rebaseline with zero pay that step,
+    matching ``dining_statue_progress_reward``.
+    """
     del progress
     if not prev_state or not state:
         return 0.0
@@ -428,16 +452,24 @@ def armor_statue_progress_reward(
     if idx == 0:
         prefix = "east"
         rest = ARMOR_STATUE_REST[0]
-        target = ARMOR_EAST_SCRIPT_TARGET
+        target0 = (
+            float(ARMOR_EAST_SCRIPT_TARGET[0]),
+            float(ARMOR_EAST_SCRIPT_TARGET[1]),
+        )
+        target1 = target0
     else:
         prefix = "west"
         rest = ARMOR_STATUE_REST[1]
-        target = ARMOR_WEST_SCRIPT_TARGET
+        target0 = armor_west_statue_nav_target(prev_state)
+        target1 = armor_west_statue_nav_target(state)
 
     prev_xz = _named_statue_xz(prev_state, prefix)
     current_xz = _named_statue_xz(state, prefix)
     if prev_xz is None or current_xz is None:
         return 0.0
+    if target0 != target1:
+        return 0.0
+    target = target1
     reference = math.hypot(float(rest[0] - target[0]), float(rest[1] - target[1]))
     raw = armor_statue_progress_phi(
         math.hypot(current_xz[0] - target[0], current_xz[1] - target[1]),
@@ -582,15 +614,14 @@ def encode_armor_statue_compass(
     queue: Any = None,
     progress: Any = None,
 ) -> np.ndarray | None:
+    """Egocentric compass toward the statue nav target (dining facing convention)."""
     target = armor_statue_nav_target(state, queue, progress)
     if target is None:
         return None
     dx = target[0] - float(state.get("x", 0) or 0)
     dz = target[1] - float(state.get("z", 0) or 0)
     distance = math.hypot(dx, dz)
-    # RE1 facing is clockwise from +X (QS2: 2048 + up = -X). Negate so
-    # north/south grate bearings are ahead, not 180° off.
-    facing = -2.0 * math.pi * float(state.get("facing", 0) or 0) / FACING_FULL_CIRCLE
+    facing = 2.0 * math.pi * float(state.get("facing", 0) or 0) / FACING_FULL_CIRCLE
     relative = math.atan2(dz, dx) - facing
     return np.asarray(
         [
