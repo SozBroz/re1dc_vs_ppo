@@ -471,13 +471,15 @@ def armor_inplace_statue_push_detected(
     state: dict[str, Any] | None,
     queue: Any = None,
 ) -> bool:
-    """True when a seated vent statue moves during a shove on the pl79->80 step only.
+    """True when the wrong / already-seated armor statue is shoved.
 
-    pl79->80 (``armor_vent_far``): east is already on its vent; pushing it ends
-    the episode. pl78->79 is unchanged.
+    - ``armor_vent_door`` (pl82→83): west (far) statue must stay put; any shove
+      that moves it ends the episode.
+    - ``armor_vent_far`` (pl83→84): a seated vent statue that moves during a
+      shove ends the episode (east is already seated).
     """
     idx = armor_vent_index(_step_from_queue(queue))
-    if idx != 1 or not prev_state or not state:
+    if idx is None or not prev_state or not state:
         return False
     if str(prev_state.get("room_id", "") or "") != ARMOR_ROOM_ID:
         return False
@@ -485,6 +487,9 @@ def armor_inplace_statue_push_detected(
         return False
     if not (armor_pushing(prev_state) or armor_pushing(state)):
         return False
+
+    if idx == 0:
+        return _statue_moved(prev_state, state, "west")
 
     prev_seated = armor_stable_statues_seated(prev_state)
     for prefix, seated in zip(("east", "west"), prev_seated, strict=True):

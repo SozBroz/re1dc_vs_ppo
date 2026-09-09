@@ -330,7 +330,8 @@ def test_crest_goal_points_to_crest_after_puzzle_flag() -> None:
     assert goal[5:10] == pytest.approx(want)
 
 
-def test_inplace_push_west_on_east_step_is_ignored() -> None:
+def test_other_statue_push_on_door_step_is_detected() -> None:
+    """pl82→83: shoving the west (far) statue is terminal."""
     from re1_rl.armor_room_puzzle import armor_inplace_statue_push_detected
 
     q = PlannerLoyalQueue()
@@ -342,6 +343,22 @@ def test_inplace_push_west_on_east_step_is_ignored() -> None:
     cur = _armor_state(
         game_state=PUSH_GAME_STATE,
         **_statue_fields("west", (8795, 7836)),
+    )
+    assert armor_inplace_statue_push_detected(prev, cur, q) is True
+
+
+def test_east_statue_shove_on_door_step_is_not_wrong_statue() -> None:
+    from re1_rl.armor_room_puzzle import armor_inplace_statue_push_detected
+
+    q = PlannerLoyalQueue()
+    idx = next(
+        i for i, s in enumerate(q._steps) if s.get("beat_id") == "armor_vent_door"
+    )
+    q.seek(idx)
+    prev = _armor_state(game_state=PUSH_GAME_STATE)
+    cur = _armor_state(
+        game_state=PUSH_GAME_STATE,
+        **_statue_fields("east", (14035, 6240)),
     )
     assert armor_inplace_statue_push_detected(prev, cur, q) is False
 
@@ -388,6 +405,7 @@ def test_target_statue_shove_toward_vent_is_not_inplace_breach() -> None:
 
 def test_inplace_push_applies_terminal_penalty() -> None:
     from re1_rl.armor_room_puzzle import ARMOR_INPLACE_STATUE_PUSH_PENALTY
+    from re1_rl.planner_hop_score import hop_score_live_enabled
 
     q = PlannerLoyalQueue()
     idx = next(
@@ -411,11 +429,49 @@ def test_inplace_push_applies_terminal_penalty() -> None:
         planner_loyal_queue=q,
         return_breakdown=True,
     )
-    assert bd["armor_inplace_statue_push"] == pytest.approx(
-        -ARMOR_INPLACE_STATUE_PUSH_PENALTY
-    )
     assert progress.armor_inplace_statue_push_breached is True
     assert bd["armor_statue_progress"] == 0.0
+    if hop_score_live_enabled():
+        # Live hop score settles the failure; the dense channel is zeroed.
+        assert float(bd.get("hop_score", 0.0) or 0.0) < 0.0
+    else:
+        assert bd["armor_inplace_statue_push"] == pytest.approx(
+            -ARMOR_INPLACE_STATUE_PUSH_PENALTY
+        )
+
+
+def test_other_statue_push_on_door_step_is_terminal() -> None:
+    """pl82→83: west shove breaches like inplace on the far leg."""
+    from re1_rl.planner_hop_score import hop_score_live_enabled
+
+    q = PlannerLoyalQueue()
+    idx = next(
+        i for i, s in enumerate(q._steps) if s.get("beat_id") == "armor_vent_door"
+    )
+    q.seek(idx)
+    progress = ProgressTracker()
+    prev = _armor_state(game_state=PUSH_GAME_STATE)
+    cur = _armor_state(
+        game_state=PUSH_GAME_STATE,
+        **_statue_fields("west", (8795, 7836)),
+    )
+    _total, bd = compute_reward(
+        prev,
+        cur,
+        _planner(),
+        progress=progress,
+        planner_loyal_queue=q,
+        return_breakdown=True,
+    )
+    assert progress.armor_inplace_statue_push_breached is True
+    if hop_score_live_enabled():
+        assert float(bd.get("hop_score", 0.0) or 0.0) < 0.0
+    else:
+        from re1_rl.armor_room_puzzle import ARMOR_INPLACE_STATUE_PUSH_PENALTY
+
+        assert bd["armor_inplace_statue_push"] == pytest.approx(
+            -ARMOR_INPLACE_STATUE_PUSH_PENALTY
+        )
 
 
 def _far_queue() -> PlannerLoyalQueue:

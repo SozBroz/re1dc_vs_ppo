@@ -729,7 +729,7 @@ class ProgressTracker:
         return True
 
     def breach_armor_inplace_statue_push(self) -> bool:
-        """Mark armor wrong/seated statue shove as terminal; true only on first breach."""
+        """Mark armor wrong-statue / seated re-push as terminal; true only on first breach."""
         if self.armor_inplace_statue_push_breached:
             return False
         self.armor_inplace_statue_push_breached = True
