@@ -55,7 +55,7 @@ DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     # γ=1 so the outcome is not time-decayed across the hop (effective γ_outcome).
     # n_steps still sized from RL_GAMMA half-lives for rollout/bootstrap cuts.
     gamma=1.0,
-    ent_coef=0.02,
+    ent_coef=0.008,
 )
 DEFAULT_SYNC_INTERVAL_S = 360.0
 
