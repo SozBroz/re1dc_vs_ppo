@@ -16,8 +16,8 @@ $LEARNER = 'http://192.168.0.229:8765'
 # Visible pking: small batches + stagger. Headless remotes: modest batch.
 $PkingBatch = 4
 $PkingStaggerS = '0.75'
-$RemoteBatchMax = 8
-$RemoteStaggerS = '0.25'
+$RemoteBatchMax = 4
+$RemoteStaggerS = '0.5'
 $PkingReadyTimeoutSec = 240
 
 if ($PkingOnly) {
