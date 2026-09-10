@@ -472,14 +472,24 @@ class PlannerLoyalQueue:
                 continue
             return
 
-    def _skip_satisfied_box_nav(self) -> None:
-        """Skip go_to_box when the episode already starts in that box room."""
+    def _skip_satisfied_box_nav(
+        self, *, room: str | None = None, prev_room: str | None = None
+    ) -> None:
+        """Skip go_to_box when already in the destination box room.
+
+        Tips that mint the inbound traverse land already in 118/100, so the
+        navigate step never sees a room edge and must not consume a plNN.
+        Mid-episode after that traverse: ``prev_room`` is already the box room.
+        Do **not** use the post-transition ``room`` alone — arrival
+        ``prev!=dest, room==dest`` must still complete go_to_box.
+        """
+        already = str(prev_room or self._start_room or "").strip().upper()
         while True:
             step = self.current
             if not step or str(step.get("op") or "") != GO_TO_BOX_OP:
                 return
             dest = _box_dest_room(step)
-            if self._start_room and self._start_room == dest:
+            if already and dest and already == dest:
                 self._index += 1
                 continue
             return
@@ -540,31 +550,42 @@ class PlannerLoyalQueue:
             return None
         return list(held)
 
-    def allowed_banked_key_names(self) -> frozenset[str]:
-        """Story keys Muse authored into ``banked_in_box`` / leave banks.
+    def _banked_in_box_sources(self) -> list[Any]:
+        """Authoritative ``banked_in_box`` sources for the current use_box.
 
-        Reads chunk ``leave_118`` / ``leave_100``, the same nested on the current
-        step, and step-level ``banked_in_box`` (Muse use_box authoring format).
+        When the step has its own ``banked_in_box`` list, use only that (plus
+        any nested leave_* on the step). Do **not** union the stale chunk-level
+        ``leave_118`` / ``leave_100`` — those bank lists are from earlier visits
+        and wrongly re-allow depositing keys the step wants held (shield_key).
         """
-        from re1_rl.item_todo import canonical_item
-        from re1_rl.key_items import KEY_ITEM_NAMES
-
-        names: set[str] = set()
-        sources: list[Any] = [
+        step = self.current or {}
+        step_banked = step.get("banked_in_box")
+        if isinstance(step_banked, list):
+            sources: list[Any] = [{"banked_in_box": step_banked}]
+            for key in ("leave_100", "leave_118"):
+                nested = step.get(key)
+                if isinstance(nested, dict):
+                    sources.append(nested)
+            return sources
+        sources = [
             self.leave_118 if isinstance(self.leave_118, dict) else {},
             getattr(self, "leave_100", None)
             if isinstance(getattr(self, "leave_100", None), dict)
             else {},
         ]
-        step = self.current or {}
         for key in ("leave_100", "leave_118"):
             nested = step.get(key)
             if isinstance(nested, dict):
                 sources.append(nested)
-        # Step-level list (preferred Muse format on use_box).
-        if isinstance(step.get("banked_in_box"), list):
-            sources.append({"banked_in_box": step.get("banked_in_box")})
-        for src in sources:
+        return sources
+
+    def allowed_banked_key_names(self) -> frozenset[str]:
+        """Story keys Muse authored into ``banked_in_box`` / leave banks."""
+        from re1_rl.item_todo import canonical_item
+        from re1_rl.key_items import KEY_ITEM_NAMES
+
+        names: set[str] = set()
+        for src in self._banked_in_box_sources():
             for row in (src or {}).get("banked_in_box") or []:
                 if not isinstance(row, dict):
                     continue
@@ -574,13 +595,26 @@ class PlannerLoyalQueue:
         return frozenset(names)
 
     def allowed_banked_key_ids(self) -> frozenset[int]:
+        """Deposit-override ids: every item Muse listed in ``banked_in_box``.
+
+        Historically named ``*_key_ids``; also includes guns/ammo/herbs so a
+        planner ``use_box`` can bank shotgun / explosive at 118 despite the
+        room's default deposit allowlist.
+        """
         from re1_rl.box_target import item_name_to_id
+        from re1_rl.item_todo import canonical_item
 
         ids: set[int] = set()
-        for name in self.allowed_banked_key_names():
-            iid = item_name_to_id(name)
-            if iid is not None:
-                ids.add(int(iid))
+        for src in self._banked_in_box_sources():
+            for row in (src or {}).get("banked_in_box") or []:
+                if not isinstance(row, dict):
+                    continue
+                name = canonical_item(str(row.get("item") or ""))
+                if not name:
+                    continue
+                iid = item_name_to_id(name)
+                if iid is not None:
+                    ids.add(int(iid))
         return frozenset(ids)
 
     def evaluate_transition(
@@ -603,16 +637,16 @@ class PlannerLoyalQueue:
         if self.done:
             return result
 
+        prev_room = str(prev_state.get("room_id") or "")
+        room = str(state.get("room_id") or "")
         self._skip_satisfied_acquires()
-        self._skip_satisfied_box_nav()
+        self._skip_satisfied_box_nav(room=room, prev_room=prev_room)
         self._skip_satisfied_gallery_portraits()
         if self.done:
             return result
 
         step = self.current or {}
         op = str(step.get("op") or "")
-        prev_room = str(prev_state.get("room_id") or "")
-        room = str(state.get("room_id") or "")
         absorb = bool(getattr(self, "_absorb_start_flicker", False))
         if absorb:
             self._absorb_start_flicker = False

@@ -1,0 +1,335 @@
+{
+  "why_prev_rejected": "use_box missing held_on_exit arrays",
+  "kit_plan": "GL attic leave kit: beretta+13 handgun, shield_key, armor_key, acid rounds 6 held; shotgun, explosive rounds, red herb banked. Combat kit for terrace zombie and Yawn 1 with acid bazooka + beretta.",
+  "inventory_budget": "held_on_exit 4 items + 3 empties = 7 slots used, 1 free slot remains for on-path pickups. Armor_key kept held, shield_key kept held, no banking of shield_key.",
+  "empty_slots_on_box_exit": 3,
+  "next_chunk": {
+    "why": "Short terrace bazooka_acid pickup then direct to 20D greens/ammo, attic Yawn 1 and moon crest, then place moon crest at 11A. Ends on place_moon_crest anchor.",
+    "end_anchor_beat_id": "place_moon_crest",
+    "steps": [
+      {
+        "n": 1,
+        "op": "use_box",
+        "room_id": "118",
+        "note": "GL attic leave kit",
+        "held_on_exit": [
+          {
+            "item": "beretta",
+            "qty": 15,
+            "slot": 1
+          },
+          {
+            "item": "handgun_bullets",
+            "qty": 13,
+            "slot": 2
+          },
+          {
+            "item": "shield_key",
+            "qty": 1,
+            "slot": 3
+          },
+          {
+            "item": "armor_key",
+            "qty": 1,
+            "slot": 4
+          },
+          {
+            "item": "acid_rounds",
+            "qty": 6,
+            "slot": 5
+          },
+          {
+            "item": null,
+            "qty": 0,
+            "slot": 6
+          },
+          {
+            "item": null,
+            "qty": 0,
+            "slot": 7
+          },
+          {
+            "item": null,
+            "qty": 0,
+            "slot": 8
+          }
+        ],
+        "banked_in_box": [
+          {
+            "item": "shotgun",
+            "qty": 7,
+            "why": "free GL+greens slots"
+          },
+          {
+            "item": "explosive_rounds",
+            "qty": 6,
+            "why": "acid+GL is yawn kit"
+          },
+          {
+            "item": "red_herb",
+            "qty": 1,
+            "why": "free a slot"
+          },
+          {
+            "item": "lighter",
+            "qty": 0,
+            "why": "already boxed"
+          },
+          {
+            "item": "green_herb",
+            "qty": 1,
+            "why": "already boxed"
+          },
+          {
+            "item": "mixed_herbs_gg",
+            "qty": 1,
+            "why": "already boxed"
+          },
+          {
+            "item": "knife",
+            "qty": 0,
+            "why": "already boxed"
+          }
+        ]
+      },
+      {
+        "n": 2,
+        "op": "traverse",
+        "edge_id": "118->10B",
+        "id": "s2",
+        "beat_id": null,
+        "note": "118 to 10B"
+      },
+      {
+        "n": 3,
+        "op": "traverse",
+        "edge_id": "10B->207",
+        "id": "s3",
+        "beat_id": null,
+        "note": "10B to 207"
+      },
+      {
+        "n": 4,
+        "op": "traverse",
+        "edge_id": "207->204",
+        "id": "s4",
+        "beat_id": null,
+        "note": "207 to 204"
+      },
+      {
+        "n": 5,
+        "op": "traverse",
+        "edge_id": "204->203",
+        "id": "s5",
+        "beat_id": null,
+        "note": "204 to 203"
+      },
+      {
+        "n": 6,
+        "op": "traverse",
+        "edge_id": "203->211",
+        "id": "s6",
+        "beat_id": null,
+        "note": "203 to 211"
+      },
+      {
+        "n": 7,
+        "op": "traverse",
+        "edge_id": "211->212",
+        "id": "s7",
+        "beat_id": null,
+        "note": "211 to 212"
+      },
+      {
+        "n": 8,
+        "op": "acquire",
+        "room_id": "212",
+        "pickup_id": "212:bazooka_acid:1",
+        "id": "s8",
+        "beat_id": null,
+        "note": "terrace bazooka acid"
+      },
+      {
+        "n": 9,
+        "op": "traverse",
+        "edge_id": "212->211",
+        "id": "s9",
+        "beat_id": null,
+        "note": "back"
+      },
+      {
+        "n": 10,
+        "op": "traverse",
+        "edge_id": "211->203",
+        "id": "s10",
+        "beat_id": null,
+        "note": "211 to 203"
+      },
+      {
+        "n": 11,
+        "op": "traverse",
+        "edge_id": "203->204",
+        "id": "s11",
+        "beat_id": null,
+        "note": "203 to 204"
+      },
+      {
+        "n": 12,
+        "op": "traverse",
+        "edge_id": "204->20D",
+        "id": "s12",
+        "beat_id": null,
+        "note": "204 to 20D armor_key"
+      },
+      {
+        "n": 13,
+        "op": "acquire",
+        "room_id": "20D",
+        "pickup_id": "20D:handgun_bullets:2",
+        "id": "s13",
+        "beat_id": null,
+        "note": "20D handgun bullets"
+      },
+      {
+        "n": 14,
+        "op": "acquire",
+        "room_id": "20D",
+        "pickup_id": "20D:green_herb:1",
+        "id": "s14",
+        "beat_id": null,
+        "note": "20D green herb 1"
+      },
+      {
+        "n": 15,
+        "op": "acquire",
+        "room_id": "20D",
+        "pickup_id": "20D:green_herb:1",
+        "id": "s15",
+        "beat_id": null,
+        "note": "20D green herb 2"
+      },
+      {
+        "n": 16,
+        "op": "traverse",
+        "edge_id": "20D->20E",
+        "id": "s16",
+        "beat_id": null,
+        "note": "20D to 20E"
+      },
+      {
+        "n": 17,
+        "op": "traverse",
+        "edge_id": "20E->210",
+        "id": "s17",
+        "beat_id": "attic_enter",
+        "note": "attic enter with shield_key"
+      },
+      {
+        "n": 18,
+        "op": "trigger_cutscene",
+        "room_id": "210",
+        "id": "s18",
+        "beat_id": "yawn_intro",
+        "note": "yawn intro"
+      },
+      {
+        "n": 19,
+        "op": "boss",
+        "room_id": "210",
+        "id": "s19",
+        "beat_id": "yawn_1",
+        "note": "yawn 1"
+      },
+      {
+        "n": 20,
+        "op": "acquire",
+        "room_id": "210",
+        "pickup_id": "210:shotgun_shells:2",
+        "id": "s20",
+        "beat_id": null,
+        "note": "attic shells"
+      },
+      {
+        "n": 21,
+        "op": "acquire",
+        "room_id": "210",
+        "pickup_id": "210:moon_crest:1",
+        "id": "s21",
+        "beat_id": "moon_crest",
+        "note": "moon crest"
+      },
+      {
+        "n": 22,
+        "op": "traverse",
+        "edge_id": "210->20E",
+        "id": "s22",
+        "beat_id": null,
+        "note": "back"
+      },
+      {
+        "n": 23,
+        "op": "traverse",
+        "edge_id": "20E->20D",
+        "id": "s23",
+        "beat_id": null,
+        "note": ""
+      },
+      {
+        "n": 24,
+        "op": "traverse",
+        "edge_id": "20D->204",
+        "id": "s24",
+        "beat_id": null,
+        "note": ""
+      },
+      {
+        "n": 25,
+        "op": "traverse",
+        "edge_id": "204->207",
+        "id": "s25",
+        "beat_id": null,
+        "note": ""
+      },
+      {
+        "n": 26,
+        "op": "traverse",
+        "edge_id": "207->10B",
+        "id": "s26",
+        "beat_id": null,
+        "note": ""
+      },
+      {
+        "n": 27,
+        "op": "traverse",
+        "edge_id": "10B->10A",
+        "id": "s27",
+        "beat_id": null,
+        "note": ""
+      },
+      {
+        "n": 28,
+        "op": "traverse",
+        "edge_id": "10A->11A",
+        "id": "s28",
+        "beat_id": null,
+        "note": ""
+      },
+      {
+        "n": 29,
+        "op": "objective",
+        "room_id": "11A",
+        "site_id": "moon_crest@11A_crest_slot",
+        "id": "s29",
+        "beat_id": "place_moon_crest",
+        "note": "place moon crest"
+      }
+    ]
+  },
+  "beat_order": [
+    "attic_enter",
+    "yawn_intro",
+    "yawn_1",
+    "moon_crest",
+    "place_moon_crest"
+  ]
+}

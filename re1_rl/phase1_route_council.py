@@ -725,7 +725,27 @@ def validate_pass1_plan(
             room = dest
             continue
 
-        if op in {"objective", "use_key_item", "do_puzzle", "trigger_cutscene", "boss", "use_box"}:
+        if op == "use_box":
+            need_room = str(step.get("room_id") or "")
+            if need_room and need_room != room:
+                errors.append(
+                    f"{step_id}: OP_WRONG_ROOM {op} wants {need_room} but in {room}"
+                )
+                break
+            rows = step.get("held_on_exit")
+            if not isinstance(rows, list) or not rows:
+                errors.append(
+                    f"{step_id}: USE_BOX_MISSING_HELD_ON_EXIT need 8-slot held_on_exit"
+                )
+                break
+            held = {
+                str(r.get("item"))
+                for r in rows
+                if isinstance(r, dict) and r.get("item")
+            }
+            continue
+
+        if op in {"objective", "use_key_item", "do_puzzle", "trigger_cutscene", "boss"}:
             need_room = str(step.get("room_id") or "")
             if need_room and need_room != room:
                 errors.append(
@@ -1009,6 +1029,32 @@ def inventory_pressure_report(plan: dict[str, Any], ctx: dict[str, Any]) -> dict
                     "overflow": overflow,
                 }
             )
+            continue
+        if op == "use_box":
+            rows = step.get("held_on_exit")
+            if isinstance(rows, list) and rows:
+                slots = []
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    name = row.get("item")
+                    slots.append(
+                        {
+                            "item": str(name) if name else None,
+                            "qty": int(row.get("qty") or 0),
+                        }
+                    )
+                while len(slots) < INVENTORY_SLOTS:
+                    slots.append({"item": None, "qty": 0})
+                slots = slots[:INVENTORY_SLOTS]
+                timeline.append(
+                    {
+                        "n": step.get("n") or index + 1,
+                        "op": op,
+                        "free_after": _free_slots(slots),
+                        "held": [r.get("item") for r in slots if r.get("item")],
+                    }
+                )
             continue
         beat = str(step.get("beat_id") or "")
         site = str(step.get("site_id") or "")

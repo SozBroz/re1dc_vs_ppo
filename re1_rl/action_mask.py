@@ -60,8 +60,11 @@ SELECT_SLOT_BASE = COMBINE_ACTION + 1  # 37
 N_SELECT_SLOT = 8
 
 # Main Hall 1F (106), 2F upper hall (203), Vacant Room (102), Greenhouse /
-# tiger room (10C — herbicide pump / armor key): attack macros always illegal.
-ALWAYS_ILLEGAL_ATTACK_ROOMS: frozenset[str] = frozenset({"106", "203", "102", "10C"})
+# tiger room (10C — herbicide pump / armor key), Large Gallery (117 — crow
+# paintings, no paid combat): attack macros always illegal.
+ALWAYS_ILLEGAL_ATTACK_ROOMS: frozenset[str] = frozenset(
+    {"106", "203", "102", "10C", "117"}
+)
 
 
 def is_always_illegal_attack_room(room_id: str | None) -> bool:
@@ -201,6 +204,7 @@ def _mask_box_ui_session(
     box_inv_cursor: int = 0,
     box_target_held: list | None = None,
     box_close_only: bool = False,
+    allowed_key_ids: frozenset[int] | None = None,
 ) -> np.ndarray:
     """Legal actions while the item-box UI is open (in_control is false)."""
     from re1_rl.item_box import (
@@ -224,6 +228,9 @@ def _mask_box_ui_session(
             inventory=inventory,
             box=box,
             target=box_target_held,
+            room_id=room_id,
+            checkpoint_id=checkpoint_id,
+            allowed_key_ids=allowed_key_ids,
         )
     phase = int(box_phase)
     # UI withdraw requires an empty inv slot (Cross on empty → box list).
@@ -240,7 +247,8 @@ def _mask_box_ui_session(
         if inventory is None or box is None:
             return False
         ok, _ = can_deposit(
-            inventory, box, slot, room_id=room_id, checkpoint_id=checkpoint_id
+            inventory, box, slot, room_id=room_id, checkpoint_id=checkpoint_id,
+            allowed_key_ids=allowed_key_ids,
         )
         return bool(ok)
 
@@ -311,6 +319,9 @@ def _mask_box_target_session(
     inventory: list[tuple[int, int]] | None,
     box: list[tuple[int, int]] | None,
     target: list,
+    room_id: str | None = None,
+    checkpoint_id: str | None = None,
+    allowed_key_ids: frozenset[int] | None = None,
 ) -> np.ndarray:
     """Only transfers that close the gap to ``held_on_exit``; close when done."""
     from re1_rl.box_target import (
@@ -318,7 +329,7 @@ def _mask_box_target_session(
         needed_box_slots,
         surplus_inventory_slots,
     )
-    from re1_rl.item_box import _first_empty_slot, can_withdraw
+    from re1_rl.item_box import _first_empty_slot, can_deposit, can_withdraw
     from re1_rl.item_box_ui_macro import first_empty_inventory_slot
 
     mask[:] = False
@@ -333,6 +344,17 @@ def _mask_box_target_session(
     has_empty_inv = first_empty_inventory_slot(inv) is not None
     box_has_empty = _first_empty_slot(list(bx)[:16]) is not None
     phase = int(box_phase)
+
+    def _dep_ok(slot: int) -> bool:
+        ok, _ = can_deposit(
+            inv,
+            bx,
+            int(slot),
+            room_id=room_id,
+            checkpoint_id=checkpoint_id,
+            allowed_key_ids=allowed_key_ids,
+        )
+        return bool(ok)
 
     if phase == BOX_PHASE_WITHDRAW_SLOT:
         if has_empty_inv:
@@ -350,12 +372,12 @@ def _mask_box_target_session(
             for i in surplus:
                 idx = SELECT_SLOT_BASE + i
                 if 0 <= i < N_SELECT_SLOT and idx < n_actions:
-                    mask[idx] = True
+                    mask[idx] = _dep_ok(i)
         if not mask.any() and BOX_CLOSE_ACTION < n_actions:
             mask[BOX_CLOSE_ACTION] = True
         return mask
 
-    can_dep = bool(surplus) and box_has_empty
+    can_dep = bool(surplus) and box_has_empty and any(_dep_ok(i) for i in surplus)
     can_wd = bool(needed) and has_empty_inv
     if BOX_DEPOSIT_ACTION < n_actions:
         mask[BOX_DEPOSIT_ACTION] = can_dep
@@ -403,6 +425,7 @@ def action_mask(
     checkpoint_id: str | None = None,
     box_target_held: list | None = None,
     box_close_only: bool = False,
+    allowed_key_ids: frozenset[int] | None = None,
 ) -> np.ndarray:
     """Return bool mask (True = legal) for MaskablePPO / ActionMasker."""
     del prev_action
@@ -432,6 +455,7 @@ def action_mask(
             box_inv_cursor=box_inv_cursor,
             box_target_held=box_target_held,
             box_close_only=box_close_only,
+            allowed_key_ids=allowed_key_ids,
         )
     if not in_control:
         mask[:] = False

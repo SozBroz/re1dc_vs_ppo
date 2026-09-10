@@ -154,8 +154,9 @@ def test_target_mask_only_deposits_surplus() -> None:
         box_target_held=TARGET,
     )
     assert pick[SELECT_SLOT_BASE + 0]
-    assert pick[SELECT_SLOT_BASE + 3]
+    assert not pick[SELECT_SLOT_BASE + 3]  # shield_key — never deposit
     assert pick[SELECT_SLOT_BASE + 4]
+    assert pick[SELECT_SLOT_BASE + 5]
     assert not pick[SELECT_SLOT_BASE + 1]
     assert not pick[SELECT_SLOT_BASE + 2]
     assert not pick[SELECT_SLOT_BASE + 6]
@@ -358,8 +359,8 @@ def test_muse_v3_box_before_20a_unlocks_lighter_bank() -> None:
     banked = q.allowed_banked_key_names()
     assert "lighter" in banked
     assert "armor_key" in banked
-    # Chunk leave_118 still lists shield_key; union is fine while held_on_exit keeps it.
-    assert "shield_key" in banked
+    # Step-level banked_in_box wins — do not re-allow shield_key from stale leave_118.
+    assert "shield_key" not in banked
 
     inv = [(0, 0)] * 8
     box = [(0, 0)] * 16

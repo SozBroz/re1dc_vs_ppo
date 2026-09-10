@@ -180,3 +180,23 @@ Muse beat_order after this: yawn_intro → yawn_1 → moon_crest → place_moon_
 | 176–179 | … | yawn_intro, yawn_1, shells, moon_crest |
 | 180–189 | … | walk to 11A place_moon_crest |
 
+## 2026-09-10 — pl164 118 box deposit fix + Muse reconfirm
+
+- **Tip:** pl164, room 118 (already at box after `10B->118`).
+- **Model:** muse-glimmer (`_tmp/pl164_muse_v3_response.json`); kit matches prior operator leave_118.
+- **End anchor:** `place_moon_crest` (unchanged tail)
+- **Why / bugs fixed (code, not route rewrite):**
+  1. Room-118 deposits of shotgun/explosive were `not_allowlisted` while box-target mask still asked for them → UI stuck (often on shield_key, wrongly allowlisted via stale chunk `leave_118`).
+  2. Step-level `banked_in_box` now owns deposit overrides (guns/ammo included); stale leave_118 keys no longer union in.
+  3. `go_to_box` after inbound traverse: `capture: false` so it does **not** consume a plNN (use_box mints as **pl165**). Same skip when already in box room mid-episode (`prev_room`).
+  4. Validator now applies `use_box.held_on_exit` for edge gates + inventory pressure.
+- **Raw:** `muse_raw/2026-09-10_pl164_box_yawn_moon.json`
+- **Pinned:** live `cp05` steps 160+ already held this kit; no step renumber beyond `capture:false` on go_to_box n=160.
+- **PL note:** former hole pl165(go_to_box) is now `(no cell)`; use_box is pl165; 20D HG clip is pl177 (was planned pl178 in old capturing count).
+
+| n | op | what |
+|---|---|---|
+| 160 | go_to_box | capture:false (already in 118) |
+| 161 | use_box | bank shotgun+explosive+red; withdraw armor_key; 3 empty; shield held |
+| 162–188 | … | short terrace → GL → 20D loot → yawn → place_moon_crest |
+

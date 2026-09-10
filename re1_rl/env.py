@@ -5336,10 +5336,12 @@ class RE1Env(gym.Env):
             ) or None
         box_target_held = None
         box_close_only = False
+        allowed_box_key_ids: frozenset[int] | None = None
         if self._planner_loyal_active():
             queue = getattr(self, "_planner_loyal_queue", None)
             box_target_held = queue.box_target_held() if queue is not None else None
             box_close_only = box_target_held is None
+            allowed_box_key_ids = self._planner_allowed_box_key_ids()
         mask = build_action_mask(
             int(self.action_space.n),
             self._prev_action,
@@ -5382,6 +5384,7 @@ class RE1Env(gym.Env):
             checkpoint_id=checkpoint_id,
             box_target_held=box_target_held,
             box_close_only=box_close_only,
+            allowed_key_ids=allowed_box_key_ids,
         )
         if (
             box_ui_open
