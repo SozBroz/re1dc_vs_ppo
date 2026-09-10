@@ -221,6 +221,24 @@ def test_deposit_from_empty_slot_refused():
     assert not ok and reason == "empty_slot"
 
 
+def test_deposit_qty0_lighter_when_planned_key_allowed():
+    """Muse banked lighter often sits at qty=0; must still be depositable."""
+    from re1_rl.inventory_stacking import effective_transfer_qty
+
+    lighter_id = 0x30  # lighter
+    assert effective_transfer_qty(lighter_id, 0) == 1
+    inv = [(lighter_id, 0)] + [(0, 0)] * 7
+    box = _empty_box()
+    ok, reason = can_deposit(
+        inv,
+        box,
+        0,
+        room_id="118",
+        allowed_key_ids=frozenset({lighter_id}),
+    )
+    assert ok, reason
+
+
 def test_deposit_with_full_box_refused_when_no_empty_slot():
     inv = [(0x02, 15)] + [(0, 0)] * 7
     box = [(0x41, 1)] * BOX_SLOTS

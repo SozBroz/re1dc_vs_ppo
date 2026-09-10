@@ -57,8 +57,10 @@ def is_stackable(item_id: int) -> bool:
 def effective_transfer_qty(item_id: int, qty: int) -> int:
     """Units available to move from a slot.
 
-    PS1 knife (and empty-magazine weapons) keep ``qty == 0`` while occupying a
-    slot; treat those as one transferable unit.
+    PS1 knife / empty-magazine weapons keep ``qty == 0`` while occupying a
+    slot; treat those as one transferable unit. Same for other non-stackable
+    occupants (e.g. lighter at qty 0) — the whole slot must be movable or
+    ``use_box`` can never clear surplus key ghosts.
     """
     iid = int(item_id) & 0xFF
     if iid == 0:
@@ -67,6 +69,8 @@ def effective_transfer_qty(item_id: int, qty: int) -> int:
     if q > 0:
         return q
     if iid in WEAPON_ITEM_IDS:
+        return 1
+    if not is_stackable(iid):
         return 1
     return 0
 
