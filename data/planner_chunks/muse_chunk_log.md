@@ -166,7 +166,7 @@ Muse beat_order after this: yawn_intro → yawn_1 → moon_crest → place_moon_
 - **Why:** Drain→fishtank→cupboard→explosive as separate PLs; then box→212 GL→20D greens→yawn mint→place moon.
 - **Raw:** `muse_raw/2026-09-10_pl157_gl_yawn_moon.json`
 - **Pinned as:** `cp05_shield_key.json` steps 152–188
-- **Operator edits:** formal `held_on_exit`/`banked_in_box`; withdraw `armor_key` for `204->20D`; bank shotgun+explosive+red for 3 free slots; `20D:green_herb:2`; explicit `yawn_intro`/`yawn_1`; short terrace path (no gallery detour).
+- **Operator edits:** formal `held_on_exit`/`banked_in_box`; withdraw `armor_key` for `204->20D`; bank shotgun+explosive+red for **3 free slots** (GL + 2 greens); keep `handgun_bullets` so Richard corpse clip stacks; add `20D:handgun_bullets:2`; `20D:green_herb:2`; explicit `yawn_intro`/`yawn_1`; short terrace path (no gallery detour).
 
 | n | op | what |
 |---|---|---|
@@ -174,9 +174,9 @@ Muse beat_order after this: yawn_intro → yawn_1 → moon_crest → place_moon_
 | 153 | do_puzzle | study_push_fishtank |
 | 154 | do_puzzle | study_push_cupboard |
 | 155 | acquire | 20A:explosive_rounds:1 |
-| 156–161 | … | box at 118 (armor_key out; shotgun/explosive/red banked) |
+| 156–161 | … | box at 118 (armor_key out; shotgun/explosive/red banked; **3 empty**) |
 | 162–168 | … | short terrace → 212:bazooka_acid |
-| 169–172 | … | 20D greens → 20E→210 attic_enter |
-| 173–176 | … | yawn_intro, yawn_1, shells, moon_crest |
-| 177–188 | … | walk to 11A place_moon_crest |
+| 169–175 | … | 20D Richard clip (stacks) + greens → 20E→210 attic_enter |
+| 176–179 | … | yawn_intro, yawn_1, shells, moon_crest |
+| 180–189 | … | walk to 11A place_moon_crest |
 

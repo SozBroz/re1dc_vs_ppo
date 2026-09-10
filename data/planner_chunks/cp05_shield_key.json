@@ -1272,7 +1272,7 @@
     {
       "op": "use_box",
       "room_id": "118",
-      "note": "withdraw armor_key for 204->20D; keep beretta+hg combat kit; bank shotgun+explosive+red; 3 free for GL+2 greens",
+      "note": "leave with 3 empty slots for GL + 2 greens; keep handgun_bullets so Richard corpse clip stacks (no 4th slot). Withdraw armor_key; bank shotgun + explosive + red",
       "held_on_exit": [
         {
           "item": "beretta",
@@ -1417,28 +1417,35 @@
     {
       "op": "acquire",
       "room_id": "20D",
+      "pickup_id": "20D:handgun_bullets:2",
+      "note": "Richard corpse clip \u2014 stacks into held handgun_bullets (cap 30)",
+      "n": 173
+    },
+    {
+      "op": "acquire",
+      "room_id": "20D",
       "pickup_id": "20D:green_herb:1",
       "note": "20D green 1/2",
-      "n": 173
+      "n": 174
     },
     {
       "op": "acquire",
       "room_id": "20D",
       "pickup_id": "20D:green_herb:2",
       "note": "20D green 2/2",
-      "n": 174
+      "n": 175
     },
     {
       "op": "traverse",
       "edge_id": "20D->20E",
-      "n": 175
+      "n": 176
     },
     {
       "op": "traverse",
       "edge_id": "20E->210",
       "beat_id": "attic_enter",
       "note": "enter attic with shield_key",
-      "n": 176
+      "n": 177
     },
     {
       "op": "trigger_cutscene",
@@ -1447,7 +1454,7 @@
       "beat_id": "yawn_intro",
       "capture": false,
       "note": "Yawn intro cinema",
-      "n": 177
+      "n": 178
     },
     {
       "op": "boss",
@@ -1455,14 +1462,14 @@
       "room_id": "210",
       "beat_id": "yawn_1",
       "note": "fight Yawn (GL+acid)",
-      "n": 178
+      "n": 179
     },
     {
       "op": "acquire",
       "room_id": "210",
       "pickup_id": "210:shotgun_shells:2",
       "note": "Yawn mint shells",
-      "n": 179
+      "n": 180
     },
     {
       "op": "acquire",
@@ -1470,42 +1477,42 @@
       "pickup_id": "210:moon_crest:1",
       "beat_id": "moon_crest",
       "note": "Yawn mint moon crest",
-      "n": 180
-    },
-    {
-      "op": "traverse",
-      "edge_id": "210->20E",
       "n": 181
     },
     {
       "op": "traverse",
-      "edge_id": "20E->20D",
+      "edge_id": "210->20E",
       "n": 182
     },
     {
       "op": "traverse",
-      "edge_id": "20D->204",
+      "edge_id": "20E->20D",
       "n": 183
     },
     {
       "op": "traverse",
-      "edge_id": "204->207",
+      "edge_id": "20D->204",
       "n": 184
     },
     {
       "op": "traverse",
-      "edge_id": "207->10B",
+      "edge_id": "204->207",
       "n": 185
     },
     {
       "op": "traverse",
-      "edge_id": "10B->10A",
+      "edge_id": "207->10B",
       "n": 186
     },
     {
       "op": "traverse",
-      "edge_id": "10A->11A",
+      "edge_id": "10B->10A",
       "n": 187
+    },
+    {
+      "op": "traverse",
+      "edge_id": "10A->11A",
+      "n": 188
     },
     {
       "op": "objective",
@@ -1513,7 +1520,7 @@
       "room_id": "11A",
       "beat_id": "place_moon_crest",
       "note": "place moon crest \u2014 Phase-1 crest set complete",
-      "n": 188
+      "n": 189
     }
   ]
 }

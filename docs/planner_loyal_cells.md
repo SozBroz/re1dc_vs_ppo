@@ -1,6 +1,6 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (188 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (189 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **C-RE1 numbering (Sep 2026):** `pl00` is the dining fresh start (no emblem). Opening remint is `pl01` emblem … `pl06` lockpick (`opening_to_lockpick.json`). Live shield-key step 0 (`106->105`) mints `pl07`. Watch `states/planner_loyal/cells/plNN/cell.pst` — BizHawk `cell.State` is backed up under `backups/planner_loyal_bizhawk_20260904/`.
 
@@ -11,7 +11,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl06`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - Tea-room lock: `104->103` stays locked until `103->104` is done once (this chunk never opens it). `103->10C` / `103->10D` are open. Do not walk `116->106` after the shotgun. Vacant `102` clip+shells are taken on the armor-key return; skip re-loot.
-- Chunk end-anchor: `place_moon_crest` (`pl192`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `place_moon_crest` (`pl193`). Mid-chunk success keeps the episode open.
 
 ## What's minted / what it's stuck on
 
@@ -208,22 +208,23 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 | `pl175` | 170 | `211->203` | `203` (HALL 2F) | traverse | Walk `211->203` into `203` (HALL 2F) |
 | `pl176` | 171 | `203->204` | `204` (C PASSAGE) | traverse | Walk `203->204` into `204` (C PASSAGE) |
 | `pl177` | 172 | `204->20D` | `20D` (PILLAR PASSAGE) | traverse | Walk `204->20D` into `20D` (PILLAR PASSAGE) |
-| `pl178` | 173 | `20D:green_herb:1` | `20D` (PILLAR PASSAGE) | acquire | Take `20D:green_herb:1` (20D green 1/2) |
-| `pl179` | 174 | `20D:green_herb:2` | `20D` (PILLAR PASSAGE) | acquire | Take `20D:green_herb:2` (20D green 2/2) |
-| `pl180` | 175 | `20D->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `20D->20E` into `20E` (FRONT OF ATTIC) |
-| `pl181` | 176 | `attic_enter` | `210` (ATTIC) | traverse | Walk `20E->210` into `210` (ATTIC) |
-| _(none)_ | 177 | `yawn_intro` | `210` (ATTIC) | trigger_cutscene | `yawn_intro` at `210:yawn_intro` — Yawn intro cinema |
-| `pl182` | 178 | `yawn_1` | `210` (ATTIC) | boss | boss |
-| `pl183` | 179 | `210:shotgun_shells:2` | `210` (ATTIC) | acquire | Take `210:shotgun_shells:2` (Yawn mint shells) |
-| `pl184` | 180 | `moon_crest` | `210` (ATTIC) | acquire | Take `210:moon_crest:1` (Yawn mint moon crest) |
-| `pl185` | 181 | `210->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `210->20E` into `20E` (FRONT OF ATTIC) |
-| `pl186` | 182 | `20E->20D` | `20D` (PILLAR PASSAGE) | traverse | Walk `20E->20D` into `20D` (PILLAR PASSAGE) |
-| `pl187` | 183 | `20D->204` | `204` (C PASSAGE) | traverse | Walk `20D->204` into `204` (C PASSAGE) |
-| `pl188` | 184 | `204->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `204->207` into `207` (2F RIGHT STAIRS) |
-| `pl189` | 185 | `207->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `207->10B` into `10B` (1F RIGHT STAIRS) |
-| `pl190` | 186 | `10B->10A` | `10A` (BACK PASSAGE) | traverse | Walk `10B->10A` into `10A` (BACK PASSAGE) |
-| `pl191` | 187 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
-| `pl192` | 188 | `place_moon_crest` | `11A` (ROOFED PASSAGE) | objective | `place_moon_crest` at `moon_crest@11A_crest_slot` — place moon crest — Phase-1 crest set complete |
+| `pl178` | 173 | `20D:handgun_bullets:2` | `20D` (PILLAR PASSAGE) | acquire | Take `20D:handgun_bullets:2` (Richard corpse clip — stacks into held handgun_bullets (cap 30)) |
+| `pl179` | 174 | `20D:green_herb:1` | `20D` (PILLAR PASSAGE) | acquire | Take `20D:green_herb:1` (20D green 1/2) |
+| `pl180` | 175 | `20D:green_herb:2` | `20D` (PILLAR PASSAGE) | acquire | Take `20D:green_herb:2` (20D green 2/2) |
+| `pl181` | 176 | `20D->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `20D->20E` into `20E` (FRONT OF ATTIC) |
+| `pl182` | 177 | `attic_enter` | `210` (ATTIC) | traverse | Walk `20E->210` into `210` (ATTIC) |
+| _(none)_ | 178 | `yawn_intro` | `210` (ATTIC) | trigger_cutscene | `yawn_intro` at `210:yawn_intro` — Yawn intro cinema |
+| `pl183` | 179 | `yawn_1` | `210` (ATTIC) | boss | boss |
+| `pl184` | 180 | `210:shotgun_shells:2` | `210` (ATTIC) | acquire | Take `210:shotgun_shells:2` (Yawn mint shells) |
+| `pl185` | 181 | `moon_crest` | `210` (ATTIC) | acquire | Take `210:moon_crest:1` (Yawn mint moon crest) |
+| `pl186` | 182 | `210->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `210->20E` into `20E` (FRONT OF ATTIC) |
+| `pl187` | 183 | `20E->20D` | `20D` (PILLAR PASSAGE) | traverse | Walk `20E->20D` into `20D` (PILLAR PASSAGE) |
+| `pl188` | 184 | `20D->204` | `204` (C PASSAGE) | traverse | Walk `20D->204` into `204` (C PASSAGE) |
+| `pl189` | 185 | `204->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `204->207` into `207` (2F RIGHT STAIRS) |
+| `pl190` | 186 | `207->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `207->10B` into `10B` (1F RIGHT STAIRS) |
+| `pl191` | 187 | `10B->10A` | `10A` (BACK PASSAGE) | traverse | Walk `10B->10A` into `10A` (BACK PASSAGE) |
+| `pl192` | 188 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
+| `pl193` | 189 | `place_moon_crest` | `11A` (ROOFED PASSAGE) | objective | `place_moon_crest` at `moon_crest@11A_crest_slot` — place moon crest — Phase-1 crest set complete |
 
 ## Details
 
@@ -284,7 +285,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl07`–`pl192`)
+### Chunk cells (`pl07`–`pl193`)
 
 ### `pl07` — `106->105` (step 1)
 
@@ -2004,7 +2005,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 
 - **Room:** `118` (STAIRS UNDER ROOM)
 - **Op:** `use_box`
-- **Note:** withdraw armor_key for 204->20D; keep beretta+hg combat kit; bank shotgun+explosive+red; 3 free for GL+2 greens
+- **Note:** leave with 3 empty slots for GL + 2 greens; keep handgun_bullets so Richard corpse clip stacks (no 4th slot). Withdraw armor_key; bank shotgun + explosive + red
 - **Objective:** Rearrange the 118 box to the leave_118 loadout, then close the box
 - **Items gained:** _(none)_
 - **How to achieve:** Rearrange the 118 box to the leave_118 loadout, then close the box.
@@ -2124,7 +2125,18 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `204->20D` into `20D` (PILLAR PASSAGE).
 - **Success condition:** Enter room `20D` via `204->20D` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->20D got <room>` (−4).
 
-### `pl178` — `20D:green_herb:1` (step 173)
+### `pl178` — `20D:handgun_bullets:2` (step 173)
+
+- **Room:** `20D` (PILLAR PASSAGE)
+- **Op:** `acquire`
+- **Pickup:** `20D:handgun_bullets:2`
+- **Note:** Richard corpse clip — stacks into held handgun_bullets (cap 30)
+- **Objective:** Take `20D:handgun_bullets:2` (Richard corpse clip — stacks into held handgun_bullets (cap 30))
+- **Items gained:** `handgun_bullets`
+- **How to achieve:** Take `20D:handgun_bullets:2` (Richard corpse clip — stacks into held handgun_bullets (cap 30)).
+- **Success condition:** Inventory gains `20D:handgun_bullets:2` while this step is current
+
+### `pl179` — `20D:green_herb:1` (step 174)
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Op:** `acquire`
@@ -2135,7 +2147,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Take `20D:green_herb:1` (20D green 1/2).
 - **Success condition:** Inventory gains `20D:green_herb:1` while this step is current
 
-### `pl179` — `20D:green_herb:2` (step 174)
+### `pl180` — `20D:green_herb:2` (step 175)
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Op:** `acquire`
@@ -2146,7 +2158,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Take `20D:green_herb:2` (20D green 2/2).
 - **Success condition:** Inventory gains `20D:green_herb:2` while this step is current
 
-### `pl180` — `20D->20E` (step 175)
+### `pl181` — `20D->20E` (step 176)
 
 - **Room:** `20E` (FRONT OF ATTIC)
 - **Op:** `traverse`
@@ -2156,7 +2168,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `20D->20E` into `20E` (FRONT OF ATTIC).
 - **Success condition:** Enter room `20E` via `20D->20E` (already-there counts after cinema dump). Any other door is `wrong_traverse:20D->20E got <room>` (−4).
 
-### `pl181` — `attic_enter` (step 176)
+### `pl182` — `attic_enter` (step 177)
 
 - **Room:** `210` (ATTIC)
 - **Op:** `traverse`
@@ -2168,7 +2180,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `20E->210` into `210` (ATTIC).
 - **Success condition:** Enter room `210` via `20E->210` (already-there counts after cinema dump). Any other door is `wrong_traverse:20E->210 got <room>` (−4).
 
-### `(no cell)` — `yawn_intro` (step 177, capture:false)
+### `(no cell)` — `yawn_intro` (step 178, capture:false)
 
 - **Room:** `210` (ATTIC)
 - **Op:** `trigger_cutscene`
@@ -2181,7 +2193,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** `yawn_intro` at `210:yawn_intro` — Yawn intro cinema.
 - **Success condition:** trigger_cutscene
 
-### `pl182` — `yawn_1` (step 178)
+### `pl183` — `yawn_1` (step 179)
 
 - **Room:** `210` (ATTIC)
 - **Op:** `boss`
@@ -2193,7 +2205,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** boss.
 - **Success condition:** boss
 
-### `pl183` — `210:shotgun_shells:2` (step 179)
+### `pl184` — `210:shotgun_shells:2` (step 180)
 
 - **Room:** `210` (ATTIC)
 - **Op:** `acquire`
@@ -2204,7 +2216,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Take `210:shotgun_shells:2` (Yawn mint shells).
 - **Success condition:** Inventory gains `210:shotgun_shells:2` while this step is current
 
-### `pl184` — `moon_crest` (step 180)
+### `pl185` — `moon_crest` (step 181)
 
 - **Room:** `210` (ATTIC)
 - **Op:** `acquire`
@@ -2216,7 +2228,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Take `210:moon_crest:1` (Yawn mint moon crest).
 - **Success condition:** Inventory gains `210:moon_crest:1` while this step is current
 
-### `pl185` — `210->20E` (step 181)
+### `pl186` — `210->20E` (step 182)
 
 - **Room:** `20E` (FRONT OF ATTIC)
 - **Op:** `traverse`
@@ -2226,7 +2238,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `210->20E` into `20E` (FRONT OF ATTIC).
 - **Success condition:** Enter room `20E` via `210->20E` (already-there counts after cinema dump). Any other door is `wrong_traverse:210->20E got <room>` (−4).
 
-### `pl186` — `20E->20D` (step 182)
+### `pl187` — `20E->20D` (step 183)
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Op:** `traverse`
@@ -2236,7 +2248,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `20E->20D` into `20D` (PILLAR PASSAGE).
 - **Success condition:** Enter room `20D` via `20E->20D` (already-there counts after cinema dump). Any other door is `wrong_traverse:20E->20D got <room>` (−4).
 
-### `pl187` — `20D->204` (step 183)
+### `pl188` — `20D->204` (step 184)
 
 - **Room:** `204` (C PASSAGE)
 - **Op:** `traverse`
@@ -2246,7 +2258,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `20D->204` into `204` (C PASSAGE).
 - **Success condition:** Enter room `204` via `20D->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:20D->204 got <room>` (−4).
 
-### `pl188` — `204->207` (step 184)
+### `pl189` — `204->207` (step 185)
 
 - **Room:** `207` (2F RIGHT STAIRS)
 - **Op:** `traverse`
@@ -2256,7 +2268,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `204->207` into `207` (2F RIGHT STAIRS).
 - **Success condition:** Enter room `207` via `204->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->207 got <room>` (−4).
 
-### `pl189` — `207->10B` (step 185)
+### `pl190` — `207->10B` (step 186)
 
 - **Room:** `10B` (1F RIGHT STAIRS)
 - **Op:** `traverse`
@@ -2266,7 +2278,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `207->10B` into `10B` (1F RIGHT STAIRS).
 - **Success condition:** Enter room `10B` via `207->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->10B got <room>` (−4).
 
-### `pl190` — `10B->10A` (step 186)
+### `pl191` — `10B->10A` (step 187)
 
 - **Room:** `10A` (BACK PASSAGE)
 - **Op:** `traverse`
@@ -2276,7 +2288,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `10B->10A` into `10A` (BACK PASSAGE).
 - **Success condition:** Enter room `10A` via `10B->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->10A got <room>` (−4).
 
-### `pl191` — `10A->11A` (step 187)
+### `pl192` — `10A->11A` (step 188)
 
 - **Room:** `11A` (ROOFED PASSAGE)
 - **Op:** `traverse`
@@ -2286,7 +2298,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `10A->11A` into `11A` (ROOFED PASSAGE).
 - **Success condition:** Enter room `11A` via `10A->11A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->11A got <room>` (−4).
 
-### `pl192` — `place_moon_crest` (step 188)
+### `pl193` — `place_moon_crest` (step 189)
 
 - **Room:** `11A` (ROOFED PASSAGE)
 - **Op:** `objective`
