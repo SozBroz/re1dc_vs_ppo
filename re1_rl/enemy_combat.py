@@ -20,6 +20,11 @@ NO_COMBAT_REWARD_TYPE_NAMES: frozenset[str] = frozenset(
 # (imperator 2026-09-08; stops ammo waste farming).
 NO_COMBAT_REWARD_ROOMS: frozenset[str] = frozenset({"408", "301", "40E", "104"})
 
+# After a real N→0 kill, zombie slots often linger at HP=1 then despawn.
+# Counting 1→0 as another kill inflated pl26→pl27 almanac (10A:zombie=3
+# with only two fauna). Boss/Yawn bars never use this sentinel.
+CORPSE_DESPAWN_HP_MAX = 1
+
 # Crow gallery pests: active_byte from live QS0 / room_enemies notes.
 CROW_ACTIVE_BYTES: frozenset[int] = frozenset({0x04, 0x1C})
 CROW_IDLE_ACTIVE_BYTE = 0x04
@@ -526,6 +531,8 @@ def enemy_combat_delta(
         if before <= 0:
             continue
         if after <= 0:
+            if before <= CORPSE_DESPAWN_HP_MAX:
+                continue
             kills += 1
             damage += before
         elif after < before:
@@ -561,6 +568,13 @@ def _type_meta_by_slot(
         if meta:
             out[slot] = meta
     return out
+
+
+def is_corpse_despawn_hp(hp_before: int, *, is_yawn: bool, is_boss: bool) -> bool:
+    """True when HP collapse is a lingering corpse row, not a fresh kill."""
+    if is_yawn or is_boss:
+        return False
+    return int(hp_before) <= CORPSE_DESPAWN_HP_MAX
 
 
 def enemy_combat_events(
@@ -613,6 +627,9 @@ def enemy_combat_events(
         if meta.get("yawn_part"):
             extra["yawn_part"] = True
         if after <= 0:
+            if is_corpse_despawn_hp(before, is_yawn=is_yawn, is_boss=is_boss):
+                # Lingering HP=1 corpse row despawned — not a second kill.
+                continue
             events.append({
                 "slot": slot,
                 "hp_before": before,

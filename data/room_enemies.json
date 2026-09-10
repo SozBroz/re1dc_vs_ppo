@@ -119,10 +119,9 @@
     "enemies": [
       {
         "enemy_type": "zombie",
-        "count": 1,
-        "spawn_trigger": "return_visit",
-        "notes": "zombie in back passage",
-        "unverified": true
+        "count": 2,
+        "spawn_trigger": "first_visit",
+        "notes": "two zombies in back passage (pl26→pl27 stretch; was unverified count 1)"
       }
     ]
   },

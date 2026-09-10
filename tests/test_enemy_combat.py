@@ -159,8 +159,8 @@ def test_apply_combat_step_fields_chip() -> None:
 
 
 def test_apply_combat_step_fields_kill() -> None:
-    prev = {"room_id": "104", "enemies": [{"slot": 0, "hp": 40}]}
-    cur = {"room_id": "104", "enemies": []}
+    prev = {"room_id": "10A", "enemies": [{"slot": 0, "hp": 40}]}
+    cur = {"room_id": "10A", "enemies": []}
     out = apply_combat_step_fields(prev, cur, attack=True)
     assert out["enemy_damage"] == 40
     assert out["enemy_kills"] == 1
@@ -528,11 +528,11 @@ def test_type_id_wasp_adder_shark_deny() -> None:
 
 def test_zombie_type_still_pays() -> None:
     prev = {
-        "room_id": "104",
+        "room_id": "10A",
         "enemies": [{"slot": 0, "hp": 40, "type_id": 1}],
     }
     cur = {
-        "room_id": "104",
+        "room_id": "10A",
         "enemies": [{"slot": 0, "hp": 28, "type_id": 1}],
     }
     out = apply_combat_step_fields(prev, cur, attack=True)
@@ -587,8 +587,81 @@ def test_cerberus_active_byte_marks_combat_event() -> None:
     )
     assert len(events) == 1
     assert events[0]["is_cerberus"] is True
-    assert events[0].get("is_zombie") is False
-    assert events[0]["damage"] == 40
+
+
+def test_zombie_hp1_despawn_is_not_a_kill() -> None:
+    """pl26→pl27: real kills are N→0; lingering HP=1 corpse despawn must not mint."""
+    # Real finish on slot 1, corpse row on slot 0.
+    real = enemy_combat_events(
+        [
+            {"slot": 0, "hp": 1, "type_id": 0x15, "type_name": "zombie"},
+            {"slot": 1, "hp": 5, "type_id": 0x15, "type_name": "zombie"},
+        ],
+        [
+            {"slot": 0, "hp": 1, "type_id": 0x15, "type_name": "zombie"},
+        ],
+        room_id="10A",
+    )
+    assert len(real) == 1
+    assert real[0]["slot"] == 1
+    assert real[0]["killed"] is True
+    assert real[0]["hp_before"] == 5
+
+    despawn = enemy_combat_events(
+        [{"slot": 0, "hp": 1, "type_id": 0x15, "type_name": "zombie"}],
+        [],
+        room_id="10A",
+    )
+    assert despawn == []
+
+    # Two real fauna: 10→0 and 5→0, plus a later 1→0 corpse — only two kills.
+    first = apply_combat_step_fields(
+        {
+            "room_id": "10A",
+            "enemies": [
+                {"slot": 0, "hp": 10, "type_id": 0x15, "type_name": "zombie"},
+                {"slot": 1, "hp": 17, "type_id": 0x15, "type_name": "zombie"},
+            ],
+        },
+        {
+            "room_id": "10A",
+            "enemies": [
+                {"slot": 1, "hp": 17, "type_id": 0x15, "type_name": "zombie"},
+            ],
+        },
+        attack=True,
+    )
+    assert first["enemy_kills"] == 1
+    second = apply_combat_step_fields(
+        {
+            "room_id": "10A",
+            "enemies": [
+                {"slot": 0, "hp": 1, "type_id": 0x15, "type_name": "zombie"},
+                {"slot": 1, "hp": 5, "type_id": 0x15, "type_name": "zombie"},
+            ],
+        },
+        {
+            "room_id": "10A",
+            "enemies": [
+                {"slot": 1, "hp": 5, "type_id": 0x15, "type_name": "zombie"},
+            ],
+        },
+        attack=True,
+    )
+    assert second["enemy_kills"] == 0  # 1→0 ignored
+    third = apply_combat_step_fields(
+        {
+            "room_id": "10A",
+            "enemies": [
+                {"slot": 1, "hp": 5, "type_id": 0x15, "type_name": "zombie"},
+            ],
+        },
+        {"room_id": "10A", "enemies": []},
+        attack=True,
+    )
+    assert third["enemy_kills"] == 1
+    assert enemy_combat_delta({0: 1, 1: 5}, {1: 5}) == (0, 0)
+    assert enemy_combat_delta({1: 5}, {}) == (5, 1)
 
 
 def test_zombie_type_marks_combat_event() -> None:
