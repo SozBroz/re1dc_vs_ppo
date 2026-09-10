@@ -541,22 +541,31 @@ class PlannerLoyalQueue:
         return list(held)
 
     def allowed_banked_key_names(self) -> frozenset[str]:
-        """Story keys Muse authored into ``leave_118`` / ``leave_100`` banks."""
+        """Story keys Muse authored into ``banked_in_box`` / leave banks.
+
+        Reads chunk ``leave_118`` / ``leave_100``, the same nested on the current
+        step, and step-level ``banked_in_box`` (Muse use_box authoring format).
+        """
         from re1_rl.item_todo import canonical_item
         from re1_rl.key_items import KEY_ITEM_NAMES
 
         names: set[str] = set()
-        leaves = [
+        sources: list[Any] = [
             self.leave_118 if isinstance(self.leave_118, dict) else {},
-            getattr(self, "leave_100", None) if isinstance(getattr(self, "leave_100", None), dict) else {},
+            getattr(self, "leave_100", None)
+            if isinstance(getattr(self, "leave_100", None), dict)
+            else {},
         ]
         step = self.current or {}
         for key in ("leave_100", "leave_118"):
             nested = step.get(key)
             if isinstance(nested, dict):
-                leaves.append(nested)
-        for leave in leaves:
-            for row in (leave or {}).get("banked_in_box") or []:
+                sources.append(nested)
+        # Step-level list (preferred Muse format on use_box).
+        if isinstance(step.get("banked_in_box"), list):
+            sources.append({"banked_in_box": step.get("banked_in_box")})
+        for src in sources:
+            for row in (src or {}).get("banked_in_box") or []:
                 if not isinstance(row, dict):
                     continue
                 name = canonical_item(str(row.get("item") or ""))

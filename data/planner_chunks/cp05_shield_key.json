@@ -1113,7 +1113,7 @@
       "n": 147,
       "op": "use_box",
       "room_id": "118",
-      "note": "bank armor_key + lighter; keep Yawn staging kit",
+      "note": "bank armor_key + lighter; keep Yawn staging kit (Muse v3)",
       "held_on_exit": [
         {
           "item": "beretta",
@@ -1156,7 +1156,33 @@
           "slot": 8
         }
       ],
-      "banked_in_box_note": "armor_key + lighter + prior green_herb/mixed_herbs_gg/knife"
+      "banked_in_box": [
+        {
+          "item": "armor_key",
+          "qty": 1,
+          "why": "deer already unlocked; free a slot for 20A explosive / later GL"
+        },
+        {
+          "item": "lighter",
+          "qty": 1,
+          "why": "no 20F use this chunk; bank dead carry for Yawn slot budget"
+        },
+        {
+          "item": "green_herb",
+          "qty": 1,
+          "why": "already boxed; Muse retain (skip 20D greens this staging)"
+        },
+        {
+          "item": "mixed_herbs_gg",
+          "qty": 1,
+          "why": "already boxed; Muse retain"
+        },
+        {
+          "item": "knife",
+          "qty": 0,
+          "why": "already boxed; Muse retain"
+        }
+      ]
     },
     {
       "n": 148,

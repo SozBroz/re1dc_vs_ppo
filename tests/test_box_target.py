@@ -339,6 +339,39 @@ def test_live_chunk_use_box_unlocks_shield_key_bank() -> None:
     assert box_pollution_reason(dirty, room_id="118") == "key_item_in_box:shield_key@0"
 
 
+def test_muse_v3_box_before_20a_unlocks_lighter_bank() -> None:
+    """pl150 tip skips go_to_box; use_box must allow Muse armor_key+lighter bank."""
+    from re1_rl.box_target import item_name_to_id
+    from re1_rl.item_box import can_deposit
+
+    q = PlannerLoyalQueue()
+    # Step n=146 go_to_box is index 145; tip pl150 seeks that then skips to use_box.
+    q.seek(145)
+    q.note_start_inventory({"room_id": "118", "inventory_slots": [("beretta", 13)]})
+    q.evaluate_transition(
+        prev_state={"room_id": "118"},
+        state={"room_id": "118"},
+    )
+    assert q.current is not None
+    assert q.current["op"] == "use_box"
+    assert q.current.get("n") == 147
+    banked = q.allowed_banked_key_names()
+    assert "lighter" in banked
+    assert "armor_key" in banked
+    # Chunk leave_118 still lists shield_key; union is fine while held_on_exit keeps it.
+    assert "shield_key" in banked
+
+    inv = [(0, 0)] * 8
+    box = [(0, 0)] * 16
+    lid = item_name_to_id("lighter")
+    assert lid is not None
+    inv[0] = (int(lid), 1)
+    ok, reason = can_deposit(
+        inv, box, 0, room_id="118", allowed_key_ids=q.allowed_banked_key_ids()
+    )
+    assert ok, reason
+
+
 def test_leave_100_deposits_any_incoming_heal() -> None:
     """Older PLs may arrive with herbs/mixes/spray; none stay on exit."""
     from re1_rl.item_box import can_deposit
