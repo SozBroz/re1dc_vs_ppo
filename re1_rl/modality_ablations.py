@@ -242,10 +242,16 @@ def build_discriminative_param_groups(
 
 
 def maybe_apply_discriminative_optimizer(model: Any) -> bool:
-    """Rebuild Adam with discriminative groups when ``RE1_DISC_LR=1``. Returns True if applied."""
+    """Rebuild Adam with discriminative groups when ``RE1_DISC_LR=1``. Returns True if applied.
+
+    No-op when ``policy`` is not yet built (SB3 ``load`` uses ``_init_setup_model=False``).
+    Learner path re-invokes this after resume so disc LR still applies.
+    """
     if not discriminative_lr_enabled():
         return False
-    policy = model.policy
+    policy = getattr(model, "policy", None)
+    if policy is None:
+        return False
     base_lr = float(model.lr_schedule(1.0)) if callable(model.lr_schedule) else float(
         getattr(model, "learning_rate", 3e-4)
     )
