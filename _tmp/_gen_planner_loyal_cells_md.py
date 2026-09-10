@@ -96,6 +96,8 @@ def success_for(step: dict) -> str:
     if op == "acquire":
         return f"Inventory gains `{pickup}` while this step is current"
     if op == "use_box":
+        if step.get("held_on_exit"):
+            return "Box closes and inventory matches this step's `held_on_exit`"
         leave = "leave_100" if room == "100" else "leave_118"
         return f"Box closes and inventory matches `{leave}.held_on_exit`"
     if op == "do_puzzle" and beat.startswith("gallery_portrait_"):

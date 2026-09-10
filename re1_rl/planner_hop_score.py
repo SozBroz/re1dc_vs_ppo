@@ -1,16 +1,23 @@
 """Planner-loyal hop score (±1 band): shadow telemetry + live settlement.
 
 Live mode (``RE1_PLANNER_HOP_SCORE_V1=1`` / ``live``):
-  S_success = S_base + B_kill with S_base in [0.20, 1.00];
-  only kills (budget 2) may push above +1 (up to +1.50).
-  divert -0.50, death -1.00, timeout -1.25.
+  Same channel mix as the original ±1 design (HP/ammo/heal/time in ``S_base``,
+  kills as additive ``B_kill``), but every channel's nominal max contribution is
+  scaled by ``CHANNEL_SCORE_SCALE`` (currently 0.67 = −33%):
+
+    S_success = S_base + B_kill   (no upper bound)
+    S_base = 0.20 + 0.536 × Q_raw   (raw / unclipped channel mix)
+    B_kill = B_KILL_PER_KILL * K   (uncapped; ~0.1675 each when E_start > 0)
+
+  divert -0.90, death -0.90, timeout -1.00.
 
   q_hp blends gross damage (``D_hp``) with absolute end HP vs Fine (96) so
   Caution tips cannot score perfect HP without healing, and a full heal can
   beat bare pickup despite ``H_used``.
 
-Clipping is applied only when composing Q / B_kill. Raw (unclipped)
-qualities and clip flags are always logged so overshoots are visible.
+Settlement uses **unclipped** qualities for ``S_base`` so channel overshoots
+(and kill overshoot) raise total ``S`` without a ±1 / perfect ceiling.
+Clipped ``q_*`` / ``Q`` remain in the report for telemetry only.
 """
 
 from __future__ import annotations
@@ -31,9 +38,10 @@ PLANNER_BOSS_TIMEOUT_FRAMES = 12 * 60 * 60  # 43200 = 12 min
 PLANNER_DEFAULT_MAX_STEPS = PLANNER_DEFAULT_TIMEOUT_FRAMES // 8  # 2700
 PLANNER_BOSS_MAX_STEPS = PLANNER_BOSS_TIMEOUT_FRAMES // 8  # 5400
 
-# ±1 success band (kill overshoot separate).
+# Original mix proportions; max score from each channel × CHANNEL_SCORE_SCALE.
+CHANNEL_SCORE_SCALE = 0.67  # −33% vs the pre-scale ±1 band
 HOP_SUCCESS_FLOOR = 0.20
-HOP_SUCCESS_SPAN = 0.80
+HOP_SUCCESS_SPAN = 0.80 * CHANNEL_SCORE_SCALE  # 0.536
 W_HP = 0.40
 W_AMMO = 0.35
 W_HEAL = 0.15
@@ -43,9 +51,12 @@ W_TIME = 0.10
 # Abs share sized so Caution→Fine (+GR use) beats bare pickup on S.
 W_HP_DMG = 0.30
 W_HP_ABS = 0.70
-# Kill is NOT in Q — additive overshoot only.
-K_BUDGET = 2  # kills for full B_kill
-B_KILL_MAX = 0.50
+# Kill is NOT in Q — additive overshoot only (also scaled −33%).
+# Historical "full" band was 0.50 for 2 kills; per-kill rate kept, uncapped.
+K_BUDGET = 2  # reference count that defined the old full B_kill band
+B_KILL_MAX = 0.50 * CHANNEL_SCORE_SCALE  # 0.335 = score for K_BUDGET kills
+B_KILL_PER_KILL = B_KILL_MAX / float(K_BUDGET)  # ~0.1675; no K ceiling
+HOP_SUCCESS_PERFECT = HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN + B_KILL_MAX
 
 HP_BAND_LO = 1
 HP_BAND_HI = 96
@@ -80,9 +91,9 @@ HEAL_UNITS: dict[str, float] = {
     "mixed_herbs_grb": 1.20,
 }
 
-FAIL_SCORE_DIVERT = -0.50
-FAIL_SCORE_DEATH = -1.00
-FAIL_SCORE_TIMEOUT = -1.25
+FAIL_SCORE_DIVERT = -0.90
+FAIL_SCORE_DEATH = -0.90
+FAIL_SCORE_TIMEOUT = -1.00
 # Back-compat aliases for older call sites / tests.
 FAIL_SCORE_DEFAULT = FAIL_SCORE_DIVERT
 
@@ -544,15 +555,14 @@ class PlannerHopMeters:
             b_kill_raw = 0.0
             b_kill = 0.0
         else:
-            b_kill_raw = float(B_KILL_MAX) * float(q_kill_ratio_raw)
-            b_kill = float(B_KILL_MAX) * _clip01(q_kill_ratio_raw)
-            if q_kill_ratio_raw > 1.0:
-                clip_flags.append("B_kill_hi")
-            elif q_kill_ratio_raw < 0.0:
+            # Uncapped: each scored kill pays B_KILL_PER_KILL (no clip at K_BUDGET).
+            b_kill_raw = float(B_KILL_PER_KILL) * float(self.k_scored)
+            b_kill = float(b_kill_raw)
+            if q_kill_ratio_raw < 0.0:
                 clip_flags.append("B_kill_lo")
 
-        # Legacy name in logs: fraction of kill budget used (clipped).
-        q_kill = 0.0 if int(self.e_start) <= 0 else _clip01(q_kill_ratio_raw)
+        # Legacy name in logs: kills relative to the old 2-kill reference (may be >1).
+        q_kill = 0.0 if int(self.e_start) <= 0 else float(q_kill_ratio_raw)
 
         q_mix = (
             W_HP * q_hp
@@ -566,8 +576,10 @@ class PlannerHopMeters:
             + W_HEAL * q_heal_raw
             + W_TIME * q_time_raw
         )
-        s_base = float(HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN * q_mix)
+        # Paid score uses raw (unclipped) mix — total S is uncapped.
         s_base_raw = float(HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN * q_mix_raw)
+        s_base = float(s_base_raw)
+        s_base_clipped = float(HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN * q_mix)
 
         return {
             "q_hp_raw": q_hp_raw,
@@ -588,9 +600,11 @@ class PlannerHopMeters:
             "B_kill": b_kill,
             "S_base_raw": s_base_raw,
             "S_base": s_base,
+            "S_base_clipped": s_base_clipped,
             "clip_flags": clip_flags,
             "B_ammo": float(b_ammo),
             "K_budget": int(K_BUDGET),
+            "B_kill_per_kill": float(B_KILL_PER_KILL),
             "hp_end": int(self.hp_end),
         }
 

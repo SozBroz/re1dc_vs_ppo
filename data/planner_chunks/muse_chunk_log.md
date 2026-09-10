@@ -89,3 +89,48 @@ Muse remaining beat_order after this: gallery portraits → star_crest → green
 | 128 | objective | wind_crest@11A_crest_slot (place_wind_crest) |
 
 Muse beat_order after this: attic_enter → yawn_intro → yawn_1 → moon_crest → place_moon_crest.
+
+## 2026-09-09 — attic_enter (pl134)
+
+- **Tip:** pl134, room 11A, `place_wind_crest` done. HP 68 Fine; beretta 7 + shotgun 4; armor_key + green_herb held; box has shield_key, mixed_herbs_gg, knife, acid_rounds×6.
+- **Model:** muse-glimmer (operator rejected naked attic; required GL + 208/209/20A)
+- **End anchor:** `attic_enter`
+- **Why:** Stage Yawn kit via 118 box + deer-wing loot + terrace `bazooka_acid`, then enter attic with `shield_key` held.
+- **Raw:** `_tmp/pl134_muse_next_response.json`
+- **Pinned as:** `cp05_shield_key.json` steps 130–159
+- **Operator edits:** `use_box` `held_on_exit` deposits `green_herb` and withdraws `shield_key` + `acid_rounds` (Muse omitted held_on_exit); second 20D green fixed to `20D:green_herb:2` (Muse duplicated `:1`). Inventory stays tight after 209/20A/212 — combine/reload may be required in the wild.
+
+| n | op | what |
+|---|---|---|
+| 130 | traverse | 11A→10A |
+| 131 | traverse | 10A→10B |
+| 132 | traverse | 10B→118 |
+| 133 | go_to_box | 118 |
+| 134 | use_box | withdraw shield_key + acid_rounds (deposit green) |
+| 135 | traverse | 118→10B |
+| 136 | traverse | 10B→207 |
+| 137 | traverse | 207→208 |
+| 138 | traverse | 208→209 |
+| 139 | acquire | 209:red_herb:1 |
+| 140 | acquire | 209:handgun_bullets:2 |
+| 141 | acquire | 209:lighter:3 |
+| 142 | traverse | 209→208 |
+| 143 | traverse | 208→20A |
+| 144 | acquire | 20A:explosive_rounds:1 |
+| 145 | traverse | 20A→208 |
+| 146 | traverse | 208→207 |
+| 147 | traverse | 207→204 |
+| 148 | traverse | 204→203 |
+| 149 | traverse | 203→211 |
+| 150 | traverse | 211→212 |
+| 151 | acquire | 212:bazooka_acid:1 |
+| 152 | traverse | 212→211 |
+| 153 | traverse | 211→203 |
+| 154 | traverse | 203→204 |
+| 155 | traverse | 204→20D |
+| 156 | acquire | 20D:green_herb:1 |
+| 157 | acquire | 20D:green_herb:2 |
+| 158 | traverse | 20D→20E |
+| 159 | traverse | 20E→210 (`attic_enter`) |
+
+Muse beat_order after this: yawn_intro → yawn_1 → moon_crest → place_moon_crest.

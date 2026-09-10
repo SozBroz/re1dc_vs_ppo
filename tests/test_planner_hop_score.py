@@ -10,6 +10,7 @@ from re1_rl.planner_hop_score import (
     FAIL_SCORE_DIVERT,
     FAIL_SCORE_TIMEOUT,
     HOP_SUCCESS_FLOOR,
+    HOP_SUCCESS_SPAN,
     K_BUDGET,
     PLANNER_DEFAULT_MAX_STEPS,
     PLANNER_DEFAULT_TIMEOUT_FRAMES,
@@ -91,8 +92,26 @@ def test_empty_room_success_no_kill_bonus() -> None:
     assert report["success"] is True
     assert report["B_kill"] == 0.0
     assert report["q_kill"] == 0.0
-    assert report["S"] == pytest.approx(1.0)  # perfect base
-    assert report["S"] <= 1.0 + 1e-9
+    # Perfect S_base under −33% channel scale: 0.20 + 0.536 = 0.736
+    assert report["S"] == pytest.approx(HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN)
+    assert report["S"] == pytest.approx(report["S_base"])
+
+
+def test_total_score_uncapped_via_raw_channel_overshoot() -> None:
+    """Negative ammo spend (overshoot) raises S above the clipped-channel ceiling."""
+    meters = PlannerHopMeters.begin(
+        {"room_id": "106", "enemies": [], "hp": 96},
+        tip="pl10",
+        boss=False,
+        budget_frames=21600,
+    )
+    meters.frames = 0
+    meters.a_spent = -0.5  # better than zero spend → q_ammo_raw = 1.5
+    report = meters.settle(outcome="hop_success")
+    clipped_ceiling = HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN
+    assert report["S_base"] > clipped_ceiling
+    assert report["S"] > clipped_ceiling
+    assert report["S"] == pytest.approx(report["S_base"])
 
 
 def test_two_kills_full_overshoot() -> None:
@@ -141,7 +160,7 @@ def test_two_kills_full_overshoot() -> None:
     assert report["K"] == 2
     assert report["B_kill"] == pytest.approx(B_KILL_MAX)
     assert report["S"] == pytest.approx(report["S_base"] + B_KILL_MAX)
-    assert report["S"] > 1.0
+    assert report["S"] > report["S_base"]
 
 
 def test_one_kill_half_overshoot() -> None:
@@ -180,8 +199,64 @@ def test_one_kill_half_overshoot() -> None:
     )
     report = meters.settle(outcome="hop_success")
     assert report["K"] == 1
-    assert report["B_kill"] == pytest.approx(0.25)
-    assert report["B_kill_raw"] == pytest.approx(0.25)
+    assert report["B_kill"] == pytest.approx(B_KILL_MAX * 0.5)
+    assert report["B_kill_raw"] == pytest.approx(B_KILL_MAX * 0.5)
+
+
+def test_three_kills_uncapped_beyond_old_budget() -> None:
+    """Each kill pays B_KILL_PER_KILL with no ceiling at K_BUDGET=2."""
+    from re1_rl.planner_hop_score import B_KILL_PER_KILL
+
+    start = {
+        "room_id": "10A",
+        "hp": 96,
+        "enemies": [
+            {"slot": 0, "hp": 40, "alive": True, "type_name": "zombie"},
+            {"slot": 1, "hp": 40, "alive": True, "type_name": "zombie"},
+            {"slot": 2, "hp": 40, "alive": True, "type_name": "zombie"},
+        ],
+    }
+    meters = PlannerHopMeters.begin(start, tip="pl26", budget_frames=21600)
+    assert meters.e_start == 3
+
+    def _kill(slot: int, enemies: list[dict]) -> None:
+        meters.note_step(
+            {"room_id": "10A", "hp": 96, "enemies": enemies},
+            {
+                "room_id": "10A",
+                "hp": 96,
+                "step_emulated_frames": 0,
+                "ammo_spent": 0,
+                "enemies": [
+                    {**e, "hp": 0, "alive": False} if int(e["slot"]) == slot else e
+                    for e in enemies
+                ],
+                "combat_events": [
+                    {
+                        "slot": slot,
+                        "killed": True,
+                        "reward_denied": False,
+                        "is_crow": False,
+                        "damage": 40,
+                    }
+                ],
+                "enemy_kills": 1,
+                "inventory_slots": [],
+            },
+        )
+
+    enemies = list(start["enemies"])
+    for slot in (0, 1, 2):
+        _kill(slot, enemies)
+        enemies = [
+            {**e, "hp": 0, "alive": False} if int(e["slot"]) <= slot else e
+            for e in enemies
+        ]
+    report = meters.settle(outcome="hop_success")
+    assert report["K"] == 3
+    assert report["B_kill"] == pytest.approx(3 * B_KILL_PER_KILL)
+    assert report["B_kill"] > B_KILL_MAX
+    assert B_KILL_PER_KILL == pytest.approx(0.1675)
 
 
 def test_fail_ladder() -> None:
@@ -189,7 +264,10 @@ def test_fail_ladder() -> None:
     assert meters.fail_score("planner_divert") == FAIL_SCORE_DIVERT
     assert meters.fail_score("planner_timeout") == FAIL_SCORE_TIMEOUT
     assert meters.fail_score("hp_death") == FAIL_SCORE_DEATH
-    assert FAIL_SCORE_TIMEOUT < FAIL_SCORE_DEATH < FAIL_SCORE_DIVERT < 0
+    assert FAIL_SCORE_DIVERT == pytest.approx(-0.90)
+    assert FAIL_SCORE_DEATH == pytest.approx(-0.90)
+    assert FAIL_SCORE_TIMEOUT == pytest.approx(-1.00)
+    assert FAIL_SCORE_TIMEOUT < FAIL_SCORE_DEATH <= FAIL_SCORE_DIVERT < 0
 
 
 def test_raw_quality_logged_when_overshoot() -> None:
@@ -354,8 +432,37 @@ def test_note_statue_locals_accumulate_push_and_approach() -> None:
 
 
 
-def test_success_floor_constant() -> None:
-    assert HOP_SUCCESS_FLOOR == 0.20
+def test_channel_scale_preserves_proportions() -> None:
+    from re1_rl.planner_hop_score import (
+        CHANNEL_SCORE_SCALE,
+        HOP_SUCCESS_PERFECT,
+        HOP_SUCCESS_SPAN,
+        W_AMMO,
+        W_HEAL,
+        W_HP,
+        W_TIME,
+    )
+
+    assert CHANNEL_SCORE_SCALE == pytest.approx(0.67)
+    assert W_HP == pytest.approx(0.40)
+    assert W_AMMO == pytest.approx(0.35)
+    assert W_HEAL == pytest.approx(0.15)
+    assert W_TIME == pytest.approx(0.10)
+    assert HOP_SUCCESS_FLOOR == pytest.approx(0.20)
+    assert HOP_SUCCESS_SPAN == pytest.approx(0.80 * 0.67)
+    assert B_KILL_MAX == pytest.approx(0.50 * 0.67)
+    from re1_rl.planner_hop_score import B_KILL_PER_KILL
+
+    assert B_KILL_PER_KILL == pytest.approx(B_KILL_MAX / 2.0)
+    assert B_KILL_PER_KILL == pytest.approx(0.1675)
+    # Max drains (span × weight): HP 0.2144, ammo 0.1876, heal 0.0804, time 0.0536
+    assert HOP_SUCCESS_SPAN * W_HP == pytest.approx(0.32 * 0.67)
+    assert HOP_SUCCESS_SPAN * W_AMMO == pytest.approx(0.28 * 0.67)
+    assert HOP_SUCCESS_SPAN * W_HEAL == pytest.approx(0.12 * 0.67)
+    assert HOP_SUCCESS_SPAN * W_TIME == pytest.approx(0.08 * 0.67)
+    assert HOP_SUCCESS_PERFECT == pytest.approx(
+        HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN + B_KILL_MAX
+    )
 
 
 def test_compose_hop_learning_target_negative_overpowers_positive_s() -> None:

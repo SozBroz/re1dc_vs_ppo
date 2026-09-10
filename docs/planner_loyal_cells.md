@@ -1,6 +1,6 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (129 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (159 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **C-RE1 numbering (Sep 2026):** `pl00` is the dining fresh start (no emblem). Opening remint is `pl01` emblem … `pl06` lockpick (`opening_to_lockpick.json`). Live shield-key step 0 (`106->105`) mints `pl07`. Watch `states/planner_loyal/cells/plNN/cell.pst` — BizHawk `cell.State` is backed up under `backups/planner_loyal_bizhawk_20260904/`.
 
@@ -11,7 +11,7 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl06`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - Tea-room lock: `104->103` stays locked until `103->104` is done once (this chunk never opens it). `103->10C` / `103->10D` are open. Do not walk `116->106` after the shotgun. Vacant `102` clip+shells are taken on the armor-key return; skip re-loot.
-- Chunk end-anchor: `place_wind_crest` (`pl134`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `attic_enter` (`pl164`). Mid-chunk success keeps the episode open.
 
 ## What's minted / what it's stuck on
 
@@ -164,7 +164,37 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 | `pl131` | 126 | `108->109` | `109` (TRAP PASSAGE) | traverse | Walk `108->109` into `109` (TRAP PASSAGE) |
 | `pl132` | 127 | `109->10A` | `10A` (BACK PASSAGE) | traverse | Walk `109->10A` into `10A` (BACK PASSAGE) |
 | `pl133` | 128 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
-| `pl134` | 129 | `place_wind_crest` | `11A` (ROOFED PASSAGE) | objective | `place_wind_crest` at `wind_crest@11A_crest_slot` — chunk end-anchor |
+| `pl134` | 129 | `place_wind_crest` | `11A` (ROOFED PASSAGE) | objective | `place_wind_crest` at `wind_crest@11A_crest_slot` — place_wind_crest mid-chunk (Yawn kit stretch follows) |
+| `pl135` | 130 | `11A->10A` | `10A` (BACK PASSAGE) | traverse | Walk `11A->10A` into `10A` (BACK PASSAGE) |
+| `pl136` | 131 | `10A->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `10A->10B` into `10B` (1F RIGHT STAIRS) |
+| `pl137` | 132 | `10B->118` | `118` (STAIRS UNDER ROOM) | traverse | Walk `10B->118` into `118` (STAIRS UNDER ROOM) |
+| `pl138` | 133 | `go_to_box` | `118` (STAIRS UNDER ROOM) | go_to_box | go_to_box |
+| `pl139` | 134 | `use_box` | `118` (STAIRS UNDER ROOM) | use_box | Rearrange the 118 box to the leave_118 loadout, then close the box |
+| `pl140` | 135 | `118->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `118->10B` into `10B` (1F RIGHT STAIRS) |
+| `pl141` | 136 | `10B->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `10B->207` into `207` (2F RIGHT STAIRS) |
+| `pl142` | 137 | `207->208` | `208` (DEER ROOM) | traverse | Walk `207->208` into `208` (DEER ROOM) |
+| `pl143` | 138 | `208->209` | `209` (BEDROOM) | traverse | Walk `208->209` into `209` (BEDROOM) |
+| `pl144` | 139 | `209:red_herb:1` | `209` (BEDROOM) | acquire | Take `209:red_herb:1` (209 red herb) |
+| `pl145` | 140 | `209:handgun_bullets:2` | `209` (BEDROOM) | acquire | Take `209:handgun_bullets:2` (209 handgun clip) |
+| `pl146` | 141 | `209:lighter:3` | `209` (BEDROOM) | acquire | Take `209:lighter:3` (209 lighter) |
+| `pl147` | 142 | `209->208` | `208` (DEER ROOM) | traverse | Walk `209->208` into `208` (DEER ROOM) |
+| `pl148` | 143 | `208->20A` | `20A` (STUDY ROOM) | traverse | Walk `208->20A` into `20A` (STUDY ROOM) |
+| `pl149` | 144 | `20A:explosive_rounds:1` | `20A` (STUDY ROOM) | acquire | Take `20A:explosive_rounds:1` (20A explosive rounds) |
+| `pl150` | 145 | `20A->208` | `208` (DEER ROOM) | traverse | Walk `20A->208` into `208` (DEER ROOM) |
+| `pl151` | 146 | `208->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `208->207` into `207` (2F RIGHT STAIRS) |
+| `pl152` | 147 | `207->204` | `204` (C PASSAGE) | traverse | Walk `207->204` into `204` (C PASSAGE) |
+| `pl153` | 148 | `204->203` | `203` (HALL 2F) | traverse | Walk `204->203` into `203` (HALL 2F) |
+| `pl154` | 149 | `203->211` | `211` (TERRACE PASSAGE) | traverse | Walk `203->211` into `211` (TERRACE PASSAGE) |
+| `pl155` | 150 | `211->212` | `212` (TERRACE) | traverse | Walk `211->212` into `212` (TERRACE) |
+| `pl156` | 151 | `212:bazooka_acid:1` | `212` (TERRACE) | acquire | Take `212:bazooka_acid:1` (Forest Speyer bazooka acid) |
+| `pl157` | 152 | `212->211` | `211` (TERRACE PASSAGE) | traverse | Walk `212->211` into `211` (TERRACE PASSAGE) |
+| `pl158` | 153 | `211->203` | `203` (HALL 2F) | traverse | Walk `211->203` into `203` (HALL 2F) |
+| `pl159` | 154 | `203->204` | `204` (C PASSAGE) | traverse | Walk `203->204` into `204` (C PASSAGE) |
+| `pl160` | 155 | `204->20D` | `20D` (PILLAR PASSAGE) | traverse | Walk `204->20D` into `20D` (PILLAR PASSAGE) |
+| `pl161` | 156 | `20D:green_herb:1` | `20D` (PILLAR PASSAGE) | acquire | Take `20D:green_herb:1` (20D first green herb) |
+| `pl162` | 157 | `20D:green_herb:2` | `20D` (PILLAR PASSAGE) | acquire | Take `20D:green_herb:2` (20D second green herb (Muse duplicate :1 fixed)) |
+| `pl163` | 158 | `20D->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `20D->20E` into `20E` (FRONT OF ATTIC) |
+| `pl164` | 159 | `attic_enter` | `210` (ATTIC) | traverse | Walk `20E->210` into `210` (ATTIC) |
 
 ## Details
 
@@ -225,7 +255,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl07`–`pl134`)
+### Chunk cells (`pl07`–`pl164`)
 
 ### `pl07` — `106->105` (step 1)
 
@@ -1596,9 +1626,338 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **Op:** `objective`
 - **Site:** `wind_crest@11A_crest_slot`
 - **Beat:** `place_wind_crest`
-- **Note:** chunk end-anchor
-- **Objective:** `place_wind_crest` at `wind_crest@11A_crest_slot` — chunk end-anchor
+- **Note:** place_wind_crest mid-chunk (Yawn kit stretch follows)
+- **Objective:** `place_wind_crest` at `wind_crest@11A_crest_slot` — place_wind_crest mid-chunk (Yawn kit stretch follows)
 - **Items gained:** _(none)_
-- **How to achieve:** `place_wind_crest` at `wind_crest@11A_crest_slot` — chunk end-anchor.
+- **How to achieve:** `place_wind_crest` at `wind_crest@11A_crest_slot` — place_wind_crest mid-chunk (Yawn kit stretch follows).
 - **Success condition:** `story_use_success` == `wind_crest@11A_crest_slot` in room `11A`
+
+### `pl135` — `11A->10A` (step 130)
+
+- **Room:** `10A` (BACK PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `11A->10A`
+- **Note:** to box route for Yawn kit
+- **Objective:** Walk `11A->10A` into `10A` (BACK PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `11A->10A` into `10A` (BACK PASSAGE).
+- **Success condition:** Enter room `10A` via `11A->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:11A->10A got <room>` (−4).
+
+### `pl136` — `10A->10B` (step 131)
+
+- **Room:** `10B` (1F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `10A->10B`
+- **Note:** to box route
+- **Objective:** Walk `10A->10B` into `10B` (1F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10A->10B` into `10B` (1F RIGHT STAIRS).
+- **Success condition:** Enter room `10B` via `10A->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->10B got <room>` (−4).
+
+### `pl137` — `10B->118` (step 132)
+
+- **Room:** `118` (STAIRS UNDER ROOM)
+- **Op:** `traverse`
+- **Edge:** `10B->118`
+- **Note:** stairs under room box
+- **Objective:** Walk `10B->118` into `118` (STAIRS UNDER ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10B->118` into `118` (STAIRS UNDER ROOM).
+- **Success condition:** Enter room `118` via `10B->118` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->118 got <room>` (−4).
+
+### `pl138` — `go_to_box` (step 133)
+
+- **Room:** `118` (STAIRS UNDER ROOM)
+- **Op:** `go_to_box`
+- **Note:** Yawn kit box
+- **Objective:** go_to_box
+- **Items gained:** _(none)_
+- **How to achieve:** go_to_box.
+- **Success condition:** go_to_box
+
+### `pl139` — `use_box` (step 134)
+
+- **Room:** `118` (STAIRS UNDER ROOM)
+- **Op:** `use_box`
+- **Note:** deposit green_herb; withdraw shield_key + acid_rounds (Yawn kit)
+- **Objective:** Rearrange the 118 box to the leave_118 loadout, then close the box
+- **Items gained:** _(none)_
+- **How to achieve:** Rearrange the 118 box to the leave_118 loadout, then close the box.
+- **Success condition:** Box closes and inventory matches this step's `held_on_exit`
+
+### `pl140` — `118->10B` (step 135)
+
+- **Room:** `10B` (1F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `118->10B`
+- **Note:** exit box
+- **Objective:** Walk `118->10B` into `10B` (1F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `118->10B` into `10B` (1F RIGHT STAIRS).
+- **Success condition:** Enter room `10B` via `118->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:118->10B got <room>` (−4).
+
+### `pl141` — `10B->207` (step 136)
+
+- **Room:** `207` (2F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `10B->207`
+- **Note:** 2F right stairs
+- **Objective:** Walk `10B->207` into `207` (2F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10B->207` into `207` (2F RIGHT STAIRS).
+- **Success condition:** Enter room `207` via `10B->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->207 got <room>` (−4).
+
+### `pl142` — `207->208` (step 137)
+
+- **Room:** `208` (DEER ROOM)
+- **Op:** `traverse`
+- **Edge:** `207->208`
+- **Note:** armor_key opens deer hub
+- **Objective:** Walk `207->208` into `208` (DEER ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `207->208` into `208` (DEER ROOM).
+- **Success condition:** Enter room `208` via `207->208` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->208 got <room>` (−4).
+
+### `pl143` — `208->209` (step 138)
+
+- **Room:** `209` (BEDROOM)
+- **Op:** `traverse`
+- **Edge:** `208->209`
+- **Note:** bedroom loot
+- **Objective:** Walk `208->209` into `209` (BEDROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `208->209` into `209` (BEDROOM).
+- **Success condition:** Enter room `209` via `208->209` (already-there counts after cinema dump). Any other door is `wrong_traverse:208->209 got <room>` (−4).
+
+### `pl144` — `209:red_herb:1` (step 139)
+
+- **Room:** `209` (BEDROOM)
+- **Op:** `acquire`
+- **Pickup:** `209:red_herb:1`
+- **Note:** 209 red herb
+- **Objective:** Take `209:red_herb:1` (209 red herb)
+- **Items gained:** `red_herb`
+- **How to achieve:** Take `209:red_herb:1` (209 red herb).
+- **Success condition:** Inventory gains `209:red_herb:1` while this step is current
+
+### `pl145` — `209:handgun_bullets:2` (step 140)
+
+- **Room:** `209` (BEDROOM)
+- **Op:** `acquire`
+- **Pickup:** `209:handgun_bullets:2`
+- **Note:** 209 handgun clip
+- **Objective:** Take `209:handgun_bullets:2` (209 handgun clip)
+- **Items gained:** `handgun_bullets`
+- **How to achieve:** Take `209:handgun_bullets:2` (209 handgun clip).
+- **Success condition:** Inventory gains `209:handgun_bullets:2` while this step is current
+
+### `pl146` — `209:lighter:3` (step 141)
+
+- **Room:** `209` (BEDROOM)
+- **Op:** `acquire`
+- **Pickup:** `209:lighter:3`
+- **Note:** 209 lighter
+- **Objective:** Take `209:lighter:3` (209 lighter)
+- **Items gained:** `lighter`
+- **How to achieve:** Take `209:lighter:3` (209 lighter).
+- **Success condition:** Inventory gains `209:lighter:3` while this step is current
+
+### `pl147` — `209->208` (step 142)
+
+- **Room:** `208` (DEER ROOM)
+- **Op:** `traverse`
+- **Edge:** `209->208`
+- **Note:** back to deer hub
+- **Objective:** Walk `209->208` into `208` (DEER ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `209->208` into `208` (DEER ROOM).
+- **Success condition:** Enter room `208` via `209->208` (already-there counts after cinema dump). Any other door is `wrong_traverse:209->208 got <room>` (−4).
+
+### `pl148` — `208->20A` (step 143)
+
+- **Room:** `20A` (STUDY ROOM)
+- **Op:** `traverse`
+- **Edge:** `208->20A`
+- **Note:** study room
+- **Objective:** Walk `208->20A` into `20A` (STUDY ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `208->20A` into `20A` (STUDY ROOM).
+- **Success condition:** Enter room `20A` via `208->20A` (already-there counts after cinema dump). Any other door is `wrong_traverse:208->20A got <room>` (−4).
+
+### `pl149` — `20A:explosive_rounds:1` (step 144)
+
+- **Room:** `20A` (STUDY ROOM)
+- **Op:** `acquire`
+- **Pickup:** `20A:explosive_rounds:1`
+- **Note:** 20A explosive rounds
+- **Objective:** Take `20A:explosive_rounds:1` (20A explosive rounds)
+- **Items gained:** `explosive_rounds`
+- **How to achieve:** Take `20A:explosive_rounds:1` (20A explosive rounds).
+- **Success condition:** Inventory gains `20A:explosive_rounds:1` while this step is current
+
+### `pl150` — `20A->208` (step 145)
+
+- **Room:** `208` (DEER ROOM)
+- **Op:** `traverse`
+- **Edge:** `20A->208`
+- **Note:** back to deer hub
+- **Objective:** Walk `20A->208` into `208` (DEER ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `20A->208` into `208` (DEER ROOM).
+- **Success condition:** Enter room `208` via `20A->208` (already-there counts after cinema dump). Any other door is `wrong_traverse:20A->208 got <room>` (−4).
+
+### `pl151` — `208->207` (step 146)
+
+- **Room:** `207` (2F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `208->207`
+- **Note:** up to 2F right stairs
+- **Objective:** Walk `208->207` into `207` (2F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `208->207` into `207` (2F RIGHT STAIRS).
+- **Success condition:** Enter room `207` via `208->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:208->207 got <room>` (−4).
+
+### `pl152` — `207->204` (step 147)
+
+- **Room:** `204` (C PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `207->204`
+- **Note:** to C passage
+- **Objective:** Walk `207->204` into `204` (C PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `207->204` into `204` (C PASSAGE).
+- **Success condition:** Enter room `204` via `207->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->204 got <room>` (−4).
+
+### `pl153` — `204->203` (step 148)
+
+- **Room:** `203` (HALL 2F)
+- **Op:** `traverse`
+- **Edge:** `204->203`
+- **Note:** to Hall 2F
+- **Objective:** Walk `204->203` into `203` (HALL 2F)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `204->203` into `203` (HALL 2F).
+- **Success condition:** Enter room `203` via `204->203` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->203 got <room>` (−4).
+
+### `pl154` — `203->211` (step 149)
+
+- **Room:** `211` (TERRACE PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `203->211`
+- **Note:** terrace passage
+- **Objective:** Walk `203->211` into `211` (TERRACE PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `203->211` into `211` (TERRACE PASSAGE).
+- **Success condition:** Enter room `211` via `203->211` (already-there counts after cinema dump). Any other door is `wrong_traverse:203->211 got <room>` (−4).
+
+### `pl155` — `211->212` (step 150)
+
+- **Room:** `212` (TERRACE)
+- **Op:** `traverse`
+- **Edge:** `211->212`
+- **Note:** terrace
+- **Objective:** Walk `211->212` into `212` (TERRACE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `211->212` into `212` (TERRACE).
+- **Success condition:** Enter room `212` via `211->212` (already-there counts after cinema dump). Any other door is `wrong_traverse:211->212 got <room>` (−4).
+
+### `pl156` — `212:bazooka_acid:1` (step 151)
+
+- **Room:** `212` (TERRACE)
+- **Op:** `acquire`
+- **Pickup:** `212:bazooka_acid:1`
+- **Note:** Forest Speyer bazooka acid
+- **Objective:** Take `212:bazooka_acid:1` (Forest Speyer bazooka acid)
+- **Items gained:** `bazooka_acid`
+- **How to achieve:** Take `212:bazooka_acid:1` (Forest Speyer bazooka acid).
+- **Success condition:** Inventory gains `212:bazooka_acid:1` while this step is current
+
+### `pl157` — `212->211` (step 152)
+
+- **Room:** `211` (TERRACE PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `212->211`
+- **Note:** back from terrace
+- **Objective:** Walk `212->211` into `211` (TERRACE PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `212->211` into `211` (TERRACE PASSAGE).
+- **Success condition:** Enter room `211` via `212->211` (already-there counts after cinema dump). Any other door is `wrong_traverse:212->211 got <room>` (−4).
+
+### `pl158` — `211->203` (step 153)
+
+- **Room:** `203` (HALL 2F)
+- **Op:** `traverse`
+- **Edge:** `211->203`
+- **Note:** back to Hall 2F
+- **Objective:** Walk `211->203` into `203` (HALL 2F)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `211->203` into `203` (HALL 2F).
+- **Success condition:** Enter room `203` via `211->203` (already-there counts after cinema dump). Any other door is `wrong_traverse:211->203 got <room>` (−4).
+
+### `pl159` — `203->204` (step 154)
+
+- **Room:** `204` (C PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `203->204`
+- **Note:** to C passage
+- **Objective:** Walk `203->204` into `204` (C PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `203->204` into `204` (C PASSAGE).
+- **Success condition:** Enter room `204` via `203->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:203->204 got <room>` (−4).
+
+### `pl160` — `204->20D` (step 155)
+
+- **Room:** `20D` (PILLAR PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `204->20D`
+- **Note:** armor_key opens pillar passage
+- **Objective:** Walk `204->20D` into `20D` (PILLAR PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `204->20D` into `20D` (PILLAR PASSAGE).
+- **Success condition:** Enter room `20D` via `204->20D` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->20D got <room>` (−4).
+
+### `pl161` — `20D:green_herb:1` (step 156)
+
+- **Room:** `20D` (PILLAR PASSAGE)
+- **Op:** `acquire`
+- **Pickup:** `20D:green_herb:1`
+- **Note:** 20D first green herb
+- **Objective:** Take `20D:green_herb:1` (20D first green herb)
+- **Items gained:** `green_herb`
+- **How to achieve:** Take `20D:green_herb:1` (20D first green herb).
+- **Success condition:** Inventory gains `20D:green_herb:1` while this step is current
+
+### `pl162` — `20D:green_herb:2` (step 157)
+
+- **Room:** `20D` (PILLAR PASSAGE)
+- **Op:** `acquire`
+- **Pickup:** `20D:green_herb:2`
+- **Note:** 20D second green herb (Muse duplicate :1 fixed)
+- **Objective:** Take `20D:green_herb:2` (20D second green herb (Muse duplicate :1 fixed))
+- **Items gained:** `green_herb`
+- **How to achieve:** Take `20D:green_herb:2` (20D second green herb (Muse duplicate :1 fixed)).
+- **Success condition:** Inventory gains `20D:green_herb:2` while this step is current
+
+### `pl163` — `20D->20E` (step 158)
+
+- **Room:** `20E` (FRONT OF ATTIC)
+- **Op:** `traverse`
+- **Edge:** `20D->20E`
+- **Note:** front of attic
+- **Objective:** Walk `20D->20E` into `20E` (FRONT OF ATTIC)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `20D->20E` into `20E` (FRONT OF ATTIC).
+- **Success condition:** Enter room `20E` via `20D->20E` (already-there counts after cinema dump). Any other door is `wrong_traverse:20D->20E got <room>` (−4).
+
+### `pl164` — `attic_enter` (step 159)
+
+- **Room:** `210` (ATTIC)
+- **Op:** `traverse`
+- **Edge:** `20E->210`
+- **Beat:** `attic_enter`
+- **Note:** shield_key opens attic; chunk end-anchor attic_enter
+- **Objective:** Walk `20E->210` into `210` (ATTIC)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `20E->210` into `210` (ATTIC).
+- **Success condition:** Enter room `210` via `20E->210` (already-there counts after cinema dump). Any other door is `wrong_traverse:20E->210 got <room>` (−4).
 

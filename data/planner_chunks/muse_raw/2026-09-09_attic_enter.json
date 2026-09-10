@@ -1,0 +1,319 @@
+{
+  "why_tea_unlocked": "103->104 is already open from earlier progress; no lock action needed",
+  "why_not_naked_attic": "beretta 7 + shotgun 4 is far below Yawn combat strain ~60 handgun rounds / ~4 acid GL rounds; attic entry requires a real Yawn kit",
+  "why_box_118": "from 11A the only box route is 11A->10A->10B->118; 100 is unreachable without the long 1F loop and would violate the 118 mandate",
+  "kit_plan": "withdraw shield_key and acid_rounds from 118, acquire bazooka_acid at 212, loot 209 handgun clip/lighter/red herb and 20A explosive_rounds, then enter attic with shield_key held",
+  "next_chunk": {
+    "why": "stage Yawn kit via 118 box withdraw + terrace GL + 208/209/20A loot, then enter attic with shield_key held",
+    "end_anchor_beat_id": "attic_enter",
+    "steps": [
+      {
+        "n": 1,
+        "op": "traverse",
+        "edge_id": "11A->10A",
+        "id": "s1",
+        "beat_id": null,
+        "note": "to box route",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 2,
+        "op": "traverse",
+        "edge_id": "10A->10B",
+        "id": "s2",
+        "beat_id": null,
+        "note": "to box route",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 3,
+        "op": "traverse",
+        "edge_id": "10B->118",
+        "id": "s3",
+        "beat_id": null,
+        "note": "arrive at stairs under room box",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 4,
+        "op": "go_to_box",
+        "room_id": "118",
+        "id": "s4",
+        "beat_id": null,
+        "note": "box room",
+        "edge_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 5,
+        "op": "use_box",
+        "room_id": "118",
+        "id": "s5",
+        "beat_id": null,
+        "note": "withdraw shield_key and acid_rounds for Yawn kit",
+        "edge_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 6,
+        "op": "traverse",
+        "edge_id": "118->10B",
+        "id": "s6",
+        "beat_id": null,
+        "note": "exit box",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 7,
+        "op": "traverse",
+        "edge_id": "10B->207",
+        "id": "s7",
+        "beat_id": null,
+        "note": "to 2F right stairs",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 8,
+        "op": "traverse",
+        "edge_id": "207->208",
+        "id": "s8",
+        "beat_id": null,
+        "note": "armor_key opens deer hub",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 9,
+        "op": "traverse",
+        "edge_id": "208->209",
+        "id": "s9",
+        "beat_id": null,
+        "note": "bedroom loot",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 10,
+        "op": "acquire",
+        "room_id": "209",
+        "pickup_id": "209:red_herb:1",
+        "id": "s10",
+        "beat_id": null,
+        "note": "209 red herb",
+        "edge_id": null
+      },
+      {
+        "n": 11,
+        "op": "acquire",
+        "room_id": "209",
+        "pickup_id": "209:handgun_bullets:2",
+        "id": "s11",
+        "beat_id": null,
+        "note": "209 handgun clip",
+        "edge_id": null
+      },
+      {
+        "n": 12,
+        "op": "acquire",
+        "room_id": "209",
+        "pickup_id": "209:lighter:3",
+        "id": "s12",
+        "beat_id": null,
+        "note": "209 lighter",
+        "edge_id": null
+      },
+      {
+        "n": 13,
+        "op": "traverse",
+        "edge_id": "209->208",
+        "id": "s13",
+        "beat_id": null,
+        "note": "back to deer hub",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 14,
+        "op": "traverse",
+        "edge_id": "208->20A",
+        "id": "s14",
+        "beat_id": null,
+        "note": "study room",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 15,
+        "op": "acquire",
+        "room_id": "20A",
+        "pickup_id": "20A:explosive_rounds:1",
+        "id": "s15",
+        "beat_id": null,
+        "note": "20A explosive rounds",
+        "edge_id": null
+      },
+      {
+        "n": 16,
+        "op": "traverse",
+        "edge_id": "20A->208",
+        "id": "s16",
+        "beat_id": null,
+        "note": "back to deer hub",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 17,
+        "op": "traverse",
+        "edge_id": "208->207",
+        "id": "s17",
+        "beat_id": null,
+        "note": "up to 2F right stairs",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 18,
+        "op": "traverse",
+        "edge_id": "207->204",
+        "id": "s18",
+        "beat_id": null,
+        "note": "to C passage",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 19,
+        "op": "traverse",
+        "edge_id": "204->203",
+        "id": "s19",
+        "beat_id": null,
+        "note": "to Hall 2F",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 20,
+        "op": "traverse",
+        "edge_id": "203->211",
+        "id": "s20",
+        "beat_id": null,
+        "note": "to terrace passage",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 21,
+        "op": "traverse",
+        "edge_id": "211->212",
+        "id": "s21",
+        "beat_id": null,
+        "note": "terrace",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 22,
+        "op": "acquire",
+        "room_id": "212",
+        "pickup_id": "212:bazooka_acid:1",
+        "id": "s22",
+        "beat_id": null,
+        "note": "Forest Speyer bazooka acid",
+        "edge_id": null
+      },
+      {
+        "n": 23,
+        "op": "traverse",
+        "edge_id": "212->211",
+        "id": "s23",
+        "beat_id": null,
+        "note": "back from terrace",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 24,
+        "op": "traverse",
+        "edge_id": "211->203",
+        "id": "s24",
+        "beat_id": null,
+        "note": "back to Hall 2F",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 25,
+        "op": "traverse",
+        "edge_id": "203->204",
+        "id": "s25",
+        "beat_id": null,
+        "note": "to C passage",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 26,
+        "op": "traverse",
+        "edge_id": "204->20D",
+        "id": "s26",
+        "beat_id": null,
+        "note": "armor_key opens pillar passage",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 27,
+        "op": "acquire",
+        "room_id": "20D",
+        "pickup_id": "20D:green_herb:1",
+        "id": "s27",
+        "beat_id": null,
+        "note": "20D first green herb",
+        "edge_id": null
+      },
+      {
+        "n": 28,
+        "op": "acquire",
+        "room_id": "20D",
+        "pickup_id": "20D:green_herb:1",
+        "id": "s28",
+        "beat_id": null,
+        "note": "20D second green herb",
+        "edge_id": null
+      },
+      {
+        "n": 29,
+        "op": "traverse",
+        "edge_id": "20D->20E",
+        "id": "s29",
+        "beat_id": null,
+        "note": "front of attic",
+        "room_id": null,
+        "pickup_id": null
+      },
+      {
+        "n": 30,
+        "op": "traverse",
+        "edge_id": "20E->210",
+        "id": "s30",
+        "beat_id": "attic_enter",
+        "note": "shield_key opens attic; completes attic_enter",
+        "room_id": null,
+        "pickup_id": null
+      }
+    ]
+  },
+  "beat_order": [
+    "attic_enter",
+    "yawn_intro",
+    "yawn_1",
+    "moon_crest",
+    "place_moon_crest"
+  ]
+}
