@@ -48,14 +48,17 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
 #   - Credit assignment is per n_steps segment, not the whole sync window.
 DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     n_steps=_DISTRIBUTED_N_STEPS,
-    batch_size=2048,  # WH2 learner default; launchers may override (e.g. 3072)
-    n_epochs=4,
-    learning_rate=1e-4,
+    batch_size=8192,  # mandate expansion: use 5090 VRAM headroom
+    n_epochs=2,  # fewer passes over on-policy data (anti-forget)
+    learning_rate=3e-5,  # FiLM/fusion base; disc LR scales CNN/towers down
     # Planner-loyal hop-score: one cell = one episode with a terminal S. Use
     # γ=1 so the outcome is not time-decayed across the hop (effective γ_outcome).
     # n_steps still sized from RL_GAMMA half-lives for rollout/bootstrap cuts.
     gamma=1.0,
-    ent_coef=0.008,
+    ent_coef=0.005,
+    clip_range=0.10,
+    target_kl=0.006,
+    max_grad_norm=0.30,
 )
 DEFAULT_SYNC_INTERVAL_S = 360.0
 
@@ -967,6 +970,35 @@ def _actor_process(
                 audit["reattributed_combat_pay"] = moved
                 audit["reattributed_combat_to_step"] = target
                 info["combat_audit"] = audit
+            # Mandate: 4-step pre-hit HP tax on prior eligible buffer steps.
+            try:
+                from re1_rl.planner_hop_score import (
+                    apply_hit_backfeed_tax,
+                    hop_score_live_enabled,
+                )
+
+                if hop_score_live_enabled() and step_i > 0:
+                    hp_lost = float(
+                        ((info or {}).get("reward_breakdown") or {}).get(
+                            "hp_lost_points"
+                        )
+                        or 0.0
+                    )
+                    if hp_lost > 0.0:
+                        taxed = apply_hit_backfeed_tax(
+                            rewards,
+                            current_index=int(step_i),
+                            hp_lost=float(hp_lost),
+                        )
+                        if taxed != 0.0 and info is not None:
+                            info = dict(info)
+                            breakdown = dict(info.get("reward_breakdown") or {})
+                            breakdown["hit_backfeed"] = float(
+                                breakdown.get("hit_backfeed") or 0.0
+                            ) + float(taxed)
+                            info["reward_breakdown"] = breakdown
+            except Exception:
+                pass
             if _footage_env is not None:
                 try:
                     _footage_env.append(

@@ -1158,6 +1158,7 @@ def _compute_planner_loyal_reward(
     hp_delta = hp - prev_hp
     if hp_delta < 0 and _player_hp_in_reward_band(prev_hp) and hp <= JILL_FINE_HP:
         bd["hp"] = HP_LOSS_SCALE * hp_delta
+        bd["hp_lost_points"] = float(-hp_delta)
     elif (
         hp_delta > 0
         and _player_hp_in_reward_band(prev_hp)
@@ -1172,6 +1173,20 @@ def _compute_planner_loyal_reward(
     if enemy_damage_pay > 0.0:
         bd["enemy_damage"] = enemy_damage_pay
     if enemy_kill_pay > 0.0:
+        # Hop-live: rescale ENEMY_KILL_REWARD (2.0) → HOP_LOCAL_ENEMY_KILL (0.50).
+        # Boss× already baked into enemy_kill_pay via combat scale.
+        try:
+            from re1_rl.planner_hop_score import (
+                HOP_LOCAL_ENEMY_KILL,
+                hop_score_live_enabled,
+            )
+
+            if hop_score_live_enabled():
+                enemy_kill_pay = float(enemy_kill_pay) * (
+                    float(HOP_LOCAL_ENEMY_KILL) / float(ENEMY_KILL_REWARD)
+                )
+        except Exception:
+            pass
         bd["enemy_kill"] = enemy_kill_pay
 
     reload_pay = low_ammo_reload_reward(prev_state, state)
@@ -1888,6 +1903,7 @@ def compute_reward(
     # Jill max (96). Death chip still allows hp==0.
     if hp_delta < 0 and _player_hp_in_reward_band(prev_hp) and hp <= JILL_FINE_HP:
         bd["hp"] = HP_LOSS_SCALE * hp_delta
+        bd["hp_lost_points"] = float(-hp_delta)
     elif (
         hp_delta > 0
         and _player_hp_in_reward_band(prev_hp)
@@ -1906,6 +1922,20 @@ def compute_reward(
     if enemy_damage_pay > 0.0:
         bd["enemy_damage"] = enemy_damage_pay
     if enemy_kill_pay > 0.0:
+        # Hop-live: rescale ENEMY_KILL_REWARD (2.0) → HOP_LOCAL_ENEMY_KILL (0.50).
+        # Boss× already baked into enemy_kill_pay via combat scale.
+        try:
+            from re1_rl.planner_hop_score import (
+                HOP_LOCAL_ENEMY_KILL,
+                hop_score_live_enabled,
+            )
+
+            if hop_score_live_enabled():
+                enemy_kill_pay = float(enemy_kill_pay) * (
+                    float(HOP_LOCAL_ENEMY_KILL) / float(ENEMY_KILL_REWARD)
+                )
+        except Exception:
+            pass
         bd["enemy_kill"] = enemy_kill_pay
 
     reload_pay = low_ammo_reload_reward(prev_state, state)

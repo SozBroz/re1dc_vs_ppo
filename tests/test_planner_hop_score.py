@@ -159,8 +159,10 @@ def test_two_kills_full_overshoot() -> None:
     report = meters.settle(outcome="hop_success")
     assert report["K"] == 2
     assert report["B_kill"] == pytest.approx(B_KILL_MAX)
-    assert report["S"] == pytest.approx(report["S_base"] + B_KILL_MAX)
-    assert report["S"] > report["S_base"]
+    # Mandate: B_kill is telemetry only; S_core == S_base (no fight broadcast).
+    assert report["S"] == pytest.approx(report["S_base"])
+    assert report.get("B_kill_in_S") is False
+    assert report["B_kill"] > 0.0
 
 
 def test_one_kill_half_overshoot() -> None:
@@ -274,13 +276,13 @@ def test_raw_quality_logged_when_overshoot() -> None:
     meters = PlannerHopMeters.begin(
         {"room_id": "106", "enemies": [], "hp": 96}, budget_frames=100
     )
-    meters.d_hp = 400.0  # past denom even after end-HP blend
+    meters.d_hp = 400.0  # past denom — telemetry only under S_core (W_HP_DMG=0)
     meters.frames = 0
     report = meters.settle(outcome="hop_success")
     assert report["q_hp_dmg_raw"] < 0.0
-    assert report["q_hp_raw"] < 0.0
-    assert report["q_hp"] == 0.0
-    assert "q_hp_lo" in str(report["clip_flags"])
+    # Absolute end-HP still Fine → q_hp_raw stays in [0,1] with W_HP_DMG=0.
+    assert report["q_hp_raw"] == pytest.approx(1.0)
+    assert report["q_hp"] == pytest.approx(1.0)
 
 
 def test_caution_full_heal_beats_bare_pickup() -> None:
@@ -369,7 +371,8 @@ def test_apply_live_hop_score_zeros_legacy() -> None:
     )
     assert bd["hop_score"] == FAIL_SCORE_DIVERT
     assert bd["planner_divert"] == 0.0
-    assert bd["enemy_kill"] == 0.0
+    # Mandate: enemy_kill stays as γ≈0 local; dense hp still replaced.
+    assert bd["enemy_kill"] == 2.0
     assert bd["hp"] == 0.0
     assert report["S"] == FAIL_SCORE_DIVERT
 
@@ -461,7 +464,7 @@ def test_channel_scale_preserves_proportions() -> None:
     assert HOP_SUCCESS_SPAN * W_HEAL == pytest.approx(0.12 * 0.67)
     assert HOP_SUCCESS_SPAN * W_TIME == pytest.approx(0.08 * 0.67)
     assert HOP_SUCCESS_PERFECT == pytest.approx(
-        HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN + B_KILL_MAX
+        HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN
     )
 
 

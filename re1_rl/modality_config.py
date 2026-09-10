@@ -48,8 +48,12 @@ def modality_diag_every_n_updates() -> int:
 
 
 def goal_film_enabled() -> bool:
-    """Identity-init FiLM goal conditioning on vision/spatial towers."""
-    return _env_truthy("RE1_GOAL_FILM", "0")
+    """Identity-init FiLM goal conditioning on vision/spatial towers.
+
+    Mandate default ON. Set ``RE1_GOAL_FILM=0`` to force off (POLICY_KWARGS
+    may still pass ``goal_film=True`` explicitly).
+    """
+    return _env_truthy("RE1_GOAL_FILM", "1")
 
 
 def mod_drop_enabled() -> bool:
@@ -63,10 +67,10 @@ def mod_drop_rate() -> float:
 
 
 def discriminative_lr_enabled() -> bool:
-    """Mature towers (CNN/world) use a reduced learning rate."""
-    return _env_truthy("RE1_DISC_LR", "0")
+    """Mature towers (CNN/world) use a reduced learning rate. Mandate default ON."""
+    return _env_truthy("RE1_DISC_LR", "1")
 
 
 def discriminative_lr_mult() -> float:
-    """Multiplier for mature-tower LR (default 0.2)."""
-    return min(1.0, max(0.01, _env_float("RE1_DISC_LR_MULT", 0.2)))
+    """Multiplier for mature-tower LR (default 0.3 ≈ 9e-6 when base is 3e-5)."""
+    return min(1.0, max(0.01, _env_float("RE1_DISC_LR_MULT", 0.3)))

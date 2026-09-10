@@ -1,9 +1,10 @@
 """Combat-efficient policy extractor: typed towers + joint combat latent.
 
-NatureCNN 512-d + typed towers; LayerNorm fusion into FEATURES_DIM (1024)
-for [512, 512] pi/vf. Goal tower is 256-d for planner_steps residual under
-RE1_PLANNER_LOYAL. Named persistent-state tower is conditional on verified
-RAM fields only. IMPALA-3 vision is still deferred.
+NatureCNN 512-d + typed towers; LayerNorm fusion into FEATURES_DIM (2048)
+for [1024, 1024, 1024] pi/vf. Goal tower is 256-d for planner_steps residual
+under RE1_PLANNER_LOYAL. Goal FiLM on vision/spatial is on by default.
+Named persistent-state tower is conditional on verified RAM fields only.
+IMPALA-3 vision is still deferred.
 """
 
 from __future__ import annotations
@@ -87,9 +88,9 @@ PERSISTENT_STATE_DIM = NAMED_STATE_DIM
 PERSISTENT_TOWER_DIM = 96
 NAMED_STATE_OBS_KEY = "named_state"
 
-FEATURES_DIM = 1024
-PARAM_HARD_CAP = 8_000_000
-PARAM_TARGET = 5_000_000
+FEATURES_DIM = 2048
+PARAM_HARD_CAP = 16_000_000
+PARAM_TARGET = 14_000_000
 
 _OMIT_OBS_KEYS = frozenset({"frame", "world_state", "key_hints", "affordances"})
 

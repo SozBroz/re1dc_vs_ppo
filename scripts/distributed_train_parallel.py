@@ -357,11 +357,20 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         if getattr(model, "policy", None) is not None and hasattr(model.policy, "optimizer"):
             for group in model.policy.optimizer.param_groups:
                 group["lr"] = lr
-    # Ops-only Baseline E probe (default remains None). Example: RE1_TARGET_KL=0.02
+    # Ops: RE1_TARGET_KL overrides; else use DISTRIBUTED_EPOCH_HYPERPARAMS target_kl.
     _tk_raw = os.environ.get("RE1_TARGET_KL", "").strip()
     if _tk_raw:
         model.target_kl = float(_tk_raw)
         log(args.machine_name, f"RE1_TARGET_KL override -> target_kl={model.target_kl}")
+    elif DISTRIBUTED_EPOCH_HYPERPARAMS.get("target_kl") is not None:
+        model.target_kl = float(DISTRIBUTED_EPOCH_HYPERPARAMS["target_kl"])
+    try:
+        from re1_rl.modality_ablations import maybe_apply_discriminative_optimizer
+
+        if maybe_apply_discriminative_optimizer(model):
+            log(args.machine_name, "discriminative LR optimizer groups applied")
+    except Exception as exc:
+        log(args.machine_name, f"discriminative LR skipped: {exc}")
     if resume_path is not None:
         log(args.machine_name, f"resumed learner from {resume_path}")
     log(
@@ -371,6 +380,7 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         f"n_epochs={DISTRIBUTED_EPOCH_HYPERPARAMS['n_epochs']} "
         f"gamma={DISTRIBUTED_EPOCH_HYPERPARAMS['gamma']} "
         f"ent_coef={getattr(model, 'ent_coef', None)} "
+        f"clip_range={getattr(model, 'clip_range', None)} "
         f"target_kl={getattr(model, 'target_kl', None)}",
     )
     return model, ckpt_dir
@@ -1168,4 +1178,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    import multiprocessing as mp
+
+    mp.freeze_support()
+    # venv was created from Store Python; spawn children otherwise re-run
+    # this file as a second worker (40 C-RE1 windows for n_envs=20).
+    mp.set_executable(sys.executable)
     raise SystemExit(main())

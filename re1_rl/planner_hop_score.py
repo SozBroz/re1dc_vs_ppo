@@ -1,25 +1,20 @@
 """Planner-loyal hop score (±1 band): shadow telemetry + live settlement.
 
 Live mode (``RE1_PLANNER_HOP_SCORE_V1=1`` / ``live``):
-  Same channel mix as the original ±1 design (HP/ammo/heal/time in ``S_base``,
-  kills as additive ``B_kill``), but every channel's nominal max contribution is
-  scaled by ``CHANNEL_SCORE_SCALE`` (currently 0.67 = −33%):
+  Resource/time quality stays in terminal ``S_core`` (γ_outcome=1 broadcast).
+  Fight budget is **not** rebroadcast via ``B_kill`` / gross ``D_hp`` — those
+  land as γ≈0 locals (``enemy_damage``, ``enemy_kill``, 4-step pre-hit HP tax):
 
-    S_success = S_base + B_kill   (no upper bound)
-    S_base = 0.20 + 0.536 × Q_raw   (raw / unclipped channel mix)
-    B_kill = B_KILL_PER_KILL * K   (uncapped; ~0.1675 each when E_start > 0)
+    S_success = S_core = S_base   (abs-HP / ammo / heal / time; no B_kill)
+    S_base = 0.20 + 0.536 × Q_raw
+    q_hp uses absolute end-HP only (W_HP_DMG=0); D_hp remains telemetry
 
   divert -0.90, death -0.90, timeout -1.00.
 
-  q_hp blends gross damage (``D_hp``) with absolute end HP vs Fine (96) so
-  Caution tips cannot score perfect HP without healing, and a full heal can
-  beat bare pickup despite ``H_used``.
-
 Settlement uses **unclipped** qualities for ``S_base`` so channel overshoots
-(and kill overshoot) raise total ``S`` without a ±1 / perfect ceiling.
+raise total ``S`` without a ±1 / perfect ceiling.
 Clipped ``q_*`` / ``Q`` remain in the report for telemetry only.
 """
-
 from __future__ import annotations
 
 import os
@@ -46,17 +41,18 @@ W_HP = 0.40
 W_AMMO = 0.35
 W_HEAL = 0.15
 W_TIME = 0.10
-# Within q_hp: gross damage still counts, but end HP (Fine=96) must too —
-# otherwise Caution tips get perfect q_hp with D_hp=0 and healing is pure loss.
-# Abs share sized so Caution→Fine (+GR use) beats bare pickup on S.
-W_HP_DMG = 0.30
-W_HP_ABS = 0.70
-# Kill is NOT in Q — additive overshoot only (also scaled −33%).
-# Historical "full" band was 0.50 for 2 kills; per-kill rate kept, uncapped.
+# Mandate: gross fight damage leaves S_core; only absolute end-HP stays in q_hp.
+W_HP_DMG = 0.0
+W_HP_ABS = 1.0
+# Kill telemetry only — not added to S_core (paid as γ≈0 enemy_kill local).
 K_BUDGET = 2  # reference count that defined the old full B_kill band
 B_KILL_MAX = 0.50 * CHANNEL_SCORE_SCALE  # 0.335 = score for K_BUDGET kills
-B_KILL_PER_KILL = B_KILL_MAX / float(K_BUDGET)  # ~0.1675; no K ceiling
-HOP_SUCCESS_PERFECT = HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN + B_KILL_MAX
+B_KILL_PER_KILL = B_KILL_MAX / float(K_BUDGET)  # ~0.1675; telemetry only
+HOP_SUCCESS_PERFECT = HOP_SUCCESS_FLOOR + HOP_SUCCESS_SPAN  # no B_kill in S_core
+# Hop-local kill pay (rescales reward.py ENEMY_KILL_REWARD=2.0 → 0.50 base).
+HOP_LOCAL_ENEMY_KILL = 0.50
+# 4-step pre-hit damage-taken backfeed weights (renormalize if fewer steps).
+HIT_BACKFEED_WEIGHTS = (0.10, 0.20, 0.30, 0.40)
 
 HP_BAND_LO = 1
 HP_BAND_HI = 96
@@ -140,14 +136,13 @@ SUCCESS_OUTCOMES = frozenset(
 )
 
 # Dense / terminal keys replaced by hop_score under live.
+# enemy_damage / enemy_kill stay as γ≈0 locals (mandate combat credit).
 LIVE_REPLACED_SCALAR_KEYS = frozenset(
     {
         "planner_step_success",
         "planner_divert",
         "planner_timeout",
         "death",
-        "enemy_damage",
-        "enemy_kill",
         "hp",
         "ammo_spend",
         "heal_use_tax",
@@ -161,9 +156,12 @@ LIVE_REPLACED_SCALAR_KEYS = frozenset(
     }
 )
 
-# Localized γ≈0 taxes that remain in the scalar stream under live hop-score.
+# Localized γ≈0 taxes/pays that remain in the scalar stream under live hop-score.
 HOP_LOCAL_SCALAR_KEYS = frozenset(
     {
+        "enemy_damage",
+        "enemy_kill",
+        "hit_backfeed",
         "attack_miss",
         "ammo_waste",
         "combat_overkill",
@@ -210,6 +208,43 @@ def hop_local_reward_from_bd(bd: dict[str, float] | None) -> float:
     for key in HOP_LOCAL_SCALAR_KEYS:
         total += float(bd.get(key, 0.0) or 0.0)
     return float(total)
+
+
+def apply_hit_backfeed_tax(
+    rewards: Any,
+    *,
+    current_index: int,
+    hp_lost: float,
+    weights: tuple[float, ...] = HIT_BACKFEED_WEIGHTS,
+) -> float:
+    """Distribute HP-loss tax over up to 4 prior buffer steps (not current).
+
+    ``hp_lost`` is positive HP points lost. Returns total tax applied (≤0).
+    """
+    import numpy as np
+
+    from re1_rl.reward import HP_LOSS_SCALE
+
+    lost = float(hp_lost)
+    if lost <= 0.0 or current_index <= 0:
+        return 0.0
+    total_tax = -float(HP_LOSS_SCALE) * lost
+    n = min(len(weights), int(current_index))
+    if n <= 0:
+        return 0.0
+    # Use the last n weights (closest steps get the heaviest share).
+    chosen = weights[-n:]
+    wsum = float(sum(chosen))
+    if wsum <= 0.0:
+        return 0.0
+    applied = 0.0
+    for i, w in enumerate(chosen):
+        # i=0 is farthest among the n; last weight is t-1.
+        step_i = int(current_index) - n + i
+        share = total_tax * (float(w) / wsum)
+        rewards[step_i] = float(rewards[step_i]) + share
+        applied += share
+    return float(applied)
 
 
 def compose_hop_learning_target(
@@ -619,8 +654,9 @@ class PlannerHopMeters:
         }
 
     def success_score(self) -> float:
+        """S_core only — fight budget is γ≈0 local, not broadcast."""
         b = self.quality_bundle()
-        return float(b["S_base"] + b["B_kill"])
+        return float(b["S_base"])
 
     def fail_score(self, reason: str | None) -> float:
         key = str(reason or "").strip().lower()
@@ -646,7 +682,7 @@ class PlannerHopMeters:
         success = outcome_key in SUCCESS_OUTCOMES and not fail_key
         b = self.quality_bundle()
         if success:
-            s = float(b["S_base"] + b["B_kill"])
+            s = float(b["S_base"])  # S_core: no B_kill broadcast
             reason = outcome_key or "hop_success"
         else:
             reason = fail_key or outcome_key or "unknown"
@@ -659,10 +695,12 @@ class PlannerHopMeters:
             "outcome": reason,
             "success": bool(success),
             "S": round(float(s), 6),
+            "S_core": round(float(b["S_base"]) if success else float(s), 6),
             "S_base": round(float(b["S_base"]), 6),
             "S_base_raw": round(float(b["S_base_raw"]), 6),
             "B_kill": round(float(b["B_kill"]), 6),
             "B_kill_raw": round(float(b["B_kill_raw"]), 6),
+            "B_kill_in_S": False,
             "Q": round(float(b["Q"]), 6),
             "Q_raw": round(float(b["Q_raw"]), 6),
             "q_hp": round(float(b["q_hp"]), 6),
