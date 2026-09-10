@@ -7,7 +7,9 @@ param(
   [Parameter(Mandatory=$true)][string]$NEnvs,
   [Parameter(Mandatory=$true)][string]$BasePort,
   [Parameter(Mandatory=$true)][string]$ActorRanks,
-  [string]$Visible = '0'
+  [string]$Visible = '0',
+  [int]$StartupBatch = 0,
+  [string]$StartupStaggerS = '0.25'
 )
 $ErrorActionPreference = 'Stop'
 $launcher = Join-Path $Rl "_tmp\launch_$WorkerId.cmd"
@@ -25,6 +27,8 @@ Start-Sleep -Seconds 2
 
 $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $log = Join-Path $logDir "worker_${WorkerId}.$stamp.log"
+$batchSize = if ($StartupBatch -gt 0) { [int]$StartupBatch } else { [Math]::Min([int]$NEnvs, 8) }
+if ($batchSize -lt 1) { $batchSize = 1 }
 
 $cmdBody = @"
 @echo off
@@ -32,8 +36,8 @@ set RE1_RL_ROOT=$Rl
 set RE1_RECOMP_ROOT=$Recomp
 set RE1_RECOMP_VISIBLE=$Visible
 set RE1_ECOSYSTEM_ENEMY_WORK=1
-set RE1_ACTOR_STARTUP_BATCH_SIZE=$NEnvs
-set RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK=0
+set RE1_ACTOR_STARTUP_BATCH_SIZE=$batchSize
+set RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK=$StartupStaggerS
 set RE1_GRID_LOCK_INTERVAL_S=0.15
 set RE1_GRID_MONITOR=right
 set LEARNER_HOST=192.168.0.229

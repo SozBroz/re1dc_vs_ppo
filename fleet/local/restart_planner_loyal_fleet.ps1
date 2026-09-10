@@ -66,10 +66,43 @@ Write-Host '=== START WH3 LEARNER (WMI) ===' -ForegroundColor Green
 Invoke-FleetSsh $WH3 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\sshuser\re1_rl\fleet\local\wmi_start_learner_wh3_planner_loyal.ps1'
 Wait-LearnerHealth -TimeoutSec $LearnerWaitSec
 
-Write-Host '=== START REMOTE WORKERS ===' -ForegroundColor Green
-Invoke-FleetSsh $WH1 'powershell -NoProfile -ExecutionPolicy Bypass -File D:\re1_rl\_tmp\_restart_wh1_pl.ps1'
-Invoke-FleetSsh $WH2 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\sshuser\re1_rl\fleet\local\restart_worker_workhorse2_planner_loyal.ps1'
-& cmd.exe /c (Join-Path $ROOT 'fleet\local\start_worker_detached_pking_planner_loyal.cmd')
-Write-Host 'PKING planner-loyal worker started.'
+Write-Host '=== START C-RE1 RECOMP WORKERS (no BizHawk) ===' -ForegroundColor Green
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ROOT '_tmp\_start_recomp_fleet_scaled.ps1')
+if ($LASTEXITCODE -ne 0) { throw "recomp fleet start failed ($LASTEXITCODE)" }
+Write-Host 'C-RE1 recomp workers started.'
 
-Write-Host 'PLANNER_LOYAL_FLEET_RESTART_OK' -ForegroundColor Green
+# Gate: all four workers must be visible on the learner (pking used to crash-loop
+# and the restart script still printed OK).
+$expected = @('pking-recomp', 'wh1-recomp', 'wh2-recomp', 'wh3-recomp')
+$gateDeadline = (Get-Date).AddSeconds(120)
+Write-Host 'Waiting for all workers on learner /status...' -ForegroundColor Yellow
+while ((Get-Date) -lt $gateDeadline) {
+  try {
+    $st = (Invoke-WebRequest -UseBasicParsing "http://${LEARNER_HOST}:${LEARNER_PORT}/status" -TimeoutSec 5).Content | ConvertFrom-Json
+    $missing = @()
+    foreach ($wid in $expected) {
+      $w = $st.workers.$wid
+      $n = 0
+      if ($null -ne $w) { $n = [int]$w.n_envs }
+      # pking reports n_envs early during staggered boot; require full count.
+      $need = switch ($wid) {
+        'pking-recomp' { 20 }
+        'wh1-recomp' { 8 }
+        'wh2-recomp' { 28 }
+        'wh3-recomp' { 24 }
+        default { 1 }
+      }
+      if ($n -lt $need) { $missing += ("{0}({1}/{2})" -f $wid, $n, $need) }
+    }
+    if ($missing.Count -eq 0) {
+      Write-Host ('all workers online: ' + (($expected | ForEach-Object { "$_=$($st.workers.$_.n_envs)" }) -join ' ')) -ForegroundColor Green
+      Write-Host 'PLANNER_LOYAL_FLEET_RESTART_OK' -ForegroundColor Green
+      return
+    }
+    Write-Host ('  missing: ' + ($missing -join ', '))
+  } catch {
+    Write-Host '  status poll failed'
+  }
+  Start-Sleep -Seconds 5
+}
+throw 'fleet restart incomplete: not all workers visible on learner'
