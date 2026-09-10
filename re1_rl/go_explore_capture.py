@@ -952,9 +952,16 @@ def maybe_capture_cell(
 
     allowed_keys = None
     queue = getattr(env, "_planner_loyal_queue", None) if env is not None else None
-    getter = getattr(queue, "allowed_banked_key_names", None) if queue else None
-    if getter is not None:
-        allowed_keys = getter()
+    # Prefer ids→names so Muse banked weapons (shotgun @ 118) pass pollution.
+    id_getter = getattr(queue, "allowed_banked_key_ids", None) if queue else None
+    if id_getter is not None:
+        from re1_rl.item_box import key_names_for_ids
+
+        allowed_keys = key_names_for_ids(frozenset(id_getter()))
+    else:
+        getter = getattr(queue, "allowed_banked_key_names", None) if queue else None
+        if getter is not None:
+            allowed_keys = getter()
     ok, reason = integrity_gate_ok(
         env_state, progress, allowed_key_names=allowed_keys
     )

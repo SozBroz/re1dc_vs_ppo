@@ -303,6 +303,10 @@ def box_pollution_reason(
             label = name or f"0x{item_id:02x}"
             return f"deep_box_item:{label}@{i}"
         if int(item_id) not in BOX_STORABLE_ITEM_IDS:
+            # Planner ``banked_in_box`` overrides (shotgun / explosive at 118, …)
+            # arrive via allowed_key_names (ids→names), same as planned keys.
+            if allowed_key_names and name and name in allowed_key_names:
+                continue
             label = name or f"0x{item_id:02x}"
             return f"disallowed_item_in_box:{label}@{i}"
     return None

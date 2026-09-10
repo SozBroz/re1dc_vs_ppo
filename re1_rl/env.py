@@ -845,11 +845,14 @@ class RE1Env(gym.Env):
         return frozenset(getter())
 
     def _planner_allowed_box_key_names(self) -> frozenset[str]:
-        queue = getattr(self, "_planner_loyal_queue", None)
-        getter = getattr(queue, "allowed_banked_key_names", None) if queue else None
-        if getter is None:
-            return frozenset()
-        return frozenset(getter())
+        """All planner-banked item names (keys + guns/ammo/herbs).
+
+        Prefer ids→names so ``box_pollution_reason`` allows Muse ``banked_in_box``
+        weapons (e.g. shotgun at 118). ``allowed_banked_key_names`` is keys-only.
+        """
+        from re1_rl.item_box import key_names_for_ids
+
+        return key_names_for_ids(self._planner_allowed_box_key_ids())
 
     def _box_pollution_failure(self) -> str | None:
         """Terminal if a key (or any deep-slot item) is parked in the live box."""

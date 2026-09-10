@@ -340,6 +340,43 @@ def test_live_chunk_use_box_unlocks_shield_key_bank() -> None:
     assert box_pollution_reason(dirty, room_id="118") == "key_item_in_box:shield_key@0"
 
 
+def test_pl164_use_box_allows_shotgun_bank_pollution() -> None:
+    """Muse pl165 kit banks shotgun at 118; deposit must not trip pollution."""
+    from re1_rl.box_target import item_name_to_id
+    from re1_rl.item_box import box_pollution_reason, can_deposit, key_names_for_ids
+
+    q = PlannerLoyalQueue()
+    idx = next(
+        i
+        for i, step in enumerate(q._steps)
+        if step.get("op") == "use_box"
+        and step.get("n") == 161
+        and step.get("room_id") == "118"
+    )
+    q.seek(idx)
+    assert q.current is not None
+    assert "shotgun" not in q.allowed_banked_key_names()  # keys-only helper
+    ids = q.allowed_banked_key_ids()
+    sid = item_name_to_id("shotgun")
+    assert sid is not None and int(sid) in ids
+    names = key_names_for_ids(ids)
+    assert "shotgun" in names
+    assert "shield_key" not in names  # held_on_exit — not banked this visit
+
+    inv = [(0, 0)] * 8
+    box = [(0, 0)] * 16
+    inv[0] = (int(sid), 7)
+    ok, reason = can_deposit(
+        inv, box, 0, room_id="118", allowed_key_ids=ids
+    )
+    assert ok, reason
+    dirty = [(int(sid), 7)] + [(0, 0)] * 15
+    assert box_pollution_reason(dirty, room_id="118") == "disallowed_item_in_box:shotgun@0"
+    assert (
+        box_pollution_reason(dirty, room_id="118", allowed_key_names=names) is None
+    )
+
+
 def test_muse_v3_box_before_20a_unlocks_lighter_bank() -> None:
     """pl150 tip skips go_to_box; use_box must allow Muse armor_key+lighter bank."""
     from re1_rl.box_target import item_name_to_id
