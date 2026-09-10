@@ -342,10 +342,17 @@ def _build_learner_model(args: argparse.Namespace, device: str):
     # keep model.n_steps aligned with CLI for any SB3 helpers that read it.
     model.n_steps = int(args.n_steps)
     # Large-batch epoch hyperparams (gentler LR / fewer epochs / bigger minibatches).
+    # SB3 stores clip_range as a Schedule callable; a bare float breaks train().
+    from stable_baselines3.common.utils import get_schedule_fn
+
     for key, value in DISTRIBUTED_EPOCH_HYPERPARAMS.items():
         if key == "n_steps":
             continue
-        if hasattr(model, key):
+        if not hasattr(model, key):
+            continue
+        if key in ("clip_range", "clip_range_vf") and value is not None:
+            setattr(model, key, get_schedule_fn(value))
+        else:
             setattr(model, key, value)
     batch_override = getattr(args, "batch_size", None)
     if batch_override is not None:
