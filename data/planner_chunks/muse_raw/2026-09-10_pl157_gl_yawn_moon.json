@@ -1,0 +1,324 @@
+{
+  "why": "operator-fixed Muse pl157 after study puzzle PLs",
+  "end_anchor_beat_id": "place_moon_crest",
+  "study_steps": [
+    {
+      "n": 152,
+      "op": "do_puzzle",
+      "site_id": "study_insect_switch",
+      "room_id": "20A",
+      "beat_id": "study_insect_switch",
+      "note": "insect wall button drains fishtank (u8@0x800C8701 bit 0x20)"
+    },
+    {
+      "n": 153,
+      "op": "do_puzzle",
+      "site_id": "study_push_fishtank",
+      "room_id": "20A",
+      "beat_id": "study_push_fishtank",
+      "note": "shove drained fishtank south along east wall (gs=0x80800040)"
+    },
+    {
+      "n": 154,
+      "op": "do_puzzle",
+      "site_id": "study_push_cupboard",
+      "room_id": "20A",
+      "beat_id": "study_push_cupboard",
+      "note": "shove north cupboard east to reveal explosive rounds"
+    },
+    {
+      "n": 155,
+      "op": "acquire",
+      "room_id": "20A",
+      "pickup_id": "20A:explosive_rounds:1",
+      "note": "20A explosive rounds after insect/tank/cupboard puzzle"
+    }
+  ],
+  "muse_steps": [
+    {
+      "op": "traverse",
+      "edge_id": "20A->208",
+      "note": "leave study after explosive",
+      "n": 156
+    },
+    {
+      "op": "traverse",
+      "edge_id": "208->207",
+      "note": "to stairs",
+      "n": 157
+    },
+    {
+      "op": "traverse",
+      "edge_id": "207->10B",
+      "note": "down to 1F",
+      "n": 158
+    },
+    {
+      "op": "traverse",
+      "edge_id": "10B->118",
+      "note": "to box",
+      "n": 159
+    },
+    {
+      "op": "go_to_box",
+      "room_id": "118",
+      "note": "box for GL/attic kit",
+      "n": 160
+    },
+    {
+      "op": "use_box",
+      "room_id": "118",
+      "note": "withdraw armor_key for 204->20D; keep beretta+hg combat kit; bank shotgun+explosive+red; 3 free for GL+2 greens",
+      "held_on_exit": [
+        {
+          "item": "beretta",
+          "qty": 15,
+          "slot": 1
+        },
+        {
+          "item": "handgun_bullets",
+          "qty": 13,
+          "slot": 2
+        },
+        {
+          "item": "shield_key",
+          "qty": 1,
+          "slot": 3
+        },
+        {
+          "item": "armor_key",
+          "qty": 1,
+          "slot": 4
+        },
+        {
+          "item": "acid_rounds",
+          "qty": 6,
+          "slot": 5
+        },
+        {
+          "item": null,
+          "qty": 0,
+          "slot": 6
+        },
+        {
+          "item": null,
+          "qty": 0,
+          "slot": 7
+        },
+        {
+          "item": null,
+          "qty": 0,
+          "slot": 8
+        }
+      ],
+      "banked_in_box": [
+        {
+          "item": "shotgun",
+          "qty": 7,
+          "why": "free slots for GL+20D greens; beretta+hg is combat kit"
+        },
+        {
+          "item": "explosive_rounds",
+          "qty": 6,
+          "why": "bank; acid+GL is yawn primary kit"
+        },
+        {
+          "item": "red_herb",
+          "qty": 1,
+          "why": "free a slot"
+        },
+        {
+          "item": "lighter",
+          "qty": 0,
+          "why": "already boxed"
+        },
+        {
+          "item": "green_herb",
+          "qty": 1,
+          "why": "already boxed"
+        },
+        {
+          "item": "mixed_herbs_gg",
+          "qty": 1,
+          "why": "already boxed"
+        },
+        {
+          "item": "knife",
+          "qty": 0,
+          "why": "already boxed"
+        }
+      ],
+      "n": 161
+    },
+    {
+      "op": "traverse",
+      "edge_id": "118->10B",
+      "note": "exit box",
+      "n": 162
+    },
+    {
+      "op": "traverse",
+      "edge_id": "10B->207",
+      "note": "stairs up (short terrace path)",
+      "n": 163
+    },
+    {
+      "op": "traverse",
+      "edge_id": "207->204",
+      "n": 164
+    },
+    {
+      "op": "traverse",
+      "edge_id": "204->203",
+      "n": 165
+    },
+    {
+      "op": "traverse",
+      "edge_id": "203->211",
+      "n": 166
+    },
+    {
+      "op": "traverse",
+      "edge_id": "211->212",
+      "n": 167
+    },
+    {
+      "op": "acquire",
+      "room_id": "212",
+      "pickup_id": "212:bazooka_acid:1",
+      "note": "mandatory GL for Yawn",
+      "n": 168
+    },
+    {
+      "op": "traverse",
+      "edge_id": "212->211",
+      "n": 169
+    },
+    {
+      "op": "traverse",
+      "edge_id": "211->203",
+      "n": 170
+    },
+    {
+      "op": "traverse",
+      "edge_id": "203->204",
+      "n": 171
+    },
+    {
+      "op": "traverse",
+      "edge_id": "204->20D",
+      "note": "armor_key gate into pillar passage",
+      "n": 172
+    },
+    {
+      "op": "acquire",
+      "room_id": "20D",
+      "pickup_id": "20D:green_herb:1",
+      "note": "20D green 1/2",
+      "n": 173
+    },
+    {
+      "op": "acquire",
+      "room_id": "20D",
+      "pickup_id": "20D:green_herb:2",
+      "note": "20D green 2/2",
+      "n": 174
+    },
+    {
+      "op": "traverse",
+      "edge_id": "20D->20E",
+      "n": 175
+    },
+    {
+      "op": "traverse",
+      "edge_id": "20E->210",
+      "beat_id": "attic_enter",
+      "note": "enter attic with shield_key",
+      "n": 176
+    },
+    {
+      "op": "trigger_cutscene",
+      "site_id": "210:yawn_intro",
+      "room_id": "210",
+      "beat_id": "yawn_intro",
+      "capture": false,
+      "note": "Yawn intro cinema",
+      "n": 177
+    },
+    {
+      "op": "boss",
+      "site_id": "210:yawn",
+      "room_id": "210",
+      "beat_id": "yawn_1",
+      "note": "fight Yawn (GL+acid)",
+      "n": 178
+    },
+    {
+      "op": "acquire",
+      "room_id": "210",
+      "pickup_id": "210:shotgun_shells:2",
+      "note": "Yawn mint shells",
+      "n": 179
+    },
+    {
+      "op": "acquire",
+      "room_id": "210",
+      "pickup_id": "210:moon_crest:1",
+      "beat_id": "moon_crest",
+      "note": "Yawn mint moon crest",
+      "n": 180
+    },
+    {
+      "op": "traverse",
+      "edge_id": "210->20E",
+      "n": 181
+    },
+    {
+      "op": "traverse",
+      "edge_id": "20E->20D",
+      "n": 182
+    },
+    {
+      "op": "traverse",
+      "edge_id": "20D->204",
+      "n": 183
+    },
+    {
+      "op": "traverse",
+      "edge_id": "204->207",
+      "n": 184
+    },
+    {
+      "op": "traverse",
+      "edge_id": "207->10B",
+      "n": 185
+    },
+    {
+      "op": "traverse",
+      "edge_id": "10B->10A",
+      "n": 186
+    },
+    {
+      "op": "traverse",
+      "edge_id": "10A->11A",
+      "n": 187
+    },
+    {
+      "op": "objective",
+      "site_id": "moon_crest@11A_crest_slot",
+      "room_id": "11A",
+      "beat_id": "place_moon_crest",
+      "note": "place moon crest \u2014 Phase-1 crest set complete",
+      "n": 188
+    }
+  ],
+  "muse_raw": "_tmp/pl157_muse_next_response.json",
+  "operator_fixes": [
+    "held_on_exit + banked_in_box on use_box",
+    "withdraw armor_key for 204->20D",
+    "bank shotgun+explosive+red for 3 free (GL+2 greens)",
+    "20D:green_herb:1 and :2 (skip serum-gated HG)",
+    "explicit yawn_intro + yawn_1 before mint",
+    "short terrace path 118->10B->207->204->203->211->212"
+  ]
+}

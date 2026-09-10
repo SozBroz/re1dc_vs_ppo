@@ -90,6 +90,10 @@ DINING_STATUE_X = 0x800DB6E0  # s16
 DINING_STATUE_Z = 0x800DB6E8  # s16
 # Armor room 205 vents-covered / crest-available (QS2=0, QS1=0x20).
 ARMOR_PUZZLE_FLAG = 0x800C8704  # u8 bit 0x20 [CONFIRMED QS1 vs QS2 2026-08-30]
+# Study room 20A fishtank drained (insect wall button). Demo replay
+# pl156_20260910_072945_ok: 0→1 on interact, sticky through ammo pickup.
+# Do not use 0x800C867A/867C (lab/game timers) or 0x800C8662 (camera).
+STUDY_TANK_DRAINED_FLAG = 0x800C8701  # u8 bit 0x20 [CONFIRMED 2026-09-10]
 # Player-model work vertices near Jill, not armor statue coordinates. Kept for
 # backwards-compatible telemetry only; never use these to grade room 205.
 ARMOR_STATUE_X = 0x800DB7D8  # s16
@@ -531,6 +535,7 @@ DEFAULT_RAM_FIELDS: list[tuple[str, int, str]] = [
     ("dining_statue_x", DINING_STATUE_X, "s16"),
     ("dining_statue_z", DINING_STATUE_Z, "s16"),
     ("armor_puzzle_flag", ARMOR_PUZZLE_FLAG, "u8"),
+    ("study_tank_drained_flag", STUDY_TANK_DRAINED_FLAG, "u8"),
     ("armor_statue_x", ARMOR_STATUE_X, "s16"),
     ("armor_statue_z", ARMOR_STATUE_Z, "s16"),
     ("armor_east_statue_x", ARMOR_EAST_STATUE_X, "s16"),

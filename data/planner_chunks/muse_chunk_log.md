@@ -158,3 +158,25 @@ Muse beat_order after this: yawn_intro → yawn_1 → moon_crest → place_moon_
 | 151 | traverse | 208→20A |
 | 152 | acquire | 20A:explosive_rounds:1 |
 
+## 2026-09-10 — study 20A puzzle PLs + GL/yawn/moon (pl156)
+
+- **Tip:** pl156, room 20A after `208->20A`. Study mega-acquire replaced by three `do_puzzle` beats + acquire.
+- **Model:** muse-glimmer (`_tmp/pl157_muse_next_response.json`) then operator-fixed kit/path.
+- **End anchor:** `place_moon_crest`
+- **Why:** Drain→fishtank→cupboard→explosive as separate PLs; then box→212 GL→20D greens→yawn mint→place moon.
+- **Raw:** `muse_raw/2026-09-10_pl157_gl_yawn_moon.json`
+- **Pinned as:** `cp05_shield_key.json` steps 152–188
+- **Operator edits:** formal `held_on_exit`/`banked_in_box`; withdraw `armor_key` for `204->20D`; bank shotgun+explosive+red for 3 free slots; `20D:green_herb:2`; explicit `yawn_intro`/`yawn_1`; short terrace path (no gallery detour).
+
+| n | op | what |
+|---|---|---|
+| 152 | do_puzzle | study_insect_switch |
+| 153 | do_puzzle | study_push_fishtank |
+| 154 | do_puzzle | study_push_cupboard |
+| 155 | acquire | 20A:explosive_rounds:1 |
+| 156–161 | … | box at 118 (armor_key out; shotgun/explosive/red banked) |
+| 162–168 | … | short terrace → 212:bazooka_acid |
+| 169–172 | … | 20D greens → 20E→210 attic_enter |
+| 173–176 | … | yawn_intro, yawn_1, shells, moon_crest |
+| 177–188 | … | walk to 11A place_moon_crest |
+

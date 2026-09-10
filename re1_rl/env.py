@@ -741,6 +741,10 @@ class RE1Env(gym.Env):
             "armor_puzzle_ready": bool(
                 int(ram.get("armor_puzzle_flag", 0) or 0) & 0x20
             ),
+            "study_tank_drained_flag": int(ram.get("study_tank_drained_flag", 0) or 0),
+            "study_tank_drained": bool(
+                int(ram.get("study_tank_drained_flag", 0) or 0) & 0x20
+            ),
             "armor_statue_x": int(ram.get("armor_statue_x", 0) or 0),
             "armor_statue_z": int(ram.get("armor_statue_z", 0) or 0),
             "armor_east_statue_x": int(ram.get("armor_east_statue_x", 0) or 0),

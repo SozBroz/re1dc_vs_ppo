@@ -719,6 +719,19 @@ class PlannerLoyalQueue:
             )
             return result
 
+        from re1_rl.study_room_puzzle import study_room_step_complete
+
+        if study_room_step_complete(step, state):
+            result["step_success"] = True
+            self._index += 1
+            self._mark_step_success()
+            beat = str(step.get("beat_id") or step.get("site_id") or "")
+            print(
+                f"[planner_loyal] study_20A {beat} room={room}",
+                flush=True,
+            )
+            return result
+
         # Piano USE can lose music_notes and spawn gold_emblem on one frame.
         # Pickup used to fire first and kill piano_play before pl13 could mint.
         if op in {"objective", "do_puzzle", "trigger_cutscene", "boss"}:
@@ -1621,6 +1634,18 @@ def encode_planner_loyal_goal(
                 v[5:10] = dining_compass
                 v[21] = 1.0
                 compass_set = True
+        elif room == "20A":
+            from re1_rl.study_room_puzzle import (
+                encode_study_room_compass,
+                study_room_active,
+            )
+
+            if study_room_active(queue, state):
+                study_compass = encode_study_room_compass(state, queue=queue)
+                if study_compass is not None:
+                    v[5:10] = study_compass
+                    v[21] = 1.0
+                    compass_set = True
         if not compass_set:
             target_xz = _planner_step_target_xz(step, item_positions=item_positions)
         if _star_crest_awaiting_end_of_life(step, state):
