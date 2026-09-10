@@ -2,9 +2,9 @@
   "schema_version": 1,
   "checkpoint_id": "barry_hall_return_106",
   "chunk_id": "cp05_shield_key",
-  "source": "phase1_pass1_council+muse_pl110_resources+muse_pl134_yawn_kit",
-  "end_anchor_beat_id": "attic_enter",
-  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). Tea-room lock: 104->103 stays locked until 103->104 is traversed once (this chunk never opens it). After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, armor_key, then exactly two red + two green bench herbs in order red/green/red/green (floor has 4G+2R \u2014 a 3rd green or red is divert). Merge to GR before 102 so clip+shells fit; 102->101->100 use_box (leave_100: no heals on exit \u2014 incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) then 100->101->201->202->203->204->205. In 205 take 205:sun_crest:1. After sun_crest: Richard bleedout FIRST (capture:false \u2014 cinema dumps to C passage 204, no pl84/pl85 cells), then place_sun_crest at 11A, then dining 2F enter + push_statue_2f. After statue: 202->203->106->105 take blue jewel, backtrack 105->106->203->202->201->101->103 (skip vacant 102 \u2014 already looted), 103->10D tiger eye + wind_crest. After wind_crest in 10D: loot 10E clip+shells, unlock tea via 103->104, first-floor 104->105->106, dressing 111 shelf clip + locked-desk shells (one of each), then 111->112 take both SE green herbs (112:green_herb:1 then :2), return 112->111->106, art circuit 106->107->108->109->10A->11A, place_wind_crest. Tip cell pl110. After place_wind_crest (pl134): 11A->10A->10B->118 go_to_box/use_box (deposit green_herb; withdraw shield_key+acid_rounds), deer wing 207->208->209 (red/clip/lighter) ->20A explosive, terrace 203->211->212 bazooka_acid, then 204->20D greens (:1/:2) ->20E->210 attic_enter. Tip cell pl134.",
+  "source": "phase1_pass1_council+muse_pl110_resources+muse_pl134_yawn_kit+muse_pl147_box_before_20A_v3",
+  "end_anchor_beat_id": "",
+  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). Tea-room lock: 104->103 stays locked until 103->104 is traversed once (this chunk never opens it). After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, armor_key, then exactly two red + two green bench herbs in order red/green/red/green (floor has 4G+2R \u2014 a 3rd green or red is divert). Merge to GR before 102 so clip+shells fit; 102->101->100 use_box (leave_100: no heals on exit \u2014 incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) then 100->101->201->202->203->204->205. In 205 take 205:sun_crest:1. After sun_crest: Richard bleedout FIRST (capture:false \u2014 cinema dumps to C passage 204, no pl84/pl85 cells), then place_sun_crest at 11A, then dining 2F enter + push_statue_2f. After statue: 202->203->106->105 take blue jewel, backtrack 105->106->203->202->201->101->103 (skip vacant 102 \u2014 already looted), 103->10D tiger eye + wind_crest. After wind_crest in 10D: loot 10E clip+shells, unlock tea via 103->104, first-floor 104->105->106, dressing 111 shelf clip + locked-desk shells (one of each), then 111->112 take both SE green herbs (112:green_herb:1 then :2), return 112->111->106, art circuit 106->107->108->109->10A->11A, place_wind_crest. Tip cell pl110. After place_wind_crest (pl134): 11A->10A->10B->118 go_to_box/use_box (deposit green_herb; withdraw shield_key+acid_rounds), deer wing 207->208->209 (red/clip/lighter) ->20A explosive, terrace 203->211->212 bazooka_acid, then 204->20D greens (:1/:2) ->20E->210 attic_enter. Tip cell pl134. After 209 lighter + 209->208 (pl147): MUST box at 118 before 20A (inv full). Muse v3: 208->207->10B->118 use_box banks armor_key+lighter (deer already unlocked; no 20F lighter use this staging), keep beretta/shotgun/shield_key/acid_rounds/red_herb/handgun_bullets, return deer, 208->20A acquire explosive_rounds. Skip 20D greens and attic this staging chunk (herb brick with Yawn kit). Tip cell pl147. Raw: _tmp/pl147_muse_v3_response.json.",
   "leave_118": {
     "banked_in_box": [
       {
@@ -1088,109 +1088,106 @@
     {
       "n": 143,
       "op": "traverse",
-      "edge_id": "208->20A",
-      "note": "study room"
+      "edge_id": "208->207",
+      "note": "deer to 2F right stairs (box run)"
     },
     {
       "n": 144,
-      "op": "acquire",
-      "room_id": "20A",
-      "pickup_id": "20A:explosive_rounds:1",
-      "note": "20A explosive rounds"
+      "op": "traverse",
+      "edge_id": "207->10B",
+      "note": "stairs to 1F"
     },
     {
       "n": 145,
       "op": "traverse",
-      "edge_id": "20A->208",
-      "note": "back to deer hub"
+      "edge_id": "10B->118",
+      "note": "to box room"
     },
     {
       "n": 146,
-      "op": "traverse",
-      "edge_id": "208->207",
-      "note": "up to 2F right stairs"
+      "op": "go_to_box",
+      "room_id": "118",
+      "note": "box before 20A (inv was full after 209)"
     },
     {
       "n": 147,
-      "op": "traverse",
-      "edge_id": "207->204",
-      "note": "to C passage"
+      "op": "use_box",
+      "room_id": "118",
+      "note": "bank armor_key + lighter; keep Yawn staging kit",
+      "held_on_exit": [
+        {
+          "item": "beretta",
+          "qty": 13,
+          "slot": 1
+        },
+        {
+          "item": "shotgun",
+          "qty": 7,
+          "slot": 2
+        },
+        {
+          "item": "shield_key",
+          "qty": 1,
+          "slot": 3
+        },
+        {
+          "item": "acid_rounds",
+          "qty": 6,
+          "slot": 4
+        },
+        {
+          "item": "red_herb",
+          "qty": 1,
+          "slot": 5
+        },
+        {
+          "item": "handgun_bullets",
+          "qty": 15,
+          "slot": 6
+        },
+        {
+          "item": null,
+          "qty": 0,
+          "slot": 7
+        },
+        {
+          "item": null,
+          "qty": 0,
+          "slot": 8
+        }
+      ],
+      "banked_in_box_note": "armor_key + lighter + prior green_herb/mixed_herbs_gg/knife"
     },
     {
       "n": 148,
       "op": "traverse",
-      "edge_id": "204->203",
-      "note": "to Hall 2F"
+      "edge_id": "118->10B",
+      "note": "exit box"
     },
     {
       "n": 149,
       "op": "traverse",
-      "edge_id": "203->211",
-      "note": "terrace passage"
+      "edge_id": "10B->207",
+      "note": "stairs up"
     },
     {
       "n": 150,
       "op": "traverse",
-      "edge_id": "211->212",
-      "note": "terrace"
+      "edge_id": "207->208",
+      "note": "return deer hub"
     },
     {
       "n": 151,
-      "op": "acquire",
-      "room_id": "212",
-      "pickup_id": "212:bazooka_acid:1",
-      "note": "Forest Speyer bazooka acid"
+      "op": "traverse",
+      "edge_id": "208->20A",
+      "note": "study room"
     },
     {
       "n": 152,
-      "op": "traverse",
-      "edge_id": "212->211",
-      "note": "back from terrace"
-    },
-    {
-      "n": 153,
-      "op": "traverse",
-      "edge_id": "211->203",
-      "note": "back to Hall 2F"
-    },
-    {
-      "n": 154,
-      "op": "traverse",
-      "edge_id": "203->204",
-      "note": "to C passage"
-    },
-    {
-      "n": 155,
-      "op": "traverse",
-      "edge_id": "204->20D",
-      "note": "armor_key opens pillar passage"
-    },
-    {
-      "n": 156,
       "op": "acquire",
-      "room_id": "20D",
-      "pickup_id": "20D:green_herb:1",
-      "note": "20D first green herb"
-    },
-    {
-      "n": 157,
-      "op": "acquire",
-      "room_id": "20D",
-      "pickup_id": "20D:green_herb:2",
-      "note": "20D second green herb (Muse duplicate :1 fixed)"
-    },
-    {
-      "n": 158,
-      "op": "traverse",
-      "edge_id": "20D->20E",
-      "note": "front of attic"
-    },
-    {
-      "n": 159,
-      "op": "traverse",
-      "edge_id": "20E->210",
-      "beat_id": "attic_enter",
-      "note": "shield_key opens attic; chunk end-anchor attic_enter"
+      "room_id": "20A",
+      "pickup_id": "20A:explosive_rounds:1",
+      "note": "20A explosive rounds (chunk staging end; GL/attic next Muse)"
     }
   ]
 }

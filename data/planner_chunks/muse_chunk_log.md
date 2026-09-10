@@ -134,3 +134,27 @@ Muse beat_order after this: attic_enter → yawn_intro → yawn_1 → moon_crest
 | 159 | traverse | 20E→210 (`attic_enter`) |
 
 Muse beat_order after this: yawn_intro → yawn_1 → moon_crest → place_moon_crest.
+
+## 2026-09-10 — box before 20A (pl147)
+
+- **Tip:** pl147, room 208 deer hub after 209 lighter loot. Inv FULL.
+- **Model:** muse-glimmer (v3 pushback: herb brick + lighter-must-use + attic optional)
+- **End anchor:** staging acquire `20A:explosive_rounds:1` (no DAG beat; attic deferred)
+- **Why:** Box at 118 before study; bank armor_key + lighter; skip 20D greens this staging.
+- **Raw:** `_tmp/pl147_muse_v3_response.json` / `muse_raw/2026-09-10_box_before_20A.json`
+- **Pinned as:** `cp05_shield_key.json` steps 143–152 (replaced prior 143–159 attic path)
+- **Operator edits:** formal `held_on_exit` on use_box (Muse note-only); truncated attic/GL/20D greens pending next Muse.
+
+| n | op | what |
+|---|---|---|
+| 143 | traverse | 208→207 |
+| 144 | traverse | 207→10B |
+| 145 | traverse | 10B→118 |
+| 146 | go_to_box | 118 |
+| 147 | use_box | bank armor_key + lighter |
+| 148 | traverse | 118→10B |
+| 149 | traverse | 10B→207 |
+| 150 | traverse | 207→208 |
+| 151 | traverse | 208→20A |
+| 152 | acquire | 20A:explosive_rounds:1 |
+

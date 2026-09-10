@@ -1,6 +1,6 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (159 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (152 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **C-RE1 numbering (Sep 2026):** `pl00` is the dining fresh start (no emblem). Opening remint is `pl01` emblem … `pl06` lockpick (`opening_to_lockpick.json`). Live shield-key step 0 (`106->105`) mints `pl07`. Watch `states/planner_loyal/cells/plNN/cell.pst` — BizHawk `cell.State` is backed up under `backups/planner_loyal_bizhawk_20260904/`.
 
@@ -11,11 +11,11 @@ On step success the fleet installs `states/planner_loyal/cells/plNN/` for the co
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl06`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - Tea-room lock: `104->103` stays locked until `103->104` is done once (this chunk never opens it). `103->10C` / `103->10D` are open. Do not walk `116->106` after the shotgun. Vacant `102` clip+shells are taken on the armor-key return; skip re-loot.
-- Chunk end-anchor: `attic_enter` (`pl164`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `` (`pl157`). Mid-chunk success keeps the episode open.
 
 ## What's minted / what it's stuck on
 
-Live C-RE1 `cell.pst` on this machine: `pl00` (fresh_start_105), `pl01` (opening_to_lockpick_step01), `pl02` (opening_to_lockpick_step02), `pl03` (opening_to_lockpick_step03), `pl04` (opening_to_lockpick_step04), `pl05` (opening_to_lockpick_step05), `pl06` (opening_to_lockpick_step06), `pl07` (cp05_shield_key_step01), `pl08` (cp05_shield_key_step02), `pl09` (cp05_shield_key_step03), `pl10` (cp05_shield_key_step04), `pl100` (cp05_shield_key_step95), `pl101` (cp05_shield_key_step96), `pl102` (cp05_shield_key_step97), `pl103` (cp05_shield_key_step98), `pl104` (cp05_shield_key_step99), `pl105` (cp05_shield_key_step100), `pl106` (cp05_shield_key_step101), `pl107` (cp05_shield_key_step102), `pl108` (cp05_shield_key_step103), `pl109` (cp05_shield_key_step104), `pl11` (cp05_shield_key_step05), `pl110` (cp05_shield_key_step105), `pl111` (cp05_shield_key_step106), `pl112` (cp05_shield_key_step107), `pl113` (cp05_shield_key_step108), `pl114` (cp05_shield_key_step109), `pl115` (cp05_shield_key_step110), `pl116` (cp05_shield_key_step111), `pl117` (cp05_shield_key_step112), `pl118` (cp05_shield_key_step113), `pl119` (cp05_shield_key_step114), `pl12` (cp05_shield_key_step06), `pl120` (cp05_shield_key_step115), `pl121` (cp05_shield_key_step116), `pl122` (cp05_shield_key_step117), `pl123` (cp05_shield_key_step118), `pl124` (cp05_shield_key_step119), `pl125` (cp05_shield_key_step120), `pl126` (cp05_shield_key_step121), `pl127` (cp05_shield_key_step122), `pl128` (cp05_shield_key_step123), `pl129` (cp05_shield_key_step124), `pl13` (cp05_shield_key_step07), `pl130` (cp05_shield_key_step125), `pl131` (cp05_shield_key_step126), `pl132` (cp05_shield_key_step127), `pl133` (cp05_shield_key_step128), `pl134` (cp05_shield_key_step129), `pl14` (cp05_shield_key_step08), `pl15` (cp05_shield_key_step09), `pl16` (cp05_shield_key_step10), `pl17` (cp05_shield_key_step11), `pl18` (cp05_shield_key_step12), `pl19` (cp05_shield_key_step13), `pl20` (cp05_shield_key_step14), `pl21` (cp05_shield_key_step15), `pl22` (cp05_shield_key_step16), `pl23` (cp05_shield_key_step17), `pl24` (cp05_shield_key_step18), `pl25` (cp05_shield_key_step19), `pl26` (cp05_shield_key_step20), `pl27` (cp05_shield_key_step21), `pl28` (cp05_shield_key_step22), `pl29` (cp05_shield_key_step23), `pl30` (cp05_shield_key_step24), `pl31` (cp05_shield_key_step25), `pl32` (cp05_shield_key_step26), `pl33` (cp05_shield_key_step27), `pl34` (cp05_shield_key_step28), `pl35` (cp05_shield_key_step29), `pl36` (cp05_shield_key_step30), `pl37` (cp05_shield_key_step31), `pl38` (cp05_shield_key_step32), `pl39` (cp05_shield_key_step33), `pl40` (cp05_shield_key_step34), `pl41` (cp05_shield_key_step35), `pl42` (cp05_shield_key_step36), `pl43` (cp05_shield_key_step37), `pl44` (cp05_shield_key_step38), `pl45` (cp05_shield_key_step39), `pl46` (cp05_shield_key_step40), `pl47` (cp05_shield_key_step41), `pl48` (cp05_shield_key_step42), `pl49` (cp05_shield_key_step43), `pl50` (cp05_shield_key_step44), `pl51` (cp05_shield_key_step45), `pl52` (cp05_shield_key_step46), `pl53` (cp05_shield_key_step47), `pl54` (cp05_shield_key_step48), `pl55` (cp05_shield_key_step49), `pl56` (cp05_shield_key_step50), `pl57` (cp05_shield_key_step51), `pl58` (cp05_shield_key_step52), `pl59` (cp05_shield_key_step53), `pl60` (cp05_shield_key_step54), `pl61` (cp05_shield_key_step55), `pl62` (cp05_shield_key_step56), `pl63` (cp05_shield_key_step57), `pl64` (cp05_shield_key_step58), `pl65` (cp05_shield_key_step59), `pl66` (cp05_shield_key_step60), `pl67` (cp05_shield_key_step61), `pl68` (cp05_shield_key_step62), `pl69` (cp05_shield_key_step63), `pl70` (cp05_shield_key_step64), `pl71` (cp05_shield_key_step65), `pl72` (cp05_shield_key_step66), `pl73` (cp05_shield_key_step67), `pl74` (cp05_shield_key_step68), `pl75` (cp05_shield_key_step69), `pl76` (cp05_shield_key_step70), `pl77` (cp05_shield_key_step71), `pl78` (cp05_shield_key_step72), `pl79` (cp05_shield_key_step73), `pl80` (cp05_shield_key_step74), `pl81` (cp05_shield_key_step75), `pl82` (cp05_shield_key_step76), `pl83` (cp05_shield_key_step77), `pl84` (cp05_shield_key_step78), `pl85` (cp05_shield_key_step79), `pl86` (cp05_shield_key_step80), `pl87` (cp05_shield_key_step81), `pl88` (cp05_shield_key_step83), `pl89` (cp05_shield_key_step84), `pl90` (cp05_shield_key_step85), `pl91` (cp05_shield_key_step86), `pl92` (cp05_shield_key_step87), `pl93` (cp05_shield_key_step88), `pl94` (cp05_shield_key_step89), `pl95` (cp05_shield_key_step90), `pl96` (cp05_shield_key_step91), `pl97` (cp05_shield_key_step92), `pl98` (cp05_shield_key_step93), `pl99` (cp05_shield_key_step94).
+Live C-RE1 `cell.pst` on this machine: `pl00` (fresh_start_105), `pl01` (opening_to_lockpick_step01), `pl02` (opening_to_lockpick_step02), `pl03` (opening_to_lockpick_step03), `pl04` (opening_to_lockpick_step04), `pl05` (opening_to_lockpick_step05), `pl06` (opening_to_lockpick_step06), `pl07` (cp05_shield_key_step01), `pl08` (cp05_shield_key_step02), `pl09` (cp05_shield_key_step03), `pl10` (cp05_shield_key_step04), `pl100` (cp05_shield_key_step95), `pl101` (cp05_shield_key_step96), `pl102` (cp05_shield_key_step97), `pl103` (cp05_shield_key_step98), `pl104` (cp05_shield_key_step99), `pl105` (cp05_shield_key_step100), `pl106` (cp05_shield_key_step101), `pl107` (cp05_shield_key_step102), `pl108` (cp05_shield_key_step103), `pl109` (cp05_shield_key_step104), `pl11` (cp05_shield_key_step05), `pl110` (cp05_shield_key_step105), `pl111` (cp05_shield_key_step106), `pl112` (cp05_shield_key_step107), `pl113` (cp05_shield_key_step108), `pl114` (cp05_shield_key_step109), `pl115` (cp05_shield_key_step110), `pl116` (cp05_shield_key_step111), `pl117` (cp05_shield_key_step112), `pl118` (cp05_shield_key_step113), `pl119` (cp05_shield_key_step114), `pl12` (cp05_shield_key_step06), `pl120` (cp05_shield_key_step115), `pl121` (cp05_shield_key_step116), `pl122` (cp05_shield_key_step117), `pl123` (cp05_shield_key_step118), `pl124` (cp05_shield_key_step119), `pl125` (cp05_shield_key_step120), `pl126` (cp05_shield_key_step121), `pl127` (cp05_shield_key_step122), `pl128` (cp05_shield_key_step123), `pl129` (cp05_shield_key_step124), `pl13` (cp05_shield_key_step07), `pl130` (cp05_shield_key_step125), `pl131` (cp05_shield_key_step126), `pl132` (cp05_shield_key_step127), `pl133` (cp05_shield_key_step128), `pl134` (cp05_shield_key_step129), `pl135` (cp05_shield_key_step130), `pl136` (cp05_shield_key_step131), `pl137` (cp05_shield_key_step132), `pl139` (cp05_shield_key_step134), `pl14` (cp05_shield_key_step08), `pl140` (cp05_shield_key_step135), `pl141` (cp05_shield_key_step136), `pl142` (cp05_shield_key_step137), `pl143` (cp05_shield_key_step138), `pl144` (cp05_shield_key_step139), `pl145` (cp05_shield_key_step140), `pl146` (cp05_shield_key_step141), `pl147` (cp05_shield_key_step142), `pl15` (cp05_shield_key_step09), `pl16` (cp05_shield_key_step10), `pl17` (cp05_shield_key_step11), `pl18` (cp05_shield_key_step12), `pl19` (cp05_shield_key_step13), `pl20` (cp05_shield_key_step14), `pl21` (cp05_shield_key_step15), `pl22` (cp05_shield_key_step16), `pl23` (cp05_shield_key_step17), `pl24` (cp05_shield_key_step18), `pl25` (cp05_shield_key_step19), `pl26` (cp05_shield_key_step20), `pl27` (cp05_shield_key_step21), `pl28` (cp05_shield_key_step22), `pl29` (cp05_shield_key_step23), `pl30` (cp05_shield_key_step24), `pl31` (cp05_shield_key_step25), `pl32` (cp05_shield_key_step26), `pl33` (cp05_shield_key_step27), `pl34` (cp05_shield_key_step28), `pl35` (cp05_shield_key_step29), `pl36` (cp05_shield_key_step30), `pl37` (cp05_shield_key_step31), `pl38` (cp05_shield_key_step32), `pl39` (cp05_shield_key_step33), `pl40` (cp05_shield_key_step34), `pl41` (cp05_shield_key_step35), `pl42` (cp05_shield_key_step36), `pl43` (cp05_shield_key_step37), `pl44` (cp05_shield_key_step38), `pl45` (cp05_shield_key_step39), `pl46` (cp05_shield_key_step40), `pl47` (cp05_shield_key_step41), `pl48` (cp05_shield_key_step42), `pl49` (cp05_shield_key_step43), `pl50` (cp05_shield_key_step44), `pl51` (cp05_shield_key_step45), `pl52` (cp05_shield_key_step46), `pl53` (cp05_shield_key_step47), `pl54` (cp05_shield_key_step48), `pl55` (cp05_shield_key_step49), `pl56` (cp05_shield_key_step50), `pl57` (cp05_shield_key_step51), `pl58` (cp05_shield_key_step52), `pl59` (cp05_shield_key_step53), `pl60` (cp05_shield_key_step54), `pl61` (cp05_shield_key_step55), `pl62` (cp05_shield_key_step56), `pl63` (cp05_shield_key_step57), `pl64` (cp05_shield_key_step58), `pl65` (cp05_shield_key_step59), `pl66` (cp05_shield_key_step60), `pl67` (cp05_shield_key_step61), `pl68` (cp05_shield_key_step62), `pl69` (cp05_shield_key_step63), `pl70` (cp05_shield_key_step64), `pl71` (cp05_shield_key_step65), `pl72` (cp05_shield_key_step66), `pl73` (cp05_shield_key_step67), `pl74` (cp05_shield_key_step68), `pl75` (cp05_shield_key_step69), `pl76` (cp05_shield_key_step70), `pl77` (cp05_shield_key_step71), `pl78` (cp05_shield_key_step72), `pl79` (cp05_shield_key_step73), `pl80` (cp05_shield_key_step74), `pl81` (cp05_shield_key_step75), `pl82` (cp05_shield_key_step76), `pl83` (cp05_shield_key_step77), `pl84` (cp05_shield_key_step78), `pl85` (cp05_shield_key_step79), `pl86` (cp05_shield_key_step80), `pl87` (cp05_shield_key_step81), `pl88` (cp05_shield_key_step83), `pl89` (cp05_shield_key_step84), `pl90` (cp05_shield_key_step85), `pl91` (cp05_shield_key_step86), `pl92` (cp05_shield_key_step87), `pl93` (cp05_shield_key_step88), `pl94` (cp05_shield_key_step89), `pl95` (cp05_shield_key_step90), `pl96` (cp05_shield_key_step91), `pl97` (cp05_shield_key_step92), `pl98` (cp05_shield_key_step93), `pl99` (cp05_shield_key_step94).
 Highest minted is `pl99`. The fleet is **stuck trying to mint `pl100`** (see the summary row for that slot — that is the current objective).
 
 Logs (pking): `reset tip=` is the start cell; `queue_seek ... want=` is the step they must finish; `fail='planner_divert' target=` / `divert=` is why they died before minting. `minted pl` / `reject quality pl` is a completed cell.
@@ -178,23 +178,16 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 | `pl145` | 140 | `209:handgun_bullets:2` | `209` (BEDROOM) | acquire | Take `209:handgun_bullets:2` (209 handgun clip) |
 | `pl146` | 141 | `209:lighter:3` | `209` (BEDROOM) | acquire | Take `209:lighter:3` (209 lighter) |
 | `pl147` | 142 | `209->208` | `208` (DEER ROOM) | traverse | Walk `209->208` into `208` (DEER ROOM) |
-| `pl148` | 143 | `208->20A` | `20A` (STUDY ROOM) | traverse | Walk `208->20A` into `20A` (STUDY ROOM) |
-| `pl149` | 144 | `20A:explosive_rounds:1` | `20A` (STUDY ROOM) | acquire | Take `20A:explosive_rounds:1` (20A explosive rounds) |
-| `pl150` | 145 | `20A->208` | `208` (DEER ROOM) | traverse | Walk `20A->208` into `208` (DEER ROOM) |
-| `pl151` | 146 | `208->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `208->207` into `207` (2F RIGHT STAIRS) |
-| `pl152` | 147 | `207->204` | `204` (C PASSAGE) | traverse | Walk `207->204` into `204` (C PASSAGE) |
-| `pl153` | 148 | `204->203` | `203` (HALL 2F) | traverse | Walk `204->203` into `203` (HALL 2F) |
-| `pl154` | 149 | `203->211` | `211` (TERRACE PASSAGE) | traverse | Walk `203->211` into `211` (TERRACE PASSAGE) |
-| `pl155` | 150 | `211->212` | `212` (TERRACE) | traverse | Walk `211->212` into `212` (TERRACE) |
-| `pl156` | 151 | `212:bazooka_acid:1` | `212` (TERRACE) | acquire | Take `212:bazooka_acid:1` (Forest Speyer bazooka acid) |
-| `pl157` | 152 | `212->211` | `211` (TERRACE PASSAGE) | traverse | Walk `212->211` into `211` (TERRACE PASSAGE) |
-| `pl158` | 153 | `211->203` | `203` (HALL 2F) | traverse | Walk `211->203` into `203` (HALL 2F) |
-| `pl159` | 154 | `203->204` | `204` (C PASSAGE) | traverse | Walk `203->204` into `204` (C PASSAGE) |
-| `pl160` | 155 | `204->20D` | `20D` (PILLAR PASSAGE) | traverse | Walk `204->20D` into `20D` (PILLAR PASSAGE) |
-| `pl161` | 156 | `20D:green_herb:1` | `20D` (PILLAR PASSAGE) | acquire | Take `20D:green_herb:1` (20D first green herb) |
-| `pl162` | 157 | `20D:green_herb:2` | `20D` (PILLAR PASSAGE) | acquire | Take `20D:green_herb:2` (20D second green herb (Muse duplicate :1 fixed)) |
-| `pl163` | 158 | `20D->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `20D->20E` into `20E` (FRONT OF ATTIC) |
-| `pl164` | 159 | `attic_enter` | `210` (ATTIC) | traverse | Walk `20E->210` into `210` (ATTIC) |
+| `pl148` | 143 | `208->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `208->207` into `207` (2F RIGHT STAIRS) |
+| `pl149` | 144 | `207->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `207->10B` into `10B` (1F RIGHT STAIRS) |
+| `pl150` | 145 | `10B->118` | `118` (STAIRS UNDER ROOM) | traverse | Walk `10B->118` into `118` (STAIRS UNDER ROOM) |
+| `pl151` | 146 | `go_to_box` | `118` (STAIRS UNDER ROOM) | go_to_box | go_to_box |
+| `pl152` | 147 | `use_box` | `118` (STAIRS UNDER ROOM) | use_box | Rearrange the 118 box to the leave_118 loadout, then close the box |
+| `pl153` | 148 | `118->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `118->10B` into `10B` (1F RIGHT STAIRS) |
+| `pl154` | 149 | `10B->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `10B->207` into `207` (2F RIGHT STAIRS) |
+| `pl155` | 150 | `207->208` | `208` (DEER ROOM) | traverse | Walk `207->208` into `208` (DEER ROOM) |
+| `pl156` | 151 | `208->20A` | `20A` (STUDY ROOM) | traverse | Walk `208->20A` into `20A` (STUDY ROOM) |
+| `pl157` | 152 | `20A:explosive_rounds:1` | `20A` (STUDY ROOM) | acquire | Take `20A:explosive_rounds:1` (20A explosive rounds (chunk staging end; GL/attic next Muse)) |
 
 ## Details
 
@@ -255,7 +248,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl07`–`pl164`)
+### Chunk cells (`pl07`–`pl157`)
 
 ### `pl07` — `106->105` (step 1)
 
@@ -1773,7 +1766,93 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `209->208` into `208` (DEER ROOM).
 - **Success condition:** Enter room `208` via `209->208` (already-there counts after cinema dump). Any other door is `wrong_traverse:209->208 got <room>` (−4).
 
-### `pl148` — `208->20A` (step 143)
+### `pl148` — `208->207` (step 143)
+
+- **Room:** `207` (2F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `208->207`
+- **Note:** deer to 2F right stairs (box run)
+- **Objective:** Walk `208->207` into `207` (2F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `208->207` into `207` (2F RIGHT STAIRS).
+- **Success condition:** Enter room `207` via `208->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:208->207 got <room>` (−4).
+
+### `pl149` — `207->10B` (step 144)
+
+- **Room:** `10B` (1F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `207->10B`
+- **Note:** stairs to 1F
+- **Objective:** Walk `207->10B` into `10B` (1F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `207->10B` into `10B` (1F RIGHT STAIRS).
+- **Success condition:** Enter room `10B` via `207->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->10B got <room>` (−4).
+
+### `pl150` — `10B->118` (step 145)
+
+- **Room:** `118` (STAIRS UNDER ROOM)
+- **Op:** `traverse`
+- **Edge:** `10B->118`
+- **Note:** to box room
+- **Objective:** Walk `10B->118` into `118` (STAIRS UNDER ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10B->118` into `118` (STAIRS UNDER ROOM).
+- **Success condition:** Enter room `118` via `10B->118` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->118 got <room>` (−4).
+
+### `pl151` — `go_to_box` (step 146)
+
+- **Room:** `118` (STAIRS UNDER ROOM)
+- **Op:** `go_to_box`
+- **Note:** box before 20A (inv was full after 209)
+- **Objective:** go_to_box
+- **Items gained:** _(none)_
+- **How to achieve:** go_to_box.
+- **Success condition:** go_to_box
+
+### `pl152` — `use_box` (step 147)
+
+- **Room:** `118` (STAIRS UNDER ROOM)
+- **Op:** `use_box`
+- **Note:** bank armor_key + lighter; keep Yawn staging kit
+- **Objective:** Rearrange the 118 box to the leave_118 loadout, then close the box
+- **Items gained:** _(none)_
+- **How to achieve:** Rearrange the 118 box to the leave_118 loadout, then close the box.
+- **Success condition:** Box closes and inventory matches this step's `held_on_exit`
+
+### `pl153` — `118->10B` (step 148)
+
+- **Room:** `10B` (1F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `118->10B`
+- **Note:** exit box
+- **Objective:** Walk `118->10B` into `10B` (1F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `118->10B` into `10B` (1F RIGHT STAIRS).
+- **Success condition:** Enter room `10B` via `118->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:118->10B got <room>` (−4).
+
+### `pl154` — `10B->207` (step 149)
+
+- **Room:** `207` (2F RIGHT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `10B->207`
+- **Note:** stairs up
+- **Objective:** Walk `10B->207` into `207` (2F RIGHT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `10B->207` into `207` (2F RIGHT STAIRS).
+- **Success condition:** Enter room `207` via `10B->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->207 got <room>` (−4).
+
+### `pl155` — `207->208` (step 150)
+
+- **Room:** `208` (DEER ROOM)
+- **Op:** `traverse`
+- **Edge:** `207->208`
+- **Note:** return deer hub
+- **Objective:** Walk `207->208` into `208` (DEER ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `207->208` into `208` (DEER ROOM).
+- **Success condition:** Enter room `208` via `207->208` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->208 got <room>` (−4).
+
+### `pl156` — `208->20A` (step 151)
 
 - **Room:** `20A` (STUDY ROOM)
 - **Op:** `traverse`
@@ -1784,180 +1863,14 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `208->20A` into `20A` (STUDY ROOM).
 - **Success condition:** Enter room `20A` via `208->20A` (already-there counts after cinema dump). Any other door is `wrong_traverse:208->20A got <room>` (−4).
 
-### `pl149` — `20A:explosive_rounds:1` (step 144)
+### `pl157` — `20A:explosive_rounds:1` (step 152)
 
 - **Room:** `20A` (STUDY ROOM)
 - **Op:** `acquire`
 - **Pickup:** `20A:explosive_rounds:1`
-- **Note:** 20A explosive rounds
-- **Objective:** Take `20A:explosive_rounds:1` (20A explosive rounds)
+- **Note:** 20A explosive rounds (chunk staging end; GL/attic next Muse)
+- **Objective:** Take `20A:explosive_rounds:1` (20A explosive rounds (chunk staging end; GL/attic next Muse))
 - **Items gained:** `explosive_rounds`
-- **How to achieve:** Take `20A:explosive_rounds:1` (20A explosive rounds).
+- **How to achieve:** Take `20A:explosive_rounds:1` (20A explosive rounds (chunk staging end; GL/attic next Muse)).
 - **Success condition:** Inventory gains `20A:explosive_rounds:1` while this step is current
-
-### `pl150` — `20A->208` (step 145)
-
-- **Room:** `208` (DEER ROOM)
-- **Op:** `traverse`
-- **Edge:** `20A->208`
-- **Note:** back to deer hub
-- **Objective:** Walk `20A->208` into `208` (DEER ROOM)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `20A->208` into `208` (DEER ROOM).
-- **Success condition:** Enter room `208` via `20A->208` (already-there counts after cinema dump). Any other door is `wrong_traverse:20A->208 got <room>` (−4).
-
-### `pl151` — `208->207` (step 146)
-
-- **Room:** `207` (2F RIGHT STAIRS)
-- **Op:** `traverse`
-- **Edge:** `208->207`
-- **Note:** up to 2F right stairs
-- **Objective:** Walk `208->207` into `207` (2F RIGHT STAIRS)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `208->207` into `207` (2F RIGHT STAIRS).
-- **Success condition:** Enter room `207` via `208->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:208->207 got <room>` (−4).
-
-### `pl152` — `207->204` (step 147)
-
-- **Room:** `204` (C PASSAGE)
-- **Op:** `traverse`
-- **Edge:** `207->204`
-- **Note:** to C passage
-- **Objective:** Walk `207->204` into `204` (C PASSAGE)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `207->204` into `204` (C PASSAGE).
-- **Success condition:** Enter room `204` via `207->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->204 got <room>` (−4).
-
-### `pl153` — `204->203` (step 148)
-
-- **Room:** `203` (HALL 2F)
-- **Op:** `traverse`
-- **Edge:** `204->203`
-- **Note:** to Hall 2F
-- **Objective:** Walk `204->203` into `203` (HALL 2F)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `204->203` into `203` (HALL 2F).
-- **Success condition:** Enter room `203` via `204->203` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->203 got <room>` (−4).
-
-### `pl154` — `203->211` (step 149)
-
-- **Room:** `211` (TERRACE PASSAGE)
-- **Op:** `traverse`
-- **Edge:** `203->211`
-- **Note:** terrace passage
-- **Objective:** Walk `203->211` into `211` (TERRACE PASSAGE)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `203->211` into `211` (TERRACE PASSAGE).
-- **Success condition:** Enter room `211` via `203->211` (already-there counts after cinema dump). Any other door is `wrong_traverse:203->211 got <room>` (−4).
-
-### `pl155` — `211->212` (step 150)
-
-- **Room:** `212` (TERRACE)
-- **Op:** `traverse`
-- **Edge:** `211->212`
-- **Note:** terrace
-- **Objective:** Walk `211->212` into `212` (TERRACE)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `211->212` into `212` (TERRACE).
-- **Success condition:** Enter room `212` via `211->212` (already-there counts after cinema dump). Any other door is `wrong_traverse:211->212 got <room>` (−4).
-
-### `pl156` — `212:bazooka_acid:1` (step 151)
-
-- **Room:** `212` (TERRACE)
-- **Op:** `acquire`
-- **Pickup:** `212:bazooka_acid:1`
-- **Note:** Forest Speyer bazooka acid
-- **Objective:** Take `212:bazooka_acid:1` (Forest Speyer bazooka acid)
-- **Items gained:** `bazooka_acid`
-- **How to achieve:** Take `212:bazooka_acid:1` (Forest Speyer bazooka acid).
-- **Success condition:** Inventory gains `212:bazooka_acid:1` while this step is current
-
-### `pl157` — `212->211` (step 152)
-
-- **Room:** `211` (TERRACE PASSAGE)
-- **Op:** `traverse`
-- **Edge:** `212->211`
-- **Note:** back from terrace
-- **Objective:** Walk `212->211` into `211` (TERRACE PASSAGE)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `212->211` into `211` (TERRACE PASSAGE).
-- **Success condition:** Enter room `211` via `212->211` (already-there counts after cinema dump). Any other door is `wrong_traverse:212->211 got <room>` (−4).
-
-### `pl158` — `211->203` (step 153)
-
-- **Room:** `203` (HALL 2F)
-- **Op:** `traverse`
-- **Edge:** `211->203`
-- **Note:** back to Hall 2F
-- **Objective:** Walk `211->203` into `203` (HALL 2F)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `211->203` into `203` (HALL 2F).
-- **Success condition:** Enter room `203` via `211->203` (already-there counts after cinema dump). Any other door is `wrong_traverse:211->203 got <room>` (−4).
-
-### `pl159` — `203->204` (step 154)
-
-- **Room:** `204` (C PASSAGE)
-- **Op:** `traverse`
-- **Edge:** `203->204`
-- **Note:** to C passage
-- **Objective:** Walk `203->204` into `204` (C PASSAGE)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `203->204` into `204` (C PASSAGE).
-- **Success condition:** Enter room `204` via `203->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:203->204 got <room>` (−4).
-
-### `pl160` — `204->20D` (step 155)
-
-- **Room:** `20D` (PILLAR PASSAGE)
-- **Op:** `traverse`
-- **Edge:** `204->20D`
-- **Note:** armor_key opens pillar passage
-- **Objective:** Walk `204->20D` into `20D` (PILLAR PASSAGE)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `204->20D` into `20D` (PILLAR PASSAGE).
-- **Success condition:** Enter room `20D` via `204->20D` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->20D got <room>` (−4).
-
-### `pl161` — `20D:green_herb:1` (step 156)
-
-- **Room:** `20D` (PILLAR PASSAGE)
-- **Op:** `acquire`
-- **Pickup:** `20D:green_herb:1`
-- **Note:** 20D first green herb
-- **Objective:** Take `20D:green_herb:1` (20D first green herb)
-- **Items gained:** `green_herb`
-- **How to achieve:** Take `20D:green_herb:1` (20D first green herb).
-- **Success condition:** Inventory gains `20D:green_herb:1` while this step is current
-
-### `pl162` — `20D:green_herb:2` (step 157)
-
-- **Room:** `20D` (PILLAR PASSAGE)
-- **Op:** `acquire`
-- **Pickup:** `20D:green_herb:2`
-- **Note:** 20D second green herb (Muse duplicate :1 fixed)
-- **Objective:** Take `20D:green_herb:2` (20D second green herb (Muse duplicate :1 fixed))
-- **Items gained:** `green_herb`
-- **How to achieve:** Take `20D:green_herb:2` (20D second green herb (Muse duplicate :1 fixed)).
-- **Success condition:** Inventory gains `20D:green_herb:2` while this step is current
-
-### `pl163` — `20D->20E` (step 158)
-
-- **Room:** `20E` (FRONT OF ATTIC)
-- **Op:** `traverse`
-- **Edge:** `20D->20E`
-- **Note:** front of attic
-- **Objective:** Walk `20D->20E` into `20E` (FRONT OF ATTIC)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `20D->20E` into `20E` (FRONT OF ATTIC).
-- **Success condition:** Enter room `20E` via `20D->20E` (already-there counts after cinema dump). Any other door is `wrong_traverse:20D->20E got <room>` (−4).
-
-### `pl164` — `attic_enter` (step 159)
-
-- **Room:** `210` (ATTIC)
-- **Op:** `traverse`
-- **Edge:** `20E->210`
-- **Beat:** `attic_enter`
-- **Note:** shield_key opens attic; chunk end-anchor attic_enter
-- **Objective:** Walk `20E->210` into `210` (ATTIC)
-- **Items gained:** _(none)_
-- **How to achieve:** Walk `20E->210` into `210` (ATTIC).
-- **Success condition:** Enter room `210` via `20E->210` (already-there counts after cinema dump). Any other door is `wrong_traverse:20E->210 got <room>` (−4).
 

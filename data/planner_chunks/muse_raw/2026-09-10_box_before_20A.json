@@ -1,0 +1,103 @@
+{
+  "why_prev_rejected": "20D herb brick + dead lighter carry + long terrace loop",
+  "lighter_decision": "bank lighter at use_box \u2014 no 20F use this chunk, keep slot budget for Yawn kit",
+  "herb_decision": "skip 20D greens this chunk; no acquire to avoid inventory brick, box already has greens",
+  "chunk_scope": "short coherent box + 20A explosive staging; attic optional deferred to next chunk to keep kit math clean",
+  "kit_plan": "bank armor_key and lighter at 118, keep beretta+handgun_bullets, shotgun+shotgun_shells, shield_key, acid_rounds, red_herb for combat kit; 2 free slots for explosive_rounds and later bazooka_acid",
+  "inventory_budget": "after use_box held 6 items beretta,shotgun,shield_key,acid_rounds,red_herb,handgun_bullets; 2 free slots; armor_key and lighter banked in box; box retains green_herb,mixed_herbs_gg,knife",
+  "next_chunk": {
+    "why": "box before 20A as required, bank dead keys, acquire 20A explosive_rounds with clean slot math, stop before herb brick and terrace loop",
+    "end_anchor_beat_id": "20A_explosive_acquire",
+    "steps": [
+      {
+        "n": 1,
+        "op": "traverse",
+        "edge_id": "208->207",
+        "beat_id": null,
+        "id": "s1",
+        "note": "deer to stairs"
+      },
+      {
+        "n": 2,
+        "op": "traverse",
+        "edge_id": "207->10B",
+        "beat_id": null,
+        "id": "s2",
+        "note": "stairs down"
+      },
+      {
+        "n": 3,
+        "op": "traverse",
+        "edge_id": "10B->118",
+        "beat_id": null,
+        "id": "s3",
+        "note": "to box room"
+      },
+      {
+        "n": 4,
+        "op": "go_to_box",
+        "room_id": "118",
+        "beat_id": null,
+        "id": "s4",
+        "note": "enter box"
+      },
+      {
+        "n": 5,
+        "op": "use_box",
+        "room_id": "118",
+        "beat_id": null,
+        "id": "s5",
+        "note": "bank armor_key lighter",
+        "pickup_id": null
+      },
+      {
+        "n": 6,
+        "op": "traverse",
+        "edge_id": "118->10B",
+        "beat_id": null,
+        "id": "s6",
+        "note": "back up"
+      },
+      {
+        "n": 7,
+        "op": "traverse",
+        "edge_id": "10B->207",
+        "beat_id": null,
+        "id": "s7",
+        "note": "stairs up"
+      },
+      {
+        "n": 8,
+        "op": "traverse",
+        "edge_id": "207->208",
+        "beat_id": null,
+        "id": "s8",
+        "note": "return deer"
+      },
+      {
+        "n": 9,
+        "op": "traverse",
+        "edge_id": "208->20A",
+        "beat_id": null,
+        "id": "s9",
+        "note": "to study"
+      },
+      {
+        "n": 10,
+        "op": "acquire",
+        "room_id": "20A",
+        "pickup_id": "20A:explosive_rounds:1",
+        "beat_id": "20A_explosive_acquire",
+        "id": "s10",
+        "note": "stage explosive"
+      }
+    ]
+  },
+  "beat_order": [
+    "attic_enter",
+    "yawn_intro",
+    "yawn_1",
+    "moon_crest",
+    "place_moon_crest"
+  ]
+}
