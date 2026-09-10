@@ -6,7 +6,7 @@ call "%~dp0..\fleet_hosts.cmd"
 set MACHINE=workhorse3
 set LEARNER_PORT=%FLEET_LEARNER_PORT%
 set SYNC_INTERVAL_S=360
-set BATCH_SIZE=4096
+set BATCH_SIZE=8192
 set MAX_PENDING_STEPS=220000
 set MIN_HOST_FREE_GB=16
 
@@ -23,8 +23,9 @@ if not exist data\checkpoints mkdir data\checkpoints
 
 call "%~dp0flush_log.cmd" data\logs\learner_wh3_planner_loyal.log
 
-echo Starting WH3 local planner-loyal worker via interactive scheduled task...
-start "wh3-pl-worker-sched" /MIN powershell -NoProfile -ExecutionPolicy Bypass -File fleet\local\start_wh3_pl_local_worker.ps1 -DelaySec 45
+REM C-RE1 only: do not start the BizHawk local worker.
+REM echo Starting WH3 local planner-loyal worker via interactive scheduled task...
+REM start "wh3-pl-worker-sched" /MIN powershell -NoProfile -ExecutionPolicy Bypass -File fleet\local\start_wh3_pl_local_worker.ps1 -DelaySec 45
 
 echo [%DATE% %TIME%] WH3 planner-loyal learner start batch=%BATCH_SIZE% >> data\logs\learner_wh3_planner_loyal.log
 
