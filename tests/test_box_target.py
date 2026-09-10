@@ -340,8 +340,8 @@ def test_live_chunk_use_box_unlocks_shield_key_bank() -> None:
     assert box_pollution_reason(dirty, room_id="118") == "key_item_in_box:shield_key@0"
 
 
-def test_pl164_use_box_allows_shotgun_bank_pollution() -> None:
-    """Muse pl165 kit banks shotgun at 118; deposit must not trip pollution."""
+def test_pl165_use_box_allows_beretta_bank_pollution() -> None:
+    """pl165 kit banks beretta at 118 (hold shotgun); deposit must not trip pollution."""
     from re1_rl.box_target import item_name_to_id
     from re1_rl.item_box import box_pollution_reason, can_deposit, key_names_for_ids
 
@@ -355,23 +355,28 @@ def test_pl164_use_box_allows_shotgun_bank_pollution() -> None:
     )
     q.seek(idx)
     assert q.current is not None
-    assert "shotgun" not in q.allowed_banked_key_names()  # keys-only helper
+    held = {
+        str(r.get("item"))
+        for r in (q.current.get("held_on_exit") or [])
+        if isinstance(r, dict) and r.get("item")
+    }
+    assert "shotgun" in held and "beretta" not in held
     ids = q.allowed_banked_key_ids()
-    sid = item_name_to_id("shotgun")
-    assert sid is not None and int(sid) in ids
+    bid = item_name_to_id("beretta")
+    assert bid is not None and int(bid) in ids
     names = key_names_for_ids(ids)
-    assert "shotgun" in names
+    assert "beretta" in names
     assert "shield_key" not in names  # held_on_exit — not banked this visit
 
     inv = [(0, 0)] * 8
     box = [(0, 0)] * 16
-    inv[0] = (int(sid), 7)
+    inv[0] = (int(bid), 15)
     ok, reason = can_deposit(
         inv, box, 0, room_id="118", allowed_key_ids=ids
     )
     assert ok, reason
-    dirty = [(int(sid), 7)] + [(0, 0)] * 15
-    assert box_pollution_reason(dirty, room_id="118") == "disallowed_item_in_box:shotgun@0"
+    dirty = [(int(bid), 15)] + [(0, 0)] * 15
+    assert box_pollution_reason(dirty, room_id="118") == "disallowed_item_in_box:beretta@0"
     assert (
         box_pollution_reason(dirty, room_id="118", allowed_key_names=names) is None
     )
