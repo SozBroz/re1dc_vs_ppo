@@ -1418,7 +1418,7 @@
       "op": "acquire",
       "room_id": "20D",
       "pickup_id": "20D:handgun_bullets:2",
-      "note": "Richard corpse clip \u2014 stacks into held handgun_bullets (cap 30)",
+      "note": "Richard corpse clip stacks into held handgun_bullets (cap 30)",
       "n": 173
     },
     {
