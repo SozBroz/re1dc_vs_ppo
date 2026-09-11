@@ -998,6 +998,7 @@ def test_yawn_bite_branch_tip_in_101_stays_on_recovery():
     held = [("moon_crest", 1), ("shotgun_shells", 7)]
     q.seek(edge_i)
     q.note_start_inventory({"room_id": "101", "inventory_slots": held})
+    assert q.current.get("edge_id") == "101->201"
     stay = q.evaluate_transition(
         prev_state={"room_id": "101", "inventory_slots": held},
         state={"room_id": "101", "inventory_slots": held},
@@ -1010,6 +1011,48 @@ def test_yawn_bite_branch_tip_in_101_stays_on_recovery():
     )
     assert hop["step_success"] is True
     assert q.current.get("edge_id") == "201->202"
+
+
+def test_yawn_bite_tip_in_100_skips_20d_without_crest_in_ram():
+    """Room 100 tip arms bite branch even if crest RAM lags a frame."""
+    q = PlannerLoyalQueue()
+    stairs_i = next(
+        i for i, s in enumerate(q._steps) if s.get("edge_id") == "20E->20D"
+    )
+    q.seek(stairs_i + 1)
+    q.note_start_inventory({"room_id": "100", "inventory_slots": [("shield_key", 1)]})
+    assert q._yawn_bite_recovery is True
+    assert q.current.get("edge_id") == "100->101"
+
+
+def test_yawn_bite_tip_ignores_save_room_floor_loot():
+    q = PlannerLoyalQueue()
+    stairs_i = next(
+        i for i, s in enumerate(q._steps) if s.get("edge_id") == "20E->20D"
+    )
+    q.seek(stairs_i + 1)
+    held = [("moon_crest", 1), ("shotgun_shells", 7)]
+    q.note_start_inventory({"room_id": "100", "inventory_slots": held})
+    assert q.current.get("edge_id") == "100->101"
+    ink = q.evaluate_transition(
+        prev_state={"room_id": "100", "inventory_slots": held},
+        state={
+            "room_id": "100",
+            "inventory_slots": held + [("ink_ribbon", 1)],
+        },
+    )
+    assert ink["divert"] is False, ink
+    serum = q.evaluate_transition(
+        prev_state={
+            "room_id": "100",
+            "inventory_slots": held + [("ink_ribbon", 1)],
+        },
+        state={
+            "room_id": "100",
+            "inventory_slots": held + [("ink_ribbon", 1), ("serum", 1)],
+        },
+    )
+    assert serum["divert"] is False, serum
 
 
 def test_yawn_bite_warp_mid_episode_leave_100_recovers():

@@ -158,6 +158,8 @@ YAWN_BITE_WARP_ROOM = "100"
 YAWN_BITE_SKIP_EDGES = frozenset({"20D->204"})
 # From-rooms of mintable yawn_bite_recovery edges (not 204 — join room).
 YAWN_BITE_RECOVERY_FROM_ROOMS = frozenset({"100", "101", "201", "202", "203"})
+# Save-room floor junk on bite tips — picking it must not block 100→101 mint.
+YAWN_BITE_IGNORE_FLOOR_LOOT = frozenset({"ink_ribbon", "serum"})
 # Chunk steps tagged yawn_bite_recovery (100→…→204); skipped on normal 20D tips.
 
 
@@ -308,12 +310,16 @@ class PlannerLoyalQueue:
         self._absorb_start_flicker = True
         self._start_gallery_progress = int(state.get("gallery_progress", 0) or 0)
         self._start_gallery_solved = bool(state.get("gallery_puzzle_solved", False))
-        # Bite-branch tips (100/101/201/202/203 + moon crest) keep recovery
-        # armed so 20D→204 stays skipped across minted corridor cells.
+        # Bite-branch tips (100/101/201/202/203) keep recovery armed so
+        # 20D→204 stays skipped across minted corridor cells. Do not require
+        # moon_crest here — RAM settle can lag; room alone is enough because
+        # early box tips in 100 never seek onto the post-Yawn 20D→204 fork.
         self._yawn_bite_recovery = (
             self._start_room in YAWN_BITE_RECOVERY_FROM_ROOMS
-            and "moon_crest" in self._start_held
         )
+        if self._yawn_bite_recovery:
+            self._skip_yawn_bite_warp_corridor()
+
 
     def seek(self, index: int) -> None:
         """Jump queue to ``index`` (0 = first step; len(steps) = done)."""
@@ -466,6 +472,9 @@ class PlannerLoyalQueue:
         """
         from re1_rl.typewriter_save import count_ink_ribbons
 
+        # Bite-branch tips spawn in 100; floor ribbons/serum are noise, not a plan.
+        if self._yawn_bite_recovery_active():
+            return None
         planned_now = self._current_step_is_ink_ribbon_acquire()
         if "ink_ribbon" in _inventory_gains(prev_state, state) and not planned_now:
             return "unplanned_pickup:['ink_ribbon']"
@@ -863,12 +872,16 @@ class PlannerLoyalQueue:
             unexpected -= (
                 self._completed_acquire_names(room) - _ON_PATH_PILE_ITEMS
             )
+            if self._yawn_bite_recovery_active():
+                unexpected -= YAWN_BITE_IGNORE_FLOOR_LOOT
             # Floor piles always count, even if a chamber qty-bump also fired.
             # Exception: room_items event-gated piles (210 Yawn mint shells) —
             # same attic loot yawn_moon_210 treated as fight-cell gains, not rogue piles.
             unexpected |= (
                 (gained & _ON_PATH_PILE_ITEMS) - planned - _event_grant_names(room)
             )
+            if self._yawn_bite_recovery_active():
+                unexpected -= YAWN_BITE_IGNORE_FLOOR_LOOT
             if unexpected:
                 result["divert"] = True
                 result["divert_reason"] = (
