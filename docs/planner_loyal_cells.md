@@ -1,17 +1,18 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (189 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (194 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **C-RE1 numbering (Sep 2026):** `pl00` is the dining fresh start (no emblem). Opening remint is `pl01` emblem … `pl06` lockpick (`opening_to_lockpick.json`). Live shield-key step 0 (`106->105`) mints `pl07`. Watch `states/planner_loyal/cells/plNN/cell.pst` — BizHawk `cell.State` is backed up under `backups/planner_loyal_bizhawk_20260904/`.
 
 On step success the fleet installs `states/planner_loyal/cells/plNN/` for the completed index.
 
 - Slot formula: capturing steps only — `capture:false` (Richard bleedout, yawn_intro, yawn_1, go_to_box) does not consume a `plNN`. After attic enter `pl181`, next mint is shells `pl182` (fight is mid-hop only).
+- Post-Yawn **branching pls**: stairs leave `pl185` accepts `20D` or bite-warp `100`. Normal branch mints `pl186` (`20D→204`) and skips bite hops. Bite branch mints `pl187`–`pl191` (`100→101→201→202→203→204`) and skips `20D→204`. Both rejoin at `pl192` (`204→207`) through `pl196` (`place_moon_crest`).
 - Training starts: every minted `pl06+` plus `pl00` when it has `cell.pst` (pin file `data/planner_loyal_reset_pin.env`; blank = uniform over loadable C-RE1 cells, **not** pinned to `pl00`).
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl06`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - Tea-room lock: `104->103` stays locked until `103->104` is done once (this chunk never opens it). `103->10C` / `103->10D` are open. Do not walk `116->106` after the shotgun. Vacant `102` clip+shells are taken on the armor-key return; skip re-loot.
-- Chunk end-anchor: `place_moon_crest` (`pl191`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `place_moon_crest` (`pl196`). Mid-chunk success keeps the episode open.
 
 ## What's minted / what it's stuck on
 
@@ -220,11 +221,16 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 | `pl184` | 182 | `210->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `210->20E` into `20E` (FRONT OF ATTIC) |
 | `pl185` | 183 | `20E->20D` | `20D` (PILLAR PASSAGE) | traverse | Walk `20E->20D` into `20D` (PILLAR PASSAGE) |
 | `pl186` | 184 | `20D->204` | `204` (C PASSAGE) | traverse | Walk `20D->204` into `204` (C PASSAGE) |
-| `pl187` | 185 | `204->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `204->207` into `207` (2F RIGHT STAIRS) |
-| `pl188` | 186 | `207->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `207->10B` into `10B` (1F RIGHT STAIRS) |
-| `pl189` | 187 | `10B->10A` | `10A` (BACK PASSAGE) | traverse | Walk `10B->10A` into `10A` (BACK PASSAGE) |
-| `pl190` | 188 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
-| `pl191` | 189 | `place_moon_crest` | `11A` (ROOFED PASSAGE) | objective | `place_moon_crest` at `moon_crest@11A_crest_slot` — place moon crest — Phase-1 crest set complete |
+| `pl187` | 185 | `100->101` | `101` (1F LEFT STAIRS) | traverse | Walk `100->101` into `101` (1F LEFT STAIRS) |
+| `pl188` | 186 | `101->201` | `201` (2F LEFT STAIRS) | traverse | Walk `101->201` into `201` (2F LEFT STAIRS) |
+| `pl189` | 187 | `201->202` | `202` (DINING ROOM 2F) | traverse | Walk `201->202` into `202` (DINING ROOM 2F) |
+| `pl190` | 188 | `202->203` | `203` (HALL 2F) | traverse | Walk `202->203` into `203` (HALL 2F) |
+| `pl191` | 189 | `203->204` | `204` (C PASSAGE) | traverse | Walk `203->204` into `204` (C PASSAGE) |
+| `pl192` | 190 | `204->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `204->207` into `207` (2F RIGHT STAIRS) |
+| `pl193` | 191 | `207->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `207->10B` into `10B` (1F RIGHT STAIRS) |
+| `pl194` | 192 | `10B->10A` | `10A` (BACK PASSAGE) | traverse | Walk `10B->10A` into `10A` (BACK PASSAGE) |
+| `pl195` | 193 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
+| `pl196` | 194 | `place_moon_crest` | `11A` (ROOFED PASSAGE) | objective | `place_moon_crest` at `moon_crest@11A_crest_slot` — place moon crest — Phase-1 crest set complete |
 
 ## Details
 
@@ -285,7 +291,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl07`–`pl191`)
+### Chunk cells (`pl07`–`pl196`)
 
 ### `pl07` — `106->105` (step 1)
 
@@ -2249,29 +2255,86 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **Objective:** Walk `20E->20D` into `20D` (PILLAR PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `20E->20D` into `20D` (PILLAR PASSAGE).
-- **Success condition:** Enter `20D` via `20E->20D`, **or** Yawn bite-warp from `20E` to save room `100` (requires `moon_crest` held). A `100` tip skips `20D->204`, walks `100→101→201→202→203→204`, then resumes `204->207`. Any other door is `wrong_traverse:20E->20D got <room>` (−4).
+- **Success condition:** Enter `20D` via `20E->20D`, **or** Yawn bite-warp from `20E` to save room `100` (requires `moon_crest` held). **Normal branch:** mint `20D→204` then shared `204→207`…`place_moon_crest`. **Bite branch:** mint `100→101→201→202→203→204` then the same shared tail. Any other door is `wrong_traverse:20E->20D got <room>` (−4).
 
 ### `pl186` — `20D->204` (step 184)
 
 - **Room:** `204` (C PASSAGE)
 - **Op:** `traverse`
 - **Edge:** `20D->204`
+- **Note:** normal stairs branch; skipped on bite-warp tip
 - **Objective:** Walk `20D->204` into `204` (C PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `20D->204` into `204` (C PASSAGE).
 - **Success condition:** Enter room `204` via `20D->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:20D->204 got <room>` (−4).
 
-### `pl187` — `204->207` (step 185)
+### `pl187` — `100->101` (step 185)
+
+- **Room:** `101` (1F LEFT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `100->101`
+- **Note:** bite-warp recovery: save room to stairs; mintable bite-branch pl
+- **Objective:** Walk `100->101` into `101` (1F LEFT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `100->101` into `101` (1F LEFT STAIRS).
+- **Success condition:** Enter room `101` via `100->101` (already-there counts after cinema dump). Any other door is `wrong_traverse:100->101 got <room>` (−4).
+
+### `pl188` — `101->201` (step 186)
+
+- **Room:** `201` (2F LEFT STAIRS)
+- **Op:** `traverse`
+- **Edge:** `101->201`
+- **Note:** bite-warp recovery; mintable bite-branch pl
+- **Objective:** Walk `101->201` into `201` (2F LEFT STAIRS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `101->201` into `201` (2F LEFT STAIRS).
+- **Success condition:** Enter room `201` via `101->201` (already-there counts after cinema dump). Any other door is `wrong_traverse:101->201 got <room>` (−4).
+
+### `pl189` — `201->202` (step 187)
+
+- **Room:** `202` (DINING ROOM 2F)
+- **Op:** `traverse`
+- **Edge:** `201->202`
+- **Note:** bite-warp recovery; mintable bite-branch pl
+- **Objective:** Walk `201->202` into `202` (DINING ROOM 2F)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `201->202` into `202` (DINING ROOM 2F).
+- **Success condition:** Enter room `202` via `201->202` (already-there counts after cinema dump). Any other door is `wrong_traverse:201->202 got <room>` (−4).
+
+### `pl190` — `202->203` (step 188)
+
+- **Room:** `203` (HALL 2F)
+- **Op:** `traverse`
+- **Edge:** `202->203`
+- **Note:** bite-warp recovery; mintable bite-branch pl
+- **Objective:** Walk `202->203` into `203` (HALL 2F)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `202->203` into `203` (HALL 2F).
+- **Success condition:** Enter room `203` via `202->203` (already-there counts after cinema dump). Any other door is `wrong_traverse:202->203 got <room>` (−4).
+
+### `pl191` — `203->204` (step 189)
+
+- **Room:** `204` (C PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `203->204`
+- **Note:** bite-warp recovery: merge at C passage; mintable bite-branch pl
+- **Objective:** Walk `203->204` into `204` (C PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `203->204` into `204` (C PASSAGE).
+- **Success condition:** Enter room `204` via `203->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:203->204 got <room>` (−4).
+
+### `pl192` — `204->207` (step 190)
 
 - **Room:** `207` (2F RIGHT STAIRS)
 - **Op:** `traverse`
 - **Edge:** `204->207`
+- **Note:** rejoin after 20D or bite 100..204; shared through place_moon_crest
 - **Objective:** Walk `204->207` into `207` (2F RIGHT STAIRS)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `204->207` into `207` (2F RIGHT STAIRS).
 - **Success condition:** Enter room `207` via `204->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->207 got <room>` (−4).
 
-### `pl188` — `207->10B` (step 186)
+### `pl193` — `207->10B` (step 191)
 
 - **Room:** `10B` (1F RIGHT STAIRS)
 - **Op:** `traverse`
@@ -2281,7 +2344,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `207->10B` into `10B` (1F RIGHT STAIRS).
 - **Success condition:** Enter room `10B` via `207->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->10B got <room>` (−4).
 
-### `pl189` — `10B->10A` (step 187)
+### `pl194` — `10B->10A` (step 192)
 
 - **Room:** `10A` (BACK PASSAGE)
 - **Op:** `traverse`
@@ -2291,7 +2354,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `10B->10A` into `10A` (BACK PASSAGE).
 - **Success condition:** Enter room `10A` via `10B->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->10A got <room>` (−4).
 
-### `pl190` — `10A->11A` (step 188)
+### `pl195` — `10A->11A` (step 193)
 
 - **Room:** `11A` (ROOFED PASSAGE)
 - **Op:** `traverse`
@@ -2301,7 +2364,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `10A->11A` into `11A` (ROOFED PASSAGE).
 - **Success condition:** Enter room `11A` via `10A->11A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->11A got <room>` (−4).
 
-### `pl191` — `place_moon_crest` (step 189)
+### `pl196` — `place_moon_crest` (step 194)
 
 - **Room:** `11A` (ROOFED PASSAGE)
 - **Op:** `objective`

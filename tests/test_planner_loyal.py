@@ -101,7 +101,10 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[sun_i + 3]["beat_id"] == "richard_bleedout"
     assert steps[sun_i + 3]["site_id"] == "20D:richard"
     assert steps[sun_i + 3].get("capture") is False
-    assert not any(s.get("edge_id") == "20D->204" for s in steps)
+    # Richard dump is already in 204 — no 20D→204 before the right-stairs hop.
+    assert not any(
+        s.get("edge_id") == "20D->204" for s in steps[sun_i : sun_i + 5]
+    )
     assert steps[sun_i + 4]["edge_id"] == "204->207"
     assert any(s.get("beat_id") == "place_sun_crest" for s in steps)
     assert any(s.get("beat_id") == "dining_2f_enter" for s in steps)
@@ -960,7 +963,8 @@ def test_yawn_bite_warp_tip_skips_20d_204_and_merges_at_204():
     )
     assert stay["divert"] is False
     assert stay["step_success"] is False
-    assert q.current.get("edge_id") == "204->207"
+    assert q.current.get("edge_id") == "100->101"
+    assert q.current.get("yawn_bite_recovery") is True
     assert q.target_room(here="100") == "101"
 
     path = ["100", "101", "201", "202", "203", "204"]
@@ -970,9 +974,11 @@ def test_yawn_bite_warp_tip_skips_20d_204_and_merges_at_204():
             state={"room_id": b, "inventory_slots": held},
         )
         assert hop["divert"] is False, hop
-        assert hop["step_success"] is False
-        assert q.current.get("edge_id") == "204->207"
+        assert hop["step_success"] is True
+        # Mintable branch hops (not capture:false).
+        assert q._steps[q.index - 1].get("capture") is not False
 
+    assert q.current.get("edge_id") == "204->207"
     assert q.target_room(here="204") == "207"
     done = q.evaluate_transition(
         prev_state={"room_id": "204", "inventory_slots": held},
@@ -982,7 +988,54 @@ def test_yawn_bite_warp_tip_skips_20d_204_and_merges_at_204():
     assert done["step_success"] is True
 
 
-def test_yawn_normal_20d_tip_still_requires_20d_204():
+def test_yawn_bite_branch_tip_in_101_stays_on_recovery():
+    """Minted 101 tip must not skip the rest of the bite corridor."""
+    q = PlannerLoyalQueue()
+    edge_i = next(
+        i for i, s in enumerate(q._steps) if s.get("edge_id") == "101->201"
+        and s.get("yawn_bite_recovery")
+    )
+    held = [("moon_crest", 1), ("shotgun_shells", 7)]
+    q.seek(edge_i)
+    q.note_start_inventory({"room_id": "101", "inventory_slots": held})
+    stay = q.evaluate_transition(
+        prev_state={"room_id": "101", "inventory_slots": held},
+        state={"room_id": "101", "inventory_slots": held},
+    )
+    assert stay["divert"] is False
+    assert q.current.get("edge_id") == "101->201"
+    hop = q.evaluate_transition(
+        prev_state={"room_id": "101", "inventory_slots": held},
+        state={"room_id": "201", "inventory_slots": held},
+    )
+    assert hop["step_success"] is True
+    assert q.current.get("edge_id") == "201->202"
+
+
+def test_yawn_bite_warp_mid_episode_leave_100_recovers():
+    """Stairs warp mid-episode must arm recovery so 100→101 is not a divert."""
+    q = PlannerLoyalQueue()
+    stairs_i = next(
+        i for i, s in enumerate(q._steps) if s.get("edge_id") == "20E->20D"
+    )
+    held = [("moon_crest", 1), ("shotgun_shells", 7)]
+    q.seek(stairs_i)
+    q.note_start_inventory({"room_id": "20E", "inventory_slots": held})
+    warp = q.evaluate_transition(
+        prev_state={"room_id": "20E", "inventory_slots": held},
+        state={"room_id": "100", "inventory_slots": held},
+    )
+    assert warp["step_success"] is True
+    leave = q.evaluate_transition(
+        prev_state={"room_id": "100", "inventory_slots": held},
+        state={"room_id": "101", "inventory_slots": held},
+    )
+    assert leave["divert"] is False, leave
+    assert leave["step_success"] is True
+    assert q.current.get("edge_id") == "101->201"
+
+
+def test_yawn_normal_20d_tip_skips_bite_recovery_corridor():
     q = PlannerLoyalQueue()
     stairs_i = next(
         i for i, s in enumerate(q._steps) if s.get("edge_id") == "20E->20D"
@@ -1000,7 +1053,38 @@ def test_yawn_normal_20d_tip_still_requires_20d_204():
         state={"room_id": "204", "inventory_slots": held},
     )
     assert ok["step_success"] is True
+    # Bite-branch pls are skipped; next hop is shared rejoin.
+    stay = q.evaluate_transition(
+        prev_state={"room_id": "204", "inventory_slots": held},
+        state={"room_id": "204", "inventory_slots": held},
+    )
+    assert stay["divert"] is False
     assert q.current.get("edge_id") == "204->207"
+
+
+def test_yawn_branch_slots_rejoin_before_place_moon():
+    from re1_rl.planner_loyal_cells import slot_index_for_completed_step
+
+    q = PlannerLoyalQueue()
+    steps = q._steps
+    by_edge = {}
+    for i, s in enumerate(steps):
+        edge = s.get("edge_id")
+        if edge == "20D->204" and int(s.get("n") or 0) >= 180:
+            by_edge["normal"] = i
+        if s.get("yawn_bite_recovery") and edge == "100->101":
+            by_edge["bite0"] = i
+        if s.get("yawn_bite_recovery") and edge == "203->204":
+            by_edge["bite_last"] = i
+        if edge == "204->207" and int(s.get("n") or 0) >= 180:
+            by_edge["rejoin"] = i
+        if s.get("beat_id") == "place_moon_crest":
+            by_edge["place"] = i
+    assert slot_index_for_completed_step(by_edge["normal"], steps) == 186
+    assert slot_index_for_completed_step(by_edge["bite0"], steps) == 187
+    assert slot_index_for_completed_step(by_edge["bite_last"], steps) == 191
+    assert slot_index_for_completed_step(by_edge["rejoin"], steps) == 192
+    assert slot_index_for_completed_step(by_edge["place"], steps) == 196
 
 
 def test_ink_ribbon_use_diverts_when_not_planned():

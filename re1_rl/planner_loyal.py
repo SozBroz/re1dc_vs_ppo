@@ -156,8 +156,9 @@ YAWN_STAIRS_LEAVE_EDGE = "20E->20D"
 YAWN_STAIRS_LEAVE_NORMAL = "20D"
 YAWN_BITE_WARP_ROOM = "100"
 YAWN_BITE_SKIP_EDGES = frozenset({"20D->204"})
-YAWN_BITE_MERGE_PATH = ("100", "101", "201", "202", "203", "204")
-YAWN_BITE_RESUME_EDGE = "204->207"
+# From-rooms of mintable yawn_bite_recovery edges (not 204 — join room).
+YAWN_BITE_RECOVERY_FROM_ROOMS = frozenset({"100", "101", "201", "202", "203"})
+# Chunk steps tagged yawn_bite_recovery (100→…→204); skipped on normal 20D tips.
 
 
 def _encode_queue_op(op: str) -> str:
@@ -241,6 +242,7 @@ class PlannerLoyalQueue:
         self._start_gallery_solved = False
         self._satisfied_pickups: set[str] = set()
         self.pending_capture_indices: list[int] = []
+        self._yawn_bite_recovery = False
 
     def reload_if_stale(self, project_root: Path | str | None = None) -> bool:
         """Re-read the chunk file. True when bytes or path changed."""
@@ -295,6 +297,7 @@ class PlannerLoyalQueue:
         self._start_gallery_solved = False
         self._satisfied_pickups = set()
         self.pending_capture_indices = []
+        self._yawn_bite_recovery = False
 
     def note_start_inventory(self, state: dict[str, Any]) -> None:
         """Snapshot episode-start inventory (sidecar / live RAM after reset)."""
@@ -305,6 +308,12 @@ class PlannerLoyalQueue:
         self._absorb_start_flicker = True
         self._start_gallery_progress = int(state.get("gallery_progress", 0) or 0)
         self._start_gallery_solved = bool(state.get("gallery_puzzle_solved", False))
+        # Bite-branch tips (100/101/201/202/203 + moon crest) keep recovery
+        # armed so 20D→204 stays skipped across minted corridor cells.
+        self._yawn_bite_recovery = (
+            self._start_room in YAWN_BITE_RECOVERY_FROM_ROOMS
+            and "moon_crest" in self._start_held
+        )
 
     def seek(self, index: int) -> None:
         """Jump queue to ``index`` (0 = first step; len(steps) = done)."""
@@ -522,27 +531,28 @@ class PlannerLoyalQueue:
                 return
             self._index += 1
 
+    def _yawn_bite_recovery_active(self) -> bool:
+        return bool(getattr(self, "_yawn_bite_recovery", False))
+
+    def _arm_yawn_bite_recovery(self) -> None:
+        self._yawn_bite_recovery = True
+
     def _skip_yawn_bite_warp_corridor(self) -> None:
-        """Skip 20D→204 when tip started in 100 after 20E stairs bite-warp."""
-        if str(self._start_room or "").strip().upper() != YAWN_BITE_WARP_ROOM:
-            return
+        """Skip the branch the tip is not on (20D→204 vs 100→…→204)."""
+        recovering = self._yawn_bite_recovery_active()
         while True:
             step = self.current
             if not step or str(step.get("op") or "") != "traverse":
                 return
             edge = str(step.get("edge_id") or "")
-            if edge not in YAWN_BITE_SKIP_EDGES:
+            if recovering:
+                if edge not in YAWN_BITE_SKIP_EDGES:
+                    return
+                self._index += 1
+                continue
+            if not step.get("yawn_bite_recovery"):
                 return
             self._index += 1
-
-    def _yawn_bite_warp_recovering(self) -> bool:
-        """True when a 100 tip is hunting the post-corridor resume edge."""
-        if str(self._start_room or "").strip().upper() != YAWN_BITE_WARP_ROOM:
-            return False
-        step = self.current
-        if not step or str(step.get("op") or "") != "traverse":
-            return False
-        return str(step.get("edge_id") or "") == YAWN_BITE_RESUME_EDGE
 
     def target_room(self, here: str | None = None) -> str | None:
         step = self.current
@@ -551,13 +561,6 @@ class PlannerLoyalQueue:
         op = str(step.get("op") or "")
         if op == "traverse":
             edge = str(step.get("edge_id") or "")
-            if (
-                self._yawn_bite_warp_recovering()
-                and edge == YAWN_BITE_RESUME_EDGE
-            ):
-                nxt = _yawn_bite_next_room(here)
-                if nxt is not None:
-                    return nxt
             if "->" in edge:
                 return edge.split("->", 1)[1]
             return None
@@ -938,18 +941,10 @@ class PlannerLoyalQueue:
                 return result
             edge = str(step.get("edge_id") or "")
             expected = edge.split("->", 1)[1] if "->" in edge else ""
-            if self._yawn_bite_warp_recovering() and edge == YAWN_BITE_RESUME_EDGE:
-                if _yawn_bite_merge_walk_ok(prev_room, room):
-                    # Still walking 100→…→204; do not complete 204→207 yet.
-                    if room != expected:
-                        return result
-                elif room != expected:
-                    result["divert"] = True
-                    result["divert_reason"] = f"wrong_traverse:{edge} got {room}"
-                    self.divert_reason = result["divert_reason"]
-                    return result
-            elif room != expected:
+            if room != expected:
                 if _yawn_stairs_leave_ok(edge, prev_room, room, state):
+                    if room == YAWN_BITE_WARP_ROOM:
+                        self._arm_yawn_bite_recovery()
                     result["step_success"] = True
                     self._index += 1
                     self._mark_step_success()
@@ -984,6 +979,7 @@ class PlannerLoyalQueue:
                 and room == YAWN_BITE_WARP_ROOM
                 and "moon_crest" in _inventory_held_names(state)
             ):
+                self._arm_yawn_bite_recovery()
                 result["step_success"] = True
                 self._index += 1
                 self._mark_step_success()
@@ -1287,35 +1283,6 @@ def _yawn_stairs_leave_ok(
         return False
     # Crest proves attic loot hops finished.
     return "moon_crest" in _inventory_held_names(state)
-
-
-def _yawn_bite_next_room(here: str | None) -> str | None:
-    """Next room on the 100→…→204 merge path, or 207 once already in 204."""
-    room = str(here or "").strip().upper()
-    if not room:
-        return YAWN_BITE_MERGE_PATH[1] if len(YAWN_BITE_MERGE_PATH) > 1 else "204"
-    if room == "204":
-        return YAWN_BITE_RESUME_EDGE.split("->", 1)[1]
-    path = YAWN_BITE_MERGE_PATH
-    if room not in path:
-        return path[0]
-    idx = path.index(room)
-    if idx + 1 < len(path):
-        return path[idx + 1]
-    return YAWN_BITE_RESUME_EDGE.split("->", 1)[1]
-
-
-def _yawn_bite_merge_walk_ok(prev_room: str, room: str) -> bool:
-    """True when a room change stays on the bite-warp merge spine toward 204."""
-    prev = str(prev_room or "").strip().upper()
-    cur = str(room or "").strip().upper()
-    path = YAWN_BITE_MERGE_PATH
-    if cur not in path:
-        return False
-    if prev not in path:
-        # First sample after tip load may glitch; allow landing on-path.
-        return True
-    return path.index(cur) >= path.index(prev)
 
 
 def _dining_statue_step_complete(

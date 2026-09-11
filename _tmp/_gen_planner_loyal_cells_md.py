@@ -89,6 +89,15 @@ def success_for(step: dict) -> str:
     beat = str(step.get("beat_id") or "")
     if op == "traverse":
         to = dest_of(edge)
+        if edge == "20E->20D":
+            return (
+                "Enter `20D` via `20E->20D`, **or** Yawn bite-warp from `20E` "
+                "to save room `100` (requires `moon_crest` held). "
+                "**Normal branch:** mint `20D→204` then shared "
+                "`204→207`…`place_moon_crest`. **Bite branch:** mint "
+                "`100→101→201→202→203→204` then the same shared tail. "
+                "Any other door is `wrong_traverse:20E->20D got <room>` (−4)."
+            )
         return (
             f"Enter room `{to}` via `{edge}` (already-there counts after cinema "
             f"dump). Any other door is `wrong_traverse:{edge} got <room>` (−4)."
@@ -174,9 +183,17 @@ def main() -> None:
     )
     a("")
     a(
-        "- Slot formula: capturing steps only — `capture:false` (Richard) does "
-        "not consume a `plNN`. After `pl86` (`204->20D`), next mint is `pl87` "
-        "(`204->207`)."
+        "- Slot formula: capturing steps only — `capture:false` "
+        "(Richard bleedout, yawn_intro, yawn_1, go_to_box) does not consume "
+        "a `plNN`. After attic enter `pl181`, next mint is shells `pl182` "
+        "(fight is mid-hop only)."
+    )
+    a(
+        "- Post-Yawn **branching pls**: stairs leave `pl185` accepts `20D` or "
+        "bite-warp `100`. Normal branch mints `pl186` (`20D→204`) and skips "
+        "bite hops. Bite branch mints `pl187`–`pl191` "
+        "(`100→101→201→202→203→204`) and skips `20D→204`. Both rejoin at "
+        "`pl192` (`204→207`) through `pl196` (`place_moon_crest`)."
     )
     a(
         "- Training starts: every minted `pl06+` plus `pl00` when it has "
@@ -226,17 +243,19 @@ def main() -> None:
                 except (OSError, json.JSONDecodeError):
                     pass
             minted.append((idx, cid))
+    minted.sort(key=lambda t: t[0])
     if minted:
         a(
             "Live C-RE1 `cell.pst` on this machine: "
             + ", ".join(f"`pl{i:02d}` ({cid})" for i, cid in minted)
             + "."
         )
-        nxt = minted[-1][0] + 1
+        highest = minted[-1][0]
+        nxt = highest + 1
         a(
-            f"Highest minted is `pl{minted[-1][0]:02d}`. The fleet is **stuck "
-            f"trying to mint `pl{nxt:02d}`** (see the summary row for that "
-            "slot — that is the current objective)."
+            f"Highest minted is `pl{highest:02d}`. The fleet frontier is "
+            f"**`pl{nxt:02d}`** (see the summary row for that slot — next "
+            "capturing hop after the newest tip)."
         )
     else:
         a("No live `cell.pst` cells found under `states/planner_loyal/cells`.")
