@@ -151,11 +151,11 @@ PLANNER_OP_TYPES = (
 DEFAULT_BOX_ROOM = "118"
 GO_TO_BOX_OP = "go_to_box"
 
-# Post-Yawn attic leave: normal door to 20E, or bite cinema warp to save room 100.
-YAWN_ATTIC_LEAVE_EDGE = "210->20E"
-YAWN_ATTIC_LEAVE_NORMAL = "20E"
+# Post-Yawn front-of-attic stairs: normal 20E→20D, or bite cinema warp 20E→100.
+YAWN_STAIRS_LEAVE_EDGE = "20E->20D"
+YAWN_STAIRS_LEAVE_NORMAL = "20D"
 YAWN_BITE_WARP_ROOM = "100"
-YAWN_BITE_SKIP_EDGES = frozenset({"20E->20D", "20D->204"})
+YAWN_BITE_SKIP_EDGES = frozenset({"20D->204"})
 YAWN_BITE_MERGE_PATH = ("100", "101", "201", "202", "203", "204")
 YAWN_BITE_RESUME_EDGE = "204->207"
 
@@ -523,7 +523,7 @@ class PlannerLoyalQueue:
             self._index += 1
 
     def _skip_yawn_bite_warp_corridor(self) -> None:
-        """Skip 20E→20D→204 when tip started in 100 after attic bite-warp leave."""
+        """Skip 20D→204 when tip started in 100 after 20E stairs bite-warp."""
         if str(self._start_room or "").strip().upper() != YAWN_BITE_WARP_ROOM:
             return
         while True:
@@ -949,12 +949,12 @@ class PlannerLoyalQueue:
                     self.divert_reason = result["divert_reason"]
                     return result
             elif room != expected:
-                if _yawn_attic_leave_ok(edge, prev_room, room, state):
+                if _yawn_stairs_leave_ok(edge, prev_room, room, state):
                     result["step_success"] = True
                     self._index += 1
                     self._mark_step_success()
                     print(
-                        f"[planner_loyal] yawn_attic_leave "
+                        f"[planner_loyal] yawn_stairs_leave "
                         f"{prev_room}->{room}",
                         flush=True,
                     )
@@ -978,9 +978,9 @@ class PlannerLoyalQueue:
         if op == "traverse":
             edge = str(step.get("edge_id") or "")
             expected = edge.split("->", 1)[1] if "->" in edge else ""
-            # Bite-warp tip already standing in 100 after leave mint.
+            # Bite-warp tip already standing in 100 after stairs leave mint.
             if (
-                edge == YAWN_ATTIC_LEAVE_EDGE
+                edge == YAWN_STAIRS_LEAVE_EDGE
                 and room == YAWN_BITE_WARP_ROOM
                 and "moon_crest" in _inventory_held_names(state)
             ):
@@ -988,7 +988,7 @@ class PlannerLoyalQueue:
                 self._index += 1
                 self._mark_step_success()
                 print(
-                    f"[planner_loyal] yawn_attic_leave already {room}",
+                    f"[planner_loyal] yawn_stairs_leave already {room}",
                     flush=True,
                 )
                 return result
@@ -1271,21 +1271,21 @@ def _yawn_boss_complete(
 _YAWN_FIGHT_LOOT = frozenset({"shotgun_shells", "moon_crest"})
 
 
-def _yawn_attic_leave_ok(
+def _yawn_stairs_leave_ok(
     edge: str,
     prev_room: str,
     room: str,
     state: dict[str, Any] | None,
 ) -> bool:
-    """True for authored attic leave to 20E or bite-warp dump to 100."""
-    if str(edge or "") != YAWN_ATTIC_LEAVE_EDGE:
+    """True for 20E stairs leave to 20D or bite-warp dump to 100."""
+    if str(edge or "") != YAWN_STAIRS_LEAVE_EDGE:
         return False
-    if str(prev_room or "").strip().upper() != "210":
+    if str(prev_room or "").strip().upper() != "20E":
         return False
     dest = str(room or "").strip().upper()
-    if dest not in {YAWN_ATTIC_LEAVE_NORMAL, YAWN_BITE_WARP_ROOM}:
+    if dest not in {YAWN_STAIRS_LEAVE_NORMAL, YAWN_BITE_WARP_ROOM}:
         return False
-    # Crest proves loot hops finished; warp during fight must not mint leave.
+    # Crest proves attic loot hops finished.
     return "moon_crest" in _inventory_held_names(state)
 
 

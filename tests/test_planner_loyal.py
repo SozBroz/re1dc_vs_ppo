@@ -899,35 +899,35 @@ def test_yawn_leave_after_retreat_completes_boss_not_divert():
     assert result["step_success"] is True
 
 
-def _seek_yawn_attic_leave(q: PlannerLoyalQueue) -> None:
+def _seek_yawn_stairs_leave(q: PlannerLoyalQueue) -> None:
     idx = next(
         i
         for i, step in enumerate(q._steps)
-        if step.get("edge_id") == "210->20E"
+        if step.get("edge_id") == "20E->20D"
     )
     q.seek(idx)
 
 
-def test_yawn_attic_leave_normal_20e_with_crest():
+def test_yawn_stairs_leave_normal_20d_with_crest():
     q = PlannerLoyalQueue()
-    _seek_yawn_attic_leave(q)
+    _seek_yawn_stairs_leave(q)
     held = [("shield_key", 1), ("moon_crest", 1), ("shotgun_shells", 7)]
     result = q.evaluate_transition(
-        prev_state={"room_id": "210", "inventory_slots": held},
-        state={"room_id": "20E", "inventory_slots": held},
+        prev_state={"room_id": "20E", "inventory_slots": held},
+        state={"room_id": "20D", "inventory_slots": held},
     )
     assert result["divert"] is False
     assert result["step_success"] is True
     assert len(q.pending_capture_indices) == 1
-    assert q.current.get("edge_id") == "20E->20D"
+    assert q.current.get("edge_id") == "20D->204"
 
 
-def test_yawn_attic_leave_bite_warp_100_with_crest():
+def test_yawn_stairs_leave_bite_warp_100_with_crest():
     q = PlannerLoyalQueue()
-    _seek_yawn_attic_leave(q)
+    _seek_yawn_stairs_leave(q)
     held = [("shield_key", 1), ("moon_crest", 1), ("shotgun_shells", 7)]
     result = q.evaluate_transition(
-        prev_state={"room_id": "210", "inventory_slots": held},
+        prev_state={"room_id": "20E", "inventory_slots": held},
         state={"room_id": "100", "inventory_slots": held},
     )
     assert result["divert"] is False
@@ -935,26 +935,25 @@ def test_yawn_attic_leave_bite_warp_100_with_crest():
     assert len(q.pending_capture_indices) == 1
 
 
-def test_yawn_attic_leave_bite_warp_without_crest_diverts():
+def test_yawn_stairs_leave_bite_warp_without_crest_diverts():
     q = PlannerLoyalQueue()
-    _seek_yawn_attic_leave(q)
+    _seek_yawn_stairs_leave(q)
     result = q.evaluate_transition(
-        prev_state={"room_id": "210", "inventory_slots": [("shield_key", 1)]},
+        prev_state={"room_id": "20E", "inventory_slots": [("shield_key", 1)]},
         state={"room_id": "100", "inventory_slots": [("shield_key", 1)]},
     )
     assert result["divert"] is True
     assert "wrong_traverse" in str(result["divert_reason"])
 
 
-def test_yawn_bite_warp_tip_skips_corridor_and_merges_at_204():
+def test_yawn_bite_warp_tip_skips_20d_204_and_merges_at_204():
     q = PlannerLoyalQueue()
-    leave_i = next(
-        i for i, s in enumerate(q._steps) if s.get("edge_id") == "210->20E"
+    stairs_i = next(
+        i for i, s in enumerate(q._steps) if s.get("edge_id") == "20E->20D"
     )
-    q.seek(leave_i + 1)  # would be 20E->20D without skip
+    q.seek(stairs_i + 1)  # would be 20D->204 without skip
     held = [("moon_crest", 1), ("shotgun_shells", 7)]
     q.note_start_inventory({"room_id": "100", "inventory_slots": held})
-    # First eval runs skip → current becomes 204→207.
     stay = q.evaluate_transition(
         prev_state={"room_id": "100", "inventory_slots": held},
         state={"room_id": "100", "inventory_slots": held},
@@ -983,25 +982,25 @@ def test_yawn_bite_warp_tip_skips_corridor_and_merges_at_204():
     assert done["step_success"] is True
 
 
-def test_yawn_normal_20e_tip_still_requires_corridor():
+def test_yawn_normal_20d_tip_still_requires_20d_204():
     q = PlannerLoyalQueue()
-    leave_i = next(
-        i for i, s in enumerate(q._steps) if s.get("edge_id") == "210->20E"
+    stairs_i = next(
+        i for i, s in enumerate(q._steps) if s.get("edge_id") == "20E->20D"
     )
-    q.seek(leave_i + 1)
+    q.seek(stairs_i + 1)
     held = [("moon_crest", 1)]
-    q.note_start_inventory({"room_id": "20E", "inventory_slots": held})
+    q.note_start_inventory({"room_id": "20D", "inventory_slots": held})
     bad = q.evaluate_transition(
-        prev_state={"room_id": "20E", "inventory_slots": held},
-        state={"room_id": "204", "inventory_slots": held},
+        prev_state={"room_id": "20D", "inventory_slots": held},
+        state={"room_id": "100", "inventory_slots": held},
     )
     assert bad["divert"] is True
     ok = q.evaluate_transition(
-        prev_state={"room_id": "20E", "inventory_slots": held},
-        state={"room_id": "20D", "inventory_slots": held},
+        prev_state={"room_id": "20D", "inventory_slots": held},
+        state={"room_id": "204", "inventory_slots": held},
     )
     assert ok["step_success"] is True
-    assert q.current.get("edge_id") == "20D->204"
+    assert q.current.get("edge_id") == "204->207"
 
 
 def test_ink_ribbon_use_diverts_when_not_planned():
