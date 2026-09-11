@@ -6,17 +6,17 @@ Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chun
 
 On step success the fleet installs `states/planner_loyal/cells/plNN/` for the completed index.
 
-- Slot formula: capturing steps only — `capture:false` (Richard) does not consume a `plNN`. After `pl86` (`204->20D`), next mint is `pl87` (`204->207`).
+- Slot formula: capturing steps only — `capture:false` (Richard bleedout, yawn_intro, yawn_1, go_to_box) does not consume a `plNN`. After attic enter `pl181`, next mint is shells `pl182` (fight is mid-hop only).
 - Training starts: every minted `pl06+` plus `pl00` when it has `cell.pst` (pin file `data/planner_loyal_reset_pin.env`; blank = uniform over loadable C-RE1 cells, **not** pinned to `pl00`).
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl06`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - Tea-room lock: `104->103` stays locked until `103->104` is done once (this chunk never opens it). `103->10C` / `103->10D` are open. Do not walk `116->106` after the shotgun. Vacant `102` clip+shells are taken on the armor-key return; skip re-loot.
-- Chunk end-anchor: `place_moon_crest` (`pl192`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `place_moon_crest` (`pl191`). Mid-chunk success keeps the episode open.
 
 ## What's minted / what it's stuck on
 
-Live C-RE1 `cell.pst` on this machine: `pl00` (fresh_start_105), `pl01` (opening_to_lockpick_step01), `pl02` (opening_to_lockpick_step02), `pl03` (opening_to_lockpick_step03), `pl04` (opening_to_lockpick_step04), `pl05` (opening_to_lockpick_step05), `pl06` (opening_to_lockpick_step06), `pl07` (cp05_shield_key_step01), `pl08` (cp05_shield_key_step02), `pl09` (cp05_shield_key_step03), `pl10` (cp05_shield_key_step04), `pl100` (cp05_shield_key_step95), `pl101` (cp05_shield_key_step96), `pl102` (cp05_shield_key_step97), `pl103` (cp05_shield_key_step98), `pl104` (cp05_shield_key_step99), `pl105` (cp05_shield_key_step100), `pl106` (cp05_shield_key_step101), `pl107` (cp05_shield_key_step102), `pl108` (cp05_shield_key_step103), `pl109` (cp05_shield_key_step104), `pl11` (cp05_shield_key_step05), `pl110` (cp05_shield_key_step105), `pl111` (cp05_shield_key_step106), `pl112` (cp05_shield_key_step107), `pl113` (cp05_shield_key_step108), `pl114` (cp05_shield_key_step109), `pl115` (cp05_shield_key_step110), `pl116` (cp05_shield_key_step111), `pl117` (cp05_shield_key_step112), `pl118` (cp05_shield_key_step113), `pl119` (cp05_shield_key_step114), `pl12` (cp05_shield_key_step06), `pl120` (cp05_shield_key_step115), `pl121` (cp05_shield_key_step116), `pl122` (cp05_shield_key_step117), `pl123` (cp05_shield_key_step118), `pl124` (cp05_shield_key_step119), `pl125` (cp05_shield_key_step120), `pl126` (cp05_shield_key_step121), `pl127` (cp05_shield_key_step122), `pl128` (cp05_shield_key_step123), `pl129` (cp05_shield_key_step124), `pl13` (cp05_shield_key_step07), `pl130` (cp05_shield_key_step125), `pl131` (cp05_shield_key_step126), `pl132` (cp05_shield_key_step127), `pl133` (cp05_shield_key_step128), `pl134` (cp05_shield_key_step129), `pl135` (cp05_shield_key_step130), `pl136` (cp05_shield_key_step131), `pl137` (cp05_shield_key_step132), `pl139` (cp05_shield_key_step134), `pl14` (cp05_shield_key_step08), `pl140` (cp05_shield_key_step135), `pl141` (cp05_shield_key_step136), `pl142` (cp05_shield_key_step137), `pl143` (cp05_shield_key_step138), `pl144` (cp05_shield_key_step139), `pl145` (cp05_shield_key_step140), `pl146` (cp05_shield_key_step141), `pl147` (cp05_shield_key_step142), `pl148` (cp05_shield_key_step143), `pl149` (cp05_shield_key_step144), `pl15` (cp05_shield_key_step09), `pl150` (cp05_shield_key_step145), `pl152` (cp05_shield_key_step147), `pl153` (cp05_shield_key_step148), `pl154` (cp05_shield_key_step149), `pl155` (cp05_shield_key_step150), `pl156` (cp05_shield_key_step151), `pl157` (cp05_shield_key_step152), `pl158` (cp05_shield_key_step153), `pl159` (cp05_shield_key_step154), `pl16` (cp05_shield_key_step10), `pl160` (cp05_shield_key_step155), `pl161` (cp05_shield_key_step156), `pl162` (cp05_shield_key_step157), `pl163` (cp05_shield_key_step158), `pl164` (cp05_shield_key_step159), `pl17` (cp05_shield_key_step11), `pl18` (cp05_shield_key_step12), `pl19` (cp05_shield_key_step13), `pl20` (cp05_shield_key_step14), `pl21` (cp05_shield_key_step15), `pl22` (cp05_shield_key_step16), `pl23` (cp05_shield_key_step17), `pl24` (cp05_shield_key_step18), `pl25` (cp05_shield_key_step19), `pl26` (cp05_shield_key_step20), `pl31` (cp05_shield_key_step25), `pl32` (cp05_shield_key_step26), `pl33` (cp05_shield_key_step27), `pl34` (cp05_shield_key_step28), `pl35` (cp05_shield_key_step29), `pl36` (cp05_shield_key_step30), `pl37` (cp05_shield_key_step31), `pl38` (cp05_shield_key_step32), `pl39` (cp05_shield_key_step33), `pl40` (cp05_shield_key_step34), `pl41` (cp05_shield_key_step35), `pl42` (cp05_shield_key_step36), `pl43` (cp05_shield_key_step37), `pl44` (cp05_shield_key_step38), `pl45` (cp05_shield_key_step39), `pl46` (cp05_shield_key_step40), `pl47` (cp05_shield_key_step41), `pl48` (cp05_shield_key_step42), `pl49` (cp05_shield_key_step43), `pl50` (cp05_shield_key_step44), `pl51` (cp05_shield_key_step45), `pl52` (cp05_shield_key_step46), `pl53` (cp05_shield_key_step47), `pl54` (cp05_shield_key_step48), `pl55` (cp05_shield_key_step49), `pl56` (cp05_shield_key_step50), `pl57` (cp05_shield_key_step51), `pl58` (cp05_shield_key_step52), `pl59` (cp05_shield_key_step53), `pl60` (cp05_shield_key_step54), `pl61` (cp05_shield_key_step55), `pl62` (cp05_shield_key_step56), `pl63` (cp05_shield_key_step57), `pl64` (cp05_shield_key_step58), `pl65` (cp05_shield_key_step59), `pl66` (cp05_shield_key_step60), `pl67` (cp05_shield_key_step61), `pl68` (cp05_shield_key_step62), `pl69` (cp05_shield_key_step63), `pl70` (cp05_shield_key_step64), `pl71` (cp05_shield_key_step65), `pl72` (cp05_shield_key_step66), `pl73` (cp05_shield_key_step67), `pl74` (cp05_shield_key_step68), `pl75` (cp05_shield_key_step69), `pl76` (cp05_shield_key_step70), `pl77` (cp05_shield_key_step71), `pl78` (cp05_shield_key_step72), `pl79` (cp05_shield_key_step73), `pl80` (cp05_shield_key_step74), `pl81` (cp05_shield_key_step75), `pl82` (cp05_shield_key_step76), `pl83` (cp05_shield_key_step77), `pl84` (cp05_shield_key_step78), `pl85` (cp05_shield_key_step79), `pl86` (cp05_shield_key_step80), `pl87` (cp05_shield_key_step81), `pl88` (cp05_shield_key_step83), `pl89` (cp05_shield_key_step84), `pl90` (cp05_shield_key_step85), `pl91` (cp05_shield_key_step86), `pl92` (cp05_shield_key_step87), `pl93` (cp05_shield_key_step88), `pl94` (cp05_shield_key_step89), `pl95` (cp05_shield_key_step90), `pl96` (cp05_shield_key_step91), `pl97` (cp05_shield_key_step92), `pl98` (cp05_shield_key_step93), `pl99` (cp05_shield_key_step94).
-Highest minted is `pl99`. The fleet is **stuck trying to mint `pl100`** (see the summary row for that slot — that is the current objective).
+Live C-RE1 `cell.pst` on this machine: `pl00` (fresh_start_105), `pl01` (opening_to_lockpick_step01), `pl02` (opening_to_lockpick_step02), `pl03` (opening_to_lockpick_step03), `pl04` (opening_to_lockpick_step04), `pl05` (opening_to_lockpick_step05), `pl06` (opening_to_lockpick_step06), `pl07` (cp05_shield_key_step01), `pl08` (cp05_shield_key_step02), `pl09` (cp05_shield_key_step03), `pl10` (cp05_shield_key_step04), `pl11` (cp05_shield_key_step05), `pl12` (cp05_shield_key_step06), `pl13` (cp05_shield_key_step07), `pl14` (cp05_shield_key_step08), `pl15` (cp05_shield_key_step09), `pl16` (cp05_shield_key_step10), `pl17` (cp05_shield_key_step11), `pl18` (cp05_shield_key_step12), `pl19` (cp05_shield_key_step13), `pl20` (cp05_shield_key_step14), `pl21` (cp05_shield_key_step15), `pl22` (cp05_shield_key_step16), `pl23` (cp05_shield_key_step17), `pl24` (cp05_shield_key_step18), `pl25` (cp05_shield_key_step19), `pl26` (cp05_shield_key_step20), `pl27` (cp05_shield_key_step21), `pl28` (cp05_shield_key_step22), `pl29` (cp05_shield_key_step23), `pl30` (cp05_shield_key_step24), `pl31` (cp05_shield_key_step25), `pl32` (cp05_shield_key_step26), `pl33` (cp05_shield_key_step27), `pl34` (cp05_shield_key_step28), `pl35` (cp05_shield_key_step29), `pl36` (cp05_shield_key_step30), `pl37` (cp05_shield_key_step31), `pl38` (cp05_shield_key_step32), `pl39` (cp05_shield_key_step33), `pl40` (cp05_shield_key_step34), `pl41` (cp05_shield_key_step35), `pl42` (cp05_shield_key_step36), `pl43` (cp05_shield_key_step37), `pl44` (cp05_shield_key_step38), `pl45` (cp05_shield_key_step39), `pl46` (cp05_shield_key_step40), `pl47` (cp05_shield_key_step41), `pl48` (cp05_shield_key_step42), `pl49` (cp05_shield_key_step43), `pl50` (cp05_shield_key_step44), `pl51` (cp05_shield_key_step45), `pl52` (cp05_shield_key_step46), `pl53` (cp05_shield_key_step47), `pl54` (cp05_shield_key_step48), `pl55` (cp05_shield_key_step49), `pl56` (cp05_shield_key_step50), `pl57` (cp05_shield_key_step51), `pl58` (cp05_shield_key_step52), `pl59` (cp05_shield_key_step53), `pl60` (cp05_shield_key_step54), `pl61` (cp05_shield_key_step55), `pl62` (cp05_shield_key_step56), `pl63` (cp05_shield_key_step57), `pl64` (cp05_shield_key_step58), `pl65` (cp05_shield_key_step59), `pl66` (cp05_shield_key_step60), `pl67` (cp05_shield_key_step61), `pl68` (cp05_shield_key_step62), `pl69` (cp05_shield_key_step63), `pl70` (cp05_shield_key_step64), `pl71` (cp05_shield_key_step65), `pl72` (cp05_shield_key_step66), `pl73` (cp05_shield_key_step67), `pl74` (cp05_shield_key_step68), `pl75` (cp05_shield_key_step69), `pl76` (cp05_shield_key_step70), `pl77` (cp05_shield_key_step71), `pl78` (cp05_shield_key_step72), `pl79` (cp05_shield_key_step73), `pl80` (cp05_shield_key_step74), `pl81` (cp05_shield_key_step75), `pl82` (cp05_shield_key_step76), `pl83` (cp05_shield_key_step77), `pl84` (cp05_shield_key_step78), `pl85` (cp05_shield_key_step79), `pl86` (cp05_shield_key_step80), `pl87` (cp05_shield_key_step81), `pl88` (cp05_shield_key_step83), `pl89` (cp05_shield_key_step84), `pl90` (cp05_shield_key_step85), `pl91` (cp05_shield_key_step86), `pl92` (cp05_shield_key_step87), `pl93` (cp05_shield_key_step88), `pl94` (cp05_shield_key_step89), `pl95` (cp05_shield_key_step90), `pl96` (cp05_shield_key_step91), `pl97` (cp05_shield_key_step92), `pl98` (cp05_shield_key_step93), `pl99` (cp05_shield_key_step94), `pl100` (cp05_shield_key_step95), `pl101` (cp05_shield_key_step96), `pl102` (cp05_shield_key_step97), `pl103` (cp05_shield_key_step98), `pl104` (cp05_shield_key_step99), `pl105` (cp05_shield_key_step100), `pl106` (cp05_shield_key_step101), `pl107` (cp05_shield_key_step102), `pl108` (cp05_shield_key_step103), `pl109` (cp05_shield_key_step104), `pl110` (cp05_shield_key_step105), `pl111` (cp05_shield_key_step106), `pl112` (cp05_shield_key_step107), `pl113` (cp05_shield_key_step108), `pl114` (cp05_shield_key_step109), `pl115` (cp05_shield_key_step110), `pl116` (cp05_shield_key_step111), `pl117` (cp05_shield_key_step112), `pl118` (cp05_shield_key_step113), `pl119` (cp05_shield_key_step114), `pl120` (cp05_shield_key_step115), `pl121` (cp05_shield_key_step116), `pl122` (cp05_shield_key_step117), `pl123` (cp05_shield_key_step118), `pl124` (cp05_shield_key_step119), `pl125` (cp05_shield_key_step120), `pl126` (cp05_shield_key_step121), `pl127` (cp05_shield_key_step122), `pl128` (cp05_shield_key_step123), `pl129` (cp05_shield_key_step124), `pl130` (cp05_shield_key_step125), `pl131` (cp05_shield_key_step126), `pl132` (cp05_shield_key_step127), `pl133` (cp05_shield_key_step128), `pl134` (cp05_shield_key_step129), `pl135` (cp05_shield_key_step130), `pl136` (cp05_shield_key_step131), `pl137` (cp05_shield_key_step132), `pl139` (cp05_shield_key_step134), `pl140` (cp05_shield_key_step135), `pl141` (cp05_shield_key_step136), `pl142` (cp05_shield_key_step137), `pl143` (cp05_shield_key_step138), `pl144` (cp05_shield_key_step139), `pl145` (cp05_shield_key_step140), `pl146` (cp05_shield_key_step141), `pl147` (cp05_shield_key_step142), `pl148` (cp05_shield_key_step143), `pl149` (cp05_shield_key_step144), `pl150` (cp05_shield_key_step145), `pl152` (cp05_shield_key_step147), `pl153` (cp05_shield_key_step148), `pl154` (cp05_shield_key_step149), `pl155` (cp05_shield_key_step150), `pl156` (cp05_shield_key_step151), `pl157` (cp05_shield_key_step152), `pl158` (cp05_shield_key_step153), `pl159` (cp05_shield_key_step154), `pl160` (cp05_shield_key_step155), `pl161` (cp05_shield_key_step156), `pl162` (cp05_shield_key_step157), `pl163` (cp05_shield_key_step158), `pl164` (cp05_shield_key_step159), `pl165` (cp05_shield_key_step161), `pl166` (cp05_shield_key_step162), `pl167` (cp05_shield_key_step163), `pl168` (cp05_shield_key_step164), `pl169` (cp05_shield_key_step165), `pl170` (cp05_shield_key_step166), `pl171` (cp05_shield_key_step167), `pl172` (cp05_shield_key_step168), `pl173` (cp05_shield_key_step169), `pl174` (cp05_shield_key_step170), `pl175` (cp05_shield_key_step171), `pl176` (cp05_shield_key_step172), `pl177` (cp05_shield_key_step173), `pl178` (cp05_shield_key_step174), `pl179` (cp05_shield_key_step175), `pl180` (cp05_shield_key_step176), `pl181` (cp05_shield_key_step177), `pl182` (cp05_shield_key_step180), `pl183` (cp05_shield_key_step181), `pl184` (cp05_shield_key_step182), `pl185` (cp05_shield_key_step183).
+Highest minted is `pl185`. The fleet frontier is **`pl186`** (see the summary row for that slot — next capturing hop after the newest tip).
 
 Logs (pking): `reset tip=` is the start cell; `queue_seek ... want=` is the step they must finish; `fail='planner_divert' target=` / `divert=` is why they died before minting. `minted pl` / `reject quality pl` is a completed cell.
 
@@ -214,17 +214,17 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 | `pl180` | 176 | `20D->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `20D->20E` into `20E` (FRONT OF ATTIC) |
 | `pl181` | 177 | `attic_enter` | `210` (ATTIC) | traverse | Walk `20E->210` into `210` (ATTIC) |
 | _(none)_ | 178 | `yawn_intro` | `210` (ATTIC) | trigger_cutscene | `yawn_intro` at `210:yawn_intro` — Yawn intro cinema |
-| `pl182` | 179 | `yawn_1` | `210` (ATTIC) | boss | boss |
-| `pl183` | 180 | `210:shotgun_shells:2` | `210` (ATTIC) | acquire | Take `210:shotgun_shells:2` (Yawn mint shells) |
-| `pl184` | 181 | `moon_crest` | `210` (ATTIC) | acquire | Take `210:moon_crest:1` (Yawn mint moon crest) |
-| `pl185` | 182 | `210->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `210->20E` into `20E` (FRONT OF ATTIC) |
-| `pl186` | 183 | `20E->20D` | `20D` (PILLAR PASSAGE) | traverse | Walk `20E->20D` into `20D` (PILLAR PASSAGE) |
-| `pl187` | 184 | `20D->204` | `204` (C PASSAGE) | traverse | Walk `20D->204` into `204` (C PASSAGE) |
-| `pl188` | 185 | `204->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `204->207` into `207` (2F RIGHT STAIRS) |
-| `pl189` | 186 | `207->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `207->10B` into `10B` (1F RIGHT STAIRS) |
-| `pl190` | 187 | `10B->10A` | `10A` (BACK PASSAGE) | traverse | Walk `10B->10A` into `10A` (BACK PASSAGE) |
-| `pl191` | 188 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
-| `pl192` | 189 | `place_moon_crest` | `11A` (ROOFED PASSAGE) | objective | `place_moon_crest` at `moon_crest@11A_crest_slot` — place moon crest — Phase-1 crest set complete |
+| _(none)_ | 179 | `yawn_1` | `210` (ATTIC) | boss | boss |
+| `pl182` | 180 | `210:shotgun_shells:2` | `210` (ATTIC) | acquire | Take `210:shotgun_shells:2` (Yawn mint shells) |
+| `pl183` | 181 | `moon_crest` | `210` (ATTIC) | acquire | Take `210:moon_crest:1` (Yawn mint moon crest) |
+| `pl184` | 182 | `210->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `210->20E` into `20E` (FRONT OF ATTIC) |
+| `pl185` | 183 | `20E->20D` | `20D` (PILLAR PASSAGE) | traverse | Walk `20E->20D` into `20D` (PILLAR PASSAGE) |
+| `pl186` | 184 | `20D->204` | `204` (C PASSAGE) | traverse | Walk `20D->204` into `204` (C PASSAGE) |
+| `pl187` | 185 | `204->207` | `207` (2F RIGHT STAIRS) | traverse | Walk `204->207` into `207` (2F RIGHT STAIRS) |
+| `pl188` | 186 | `207->10B` | `10B` (1F RIGHT STAIRS) | traverse | Walk `207->10B` into `10B` (1F RIGHT STAIRS) |
+| `pl189` | 187 | `10B->10A` | `10A` (BACK PASSAGE) | traverse | Walk `10B->10A` into `10A` (BACK PASSAGE) |
+| `pl190` | 188 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
+| `pl191` | 189 | `place_moon_crest` | `11A` (ROOFED PASSAGE) | objective | `place_moon_crest` at `moon_crest@11A_crest_slot` — place moon crest — Phase-1 crest set complete |
 
 ## Details
 
@@ -285,7 +285,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl07`–`pl192`)
+### Chunk cells (`pl07`–`pl191`)
 
 ### `pl07` — `106->105` (step 1)
 
@@ -2006,7 +2006,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 
 - **Room:** `118` (STAIRS UNDER ROOM)
 - **Op:** `use_box`
-- **Note:** leave with 3 empty slots for GL + 2 greens; keep handgun_bullets so Richard corpse clip stacks (no 4th slot). Withdraw armor_key; bank shotgun + explosive + red
+- **Note:** leave with 3 empty slots for GL + 2 greens; keep handgun_bullets so Richard corpse clip stacks. Hold shotgun (terrace + shells after Yawn); armor_key for 204->20D; shield for attic. Bank beretta + explosive + red (GL+acid is Yawn primary)
 - **Objective:** Rearrange the 118 box to the leave_118 loadout, then close the box
 - **Items gained:** _(none)_
 - **How to achieve:** Rearrange the 118 box to the leave_118 loadout, then close the box.
@@ -2194,19 +2194,20 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** `yawn_intro` at `210:yawn_intro` — Yawn intro cinema.
 - **Success condition:** trigger_cutscene
 
-### `pl182` — `yawn_1` (step 179)
+### `(no cell)` — `yawn_1` (step 179, capture:false)
 
 - **Room:** `210` (ATTIC)
 - **Op:** `boss`
 - **Site:** `210:yawn`
 - **Beat:** `yawn_1`
-- **Note:** fight Yawn (GL+acid)
+- **Capture:** `false` (queue advance only; no `plNN` cell)
+- **Note:** fight Yawn (GL+acid); capture:false — mints are shells/crest/leave
 - **Objective:** boss
 - **Items gained:** _(none)_
 - **How to achieve:** boss.
 - **Success condition:** boss
 
-### `pl183` — `210:shotgun_shells:2` (step 180)
+### `pl182` — `210:shotgun_shells:2` (step 180)
 
 - **Room:** `210` (ATTIC)
 - **Op:** `acquire`
@@ -2217,7 +2218,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Take `210:shotgun_shells:2` (Yawn mint shells).
 - **Success condition:** Inventory gains `210:shotgun_shells:2` while this step is current
 
-### `pl184` — `moon_crest` (step 181)
+### `pl183` — `moon_crest` (step 181)
 
 - **Room:** `210` (ATTIC)
 - **Op:** `acquire`
@@ -2229,7 +2230,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Take `210:moon_crest:1` (Yawn mint moon crest).
 - **Success condition:** Inventory gains `210:moon_crest:1` while this step is current
 
-### `pl185` — `210->20E` (step 182)
+### `pl184` — `210->20E` (step 182)
 
 - **Room:** `20E` (FRONT OF ATTIC)
 - **Op:** `traverse`
@@ -2239,17 +2240,18 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `210->20E` into `20E` (FRONT OF ATTIC).
 - **Success condition:** Enter room `20E` via `210->20E` (already-there counts after cinema dump). Any other door is `wrong_traverse:210->20E got <room>` (−4).
 
-### `pl186` — `20E->20D` (step 183)
+### `pl185` — `20E->20D` (step 183)
 
 - **Room:** `20D` (PILLAR PASSAGE)
 - **Op:** `traverse`
 - **Edge:** `20E->20D`
+- **Note:** attic stairs; bite-warp to 100 also completes this hop
 - **Objective:** Walk `20E->20D` into `20D` (PILLAR PASSAGE)
 - **Items gained:** _(none)_
 - **How to achieve:** Walk `20E->20D` into `20D` (PILLAR PASSAGE).
-- **Success condition:** Enter room `20D` via `20E->20D` (already-there counts after cinema dump). Any other door is `wrong_traverse:20E->20D got <room>` (−4).
+- **Success condition:** Enter `20D` via `20E->20D`, **or** Yawn bite-warp from `20E` to save room `100` (requires `moon_crest` held). A `100` tip skips `20D->204`, walks `100→101→201→202→203→204`, then resumes `204->207`. Any other door is `wrong_traverse:20E->20D got <room>` (−4).
 
-### `pl187` — `20D->204` (step 184)
+### `pl186` — `20D->204` (step 184)
 
 - **Room:** `204` (C PASSAGE)
 - **Op:** `traverse`
@@ -2259,7 +2261,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `20D->204` into `204` (C PASSAGE).
 - **Success condition:** Enter room `204` via `20D->204` (already-there counts after cinema dump). Any other door is `wrong_traverse:20D->204 got <room>` (−4).
 
-### `pl188` — `204->207` (step 185)
+### `pl187` — `204->207` (step 185)
 
 - **Room:** `207` (2F RIGHT STAIRS)
 - **Op:** `traverse`
@@ -2269,7 +2271,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `204->207` into `207` (2F RIGHT STAIRS).
 - **Success condition:** Enter room `207` via `204->207` (already-there counts after cinema dump). Any other door is `wrong_traverse:204->207 got <room>` (−4).
 
-### `pl189` — `207->10B` (step 186)
+### `pl188` — `207->10B` (step 186)
 
 - **Room:** `10B` (1F RIGHT STAIRS)
 - **Op:** `traverse`
@@ -2279,7 +2281,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `207->10B` into `10B` (1F RIGHT STAIRS).
 - **Success condition:** Enter room `10B` via `207->10B` (already-there counts after cinema dump). Any other door is `wrong_traverse:207->10B got <room>` (−4).
 
-### `pl190` — `10B->10A` (step 187)
+### `pl189` — `10B->10A` (step 187)
 
 - **Room:** `10A` (BACK PASSAGE)
 - **Op:** `traverse`
@@ -2289,7 +2291,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `10B->10A` into `10A` (BACK PASSAGE).
 - **Success condition:** Enter room `10A` via `10B->10A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10B->10A got <room>` (−4).
 
-### `pl191` — `10A->11A` (step 188)
+### `pl190` — `10A->11A` (step 188)
 
 - **Room:** `11A` (ROOFED PASSAGE)
 - **Op:** `traverse`
@@ -2299,7 +2301,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **How to achieve:** Walk `10A->11A` into `11A` (ROOFED PASSAGE).
 - **Success condition:** Enter room `11A` via `10A->11A` (already-there counts after cinema dump). Any other door is `wrong_traverse:10A->11A got <room>` (−4).
 
-### `pl192` — `place_moon_crest` (step 189)
+### `pl191` — `place_moon_crest` (step 189)
 
 - **Room:** `11A` (ROOFED PASSAGE)
 - **Op:** `objective`
