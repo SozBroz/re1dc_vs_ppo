@@ -17,9 +17,17 @@ YAWN_CUTSCENE_ROOM = "210"
 YAWN_CUTSCENE_KEY = "210:yawn"
 
 
-def _on_yawn_cutscene_leg(planner: Any) -> bool:
-    obj = planner.current_objective() or {}
-    return str(obj.get("checkpoint_id") or "") == YAWN_CUTSCENE_CHECKPOINT_ID
+def _on_yawn_cutscene_leg(planner: Any, planner_loyal_queue: Any = None) -> bool:
+    obj = planner.current_objective() or {} if planner is not None else {}
+    if str(obj.get("checkpoint_id") or "") == YAWN_CUTSCENE_CHECKPOINT_ID:
+        return True
+    step = getattr(planner_loyal_queue, "current", None) or {}
+    if not isinstance(step, dict):
+        return False
+    return (
+        str(step.get("beat_id") or "") == "yawn_intro"
+        or str(step.get("site_id") or "") == "210:yawn_intro"
+    )
 
 
 def yawn_cutscene_seen(progress: Any) -> bool:
@@ -38,6 +46,7 @@ def yawn_spawn_triggered(
     new_state: dict[str, Any] | None,
     *,
     after_skip: bool = False,
+    planner_loyal_queue: Any = None,
 ) -> bool:
     """True when cp120 observes the Yawn spawn.
 
@@ -46,7 +55,7 @@ def yawn_spawn_triggered(
     this handles Yawn appearing one sample before settlement without letting
     cp119's already-populated enemy slot complete cp120 on step one.
     """
-    if not _on_yawn_cutscene_leg(planner):
+    if not _on_yawn_cutscene_leg(planner, planner_loyal_queue):
         return False
     from re1_rl.yawn_outcome import yawn_contact_edge
 
@@ -66,6 +75,7 @@ def note_yawn_spawn(
     new_state: dict[str, Any],
     *,
     after_skip: bool = False,
+    planner_loyal_queue: Any = None,
 ) -> None:
     """Mint ``210:yawn`` when the spawn cinema leaves Yawn active."""
     if progress is None or not yawn_spawn_triggered(
@@ -73,6 +83,7 @@ def note_yawn_spawn(
         prev_state,
         new_state,
         after_skip=after_skip,
+        planner_loyal_queue=planner_loyal_queue,
     ):
         return
     progress.observe_cutscene(YAWN_CUTSCENE_KEY)
@@ -85,9 +96,10 @@ def yawn_cutscene_skip_settled(
     new_state: dict[str, Any] | None,
     *,
     skip_frames: int,
+    planner_loyal_queue: Any = None,
 ) -> bool:
     """True for a long same-room skip wholly inside attic 210 on this leg."""
-    if not _on_yawn_cutscene_leg(planner):
+    if not _on_yawn_cutscene_leg(planner, planner_loyal_queue):
         return False
     entry = entry_prev or {}
     if str(entry.get("room_id") or "").upper() != YAWN_CUTSCENE_ROOM:
@@ -104,6 +116,7 @@ def note_yawn_cutscene_skip_settle(
     new_state: dict[str, Any],
     *,
     skip_frames: int,
+    planner_loyal_queue: Any = None,
 ) -> None:
     """Record ``210:yawn`` after the genuine attic intro cinema skip."""
     if progress is None:
@@ -113,6 +126,7 @@ def note_yawn_cutscene_skip_settle(
         entry_prev,
         new_state,
         skip_frames=skip_frames,
+        planner_loyal_queue=planner_loyal_queue,
     ):
         return
     progress.observe_cutscene(YAWN_CUTSCENE_KEY)

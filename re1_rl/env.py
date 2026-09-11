@@ -3250,6 +3250,7 @@ class RE1Env(gym.Env):
             skip_entry,
             state,
             after_skip=True,
+            planner_loyal_queue=getattr(self, "_planner_loyal_queue", None),
         )
         note_yawn_cutscene_skip_settle(
             self._planner,
@@ -3257,6 +3258,7 @@ class RE1Env(gym.Env):
             skip_entry,
             state,
             skip_frames=skip_frames,
+            planner_loyal_queue=getattr(self, "_planner_loyal_queue", None),
         )
         note_kenneth_cutscene_skip_settle(
             self._progress,
@@ -5866,6 +5868,7 @@ class RE1Env(gym.Env):
             self._progress,
             self._prev_state,
             state,
+            planner_loyal_queue=getattr(self, "_planner_loyal_queue", None),
         )
         save_complete = self._poll_typewriter_save(self._prev_state, state)
         reward, breakdown = compute_reward(

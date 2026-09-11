@@ -146,6 +146,22 @@ def test_yawn_spawn_edge_mints_without_duration_gate() -> None:
     assert cur.get("yawn_cutscene_confirmed") is True
 
 
+def test_yawn_spawn_fires_on_planner_loyal_yawn_intro_queue() -> None:
+    from re1_rl.planner_loyal import PlannerLoyalQueue
+
+    q = PlannerLoyalQueue()
+    idx = next(i for i, s in enumerate(q._steps) if s.get("beat_id") == "yawn_intro")
+    q.seek(idx)
+    progress = ProgressTracker()
+    prev = _state("210", enemies=[])
+    cur = _state("210", enemies=[_spawned_yawn()])
+    # Legacy planner is not on yawn_cutscene_210 — loyal queue must arm it.
+    assert not yawn_spawn_triggered(None, prev, cur)
+    assert yawn_spawn_triggered(None, prev, cur, planner_loyal_queue=q)
+    note_yawn_spawn(None, progress, prev, cur, planner_loyal_queue=q)
+    assert YAWN_CUTSCENE_KEY in progress.observed_cutscenes
+
+
 def test_yawn_spawn_presence_survives_async_sample_race() -> None:
     planner = _planner("yawn_cutscene_210")
     yawn = _spawned_yawn()

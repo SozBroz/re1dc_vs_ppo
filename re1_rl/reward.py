@@ -1095,10 +1095,32 @@ def _compute_planner_loyal_reward(
         bd["checkpoint_success"] = pay
         from re1_rl.planner_hop_score import hop_score_live_enabled
 
-        if progress is not None and (
+        # capture:false beats (yawn_intro, go_to_box, Richard) advance the
+        # queue only — hop-score live must keep playing so the next capturable
+        # step can mint in this episode.
+        completed = max(0, int(getattr(planner_loyal_queue, "index", 1) or 1) - 1)
+        steps = getattr(planner_loyal_queue, "_steps", []) or []
+        done_step = steps[completed] if 0 <= completed < len(steps) else {}
+        skip_capture = (
+            isinstance(done_step, dict) and done_step.get("capture") is False
+        )
+        if skip_capture and not planner_loyal_queue.done:
+            if progress is not None:
+                progress.note_softlock_extension(hop_frames)
+                progress.note_max_steps_extension(hop_steps)
+                if hasattr(progress, "arm_cell_timeout"):
+                    # Boss budget once yawn_1 becomes current after intro.
+                    boss_now = current_step_is_boss(planner_loyal_queue)
+                    progress.arm_cell_timeout(
+                        int(planner_timeout_frames(boss=boss_now))
+                    )
+                    progress.leg_emulated_frames = 0
+            # Do not claim checkpoint_success — episode continues.
+            bd["checkpoint_success"] = 0.0
+        elif progress is not None and (
             planner_loyal_queue.done or hop_score_live_enabled()
         ):
-            # Live ±1: every hop success ends the episode (one cell = one episode).
+            # Live ±1: every capturing hop success ends the episode.
             if hasattr(progress, "claim_checkpoint_success"):
                 progress.claim_checkpoint_success()
             if hop_score_live_enabled() and not planner_loyal_queue.done:
@@ -1284,6 +1306,12 @@ def _compute_planner_loyal_reward(
             # Non-terminal steps (and terminals that did not wipe above).
             meters.note_statue_locals(bd)
         # Priority: death > timeout > divert-class > success (matches terminal ownership).
+        skip_capture_midhop = (
+            float(bd.get("planner_step_success", 0.0) or 0.0) > 0.0
+            and float(bd.get("checkpoint_success", 0.0) or 0.0) <= 0.0
+            and loyal.get("step_success")
+            and not bool(getattr(planner_loyal_queue, "done", False))
+        )
         if state.get("dead") or float(bd.get("death", 0.0) or 0.0) < 0.0:
             apply_live_hop_score(
                 bd, meters, outcome="death", failure="death"
@@ -1320,6 +1348,10 @@ def _compute_planner_loyal_reward(
             apply_live_hop_score(
                 bd, meters, outcome="planner_divert", failure="planner_divert"
             )
+        elif skip_capture_midhop:
+            # capture:false advanced the queue; keep dense channels stripped but
+            # do not settle ±1 terminal S — the capturing hop is still ahead.
+            zero_live_replaced_channels(bd)
         elif float(bd.get("planner_step_success", 0.0) or 0.0) > 0.0 or loyal.get(
             "step_success"
         ):

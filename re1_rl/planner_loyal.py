@@ -839,6 +839,18 @@ class PlannerLoyalQueue:
                 return result
             if op == "acquire":
                 if not matched:
+                    # Tip may already hold attic fight loot from the yawn_1 hop.
+                    held = _inventory_held_names(state)
+                    if (
+                        room == "210"
+                        and want_item in _YAWN_FIGHT_LOOT
+                        and want_item in held
+                    ):
+                        result["step_success"] = True
+                        self._index += 1
+                        self._mark_step_success()
+                        self._rebuild_satisfied_pickups()
+                        return result
                     return result
                 result["step_success"] = True
                 self._index += 1
@@ -867,6 +879,18 @@ class PlannerLoyalQueue:
                     self._mark_step_success()
                     print(
                         f"[planner_loyal] richard_bleedout "
+                        f"{prev_room}->{room}",
+                        flush=True,
+                    )
+                    return result
+                # Yawn retreat may settle as Jill leaves 210→20E.
+                if _yawn_boss_complete(step, state, prev_state, progress):
+                    result["step_success"] = True
+                    self._index += 1
+                    self._mark_step_success()
+                    self._cascade_yawn_fight_loot(state)
+                    print(
+                        f"[planner_loyal] yawn_1 retreat "
                         f"{prev_room}->{room}",
                         flush=True,
                     )
@@ -948,6 +972,25 @@ class PlannerLoyalQueue:
                     flush=True,
                 )
                 return result
+            if _yawn_intro_complete(step, state, progress):
+                result["step_success"] = True
+                self._index += 1
+                self._mark_step_success()
+                print(
+                    f"[planner_loyal] yawn_intro room={room}",
+                    flush=True,
+                )
+                return result
+            if _yawn_boss_complete(step, state, prev_state, progress):
+                result["step_success"] = True
+                self._index += 1
+                self._mark_step_success()
+                self._cascade_yawn_fight_loot(state)
+                print(
+                    f"[planner_loyal] yawn_1 retreat room={room}",
+                    flush=True,
+                )
+                return result
             if _is_gallery_end_of_life(step) and _gallery_end_of_life_complete(
                 prev_state, state
             ):
@@ -983,6 +1026,30 @@ class PlannerLoyalQueue:
                 return result
 
         return result
+
+    def _cascade_yawn_fight_loot(self, state: dict[str, Any]) -> None:
+        """After yawn_1, mint attic shells/crest acquires already held this fight.
+
+        yawn_moon_210 treated loot as fight-cell gains. Split hop steps still
+        need those acquires to clear when the agent already scooped them.
+        """
+        held = _inventory_held_names(state)
+        while True:
+            step = self.current
+            if not isinstance(step, dict) or str(step.get("op") or "") != "acquire":
+                break
+            if str(step.get("room_id") or "") != "210":
+                break
+            _, item, _ = _pickup_id_parts(str(step.get("pickup_id") or ""))
+            if item not in _YAWN_FIGHT_LOOT or item not in held:
+                break
+            self._index += 1
+            self._mark_step_success()
+            self._rebuild_satisfied_pickups()
+            print(
+                f"[planner_loyal] yawn_loot_acquire {item} room=210",
+                flush=True,
+            )
 
 
 def read_queue_current(queue: PlannerLoyalQueue) -> dict[str, Any]:
@@ -1079,6 +1146,53 @@ def _richard_bleedout_complete(
     from re1_rl.richard_cutscene_checkpoint import richard_cutscene_seen
 
     return richard_cutscene_seen(progress)
+
+
+def _yawn_intro_complete(
+    step: dict[str, Any],
+    state: dict[str, Any] | None,
+    progress: Any = None,
+) -> bool:
+    """True when current step is yawn_intro and the attic cinema ledger fired."""
+    site = str(step.get("site_id") or "")
+    beat = str(step.get("beat_id") or "")
+    if site != "210:yawn_intro" and beat != "yawn_intro":
+        return False
+    snap = state or {}
+    if snap.get("yawn_cutscene_confirmed"):
+        return True
+    from re1_rl.yawn_cutscene_checkpoint import yawn_cutscene_seen
+
+    return yawn_cutscene_seen(progress)
+
+
+def _yawn_boss_complete(
+    step: dict[str, Any],
+    state: dict[str, Any] | None,
+    prev_state: dict[str, Any] | None = None,
+    progress: Any = None,
+) -> bool:
+    """True when yawn_1 retreat latches (attic fight-1 is retreat, not a kill)."""
+    site = str(step.get("site_id") or "")
+    beat = str(step.get("beat_id") or "")
+    if site != "210:yawn" and beat != "yawn_1":
+        return False
+    if progress is not None and bool(getattr(progress, "yawn_retreated", False)):
+        return True
+    snap = state or {}
+    from re1_rl.yawn_outcome import yawn_retreat_detected, yawn_should_latch_retreat
+
+    if yawn_should_latch_retreat(snap):
+        return True
+    return yawn_retreat_detected(
+        snap,
+        prev_state,
+        enemies=snap.get("enemies"),
+        prev_enemies=(prev_state or {}).get("enemies") if prev_state else None,
+    )
+
+
+_YAWN_FIGHT_LOOT = frozenset({"shotgun_shells", "moon_crest"})
 
 
 def _dining_statue_step_complete(

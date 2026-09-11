@@ -794,6 +794,86 @@ def test_yawn_attic_shells_event_grant_does_not_divert_on_boss():
     assert result.get("divert_reason") is None
 
 
+def test_yawn_intro_completes_on_cutscene_confirm():
+    q = PlannerLoyalQueue()
+    idx = next(
+        i
+        for i, step in enumerate(q._steps)
+        if step.get("beat_id") == "yawn_intro"
+    )
+    q.seek(idx)
+    prev = {"room_id": "210", "inventory_slots": [("shield_key", 1)]}
+    cur = {
+        "room_id": "210",
+        "inventory_slots": [("shield_key", 1)],
+        "yawn_cutscene_confirmed": True,
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result["step_success"] is True
+    assert q.current is not None
+    assert q.current.get("beat_id") == "yawn_1"
+    assert q.pending_capture_indices == []
+
+
+def test_yawn_boss_completes_on_retreat_and_cascades_held_loot():
+    q = PlannerLoyalQueue()
+    idx = next(
+        i
+        for i, step in enumerate(q._steps)
+        if step.get("op") == "boss" and step.get("beat_id") == "yawn_1"
+    )
+    q.seek(idx)
+    progress = ProgressTracker()
+    progress.yawn_retreated = True
+    prev = {
+        "room_id": "210",
+        "inventory_slots": [
+            ("bazooka_acid", 1),
+            ("shield_key", 1),
+            ("shotgun_shells", 7),
+            ("moon_crest", 1),
+        ],
+    }
+    cur = {
+        "room_id": "210",
+        "inventory_slots": [
+            ("bazooka_acid", 1),
+            ("shield_key", 1),
+            ("shotgun_shells", 7),
+            ("moon_crest", 1),
+        ],
+    }
+    result = q.evaluate_transition(
+        prev_state=prev, state=cur, progress=progress
+    )
+    assert result["divert"] is False
+    assert result["step_success"] is True
+    # Boss + shells + crest all queued; next hop is leave attic.
+    assert q.current is not None
+    assert q.current.get("edge_id") == "210->20E"
+    assert len(q.pending_capture_indices) == 3
+
+
+def test_yawn_leave_after_retreat_completes_boss_not_divert():
+    q = PlannerLoyalQueue()
+    idx = next(
+        i
+        for i, step in enumerate(q._steps)
+        if step.get("op") == "boss" and step.get("beat_id") == "yawn_1"
+    )
+    q.seek(idx)
+    progress = ProgressTracker()
+    progress.yawn_retreated = True
+    result = q.evaluate_transition(
+        prev_state={"room_id": "210", "inventory_slots": [("shield_key", 1)]},
+        state={"room_id": "20E", "inventory_slots": [("shield_key", 1)]},
+        progress=progress,
+    )
+    assert result["divert"] is False
+    assert result["step_success"] is True
+
+
 def test_ink_ribbon_use_diverts_when_not_planned():
     q = PlannerLoyalQueue()
     prev = {"room_id": "106", "inventory_slots": [("ink_ribbon", 2)]}
