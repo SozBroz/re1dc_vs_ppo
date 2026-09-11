@@ -765,6 +765,35 @@ def test_cutscene_event_grant_does_not_divert_on_traverse():
     assert result["divert_reason"] is None
 
 
+def test_yawn_attic_shells_event_grant_does_not_divert_on_boss():
+    """yawn_moon_210 loot: 210 shotgun_shells are event-gated, not a rogue pile."""
+    q = PlannerLoyalQueue()
+    idx = next(
+        i
+        for i, step in enumerate(q._steps)
+        if step.get("op") == "boss" and step.get("beat_id") == "yawn_1"
+    )
+    q.seek(idx)
+    assert q.current is not None
+    assert q.current["op"] == "boss"
+    prev = {
+        "room_id": "210",
+        "inventory_slots": [("bazooka_acid", 3), ("shield_key", 1)],
+    }
+    cur = {
+        "room_id": "210",
+        "inventory_slots": [
+            ("bazooka_acid", 3),
+            ("shield_key", 1),
+            ("shotgun_shells", 7),
+        ],
+        "new_items": ["shotgun_shells"],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result.get("divert_reason") is None
+
+
 def test_ink_ribbon_use_diverts_when_not_planned():
     q = PlannerLoyalQueue()
     prev = {"room_id": "106", "inventory_slots": [("ink_ribbon", 2)]}

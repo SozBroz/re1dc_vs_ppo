@@ -823,7 +823,11 @@ class PlannerLoyalQueue:
                 self._completed_acquire_names(room) - _ON_PATH_PILE_ITEMS
             )
             # Floor piles always count, even if a chamber qty-bump also fired.
-            unexpected |= (gained & _ON_PATH_PILE_ITEMS) - planned
+            # Exception: room_items event-gated piles (210 Yawn mint shells) —
+            # same attic loot yawn_moon_210 treated as fight-cell gains, not rogue piles.
+            unexpected |= (
+                (gained & _ON_PATH_PILE_ITEMS) - planned - _event_grant_names(room)
+            )
             if unexpected:
                 result["divert"] = True
                 result["divert_reason"] = (
