@@ -9,192 +9,325 @@
       "prototype": true,
       "pl_first": 1,
       "pl_last": 2,
-      "rooms": ["105", "104"],
+      "rooms": [
+        "105",
+        "104"
+      ],
       "finish": "Leave dining 105 with wooden emblem into tea 104",
-      "pickups": ["wooden_emblem"]
+      "pickups": [
+        "wooden_emblem"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "opening_return_to_lockpick",
       "pl_first": 3,
       "pl_last": 6,
-      "rooms": ["105", "106", "203"],
+      "rooms": [
+        "105",
+        "106",
+        "203"
+      ],
       "finish": "Return to main hall lockpick tip after Kenneth",
-      "pickups": []
+      "pickups": [],
+      "pl_by_pl": true
     },
     {
       "id": "tea_clips_leave_bar",
       "pl_first": 8,
       "pl_last": 11,
-      "rooms": ["104", "10F"],
+      "rooms": [
+        "104",
+        "10F"
+      ],
       "finish": "Leave tea 104 with both clips into bar 10F",
-      "pickups": ["104:handgun_bullets:1", "104:handgun_bullets:2"]
+      "pickups": [
+        "104:handgun_bullets:1",
+        "104:handgun_bullets:2"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "bar_piano_gold_swap",
       "pl_first": 12,
       "pl_last": 15,
-      "rooms": ["10F"],
+      "rooms": [
+        "10F"
+      ],
       "finish": "Leave bar circuit ready (notes+piano+gold+swap done)",
-      "pickups": ["music_notes", "gold_emblem"]
+      "pickups": [
+        "music_notes",
+        "gold_emblem"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "dining_fireplace_shield",
       "pl_first": 16,
       "pl_last": 19,
-      "rooms": ["104", "105"],
+      "rooms": [
+        "104",
+        "105"
+      ],
       "finish": "Leave dining 105 with shield key after fireplace",
-      "pickups": ["shield_key"]
+      "pickups": [
+        "shield_key"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "gallery_to_l_enter",
       "pl_first": 20,
       "pl_last": 21,
-      "rooms": ["106", "107"],
+      "rooms": [
+        "106",
+        "107"
+      ],
       "finish": "Walk main hall into gallery (L enter is start of next segment)",
-      "pickups": []
+      "pickups": [],
+      "pl_by_pl": true
     },
     {
       "id": "l_hallway_bullets",
       "prototype": true,
       "pl_first": 22,
       "pl_last": 24,
-      "rooms": ["108", "109"],
+      "rooms": [
+        "108",
+        "109"
+      ],
       "finish": "Leave L hallway 108 with handgun clip into trap 109",
-      "pickups": ["108:handgun_bullets:1"]
+      "pickups": [
+        "108:handgun_bullets:1"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "trap_herb_to_back",
       "pl_first": 25,
       "pl_last": 26,
-      "rooms": ["109", "10A"],
+      "rooms": [
+        "109",
+        "10A"
+      ],
       "finish": "Take trap herb and leave to back passage",
-      "pickups": ["109:green_herb:1"]
+      "pickups": [
+        "109:green_herb:1"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "stairs_herb_chemical_box",
       "pl_first": 27,
       "pl_last": 31,
-      "rooms": ["10B", "118"],
+      "rooms": [
+        "10B",
+        "118"
+      ],
       "finish": "Herb + chemical + leave_118 box close",
-      "pickups": ["10B:green_herb:1", "chemical"]
+      "pickups": [
+        "10B:green_herb:1",
+        "chemical"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "shotgun_living_room",
       "pl_first": 35,
       "pl_last": 37,
-      "rooms": ["115", "116"],
+      "rooms": [
+        "115",
+        "116"
+      ],
       "finish": "Enter living room, take shotgun",
-      "pickups": ["116:shotgun:1"]
+      "pickups": [
+        "116:shotgun:1"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "place_star_crest",
       "pl_first": 51,
       "pl_last": 52,
-      "rooms": ["11A"],
+      "rooms": [
+        "11A"
+      ],
       "finish": "Place star crest on roofed passage",
-      "pickups": []
+      "pickups": [],
+      "pl_by_pl": true
     },
     {
       "id": "greenhouse_armor_herbs",
       "pl_first": 62,
       "pl_last": 68,
-      "rooms": ["10C"],
+      "rooms": [
+        "10C"
+      ],
       "finish": "Pump + armor key + four bench herbs, leave greenhouse",
-      "pickups": ["armor_key", "10C:red_herb:3a", "10C:green_herb:2a", "10C:red_herb:3b", "10C:green_herb:2b"]
+      "pickups": [
+        "armor_key",
+        "10C:red_herb:3a",
+        "10C:green_herb:2a",
+        "10C:red_herb:3b",
+        "10C:green_herb:2b"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "vacant_ammo",
       "pl_first": 71,
       "pl_last": 73,
-      "rooms": ["102"],
+      "rooms": [
+        "102"
+      ],
       "finish": "Leave vacant room with clip+shells",
-      "pickups": ["102:handgun_bullets:1", "102:shotgun_shells:2"]
+      "pickups": [
+        "102:handgun_bullets:1",
+        "102:shotgun_shells:2"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "save_room_box",
       "pl_first": 75,
       "pl_last": 76,
-      "rooms": ["100"],
+      "rooms": [
+        "100"
+      ],
       "finish": "leave_100 box close",
-      "pickups": []
+      "pickups": [],
+      "pl_by_pl": true
     },
     {
       "id": "place_sun_crest",
       "pl_first": 91,
       "pl_last": 92,
-      "rooms": ["11A"],
+      "rooms": [
+        "11A"
+      ],
       "finish": "Place sun crest",
-      "pickups": []
+      "pickups": [],
+      "pl_by_pl": true
     },
     {
       "id": "dining_2f_statue_jewel",
       "pl_first": 98,
       "pl_last": 103,
-      "rooms": ["202", "203", "106", "105"],
+      "rooms": [
+        "202",
+        "203",
+        "106",
+        "105"
+      ],
       "finish": "Push 2F statue and recover blue jewel in dining 105",
-      "pickups": ["blue_jewel"]
+      "pickups": [
+        "blue_jewel"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "tiger_wind_crest",
       "pl_first": 110,
       "pl_last": 112,
-      "rooms": ["10D"],
+      "rooms": [
+        "10D"
+      ],
       "finish": "Insert jewel and take wind crest",
-      "pickups": ["wind_crest"]
+      "pickups": [
+        "wind_crest"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "employee_ammo",
       "pl_first": 114,
       "pl_last": 116,
-      "rooms": ["10E"],
+      "rooms": [
+        "10E"
+      ],
       "finish": "Leave employee room with clip+shells",
-      "pickups": ["10E:handgun_bullets:1", "10E:shotgun_shells:2"]
+      "pickups": [
+        "10E:handgun_bullets:1",
+        "10E:shotgun_shells:2"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "dressing_wardrobe_loot",
       "pl_first": 121,
       "pl_last": 126,
-      "rooms": ["111", "112"],
+      "rooms": [
+        "111",
+        "112"
+      ],
       "finish": "Dressing+wardrobe ammo/herbs then leave to main hall",
-      "pickups": ["111:handgun_bullets:1", "111:shotgun_shells:2", "112:green_herb:1", "112:green_herb:2"]
+      "pickups": [
+        "111:handgun_bullets:1",
+        "111:shotgun_shells:2",
+        "112:green_herb:1",
+        "112:green_herb:2"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "place_wind_crest",
       "pl_first": 133,
       "pl_last": 134,
-      "rooms": ["11A"],
+      "rooms": [
+        "11A"
+      ],
       "finish": "Place wind crest",
-      "pickups": []
+      "pickups": [],
+      "pl_by_pl": true
     },
     {
       "id": "bedroom_loot",
       "pl_first": 143,
       "pl_last": 146,
-      "rooms": ["209"],
+      "rooms": [
+        "209"
+      ],
       "finish": "Leave bedroom with red herb+clip+lighter",
-      "pickups": ["209:red_herb:1", "209:handgun_bullets:2", "209:lighter:3"]
+      "pickups": [
+        "209:red_herb:1",
+        "209:handgun_bullets:2",
+        "209:lighter:3"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "study_puzzle_rounds",
       "pl_first": 156,
       "pl_last": 160,
-      "rooms": ["20A"],
+      "rooms": [
+        "20A"
+      ],
       "finish": "Study insect/tank/cupboard + explosive rounds",
-      "pickups": ["20A:explosive_rounds:1"]
+      "pickups": [
+        "20A:explosive_rounds:1"
+      ],
+      "pl_by_pl": true
     },
     {
       "id": "courtyard_shed_exit",
       "pl_first": 197,
       "pl_last": 200,
-      "rooms": ["11B", "300"],
+      "rooms": [
+        "11B",
+        "300"
+      ],
       "finish": "Shed stepladder + square crank + leave mansion to courtyard 300",
-      "pickups": ["square_crank"]
+      "pickups": [
+        "square_crank"
+      ],
+      "pl_by_pl": true
     }
   ],
   "notes": [
     "pl_first/pl_last are live C-RE1 cell slot indices (plNN).",
     "Solo traverse PLs not listed remain one-hop episodes.",
     "Gallery pl41-pl49 (117) and armor room pl82-pl85 (205) stay PL-by-PL by design (not segments).",
-    "RE1_PLANNER_ROOM_SEGMENTS_PROTOTYPE_ONLY=1 (default) chains only prototype:true segments."
+    "RE1_PLANNER_ROOM_SEGMENTS_PROTOTYPE_ONLY=1 (default) chains only prototype:true segments.",
+    "MARCH 2026-09-11: all segments pl_by_pl (one-PL episodes, terminal S_hop); chaining disabled until hops chain reliably."
   ]
 }
