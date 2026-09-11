@@ -1484,6 +1484,7 @@
     {
       "op": "traverse",
       "edge_id": "210->20E",
+      "note": "leave attic; bite-warp to 100 also completes this hop",
       "n": 182
     },
     {
