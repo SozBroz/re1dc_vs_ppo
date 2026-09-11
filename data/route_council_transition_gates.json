@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "notes": "Story/key transition gates. Phase 1 Muse still excludes courtyard via phase1_policy; cp05 post-moon hops (Phase 1.5+) author 11A->11B and residence edges directly.",
+  "edge_gates": {
+    "11A->11B": {
+      "gate_id": "courtyard_crest_gate",
+      "requires_story_uses": [
+        "star_crest@11A_crest_slot",
+        "wind_crest@11A_crest_slot",
+        "sun_crest@11A_crest_slot",
+        "moon_crest@11A_crest_slot"
+      ],
+      "phase1_policy": "exclude_edge",
+      "notes": "Crest-shed opens after four crest placements. Phase-1 Muse omits; planner-loyal cp05 appends post-moon."
+    }
+  },
+  "quarantined_edges": [
+    {"from": "108", "to": "11B", "reason": "Bad empirical harvest; 11B is off 11A."},
+    {"from": "11B", "to": "106", "reason": "Bad empirical harvest."},
+    {"from": "10A", "to": "11B", "reason": "Invented by prior Qwen plan."},
+    {"from": "10B", "to": "11B", "reason": "Invented by prior Qwen sanitizer."}
+  ],
+  "phase1_excluded_rooms": ["11B", "300", "301", "302", "303", "304", "305", "306"],
+  "phase1_excluded_items": ["square_crank", "ink_ribbon", "map_1f", "map_2f", "map_dormitory", "map_garden", "map_underground", "serum"]
+}

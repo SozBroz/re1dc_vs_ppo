@@ -200,3 +200,10 @@ Muse beat_order after this: yawn_intro → yawn_1 → moon_crest → place_moon_
 | 161 | use_box | bank shotgun+explosive+red; withdraw armor_key; 3 empty; shield held |
 | 162–188 | … | short terrace → GL → 20D loot → yawn → place_moon_crest |
 
+
+## 2026-09-11 — plant42_helmet (operator + Muse shed/crank)
+
+- **Tip:** pl196 / place_moon_crest @ 11A
+- **End anchor:** `helmet_key`
+- **Raw:** `muse_raw/2026-09-11_plant42_helmet.json`
+- **Notes:** Muse authored shed+crank; courtyard→residence→V-Jolt→Plant 42 spine from doors_rdt + Phase-2 skeleton. `cover_plant_hole` omitted until 400 grate RAM hunt.

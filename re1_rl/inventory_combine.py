@@ -1,7 +1,10 @@
-"""RE1 DC inventory COMBINE: herbs, ammo pile merge, weapon reload."""
+"""RE1 DC inventory COMBINE: herbs, chem (V-Jolt), ammo pile merge, weapon reload."""
 
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from re1_rl.ammo_accounting import combine_clip_capacity, WEAPON_AMMO_ITEM
@@ -13,6 +16,48 @@ from re1_rl.memory_map import (
     INVENTORY_BASE,
     WEAPON_ITEM_IDS,
 )
+
+_ROOT = Path(__file__).resolve().parents[1]
+
+
+@lru_cache(maxsize=1)
+def _chem_pairs() -> frozenset[tuple[int, int, int]]:
+    """Unordered (lo, hi, dst) chem recipes from ``data/combine_recipes.json``."""
+    path = _ROOT / "data" / "combine_recipes.json"
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    out: set[tuple[int, int, int]] = set()
+    for row in rows:
+        if str(row.get("kind") or "") != "chem":
+            continue
+        a = int(row.get("a") or 0) & 0xFF
+        b = int(row.get("b") or 0) & 0xFF
+        dst = int(row.get("dst") or 0) & 0xFF
+        if a and b and dst:
+            lo, hi = (a, b) if a <= b else (b, a)
+            out.add((lo, hi, dst))
+    return frozenset(out)
+
+
+def _plan_chem_combine(
+    inventory: list[tuple[int, int]],
+    first: int,
+    second: int,
+) -> tuple[list[tuple[int, int]], int, int] | None:
+    """Merge two chem bottles into ``dst`` in ``first``; clear ``second``."""
+    id1, q1 = inventory[first]
+    id2, q2 = inventory[second]
+    a = int(id1) & 0xFF
+    b = int(id2) & 0xFF
+    if a == 0 or b == 0 or int(q1) <= 0 or int(q2) <= 0:
+        return None
+    lo, hi = (a, b) if a <= b else (b, a)
+    dst = next((d for la, lb, d in _chem_pairs() if la == lo and lb == hi), None)
+    if dst is None:
+        return None
+    new_inv = list(inventory)
+    new_inv[first] = (int(dst), 1)
+    new_inv[second] = (0, 0)
+    return new_inv, first, int(dst)
 
 # Grenade / rocket launchers: COMBINE only when the weapon slot is empty.
 # (PS1 DC will not top up a partially loaded bazooka from a rounds pack.)
@@ -122,6 +167,10 @@ def plan_combine(
     herb = plan_herb_combine(inventory, first_slot, second_slot)
     if herb is not None:
         return herb
+
+    chem = _plan_chem_combine(inventory, first_slot, second_slot)
+    if chem is not None:
+        return chem
 
     ammo = _plan_ammo_merge(inventory, first_slot, second_slot)
     if ammo is not None:

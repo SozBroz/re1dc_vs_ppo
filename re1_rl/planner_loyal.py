@@ -817,6 +817,26 @@ class PlannerLoyalQueue:
             )
             return result
 
+        # V-Jolt mix / Plant 42 before unplanned_pickup (product is an inv gain).
+        if _vjolt_mix_complete(step, state):
+            result["step_success"] = True
+            self._index += 1
+            self._mark_step_success()
+            print(
+                f"[planner_loyal] vjolt_mix room={room}",
+                flush=True,
+            )
+            return result
+        if _plant_42_boss_complete(step, state, prev_state):
+            result["step_success"] = True
+            self._index += 1
+            self._mark_step_success()
+            print(
+                f"[planner_loyal] plant_42 room={room}",
+                flush=True,
+            )
+            return result
+
         # Piano USE can lose music_notes and spawn gold_emblem on one frame.
         # Pickup used to fire first and kill piano_play before pl13 could mint.
         if op in {"objective", "do_puzzle", "trigger_cutscene", "boss"}:
@@ -1070,6 +1090,24 @@ class PlannerLoyalQueue:
                     flush=True,
                 )
                 return result
+            if _vjolt_mix_complete(step, state):
+                result["step_success"] = True
+                self._index += 1
+                self._mark_step_success()
+                print(
+                    f"[planner_loyal] vjolt_mix room={room}",
+                    flush=True,
+                )
+                return result
+            if _plant_42_boss_complete(step, state, prev_state):
+                result["step_success"] = True
+                self._index += 1
+                self._mark_step_success()
+                print(
+                    f"[planner_loyal] plant_42 room={room}",
+                    flush=True,
+                )
+                return result
             if _is_gallery_end_of_life(step) and _gallery_end_of_life_complete(
                 prev_state, state
             ):
@@ -1278,6 +1316,70 @@ def _yawn_boss_complete(
 
 
 _YAWN_FIGHT_LOOT = frozenset({"shotgun_shells", "moon_crest"})
+
+
+def _vjolt_mix_complete(
+    step: dict[str, Any],
+    state: dict[str, Any] | None,
+) -> bool:
+    """True when ``vjolt_mix`` finished — ``v_jolt`` is held."""
+    site = str(step.get("site_id") or "")
+    beat = str(step.get("beat_id") or "")
+    if beat != "vjolt_mix" and site != "vjolt_mix@409":
+        return False
+    return "v_jolt" in _inventory_held_names(state or {})
+
+
+def _plant_42_boss_complete(
+    step: dict[str, Any],
+    state: dict[str, Any] | None,
+    prev_state: dict[str, Any] | None = None,
+) -> bool:
+    """True when Plant 42 is dead or helmet_key already dropped into inventory.
+
+    Kill: Plant 42 RAM type (``0x10``) HP collapses while Jill is in ``40C``.
+    Loot latch: ``helmet_key`` rising edge (fireplace after fight).
+    """
+    site = str(step.get("site_id") or "")
+    beat = str(step.get("beat_id") or "")
+    if beat != "plant_42" and site not in {"40C:plant_42", "plant_42@40C"}:
+        return False
+    snap = state or {}
+    room = str(snap.get("room") or snap.get("room_id") or "").strip().upper()
+    if room and room != "40C":
+        return False
+    held = _inventory_held_names(snap)
+    prev_held = _inventory_held_names(prev_state or {})
+    if "helmet_key" in held and "helmet_key" not in prev_held:
+        return True
+    if "helmet_key" in held:
+        return True
+    from re1_rl.enemy_combat import PLANT42_RAM_TYPE_ID, enemy_hp_by_slot
+
+    prev_enemies = (prev_state or {}).get("enemies") if prev_state else None
+    curr_enemies = snap.get("enemies") or []
+    if not curr_enemies and not prev_enemies:
+        return False
+    prev_hps = enemy_hp_by_slot(prev_enemies or [])
+    curr_hps = enemy_hp_by_slot(curr_enemies)
+
+    def _is_plant(ent: dict[str, Any]) -> bool:
+        name = str(ent.get("type_name") or ent.get("name") or "").lower()
+        if name in {"plant_42", "plant42"}:
+            return True
+        return int(ent.get("type_id") or 0) == int(PLANT42_RAM_TYPE_ID)
+
+    for ent in prev_enemies or []:
+        if not isinstance(ent, dict) or not _is_plant(ent):
+            continue
+        slot = int(ent.get("slot") or ent.get("index") or -1)
+        if slot < 0:
+            continue
+        prev_hp = int(prev_hps.get(slot, ent.get("hp") or 0) or 0)
+        curr_hp = int(curr_hps.get(slot, 0) or 0)
+        if prev_hp > 0 and curr_hp <= 0:
+            return True
+    return False
 
 
 def _yawn_stairs_leave_ok(

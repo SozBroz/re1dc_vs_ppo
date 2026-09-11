@@ -122,10 +122,14 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert steps[statue_i + 13]["beat_id"] == "wind_crest"
     # Resource-first place_wind tail (pl110 Muse): 10E loot, 103->104 unlock,
     # 111 clips, wardrobe 112 greens, art→11A.
-    assert steps[-1]["beat_id"] == "place_wind_crest"
-    assert steps[-1]["n"] == 129
-    assert steps[-1]["site_id"] == "wind_crest@11A_crest_slot"
-    assert chunk["end_anchor_beat_id"] == "place_wind_crest"
+    assert any(s.get("beat_id") == "place_wind_crest" for s in steps)
+    assert any(s.get("beat_id") == "place_moon_crest" for s in steps)
+    assert any(s.get("beat_id") == "square_crank" for s in steps)
+    assert any(s.get("beat_id") == "plant_42" for s in steps)
+    assert steps[-1]["beat_id"] == "helmet_key"
+    assert steps[-1]["n"] == 244
+    assert steps[-1]["pickup_id"] == "40C:helmet_key:1"
+    assert chunk["end_anchor_beat_id"] == "helmet_key"
     wind_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "wind_crest")
     assert steps[wind_i]["n"] == 107
     assert steps[wind_i + 1]["edge_id"] == "10D->103"
@@ -3101,7 +3105,7 @@ def test_pl18_seek_lands_on_chemical_tail():
     q.seek(13)
     assert q.current is not None
     assert q.current["edge_id"] == "105->106"
-    assert q.end_anchor == "place_wind_crest"
+    assert q.end_anchor == "helmet_key"
     assert q._steps[23]["pickup_id"].startswith("118:chemical")
     assert q._steps[24]["op"] == "use_box"
     assert any(
@@ -3114,7 +3118,10 @@ def test_pl18_seek_lands_on_chemical_tail():
     assert by_beat["push_statue_2f"]["n"] == 94
     assert by_beat["wind_crest"]["n"] == 107
     assert by_beat["place_wind_crest"]["n"] == 129
-    assert q._steps[-1]["beat_id"] == "place_wind_crest"
+    assert by_beat["place_moon_crest"]["n"] == 194
+    assert by_beat["square_crank"]["pickup_id"] == "11B:square_crank:1"
+    assert by_beat["helmet_key"]["n"] == 244
+    assert q._steps[-1]["beat_id"] == "helmet_key"
 
 
 def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):
@@ -3485,3 +3492,57 @@ def test_richard_skip_settled_on_planner_loyal_leg():
         progress=progress,
     )
     assert result["step_success"] is True
+
+def test_vjolt_mix_and_plant42_boss_complete():
+    from re1_rl.planner_loyal import _plant_42_boss_complete, _vjolt_mix_complete
+
+    assert _vjolt_mix_complete(
+        {"beat_id": "vjolt_mix", "site_id": "vjolt_mix@409"},
+        {"inventory_slots": [("v_jolt", 1)]},
+    )
+    assert not _vjolt_mix_complete(
+        {"beat_id": "vjolt_mix", "site_id": "vjolt_mix@409"},
+        {"inventory_slots": [("water", 1)]},
+    )
+    assert _plant_42_boss_complete(
+        {"beat_id": "plant_42", "site_id": "40C:plant_42"},
+        {"room_id": "40C", "inventory_slots": [("helmet_key", 1)]},
+        {"room_id": "40C", "inventory_slots": []},
+    )
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "t",
+            "end_anchor_beat_id": "vjolt_mix",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "do_puzzle",
+                    "site_id": "vjolt_mix@409",
+                    "room_id": "409",
+                    "beat_id": "vjolt_mix",
+                }
+            ],
+        }
+    )
+    r = q.evaluate_transition(
+        prev_state={"room_id": "409", "inventory_slots": [("n_p003", 1)]},
+        state={"room_id": "409", "inventory_slots": [("v_jolt", 1)]},
+    )
+    assert r["step_success"] is True
+
+
+def test_chem_combine_vjolt_path():
+    from re1_rl.inventory_combine import plan_combine
+
+    # water + umb_no2 -> n_p003
+    inv = [(20, 1), (21, 1)] + [(0, 0)] * 6
+    planned = plan_combine(inv, 0, 1)
+    assert planned is not None
+    new_inv, _dest, product = planned
+    assert product == 26
+    assert new_inv[0] == (26, 1)
+    # n_p003 + umb_no13 -> v_jolt
+    inv2 = [(26, 1), (24, 1)] + [(0, 0)] * 6
+    planned2 = plan_combine(inv2, 0, 1)
+    assert planned2 is not None
+    assert planned2[2] == 27

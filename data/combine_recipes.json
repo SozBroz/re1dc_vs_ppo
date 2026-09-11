@@ -36,27 +36,38 @@
     "kind": "herb"
   },
   {
-    "a": 25,
+    "a": 20,
     "b": 21,
     "dst": 26,
-    "kind": "chem"
+    "kind": "chem",
+    "notes": "water + umb_no2 -> n_p003"
   },
   {
-    "a": 22,
-    "b": 20,
-    "dst": 22,
-    "kind": "chem"
+    "a": 21,
+    "b": 22,
+    "dst": 25,
+    "kind": "chem",
+    "notes": "umb_no2 + umb_no4 -> yellow_6"
   },
   {
-    "a": 23,
+    "a": 26,
     "b": 22,
     "dst": 23,
-    "kind": "chem"
+    "kind": "chem",
+    "notes": "n_p003 + umb_no4 -> umb_no7"
   },
   {
-    "a": 24,
+    "a": 25,
     "b": 23,
+    "dst": 24,
+    "kind": "chem",
+    "notes": "yellow_6 + umb_no7 -> umb_no13"
+  },
+  {
+    "a": 26,
+    "b": 24,
     "dst": 27,
-    "kind": "chem"
+    "kind": "chem",
+    "notes": "n_p003 + umb_no13 -> v_jolt"
   }
 ]

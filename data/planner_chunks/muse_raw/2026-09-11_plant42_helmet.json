@@ -1,0 +1,261 @@
+{
+  "why": "mandatory Phase-1.5 through Plant 42 / helmet_key",
+  "end_anchor_beat_id": "helmet_key",
+  "steps": [
+    {
+      "op": "traverse",
+      "edge_id": "11A->11B",
+      "beat_id": "courtyard_shed_enter",
+      "note": "crest shed after four crests"
+    },
+    {
+      "op": "acquire",
+      "room_id": "11B",
+      "pickup_id": "11B:square_crank:1",
+      "beat_id": "square_crank",
+      "note": "top shelf crank"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "11B->300",
+      "beat_id": "courtyard_enter",
+      "note": "leave shed into courtyard"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "300->302"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "302->304",
+      "beat_id": "courtyard_exit",
+      "note": "second house gate"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "304->400",
+      "beat_id": "residence_enter",
+      "note": "guardhouse entry; cover hole ASAP (no RAM latch yet)"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "400->401"
+    },
+    {
+      "op": "acquire",
+      "room_id": "401",
+      "pickup_id": "401:red_book:1",
+      "beat_id": "red_book",
+      "note": "bed"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "401->402"
+    },
+    {
+      "op": "acquire",
+      "room_id": "402",
+      "pickup_id": "402:control_room_key:1",
+      "beat_id": "control_room_key",
+      "note": "bathtub drain then pickup"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "402->401"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "401->400"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "400->405"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "405->408"
+    },
+    {
+      "op": "acquire",
+      "room_id": "408",
+      "pickup_id": "408:dorm_key_002:1",
+      "beat_id": "dorm_key_002",
+      "note": "table near nest"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "408->405"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "405->406"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "406->40D"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40D->40E"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40E->411",
+      "beat_id": "drain_shark_hall",
+      "note": "use control_room_key on door; drain lever in 411"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "411->40E"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40E->410"
+    },
+    {
+      "op": "acquire",
+      "room_id": "410",
+      "pickup_id": "410:dorm_key_003:1",
+      "beat_id": "dorm_key_003",
+      "note": "shelf sparkle"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "410->40E"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40E->40D"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40D->406"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "406->405"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "405->408"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "408->409",
+      "beat_id": "pool_code_345",
+      "note": "keypad 345 (Jill pool table); enter drug room"
+    },
+    {
+      "op": "acquire",
+      "room_id": "409",
+      "pickup_id": "409:empty_bottle:1",
+      "note": "V-Jolt bottle"
+    },
+    {
+      "op": "acquire",
+      "room_id": "409",
+      "pickup_id": "409:empty_bottle:2",
+      "note": "V-Jolt bottle"
+    },
+    {
+      "op": "acquire",
+      "room_id": "409",
+      "pickup_id": "409:empty_bottle:3",
+      "note": "V-Jolt bottle"
+    },
+    {
+      "op": "acquire",
+      "room_id": "409",
+      "pickup_id": "409:water:1",
+      "note": "fill at sink"
+    },
+    {
+      "op": "acquire",
+      "room_id": "409",
+      "pickup_id": "409:umb_no2:1"
+    },
+    {
+      "op": "acquire",
+      "room_id": "409",
+      "pickup_id": "409:umb_no4:1"
+    },
+    {
+      "op": "do_puzzle",
+      "site_id": "vjolt_mix@409",
+      "room_id": "409",
+      "beat_id": "vjolt_mix",
+      "note": "COMBINE to v_jolt (water+UMB2\u2192NP-003 path)"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "409->408"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "408->405"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "405->406"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "406->40D"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40D->40E"
+    },
+    {
+      "op": "objective",
+      "site_id": "v_jolt@40E_water_tank",
+      "room_id": "40E",
+      "beat_id": "apply_vjolt",
+      "note": "USE v_jolt on roots"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40E->40D"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40D->406"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "406->405"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "405->408"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "408->40A",
+      "note": "dorm_key_003 door"
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40A->40C",
+      "beat_id": "plant_42_enter"
+    },
+    {
+      "op": "boss",
+      "site_id": "40C:plant_42",
+      "room_id": "40C",
+      "beat_id": "plant_42",
+      "capture": false,
+      "note": "fight Plant 42 (V-Jolt weakened); mint is helmet_key"
+    },
+    {
+      "op": "acquire",
+      "room_id": "40C",
+      "pickup_id": "40C:helmet_key:1",
+      "beat_id": "helmet_key",
+      "note": "fireplace after Plant 42 \u2014 Phase-2 end_anchor"
+    }
+  ],
+  "omitted": [
+    "cover_plant_hole"
+  ]
+}

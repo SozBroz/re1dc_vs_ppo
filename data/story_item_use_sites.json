@@ -123,9 +123,11 @@
       "id": "v_jolt@40E_water_tank",
       "item": "v_jolt",
       "room": "40E",
-      "_draft": true,
+      "x": 9000,
+      "z": 9000,
+      "radius": 2500,
       "consumes": true,
-      "notes": "BEST-EFFORT: Water tank / plant roots — apply V-Jolt (route_jill_anypct seq 28 room 40E; prep in 409)"
+      "notes": "Water tank / plant roots — apply V-Jolt (coords coarse; hop completes on inventory consume in 40E)"
     },
     {
       "id": "hex_crank@306_item_passage",
