@@ -173,6 +173,8 @@ HOP_LOCAL_SCALAR_KEYS = frozenset(
         "armor_approach",
         "dining_statue_progress",
         "dining_approach",
+        "shed_stepladder_progress",
+        "shed_approach",
     }
 )
 
@@ -545,13 +547,13 @@ class PlannerHopMeters:
             return
         push = float(breakdown.get("armor_statue_progress") or 0.0) + float(
             breakdown.get("dining_statue_progress") or 0.0
-        )
+        ) + float(breakdown.get("shed_stepladder_progress") or 0.0)
         if push > 0.0:
             self.push_pos_sum += push
             self.push_pos_steps += 1
         approach = float(breakdown.get("armor_approach") or 0.0) + float(
             breakdown.get("dining_approach") or 0.0
-        )
+        ) + float(breakdown.get("shed_approach") or 0.0)
         if approach > 0.0:
             self.approach_pos_sum += approach
 

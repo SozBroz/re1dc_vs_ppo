@@ -1067,6 +1067,7 @@ def _actor_process(
             push_override[step_i] = (
                 float(br_step.get("armor_statue_progress") or 0.0) > 0.0
                 or float(br_step.get("dining_statue_progress") or 0.0) > 0.0
+                or float(br_step.get("shed_stepladder_progress") or 0.0) > 0.0
             )
             if bool(done or trunc):
                 try:

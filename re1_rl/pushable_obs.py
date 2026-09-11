@@ -132,4 +132,32 @@ def encode_pushables(
             active=True,
             seated=dining_statue_knocked_from_state(state),
         )
+        return v
+
+    from re1_rl.shed_stepladder_puzzle import (
+        SHED_ROOM_ID,
+        _live_stepladder_xz,
+        shed_stepladder_active,
+        shed_stepladder_nav_target,
+        shed_stepladder_push_done,
+        shed_stepladder_step,
+    )
+
+    if room == SHED_ROOM_ID and shed_stepladder_active(queue, state):
+        step = _step_from_queue(queue)
+        if not shed_stepladder_step(step):
+            return v
+        obj = _live_stepladder_xz(state)
+        if obj is None:
+            return v
+        target = shed_stepladder_nav_target(state)
+        _write_slot(
+            v,
+            0,
+            state=state,
+            obj=obj,
+            target=target,
+            active=True,
+            seated=shed_stepladder_push_done(state),
+        )
     return v

@@ -126,16 +126,17 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     assert any(s.get("beat_id") == "place_moon_crest" for s in steps)
     assert any(s.get("beat_id") == "shed_push_stepladder" for s in steps)
     assert any(s.get("beat_id") == "square_crank" for s in steps)
-    assert any(s.get("beat_id") == "plant_42" for s in steps)
+    assert not any(s.get("beat_id") == "plant_42" for s in steps)
+    assert not any(s.get("beat_id") == "helmet_key" for s in steps)
     shed_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "shed_push_stepladder")
     assert steps[shed_i]["op"] == "do_puzzle"
     assert steps[shed_i]["n"] == 196
     assert steps[shed_i + 1]["beat_id"] == "square_crank"
     assert steps[shed_i + 1]["pickup_id"] == "11B:square_crank:1"
-    assert steps[-1]["beat_id"] == "helmet_key"
-    assert steps[-1]["n"] == 245
-    assert steps[-1]["pickup_id"] == "40C:helmet_key:1"
-    assert chunk["end_anchor_beat_id"] == "helmet_key"
+    assert steps[-1]["beat_id"] == "square_crank"
+    assert steps[-1]["n"] == 197
+    assert steps[-1]["pickup_id"] == "11B:square_crank:1"
+    assert chunk["end_anchor_beat_id"] == "square_crank"
     wind_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "wind_crest")
     assert steps[wind_i]["n"] == 107
     assert steps[wind_i + 1]["edge_id"] == "10D->103"
@@ -3114,7 +3115,7 @@ def test_pl18_seek_lands_on_chemical_tail():
     q.seek(13)
     assert q.current is not None
     assert q.current["edge_id"] == "105->106"
-    assert q.end_anchor == "helmet_key"
+    assert q.end_anchor == "square_crank"
     assert q._steps[23]["pickup_id"].startswith("118:chemical")
     assert q._steps[24]["op"] == "use_box"
     assert any(
@@ -3131,8 +3132,8 @@ def test_pl18_seek_lands_on_chemical_tail():
     assert by_beat["shed_push_stepladder"]["n"] == 196
     assert by_beat["square_crank"]["pickup_id"] == "11B:square_crank:1"
     assert by_beat["square_crank"]["n"] == 197
-    assert by_beat["helmet_key"]["n"] == 245
-    assert q._steps[-1]["beat_id"] == "helmet_key"
+    assert "helmet_key" not in by_beat
+    assert q._steps[-1]["beat_id"] == "square_crank"
 
 
 def test_reload_if_stale_appends_new_steps(tmp_path: Path, monkeypatch):
@@ -3560,7 +3561,9 @@ def test_chem_combine_vjolt_path():
 
 def test_shed_push_stepladder_and_crank_already_held():
     from re1_rl.shed_stepladder_puzzle import (
+        SHED_STEPLADDER_SEATED_XZ,
         shed_acquire_crank_already_held,
+        shed_stepladder_push_done,
         shed_stepladder_step_complete,
     )
 
@@ -3576,6 +3579,16 @@ def test_shed_push_stepladder_and_crank_already_held():
     assert shed_stepladder_step_complete(
         push, {"room_id": "11B", "inventory_slots": [("square_crank", 1)]}
     )
+    seated = {
+        "room_id": "11B",
+        "inventory_slots": [("shotgun", 5)],
+        "shed_stepladder_x": SHED_STEPLADDER_SEATED_XZ[0],
+        "shed_stepladder_z": SHED_STEPLADDER_SEATED_XZ[1],
+        "shed_stepladder_x_b": SHED_STEPLADDER_SEATED_XZ[0],
+        "shed_stepladder_z_b": SHED_STEPLADDER_SEATED_XZ[1],
+    }
+    assert shed_stepladder_push_done(seated)
+    assert shed_stepladder_step_complete(push, seated)
     acq = {
         "op": "acquire",
         "room_id": "11B",

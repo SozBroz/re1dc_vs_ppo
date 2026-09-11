@@ -987,6 +987,19 @@ def _compute_planner_loyal_reward(
         state,
         queue=planner_loyal_queue,
     )
+    from re1_rl.shed_stepladder_puzzle import (
+        shed_approach_progress_reward,
+        shed_approach_reference,
+        shed_stepladder_progress_reward,
+        shed_stepladder_step,
+    )
+    from re1_rl.shed_stepladder_puzzle import _step_from_queue as _shed_step
+
+    bd["shed_stepladder_progress"] = shed_stepladder_progress_reward(
+        prev_state,
+        state,
+        queue=planner_loyal_queue,
+    )
     if progress is not None and armor_approach_leg_active(
         planner_loyal_queue, state
     ):
@@ -1008,6 +1021,16 @@ def _compute_planner_loyal_reward(
                 state,
                 queue=planner_loyal_queue,
                 reference=dining_ref,
+            )
+        if shed_stepladder_step(_shed_step(planner_loyal_queue)):
+            shed_ref = progress.baseline_dining_approach(
+                shed_approach_reference(prev_state)
+            )
+            bd["shed_approach"] = shed_approach_progress_reward(
+                prev_state,
+                state,
+                queue=planner_loyal_queue,
+                reference=shed_ref,
             )
     if progress is not None and armor_inplace_statue_push_detected(
         prev_state, state, planner_loyal_queue
@@ -1283,9 +1306,10 @@ def _compute_planner_loyal_reward(
         # for free.
         armor_progress = float(bd.get("armor_statue_progress") or 0.0) > 0.0
         dining_progress = float(bd.get("dining_statue_progress") or 0.0) > 0.0
+        shed_progress = float(bd.get("shed_stepladder_progress") or 0.0) > 0.0
         if bd.get("planner_step_success", 0.0) == 0.0:
             progress.note_stagnation_step(
-                made_progress=armor_progress or dining_progress,
+                made_progress=armor_progress or dining_progress or shed_progress,
                 step_frames=step_frames,
             )
         bd["softlock"] = contempt_penalty_delta(

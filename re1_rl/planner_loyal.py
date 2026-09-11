@@ -78,6 +78,8 @@ PLANNER_LOYAL_SCALAR_KEYS: frozenset[str] = frozenset(
         "armor_gas",
         "dining_statue_progress",
         "dining_approach",
+        "shed_stepladder_progress",
+        "shed_approach",
         "main_hall_before_kenneth",
     }
 )

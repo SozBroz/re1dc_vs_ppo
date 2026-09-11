@@ -114,6 +114,12 @@ ARMOR_EAST_STATUE_X_B = 0x8012CCD0  # s16
 ARMOR_EAST_STATUE_Z_B = 0x8012CCD8  # s16
 ARMOR_EAST_STATUE_X_C = 0x8012CCE8  # s16
 ARMOR_EAST_STATUE_Z_C = 0x8012CCEC  # s16
+# Crest shed 11B metal stepladder (OM work mirrors). Live shove hunt 2026-09-11
+# pl197mon2: XZ moves exactly with Jill push delta (d_match=0); rest (4050,7500).
+SHED_STEPLADDER_X = 0x8012F8FC  # s16
+SHED_STEPLADDER_Z = 0x8012F904  # s16
+SHED_STEPLADDER_X_B = 0x8012F91C  # s16 mirror (+0x20)
+SHED_STEPLADDER_Z_B = 0x8012F924  # s16
 # Player entity block [CONFIRMED via live walk trace 2026-07-02, verify_pos.py]:
 # X/Z step ~64-162 units per frame while walking; facing full circle = 4096
 # (0x1000), turning ~192/quarter-second. Y is elevation (0 on ground floor).
@@ -551,6 +557,10 @@ DEFAULT_RAM_FIELDS: list[tuple[str, int, str]] = [
     ("armor_west_statue_z_b", ARMOR_WEST_STATUE_Z_B, "s16"),
     ("armor_west_statue_x_c", ARMOR_WEST_STATUE_X_C, "s16"),
     ("armor_west_statue_z_c", ARMOR_WEST_STATUE_Z_C, "s16"),
+    ("shed_stepladder_x", SHED_STEPLADDER_X, "s16"),
+    ("shed_stepladder_z", SHED_STEPLADDER_Z, "s16"),
+    ("shed_stepladder_x_b", SHED_STEPLADDER_X_B, "s16"),
+    ("shed_stepladder_z_b", SHED_STEPLADDER_Z_B, "s16"),
     ("player_x", PLAYER_X, "s16"),
     ("player_y", PLAYER_Y, "s16"),
     ("player_z", PLAYER_Z, "s16"),
