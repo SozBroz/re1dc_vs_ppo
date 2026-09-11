@@ -240,3 +240,29 @@ def test_full_dump_includes_metadata_and_box_cache() -> None:
     apply_episode_sidecar(fresh, data)
     assert fresh.box_cache == [(0, 15), (3, 1)]
     assert fresh.items.ever_held == {"beretta", "emblem"}
+
+
+def test_10a_zombie_almanac_cap_blocks_corpse_inflation() -> None:
+    """room_enemies 10A has 2 zombies; HP=1 despawn must not mint a 3rd."""
+    from re1_rl.pb_sidecar import (
+        clamp_enemies_killed_by_room,
+        enemies_killed_from_sidecar,
+        progress_to_sidecar,
+    )
+
+    p = ProgressTracker()
+    p.note_almanac_kill("10A", "zombie", 2)
+    p.note_almanac_kill("10A", "zombie", 1)  # would-be corpse double-count
+    assert p.enemies_killed_by_room == {"10A": {"zombie": 2}}
+
+    dumped = progress_to_sidecar(p)
+    assert dumped["enemies_killed_by_room"] == {"10A": {"zombie": 2}}
+
+    inflated = {"10A": {"zombie": 3}, "108": {"dog": 2}}
+    assert clamp_enemies_killed_by_room(inflated) == {
+        "10A": {"zombie": 2},
+        "108": {"dog": 2},
+    }
+    assert enemies_killed_from_sidecar(
+        {"enemies_killed_by_room": inflated}
+    ) == {"10A": {"zombie": 2}, "108": {"dog": 2}}

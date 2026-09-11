@@ -470,7 +470,17 @@ class ProgressTracker:
         if not room or not etype or qty <= 0:
             return
         bucket = self.enemies_killed_by_room.setdefault(room, {})
-        bucket[etype] = int(bucket.get(etype, 0)) + qty
+        nxt = int(bucket.get(etype, 0)) + qty
+        # Cap known first-visit fauna so corpse HP=1→0 double-counts cannot
+        # inflate lex total_kills (pl26→pl27 / pl31–pl59 10A:zombie=3 bug).
+        from re1_rl.pb_sidecar import almanac_room_type_cap
+
+        cap = almanac_room_type_cap(room, etype)
+        if cap is not None:
+            nxt = min(nxt, cap)
+        if nxt <= 0:
+            return
+        bucket[etype] = nxt
 
     def claim_checkpoint_success(self) -> bool:
         if self.checkpoint_success:

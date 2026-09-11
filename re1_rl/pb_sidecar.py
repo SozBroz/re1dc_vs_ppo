@@ -86,16 +86,18 @@ def progress_to_sidecar(progress: ProgressTracker) -> dict[str, Any]:
             for k, v in sorted(progress.episode_kills_by_room.items())
             if str(k).strip() and int(v) > 0
         },
-        "enemies_killed_by_room": {
-            str(room).upper(): {
-                str(etype): int(n)
-                for etype, n in sorted(types.items())
-                if str(etype).strip() and int(n) > 0
+        "enemies_killed_by_room": clamp_enemies_killed_by_room(
+            {
+                str(room).upper(): {
+                    str(etype): int(n)
+                    for etype, n in sorted(types.items())
+                    if str(etype).strip() and int(n) > 0
+                }
+                for room, types in sorted(progress.enemies_killed_by_room.items())
+                if isinstance(types, dict)
+                and any(int(n) > 0 for n in types.values())
             }
-            for room, types in sorted(progress.enemies_killed_by_room.items())
-            if isinstance(types, dict)
-            and any(int(n) > 0 for n in types.values())
-        },
+        ),
     }
 
 
@@ -141,6 +143,52 @@ def apply_progress_sidecar(progress: ProgressTracker, data: dict[str, Any]) -> N
     progress.enemies_killed_by_room = enemies_killed_from_sidecar(data)
 
 
+# Verified first-visit fauna caps (see data/room_enemies.json). Stops corpse
+# HP=1→0 double-counts from surviving in ledgers / winning lex total_kills.
+ALMANAC_ROOM_TYPE_CAPS: dict[tuple[str, str], int] = {
+    ("10A", "zombie"): 2,
+}
+
+
+def almanac_room_type_cap(room_id: str, enemy_type: str) -> int | None:
+    """Return a hard kill cap for (room, type), or None if uncapped."""
+    room = str(room_id or "").upper()
+    etype = str(enemy_type or "").strip().lower()
+    if not room or not etype:
+        return None
+    return ALMANAC_ROOM_TYPE_CAPS.get((room, etype))
+
+
+def clamp_enemies_killed_by_room(
+    raw: dict[str, dict[str, int]] | None,
+) -> dict[str, dict[str, int]]:
+    """Copy ledger with known room/type caps applied."""
+    out: dict[str, dict[str, int]] = {}
+    if not isinstance(raw, dict):
+        return out
+    for room, types in raw.items():
+        room_id = str(room or "").upper()
+        if not room_id or not isinstance(types, dict):
+            continue
+        bucket: dict[str, int] = {}
+        for etype, count in types.items():
+            name = str(etype or "").strip().lower()
+            try:
+                n = int(count)
+            except (TypeError, ValueError):
+                continue
+            if not name or n <= 0:
+                continue
+            cap = almanac_room_type_cap(room_id, name)
+            if cap is not None:
+                n = min(n, cap)
+            if n > 0:
+                bucket[name] = n
+        if bucket:
+            out[room_id] = bucket
+    return out
+
+
 def enemies_killed_from_sidecar(data: dict[str, Any] | None) -> dict[str, dict[str, int]]:
     """Read the world kill ledger from a sidecar or its ``progress`` block."""
     raw = None
@@ -166,7 +214,7 @@ def enemies_killed_from_sidecar(data: dict[str, Any] | None) -> dict[str, dict[s
                 bucket[name] = n
         if bucket:
             out[room_id] = bucket
-    return out
+    return clamp_enemies_killed_by_room(out)
 
 
 def item_tracker_to_sidecar(items: ItemTracker) -> dict[str, Any]:
