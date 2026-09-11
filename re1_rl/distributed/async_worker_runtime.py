@@ -908,31 +908,79 @@ def run_async_worker_loop(
             hb_thread.start()
 
         for batch_number, batch_ranks in enumerate(startup_batches, start=1):
-            batch_processes: list[mp.Process] = []
-            batch_conns: list[Connection] = []
-            batch_indices: list[int] = []
-            log(
-                machine_name,
-                f"actor startup batch {batch_number}/{len(startup_batches)} "
-                f"ranks={batch_ranks}",
-            )
-            for rank in batch_ranks:
-                proc, parent_conn = _spawn_rank(rank)
-                batch_indices.append(len(processes))
-                processes.append(proc)
-                parent_conns.append(parent_conn)
-                actor_emu_pids.append(None)
-                batch_processes.append(proc)
-                batch_conns.append(parent_conn)
-            batch_pids = _wait_for_actor_spawn(
-                batch_conns,
-                len(batch_ranks),
-                processes=batch_processes,
-                actor_ranks=batch_ranks,
-            )
-            for index, rank in zip(batch_indices, batch_ranks):
-                actor_emu_pids[index] = batch_pids.get(rank)
-            if len(processes) >= 20:
+            # WH2-class boxes flake attach mid-boot (rc=1). Retry the *batch*
+            # instead of burning a full worker restart of every prior rank.
+            try:
+                batch_attempts = int(
+                    os.environ.get("RE1_ACTOR_STARTUP_BATCH_RETRIES", "2")
+                )
+            except ValueError:
+                batch_attempts = 2
+            batch_attempts = max(1, min(batch_attempts, 4))
+            last_exc: BaseException | None = None
+            for attempt in range(1, batch_attempts + 1):
+                batch_processes: list[mp.Process] = []
+                batch_conns: list[Connection] = []
+                batch_indices: list[int] = []
+                log(
+                    machine_name,
+                    f"actor startup batch {batch_number}/{len(startup_batches)} "
+                    f"ranks={batch_ranks}"
+                    + (f" attempt={attempt}/{batch_attempts}" if attempt > 1 else ""),
+                )
+                try:
+                    for rank in batch_ranks:
+                        proc, parent_conn = _spawn_rank(rank)
+                        batch_indices.append(len(processes))
+                        processes.append(proc)
+                        parent_conns.append(parent_conn)
+                        actor_emu_pids.append(None)
+                        batch_processes.append(proc)
+                        batch_conns.append(parent_conn)
+                    batch_pids = _wait_for_actor_spawn(
+                        batch_conns,
+                        len(batch_ranks),
+                        processes=batch_processes,
+                        actor_ranks=batch_ranks,
+                    )
+                    for index, rank in zip(batch_indices, batch_ranks):
+                        actor_emu_pids[index] = batch_pids.get(rank)
+                    last_exc = None
+                    break
+                except Exception as exc:
+                    last_exc = exc
+                    log(
+                        machine_name,
+                        f"startup batch {batch_number} attempt {attempt}/"
+                        f"{batch_attempts} failed: {exc}",
+                    )
+                    # Pop this attempt's slots and kill the failed procs.
+                    for _ in range(len(batch_processes)):
+                        if processes:
+                            processes.pop()
+                        if parent_conns:
+                            parent_conns.pop()
+                        if actor_emu_pids:
+                            actor_emu_pids.pop()
+                    for proc, conn in zip(batch_processes, batch_conns):
+                        try:
+                            conn.close()
+                        except OSError:
+                            pass
+                        _terminate_actor_process(proc)
+                    if attempt < batch_attempts:
+                        time.sleep(3.0 * attempt)
+            if last_exc is not None:
+                raise last_exc
+            try:
+                cooldown_after = int(
+                    os.environ.get("RE1_ACTOR_STARTUP_BATCH_COOLDOWN_AFTER", "20")
+                )
+            except ValueError:
+                cooldown_after = 20
+            if cooldown_after < 1:
+                cooldown_after = 1
+            if len(processes) >= cooldown_after:
                 try:
                     cooldown_s = float(
                         os.environ.get("RE1_ACTOR_STARTUP_BATCH_COOLDOWN_S", "0")
@@ -940,6 +988,11 @@ def run_async_worker_loop(
                 except ValueError:
                     cooldown_s = 0.0
                 if cooldown_s > 0:
+                    log(
+                        machine_name,
+                        f"startup batch cooldown {cooldown_s:.1f}s "
+                        f"after {len(processes)} actors",
+                    )
                     time.sleep(cooldown_s)
         log(machine_name, f"async worker fleet ready ({actor_count} actors)")
         for conn in parent_conns:

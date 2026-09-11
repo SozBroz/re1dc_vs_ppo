@@ -150,11 +150,23 @@ if (-not $PkingOnly) {
     Remove-Job $j -Force
   }
 
-  $startJobs = foreach ($r in $remotes) {
-    Start-Job -ScriptBlock {
+  $startJobs = @()
+  # WH2 has the most envs and historically attaches mid-boot (rc=1) then
+  # full-restarts. Start it first so its staggered boot is already underway
+  # while WH1/WH3 come up; also pass early cooldown + batch retries.
+  $wh2 = $remotes | Where-Object { $_.Wid -eq 'wh2-recomp' } | Select-Object -First 1
+  $others = @($remotes | Where-Object { $_.Wid -ne 'wh2-recomp' })
+
+  function Start-RemoteWorkerJob($r, $BatchMax, $Stagger) {
+    return Start-Job -ScriptBlock {
       param($Ssh, $Rl, $Recomp, $Wid, $Machine, $NEnvs, $BasePort, $Ranks, $BatchMax, $Stagger)
-      $batch = [Math]::Min([int]$NEnvs, [int]$BatchMax)
-      $argLine = "-Rl `"$Rl`" -Recomp `"$Recomp`" -WorkerId $Wid -MachineName $Machine -NEnvs $NEnvs -BasePort $BasePort -ActorRanks $Ranks -Visible 0 -StartupBatch $batch -StartupStaggerS $Stagger"
+      $batchCap = if ($Wid -eq 'wh2-recomp') { 2 } else { [int]$BatchMax }
+      $staggerS = if ($Wid -eq 'wh2-recomp') { '1.25' } else { $Stagger }
+      $cooldownAfter = if ($Wid -eq 'wh2-recomp') { 8 } else { 20 }
+      $cooldownS = if ($Wid -eq 'wh2-recomp') { '5' } else { '0' }
+      $retries = if ($Wid -eq 'wh2-recomp') { 3 } else { 2 }
+      $batch = [Math]::Min([int]$NEnvs, $batchCap)
+      $argLine = "-Rl `"$Rl`" -Recomp `"$Recomp`" -WorkerId $Wid -MachineName $Machine -NEnvs $NEnvs -BasePort $BasePort -ActorRanks $Ranks -Visible 0 -StartupBatch $batch -StartupStaggerS $staggerS -CooldownAfter $cooldownAfter -CooldownS $cooldownS -BatchRetries $retries"
       $out = & ssh.exe -o ConnectTimeout=90 $Ssh "powershell -NoProfile -ExecutionPolicy Bypass -File `"$Rl\_tmp\_start_remote_recomp_wmi.ps1`" $argLine" 2>&1
       $code = $LASTEXITCODE
       [pscustomobject]@{
@@ -162,7 +174,16 @@ if (-not $PkingOnly) {
         ExitCode = $code
         Out = ($out | Out-String)
       }
-    } -ArgumentList $r.Ssh, $r.Rl, $r.Recomp, $r.Wid, $r.Machine, $r.NEnvs, $r.BasePort, $r.Ranks, $RemoteBatchMax, $RemoteStaggerS
+    } -ArgumentList $r.Ssh, $r.Rl, $r.Recomp, $r.Wid, $r.Machine, $r.NEnvs, $r.BasePort, $r.Ranks, $BatchMax, $Stagger
+  }
+
+  if ($null -ne $wh2) {
+    Write-Host 'Starting WH2 first (28-env attach-sensitive)...' -ForegroundColor Yellow
+    $startJobs += Start-RemoteWorkerJob $wh2 $RemoteBatchMax $RemoteStaggerS
+    Start-Sleep -Seconds 15
+  }
+  foreach ($r in $others) {
+    $startJobs += Start-RemoteWorkerJob $r $RemoteBatchMax $RemoteStaggerS
   }
   $startJobs | Wait-Job | Out-Null
   $failed = $false

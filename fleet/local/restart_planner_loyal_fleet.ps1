@@ -74,7 +74,7 @@ Write-Host 'C-RE1 recomp workers started.'
 # Gate: all four workers must be visible on the learner (pking used to crash-loop
 # and the restart script still printed OK).
 $expected = @('pking-recomp', 'wh1-recomp', 'wh2-recomp', 'wh3-recomp')
-$gateDeadline = (Get-Date).AddSeconds(120)
+$gateDeadline = (Get-Date).AddSeconds(600)
 Write-Host 'Waiting for all workers on learner /status...' -ForegroundColor Yellow
 while ((Get-Date) -lt $gateDeadline) {
   try {
@@ -99,7 +99,11 @@ while ((Get-Date) -lt $gateDeadline) {
       Write-Host 'PLANNER_LOYAL_FLEET_RESTART_OK' -ForegroundColor Green
       return
     }
-    Write-Host ('  missing: ' + ($missing -join ', '))
+    $hint = ''
+    if ($missing -match 'wh2-recomp\(0/') {
+      $hint = ' (WH2 often sits at 0 while staggered attach runs / retries rc=1)'
+    }
+    Write-Host ('  missing: ' + ($missing -join ', ') + $hint)
   } catch {
     Write-Host '  status poll failed'
   }

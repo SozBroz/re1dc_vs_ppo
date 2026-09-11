@@ -9,7 +9,10 @@ param(
   [Parameter(Mandatory=$true)][string]$ActorRanks,
   [string]$Visible = '0',
   [int]$StartupBatch = 0,
-  [string]$StartupStaggerS = '0.25'
+  [string]$StartupStaggerS = '0.25',
+  [int]$CooldownAfter = 20,
+  [string]$CooldownS = '0',
+  [int]$BatchRetries = 2
 )
 $ErrorActionPreference = 'Stop'
 $launcher = Join-Path $Rl "_tmp\launch_$WorkerId.cmd"
@@ -23,6 +26,16 @@ Get-CimInstance Win32_Process -Filter "Name='python.exe'" -EA SilentlyContinue |
   } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }
 Get-Process -Name 'Resident_Evil_Director_s_Cut_Recompiled' -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinue
+# Free the worker port band so a prior crash cannot leave LISTEN ghosts that
+# make the next attach die with rc=1 (WH2 classic).
+$portLo = [int]$BasePort
+$portHi = $portLo + [Math]::Max(0, [int]$NEnvs - 1)
+for ($p = $portLo; $p -le $portHi; $p++) {
+  Get-NetTCPConnection -LocalPort $p -State Listen -EA SilentlyContinue |
+    ForEach-Object {
+      try { Stop-Process -Id $_.OwningProcess -Force -EA SilentlyContinue } catch {}
+    }
+}
 Start-Sleep -Seconds 2
 
 $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
@@ -38,6 +51,9 @@ set RE1_RECOMP_VISIBLE=$Visible
 set RE1_ECOSYSTEM_ENEMY_WORK=1
 set RE1_ACTOR_STARTUP_BATCH_SIZE=$batchSize
 set RE1_ACTOR_STARTUP_STAGGER_S_PER_RANK=$StartupStaggerS
+set RE1_ACTOR_STARTUP_BATCH_COOLDOWN_AFTER=$CooldownAfter
+set RE1_ACTOR_STARTUP_BATCH_COOLDOWN_S=$CooldownS
+set RE1_ACTOR_STARTUP_BATCH_RETRIES=$BatchRetries
 set RE1_GRID_LOCK_INTERVAL_S=0.15
 set RE1_GRID_MONITOR=right
 set LEARNER_HOST=192.168.0.229
