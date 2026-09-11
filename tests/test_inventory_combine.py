@@ -63,6 +63,28 @@ def test_bazooka_reload_from_acid_rounds() -> None:
     assert new_inv[1] == (0, 0)
 
 
+def test_bazooka_empty_acid_loads_explosive_retargets() -> None:
+    """Empty launcher + explosive pack becomes bazooka_explosive."""
+    inv = _inv((0x07, 0), (0x10, 6))
+    planned = plan_combine(inv, 0, 1)
+    assert planned is not None
+    new_inv, dest, product = planned
+    assert dest == 0
+    assert product == 0x08
+    assert new_inv[0] == (0x08, 6)
+    assert new_inv[1] == (0, 0)
+
+
+def test_bazooka_empty_explosive_loads_acid_retargets() -> None:
+    inv = _inv((0x08, 0), (0x11, 4))
+    planned = plan_combine(inv, 1, 0)
+    assert planned is not None
+    new_inv, _, product = planned
+    assert product == 0x07
+    assert new_inv[0] == (0x07, 4)
+    assert new_inv[1] == (0, 0)
+
+
 def test_bazooka_partial_reload_blocked_until_empty() -> None:
     # Live game: acid rounds only combine onto an empty launcher.
     inv = _inv((0x07, 5), (0x11, 6))

@@ -530,6 +530,47 @@ def test_combine_reload_does_not_divert_on_traverse():
     assert q.current["edge_id"] == "106->105"
 
 
+def test_gl_ammo_load_retarget_does_not_divert():
+    """Empty acid GL + explosive rounds → bazooka_explosive is a chamber load."""
+    q = PlannerLoyalQueue()
+    prev = {
+        "room_id": "210",
+        "inventory_slots": [
+            ("bazooka_acid", 0),
+            ("explosive_rounds", 6),
+            ("shield_key", 1),
+        ],
+    }
+    q.note_start_inventory(prev)
+    cur = {
+        "room_id": "210",
+        "inventory_slots": [
+            ("bazooka_explosive", 6),
+            ("shield_key", 1),
+        ],
+        "new_items": ["bazooka_explosive"],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result.get("divert_reason") is None
+
+
+def test_gl_acid_reload_same_variant_does_not_divert():
+    q = PlannerLoyalQueue()
+    prev = {
+        "room_id": "210",
+        "inventory_slots": [("bazooka_acid", 0), ("acid_rounds", 6)],
+    }
+    cur = {
+        "room_id": "210",
+        "inventory_slots": [("bazooka_acid", 6)],
+        "new_items": ["bazooka_acid"],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result.get("divert_reason") is None
+
+
 def test_combine_reload_full_ammo_dump_packed_does_not_divert():
     """Emptying the reserve stack into the chamber must not look like a pickup.
 
@@ -1256,6 +1297,53 @@ def test_gallery_end_of_life_completes_at_final_switch():
         "inventory_slots": [],
     }
     result = q.evaluate_transition(prev_state=prev, state=at_switch)
+    assert result["step_success"] is True
+    assert q.current["beat_id"] == "star_crest"
+
+
+def test_gallery_end_of_life_completes_on_cre1_settle_one():
+    """Live C-RE1 death-painting RAM is 2→1 at the switch, not 2→0."""
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "eol",
+            "end_anchor_beat_id": "star_crest",
+            "steps": [
+                {
+                    "n": 1,
+                    "op": "do_puzzle",
+                    "site_id": "gallery_end_of_life",
+                    "room_id": "117",
+                    "beat_id": "gallery_end_of_life",
+                },
+                {
+                    "n": 2,
+                    "op": "acquire",
+                    "pickup_id": "117:star_crest:1",
+                    "room_id": "117",
+                    "beat_id": "star_crest",
+                },
+            ],
+        }
+    )
+    q.note_start_inventory(
+        {"room_id": "117", "gallery_progress": GALLERY_STEP_VALUES[5]}
+    )
+    fx, fz = GALLERY_FINAL_SWITCH_TARGET
+    prev = {
+        "room_id": "117",
+        "gallery_progress": GALLERY_STEP_VALUES[5],
+        "x": fx,
+        "z": fz,
+        "inventory_slots": [],
+    }
+    settle = {
+        "room_id": "117",
+        "gallery_progress": 1,
+        "x": fx,
+        "z": fz,
+        "inventory_slots": [],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=settle)
     assert result["step_success"] is True
     assert q.current["beat_id"] == "star_crest"
 

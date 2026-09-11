@@ -17,6 +17,13 @@ from re1_rl.memory_map import (
 # Grenade / rocket launchers: COMBINE only when the weapon slot is empty.
 # (PS1 DC will not top up a partially loaded bazooka from a rounds pack.)
 _EMPTY_ONLY_RELOAD_WEAPONS = frozenset({0x07, 0x08, 0x09, 0x0A})
+# Empty grenade launcher retargets to the loaded ammo type (acid/explosive/flame).
+_GL_WEAPONS = frozenset({0x07, 0x08, 0x09})
+_GL_WEAPON_BY_AMMO = {
+    0x11: 0x07,  # acid_rounds -> bazooka_acid
+    0x10: 0x08,  # explosive_rounds -> bazooka_explosive
+    0x12: 0x09,  # flame_rounds -> bazooka_flame
+}
 
 
 def _plan_ammo_merge(
@@ -53,26 +60,46 @@ def _plan_weapon_reload(
     for weapon_slot, ammo_slot in ((first, second), (second, first)):
         wid, wq = inventory[weapon_slot]
         aid, aq = inventory[ammo_slot]
-        if int(wid) not in WEAPON_ITEM_IDS or int(wid) == 0x01:
+        wid_i = int(wid) & 0xFF
+        aid_i = int(aid) & 0xFF
+        wq_i = int(wq)
+        aq_i = int(aq)
+        if wid_i not in WEAPON_ITEM_IDS or wid_i == 0x01:
             continue
-        expected = WEAPON_AMMO_ITEM.get(int(wid))
-        if expected is None or int(aid) != int(expected):
+        if aq_i <= 0:
             continue
-        if int(aq) <= 0:
+
+        # Empty GL: any grenade ammo pack retargets the launcher id.
+        if wid_i in _GL_WEAPONS and wq_i == 0:
+            target_wid = _GL_WEAPON_BY_AMMO.get(aid_i)
+            if target_wid is None:
+                continue
+            clip = combine_clip_capacity(int(target_wid))
+            moved = min(aq_i, clip)
+            if moved <= 0:
+                continue
+            new_inv = list(inventory)
+            new_inv[weapon_slot] = (int(target_wid), moved)
+            remaining = aq_i - moved
+            new_inv[ammo_slot] = (aid_i, remaining) if remaining > 0 else (0, 0)
+            return new_inv, weapon_slot, int(target_wid)
+
+        expected = WEAPON_AMMO_ITEM.get(wid_i)
+        if expected is None or aid_i != int(expected):
             continue
-        if int(wid) in _EMPTY_ONLY_RELOAD_WEAPONS and int(wq) > 0:
+        if wid_i in _EMPTY_ONLY_RELOAD_WEAPONS and wq_i > 0:
             continue
-        clip = combine_clip_capacity(int(wid))
-        if int(wq) >= clip:
+        clip = combine_clip_capacity(wid_i)
+        if wq_i >= clip:
             continue
-        moved = min(int(aq), clip - int(wq))
+        moved = min(aq_i, clip - wq_i)
         if moved <= 0:
             continue
         new_inv = list(inventory)
-        new_inv[weapon_slot] = (int(wid), int(wq) + moved)
-        remaining = int(aq) - moved
-        new_inv[ammo_slot] = (int(aid), remaining) if remaining > 0 else (0, 0)
-        return new_inv, weapon_slot, int(wid)
+        new_inv[weapon_slot] = (wid_i, wq_i + moved)
+        remaining = aq_i - moved
+        new_inv[ammo_slot] = (aid_i, remaining) if remaining > 0 else (0, 0)
+        return new_inv, weapon_slot, wid_i
     return None
 
 
