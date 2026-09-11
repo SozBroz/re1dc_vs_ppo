@@ -11,8 +11,8 @@ Reward contract (imperator 2026-08-25):
 - Divert (wrong room / unplanned pickup / unplanned box / typewriter save): -4, episode end.
   COMBINE reshuffles (reload / herb mix / ammo merge), scripted ``event``
   grants (Barry acid, Speyer bazooka, …), already-held *weapon* chamber
-  bumps, and empty grenade-launcher ammo loads that retarget the launcher
-  id (acid/explosive/flame) are not pickups. Floor piles always divert unless the current step is
+  bumps, and grenade-launcher acid/explosive/flame id swaps (chamber reload;
+  the empty launcher slot may vanish then respawn) are not pickups. Floor piles always divert unless the current step is
   that exact ``acquire``. Extra items on an acquire (chemical plus a clip)
   are also a divert. Opening remint does not take the 104 clips — the live
   chunk comes back for them.
@@ -814,7 +814,10 @@ class PlannerLoyalQueue:
                 prev_held = _inventory_held_names(prev_state)
                 unexpected -= (self._start_held - prev_held) & gained
             unexpected -= _combine_explained_gains(prev_state, state)
-            unexpected -= _gl_chamber_transform_gains(prev_state, state)
+            # Grenade-launcher ids are never floor piles. Emptying the chamber can
+            # drop the weapon slot, then COMBINE respawns acid/explosive/flame as
+            # a "new" name (new_items flicker included) — never divert on that.
+            unexpected -= gained & _GL_VARIANTS
             unexpected -= unexpected & _event_grant_names(room)
             unexpected -= (
                 self._completed_acquire_names(room) - _ON_PATH_PILE_ITEMS
@@ -1354,55 +1357,6 @@ def _combine_explained_gains(
 
 
 _GL_VARIANTS = frozenset({"bazooka_acid", "bazooka_explosive", "bazooka_flame"})
-_GL_AMMO_FOR_VARIANT = {
-    "bazooka_acid": "acid_rounds",
-    "bazooka_explosive": "explosive_rounds",
-    "bazooka_flame": "flame_rounds",
-}
-
-
-def _gl_chamber_transform_gains(
-    prev_state: dict[str, Any],
-    state: dict[str, Any],
-) -> set[str]:
-    """Empty GL + rounds may retarget launcher id (acid↔explosive↔flame).
-
-    Same-frame COMBINE usually hits ``_combine_explained_gains``; this catches
-    packed / slightly-desynced transforms that still spent the matching pack.
-    """
-    prev_held = _inventory_held_names(prev_state)
-    if not (prev_held & _GL_VARIANTS):
-        return set()
-    gained = _inventory_gains(prev_state, state)
-    gl_new = gained & _GL_VARIANTS
-    if not gl_new:
-        return set()
-    prev_q = _inventory_qty_totals(prev_state)
-    cur_q = _inventory_qty_totals(state)
-    cur_held = _inventory_held_names(state)
-    explained: set[str] = set()
-    for weapon in gl_new:
-        ammo = _GL_AMMO_FOR_VARIANT[weapon]
-        ammo_spent = prev_q.get(ammo, 0) > cur_q.get(ammo, 0) or (
-            ammo in prev_held and ammo not in cur_held
-        )
-        if not ammo_spent:
-            continue
-        # Prior launcher emptied / swapped away, or same-name chamber fill.
-        prior_gl = prev_held & _GL_VARIANTS
-        if weapon in prior_gl and prev_q.get(weapon, 0) == 0:
-            explained.add(weapon)
-            continue
-        if any(
-            other != weapon
-            and (
-                other not in cur_held
-                or cur_q.get(other, 0) < prev_q.get(other, 0)
-            )
-            for other in prior_gl
-        ):
-            explained.add(weapon)
-    return explained
 
 
 _EVENT_GRANTS_BY_ROOM: dict[str, frozenset[str]] | None = None

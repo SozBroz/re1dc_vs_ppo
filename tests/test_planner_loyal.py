@@ -555,6 +555,67 @@ def test_gl_ammo_load_retarget_does_not_divert():
     assert result.get("divert_reason") is None
 
 
+def test_gl_reload_after_weapon_slot_vanishes_does_not_divert():
+    """Firing the last GL round can clear the weapon slot; reload must not divert."""
+    q = PlannerLoyalQueue()
+    start = {
+        "room_id": "210",
+        "inventory_slots": [
+            ("bazooka_acid", 1),
+            ("acid_rounds", 6),
+            ("explosive_rounds", 6),
+            ("shield_key", 1),
+        ],
+    }
+    q.note_start_inventory(start)
+    # Empty chamber: weapon row gone (game packs the hole).
+    prev = {
+        "room_id": "210",
+        "inventory_slots": [
+            ("acid_rounds", 6),
+            ("explosive_rounds", 6),
+            ("shield_key", 1),
+        ],
+    }
+    cur = {
+        "room_id": "210",
+        "inventory_slots": [
+            ("bazooka_acid", 6),
+            ("explosive_rounds", 6),
+            ("shield_key", 1),
+        ],
+        "new_items": ["bazooka_acid"],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result.get("divert_reason") is None
+
+
+def test_gl_new_items_flicker_explosive_while_holding_acid_does_not_divert():
+    """Live tips divert on new_items=['bazooka_explosive'] mid-Yawn — ignore."""
+    q = PlannerLoyalQueue()
+    prev = {
+        "room_id": "210",
+        "inventory_slots": [
+            ("bazooka_acid", 0),
+            ("acid_rounds", 6),
+            ("shield_key", 1),
+        ],
+    }
+    q.note_start_inventory(prev)
+    cur = {
+        "room_id": "210",
+        "inventory_slots": [
+            ("bazooka_acid", 6),
+            ("shield_key", 1),
+        ],
+        "new_items": ["bazooka_explosive"],
+    }
+    result = q.evaluate_transition(prev_state=prev, state=cur)
+    assert result["divert"] is False
+    assert result.get("divert_reason") is None
+
+
 def test_gl_acid_reload_same_variant_does_not_divert():
     q = PlannerLoyalQueue()
     prev = {
