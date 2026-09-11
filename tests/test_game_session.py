@@ -58,6 +58,17 @@ def test_mansion_save_room_100_not_menu_room_in_run() -> None:
     )
 
 
+def test_crest_shed_11b_not_main_menu_room() -> None:
+    """Room code 11B = stage 0 + room byte 27 — same byte as title MENU_ROOM_ID."""
+    assert (
+        outside_gameplay_reason(
+            _ram(room_id=MENU_ROOM_ID, stage_id=0, player_hp=96),
+            episode_start_hp=96,
+        )
+        is None
+    )
+
+
 def test_knife_ready_dining_not_flagged_as_pause() -> None:
     """Knife-raised savestate uses game_state 0x80800000, not full 0x90000000."""
     assert outside_gameplay_reason(_ram(game_state=0x80800000), episode_start_hp=96) is None

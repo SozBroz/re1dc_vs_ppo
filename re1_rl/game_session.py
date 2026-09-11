@@ -353,8 +353,11 @@ def outside_gameplay_reason(
 ) -> str | None:
     """Return a short reason if the engine left in-mansion play, else None.
 
-  Signals (see docs/memory_hooks_and_observation_design.md § action gating):
-    - ``room_id == MENU_ROOM_ID`` — title / load / options front-end (recon boot)
+    Signals (see docs/memory_hooks_and_observation_design.md § action gating):
+    - ``room_id == MENU_ROOM_ID`` with ``hp == 0`` — title / load / options
+      front-end (recon boot). **Not** crest-shed Store Room ``11B``: that
+      playable room is also ``stage_id=0`` + room byte ``27`` (``0x1B``) with
+      live HP — same collision class as save room ``100`` vs front-end room 0.
     - ``room_id == 0`` with ``hp == 0`` after episode had real HP — attract / boot
     - ``game_state & 0xFFFFFF00 == 0x40808000`` with ``game_mode == 0x40`` — START
       menu tree (ITEM, STATUS/ECG, MAP). Allowed for equip/use/combine macros.
@@ -365,7 +368,8 @@ def outside_gameplay_reason(
 
   Note: mansion room code ``100`` is ``stage_id=0`` + ``room_id`` byte ``0``.
   That playable save/box room must not be confused with front-end room 0
-  (which only appears with ``hp == 0``).
+  (which only appears with ``hp == 0``). Crest shed ``11B`` is ``stage_id=0`` +
+  byte ``27`` — do not treat HP>0 room 27 as the title stack.
     """
     room = int(ram.get("room_id", -1))
     stage = int(ram.get("stage_id", -1))
@@ -374,7 +378,8 @@ def outside_gameplay_reason(
     mode = int(ram.get("game_mode", 0))
     gs = int(ram.get("game_state", 0))
 
-    if room == MENU_ROOM_ID:
+    # Title stack shares room byte 27 with crest shed 11B; HP distinguishes.
+    if room == MENU_ROOM_ID and hp <= 0:
         return "main_menu_room"
 
     if episode_start_hp > 0 and hp == 0 and room in (0, MENU_ROOM_ID):
@@ -384,10 +389,8 @@ def outside_gameplay_reason(
         return "title_attract"
 
     if episode_start_hp > 0 and hp > 0 and stage <= _MAX_CURRICULUM_STAGE:
-        # MENU_ROOM_ID only — room byte 0 with HP>0 is mansion save room 100
-        # (and other Xx00 stage rooms), not the title front-end.
-        if room == MENU_ROOM_ID:
-            return "menu_room_in_run"
+        # Room byte 27 with live HP is crest shed 11B, not the title front-end.
+        # True mid-run menu escapes still trip OPTIONS / pause signatures below.
         if item_inventory_screen_from_ram(ram):
             return None
         if options_menu_from_ram(ram):
