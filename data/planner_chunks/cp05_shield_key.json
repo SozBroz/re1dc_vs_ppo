@@ -2,9 +2,9 @@
   "schema_version": 1,
   "checkpoint_id": "barry_hall_return_106",
   "chunk_id": "cp05_shield_key",
-  "source": "phase1_pass1_council+muse_pl110_resources+muse_pl134_yawn_kit+muse_pl147_box_before_20A_v3+study_20A_puzzle_pls+muse_pl157_gl_yawn_moon_operator_fixed+pl164_box_deposit_fix_capture_false_go_to_box+pl165_hold_shotgun_bank_beretta+plant42_helmet_mandatory_2026-09-11",
+  "source": "phase1_pass1_council+muse_pl110_resources+muse_pl134_yawn_kit+muse_pl147_box_before_20A_v3+study_20A_puzzle_pls+muse_pl157_gl_yawn_moon_operator_fixed+pl164_box_deposit_fix_capture_false_go_to_box+pl165_hold_shotgun_bank_beretta+plant42_helmet_mandatory_2026-09-11+shed_push_stepladder",
   "end_anchor_beat_id": "helmet_key",
-  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). Tea-room lock: 104->103 stays locked until 103->104 is traversed once (this chunk never opens it). After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, armor_key, then exactly two red + two green bench herbs in order red/green/red/green (floor has 4G+2R \u2014 a 3rd green or red is divert). Merge to GR before 102 so clip+shells fit; 102->101->100 use_box (leave_100: no heals on exit \u2014 incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) then 100->101->201->202->203->204->205. In 205 take 205:sun_crest:1. After sun_crest: Richard bleedout FIRST (capture:false \u2014 cinema dumps to C passage 204, no pl84/pl85 cells), then place_sun_crest at 11A, then dining 2F enter + push_statue_2f. After statue: 202->203->106->105 take blue jewel, backtrack 105->106->203->202->201->101->103 (skip vacant 102 \u2014 already looted), 103->10D tiger eye + wind_crest. After wind_crest in 10D: loot 10E clip+shells, unlock tea via 103->104, first-floor 104->105->106, dressing 111 shelf clip + locked-desk shells (one of each), then 111->112 take both SE green herbs (112:green_herb:1 then :2), return 112->111->106, art circuit 106->107->108->109->10A->11A, place_wind_crest. Tip cell pl110. After place_wind_crest (pl134): 11A->10A->10B->118 go_to_box/use_box (deposit green_herb; withdraw shield_key+acid_rounds), deer wing 207->208->209 (red/clip/lighter) ->20A explosive, terrace 203->211->212 bazooka_acid, then 204->20D greens (:1/:2) ->20E->210 attic_enter. Tip cell pl134. After 209 lighter + 209->208 (pl147): MUST box at 118 before 20A (inv full). Muse v3: 208->207->10B->118 use_box banks armor_key+lighter (deer already unlocked; no 20F lighter use this staging), keep beretta/shotgun/shield_key/acid_rounds/red_herb/handgun_bullets, return deer, 208->20A acquire explosive_rounds. Skip 20D greens and attic this staging chunk (herb brick with Yawn kit). Tip cell pl147. Raw: _tmp/pl147_muse_v3_response.json. After 208->20A: study_insect_switch \u2192 study_push_fishtank \u2192 study_push_cupboard \u2192 20A:explosive_rounds:1, then Muse pl157 path box\u2192212 GL\u219220D greens\u2192yawn mint\u2192place_moon_crest. After place_moon_crest (pl196): Phase-1.5 shed+square_crank, courtyard 300\u2192302\u2192304\u2192400, residence keys, V-Jolt@409, apply@40E, Plant 42, helmet_key end_anchor. cover_plant_hole omitted (no room-400 RAM latch).",
+  "notes": "Tip already holds wooden emblem (105:emblem taken). Do not acquire it. Keep emblem@10F_alcove USE after gold_emblem. After shield_key, walk 105 east-wing to 118 chemical. Then use_box to Muse leave_118 (bank shield_key), shotgun 109->115->116, return 116->115->109 (not 116->106). Tea-room lock: 104->103 stays locked until 103->104 is traversed once (this chunk never opens it). After star crest: 117->10A->11A place_star_crest, then 2F cut 11A->10A->10B->207->204->203->202->201->101->103->10C, pump, armor_key, then exactly two red + two green bench herbs in order red/green/red/green (floor has 4G+2R \u2014 a 3rd green or red is divert). Merge to GR before 102 so clip+shells fit; 102->101->100 use_box (leave_100: no heals on exit \u2014 incoming herbs/mixes/sprays deposit; bank acid_rounds, no bazooka) then 100->101->201->202->203->204->205. In 205 take 205:sun_crest:1. After sun_crest: Richard bleedout FIRST (capture:false \u2014 cinema dumps to C passage 204, no pl84/pl85 cells), then place_sun_crest at 11A, then dining 2F enter + push_statue_2f. After statue: 202->203->106->105 take blue jewel, backtrack 105->106->203->202->201->101->103 (skip vacant 102 \u2014 already looted), 103->10D tiger eye + wind_crest. After wind_crest in 10D: loot 10E clip+shells, unlock tea via 103->104, first-floor 104->105->106, dressing 111 shelf clip + locked-desk shells (one of each), then 111->112 take both SE green herbs (112:green_herb:1 then :2), return 112->111->106, art circuit 106->107->108->109->10A->11A, place_wind_crest. Tip cell pl110. After place_wind_crest (pl134): 11A->10A->10B->118 go_to_box/use_box (deposit green_herb; withdraw shield_key+acid_rounds), deer wing 207->208->209 (red/clip/lighter) ->20A explosive, terrace 203->211->212 bazooka_acid, then 204->20D greens (:1/:2) ->20E->210 attic_enter. Tip cell pl134. After 209 lighter + 209->208 (pl147): MUST box at 118 before 20A (inv full). Muse v3: 208->207->10B->118 use_box banks armor_key+lighter (deer already unlocked; no 20F lighter use this staging), keep beretta/shotgun/shield_key/acid_rounds/red_herb/handgun_bullets, return deer, 208->20A acquire explosive_rounds. Skip 20D greens and attic this staging chunk (herb brick with Yawn kit). Tip cell pl147. Raw: _tmp/pl147_muse_v3_response.json. After 208->20A: study_insect_switch \u2192 study_push_fishtank \u2192 study_push_cupboard \u2192 20A:explosive_rounds:1, then Muse pl157 path box\u2192212 GL\u219220D greens\u2192yawn mint\u2192place_moon_crest. After place_moon_crest (pl196): Phase-1.5 shed+square_crank, courtyard 300\u2192302\u2192304\u2192400, residence keys, V-Jolt@409, apply@40E, Plant 42, helmet_key end_anchor. cover_plant_hole omitted (no room-400 RAM latch). After 11A->11B: shed_push_stepladder then square_crank (climb shelf).",
   "leave_118": {
     "banked_in_box": [
       {
@@ -1570,43 +1570,51 @@
       "n": 195
     },
     {
+      "op": "do_puzzle",
+      "site_id": "shed_stepladder@11B",
+      "room_id": "11B",
+      "beat_id": "shed_push_stepladder",
+      "note": "push metal stepladder under high shelf (climb on acquire hop); hints TBD",
+      "n": 196
+    },
+    {
       "op": "acquire",
       "room_id": "11B",
       "pickup_id": "11B:square_crank:1",
       "beat_id": "square_crank",
       "note": "top shelf crank",
-      "n": 196
+      "n": 197
     },
     {
       "op": "traverse",
       "edge_id": "11B->300",
       "beat_id": "courtyard_enter",
       "note": "leave shed into courtyard",
-      "n": 197
+      "n": 198
     },
     {
       "op": "traverse",
       "edge_id": "300->302",
-      "n": 198
+      "n": 199
     },
     {
       "op": "traverse",
       "edge_id": "302->304",
       "beat_id": "courtyard_exit",
       "note": "second house gate",
-      "n": 199
+      "n": 200
     },
     {
       "op": "traverse",
       "edge_id": "304->400",
       "beat_id": "residence_enter",
       "note": "guardhouse entry; cover hole ASAP (no RAM latch yet)",
-      "n": 200
+      "n": 201
     },
     {
       "op": "traverse",
       "edge_id": "400->401",
-      "n": 201
+      "n": 202
     },
     {
       "op": "acquire",
@@ -1614,12 +1622,12 @@
       "pickup_id": "401:red_book:1",
       "beat_id": "red_book",
       "note": "bed",
-      "n": 202
+      "n": 203
     },
     {
       "op": "traverse",
       "edge_id": "401->402",
-      "n": 203
+      "n": 204
     },
     {
       "op": "acquire",
@@ -1627,27 +1635,27 @@
       "pickup_id": "402:control_room_key:1",
       "beat_id": "control_room_key",
       "note": "bathtub drain then pickup",
-      "n": 204
-    },
-    {
-      "op": "traverse",
-      "edge_id": "402->401",
       "n": 205
     },
     {
       "op": "traverse",
-      "edge_id": "401->400",
+      "edge_id": "402->401",
       "n": 206
     },
     {
       "op": "traverse",
-      "edge_id": "400->405",
+      "edge_id": "401->400",
       "n": 207
     },
     {
       "op": "traverse",
-      "edge_id": "405->408",
+      "edge_id": "400->405",
       "n": 208
+    },
+    {
+      "op": "traverse",
+      "edge_id": "405->408",
+      "n": 209
     },
     {
       "op": "acquire",
@@ -1655,44 +1663,44 @@
       "pickup_id": "408:dorm_key_002:1",
       "beat_id": "dorm_key_002",
       "note": "table near nest",
-      "n": 209
-    },
-    {
-      "op": "traverse",
-      "edge_id": "408->405",
       "n": 210
     },
     {
       "op": "traverse",
-      "edge_id": "405->406",
+      "edge_id": "408->405",
       "n": 211
     },
     {
       "op": "traverse",
-      "edge_id": "406->40D",
+      "edge_id": "405->406",
       "n": 212
     },
     {
       "op": "traverse",
-      "edge_id": "40D->40E",
+      "edge_id": "406->40D",
       "n": 213
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40D->40E",
+      "n": 214
     },
     {
       "op": "traverse",
       "edge_id": "40E->411",
       "beat_id": "drain_shark_hall",
       "note": "use control_room_key on door; drain lever in 411",
-      "n": 214
-    },
-    {
-      "op": "traverse",
-      "edge_id": "411->40E",
       "n": 215
     },
     {
       "op": "traverse",
-      "edge_id": "40E->410",
+      "edge_id": "411->40E",
       "n": 216
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40E->410",
+      "n": 217
     },
     {
       "op": "acquire",
@@ -1700,79 +1708,79 @@
       "pickup_id": "410:dorm_key_003:1",
       "beat_id": "dorm_key_003",
       "note": "shelf sparkle",
-      "n": 217
-    },
-    {
-      "op": "traverse",
-      "edge_id": "410->40E",
       "n": 218
     },
     {
       "op": "traverse",
-      "edge_id": "40E->40D",
+      "edge_id": "410->40E",
       "n": 219
     },
     {
       "op": "traverse",
-      "edge_id": "40D->406",
+      "edge_id": "40E->40D",
       "n": 220
     },
     {
       "op": "traverse",
-      "edge_id": "406->405",
+      "edge_id": "40D->406",
       "n": 221
     },
     {
       "op": "traverse",
-      "edge_id": "405->408",
+      "edge_id": "406->405",
       "n": 222
+    },
+    {
+      "op": "traverse",
+      "edge_id": "405->408",
+      "n": 223
     },
     {
       "op": "traverse",
       "edge_id": "408->409",
       "beat_id": "pool_code_345",
       "note": "keypad 345 (Jill pool table); enter drug room",
-      "n": 223
+      "n": 224
     },
     {
       "op": "acquire",
       "room_id": "409",
       "pickup_id": "409:empty_bottle:1",
       "note": "V-Jolt bottle",
-      "n": 224
+      "n": 225
     },
     {
       "op": "acquire",
       "room_id": "409",
       "pickup_id": "409:empty_bottle:2",
       "note": "V-Jolt bottle",
-      "n": 225
+      "n": 226
     },
     {
       "op": "acquire",
       "room_id": "409",
       "pickup_id": "409:empty_bottle:3",
       "note": "V-Jolt bottle",
-      "n": 226
+      "n": 227
     },
     {
       "op": "acquire",
       "room_id": "409",
       "pickup_id": "409:water:1",
       "note": "fill at sink",
-      "n": 227
-    },
-    {
-      "op": "acquire",
-      "room_id": "409",
-      "pickup_id": "409:umb_no2:1",
       "n": 228
     },
     {
       "op": "acquire",
       "room_id": "409",
-      "pickup_id": "409:umb_no4:1",
+      "pickup_id": "409:umb_no2:1",
       "n": 229
+    },
+    {
+      "op": "acquire",
+      "room_id": "409",
+      "pickup_id": "409:umb_no4:1",
+      "n": 230
     },
     {
       "op": "do_puzzle",
@@ -1780,32 +1788,32 @@
       "room_id": "409",
       "beat_id": "vjolt_mix",
       "note": "COMBINE to v_jolt (water+UMB2\u2192NP-003 path)",
-      "n": 230
-    },
-    {
-      "op": "traverse",
-      "edge_id": "409->408",
       "n": 231
     },
     {
       "op": "traverse",
-      "edge_id": "408->405",
+      "edge_id": "409->408",
       "n": 232
     },
     {
       "op": "traverse",
-      "edge_id": "405->406",
+      "edge_id": "408->405",
       "n": 233
     },
     {
       "op": "traverse",
-      "edge_id": "406->40D",
+      "edge_id": "405->406",
       "n": 234
     },
     {
       "op": "traverse",
-      "edge_id": "40D->40E",
+      "edge_id": "406->40D",
       "n": 235
+    },
+    {
+      "op": "traverse",
+      "edge_id": "40D->40E",
+      "n": 236
     },
     {
       "op": "objective",
@@ -1813,39 +1821,39 @@
       "room_id": "40E",
       "beat_id": "apply_vjolt",
       "note": "USE v_jolt on roots",
-      "n": 236
-    },
-    {
-      "op": "traverse",
-      "edge_id": "40E->40D",
       "n": 237
     },
     {
       "op": "traverse",
-      "edge_id": "40D->406",
+      "edge_id": "40E->40D",
       "n": 238
     },
     {
       "op": "traverse",
-      "edge_id": "406->405",
+      "edge_id": "40D->406",
       "n": 239
     },
     {
       "op": "traverse",
-      "edge_id": "405->408",
+      "edge_id": "406->405",
       "n": 240
+    },
+    {
+      "op": "traverse",
+      "edge_id": "405->408",
+      "n": 241
     },
     {
       "op": "traverse",
       "edge_id": "408->40A",
       "note": "dorm_key_003 door",
-      "n": 241
+      "n": 242
     },
     {
       "op": "traverse",
       "edge_id": "40A->40C",
       "beat_id": "plant_42_enter",
-      "n": 242
+      "n": 243
     },
     {
       "op": "boss",
@@ -1854,7 +1862,7 @@
       "beat_id": "plant_42",
       "capture": false,
       "note": "fight Plant 42 (V-Jolt weakened); mint is helmet_key",
-      "n": 243
+      "n": 244
     },
     {
       "op": "acquire",
@@ -1862,7 +1870,7 @@
       "pickup_id": "40C:helmet_key:1",
       "beat_id": "helmet_key",
       "note": "fireplace after Plant 42 \u2014 Phase-2 end_anchor",
-      "n": 244
+      "n": 245
     }
   ]
 }

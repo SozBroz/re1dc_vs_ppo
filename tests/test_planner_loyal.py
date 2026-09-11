@@ -124,10 +124,16 @@ def test_load_cp05_chunk_has_emblem_swap_and_clips():
     # 111 clips, wardrobe 112 greens, art→11A.
     assert any(s.get("beat_id") == "place_wind_crest" for s in steps)
     assert any(s.get("beat_id") == "place_moon_crest" for s in steps)
+    assert any(s.get("beat_id") == "shed_push_stepladder" for s in steps)
     assert any(s.get("beat_id") == "square_crank" for s in steps)
     assert any(s.get("beat_id") == "plant_42" for s in steps)
+    shed_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "shed_push_stepladder")
+    assert steps[shed_i]["op"] == "do_puzzle"
+    assert steps[shed_i]["n"] == 196
+    assert steps[shed_i + 1]["beat_id"] == "square_crank"
+    assert steps[shed_i + 1]["pickup_id"] == "11B:square_crank:1"
     assert steps[-1]["beat_id"] == "helmet_key"
-    assert steps[-1]["n"] == 244
+    assert steps[-1]["n"] == 245
     assert steps[-1]["pickup_id"] == "40C:helmet_key:1"
     assert chunk["end_anchor_beat_id"] == "helmet_key"
     wind_i = next(i for i, s in enumerate(steps) if s.get("beat_id") == "wind_crest")
@@ -3119,8 +3125,10 @@ def test_pl18_seek_lands_on_chemical_tail():
     assert by_beat["wind_crest"]["n"] == 107
     assert by_beat["place_wind_crest"]["n"] == 129
     assert by_beat["place_moon_crest"]["n"] == 194
+    assert by_beat["shed_push_stepladder"]["n"] == 196
     assert by_beat["square_crank"]["pickup_id"] == "11B:square_crank:1"
-    assert by_beat["helmet_key"]["n"] == 244
+    assert by_beat["square_crank"]["n"] == 197
+    assert by_beat["helmet_key"]["n"] == 245
     assert q._steps[-1]["beat_id"] == "helmet_key"
 
 
@@ -3546,3 +3554,49 @@ def test_chem_combine_vjolt_path():
     planned2 = plan_combine(inv2, 0, 1)
     assert planned2 is not None
     assert planned2[2] == 27
+
+def test_shed_push_stepladder_and_crank_already_held():
+    from re1_rl.shed_stepladder_puzzle import (
+        shed_acquire_crank_already_held,
+        shed_stepladder_step_complete,
+    )
+
+    push = {
+        "op": "do_puzzle",
+        "site_id": "shed_stepladder@11B",
+        "room_id": "11B",
+        "beat_id": "shed_push_stepladder",
+    }
+    assert not shed_stepladder_step_complete(
+        push, {"room_id": "11B", "inventory_slots": [("shotgun", 5)]}
+    )
+    assert shed_stepladder_step_complete(
+        push, {"room_id": "11B", "inventory_slots": [("square_crank", 1)]}
+    )
+    acq = {
+        "op": "acquire",
+        "room_id": "11B",
+        "pickup_id": "11B:square_crank:1",
+        "beat_id": "square_crank",
+    }
+    assert shed_acquire_crank_already_held(
+        acq, {"room_id": "11B", "inventory_slots": [("square_crank", 1)]}
+    )
+    q = PlannerLoyalQueue(
+        {
+            "chunk_id": "t",
+            "end_anchor_beat_id": "square_crank",
+            "steps": [push, acq],
+        }
+    )
+    r = q.evaluate_transition(
+        prev_state={"room_id": "11B", "inventory_slots": []},
+        state={"room_id": "11B", "inventory_slots": [("square_crank", 1)]},
+    )
+    assert r["step_success"] is True
+    assert q.current["beat_id"] == "square_crank"
+    r2 = q.evaluate_transition(
+        prev_state={"room_id": "11B", "inventory_slots": [("square_crank", 1)]},
+        state={"room_id": "11B", "inventory_slots": [("square_crank", 1)]},
+    )
+    assert r2["step_success"] is True

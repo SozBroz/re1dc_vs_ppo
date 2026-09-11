@@ -817,6 +817,31 @@ class PlannerLoyalQueue:
             )
             return result
 
+        from re1_rl.shed_stepladder_puzzle import (
+            shed_acquire_crank_already_held,
+            shed_stepladder_step_complete,
+        )
+
+        if shed_stepladder_step_complete(step, state):
+            result["step_success"] = True
+            self._index += 1
+            self._mark_step_success()
+            print(
+                f"[planner_loyal] shed_push_stepladder room={room}",
+                flush=True,
+            )
+            return result
+        if shed_acquire_crank_already_held(step, state):
+            result["step_success"] = True
+            self._index += 1
+            self._mark_step_success()
+            self._rebuild_satisfied_pickups()
+            print(
+                f"[planner_loyal] square_crank already_held room={room}",
+                flush=True,
+            )
+            return result
+
         # V-Jolt mix / Plant 42 before unplanned_pickup (product is an inv gain).
         if _vjolt_mix_complete(step, state):
             result["step_success"] = True
@@ -2009,6 +2034,18 @@ def encode_planner_loyal_goal(
                 study_compass = encode_study_room_compass(state, queue=queue)
                 if study_compass is not None:
                     v[5:10] = study_compass
+                    v[21] = 1.0
+                    compass_set = True
+        elif room == "11B":
+            from re1_rl.shed_stepladder_puzzle import (
+                encode_shed_stepladder_compass,
+                shed_stepladder_active,
+            )
+
+            if shed_stepladder_active(queue, state):
+                shed_compass = encode_shed_stepladder_compass(state, queue=queue)
+                if shed_compass is not None:
+                    v[5:10] = shed_compass
                     v[21] = 1.0
                     compass_set = True
         if not compass_set:
