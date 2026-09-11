@@ -73,7 +73,7 @@ def objective_for(step: dict) -> str:
     if op == "use_box":
         leave = "leave_100" if room == "100" else "leave_118"
         return f"Rearrange the {room} box to the {leave} loadout, then close the box"
-    if op in {"objective", "do_puzzle", "trigger_cutscene"}:
+    if op in {"objective", "do_puzzle", "trigger_cutscene", "boss"}:
         label = beat or site
         extra = f" — {note}" if note else ""
         return f"`{label}` at `{site or room}`{extra}"
@@ -128,6 +128,21 @@ def success_for(step: dict) -> str:
         return (
             "Room `202` and dining balcony statue knocked "
             "(`dining_statue_flag` bit 0x10 / `dining_statue_knocked`)"
+        )
+    if op == "do_puzzle" and (
+        beat == "shed_push_stepladder" or site == "shed_stepladder@11B"
+    ):
+        return (
+            "Room `11B` and `square_crank` held (provisional until "
+            "`HINTS_READY` stepladder pads); following acquire accepts "
+            "already-held crank"
+        )
+    if op == "do_puzzle" and (beat == "vjolt_mix" or site == "vjolt_mix@409"):
+        return "Room `409` and `v_jolt` held after COMBINE path"
+    if op == "boss" and (beat == "plant_42" or site in {"40C:plant_42", "plant_42@40C"}):
+        return (
+            "Room `40C` and Plant 42 dead, or `helmet_key` rising edge / "
+            "held (`capture:false` — mint is the fireplace acquire)"
         )
     if op == "trigger_cutscene" and (
         beat == "richard_bleedout" or site == "20D:richard"
@@ -193,7 +208,7 @@ def main() -> None:
         "bite-warp `100`. Normal branch mints `pl186` (`20D→204`) and skips "
         "bite hops. Bite branch mints `pl187`–`pl191` "
         "(`100→101→201→202→203→204`) and skips `20D→204`. Both rejoin at "
-        "`pl192` (`204→207`) through `pl196` (`place_moon_crest`)."
+        "`pl192` (`204→207`) through `pl196` (`place_moon_crest`). Phase-1.5+ continues `pl197` (`11A→11B` shed) through `helmet_key` (Plant 42 fireplace)."
     )
     a(
         "- Training starts: every minted `pl06+` plus `pl00` when it has "

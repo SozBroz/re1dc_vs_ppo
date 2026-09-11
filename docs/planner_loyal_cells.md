@@ -1,23 +1,23 @@
 # Planner-loyal cells (`plNN`)
 
-Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (194 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
+Generated from [`data/planner_chunks/cp05_shield_key.json`](../data/planner_chunks/cp05_shield_key.json) (245 authored steps after the lockpick tip). Room names in parentheses come from [`data/rooms.json`](../data/rooms.json).
 
 **C-RE1 numbering (Sep 2026):** `pl00` is the dining fresh start (no emblem). Opening remint is `pl01` emblem … `pl06` lockpick (`opening_to_lockpick.json`). Live shield-key step 0 (`106->105`) mints `pl07`. Watch `states/planner_loyal/cells/plNN/cell.pst` — BizHawk `cell.State` is backed up under `backups/planner_loyal_bizhawk_20260904/`.
 
 On step success the fleet installs `states/planner_loyal/cells/plNN/` for the completed index.
 
 - Slot formula: capturing steps only — `capture:false` (Richard bleedout, yawn_intro, yawn_1, go_to_box) does not consume a `plNN`. After attic enter `pl181`, next mint is shells `pl182` (fight is mid-hop only).
-- Post-Yawn **branching pls**: stairs leave `pl185` accepts `20D` or bite-warp `100`. Normal branch mints `pl186` (`20D→204`) and skips bite hops. Bite branch mints `pl187`–`pl191` (`100→101→201→202→203→204`) and skips `20D→204`. Both rejoin at `pl192` (`204→207`) through `pl196` (`place_moon_crest`).
+- Post-Yawn **branching pls**: stairs leave `pl185` accepts `20D` or bite-warp `100`. Normal branch mints `pl186` (`20D→204`) and skips bite hops. Bite branch mints `pl187`–`pl191` (`100→101→201→202→203→204`) and skips `20D→204`. Both rejoin at `pl192` (`204→207`) through `pl196` (`place_moon_crest`). Phase-1.5+ continues `pl197` (`11A→11B` shed) through `helmet_key` (Plant 42 fireplace).
 - Training starts: every minted `pl06+` plus `pl00` when it has `cell.pst` (pin file `data/planner_loyal_reset_pin.env`; blank = uniform over loadable C-RE1 cells, **not** pinned to `pl00`).
 - After reset from a cell, the live step is `planner_step_index + 1` (or first chunk step from `pl06`).
 - `wrong_traverse:A->B got C` means the **wanted** hop was `A->B`; they entered `C` instead (−4 divert). Completing `A->B` mints the cell and does **not** log `wrong_traverse`.
 - Tea-room lock: `104->103` stays locked until `103->104` is done once (this chunk never opens it). `103->10C` / `103->10D` are open. Do not walk `116->106` after the shotgun. Vacant `102` clip+shells are taken on the armor-key return; skip re-loot.
-- Chunk end-anchor: `place_moon_crest` (`pl196`). Mid-chunk success keeps the episode open.
+- Chunk end-anchor: `helmet_key` (`pl246`). Mid-chunk success keeps the episode open.
 
 ## What's minted / what it's stuck on
 
-Live C-RE1 `cell.pst` on this machine: `pl00` (fresh_start_105), `pl01` (opening_to_lockpick_step01), `pl02` (opening_to_lockpick_step02), `pl03` (opening_to_lockpick_step03), `pl04` (opening_to_lockpick_step04), `pl05` (opening_to_lockpick_step05), `pl06` (opening_to_lockpick_step06), `pl07` (cp05_shield_key_step01), `pl08` (cp05_shield_key_step02), `pl09` (cp05_shield_key_step03), `pl10` (cp05_shield_key_step04), `pl11` (cp05_shield_key_step05), `pl12` (cp05_shield_key_step06), `pl13` (cp05_shield_key_step07), `pl14` (cp05_shield_key_step08), `pl15` (cp05_shield_key_step09), `pl16` (cp05_shield_key_step10), `pl17` (cp05_shield_key_step11), `pl18` (cp05_shield_key_step12), `pl19` (cp05_shield_key_step13), `pl20` (cp05_shield_key_step14), `pl21` (cp05_shield_key_step15), `pl22` (cp05_shield_key_step16), `pl23` (cp05_shield_key_step17), `pl24` (cp05_shield_key_step18), `pl25` (cp05_shield_key_step19), `pl26` (cp05_shield_key_step20), `pl27` (cp05_shield_key_step21), `pl28` (cp05_shield_key_step22), `pl29` (cp05_shield_key_step23), `pl30` (cp05_shield_key_step24), `pl31` (cp05_shield_key_step25), `pl32` (cp05_shield_key_step26), `pl33` (cp05_shield_key_step27), `pl34` (cp05_shield_key_step28), `pl35` (cp05_shield_key_step29), `pl36` (cp05_shield_key_step30), `pl37` (cp05_shield_key_step31), `pl38` (cp05_shield_key_step32), `pl39` (cp05_shield_key_step33), `pl40` (cp05_shield_key_step34), `pl41` (cp05_shield_key_step35), `pl42` (cp05_shield_key_step36), `pl43` (cp05_shield_key_step37), `pl44` (cp05_shield_key_step38), `pl45` (cp05_shield_key_step39), `pl46` (cp05_shield_key_step40), `pl47` (cp05_shield_key_step41), `pl48` (cp05_shield_key_step42), `pl49` (cp05_shield_key_step43), `pl50` (cp05_shield_key_step44), `pl51` (cp05_shield_key_step45), `pl52` (cp05_shield_key_step46), `pl53` (cp05_shield_key_step47), `pl54` (cp05_shield_key_step48), `pl55` (cp05_shield_key_step49), `pl56` (cp05_shield_key_step50), `pl57` (cp05_shield_key_step51), `pl58` (cp05_shield_key_step52), `pl59` (cp05_shield_key_step53), `pl60` (cp05_shield_key_step54), `pl61` (cp05_shield_key_step55), `pl62` (cp05_shield_key_step56), `pl63` (cp05_shield_key_step57), `pl64` (cp05_shield_key_step58), `pl65` (cp05_shield_key_step59), `pl66` (cp05_shield_key_step60), `pl67` (cp05_shield_key_step61), `pl68` (cp05_shield_key_step62), `pl69` (cp05_shield_key_step63), `pl70` (cp05_shield_key_step64), `pl71` (cp05_shield_key_step65), `pl72` (cp05_shield_key_step66), `pl73` (cp05_shield_key_step67), `pl74` (cp05_shield_key_step68), `pl75` (cp05_shield_key_step69), `pl76` (cp05_shield_key_step70), `pl77` (cp05_shield_key_step71), `pl78` (cp05_shield_key_step72), `pl79` (cp05_shield_key_step73), `pl80` (cp05_shield_key_step74), `pl81` (cp05_shield_key_step75), `pl82` (cp05_shield_key_step76), `pl83` (cp05_shield_key_step77), `pl84` (cp05_shield_key_step78), `pl85` (cp05_shield_key_step79), `pl86` (cp05_shield_key_step80), `pl87` (cp05_shield_key_step81), `pl88` (cp05_shield_key_step83), `pl89` (cp05_shield_key_step84), `pl90` (cp05_shield_key_step85), `pl91` (cp05_shield_key_step86), `pl92` (cp05_shield_key_step87), `pl93` (cp05_shield_key_step88), `pl94` (cp05_shield_key_step89), `pl95` (cp05_shield_key_step90), `pl96` (cp05_shield_key_step91), `pl97` (cp05_shield_key_step92), `pl98` (cp05_shield_key_step93), `pl99` (cp05_shield_key_step94), `pl100` (cp05_shield_key_step95), `pl101` (cp05_shield_key_step96), `pl102` (cp05_shield_key_step97), `pl103` (cp05_shield_key_step98), `pl104` (cp05_shield_key_step99), `pl105` (cp05_shield_key_step100), `pl106` (cp05_shield_key_step101), `pl107` (cp05_shield_key_step102), `pl108` (cp05_shield_key_step103), `pl109` (cp05_shield_key_step104), `pl110` (cp05_shield_key_step105), `pl111` (cp05_shield_key_step106), `pl112` (cp05_shield_key_step107), `pl113` (cp05_shield_key_step108), `pl114` (cp05_shield_key_step109), `pl115` (cp05_shield_key_step110), `pl116` (cp05_shield_key_step111), `pl117` (cp05_shield_key_step112), `pl118` (cp05_shield_key_step113), `pl119` (cp05_shield_key_step114), `pl120` (cp05_shield_key_step115), `pl121` (cp05_shield_key_step116), `pl122` (cp05_shield_key_step117), `pl123` (cp05_shield_key_step118), `pl124` (cp05_shield_key_step119), `pl125` (cp05_shield_key_step120), `pl126` (cp05_shield_key_step121), `pl127` (cp05_shield_key_step122), `pl128` (cp05_shield_key_step123), `pl129` (cp05_shield_key_step124), `pl130` (cp05_shield_key_step125), `pl131` (cp05_shield_key_step126), `pl132` (cp05_shield_key_step127), `pl133` (cp05_shield_key_step128), `pl134` (cp05_shield_key_step129), `pl135` (cp05_shield_key_step130), `pl136` (cp05_shield_key_step131), `pl137` (cp05_shield_key_step132), `pl139` (cp05_shield_key_step134), `pl140` (cp05_shield_key_step135), `pl141` (cp05_shield_key_step136), `pl142` (cp05_shield_key_step137), `pl143` (cp05_shield_key_step138), `pl144` (cp05_shield_key_step139), `pl145` (cp05_shield_key_step140), `pl146` (cp05_shield_key_step141), `pl147` (cp05_shield_key_step142), `pl148` (cp05_shield_key_step143), `pl149` (cp05_shield_key_step144), `pl150` (cp05_shield_key_step145), `pl152` (cp05_shield_key_step147), `pl153` (cp05_shield_key_step148), `pl154` (cp05_shield_key_step149), `pl155` (cp05_shield_key_step150), `pl156` (cp05_shield_key_step151), `pl157` (cp05_shield_key_step152), `pl158` (cp05_shield_key_step153), `pl159` (cp05_shield_key_step154), `pl160` (cp05_shield_key_step155), `pl161` (cp05_shield_key_step156), `pl162` (cp05_shield_key_step157), `pl163` (cp05_shield_key_step158), `pl164` (cp05_shield_key_step159), `pl165` (cp05_shield_key_step161), `pl166` (cp05_shield_key_step162), `pl167` (cp05_shield_key_step163), `pl168` (cp05_shield_key_step164), `pl169` (cp05_shield_key_step165), `pl170` (cp05_shield_key_step166), `pl171` (cp05_shield_key_step167), `pl172` (cp05_shield_key_step168), `pl173` (cp05_shield_key_step169), `pl174` (cp05_shield_key_step170), `pl175` (cp05_shield_key_step171), `pl176` (cp05_shield_key_step172), `pl177` (cp05_shield_key_step173), `pl178` (cp05_shield_key_step174), `pl179` (cp05_shield_key_step175), `pl180` (cp05_shield_key_step176), `pl181` (cp05_shield_key_step177), `pl182` (cp05_shield_key_step180), `pl183` (cp05_shield_key_step181), `pl184` (cp05_shield_key_step182), `pl185` (cp05_shield_key_step183).
-Highest minted is `pl185`. The fleet frontier is **`pl186`** (see the summary row for that slot — next capturing hop after the newest tip).
+Live C-RE1 `cell.pst` on this machine: `pl00` (fresh_start_105), `pl01` (opening_to_lockpick_step01), `pl02` (opening_to_lockpick_step02), `pl03` (opening_to_lockpick_step03), `pl04` (opening_to_lockpick_step04), `pl05` (opening_to_lockpick_step05), `pl06` (opening_to_lockpick_step06), `pl07` (cp05_shield_key_step01), `pl08` (cp05_shield_key_step02), `pl09` (cp05_shield_key_step03), `pl10` (cp05_shield_key_step04), `pl11` (cp05_shield_key_step05), `pl12` (cp05_shield_key_step06), `pl13` (cp05_shield_key_step07), `pl14` (cp05_shield_key_step08), `pl15` (cp05_shield_key_step09), `pl16` (cp05_shield_key_step10), `pl17` (cp05_shield_key_step11), `pl18` (cp05_shield_key_step12), `pl19` (cp05_shield_key_step13), `pl20` (cp05_shield_key_step14), `pl21` (cp05_shield_key_step15), `pl22` (cp05_shield_key_step16), `pl23` (cp05_shield_key_step17), `pl24` (cp05_shield_key_step18), `pl25` (cp05_shield_key_step19), `pl26` (cp05_shield_key_step20), `pl27` (cp05_shield_key_step21), `pl28` (cp05_shield_key_step22), `pl29` (cp05_shield_key_step23), `pl30` (cp05_shield_key_step24), `pl31` (cp05_shield_key_step25), `pl32` (cp05_shield_key_step26), `pl33` (cp05_shield_key_step27), `pl34` (cp05_shield_key_step28), `pl35` (cp05_shield_key_step29), `pl36` (cp05_shield_key_step30), `pl37` (cp05_shield_key_step31), `pl38` (cp05_shield_key_step32), `pl39` (cp05_shield_key_step33), `pl40` (cp05_shield_key_step34), `pl41` (cp05_shield_key_step35), `pl42` (cp05_shield_key_step36), `pl43` (cp05_shield_key_step37), `pl44` (cp05_shield_key_step38), `pl45` (cp05_shield_key_step39), `pl46` (cp05_shield_key_step40), `pl47` (cp05_shield_key_step41), `pl48` (cp05_shield_key_step42), `pl49` (cp05_shield_key_step43), `pl50` (cp05_shield_key_step44), `pl51` (cp05_shield_key_step45), `pl52` (cp05_shield_key_step46), `pl53` (cp05_shield_key_step47), `pl54` (cp05_shield_key_step48), `pl55` (cp05_shield_key_step49), `pl56` (cp05_shield_key_step50), `pl57` (cp05_shield_key_step51), `pl58` (cp05_shield_key_step52), `pl59` (cp05_shield_key_step53), `pl60` (cp05_shield_key_step54), `pl61` (cp05_shield_key_step55), `pl62` (cp05_shield_key_step56), `pl63` (cp05_shield_key_step57), `pl64` (cp05_shield_key_step58), `pl65` (cp05_shield_key_step59), `pl66` (cp05_shield_key_step60), `pl67` (cp05_shield_key_step61), `pl68` (cp05_shield_key_step62), `pl69` (cp05_shield_key_step63), `pl70` (cp05_shield_key_step64), `pl71` (cp05_shield_key_step65), `pl72` (cp05_shield_key_step66), `pl73` (cp05_shield_key_step67), `pl74` (cp05_shield_key_step68), `pl75` (cp05_shield_key_step69), `pl76` (cp05_shield_key_step70), `pl77` (cp05_shield_key_step71), `pl78` (cp05_shield_key_step72), `pl79` (cp05_shield_key_step73), `pl80` (cp05_shield_key_step74), `pl81` (cp05_shield_key_step75), `pl82` (cp05_shield_key_step76), `pl83` (cp05_shield_key_step77), `pl84` (cp05_shield_key_step78), `pl85` (cp05_shield_key_step79), `pl86` (cp05_shield_key_step80), `pl87` (cp05_shield_key_step81), `pl88` (cp05_shield_key_step83), `pl89` (cp05_shield_key_step84), `pl90` (cp05_shield_key_step85), `pl91` (cp05_shield_key_step86), `pl92` (cp05_shield_key_step87), `pl93` (cp05_shield_key_step88), `pl94` (cp05_shield_key_step89), `pl95` (cp05_shield_key_step90), `pl96` (cp05_shield_key_step91), `pl97` (cp05_shield_key_step92), `pl98` (cp05_shield_key_step93), `pl99` (cp05_shield_key_step94), `pl100` (cp05_shield_key_step95), `pl101` (cp05_shield_key_step96), `pl102` (cp05_shield_key_step97), `pl103` (cp05_shield_key_step98), `pl104` (cp05_shield_key_step99), `pl105` (cp05_shield_key_step100), `pl106` (cp05_shield_key_step101), `pl107` (cp05_shield_key_step102), `pl108` (cp05_shield_key_step103), `pl109` (cp05_shield_key_step104), `pl110` (cp05_shield_key_step105), `pl111` (cp05_shield_key_step106), `pl112` (cp05_shield_key_step107), `pl113` (cp05_shield_key_step108), `pl114` (cp05_shield_key_step109), `pl115` (cp05_shield_key_step110), `pl116` (cp05_shield_key_step111), `pl117` (cp05_shield_key_step112), `pl118` (cp05_shield_key_step113), `pl119` (cp05_shield_key_step114), `pl120` (cp05_shield_key_step115), `pl121` (cp05_shield_key_step116), `pl122` (cp05_shield_key_step117), `pl123` (cp05_shield_key_step118), `pl124` (cp05_shield_key_step119), `pl125` (cp05_shield_key_step120), `pl126` (cp05_shield_key_step121), `pl127` (cp05_shield_key_step122), `pl128` (cp05_shield_key_step123), `pl129` (cp05_shield_key_step124), `pl130` (cp05_shield_key_step125), `pl131` (cp05_shield_key_step126), `pl132` (cp05_shield_key_step127), `pl133` (cp05_shield_key_step128), `pl134` (cp05_shield_key_step129), `pl135` (cp05_shield_key_step130), `pl136` (cp05_shield_key_step131), `pl137` (cp05_shield_key_step132), `pl139` (cp05_shield_key_step134), `pl140` (cp05_shield_key_step135), `pl141` (cp05_shield_key_step136), `pl142` (cp05_shield_key_step137), `pl143` (cp05_shield_key_step138), `pl144` (cp05_shield_key_step139), `pl145` (cp05_shield_key_step140), `pl146` (cp05_shield_key_step141), `pl147` (cp05_shield_key_step142), `pl148` (cp05_shield_key_step143), `pl149` (cp05_shield_key_step144), `pl150` (cp05_shield_key_step145), `pl152` (cp05_shield_key_step147), `pl153` (cp05_shield_key_step148), `pl154` (cp05_shield_key_step149), `pl155` (cp05_shield_key_step150), `pl156` (cp05_shield_key_step151), `pl157` (cp05_shield_key_step152), `pl158` (cp05_shield_key_step153), `pl159` (cp05_shield_key_step154), `pl160` (cp05_shield_key_step155), `pl161` (cp05_shield_key_step156), `pl162` (cp05_shield_key_step157), `pl163` (cp05_shield_key_step158), `pl164` (cp05_shield_key_step159), `pl165` (cp05_shield_key_step161), `pl166` (cp05_shield_key_step162), `pl167` (cp05_shield_key_step163), `pl168` (cp05_shield_key_step164), `pl169` (cp05_shield_key_step165), `pl170` (cp05_shield_key_step166), `pl171` (cp05_shield_key_step167), `pl172` (cp05_shield_key_step168), `pl173` (cp05_shield_key_step169), `pl174` (cp05_shield_key_step170), `pl175` (cp05_shield_key_step171), `pl176` (cp05_shield_key_step172), `pl177` (cp05_shield_key_step173), `pl178` (cp05_shield_key_step174), `pl179` (cp05_shield_key_step175), `pl180` (cp05_shield_key_step176), `pl181` (cp05_shield_key_step177), `pl182` (cp05_shield_key_step180), `pl183` (cp05_shield_key_step181), `pl184` (cp05_shield_key_step182), `pl185` (cp05_shield_key_step183), `pl187` (cp05_shield_key_step185), `pl188` (cp05_shield_key_step186), `pl189` (cp05_shield_key_step187), `pl190` (cp05_shield_key_step188), `pl191` (cp05_shield_key_step189), `pl192` (cp05_shield_key_step190), `pl193` (cp05_shield_key_step191), `pl194` (cp05_shield_key_step192), `pl195` (cp05_shield_key_step193), `pl196` (cp05_shield_key_step194).
+Highest minted is `pl196`. The fleet frontier is **`pl197`** (see the summary row for that slot — next capturing hop after the newest tip).
 
 Logs (pking): `reset tip=` is the start cell; `queue_seek ... want=` is the step they must finish; `fail='planner_divert' target=` / `divert=` is why they died before minting. `minted pl` / `reject quality pl` is a completed cell.
 
@@ -215,7 +215,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 | `pl180` | 176 | `20D->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `20D->20E` into `20E` (FRONT OF ATTIC) |
 | `pl181` | 177 | `attic_enter` | `210` (ATTIC) | traverse | Walk `20E->210` into `210` (ATTIC) |
 | _(none)_ | 178 | `yawn_intro` | `210` (ATTIC) | trigger_cutscene | `yawn_intro` at `210:yawn_intro` — Yawn intro cinema |
-| _(none)_ | 179 | `yawn_1` | `210` (ATTIC) | boss | boss |
+| _(none)_ | 179 | `yawn_1` | `210` (ATTIC) | boss | `yawn_1` at `210:yawn` — fight Yawn (GL+acid); capture:false — mints are shells/crest/leave |
 | `pl182` | 180 | `210:shotgun_shells:2` | `210` (ATTIC) | acquire | Take `210:shotgun_shells:2` (Yawn mint shells) |
 | `pl183` | 181 | `moon_crest` | `210` (ATTIC) | acquire | Take `210:moon_crest:1` (Yawn mint moon crest) |
 | `pl184` | 182 | `210->20E` | `20E` (FRONT OF ATTIC) | traverse | Walk `210->20E` into `20E` (FRONT OF ATTIC) |
@@ -231,6 +231,57 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 | `pl194` | 192 | `10B->10A` | `10A` (BACK PASSAGE) | traverse | Walk `10B->10A` into `10A` (BACK PASSAGE) |
 | `pl195` | 193 | `10A->11A` | `11A` (ROOFED PASSAGE) | traverse | Walk `10A->11A` into `11A` (ROOFED PASSAGE) |
 | `pl196` | 194 | `place_moon_crest` | `11A` (ROOFED PASSAGE) | objective | `place_moon_crest` at `moon_crest@11A_crest_slot` — place moon crest — Phase-1 crest set complete |
+| `pl197` | 195 | `courtyard_shed_enter` | `11B` (STORE ROOM) | traverse | Walk `11A->11B` into `11B` (STORE ROOM) |
+| `pl198` | 196 | `shed_push_stepladder` | `11B` (STORE ROOM) | do_puzzle | `shed_push_stepladder` at `shed_stepladder@11B` — push metal stepladder under high shelf (climb on acquire hop); hints TBD |
+| `pl199` | 197 | `square_crank` | `11B` (STORE ROOM) | acquire | Take `11B:square_crank:1` (top shelf crank) |
+| `pl200` | 198 | `courtyard_enter` | `300` (FIRST HOUSE OUT) | traverse | Walk `11B->300` into `300` (FIRST HOUSE OUT) |
+| `pl201` | 199 | `300->302` | `302` (FALLS) | traverse | Walk `300->302` into `302` (FALLS) |
+| `pl202` | 200 | `courtyard_exit` | `304` (SECOND HOUSE GATE) | traverse | Walk `302->304` into `304` (SECOND HOUSE GATE) |
+| `pl203` | 201 | `residence_enter` | `400` (ENTER PASSAGE) | traverse | Walk `304->400` into `400` (ENTER PASSAGE) |
+| `pl204` | 202 | `400->401` | `401` (ROOM 001) | traverse | Walk `400->401` into `401` (ROOM 001) |
+| `pl205` | 203 | `red_book` | `401` (ROOM 001) | acquire | Take `401:red_book:1` (bed) |
+| `pl206` | 204 | `401->402` | `402` (ROOM 001 BATHROOM) | traverse | Walk `401->402` into `402` (ROOM 001 BATHROOM) |
+| `pl207` | 205 | `control_room_key` | `402` (ROOM 001 BATHROOM) | acquire | Take `402:control_room_key:1` (bathtub drain then pickup) |
+| `pl208` | 206 | `402->401` | `401` (ROOM 001) | traverse | Walk `402->401` into `401` (ROOM 001) |
+| `pl209` | 207 | `401->400` | `400` (ENTER PASSAGE) | traverse | Walk `401->400` into `400` (ENTER PASSAGE) |
+| `pl210` | 208 | `400->405` | `405` (CENTER PASSAGE) | traverse | Walk `400->405` into `405` (CENTER PASSAGE) |
+| `pl211` | 209 | `405->408` | `408` (HONEYCOMB PASSAGE) | traverse | Walk `405->408` into `408` (HONEYCOMB PASSAGE) |
+| `pl212` | 210 | `dorm_key_002` | `408` (HONEYCOMB PASSAGE) | acquire | Take `408:dorm_key_002:1` (table near nest) |
+| `pl213` | 211 | `408->405` | `405` (CENTER PASSAGE) | traverse | Walk `408->405` into `405` (CENTER PASSAGE) |
+| `pl214` | 212 | `405->406` | `406` (ROOM 002) | traverse | Walk `405->406` into `406` (ROOM 002) |
+| `pl215` | 213 | `406->40D` | `40D` (UNDER PASSAGE) | traverse | Walk `406->40D` into `40D` (UNDER PASSAGE) |
+| `pl216` | 214 | `40D->40E` | `40E` (WATER TANK) | traverse | Walk `40D->40E` into `40E` (WATER TANK) |
+| `pl217` | 215 | `drain_shark_hall` | `411` (CONTROL ROOM) | traverse | Walk `40E->411` into `411` (CONTROL ROOM) |
+| `pl218` | 216 | `411->40E` | `40E` (WATER TANK) | traverse | Walk `411->40E` into `40E` (WATER TANK) |
+| `pl219` | 217 | `40E->410` | `410` (ARMS STOREHOUSE) | traverse | Walk `40E->410` into `410` (ARMS STOREHOUSE) |
+| `pl220` | 218 | `dorm_key_003` | `410` (ARMS STOREHOUSE) | acquire | Take `410:dorm_key_003:1` (shelf sparkle) |
+| `pl221` | 219 | `410->40E` | `40E` (WATER TANK) | traverse | Walk `410->40E` into `40E` (WATER TANK) |
+| `pl222` | 220 | `40E->40D` | `40D` (UNDER PASSAGE) | traverse | Walk `40E->40D` into `40D` (UNDER PASSAGE) |
+| `pl223` | 221 | `40D->406` | `406` (ROOM 002) | traverse | Walk `40D->406` into `406` (ROOM 002) |
+| `pl224` | 222 | `406->405` | `405` (CENTER PASSAGE) | traverse | Walk `406->405` into `405` (CENTER PASSAGE) |
+| `pl225` | 223 | `405->408` | `408` (HONEYCOMB PASSAGE) | traverse | Walk `405->408` into `408` (HONEYCOMB PASSAGE) |
+| `pl226` | 224 | `pool_code_345` | `409` (DRUG STOREHOUSE) | traverse | Walk `408->409` into `409` (DRUG STOREHOUSE) |
+| `pl227` | 225 | `409:empty_bottle:1` | `409` (DRUG STOREHOUSE) | acquire | Take `409:empty_bottle:1` (V-Jolt bottle) |
+| `pl228` | 226 | `409:empty_bottle:2` | `409` (DRUG STOREHOUSE) | acquire | Take `409:empty_bottle:2` (V-Jolt bottle) |
+| `pl229` | 227 | `409:empty_bottle:3` | `409` (DRUG STOREHOUSE) | acquire | Take `409:empty_bottle:3` (V-Jolt bottle) |
+| `pl230` | 228 | `409:water:1` | `409` (DRUG STOREHOUSE) | acquire | Take `409:water:1` (fill at sink) |
+| `pl231` | 229 | `409:umb_no2:1` | `409` (DRUG STOREHOUSE) | acquire | Take `409:umb_no2:1` |
+| `pl232` | 230 | `409:umb_no4:1` | `409` (DRUG STOREHOUSE) | acquire | Take `409:umb_no4:1` |
+| `pl233` | 231 | `vjolt_mix` | `409` (DRUG STOREHOUSE) | do_puzzle | `vjolt_mix` at `vjolt_mix@409` — COMBINE to v_jolt (water+UMB2→NP-003 path) |
+| `pl234` | 232 | `409->408` | `408` (HONEYCOMB PASSAGE) | traverse | Walk `409->408` into `408` (HONEYCOMB PASSAGE) |
+| `pl235` | 233 | `408->405` | `405` (CENTER PASSAGE) | traverse | Walk `408->405` into `405` (CENTER PASSAGE) |
+| `pl236` | 234 | `405->406` | `406` (ROOM 002) | traverse | Walk `405->406` into `406` (ROOM 002) |
+| `pl237` | 235 | `406->40D` | `40D` (UNDER PASSAGE) | traverse | Walk `406->40D` into `40D` (UNDER PASSAGE) |
+| `pl238` | 236 | `40D->40E` | `40E` (WATER TANK) | traverse | Walk `40D->40E` into `40E` (WATER TANK) |
+| `pl239` | 237 | `apply_vjolt` | `40E` (WATER TANK) | objective | `apply_vjolt` at `v_jolt@40E_water_tank` — USE v_jolt on roots |
+| `pl240` | 238 | `40E->40D` | `40D` (UNDER PASSAGE) | traverse | Walk `40E->40D` into `40D` (UNDER PASSAGE) |
+| `pl241` | 239 | `40D->406` | `406` (ROOM 002) | traverse | Walk `40D->406` into `406` (ROOM 002) |
+| `pl242` | 240 | `406->405` | `405` (CENTER PASSAGE) | traverse | Walk `406->405` into `405` (CENTER PASSAGE) |
+| `pl243` | 241 | `405->408` | `408` (HONEYCOMB PASSAGE) | traverse | Walk `405->408` into `408` (HONEYCOMB PASSAGE) |
+| `pl244` | 242 | `408->40A` | `40A` (ROOM 003) | traverse | Walk `408->40A` into `40A` (ROOM 003) |
+| `pl245` | 243 | `plant_42_enter` | `40C` (PLANT BOSS ROOM) | traverse | Walk `40A->40C` into `40C` (PLANT BOSS ROOM) |
+| _(none)_ | 244 | `plant_42` | `40C` (PLANT BOSS ROOM) | boss | `plant_42` at `40C:plant_42` — fight Plant 42 (V-Jolt weakened); mint is helmet_key |
+| `pl246` | 245 | `helmet_key` | `40C` (PLANT BOSS ROOM) | acquire | Take `40C:helmet_key:1` (fireplace after Plant 42 — Phase-2 end_anchor) |
 
 ## Details
 
@@ -291,7 +342,7 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **Items gained:** _(none)_
 - **Success:** enter `106` via `203->106`
 
-### Chunk cells (`pl07`–`pl196`)
+### Chunk cells (`pl07`–`pl246`)
 
 ### `pl07` — `106->105` (step 1)
 
@@ -2208,9 +2259,9 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **Beat:** `yawn_1`
 - **Capture:** `false` (queue advance only; no `plNN` cell)
 - **Note:** fight Yawn (GL+acid); capture:false — mints are shells/crest/leave
-- **Objective:** boss
+- **Objective:** `yawn_1` at `210:yawn` — fight Yawn (GL+acid); capture:false — mints are shells/crest/leave
 - **Items gained:** _(none)_
-- **How to achieve:** boss.
+- **How to achieve:** `yawn_1` at `210:yawn` — fight Yawn (GL+acid); capture:false — mints are shells/crest/leave.
 - **Success condition:** boss
 
 ### `pl182` — `210:shotgun_shells:2` (step 180)
@@ -2375,4 +2426,553 @@ findstr /C:"[planner_loyal] minted pl" /C:"reset tip=" /C:"queue_seek" /C:"plann
 - **Items gained:** _(none)_
 - **How to achieve:** `place_moon_crest` at `moon_crest@11A_crest_slot` — place moon crest — Phase-1 crest set complete.
 - **Success condition:** `story_use_success` == `moon_crest@11A_crest_slot` in room `11A`
+
+### `pl197` — `courtyard_shed_enter` (step 195)
+
+- **Room:** `11B` (STORE ROOM)
+- **Op:** `traverse`
+- **Edge:** `11A->11B`
+- **Beat:** `courtyard_shed_enter`
+- **Note:** crest shed after four crests
+- **Objective:** Walk `11A->11B` into `11B` (STORE ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `11A->11B` into `11B` (STORE ROOM).
+- **Success condition:** Enter room `11B` via `11A->11B` (already-there counts after cinema dump). Any other door is `wrong_traverse:11A->11B got <room>` (−4).
+
+### `pl198` — `shed_push_stepladder` (step 196)
+
+- **Room:** `11B` (STORE ROOM)
+- **Op:** `do_puzzle`
+- **Site:** `shed_stepladder@11B`
+- **Beat:** `shed_push_stepladder`
+- **Note:** push metal stepladder under high shelf (climb on acquire hop); hints TBD
+- **Objective:** `shed_push_stepladder` at `shed_stepladder@11B` — push metal stepladder under high shelf (climb on acquire hop); hints TBD
+- **Items gained:** _(none)_
+- **How to achieve:** `shed_push_stepladder` at `shed_stepladder@11B` — push metal stepladder under high shelf (climb on acquire hop); hints TBD.
+- **Success condition:** Room `11B` and `square_crank` held (provisional until `HINTS_READY` stepladder pads); following acquire accepts already-held crank
+
+### `pl199` — `square_crank` (step 197)
+
+- **Room:** `11B` (STORE ROOM)
+- **Op:** `acquire`
+- **Pickup:** `11B:square_crank:1`
+- **Beat:** `square_crank`
+- **Note:** top shelf crank
+- **Objective:** Take `11B:square_crank:1` (top shelf crank)
+- **Items gained:** `square_crank`
+- **How to achieve:** Take `11B:square_crank:1` (top shelf crank).
+- **Success condition:** Inventory gains `11B:square_crank:1` while this step is current
+
+### `pl200` — `courtyard_enter` (step 198)
+
+- **Room:** `300` (FIRST HOUSE OUT)
+- **Op:** `traverse`
+- **Edge:** `11B->300`
+- **Beat:** `courtyard_enter`
+- **Note:** leave shed into courtyard
+- **Objective:** Walk `11B->300` into `300` (FIRST HOUSE OUT)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `11B->300` into `300` (FIRST HOUSE OUT).
+- **Success condition:** Enter room `300` via `11B->300` (already-there counts after cinema dump). Any other door is `wrong_traverse:11B->300 got <room>` (−4).
+
+### `pl201` — `300->302` (step 199)
+
+- **Room:** `302` (FALLS)
+- **Op:** `traverse`
+- **Edge:** `300->302`
+- **Objective:** Walk `300->302` into `302` (FALLS)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `300->302` into `302` (FALLS).
+- **Success condition:** Enter room `302` via `300->302` (already-there counts after cinema dump). Any other door is `wrong_traverse:300->302 got <room>` (−4).
+
+### `pl202` — `courtyard_exit` (step 200)
+
+- **Room:** `304` (SECOND HOUSE GATE)
+- **Op:** `traverse`
+- **Edge:** `302->304`
+- **Beat:** `courtyard_exit`
+- **Note:** second house gate
+- **Objective:** Walk `302->304` into `304` (SECOND HOUSE GATE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `302->304` into `304` (SECOND HOUSE GATE).
+- **Success condition:** Enter room `304` via `302->304` (already-there counts after cinema dump). Any other door is `wrong_traverse:302->304 got <room>` (−4).
+
+### `pl203` — `residence_enter` (step 201)
+
+- **Room:** `400` (ENTER PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `304->400`
+- **Beat:** `residence_enter`
+- **Note:** guardhouse entry; cover hole ASAP (no RAM latch yet)
+- **Objective:** Walk `304->400` into `400` (ENTER PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `304->400` into `400` (ENTER PASSAGE).
+- **Success condition:** Enter room `400` via `304->400` (already-there counts after cinema dump). Any other door is `wrong_traverse:304->400 got <room>` (−4).
+
+### `pl204` — `400->401` (step 202)
+
+- **Room:** `401` (ROOM 001)
+- **Op:** `traverse`
+- **Edge:** `400->401`
+- **Objective:** Walk `400->401` into `401` (ROOM 001)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `400->401` into `401` (ROOM 001).
+- **Success condition:** Enter room `401` via `400->401` (already-there counts after cinema dump). Any other door is `wrong_traverse:400->401 got <room>` (−4).
+
+### `pl205` — `red_book` (step 203)
+
+- **Room:** `401` (ROOM 001)
+- **Op:** `acquire`
+- **Pickup:** `401:red_book:1`
+- **Beat:** `red_book`
+- **Note:** bed
+- **Objective:** Take `401:red_book:1` (bed)
+- **Items gained:** `red_book`
+- **How to achieve:** Take `401:red_book:1` (bed).
+- **Success condition:** Inventory gains `401:red_book:1` while this step is current
+
+### `pl206` — `401->402` (step 204)
+
+- **Room:** `402` (ROOM 001 BATHROOM)
+- **Op:** `traverse`
+- **Edge:** `401->402`
+- **Objective:** Walk `401->402` into `402` (ROOM 001 BATHROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `401->402` into `402` (ROOM 001 BATHROOM).
+- **Success condition:** Enter room `402` via `401->402` (already-there counts after cinema dump). Any other door is `wrong_traverse:401->402 got <room>` (−4).
+
+### `pl207` — `control_room_key` (step 205)
+
+- **Room:** `402` (ROOM 001 BATHROOM)
+- **Op:** `acquire`
+- **Pickup:** `402:control_room_key:1`
+- **Beat:** `control_room_key`
+- **Note:** bathtub drain then pickup
+- **Objective:** Take `402:control_room_key:1` (bathtub drain then pickup)
+- **Items gained:** `control_room_key`
+- **How to achieve:** Take `402:control_room_key:1` (bathtub drain then pickup).
+- **Success condition:** Inventory gains `402:control_room_key:1` while this step is current
+
+### `pl208` — `402->401` (step 206)
+
+- **Room:** `401` (ROOM 001)
+- **Op:** `traverse`
+- **Edge:** `402->401`
+- **Objective:** Walk `402->401` into `401` (ROOM 001)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `402->401` into `401` (ROOM 001).
+- **Success condition:** Enter room `401` via `402->401` (already-there counts after cinema dump). Any other door is `wrong_traverse:402->401 got <room>` (−4).
+
+### `pl209` — `401->400` (step 207)
+
+- **Room:** `400` (ENTER PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `401->400`
+- **Objective:** Walk `401->400` into `400` (ENTER PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `401->400` into `400` (ENTER PASSAGE).
+- **Success condition:** Enter room `400` via `401->400` (already-there counts after cinema dump). Any other door is `wrong_traverse:401->400 got <room>` (−4).
+
+### `pl210` — `400->405` (step 208)
+
+- **Room:** `405` (CENTER PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `400->405`
+- **Objective:** Walk `400->405` into `405` (CENTER PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `400->405` into `405` (CENTER PASSAGE).
+- **Success condition:** Enter room `405` via `400->405` (already-there counts after cinema dump). Any other door is `wrong_traverse:400->405 got <room>` (−4).
+
+### `pl211` — `405->408` (step 209)
+
+- **Room:** `408` (HONEYCOMB PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `405->408`
+- **Objective:** Walk `405->408` into `408` (HONEYCOMB PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `405->408` into `408` (HONEYCOMB PASSAGE).
+- **Success condition:** Enter room `408` via `405->408` (already-there counts after cinema dump). Any other door is `wrong_traverse:405->408 got <room>` (−4).
+
+### `pl212` — `dorm_key_002` (step 210)
+
+- **Room:** `408` (HONEYCOMB PASSAGE)
+- **Op:** `acquire`
+- **Pickup:** `408:dorm_key_002:1`
+- **Beat:** `dorm_key_002`
+- **Note:** table near nest
+- **Objective:** Take `408:dorm_key_002:1` (table near nest)
+- **Items gained:** `dorm_key_002`
+- **How to achieve:** Take `408:dorm_key_002:1` (table near nest).
+- **Success condition:** Inventory gains `408:dorm_key_002:1` while this step is current
+
+### `pl213` — `408->405` (step 211)
+
+- **Room:** `405` (CENTER PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `408->405`
+- **Objective:** Walk `408->405` into `405` (CENTER PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `408->405` into `405` (CENTER PASSAGE).
+- **Success condition:** Enter room `405` via `408->405` (already-there counts after cinema dump). Any other door is `wrong_traverse:408->405 got <room>` (−4).
+
+### `pl214` — `405->406` (step 212)
+
+- **Room:** `406` (ROOM 002)
+- **Op:** `traverse`
+- **Edge:** `405->406`
+- **Objective:** Walk `405->406` into `406` (ROOM 002)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `405->406` into `406` (ROOM 002).
+- **Success condition:** Enter room `406` via `405->406` (already-there counts after cinema dump). Any other door is `wrong_traverse:405->406 got <room>` (−4).
+
+### `pl215` — `406->40D` (step 213)
+
+- **Room:** `40D` (UNDER PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `406->40D`
+- **Objective:** Walk `406->40D` into `40D` (UNDER PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `406->40D` into `40D` (UNDER PASSAGE).
+- **Success condition:** Enter room `40D` via `406->40D` (already-there counts after cinema dump). Any other door is `wrong_traverse:406->40D got <room>` (−4).
+
+### `pl216` — `40D->40E` (step 214)
+
+- **Room:** `40E` (WATER TANK)
+- **Op:** `traverse`
+- **Edge:** `40D->40E`
+- **Objective:** Walk `40D->40E` into `40E` (WATER TANK)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `40D->40E` into `40E` (WATER TANK).
+- **Success condition:** Enter room `40E` via `40D->40E` (already-there counts after cinema dump). Any other door is `wrong_traverse:40D->40E got <room>` (−4).
+
+### `pl217` — `drain_shark_hall` (step 215)
+
+- **Room:** `411` (CONTROL ROOM)
+- **Op:** `traverse`
+- **Edge:** `40E->411`
+- **Beat:** `drain_shark_hall`
+- **Note:** use control_room_key on door; drain lever in 411
+- **Objective:** Walk `40E->411` into `411` (CONTROL ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `40E->411` into `411` (CONTROL ROOM).
+- **Success condition:** Enter room `411` via `40E->411` (already-there counts after cinema dump). Any other door is `wrong_traverse:40E->411 got <room>` (−4).
+
+### `pl218` — `411->40E` (step 216)
+
+- **Room:** `40E` (WATER TANK)
+- **Op:** `traverse`
+- **Edge:** `411->40E`
+- **Objective:** Walk `411->40E` into `40E` (WATER TANK)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `411->40E` into `40E` (WATER TANK).
+- **Success condition:** Enter room `40E` via `411->40E` (already-there counts after cinema dump). Any other door is `wrong_traverse:411->40E got <room>` (−4).
+
+### `pl219` — `40E->410` (step 217)
+
+- **Room:** `410` (ARMS STOREHOUSE)
+- **Op:** `traverse`
+- **Edge:** `40E->410`
+- **Objective:** Walk `40E->410` into `410` (ARMS STOREHOUSE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `40E->410` into `410` (ARMS STOREHOUSE).
+- **Success condition:** Enter room `410` via `40E->410` (already-there counts after cinema dump). Any other door is `wrong_traverse:40E->410 got <room>` (−4).
+
+### `pl220` — `dorm_key_003` (step 218)
+
+- **Room:** `410` (ARMS STOREHOUSE)
+- **Op:** `acquire`
+- **Pickup:** `410:dorm_key_003:1`
+- **Beat:** `dorm_key_003`
+- **Note:** shelf sparkle
+- **Objective:** Take `410:dorm_key_003:1` (shelf sparkle)
+- **Items gained:** `dorm_key_003`
+- **How to achieve:** Take `410:dorm_key_003:1` (shelf sparkle).
+- **Success condition:** Inventory gains `410:dorm_key_003:1` while this step is current
+
+### `pl221` — `410->40E` (step 219)
+
+- **Room:** `40E` (WATER TANK)
+- **Op:** `traverse`
+- **Edge:** `410->40E`
+- **Objective:** Walk `410->40E` into `40E` (WATER TANK)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `410->40E` into `40E` (WATER TANK).
+- **Success condition:** Enter room `40E` via `410->40E` (already-there counts after cinema dump). Any other door is `wrong_traverse:410->40E got <room>` (−4).
+
+### `pl222` — `40E->40D` (step 220)
+
+- **Room:** `40D` (UNDER PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `40E->40D`
+- **Objective:** Walk `40E->40D` into `40D` (UNDER PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `40E->40D` into `40D` (UNDER PASSAGE).
+- **Success condition:** Enter room `40D` via `40E->40D` (already-there counts after cinema dump). Any other door is `wrong_traverse:40E->40D got <room>` (−4).
+
+### `pl223` — `40D->406` (step 221)
+
+- **Room:** `406` (ROOM 002)
+- **Op:** `traverse`
+- **Edge:** `40D->406`
+- **Objective:** Walk `40D->406` into `406` (ROOM 002)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `40D->406` into `406` (ROOM 002).
+- **Success condition:** Enter room `406` via `40D->406` (already-there counts after cinema dump). Any other door is `wrong_traverse:40D->406 got <room>` (−4).
+
+### `pl224` — `406->405` (step 222)
+
+- **Room:** `405` (CENTER PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `406->405`
+- **Objective:** Walk `406->405` into `405` (CENTER PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `406->405` into `405` (CENTER PASSAGE).
+- **Success condition:** Enter room `405` via `406->405` (already-there counts after cinema dump). Any other door is `wrong_traverse:406->405 got <room>` (−4).
+
+### `pl225` — `405->408` (step 223)
+
+- **Room:** `408` (HONEYCOMB PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `405->408`
+- **Objective:** Walk `405->408` into `408` (HONEYCOMB PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `405->408` into `408` (HONEYCOMB PASSAGE).
+- **Success condition:** Enter room `408` via `405->408` (already-there counts after cinema dump). Any other door is `wrong_traverse:405->408 got <room>` (−4).
+
+### `pl226` — `pool_code_345` (step 224)
+
+- **Room:** `409` (DRUG STOREHOUSE)
+- **Op:** `traverse`
+- **Edge:** `408->409`
+- **Beat:** `pool_code_345`
+- **Note:** keypad 345 (Jill pool table); enter drug room
+- **Objective:** Walk `408->409` into `409` (DRUG STOREHOUSE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `408->409` into `409` (DRUG STOREHOUSE).
+- **Success condition:** Enter room `409` via `408->409` (already-there counts after cinema dump). Any other door is `wrong_traverse:408->409 got <room>` (−4).
+
+### `pl227` — `409:empty_bottle:1` (step 225)
+
+- **Room:** `409` (DRUG STOREHOUSE)
+- **Op:** `acquire`
+- **Pickup:** `409:empty_bottle:1`
+- **Note:** V-Jolt bottle
+- **Objective:** Take `409:empty_bottle:1` (V-Jolt bottle)
+- **Items gained:** `empty_bottle`
+- **How to achieve:** Take `409:empty_bottle:1` (V-Jolt bottle).
+- **Success condition:** Inventory gains `409:empty_bottle:1` while this step is current
+
+### `pl228` — `409:empty_bottle:2` (step 226)
+
+- **Room:** `409` (DRUG STOREHOUSE)
+- **Op:** `acquire`
+- **Pickup:** `409:empty_bottle:2`
+- **Note:** V-Jolt bottle
+- **Objective:** Take `409:empty_bottle:2` (V-Jolt bottle)
+- **Items gained:** `empty_bottle`
+- **How to achieve:** Take `409:empty_bottle:2` (V-Jolt bottle).
+- **Success condition:** Inventory gains `409:empty_bottle:2` while this step is current
+
+### `pl229` — `409:empty_bottle:3` (step 227)
+
+- **Room:** `409` (DRUG STOREHOUSE)
+- **Op:** `acquire`
+- **Pickup:** `409:empty_bottle:3`
+- **Note:** V-Jolt bottle
+- **Objective:** Take `409:empty_bottle:3` (V-Jolt bottle)
+- **Items gained:** `empty_bottle`
+- **How to achieve:** Take `409:empty_bottle:3` (V-Jolt bottle).
+- **Success condition:** Inventory gains `409:empty_bottle:3` while this step is current
+
+### `pl230` — `409:water:1` (step 228)
+
+- **Room:** `409` (DRUG STOREHOUSE)
+- **Op:** `acquire`
+- **Pickup:** `409:water:1`
+- **Note:** fill at sink
+- **Objective:** Take `409:water:1` (fill at sink)
+- **Items gained:** `water`
+- **How to achieve:** Take `409:water:1` (fill at sink).
+- **Success condition:** Inventory gains `409:water:1` while this step is current
+
+### `pl231` — `409:umb_no2:1` (step 229)
+
+- **Room:** `409` (DRUG STOREHOUSE)
+- **Op:** `acquire`
+- **Pickup:** `409:umb_no2:1`
+- **Objective:** Take `409:umb_no2:1`
+- **Items gained:** `umb_no2`
+- **How to achieve:** Take `409:umb_no2:1`.
+- **Success condition:** Inventory gains `409:umb_no2:1` while this step is current
+
+### `pl232` — `409:umb_no4:1` (step 230)
+
+- **Room:** `409` (DRUG STOREHOUSE)
+- **Op:** `acquire`
+- **Pickup:** `409:umb_no4:1`
+- **Objective:** Take `409:umb_no4:1`
+- **Items gained:** `umb_no4`
+- **How to achieve:** Take `409:umb_no4:1`.
+- **Success condition:** Inventory gains `409:umb_no4:1` while this step is current
+
+### `pl233` — `vjolt_mix` (step 231)
+
+- **Room:** `409` (DRUG STOREHOUSE)
+- **Op:** `do_puzzle`
+- **Site:** `vjolt_mix@409`
+- **Beat:** `vjolt_mix`
+- **Note:** COMBINE to v_jolt (water+UMB2→NP-003 path)
+- **Objective:** `vjolt_mix` at `vjolt_mix@409` — COMBINE to v_jolt (water+UMB2→NP-003 path)
+- **Items gained:** _(none)_
+- **How to achieve:** `vjolt_mix` at `vjolt_mix@409` — COMBINE to v_jolt (water+UMB2→NP-003 path).
+- **Success condition:** Room `409` and `v_jolt` held after COMBINE path
+
+### `pl234` — `409->408` (step 232)
+
+- **Room:** `408` (HONEYCOMB PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `409->408`
+- **Objective:** Walk `409->408` into `408` (HONEYCOMB PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `409->408` into `408` (HONEYCOMB PASSAGE).
+- **Success condition:** Enter room `408` via `409->408` (already-there counts after cinema dump). Any other door is `wrong_traverse:409->408 got <room>` (−4).
+
+### `pl235` — `408->405` (step 233)
+
+- **Room:** `405` (CENTER PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `408->405`
+- **Objective:** Walk `408->405` into `405` (CENTER PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `408->405` into `405` (CENTER PASSAGE).
+- **Success condition:** Enter room `405` via `408->405` (already-there counts after cinema dump). Any other door is `wrong_traverse:408->405 got <room>` (−4).
+
+### `pl236` — `405->406` (step 234)
+
+- **Room:** `406` (ROOM 002)
+- **Op:** `traverse`
+- **Edge:** `405->406`
+- **Objective:** Walk `405->406` into `406` (ROOM 002)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `405->406` into `406` (ROOM 002).
+- **Success condition:** Enter room `406` via `405->406` (already-there counts after cinema dump). Any other door is `wrong_traverse:405->406 got <room>` (−4).
+
+### `pl237` — `406->40D` (step 235)
+
+- **Room:** `40D` (UNDER PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `406->40D`
+- **Objective:** Walk `406->40D` into `40D` (UNDER PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `406->40D` into `40D` (UNDER PASSAGE).
+- **Success condition:** Enter room `40D` via `406->40D` (already-there counts after cinema dump). Any other door is `wrong_traverse:406->40D got <room>` (−4).
+
+### `pl238` — `40D->40E` (step 236)
+
+- **Room:** `40E` (WATER TANK)
+- **Op:** `traverse`
+- **Edge:** `40D->40E`
+- **Objective:** Walk `40D->40E` into `40E` (WATER TANK)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `40D->40E` into `40E` (WATER TANK).
+- **Success condition:** Enter room `40E` via `40D->40E` (already-there counts after cinema dump). Any other door is `wrong_traverse:40D->40E got <room>` (−4).
+
+### `pl239` — `apply_vjolt` (step 237)
+
+- **Room:** `40E` (WATER TANK)
+- **Op:** `objective`
+- **Site:** `v_jolt@40E_water_tank`
+- **Beat:** `apply_vjolt`
+- **Note:** USE v_jolt on roots
+- **Objective:** `apply_vjolt` at `v_jolt@40E_water_tank` — USE v_jolt on roots
+- **Items gained:** _(none)_
+- **How to achieve:** `apply_vjolt` at `v_jolt@40E_water_tank` — USE v_jolt on roots.
+- **Success condition:** `story_use_success` == `v_jolt@40E_water_tank` in room `40E`
+
+### `pl240` — `40E->40D` (step 238)
+
+- **Room:** `40D` (UNDER PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `40E->40D`
+- **Objective:** Walk `40E->40D` into `40D` (UNDER PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `40E->40D` into `40D` (UNDER PASSAGE).
+- **Success condition:** Enter room `40D` via `40E->40D` (already-there counts after cinema dump). Any other door is `wrong_traverse:40E->40D got <room>` (−4).
+
+### `pl241` — `40D->406` (step 239)
+
+- **Room:** `406` (ROOM 002)
+- **Op:** `traverse`
+- **Edge:** `40D->406`
+- **Objective:** Walk `40D->406` into `406` (ROOM 002)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `40D->406` into `406` (ROOM 002).
+- **Success condition:** Enter room `406` via `40D->406` (already-there counts after cinema dump). Any other door is `wrong_traverse:40D->406 got <room>` (−4).
+
+### `pl242` — `406->405` (step 240)
+
+- **Room:** `405` (CENTER PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `406->405`
+- **Objective:** Walk `406->405` into `405` (CENTER PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `406->405` into `405` (CENTER PASSAGE).
+- **Success condition:** Enter room `405` via `406->405` (already-there counts after cinema dump). Any other door is `wrong_traverse:406->405 got <room>` (−4).
+
+### `pl243` — `405->408` (step 241)
+
+- **Room:** `408` (HONEYCOMB PASSAGE)
+- **Op:** `traverse`
+- **Edge:** `405->408`
+- **Objective:** Walk `405->408` into `408` (HONEYCOMB PASSAGE)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `405->408` into `408` (HONEYCOMB PASSAGE).
+- **Success condition:** Enter room `408` via `405->408` (already-there counts after cinema dump). Any other door is `wrong_traverse:405->408 got <room>` (−4).
+
+### `pl244` — `408->40A` (step 242)
+
+- **Room:** `40A` (ROOM 003)
+- **Op:** `traverse`
+- **Edge:** `408->40A`
+- **Note:** dorm_key_003 door
+- **Objective:** Walk `408->40A` into `40A` (ROOM 003)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `408->40A` into `40A` (ROOM 003).
+- **Success condition:** Enter room `40A` via `408->40A` (already-there counts after cinema dump). Any other door is `wrong_traverse:408->40A got <room>` (−4).
+
+### `pl245` — `plant_42_enter` (step 243)
+
+- **Room:** `40C` (PLANT BOSS ROOM)
+- **Op:** `traverse`
+- **Edge:** `40A->40C`
+- **Beat:** `plant_42_enter`
+- **Objective:** Walk `40A->40C` into `40C` (PLANT BOSS ROOM)
+- **Items gained:** _(none)_
+- **How to achieve:** Walk `40A->40C` into `40C` (PLANT BOSS ROOM).
+- **Success condition:** Enter room `40C` via `40A->40C` (already-there counts after cinema dump). Any other door is `wrong_traverse:40A->40C got <room>` (−4).
+
+### `(no cell)` — `plant_42` (step 244, capture:false)
+
+- **Room:** `40C` (PLANT BOSS ROOM)
+- **Op:** `boss`
+- **Site:** `40C:plant_42`
+- **Beat:** `plant_42`
+- **Capture:** `false` (queue advance only; no `plNN` cell)
+- **Note:** fight Plant 42 (V-Jolt weakened); mint is helmet_key
+- **Objective:** `plant_42` at `40C:plant_42` — fight Plant 42 (V-Jolt weakened); mint is helmet_key
+- **Items gained:** _(none)_
+- **How to achieve:** `plant_42` at `40C:plant_42` — fight Plant 42 (V-Jolt weakened); mint is helmet_key.
+- **Success condition:** Room `40C` and Plant 42 dead, or `helmet_key` rising edge / held (`capture:false` — mint is the fireplace acquire)
+
+### `pl246` — `helmet_key` (step 245)
+
+- **Room:** `40C` (PLANT BOSS ROOM)
+- **Op:** `acquire`
+- **Pickup:** `40C:helmet_key:1`
+- **Beat:** `helmet_key`
+- **Note:** fireplace after Plant 42 — Phase-2 end_anchor
+- **Objective:** Take `40C:helmet_key:1` (fireplace after Plant 42 — Phase-2 end_anchor)
+- **Items gained:** `helmet_key`
+- **How to achieve:** Take `40C:helmet_key:1` (fireplace after Plant 42 — Phase-2 end_anchor).
+- **Success condition:** Inventory gains `40C:helmet_key:1` while this step is current
 
