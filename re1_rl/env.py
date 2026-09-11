@@ -1598,12 +1598,123 @@ class RE1Env(gym.Env):
             )
             if rec is not None:
                 minted.append(rec)
+                self._maybe_write_planner_leg_tape(rec, state, completed, steps)
                 continue
             slot = slot_index_for_completed_step(completed, steps)
             if not (cell_slot_dir(root, slot) / cell_state_filename()).is_file():
                 leftover.append(completed)
         queue.pending_capture_indices = leftover
         return minted
+
+    def _maybe_write_planner_leg_tape(
+        self,
+        rec: dict[str, Any],
+        state: dict[str, Any],
+        completed: int,
+        steps: list[dict[str, Any]],
+    ) -> None:
+        """Dump one fat tape per capture unit into the minted ``plNN`` dir.
+
+        Room segment exit (or solo/gallery/armor PL) → write ``leg_replay.json``
+        + ``leg_policy.npz``. Mid-segment hops mint thin and keep recording.
+        """
+        from re1_rl.planner_leg_replay import (
+            maybe_write_planner_capture_tape,
+            maybe_write_planner_footage_trace,
+            planner_leg_replay_enabled_from_env,
+            should_write_planner_leg_replay,
+            stop_planner_tape,
+        )
+
+        if not planner_leg_replay_enabled_from_env():
+            return
+        if not should_write_planner_leg_replay(self):
+            return
+        try:
+            from re1_rl.planner_hop_score import hop_score_live_enabled
+            from re1_rl.planner_room_segments import (
+                is_segment_midhop,
+                segment_for_completed_step,
+            )
+        except (ImportError, AttributeError, TypeError):
+            return
+        try:
+            mid = bool(
+                hop_score_live_enabled()
+                and is_segment_midhop(
+                    int(completed), self.project_root, steps=steps
+                )
+            )
+        except (TypeError, ValueError):
+            mid = False
+        if mid:
+            return
+        seg = None
+        try:
+            seg = segment_for_completed_step(
+                int(completed), self.project_root, steps=steps
+            )
+        except (TypeError, ValueError):
+            seg = None
+        try:
+            slot = int(rec.get("checkpoint_index"))
+        except (TypeError, ValueError):
+            return
+        if seg is not None:
+            try:
+                from_slot: int | None = int(seg.get("pl_first", slot)) - 1
+            except (TypeError, ValueError):
+                from_slot = slot - 1
+            segment_id = str(seg.get("id") or "")
+        else:
+            from_slot = slot - 1
+            segment_id = None
+        if from_slot is not None and int(from_slot) < 0:
+            from_slot = None
+        # Stop the recorder before settle so post-success frames don't pollute.
+        stop_planner_tape(self)
+        state_path = rec.get("state_path") or ""
+        dest_dir = Path(state_path).parent if state_path else None
+        if dest_dir is None:
+            return
+        import hashlib as _hashlib
+
+        try:
+            to_sha = _hashlib.sha256(Path(state_path).read_bytes()).hexdigest()
+        except (OSError, TypeError, ValueError):
+            to_sha = ""
+        quality = rec.get("quality") or []
+        try:
+            tape_path = maybe_write_planner_capture_tape(
+                self,
+                dest_dir,
+                completed_index=int(completed),
+                checkpoint_id=str(rec.get("checkpoint_id") or ""),
+                slot=int(slot),
+                from_slot=from_slot,
+                live_state=dict(state),
+                quality=list(quality),
+                to_state_sha256=to_sha,
+                segment_id=segment_id,
+            )
+        except (TypeError, ValueError, OSError):
+            tape_path = None
+        try:
+            policy_path = maybe_write_planner_footage_trace(self, dest_dir)
+        except (TypeError, ValueError, OSError):
+            policy_path = None
+        if tape_path is not None:
+            rec["leg_replay_path"] = str(tape_path)
+        if policy_path is not None:
+            rec["leg_policy_path"] = str(policy_path)
+        if segment_id:
+            rec["room_segment_id"] = segment_id
+        print(
+            f"[planner_tape] pl{slot:02d} segment={segment_id or 'solo'} "
+            f"tape={'ok' if tape_path else 'empty'} "
+            f"policy={'ok' if policy_path else 'empty'}",
+            flush=True,
+        )
 
     def _finish_checkpoint_capture(
         self, state: dict[str, Any], breakdown: dict[str, float]
@@ -1644,11 +1755,22 @@ class RE1Env(gym.Env):
         # One-leg: checkpoint_success is true after the hunted cell, so the
         # episode ends here. play_through (leg_span>1) keeps going.
         # Legacy planner-loyal kept the episode open for mid-chunk hops; live
-        # ±1 hop-score is one cell = one episode (end on every hop success).
+        # ±1 hop-score is one cell = one episode (end on every hop success),
+        # except room-segment mid-hops which mint and continue under a shared
+        # segment budget (RE1_PLANNER_ROOM_SEGMENTS=1).
         if queue is not None:
             from re1_rl.planner_hop_score import hop_score_live_enabled
+            from re1_rl.planner_room_segments import is_segment_midhop
 
-            end_episode = bool(queue.done) or hop_score_live_enabled()
+            completed = max(0, int(getattr(queue, "index", 1) or 1) - 1)
+            steps = getattr(queue, "_steps", []) or []
+            mid_seg = bool(
+                hop_score_live_enabled()
+                and is_segment_midhop(completed, steps=steps)
+            )
+            end_episode = bool(queue.done) or (
+                hop_score_live_enabled() and not mid_seg
+            )
             if end_episode:
                 self._checkpoint_captured = True
                 if self._progress is not None:
@@ -1657,6 +1779,19 @@ class RE1Env(gym.Env):
                 self._checkpoint_captured = False
                 if self._progress is not None:
                     self._progress.checkpoint_success = False
+                if mid_seg:
+                    # Mint done; clear freeze so the next hop plays in-episode.
+                    self._checkpoint_freeze_pending = False
+                    self._checkpoint_capture_index = None
+                    self._macro_active = False
+                    if self._progress is not None:
+                        self._progress.checkpoint_freeze_pending = False
+                    print(
+                        f"[room_segment] midhop_continue "
+                        f"completed_step={completed + 1} "
+                        f"seg={getattr(getattr(self._progress, 'room_segment', None), 'segment_id', '')}",
+                        flush=True,
+                    )
         else:
             self._checkpoint_captured = (
                 not ineligible and bool(self._progress.checkpoint_success)
@@ -2356,6 +2491,16 @@ class RE1Env(gym.Env):
                 from re1_rl.footage_trace import new_footage_trace_buffer
 
                 self._footage_trace = new_footage_trace_buffer()
+        if getattr(self, "_planner_loyal_queue", None) is not None:
+            # Room/solo tape capture (RE1_PLANNER_LEG_REPLAY=1, off by default).
+            # Armed per episode; a room segment shares one episode so one
+            # continuous tape covers the whole room visit (dumped on exit).
+            try:
+                from re1_rl.planner_leg_replay import arm_planner_leg_replay
+
+                arm_planner_leg_replay(self)
+            except (ImportError, AttributeError, TypeError):
+                pass
         self._frame_stack = []
         self.bridge.frame_ring.clear()
         self.bridge.attack_pins.clear()
@@ -2659,6 +2804,12 @@ class RE1Env(gym.Env):
         budget = int(getattr(self._progress, "cell_timeout_frames", 0) or 0)
         if budget <= 0:
             budget = planner_timeout_frames(boss=boss)
+        # Room-segment mid-hops: time quality uses remaining shared budget so
+        # later hops still feel pressure to leave the room.
+        tracker = getattr(self._progress, "room_segment", None)
+        if tracker is not None:
+            used = int(getattr(self._progress, "leg_emulated_frames", 0) or 0)
+            budget = max(1, int(budget) - used)
         self._progress.hop_meters = PlannerHopMeters.begin(
             state,
             tip=tip,
@@ -2744,15 +2895,56 @@ class RE1Env(gym.Env):
         self._progress.timeout_table_root = str(self.project_root)
         queue = getattr(self, "_planner_loyal_queue", None)
         # Planner-loyal: 6 min default / 12 min boss (hop-score redesign).
+        # Room segments share one budget across all hops in the segment.
         if queue is not None:
             from re1_rl.planner_hop_score import (
                 current_step_is_boss,
                 planner_timeout_frames,
             )
+            from re1_rl.planner_room_segments import (
+                RoomSegmentTracker,
+                room_segments_enabled,
+                segment_budget_frames,
+                segment_for_tip_slot,
+            )
 
             frames = int(
                 planner_timeout_frames(boss=current_step_is_boss(queue))
             )
+            if room_segments_enabled():
+                tip_slot = None
+                tip = str(getattr(self, "_planner_loyal_tip", "") or "")
+                if tip.startswith("pl"):
+                    try:
+                        tip_slot = int(tip[2:])
+                    except ValueError:
+                        tip_slot = None
+                if tip_slot is None:
+                    try:
+                        tip_slot = int(
+                            getattr(self, "_planner_loyal_start_index", -1)
+                        )
+                    except (TypeError, ValueError):
+                        tip_slot = None
+                seg = (
+                    segment_for_tip_slot(tip_slot, self.project_root)
+                    if tip_slot is not None and tip_slot >= 0
+                    else None
+                )
+                if seg is not None:
+                    frames = int(segment_budget_frames(seg, self.project_root))
+                    self._progress.room_segment = RoomSegmentTracker.begin(
+                        seg, project_root=self.project_root
+                    )
+                    print(
+                        f"[room_segment] begin id={seg.get('id')} "
+                        f"pl{int(seg.get('pl_first')):02d}-"
+                        f"pl{int(seg.get('pl_last')):02d} "
+                        f"budget_frames={frames}",
+                        flush=True,
+                    )
+                else:
+                    self._progress.room_segment = None
         elif flat_cell_timeout_enabled():
             # Flat-12m yawn: plain 12 min — ignore yawn_cell_timeouts.json.
             frames = int(FLAT_CELL_TIMEOUT_FRAMES)
@@ -6015,14 +6207,24 @@ class RE1Env(gym.Env):
         mid_hop = False
         if self._planner_loyal_active():
             from re1_rl.planner_hop_score import hop_score_live_enabled
+            from re1_rl.planner_room_segments import room_segments_enabled
 
             queue = getattr(self, "_planner_loyal_queue", None)
-            # Live ±1: hop success terminates the episode — no mid-chunk continue.
-            if not hop_score_live_enabled():
+            # Live ±1: hop success terminates — except room-segment mid-hops,
+            # which mint and continue (shared segment timeout).
+            if not hop_score_live_enabled() or (
+                room_segments_enabled()
+                and float(breakdown.get("room_segment_midhop", 0.0) or 0.0) > 0.0
+            ):
                 mid_hop = (
                     float(breakdown.get("planner_step_success", 0.0) or 0.0) > 0.0
                     and queue is not None
                     and not bool(getattr(queue, "done", False))
+                    and (
+                        not hop_score_live_enabled()
+                        or float(breakdown.get("room_segment_midhop", 0.0) or 0.0)
+                        > 0.0
+                    )
                 )
         self._attach_hop_score_shadow(
             info,

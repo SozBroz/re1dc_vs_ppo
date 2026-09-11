@@ -1121,14 +1121,25 @@ def _compute_planner_loyal_reward(
         # capture:false beats (yawn_intro, go_to_box, Richard) advance the
         # queue only — hop-score live must keep playing so the next capturable
         # step can mint in this episode.
+        # Room-segment mid-hops (RE1_PLANNER_ROOM_SEGMENTS=1) also continue:
+        # mint the plNN, keep the shared segment timeout, settle S_hop into
+        # the additive tracker; only the segment exit claims checkpoint_success.
         completed = max(0, int(getattr(planner_loyal_queue, "index", 1) or 1) - 1)
         steps = getattr(planner_loyal_queue, "_steps", []) or []
         done_step = steps[completed] if 0 <= completed < len(steps) else {}
         skip_capture = (
             isinstance(done_step, dict) and done_step.get("capture") is False
         )
-        if skip_capture and not planner_loyal_queue.done:
-            if progress is not None:
+        from re1_rl.planner_room_segments import is_segment_midhop
+
+        segment_midhop = bool(
+            hop_score_live_enabled()
+            and not skip_capture
+            and not planner_loyal_queue.done
+            and is_segment_midhop(completed, steps=steps)
+        )
+        if (skip_capture or segment_midhop) and not planner_loyal_queue.done:
+            if progress is not None and skip_capture:
                 progress.note_softlock_extension(hop_frames)
                 progress.note_max_steps_extension(hop_steps)
                 if hasattr(progress, "arm_cell_timeout"):
@@ -1138,12 +1149,16 @@ def _compute_planner_loyal_reward(
                         int(planner_timeout_frames(boss=boss_now))
                     )
                     progress.leg_emulated_frames = 0
+            # Segment midhop: do NOT rearm / reset leg frames — shared budget.
             # Do not claim checkpoint_success — episode continues.
             bd["checkpoint_success"] = 0.0
+            if segment_midhop:
+                bd["room_segment_midhop"] = 1.0
         elif progress is not None and (
             planner_loyal_queue.done or hop_score_live_enabled()
         ):
-            # Live ±1: every capturing hop success ends the episode.
+            # Live ±1: every capturing hop success ends the episode
+            # (unless room-segment midhop handled above).
             if hasattr(progress, "claim_checkpoint_success"):
                 progress.claim_checkpoint_success()
             if hop_score_live_enabled() and not planner_loyal_queue.done:
@@ -1372,16 +1387,43 @@ def _compute_planner_loyal_reward(
             apply_live_hop_score(
                 bd, meters, outcome="planner_divert", failure="planner_divert"
             )
-        elif skip_capture_midhop:
+        elif skip_capture_midhop and float(bd.get("room_segment_midhop", 0.0) or 0.0) <= 0.0:
             # capture:false advanced the queue; keep dense channels stripped but
             # do not settle ±1 terminal S — the capturing hop is still ahead.
             zero_live_replaced_channels(bd)
+        elif float(bd.get("room_segment_midhop", 0.0) or 0.0) > 0.0:
+            # Settle this hop's S into the additive room tracker; learning
+            # waits for segment exit (S_room). Shared timeout stays armed.
+            report = apply_live_hop_score(
+                bd, meters, outcome="planner_step_success", failure=None
+            )
+            s_hop = float(bd.get("hop_score") or 0.0)
+            bd["room_segment_hop_score"] = s_hop
+            bd["hop_score"] = 0.0  # not terminal yet
+            tracker = getattr(progress, "room_segment", None) if progress else None
+            if tracker is not None and hasattr(tracker, "note_hop_success"):
+                s_room = float(tracker.note_hop_success(report, s_hop))
+                bd["room_segment_score"] = s_room
         elif float(bd.get("planner_step_success", 0.0) or 0.0) > 0.0 or loyal.get(
             "step_success"
         ):
-            apply_live_hop_score(
+            report = apply_live_hop_score(
                 bd, meters, outcome="planner_step_success", failure=None
             )
+            tracker = getattr(progress, "room_segment", None) if progress else None
+            if tracker is not None and hasattr(tracker, "note_hop_success"):
+                s_hop = float(bd.get("hop_score") or 0.0)
+                s_room = float(tracker.note_hop_success(report, s_hop))
+                bd["room_segment_hop_score"] = s_hop
+                bd["room_segment_score"] = s_room
+                # Episode learns the additive room total, not the last hop alone.
+                bd["hop_score"] = s_room
+                try:
+                    from re1_rl.planner_room_segments import record_best_s_room
+
+                    record_best_s_room(tracker)
+                except (OSError, TypeError, ValueError):
+                    pass
         else:
             # Non-terminal live step: still strip dense channels folded into S.
             zero_live_replaced_channels(bd)
