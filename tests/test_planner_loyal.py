@@ -816,43 +816,68 @@ def test_yawn_intro_completes_on_cutscene_confirm():
     assert q.pending_capture_indices == []
 
 
-def test_yawn_boss_completes_on_retreat_and_cascades_held_loot():
+def test_yawn_intro_completes_on_combat_presence():
     q = PlannerLoyalQueue()
     idx = next(
         i
         for i, step in enumerate(q._steps)
-        if step.get("op") == "boss" and step.get("beat_id") == "yawn_1"
+        if step.get("beat_id") == "yawn_intro"
     )
     q.seek(idx)
-    progress = ProgressTracker()
-    progress.yawn_retreated = True
-    prev = {
-        "room_id": "210",
-        "inventory_slots": [
-            ("bazooka_acid", 1),
-            ("shield_key", 1),
-            ("shotgun_shells", 7),
-            ("moon_crest", 1),
-        ],
-    }
-    cur = {
-        "room_id": "210",
-        "inventory_slots": [
-            ("bazooka_acid", 1),
-            ("shield_key", 1),
-            ("shotgun_shells", 7),
-            ("moon_crest", 1),
-        ],
+    yawn = {
+        "slot": 0,
+        "type_id": 0x0F,
+        "hp": 120,
+        "hp_raw": 3050,
+        "yawn_translated": True,
+        "active_byte": 1,
+        "in_room": 1,
+        "alive": 1,
     }
     result = q.evaluate_transition(
-        prev_state=prev, state=cur, progress=progress
+        prev_state={"room_id": "210", "inventory_slots": [], "enemies": []},
+        state={"room_id": "210", "inventory_slots": [], "enemies": [yawn]},
     )
-    assert result["divert"] is False
     assert result["step_success"] is True
-    # Boss + shells + crest all queued; next hop is leave attic.
-    assert q.current is not None
-    assert q.current.get("edge_id") == "210->20E"
-    assert len(q.pending_capture_indices) == 3
+    assert q.current.get("beat_id") == "yawn_1"
+
+
+def test_yawn_boss_midhop_then_shells_acquire_mints():
+    """Intro+boss are capture:false; first mint is the shells acquire hop."""
+    q = PlannerLoyalQueue()
+    intro_i = next(
+        i for i, step in enumerate(q._steps) if step.get("beat_id") == "yawn_intro"
+    )
+    assert q._steps[intro_i].get("capture") is False
+    boss_i = next(
+        i
+        for i, step in enumerate(q._steps)
+        if step.get("op") == "boss" and step.get("beat_id") == "yawn_1"
+    )
+    assert q._steps[boss_i].get("capture") is False
+    q.seek(boss_i)
+    progress = ProgressTracker()
+    progress.yawn_retreated = True
+    boss = q.evaluate_transition(
+        prev_state={"room_id": "210", "inventory_slots": [("shield_key", 1)]},
+        state={"room_id": "210", "inventory_slots": [("shield_key", 1)]},
+        progress=progress,
+    )
+    assert boss["step_success"] is True
+    assert q.pending_capture_indices == []
+    assert q.current.get("pickup_id") == "210:shotgun_shells:2"
+    shells = q.evaluate_transition(
+        prev_state={"room_id": "210", "inventory_slots": [("shield_key", 1)]},
+        state={
+            "room_id": "210",
+            "inventory_slots": [("shield_key", 1), ("shotgun_shells", 7)],
+            "new_items": ["shotgun_shells"],
+        },
+        progress=progress,
+    )
+    assert shells["step_success"] is True
+    assert len(q.pending_capture_indices) == 1
+    assert q.current.get("pickup_id") == "210:moon_crest:1"
 
 
 def test_yawn_leave_after_retreat_completes_boss_not_divert():

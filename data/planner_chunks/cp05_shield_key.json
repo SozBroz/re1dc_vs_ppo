@@ -1462,7 +1462,8 @@
       "site_id": "210:yawn",
       "room_id": "210",
       "beat_id": "yawn_1",
-      "note": "fight Yawn (GL+acid)",
+      "capture": false,
+      "note": "fight Yawn (GL+acid); capture:false — mints are shells/crest/leave",
       "n": 179
     },
     {
