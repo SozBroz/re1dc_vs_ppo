@@ -1035,7 +1035,8 @@ def test_yawn_bite_tip_in_100_skips_20d_without_crest_in_ram():
     assert q.current.get("edge_id") == "100->101"
 
 
-def test_yawn_bite_tip_ignores_save_room_floor_loot():
+def test_yawn_bite_tip_save_room_floor_loot_diverts():
+    """Room-100 bite tips still divert on off-plan ink_ribbon / serum."""
     q = PlannerLoyalQueue()
     stairs_i = next(
         i for i, s in enumerate(q._steps) if s.get("edge_id") == "20E->20D"
@@ -1051,18 +1052,20 @@ def test_yawn_bite_tip_ignores_save_room_floor_loot():
             "inventory_slots": held + [("ink_ribbon", 1)],
         },
     )
-    assert ink["divert"] is False, ink
-    serum = q.evaluate_transition(
-        prev_state={
-            "room_id": "100",
-            "inventory_slots": held + [("ink_ribbon", 1)],
-        },
+    assert ink["divert"] is True, ink
+    assert "ink_ribbon" in str(ink["divert_reason"])
+    q2 = PlannerLoyalQueue()
+    q2.seek(stairs_i + 1)
+    q2.note_start_inventory({"room_id": "100", "inventory_slots": held})
+    serum = q2.evaluate_transition(
+        prev_state={"room_id": "100", "inventory_slots": held},
         state={
             "room_id": "100",
-            "inventory_slots": held + [("ink_ribbon", 1), ("serum", 1)],
+            "inventory_slots": held + [("serum", 1)],
         },
     )
-    assert serum["divert"] is False, serum
+    assert serum["divert"] is True, serum
+    assert "serum" in str(serum["divert_reason"])
 
 
 def test_yawn_bite_warp_mid_episode_leave_100_recovers():
