@@ -1377,48 +1377,8 @@ def capture_planner_loyal_cell(
         shutil.move(str(staging), str(dest))
     _strip_fat_artifacts(dest)
     rewrite_manifest(env.project_root)
-    proposal: dict[str, Any] = {
-        "source": "planner_loyal",
-        "route_id": ROUTE_ID,
-        "checkpoint_index": slot,
-        "checkpoint_id": checkpoint_id,
-        "room_id": room_id,
-        "chunk_id": queue.chunk_id,
-        "planner_step_index": completed,
-        "chunk_final": bool(is_final),
-        "training_start": True,
-        "quality": quality,
-        "kills": kill_audit,
-        "state_path": str(dest / cell_state_filename()),
-        "sidecar_path": str(dest / CELL_SIDECAR_NAME),
-        "meta_path": str(dest / CELL_META_NAME),
-    }
-    from re1_rl.yawn_rails_sync import build_capture_proposal, yawn_rails_sync_enabled
-
-    if yawn_rails_sync_enabled():
-        try:
-            bundled = build_capture_proposal(
-                route_id=ROUTE_ID,
-                checkpoint_index=slot,
-                checkpoint_id=checkpoint_id,
-                room_id=room_id,
-                quality=quality,
-                state_path=dest / cell_state_filename(),
-                sidecar_path=dest / CELL_SIDECAR_NAME,
-                worker_id=os.environ.get("MACHINE_NAME"),
-            )
-            proposal.update(bundled)
-            # Keep planner-specific fields after bundle merge.
-            proposal["source"] = "planner_loyal"
-            proposal["chunk_id"] = queue.chunk_id
-            proposal["planner_step_index"] = completed
-            proposal["chunk_final"] = bool(is_final)
-            proposal["training_start"] = True
-            proposal["planner_step"] = step
-            proposal["kills"] = kill_audit
-        except (OSError, ValueError, TypeError, KeyError) as exc:
-            print(f"[planner_loyal] bundle pack failed: {exc}", flush=True)
-
+    # Sync proposal is packed in env AFTER leg_replay/leg_policy land on disk
+    # (_repack_planner_loyal_sync_proposal). Packing here would ship a thin zip.
     close_planner_loyal_stretch(getattr(env, "_progress", None))
     print(
         f"[planner_loyal] minted {cell_dir_name(slot)} "
@@ -1432,7 +1392,23 @@ def capture_planner_loyal_cell(
         f"almanac_total={kill_audit['almanac_total']}",
         flush=True,
     )
-    return proposal
+    return {
+        "source": "planner_loyal",
+        "route_id": ROUTE_ID,
+        "checkpoint_index": slot,
+        "checkpoint_id": checkpoint_id,
+        "room_id": room_id,
+        "chunk_id": queue.chunk_id,
+        "planner_step_index": completed,
+        "chunk_final": bool(is_final),
+        "training_start": True,
+        "quality": quality,
+        "kills": kill_audit,
+        "planner_step": step,
+        "state_path": str(dest / cell_state_filename()),
+        "sidecar_path": str(dest / CELL_SIDECAR_NAME),
+        "meta_path": str(dest / CELL_META_NAME),
+    }
 
 
 def training_start_paths(project_root: Path | str | None = None) -> dict[str, Path]:

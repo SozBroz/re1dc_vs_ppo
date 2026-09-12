@@ -1597,14 +1597,62 @@ class RE1Env(gym.Env):
                 self, state, breakdown, completed_index=completed
             )
             if rec is not None:
-                minted.append(rec)
+                # Fat tape must land on disk BEFORE packing the sync proposal,
+                # otherwise multi-machine install ships a thin zip and
+                # promote_cell_files would delete any existing leg_replay.
                 self._maybe_write_planner_leg_tape(rec, state, completed, steps)
+                self._repack_planner_loyal_sync_proposal(rec)
+                minted.append(rec)
                 continue
             slot = slot_index_for_completed_step(completed, steps)
             if not (cell_slot_dir(root, slot) / cell_state_filename()).is_file():
                 leftover.append(completed)
         queue.pending_capture_indices = leftover
         return minted
+
+    def _repack_planner_loyal_sync_proposal(self, rec: dict[str, Any]) -> None:
+        """Rebuild yawn-rails bundle bytes after fat tape/policy are on disk."""
+        from re1_rl.yawn_rails_sync import build_capture_proposal, yawn_rails_sync_enabled
+
+        if not yawn_rails_sync_enabled():
+            return
+        state_path = rec.get("state_path")
+        sidecar_path = rec.get("sidecar_path")
+        if not state_path or not sidecar_path:
+            return
+        try:
+            bundled = build_capture_proposal(
+                route_id=str(rec.get("route_id") or "planner_loyal_v1"),
+                checkpoint_index=int(rec["checkpoint_index"]),
+                checkpoint_id=str(rec.get("checkpoint_id") or ""),
+                room_id=str(rec.get("room_id") or ""),
+                quality=list(rec.get("quality") or []),
+                state_path=Path(state_path),
+                sidecar_path=Path(sidecar_path),
+                worker_id=os.environ.get("MACHINE_NAME"),
+            )
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            print(f"[planner_loyal] fat bundle pack failed: {exc}", flush=True)
+            return
+        keep = {
+            "source": rec.get("source"),
+            "chunk_id": rec.get("chunk_id"),
+            "planner_step_index": rec.get("planner_step_index"),
+            "chunk_final": rec.get("chunk_final"),
+            "training_start": rec.get("training_start"),
+            "planner_step": rec.get("planner_step"),
+            "kills": rec.get("kills"),
+            "leg_replay_path": rec.get("leg_replay_path"),
+            "leg_policy_path": rec.get("leg_policy_path"),
+            "room_segment_id": rec.get("room_segment_id"),
+            "state_path": rec.get("state_path"),
+            "sidecar_path": rec.get("sidecar_path"),
+            "meta_path": rec.get("meta_path"),
+        }
+        rec.update(bundled)
+        for key, val in keep.items():
+            if val is not None:
+                rec[key] = val
 
     def _maybe_write_planner_leg_tape(
         self,
