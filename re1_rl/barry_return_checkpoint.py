@@ -1,10 +1,8 @@
-"""Surgical cp02 (``barry_return_105``): Kenneth, clips, heal spray, then dining.
+"""Surgical cp02 (``barry_return_105``): Kenneth, then dining — pl03 mint.
 
-CP02 success is 104→105 after the tea-room Kenneth ledger (``104:*:sN``)
-while still holding the Jill start heal spray and both Kenneth-body clips
-(30 spare ``handgun_bullets``). Those piles despawn once the Wesker/Barry
-hall cinema plays. Entering dining from the tea room before Kenneth, without
-the spray, or without both clips, fails the episode.
+Opening hop ``barry_return_105`` (mints ``pl03``) requires the tea-room Kenneth
+ledger (``104:*:sN``) and forbids dealing or taking damage on that hop.
+Entering dining from the tea room before Kenneth fails the episode.
 """
 
 from __future__ import annotations
@@ -29,6 +27,8 @@ TEA_ROOM_CLIP_QTY = 30
 TEA_ROOM_CLIP_BEATS = frozenset({"kenneth_104", "barry_return_105"})
 MAIN_HALL_BEFORE_TEA_CLIPS = "main_hall_before_tea_clips"
 BARRY_RETURN_BEFORE_TEA_CLIPS = "barry_return_before_tea_clips"
+# pl03 mint hop (opening beat barry_return_105): no fighting in 104.
+BARRY_RETURN_COMBAT = "barry_return_combat"
 
 
 def heal_spray_in_inventory(state: dict[str, Any] | None) -> bool:
@@ -67,6 +67,42 @@ def barry_return_capture_inventory_ok(state: dict[str, Any] | None) -> bool:
 def _on_barry_return_leg(planner: Any) -> bool:
     obj = planner.current_objective() or {}
     return str(obj.get("checkpoint_id") or "") == BARRY_RETURN_CHECKPOINT_ID
+
+
+def on_barry_return_pl03_step(queue: Any) -> bool:
+    """True on the opening hop that mints ``pl03`` (``barry_return_105``)."""
+    step = getattr(queue, "current", None) or {}
+    if not isinstance(step, dict):
+        return False
+    return str(step.get("beat_id") or "") == BARRY_RETURN_CHECKPOINT_ID
+
+
+def barry_return_combat_violation(
+    prev_state: dict[str, Any] | None,
+    state: dict[str, Any] | None,
+) -> bool:
+    """True when Jill took HP damage or dealt enemy damage this step.
+
+    Room 104 zeroes scalar ``enemy_damage`` pay, so read ``combat_events``
+    (still recorded with ``reward_denied``) plus a plain HP drop.
+    """
+    if not prev_state or not state:
+        return False
+    if not state.get("dead"):
+        prev_hp = int(prev_state.get("hp", 0) or 0)
+        hp = int(state.get("hp", 0) or 0)
+        if prev_hp > 0 and hp < prev_hp:
+            return True
+    if int(state.get("enemy_damage", 0) or 0) > 0:
+        return True
+    if int(state.get("enemy_kills", 0) or 0) > 0:
+        return True
+    for ev in state.get("combat_events") or []:
+        if not isinstance(ev, dict):
+            continue
+        if int(ev.get("damage", 0) or 0) > 0 or bool(ev.get("killed")):
+            return True
+    return False
 
 
 def _ledgers(progress: Any) -> set[str]:

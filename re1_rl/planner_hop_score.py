@@ -118,6 +118,7 @@ DIVERT_FAILURES = frozenset(
         "armor_inplace_statue_push",
         "main_hall_before_kenneth",
         "barry_return_before_kenneth",
+        "barry_return_combat",
         "capture_invalid",
         "forbidden_item",
         "shotgun_return",

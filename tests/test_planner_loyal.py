@@ -2077,6 +2077,86 @@ def test_planner_loyal_dining_return_after_kenneth_completes() -> None:
     assert bd["planner_divert"] == 0.0
     assert bd["planner_step_success"] > 0.0
     assert q.divert_reason is None
+
+
+def test_pl03_barry_return_fails_on_hp_damage() -> None:
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    q.seek(2)
+    progress = ProgressTracker()
+    progress.note_leg_cutscene("104:4:s0")
+    prev = {"room_id": "104", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {"room_id": "104", "inventory_slots": [], "hp": 88, "in_control": True}
+    reward, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_divert"] == PLANNER_DIVERT_PENALTY
+    assert bd["planner_step_success"] == 0.0
+    assert q.divert_reason == "barry_return_combat"
+    terminated, _truncated, reason = RE1Env._termination_flags(
+        SimpleNamespace(
+            _stage={"mode": "planner_loyal", "max_steps": 3000},
+            _progress=progress,
+            _checkpoint_captured=False,
+            _episode_failure_override=None,
+            _planner_loyal_queue=q,
+            _step_count=3,
+            _episode_truncated=lambda: False,
+        ),
+        {"dead": False},
+    )
+    assert terminated is True
+    assert reason == "barry_return_combat"
+    assert reward < 0.0
+    assert bd["planner_divert"] == PLANNER_DIVERT_PENALTY
+
+
+def test_pl03_barry_return_fails_on_denied_combat_events() -> None:
+    """104 zeroes enemy_damage pay; combat_events still count as dealing damage."""
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    q.seek(2)
+    progress = ProgressTracker()
+    progress.note_leg_cutscene("104:4:s0")
+    prev = {"room_id": "104", "inventory_slots": [], "hp": 96, "in_control": True}
+    cur = {
+        "room_id": "104",
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+        "enemy_damage": 0,
+        "enemy_kills": 0,
+        "combat_events": [
+            {"slot": 0, "damage": 5, "killed": False, "reward_denied": True}
+        ],
+    }
+    _reward_total, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_divert"] == PLANNER_DIVERT_PENALTY
+    assert q.divert_reason == "barry_return_combat"
+
+
+def test_pl03_barry_return_clean_traverse_still_succeeds() -> None:
+    opening = PROJECT_ROOT / "data" / "planner_chunks" / "opening_to_lockpick.json"
+    q = PlannerLoyalQueue(chunk_path=opening)
+    q.seek(2)
+    progress = ProgressTracker()
+    progress.note_leg_cutscene("104:4:s0")
+    prev = {
+        "room_id": "104",
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+        "combat_events": [],
+    }
+    cur = {
+        "room_id": "105",
+        "inventory_slots": [],
+        "hp": 96,
+        "in_control": True,
+        "combat_events": [],
+    }
+    _reward_total, bd = _reward(prev, cur, q, progress=progress)
+    assert bd["planner_divert"] == 0.0
+    assert bd["planner_step_success"] > 0.0
+    assert q.divert_reason is None
     assert q.current["edge_id"] == "105->106"
 
 

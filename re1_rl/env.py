@@ -1198,6 +1198,7 @@ class RE1Env(gym.Env):
             if divert in {
                 "barry_return_before_kenneth",
                 "barry_return_before_tea_clips",
+                "barry_return_combat",
                 "main_hall_before_tea_clips",
             }:
                 reason = str(divert)

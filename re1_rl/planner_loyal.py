@@ -715,6 +715,21 @@ class PlannerLoyalQueue:
         tax = _heal_use_tax(prev_state, state)
         result["heal_use_tax"] = tax
 
+        # pl03 (barry_return_105): any damage dealt or taken ends the hop.
+        from re1_rl.barry_return_checkpoint import (
+            BARRY_RETURN_COMBAT,
+            barry_return_combat_violation,
+            on_barry_return_pl03_step,
+        )
+
+        if on_barry_return_pl03_step(self) and barry_return_combat_violation(
+            prev_state, state
+        ):
+            result["divert"] = True
+            result["divert_reason"] = BARRY_RETURN_COMBAT
+            self.divert_reason = BARRY_RETURN_COMBAT
+            return result
+
         if typewriter_save_complete or _ink_ribbon_consumed(prev_state, state):
             result["divert"] = True
             result["divert_reason"] = (
