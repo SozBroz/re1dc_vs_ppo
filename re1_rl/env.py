@@ -258,6 +258,16 @@ _OPTIONS_MENU_REASONS = frozenset({"options_menu", "pause_or_options_menu"})
 # frames per step and keeps sending need so the stale watchdog never fires.
 _ITEM_MENU_DISMISS_FAIL_LIMIT = 2
 _ITEM_MENU_STUCK_REASON = "item_menu_stuck"
+# Unknown modal menus (START/MAP screens whose (mode, gs) miss the pause-tree
+# detector) hold needs_skip True forever: every skip burns its full budget,
+# the actor keeps sending need (worker stale watchdog stays silent by design),
+# and the episode never ends. pking 2026-09-12: all 20 actors wedged ~70 min
+# in the START-menu tree after the base-weights reset lockstepped pl08.
+# Trip after this many consecutive static no-control skip hits (tune via
+# RE1_SKIP_STALL_LIMIT). Doors/cutscenes/narration flip scene/msg/room within
+# a hit or two, so only a truly frozen modal survives the static gate.
+_SKIP_STALL_STATIC_HIT_LIMIT = 10
+_SKIP_STALL_REASON = "menu_skip_stuck"
 
 
 def _prune_square_pillarbox(square: np.ndarray) -> np.ndarray:
@@ -426,6 +436,11 @@ class RE1Env(gym.Env):
         self._box_inv_trusted_at_cursor = False
         self._episode_failure_override: str | None = None
         self._item_menu_dismiss_fails = 0
+        # Consecutive static no-control skip hits (unknown-modal tripwire).
+        self._skip_stall_hits = 0
+        self._skip_stall_snapshot: tuple[tuple[int, int, int, int], int] | None = (
+            None
+        )
         self._use_phase = 0
         self._inventory_before_use: list[tuple[int, int]] | None = None
         self._equip_phase = 0
@@ -2582,6 +2597,8 @@ class RE1Env(gym.Env):
         self._box_inv_trusted_at_cursor = False
         self._episode_failure_override = None
         self._item_menu_dismiss_fails = 0
+        self._skip_stall_hits = 0
+        self._skip_stall_snapshot = None
         self._last_attack_obs = empty_last_attack()
         self._last_skip_frames = 0
         self._last_settled_skip_frames = 0
@@ -4550,7 +4567,73 @@ class RE1Env(gym.Env):
         self._note_item_menu_dismiss_result(recovered)
         return recovered, report
 
-    def _skip_uncontrolled(self, max_frames: int | None = None) -> tuple[int, bool]:
+    def _note_skip_stall(self, *, track: bool) -> bool:
+        """Trip a terminal after repeated static no-control skip hits.
+
+        Call with ``track=True`` once per step that enters the skip path
+        (async ``_step_once`` branch) or per full-budget sync burn. Static
+        gate: ``(stage, room, scene_flag, msg_flag)`` identical and HP not
+        rising (poison/chip damage only decreases; nothing heals without
+        control). Returns True once, arming ``_pending_episode_failure``;
+        the caller flushes it into a terminal the same step.
+        """
+        if not track:
+            self._skip_stall_hits = 0
+            self._skip_stall_snapshot = None
+            return False
+        try:
+            limit = int(
+                os.environ.get("RE1_SKIP_STALL_LIMIT", "")
+                or _SKIP_STALL_STATIC_HIT_LIMIT
+            )
+        except ValueError:
+            limit = _SKIP_STALL_STATIC_HIT_LIMIT
+        limit = max(2, limit)
+        try:
+            ram = self._failure_ram_probe()
+        except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+            return False
+        sig = (
+            int(ram.get("stage_id", -1)),
+            int(ram.get("room_id", -1)),
+            int(ram.get("scene_flag", -1)),
+            int(ram.get("msg_flag", -1)),
+        )
+        hp = int(ram.get("player_hp", 0))
+        prev = getattr(self, "_skip_stall_snapshot", None)
+        if prev is not None and sig == prev[0] and hp <= prev[1]:
+            hits = int(getattr(self, "_skip_stall_hits", 0)) + 1
+        else:
+            self._skip_stall_snapshot = (sig, hp)
+            hits = 1
+        self._skip_stall_hits = hits
+        if hits < limit:
+            return False
+        self._skip_stall_hits = 0
+        self._skip_stall_snapshot = None
+        mode = int(ram.get("game_mode", 0))
+        gs = int(ram.get("game_state", 0))
+        try:
+            from re1_rl.game_session import pause_menu_screen_id
+
+            screen_id = pause_menu_screen_id(gs)
+        except (ImportError, AttributeError, TypeError, ValueError):
+            screen_id = None
+        port = getattr(self.bridge, "port", "?")
+        print(
+            f"[skip_stall] port={port} hits={hits} reason={_SKIP_STALL_REASON} "
+            f"mode=0x{mode:02X} gs=0x{gs:08X} room={sig[1]} stage={sig[0]} "
+            f"hp={hp} scene=0x{sig[2]:02X} msg=0x{sig[3]:02X} "
+            f"screen_id={screen_id}",
+            flush=True,
+        )
+        if getattr(self, "_pending_episode_failure", None) is None:
+            self._pending_episode_failure = _SKIP_STALL_REASON
+        return True
+
+    def _skip_uncontrolled(
+        self, max_frames: int | None = None, *, track_stuck: bool = False
+    ) -> tuple[int, bool]:
         """Wait at turbo speed until player control returns (doors, cutscenes)."""
         kwargs: dict[str, Any] = {
             "prev_hp": self._prev_hp,
@@ -4563,6 +4646,17 @@ class RE1Env(gym.Env):
                 max_frames=max_frames, **kwargs
             )
         self._last_skip_frames = int(skipped)
+        if track_stuck:
+            from re1_rl.ram_skip import DEFAULT_WAIT_MAX_FRAMES
+
+            cap = DEFAULT_WAIT_MAX_FRAMES if max_frames is None else int(
+                max_frames
+            )
+            full = (not died) and int(skipped) >= int(cap)
+            self._note_skip_stall(track=bool(full))
+        else:
+            # Reset/diagnostic paths: never arm the stall tripwire here.
+            self._note_skip_stall(track=False)
         return skipped, died
 
     @staticmethod
@@ -6029,13 +6123,20 @@ class RE1Env(gym.Env):
             self._skip_session_frames = int(
                 getattr(self, "_skip_session_frames", 0) or 0
             ) + max(0, int(step_emulated_frames))
+            if self._note_skip_stall(track=True):
+                stalled = self._flush_pending_episode_failure(action)
+                if stalled is not None:
+                    return stalled
             return self._fast_cutscene_step(
                 action, opening_policy_frames=max(0, int(step_emulated_frames))
             )
+        if self._async_cutscene_skip:
+            # Control returned (or never left): not a stall.
+            self._note_skip_stall(track=False)
 
         skipped, died_during_skip = 0, False
         if not self._async_cutscene_skip:
-            skipped, died_during_skip = self._skip_uncontrolled()
+            skipped, died_during_skip = self._skip_uncontrolled(track_stuck=True)
             if died_during_skip:
                 death = self._death_step(
                     action, died_during_skip=True, died_during_step=False
