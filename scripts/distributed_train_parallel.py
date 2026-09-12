@@ -711,6 +711,7 @@ def _run_learner(args: argparse.Namespace) -> int:
     )
     weight_store = WeightStore()
     rollout_queue: queue.Queue = queue.Queue()
+    from re1_rl.distributed.march_reset import apply_march_reset
     from re1_rl.distributed.rollout_types import normalize_curriculum_id
     from re1_rl.distributed.spaces import OBS_SCHEMA_VERSION
 
@@ -836,6 +837,25 @@ def _run_learner(args: argparse.Namespace) -> int:
                 )
             except queue.Empty:
                 pass
+
+            # Planner-march NN reset runs every spin, even mid-epoch: the
+            # base weights must land promptly after each pin advance.
+            # Dropped pending rollouts were collected under the specialized
+            # policy and would only noise up the base weights.
+            if apply_march_reset(
+                model=model,
+                weight_store=weight_store,
+                learner_state=learner_state,
+                machine_name=args.machine_name,
+            ):
+                if pending:
+                    log(
+                        args.machine_name,
+                        f"march NN reset applied; dropping {len(pending)} stale "
+                        f"rollouts ({pending_steps} steps)",
+                    )
+                    pending.clear()
+                    pending_steps = 0
 
             elapsed = time.monotonic() - epoch_t0
             status = learner_state.epoch_status()
