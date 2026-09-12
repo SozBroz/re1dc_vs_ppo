@@ -40,7 +40,12 @@ _ROOT_ENV = "RE1_YAWN_RAILS_ROOT"
 _SYNC_ENV = "RE1_YAWN_RAILS_SYNC"
 _PREFIX_ENV = "RE1_YAWN_CELL_PREFIX"
 _LOCK_NAME = "cells.sync.lock"
-_STALE_LOCK_S = 180.0
+# Stale-lock horizon for ``cells.sync.lock``. Keep this comfortably BELOW the
+# ``yawn_cells_locked`` waiter timeout: a crashed holder used to wedge every
+# learner pack/ingest (and every worker bundle pull) until a waiter outlasted
+# the horizon, while waiters gave up first — a guaranteed brownout per leak.
+# Legit holds are file renames / small zips (ms to seconds), so 60s is safe.
+_STALE_LOCK_S = 60.0
 # Planner-loyal seed tip (pl06; pl00 = fresh start); never prune these when
 # using ``pl`` prefix.
 _PLANNER_SEED_MAX_INDEX = 6
@@ -178,7 +183,9 @@ def yawn_cells_locked(
     root: Path | str,
     *,
     holder: str = "yawn_rails",
-    timeout_s: float = 90.0,
+    # Must exceed _STALE_LOCK_S: a waiter that gives up before a leaked lock
+    # goes stale can never make progress (see _STALE_LOCK_S).
+    timeout_s: float = 120.0,
 ) -> Iterator[None]:
     path = Path(root)
     if not wait_for_yawn_cells_unlock(path, timeout_s=timeout_s):
@@ -1372,7 +1379,25 @@ class YawnRailsCellStore:
                     continue
         if idx is None:
             return None
+        # Fast-path ghost check BEFORE taking the cells lock: worker polls
+        # fetch every catalogued index each cycle, and most catalogued rows
+        # have no on-disk bundle (pruned / metadata-only). Locking first
+        # serialized hundreds of doomed packs behind real ingest/mint traffic
+        # and wedged every worker's poll behind lock waits.
+        d = cell_slot_dir(self.root, idx)
+        state_p = slot_state_path(d)
+        if state_p is None:
+            for alt in ("pl", "cp"):
+                cand = Path(self.root) / "cells" / f"{alt}{int(idx):02d}"
+                state_p = slot_state_path(cand)
+                if state_p is not None:
+                    d = cand
+                    break
+        if state_p is None or not (d / CELL_SIDECAR_NAME).is_file():
+            return None
         with yawn_cells_locked(self.root, holder="yawn_pack_bundle"):
+            # Re-verify under lock (dir may have been pruned between check
+            # and acquire).
             d = cell_slot_dir(self.root, idx)
             state_p = slot_state_path(d)
             if state_p is None:
