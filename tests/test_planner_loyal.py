@@ -1856,6 +1856,47 @@ def test_reset_wrapper_skips_yawn_sampler_when_planner_loyal(monkeypatch):
     assert "route_start_index" not in (inner.last_options or {})
 
 
+def test_reset_wrapper_skips_pb_mix_for_planner_loyal_mode(monkeypatch):
+    """mode=planner_loyal must not inject champion.State (kills C-RE1 actors)."""
+    import gymnasium as gym
+    from gymnasium import spaces
+
+    from re1_rl.go_explore_reset_wrapper import GoExploreResetWrapper
+
+    injected: list[dict] = []
+    monkeypatch.delenv("RE1_PLANNER_LOYAL", raising=False)
+    monkeypatch.setattr(
+        "re1_rl.pb_curriculum.sample_training_start",
+        lambda *a, **k: injected.append({"state_path": "champion.State"})
+        or {"state_path": "champion.State", "sidecar_path": "x.json"},
+    )
+
+    class _StubEnv(gym.Env):
+        metadata = {"render_modes": []}
+
+        def __init__(self) -> None:
+            self.observation_space = spaces.Discrete(1)
+            self.action_space = spaces.Discrete(1)
+            self.curriculum_path = (
+                PROJECT_ROOT / "curriculum" / "planner_loyal_one_leg.json"
+            )
+            self.project_root = PROJECT_ROOT
+            self.last_options = None
+
+        def reset(self, *, seed=None, options=None):
+            self.last_options = options
+            return 0, {}
+
+        def step(self, action):
+            return 0, 0.0, False, False, {}
+
+    inner = _StubEnv()
+    wrapper = GoExploreResetWrapper(inner, project_root=PROJECT_ROOT, pb_weight=1.0)
+    wrapper.reset()
+    assert injected == []
+    assert "pb_bundle" not in (inner.last_options or {})
+
+
 def test_encode_dim_stable():
     q = PlannerLoyalQueue()
     vec = encode_planner_queue(q)

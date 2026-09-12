@@ -118,32 +118,34 @@ class GoExploreResetWrapper(gym.Wrapper):
         opts = dict(options or {})
         base = getattr(self.env, "unwrapped", self.env)
         curriculum_path = Path(getattr(base, "curriculum_path", ""))
+        stage: dict[str, Any] = {}
         if curriculum_path.is_file():
             try:
                 stage = _load_curriculum_cached(curriculum_path)
             except (OSError, ValueError):
                 stage = {}
-            if stage.get("mode") == "yawn_rails":
-                from re1_rl.planner_loyal import planner_loyal_enabled
+        from re1_rl.planner_loyal import planner_loyal_enabled
 
-                # Planner-loyal samples its own tip/frontier cells in env.reset.
-                # Do not inject yawn pin route_start_index (e.g. cp120 → 121).
-                if planner_loyal_enabled():
-                    return self.env.reset(seed=seed, options=opts or None)
-                if (
-                    "pb_bundle" not in opts
-                    and "pb_state_path" not in opts
-                    and "route_start_index" not in opts
-                ):
-                    from re1_rl.yawn_rails import sample_one_leg_options
+        # Planner-loyal owns tip/frontier sampling in env.reset. Never inject
+        # PB champions / go-explore archive (BizHawk .State) — C-RE1
+        # load_savestate only accepts .pst and would kill the actor.
+        if planner_loyal_enabled() or stage.get("mode") == "planner_loyal":
+            return self.env.reset(seed=seed, options=opts or None)
+        if stage.get("mode") == "yawn_rails":
+            if (
+                "pb_bundle" not in opts
+                and "pb_state_path" not in opts
+                and "route_start_index" not in opts
+            ):
+                from re1_rl.yawn_rails import sample_one_leg_options
 
-                    chooser = random.Random(seed) if seed is not None else self._rng
-                    opts.update(
-                        sample_one_leg_options(
-                            self._pb_project_root, stage, rng=chooser
-                        )
+                chooser = random.Random(seed) if seed is not None else self._rng
+                opts.update(
+                    sample_one_leg_options(
+                        self._pb_project_root, stage, rng=chooser
                     )
-                return self.env.reset(seed=seed, options=opts or None)
+                )
+            return self.env.reset(seed=seed, options=opts or None)
         if "pb_bundle" not in opts and "pb_state_path" not in opts:
             if self._reset_mix is not None and self._focus_room:
                 self._apply_focus_mix(opts)

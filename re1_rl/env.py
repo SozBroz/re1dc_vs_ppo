@@ -2167,6 +2167,57 @@ class RE1Env(gym.Env):
             self.bridge.frame_ring.store_rgb(fc, self.bridge.screenshot())
         return self.bridge.build_frame_stack()
 
+    def _recomp_loadable_savestate(self, state_path: Path | str) -> Path:
+        """C-RE1 only loads ``.pst``. Remap BizHawk ``.State`` to a planner cell.
+
+        BizHawk paths are unchanged when ``RE1_ECOSYSTEM_BRIDGE`` is not recomp.
+        """
+        path = Path(state_path)
+        if os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower() != "recomp":
+            return path
+        if path.suffix.lower() == ".pst" and path.is_file():
+            return path
+        for cand in (path.with_suffix(".pst"), path.parent / "cell.pst"):
+            if cand.is_file():
+                print(
+                    f"[pb] recomp remapped {path.name} -> {cand}",
+                    flush=True,
+                )
+                return cand
+        # Prefer the march pin / any live planner cell over curriculum .State.
+        try:
+            from re1_rl.planner_loyal_cells import (
+                cell_slot_dir,
+                planner_loyal_root,
+                training_start_paths,
+            )
+
+            tip = training_start_paths(self.project_root)
+            tip_state = Path(tip["state"])
+            if tip_state.suffix.lower() == ".pst" and tip_state.is_file():
+                print(
+                    f"[pb] recomp refused {path.name}; "
+                    f"falling back to tip {tip_state}",
+                    flush=True,
+                )
+                return tip_state
+            root = planner_loyal_root(self.project_root)
+            for idx in range(0, 64):
+                cand = cell_slot_dir(root, idx) / "cell.pst"
+                if cand.is_file():
+                    print(
+                        f"[pb] recomp refused {path.name}; "
+                        f"falling back to {cand}",
+                        flush=True,
+                    )
+                    return cand
+        except (OSError, TypeError, ValueError, ImportError):
+            pass
+        raise RuntimeError(
+            f"recomp cannot load non-pst savestate {path}; "
+            "no planner cell.pst fallback on disk"
+        )
+
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)
         opts = dict(options or {})
@@ -2237,8 +2288,20 @@ class RE1Env(gym.Env):
         from re1_rl.pb_sidecar import apply_episode_sidecar
 
         pb_bundle = resolve_pb_bundle(opts)
+        # Explicit reset options.pb_bundle (replay / forced loads) must win —
+        # tip sampling would otherwise overwrite predecessor state with the
+        # pin (replay_planner_cell pins INDEX=0 → always looks like pl00).
+        caller_pb = opts.get("pb_bundle") if isinstance(opts.get("pb_bundle"), dict) else None
+        if caller_pb is not None and pb_bundle is not None:
+            merged = dict(caller_pb)
+            merged["state_path"] = pb_bundle["state_path"]
+            merged["sidecar_path"] = pb_bundle["sidecar_path"]
+            pb_bundle = merged
         # Planner-loyal: sample tip + opened non-final CPs; seek queue past completed steps.
-        if getattr(self, "_planner_loyal_queue", None) is not None:
+        if (
+            getattr(self, "_planner_loyal_queue", None) is not None
+            and caller_pb is None
+        ):
             from re1_rl.planner_loyal_cells import (
                 TRAINING_START_INDEX as _PL_TIP,
                 sample_training_start_cell,
@@ -2468,6 +2531,7 @@ class RE1Env(gym.Env):
                 )
         else:
             state_path = self.project_root / self._stage["init_savestate"]
+        state_path = self._recomp_loadable_savestate(state_path)
         self.bridge.load_savestate(str(state_path))
         self.bridge.clear_latched_input()
         self.bridge.frameadvance(1)
@@ -2686,29 +2750,7 @@ class RE1Env(gym.Env):
                     state_path = self.project_root / self._stage["init_savestate"]
                     # C-RE1 only loads .pst; BizHawk .State fallback would
                     # NotImplemented and kill the actor.
-                    if (
-                        str(state_path).lower().endswith(".state")
-                        or os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower()
-                        == "recomp"
-                    ):
-                        recomp_root = Path(
-                            os.environ.get("RE1_RECOMP_ROOT", r"D:\re1_recomp")
-                        )
-                        pst_fallback = (
-                            recomp_root
-                            / "ecosystem"
-                            / "states"
-                            / "recomp_pl"
-                            / "cells"
-                            / "pl05"
-                            / "cell.pst"
-                        )
-                        if pst_fallback.is_file():
-                            state_path = pst_fallback
-                            print(
-                                f"[pb] recomp fresh fallback -> {state_path}",
-                                flush=True,
-                            )
+                    state_path = self._recomp_loadable_savestate(state_path)
                     self.bridge.load_savestate(str(state_path))
                     self._sticky_input.reset()
                     self._prev_action = None
