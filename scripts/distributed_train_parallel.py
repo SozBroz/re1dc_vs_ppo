@@ -562,6 +562,12 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
     obs_space, act_space = make_re1_policy_spaces()
     policy = InferencePolicy(obs_space, act_space, device)
     worker_id = args.worker_id or args.machine_name
+    # March ticks (env reset path) talk back to the learner over HTTP; publish
+    # the address the CLI already settled on so env code can find it.
+    os.environ.setdefault("RE1_LEARNER_HOST", str(args.learner_host))
+    os.environ.setdefault("RE1_LEARNER_PORT", str(args.learner_port))
+    os.environ.setdefault("FLEET_LEARNER_HOST", str(args.learner_host))
+    os.environ.setdefault("FLEET_LEARNER_PORT", str(args.learner_port))
     client = WorkerClient(
         args.learner_host,
         args.learner_port,

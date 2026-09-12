@@ -32,6 +32,8 @@ from re1_rl.combat_targets import COMBAT_TARGET_DIM, WORLD_EVENT_DIM, empty_comb
 
 from re1_rl.distributed.log_util import log
 
+from re1_rl.distributed.march_reset import apply_march_reset
+
 from re1_rl.distributed.obs_preprocess import prepare_obs_for_policy
 
 from re1_rl.distributed.rollout_types import WorkerRollout
@@ -874,7 +876,23 @@ def run_learner_loop(
 
             pass
 
-
+        # Planner-march NN reset runs even when no batch is ready: the base
+        # weights must land promptly after each pin advance. Dropped pending
+        # rollouts were collected under the specialized policy.
+        if apply_march_reset(
+            model=model,
+            weight_store=weight_store,
+            learner_state=learner_state,
+            machine_name=machine_name,
+        ):
+            if pending:
+                log(
+                    machine_name,
+                    f"march NN reset applied; dropping {len(pending)} stale "
+                    f"rollouts ({pending_steps} steps)",
+                )
+                pending.clear()
+                pending_steps = 0
 
         if pending_steps < batch_threshold:
 

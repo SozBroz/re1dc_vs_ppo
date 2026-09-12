@@ -142,6 +142,16 @@ class LearnerState:
         )
         self.yawn_rails_accepted = 0
         self.yawn_rails_rejected = 0
+        # Planner-march NN reset: POST /march/reset_weights stages a request;
+        # the train loop swaps the live model back to the base weights and
+        # records the applied advance id here for march ack polling.
+        self.pending_march_reset: dict[str, Any] | None = None
+        self.march_reset_last_attempt_unix = 0.0
+        self.march_reset_applied: dict[str, Any] = {
+            "last_applied_advance_id": None,
+            "last_applied_unix": 0,
+            "base_ckpt": "",
+        }
 
     def check_rollout_identity(self, rollout: WorkerRollout) -> tuple[bool, str]:
         """Fail closed when curriculum/schema does not match the learner."""
@@ -693,6 +703,20 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "relevance_max_age": self.state.relevance_max_age,
                     "relevance_kept": self.state.relevance_kept,
                     "relevance_dropped": self.state.relevance_dropped,
+                    "march_reset": {
+                        "last_applied_advance_id": self.state.march_reset_applied.get(
+                            "last_applied_advance_id"
+                        ),
+                        "last_applied_unix": self.state.march_reset_applied.get(
+                            "last_applied_unix", 0
+                        ),
+                        "base_ckpt": self.state.march_reset_applied.get("base_ckpt", ""),
+                        "pending_advance_id": (
+                            self.state.pending_march_reset.get("advance_id")
+                            if isinstance(self.state.pending_march_reset, dict)
+                            else None
+                        ),
+                    },
                     "go_explore_accepted": self.state.go_explore_accepted,
                     "yawn_rails_accepted": self.state.yawn_rails_accepted,
                     "pitch": pitch,
@@ -867,6 +891,30 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                     "cell_count": len(store.cells),
                 },
             )
+            return
+
+        if path == "/march/reset_weights":
+            try:
+                payload = json.loads(self._read_body().decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                self._send_json(400, {"error": "invalid json"})
+                return
+            advance_id = (
+                str(payload.get("advance_id") or "").strip()
+                if isinstance(payload, dict)
+                else ""
+            )
+            if not advance_id:
+                self._send_json(400, {"error": "advance_id required"})
+                return
+            with self.state.lock:
+                cur = self.state.pending_march_reset
+                if not (isinstance(cur, dict) and cur.get("advance_id") == advance_id):
+                    self.state.pending_march_reset = {
+                        "advance_id": advance_id,
+                        "requested_unix": time.time(),
+                    }
+            self._send_json(200, {"ok": True, "advance_id": advance_id})
             return
 
         self._send_json(404, {"error": "not found"})
