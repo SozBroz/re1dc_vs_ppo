@@ -2303,6 +2303,12 @@ class RE1Env(gym.Env):
             getattr(self, "_planner_loyal_queue", None) is not None
             and caller_pb is None
         ):
+            try:
+                from re1_rl.planner_march import maybe_advance_planner_march
+
+                maybe_advance_planner_march(self.project_root)
+            except (ImportError, AttributeError, TypeError, ValueError, OSError):
+                pass
             from re1_rl.planner_loyal_cells import (
                 TRAINING_START_INDEX as _PL_TIP,
                 sample_training_start_cell,
