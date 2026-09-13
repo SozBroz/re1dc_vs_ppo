@@ -32,6 +32,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from re1_rl.async_fleet import (  # noqa: E402
     DEFAULT_SYNC_INTERVAL_S,
     DISTRIBUTED_EPOCH_HYPERPARAMS,
+    GRIND_EPOCH_GRACE_S,
+    GRIND_EPOCH_HYPERPARAMS,
+    GRIND_SYNC_INTERVAL_S,
+    GRIND_WORKER_BUFFER_STEPS,
     PPO_HYPERPARAMS,
     load_async_learner,
 )
@@ -226,6 +230,25 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--no-local-worker", action="store_true",
                     help="learner role without co-located BizHawk fleet")
     ap.add_argument(
+        "--grind",
+        action="store_true",
+        help=(
+            "single-PL recording preset: overfit hyperparams "
+            "(ent 0, clip 0.3, no KL stop, 6 epochs x batch 2048, lr 5e-5) "
+            "plus faster cadence (sync 90s, buffer 8000, grace 30s) when those "
+            "flags are still at defaults. Revert = relaunch without --grind."
+        ),
+    )
+    ap.add_argument(
+        "--per-tip-cap",
+        action="store_true",
+        help=(
+            "shrink the planner episode wall to ~1.5x the target cell's recorded "
+            "hop frames (RE1_PL_PER_TIP_CAP=1 for local workers; set the same env "
+            "on remote launch cmds). Revert = relaunch without --per-tip-cap."
+        ),
+    )
+    ap.add_argument(
         "--n-steps",
         type=int,
         default=int(DISTRIBUTED_EPOCH_HYPERPARAMS["n_steps"]),
@@ -315,6 +338,34 @@ def build_parser() -> argparse.ArgumentParser:
     return ap
 
 
+def _apply_grind_defaults(args: argparse.Namespace) -> None:
+    """Opt-in grind wiring; full-game defaults are untouched without --grind."""
+    if bool(getattr(args, "per_tip_cap", False)):
+        os.environ["RE1_PL_PER_TIP_CAP"] = "1"
+        log(
+            getattr(args, "machine_name", "learner"),
+            "per-tip cap ON (RE1_PL_PER_TIP_CAP=1 for local workers; "
+            "set the same env on remote worker launch cmds)",
+        )
+    if not bool(getattr(args, "grind", False)):
+        return
+    # Faster cadence only when the flag is still at its full-game default;
+    # explicit CLI values always win (and are the revert path).
+    if float(args.sync_interval_s) == float(DEFAULT_SYNC_INTERVAL_S):
+        args.sync_interval_s = float(GRIND_SYNC_INTERVAL_S)
+    if int(args.worker_buffer_steps) == 32_000:
+        args.worker_buffer_steps = int(GRIND_WORKER_BUFFER_STEPS)
+    if float(args.epoch_grace_s) == 120.0:
+        args.epoch_grace_s = float(GRIND_EPOCH_GRACE_S)
+    log(
+        getattr(args, "machine_name", "learner"),
+        f"GRIND preset ON: sync_interval_s={float(args.sync_interval_s):.0f} "
+        f"worker_buffer_steps={int(args.worker_buffer_steps)} "
+        f"epoch_grace_s={float(args.epoch_grace_s):.0f} "
+        "(revert: relaunch without --grind)",
+    )
+
+
 def _build_learner_model(args: argparse.Namespace, device: str):
     """Build learner PPO via monolithic ``load_async_learner`` (transplant + Maskable)."""
     from re1_rl.checkpoint_io import resolve_resume_path
@@ -341,11 +392,17 @@ def _build_learner_model(args: argparse.Namespace, device: str):
     # Distributed train_on_rollouts builds its own buffer from worker n_steps;
     # keep model.n_steps aligned with CLI for any SB3 helpers that read it.
     model.n_steps = int(args.n_steps)
+    grind = bool(getattr(args, "grind", False))
+    epoch_hyper = (
+        dict(GRIND_EPOCH_HYPERPARAMS)
+        if grind
+        else dict(DISTRIBUTED_EPOCH_HYPERPARAMS)
+    )
     # Large-batch epoch hyperparams (gentler LR / fewer epochs / bigger minibatches).
     # SB3 stores clip_range as a Schedule callable; a bare float breaks train().
     from stable_baselines3.common.utils import get_schedule_fn
 
-    for key, value in DISTRIBUTED_EPOCH_HYPERPARAMS.items():
+    for key, value in epoch_hyper.items():
         if key == "n_steps":
             continue
         if not hasattr(model, key):
@@ -359,18 +416,21 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         model.batch_size = int(batch_override)
         log(args.machine_name, f"--batch-size override -> {model.batch_size}")
     if hasattr(model, "lr_schedule"):
-        lr = float(DISTRIBUTED_EPOCH_HYPERPARAMS["learning_rate"])
+        lr = float(epoch_hyper["learning_rate"])
         model.lr_schedule = lambda _progress: lr
         if getattr(model, "policy", None) is not None and hasattr(model.policy, "optimizer"):
             for group in model.policy.optimizer.param_groups:
                 group["lr"] = lr
-    # Ops: RE1_TARGET_KL overrides; else use DISTRIBUTED_EPOCH_HYPERPARAMS target_kl.
+    # Ops: RE1_TARGET_KL overrides; else use the selected preset target_kl
+    # (grind preset is None = KL early-stop disabled).
     _tk_raw = os.environ.get("RE1_TARGET_KL", "").strip()
     if _tk_raw:
         model.target_kl = float(_tk_raw)
         log(args.machine_name, f"RE1_TARGET_KL override -> target_kl={model.target_kl}")
-    elif DISTRIBUTED_EPOCH_HYPERPARAMS.get("target_kl") is not None:
-        model.target_kl = float(DISTRIBUTED_EPOCH_HYPERPARAMS["target_kl"])
+    elif epoch_hyper.get("target_kl") is not None:
+        model.target_kl = float(epoch_hyper["target_kl"])
+    else:
+        model.target_kl = None
     try:
         from re1_rl.modality_ablations import maybe_apply_discriminative_optimizer
 
@@ -382,13 +442,17 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         log(args.machine_name, f"resumed learner from {resume_path}")
     log(
         args.machine_name,
-        f"epoch hyperparams lr={DISTRIBUTED_EPOCH_HYPERPARAMS['learning_rate']} "
+        f"epoch hyperparams mode={'GRIND' if grind else 'baseline'} "
+        f"lr={epoch_hyper['learning_rate']} "
         f"batch_size={model.batch_size} "
-        f"n_epochs={DISTRIBUTED_EPOCH_HYPERPARAMS['n_epochs']} "
-        f"gamma={DISTRIBUTED_EPOCH_HYPERPARAMS['gamma']} "
+        f"n_epochs={epoch_hyper['n_epochs']} "
+        f"gamma={epoch_hyper['gamma']} "
         f"ent_coef={getattr(model, 'ent_coef', None)} "
         f"clip_range={getattr(model, 'clip_range', None)} "
-        f"target_kl={getattr(model, 'target_kl', None)}",
+        f"target_kl={getattr(model, 'target_kl', None)} "
+        f"max_grad_norm={epoch_hyper.get('max_grad_norm')} "
+        f"per_tip_cap={os.environ.get('RE1_PL_PER_TIP_CAP', '0')} "
+        "(revert: relaunch without --grind/--per-tip-cap)",
     )
     return model, ckpt_dir
 
@@ -1189,6 +1253,7 @@ def main() -> int:
     args = build_parser().parse_args()
     if args.actor_ranks is not None:
         args.n_envs = len(args.actor_ranks)
+    _apply_grind_defaults(args)
     if bool(getattr(args, "eval_only", False)):
         os.environ["RE1_EVAL_ONLY"] = "1"
     if args.memlog:

@@ -302,6 +302,90 @@ def planner_max_steps_extension(*, boss: bool = False) -> int:
     return int(PLANNER_BOSS_MAX_STEPS) if boss else int(PLANNER_DEFAULT_MAX_STEPS)
 
 
+# Per-tip grind cap: shrink the episode wall to ~1.5x the recorded hop time.
+# Opt-in via RE1_PL_PER_TIP_CAP=1 (revert = unset/0 keeps the flat 6/12min walls).
+# Recorded frames come from the *target* cell meta.json quality[7] (-leg_frames).
+PER_TIP_CAP_DEFAULT_FACTOR = 1.5
+PER_TIP_CAP_BOSS_FACTOR = 2.0
+PER_TIP_CAP_FLOOR_STEPS = 150  # 20s: spawn settle + door cinema on trivial hops
+PER_TIP_CAP_COMBAT_SLACK_STEPS = 50  # extra headroom on long (combat/puzzle) hops
+PER_TIP_CAP_COMBAT_RECORDED_FRAMES = 400
+
+
+def per_tip_cap_enabled() -> bool:
+    return str(os.environ.get("RE1_PL_PER_TIP_CAP", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def per_tip_cap_factor(*, boss: bool = False) -> float:
+    if boss:
+        return float(PER_TIP_CAP_BOSS_FACTOR)
+    try:
+        return max(
+            1.0, float(os.environ.get("RE1_PL_PER_TIP_FACTOR", "") or 0.0) or 1.5
+        )
+    except (TypeError, ValueError):
+        return float(PER_TIP_CAP_DEFAULT_FACTOR)
+
+
+def per_tip_cap_floor_steps() -> int:
+    """Floor override in steps (0 = use default floor)."""
+    try:
+        return max(0, int(float(os.environ.get("RE1_PL_PER_TIP_FLOOR_STEPS", "") or 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _per_tip_cap_floor_steps() -> int:
+    override = per_tip_cap_floor_steps()
+    return int(override) if override > 0 else int(PER_TIP_CAP_FLOOR_STEPS)
+
+
+def recorded_frames_for_pl(target_slot: int, cells_root: Any) -> int:
+    """Recorded hop frames for target ``plNN`` (0 = unknown, keep flat wall)."""
+    try:
+        import json
+        from pathlib import Path
+
+        meta = (
+            Path(cells_root) / "cells" / f"pl{int(target_slot):02d}" / "meta.json"
+        )
+        if not meta.is_file():
+            return 0
+        quality = (json.loads(meta.read_text(encoding="utf-8")) or {}).get("quality")
+        if not isinstance(quality, (list, tuple)) or len(quality) <= 7:
+            return 0
+        frames = -int(quality[7])
+        if frames <= 0 or frames >= 99_999_999:
+            return 0
+        return int(frames)
+    except (OSError, ValueError, TypeError):
+        return 0
+
+
+def per_tip_cap_frames(recorded_frames: int, *, boss: bool = False) -> int:
+    """Episode wall (emulated frames) for a hop recorded at ``recorded_frames``."""
+    import math
+
+    recorded = max(0, int(recorded_frames))
+    if recorded <= 0:
+        return int(planner_timeout_frames(boss=boss))
+    steps = int(math.ceil(recorded / 8.0))
+    cap_steps = int(math.ceil(steps * per_tip_cap_factor(boss=boss)))
+    if recorded >= int(PER_TIP_CAP_COMBAT_RECORDED_FRAMES):
+        cap_steps += int(PER_TIP_CAP_COMBAT_SLACK_STEPS)
+    cap_steps = max(int(_per_tip_cap_floor_steps()), int(cap_steps))
+    cap_steps = min(
+        int(cap_steps),
+        int(planner_max_steps_extension(boss=boss)),
+    )
+    return int(cap_steps * 8)
+
+
 def _clip01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
 

@@ -107,6 +107,7 @@ $env:RE1_GRID_LOCK_INTERVAL_S = '0.15'
 $env:RE1_GRID_MONITOR = 'right'
 $env:RE1_PLANNER_RESET_PIN_FILE = 'D:\re1_rl\data\planner_loyal_reset_pin.env'
 $env:RE1_PLANNER_HOP_SCORE_V1 = '1'
+$env:RE1_PL_PER_TIP_CAP = '1'
 New-Item -ItemType Directory -Force -Path (Join-Path $ROOT 'data\logs') | Out-Null
 # Rotate prior log so crash-loop detection is for this boot only.
 $logPath = Join-Path $ROOT 'data\logs\worker_pking-recomp.log'
@@ -151,19 +152,19 @@ if (-not $PkingOnly) {
   }
 
   $startJobs = @()
-  # WH2 has the most envs and historically attaches mid-boot (rc=1) then
-  # full-restarts. Start it first so its staggered boot is already underway
-  # while WH1/WH3 come up; also pass early cooldown + batch retries.
+  # WH2 has the most envs and historically attaches mid-boot (rc=1).
+  # Old knobs (batch=2, stagger=1.25*rank) made a ~9 min all-or-nothing boot
+  # and retries re-paid 25-34s sleeps. Prefer batch=4, stagger=0, short cooldown.
   $wh2 = $remotes | Where-Object { $_.Wid -eq 'wh2-recomp' } | Select-Object -First 1
   $others = @($remotes | Where-Object { $_.Wid -ne 'wh2-recomp' })
 
   function Start-RemoteWorkerJob($r, $BatchMax, $Stagger) {
     return Start-Job -ScriptBlock {
       param($Ssh, $Rl, $Recomp, $Wid, $Machine, $NEnvs, $BasePort, $Ranks, $BatchMax, $Stagger)
-      $batchCap = if ($Wid -eq 'wh2-recomp') { 2 } else { [int]$BatchMax }
-      $staggerS = if ($Wid -eq 'wh2-recomp') { '1.25' } else { $Stagger }
-      $cooldownAfter = if ($Wid -eq 'wh2-recomp') { 8 } else { 20 }
-      $cooldownS = if ($Wid -eq 'wh2-recomp') { '5' } else { '0' }
+      $batchCap = if ($Wid -eq 'wh2-recomp') { 4 } else { [int]$BatchMax }
+      $staggerS = if ($Wid -eq 'wh2-recomp') { '0' } else { $Stagger }
+      $cooldownAfter = if ($Wid -eq 'wh2-recomp') { 4 } else { 20 }
+      $cooldownS = if ($Wid -eq 'wh2-recomp') { '2' } else { '0' }
       $retries = if ($Wid -eq 'wh2-recomp') { 3 } else { 2 }
       $batch = [Math]::Min([int]$NEnvs, $batchCap)
       $argLine = "-Rl `"$Rl`" -Recomp `"$Recomp`" -WorkerId $Wid -MachineName $Machine -NEnvs $NEnvs -BasePort $BasePort -ActorRanks $Ranks -Visible 0 -StartupBatch $batch -StartupStaggerS $staggerS -CooldownAfter $cooldownAfter -CooldownS $cooldownS -BatchRetries $retries"

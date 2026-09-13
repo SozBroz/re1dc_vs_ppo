@@ -27,16 +27,21 @@ Get-CimInstance Win32_Process -Filter "Name='python.exe'" -EA SilentlyContinue |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force -EA SilentlyContinue }
 Get-Process -Name 'Resident_Evil_Director_s_Cut_Recompiled' -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinue
 # Free the worker port band so a prior crash cannot leave LISTEN ghosts that
-# make the next attach die with rc=1 (WH2 classic).
+# make the next attach die with rc=1 (WH2 classic). Kill any owner on the band,
+# not only Listen, and clear stale port-by-pid maps.
 $portLo = [int]$BasePort
 $portHi = $portLo + [Math]::Max(0, [int]$NEnvs - 1)
 for ($p = $portLo; $p -le $portHi; $p++) {
-  Get-NetTCPConnection -LocalPort $p -State Listen -EA SilentlyContinue |
+  Get-NetTCPConnection -LocalPort $p -EA SilentlyContinue |
     ForEach-Object {
       try { Stop-Process -Id $_.OwningProcess -Force -EA SilentlyContinue } catch {}
     }
 }
-Start-Sleep -Seconds 2
+$emuMap = Join-Path $Rl 'data\emu_port_by_pid'
+if (Test-Path $emuMap) {
+  Get-ChildItem $emuMap -File -EA SilentlyContinue | Remove-Item -Force -EA SilentlyContinue
+}
+Start-Sleep -Seconds 3
 
 $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $log = Join-Path $logDir "worker_${WorkerId}.$stamp.log"
@@ -61,6 +66,7 @@ set LEARNER_PORT=8765
 set RE1_PLANNER_CHUNK=$Rl\data\planner_chunks\cp05_shield_key.json
 set RE1_PLANNER_RESET_PIN_FILE=$Rl\data\planner_loyal_reset_pin.env
 set RE1_PLANNER_HOP_SCORE_V1=1
+set RE1_PL_PER_TIP_CAP=1
 set N_ENVS=$NEnvs
 set BASE_PORT=$BasePort
 set WORKER_ID=$WorkerId

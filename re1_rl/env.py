@@ -3055,21 +3055,21 @@ class RE1Env(gym.Env):
             frames = int(
                 planner_timeout_frames(boss=current_step_is_boss(queue))
             )
+            tip_slot = None
+            tip = str(getattr(self, "_planner_loyal_tip", "") or "")
+            if tip.startswith("pl"):
+                try:
+                    tip_slot = int(tip[2:])
+                except ValueError:
+                    tip_slot = None
+            if tip_slot is None:
+                try:
+                    tip_slot = int(
+                        getattr(self, "_planner_loyal_start_index", -1)
+                    )
+                except (TypeError, ValueError):
+                    tip_slot = None
             if room_segments_enabled():
-                tip_slot = None
-                tip = str(getattr(self, "_planner_loyal_tip", "") or "")
-                if tip.startswith("pl"):
-                    try:
-                        tip_slot = int(tip[2:])
-                    except ValueError:
-                        tip_slot = None
-                if tip_slot is None:
-                    try:
-                        tip_slot = int(
-                            getattr(self, "_planner_loyal_start_index", -1)
-                        )
-                    except (TypeError, ValueError):
-                        tip_slot = None
                 seg = (
                     segment_for_tip_slot(tip_slot, self.project_root)
                     if tip_slot is not None and tip_slot >= 0
@@ -3089,6 +3089,38 @@ class RE1Env(gym.Env):
                     )
                 else:
                     self._progress.room_segment = None
+            if getattr(self._progress, "room_segment", None) is None:
+                # Grind: shrink the wall to ~1.5x the target's recorded hop.
+                # Segments keep their shared budget; unset = flat 6/12min wall.
+                from re1_rl.planner_hop_score import (
+                    per_tip_cap_enabled,
+                    per_tip_cap_frames,
+                    recorded_frames_for_pl,
+                )
+                from re1_rl.planner_loyal_cells import planner_loyal_root
+
+                if per_tip_cap_enabled() and tip_slot is not None and tip_slot >= 0:
+                    recorded = int(
+                        recorded_frames_for_pl(
+                            int(tip_slot) + 1,
+                            planner_loyal_root(self.project_root),
+                        )
+                    )
+                    if recorded > 0:
+                        capped = int(
+                            per_tip_cap_frames(
+                                recorded,
+                                boss=current_step_is_boss(queue),
+                            )
+                        )
+                        if capped < int(frames):
+                            print(
+                                f"[per_tip_cap] tip=pl{tip_slot:02d} "
+                                f"target=pl{tip_slot + 1:02d} "
+                                f"recorded={recorded}f wall {frames}f->{capped}f",
+                                flush=True,
+                            )
+                            frames = capped
         elif flat_cell_timeout_enabled():
             # Flat-12m yawn: plain 12 min — ignore yawn_cell_timeouts.json.
             frames = int(FLAT_CELL_TIMEOUT_FRAMES)
