@@ -50,10 +50,22 @@ def test_recorded_frames_from_meta(tmp_path):
     cells = tmp_path / "cells" / "pl23"
     cells.mkdir(parents=True)
     (cells / "meta.json").write_text(
-        json.dumps({"quality": [96, 2, 47, 0, 0, 0, 0, -449]}), encoding="utf-8"
+        json.dumps({"quality": [96, 2, 47, 100, 4, 1, 0, -30, -449, 0, 719]}),
+        encoding="utf-8",
     )
     assert recorded_frames_for_pl(23, tmp_path) == 449
     assert recorded_frames_for_pl(24, tmp_path) == 0  # missing target -> flat wall
+
+
+def test_recorded_frames_uses_dim_8_not_dim_7(tmp_path):
+    # Real pl01 shape: dim 7 is a constant (-30), frames live at dim 8 (-42).
+    cells = tmp_path / "cells" / "pl01"
+    cells.mkdir(parents=True)
+    (cells / "meta.json").write_text(
+        json.dumps({"quality": [96, 0, 45, 100, 4, 1, 0, -30, -42, 0, 998]}),
+        encoding="utf-8",
+    )
+    assert recorded_frames_for_pl(1, tmp_path) == 42
 
 
 def test_grind_preset_overfits_but_keeps_gamma():

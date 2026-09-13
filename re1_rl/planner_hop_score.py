@@ -304,7 +304,7 @@ def planner_max_steps_extension(*, boss: bool = False) -> int:
 
 # Per-tip grind cap: shrink the episode wall to ~1.5x the recorded hop time.
 # Opt-in via RE1_PL_PER_TIP_CAP=1 (revert = unset/0 keeps the flat 6/12min walls).
-# Recorded frames come from the *target* cell meta.json quality[7] (-leg_frames).
+# Recorded frames come from the *target* cell meta.json quality[8] (-frames).
 PER_TIP_CAP_DEFAULT_FACTOR = 1.5
 PER_TIP_CAP_BOSS_FACTOR = 2.0
 PER_TIP_CAP_FLOOR_STEPS = 150  # 20s: spawn settle + door cinema on trivial hops
@@ -357,9 +357,9 @@ def recorded_frames_for_pl(target_slot: int, cells_root: Any) -> int:
         if not meta.is_file():
             return 0
         quality = (json.loads(meta.read_text(encoding="utf-8")) or {}).get("quality")
-        if not isinstance(quality, (list, tuple)) or len(quality) <= 7:
+        if not isinstance(quality, (list, tuple)) or len(quality) <= 8:
             return 0
-        frames = -int(quality[7])
+        frames = -int(quality[8])
         if frames <= 0 or frames >= 99_999_999:
             return 0
         return int(frames)
