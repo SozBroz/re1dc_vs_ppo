@@ -1033,6 +1033,9 @@ def _actor_process(
                         policy_version=int(msg.get("policy_version", 0) or 0),
                         n_actions=int(env.action_space.n),
                     )
+                    # Raw pre-action obs for offline odds recapture
+                    # (scripts/recompute_mint_odds.py). RAM-only for the episode.
+                    _footage_env.append_obs(obs_before)
                 except (TypeError, ValueError, AttributeError):
                     pass
             if info:

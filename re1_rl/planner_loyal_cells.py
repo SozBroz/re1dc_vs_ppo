@@ -1211,6 +1211,49 @@ def live_graft_matches_claim(env: Any, state: dict[str, Any]) -> bool:
     return hp > 0
 
 
+def _mint_policy_pointer(env: Any) -> dict[str, Any]:
+    """Identify the weights that ran the minted episode for offline recapture.
+
+    ``policy_version`` resolves to ``data/mint_policies/weights/v<V>.pt`` via
+    :mod:`re1_rl.distributed.weight_archive` (archived on every weight pull /
+    publish). ``leg_policy.npz`` already stores the live per-step action
+    distribution; version + temperature (+ mod_drop flag) let
+    ``scripts/recompute_mint_odds.py`` recompute it exactly from weights.
+    Fail-open dict: capture must never break when telemetry is absent.
+    """
+    import time
+
+    version = 0
+    try:
+        buf = getattr(env, "_footage_trace", None)
+        version = int(getattr(buf, "policy_version", 0) or 0)
+    except (TypeError, ValueError, AttributeError):
+        version = 0
+    try:
+        from re1_rl.inference_config import inference_temperature_from_env
+
+        temperature = float(inference_temperature_from_env())
+    except (ImportError, TypeError, ValueError, AttributeError):
+        temperature = 1.0
+    try:
+        from re1_rl.modality_config import mod_drop_enabled
+
+        mod_drop = bool(mod_drop_enabled())
+    except (ImportError, AttributeError):
+        mod_drop = False
+    try:
+        minted_at = time.time()
+    except (OSError, ValueError):
+        minted_at = 0.0
+    return {
+        "policy_version": int(version),
+        "inference_temperature": float(temperature),
+        "mod_drop": bool(mod_drop),
+        "machine": str(os.environ.get("MACHINE_NAME") or ""),
+        "minted_at_unix": float(minted_at),
+    }
+
+
 def capture_planner_loyal_cell(
     env: Any,
     state: dict[str, Any],
@@ -1377,6 +1420,7 @@ def capture_planner_loyal_cell(
         "chunk_final": bool(is_final),
         "kills": kill_audit,
         "hop_score": hop_s,
+        "mint_policy": _mint_policy_pointer(env),
         "state_sha256": _sha256_file(state_path),
         "sidecar_sha256": _sha256_file(sidecar_path),
         "bytes": state_path.stat().st_size,

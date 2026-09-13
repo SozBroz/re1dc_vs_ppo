@@ -26,6 +26,7 @@ data/footage/
 
 # Checkpoints & training artifacts (never commit weights)
 data/checkpoints/
+data/mint_policies/
 data/*.zip
 data/.ppo_*
 data/_ckpt_write*

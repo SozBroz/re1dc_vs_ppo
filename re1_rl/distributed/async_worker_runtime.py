@@ -38,6 +38,24 @@ from re1_rl.distributed.worker_client import WorkerClient
 from re1_rl.training_progress import TrainingProgressTracker
 
 
+def _archive_policy_weights(version: int, policy_bytes: bytes | None) -> None:
+    """Persist pulled weights for mint recapture (never fails the caller)."""
+    if not policy_bytes:
+        return
+    try:
+        from re1_rl.async_fleet import PROJECT_ROOT
+    except ImportError:
+        PROJECT_ROOT = None
+    try:
+        from re1_rl.distributed.weight_archive import note_policy_version_weights
+    except ImportError:
+        return
+    try:
+        note_policy_version_weights(PROJECT_ROOT, int(version), bytes(policy_bytes))
+    except (TypeError, ValueError):
+        pass
+
+
 DEFAULT_ACTOR_STALE_TIMEOUT_S = 720.0
 DEFAULT_EMUHAWK_HUNG_S = 30.0
 DEFAULT_ACTOR_RECOVER_COOLDOWN_S = 45.0
@@ -490,11 +508,13 @@ def _flush_remote_epoch(
         version, data = client.fetch_weights(min_version=policy.policy_version + 1)
         if version > policy.policy_version and data:
             policy.load_from_bytes(data, version)
+            _archive_policy_weights(version, data)
             log(machine_name, f"sync epoch weight pull -> policy_version={version}")
         else:
             version, data = client.fetch_weights(min_version=0)
             if version > policy.policy_version and data:
                 policy.load_from_bytes(data, version)
+                _archive_policy_weights(version, data)
                 log(
                     machine_name,
                     f"sync epoch weight pull (refresh) -> policy_version={version}",
@@ -586,6 +606,16 @@ def _flush_local_epoch(
                 state_dict = weight_store.get_state_dict()
                 if state_dict is not None:
                     policy.load_from_state_dict(state_dict, version)
+                    try:
+                        from re1_rl.distributed.weights import (
+                            policy_bytes_from_state_dict,
+                        )
+
+                        _archive_policy_weights(
+                            version, policy_bytes_from_state_dict(state_dict)
+                        )
+                    except ImportError:
+                        pass
                     log(
                         machine_name,
                         f"sync epoch (local) weight pull -> policy_version={version}",
@@ -1012,6 +1042,16 @@ def run_async_worker_loop(
                     state_dict = weight_store.get_state_dict()
                     if state_dict is not None:
                         policy.load_from_state_dict(state_dict, version)
+                        try:
+                            from re1_rl.distributed.weights import (
+                                policy_bytes_from_state_dict,
+                            )
+
+                            _archive_policy_weights(
+                                version, policy_bytes_from_state_dict(state_dict)
+                            )
+                        except ImportError:
+                            pass
                         log(
                             machine_name,
                             f"backpressure weight pull -> policy_version={version}",
@@ -1028,6 +1068,7 @@ def run_async_worker_loop(
                 )
                 if version > policy.policy_version and data:
                     policy.load_from_bytes(data, version)
+                    _archive_policy_weights(version, data)
                     log(
                         machine_name,
                         f"backpressure weight pull -> policy_version={version}",

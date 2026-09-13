@@ -22,15 +22,28 @@ def new_footage_trace_buffer() -> "FootageTraceBuffer":
 
 
 class FootageTraceBuffer:
-    """In-memory legal-action + odds tape. Written only on cell capture."""
+    """In-memory legal-action + odds tape. Written only on cell capture.
 
-    __slots__ = ("action", "action_mask", "masked_probs", "policy_version")
+    Optionally also carries one raw pre-action obs dict per step
+    (``append_obs``) so ``scripts/recompute_mint_odds.py`` can re-run the
+    exact forward offline. Obs live only in RAM for the episode and are
+    dumped to the gitignored mint-policies dir, never into the cell.
+    """
+
+    __slots__ = (
+        "action",
+        "action_mask",
+        "masked_probs",
+        "policy_version",
+        "obs_rows",
+    )
 
     def __init__(self) -> None:
         self.action: list[int] = []
         self.action_mask: list[np.ndarray] = []
         self.masked_probs: list[np.ndarray] = []
         self.policy_version = 0
+        self.obs_rows: list[dict[str, np.ndarray]] = []
 
     def __len__(self) -> int:
         return len(self.action)
@@ -54,6 +67,38 @@ class FootageTraceBuffer:
         self.action_mask.append(mask[:n].copy())
         self.masked_probs.append(_vec(masked_probs, n))
         self.policy_version = int(policy_version)
+
+    def append_obs(self, obs: Any) -> None:
+        """Stash a copy of the raw pre-action obs dict for this step."""
+        try:
+            row = {str(k): np.asarray(v).copy() for k, v in dict(obs).items()}
+        except (TypeError, ValueError, AttributeError):
+            return
+        self.obs_rows.append(row)
+
+    def write_obs(self, dest: Path) -> Path | None:
+        """Dump stacked per-step obs (gitignored dir). None when empty."""
+        if not self.obs_rows:
+            return None
+        try:
+            keys = list(self.obs_rows[0].keys())
+            payload: dict[str, Any] = {
+                "schema_version": np.int16(SCHEMA_VERSION),
+                "policy_version": np.int32(self.policy_version),
+                "n_steps": np.int32(len(self.obs_rows)),
+            }
+            for key in keys:
+                try:
+                    payload[f"obs_{key}"] = np.stack(
+                        [np.asarray(row[key]) for row in self.obs_rows], axis=0
+                    )
+                except (KeyError, TypeError, ValueError):
+                    return None
+        except (TypeError, ValueError, AttributeError):
+            return None
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(dest, **payload)
+        return dest
 
     def write(self, dest: Path) -> Path:
         dest.parent.mkdir(parents=True, exist_ok=True)

@@ -338,6 +338,18 @@ def build_parser() -> argparse.ArgumentParser:
     return ap
 
 
+def _archive_published_weights(weight_store: WeightStore) -> None:
+    """Persist just-published learner weights for mint recapture (best effort)."""
+    try:
+        from re1_rl.distributed.weight_archive import note_policy_version_weights
+
+        version, blob = weight_store.snapshot()
+        if blob:
+            note_policy_version_weights(PROJECT_ROOT, int(version), bytes(blob))
+    except Exception:  # noqa: BLE001 -- archiving must never break training
+        pass
+
+
 def _apply_grind_defaults(args: argparse.Namespace) -> None:
     """Opt-in grind wiring; full-game defaults are untouched without --grind."""
     if bool(getattr(args, "per_tip_cap", False)):
@@ -803,6 +815,7 @@ def _run_learner(args: argparse.Namespace) -> int:
 
     initial_version = weight_store.publish(export_policy_state_dict(model))
     learner_state.set_current_version(initial_version)
+    _archive_published_weights(weight_store)
     log(args.machine_name, f"published initial policy_version={initial_version}")
 
     stop_event = threading.Event()
@@ -1050,6 +1063,7 @@ def _run_learner(args: argparse.Namespace) -> int:
                 train_wall_s = time.monotonic() - train_t0
                 version = weight_store.publish(export_policy_state_dict(model))
                 learner_state.set_current_version(version)
+                _archive_published_weights(weight_store)
                 rss_after = _rss_gb()
                 next_admitted = int(learner_state.admitted_steps())
                 cycle_wall_s = collection_wall_s + train_wall_s

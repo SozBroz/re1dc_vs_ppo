@@ -1764,7 +1764,9 @@ class RE1Env(gym.Env):
         except (TypeError, ValueError, OSError):
             tape_path = None
         try:
-            policy_path = maybe_write_planner_footage_trace(self, dest_dir)
+            policy_path = maybe_write_planner_footage_trace(
+                self, dest_dir, slot=int(slot)
+            )
         except (TypeError, ValueError, OSError):
             policy_path = None
         if tape_path is not None:

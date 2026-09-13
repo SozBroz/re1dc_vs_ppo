@@ -281,11 +281,56 @@ def maybe_write_planner_capture_tape(
     return dest
 
 
-def maybe_write_planner_footage_trace(env: Any, dest_dir: Path) -> Path | None:
-    """Write ``leg_policy.npz`` into an already-minted ``plNN`` dir."""
+def maybe_write_planner_footage_trace(
+    env: Any, dest_dir: Path, *, slot: int | None = None
+) -> Path | None:
+    """Write ``leg_policy.npz`` into an already-minted ``plNN`` dir.
+
+    Also dumps the raw per-step pre-action obs (when the actor stashed them)
+    to the gitignored ``data/mint_policies/obs/pl<NN>_v<V>.npz`` so
+    ``scripts/recompute_mint_odds.py`` can re-run the exact forward offline.
+    Returns the ``leg_policy.npz`` path (obs path is deterministic from the
+    cell meta: slot + ``mint_policy.policy_version``).
+    """
     if not should_write_planner_leg_replay(env):
         return None
     buf = getattr(env, "_footage_trace", None)
     if buf is None or len(buf) == 0:
         return None
-    return buf.write(Path(dest_dir) / CELL_POLICY_NAME)
+    policy_path = buf.write(Path(dest_dir) / CELL_POLICY_NAME)
+    try:
+        _maybe_write_mint_obs(env, buf, slot=slot)
+    except (OSError, TypeError, ValueError, AttributeError):
+        pass
+    return policy_path
+
+
+def _maybe_write_mint_obs(env: Any, buf: Any, *, slot: int | None) -> None:
+    """Dump per-step obs for offline odds recapture (best effort)."""
+    rows = list(getattr(buf, "obs_rows", None) or [])
+    if not rows:
+        return
+    try:
+        slot_i = int(slot) if slot is not None else -1
+    except (TypeError, ValueError):
+        return
+    if slot_i < 0:
+        return
+    try:
+        version = int(getattr(buf, "policy_version", 0) or 0)
+    except (TypeError, ValueError):
+        version = 0
+    try:
+        root = Path(env.project_root)
+    except (TypeError, ValueError, AttributeError):
+        return
+    dest = (
+        root / "data" / "mint_policies" / "obs" / f"pl{slot_i:02d}_v{version}.npz"
+    )
+    try:
+        from re1_rl.footage_trace import FootageTraceBuffer
+
+        if isinstance(buf, FootageTraceBuffer):
+            buf.write_obs(dest)
+    except (OSError, TypeError, ValueError, AttributeError):
+        pass
