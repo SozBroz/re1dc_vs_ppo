@@ -250,3 +250,32 @@ def test_stop_bound_holds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     with open(tmp_path / "data" / "planner_loyal_reset_pin.env", "a", encoding="utf-8") as f:
         f.write("RE1_PLANNER_MARCH_STOP=2\n")
     assert maybe_advance_planner_march(tmp_path) is None
+
+
+def test_per_frame_dwell_scales_with_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from re1_rl.planner_march import _march_min_s_for_pin
+
+    _setup(tmp_path, monkeypatch, q_next=Q_FAT)  # target pl03, 36 recorded frames
+    monkeypatch.delenv("RE1_PLANNER_MARCH_MIN_S_PER_FRAME", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_LOYAL_CELLS_ROOT", raising=False)
+    assert _march_min_s_for_pin(2, tmp_path) == 600.0  # flat default
+    with open(tmp_path / "data" / "planner_loyal_reset_pin.env", "a", encoding="utf-8") as f:
+        f.write("RE1_PLANNER_MARCH_MIN_S_PER_FRAME=1.2\n")
+    assert _march_min_s_for_pin(2, tmp_path) == pytest.approx(1.2 * 36)
+    # Unknown target (first mint) falls back to the flat MIN_S.
+    assert _march_min_s_for_pin(9, tmp_path) == 600.0
+
+
+def test_per_frame_dwell_floor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from re1_rl.planner_march import _march_min_s_for_pin
+
+    tiny = list(Q_FAT)
+    tiny[8] = -4
+    _setup(tmp_path, monkeypatch, q_next=tiny)  # target pl03, 4 recorded frames
+    monkeypatch.delenv("RE1_PLANNER_MARCH_MIN_S_PER_FRAME", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_LOYAL_CELLS_ROOT", raising=False)
+    with open(tmp_path / "data" / "planner_loyal_reset_pin.env", "a", encoding="utf-8") as f:
+        f.write("RE1_PLANNER_MARCH_MIN_S_PER_FRAME=1.2\n")
+    assert _march_min_s_for_pin(2, tmp_path) == 5.0  # 4.8s -> 5s floor

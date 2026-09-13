@@ -91,6 +91,39 @@ def _march_min_s(project_root: Path | str | None) -> float:
         return _DEFAULT_MIN_S
 
 
+_MARCH_MIN_S_PER_FRAME_ENV = "RE1_PLANNER_MARCH_MIN_S_PER_FRAME"
+
+
+def _march_min_s_for_pin(pin: int, project_root: Path | str | None) -> float:
+    """Dwell gate for pin N: flat MIN_S, or PER_FRAME × target's recorded frames.
+
+    ``RE1_PLANNER_MARCH_MIN_S_PER_FRAME=1.2`` makes the grind proportional to
+    hop length (short hops roll fast, combat hops get real grind). Unknown
+    target (first mint) falls back to the flat MIN_S. Floor 5s.
+    """
+    base = _march_min_s(project_root)
+    from re1_rl.planner_loyal_cells import _pin_raw
+
+    try:
+        per_frame = float(
+            (_pin_raw(_MARCH_MIN_S_PER_FRAME_ENV, project_root) or "").strip() or 0.0
+        )
+    except (TypeError, ValueError, AttributeError):
+        return base
+    if per_frame <= 0:
+        return base
+    try:
+        from re1_rl.planner_hop_score import recorded_frames_for_pl
+        from re1_rl.planner_loyal_cells import planner_loyal_root
+
+        recorded = int(recorded_frames_for_pl(int(pin) + 1, planner_loyal_root(project_root)))
+    except (OSError, ValueError, TypeError):
+        return base
+    if recorded <= 0:
+        return base
+    return max(5.0, float(per_frame) * float(recorded))
+
+
 def _file_pin_index(pin_file: Path) -> int | None:
     """Exclusive INDEX from the pin *file* (env-sourced pins are not rewritable)."""
     from re1_rl.planner_loyal_cells import _parse_pin_index
@@ -436,7 +469,7 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
             {**state, "pin_idx": pin, "pin_since_unix": wall_now},
         )
         return None
-    if wall_now - pin_since_f < _march_min_s(project_root):
+    if wall_now - pin_since_f < _march_min_s_for_pin(pin, project_root):
         return None
     nxt = pin + 1
     champ = _champions(project_root).get(nxt)
