@@ -2234,6 +2234,34 @@ class RE1Env(gym.Env):
             "no planner cell.pst fallback on disk"
         )
 
+    def _reload_fresh_init_savestate(self) -> dict[str, Any]:
+        """Fresh stage start when a pb graft/sidecar is unusable.
+
+        Used when a poisoned cell graft (room 0/``100`` + hp 0 decode) refuses
+        to match its sidecar even after sidecar apply, and for the legacy
+        non-recomp mismatch path. Never trains on the poisoned bytes.
+        """
+        state_path = self.project_root / self._stage["init_savestate"]
+        # C-RE1 only loads .pst; BizHawk .State fallback would
+        # NotImplemented and kill the actor.
+        state_path = self._recomp_loadable_savestate(state_path)
+        self.bridge.load_savestate(str(state_path))
+        self._sticky_input.reset()
+        self._prev_action = None
+        self.bridge.clear_latched_input()
+        self.bridge.frameadvance(1)
+        if self._ram_skip.use_engine_patches:
+            self._ram_skip.install_engine_patches()
+        self._skip_uncontrolled()
+        self.bridge.clear_latched_input()
+        self._progress = ProgressTracker(leg_span=self._leg_span)
+        self._visited.reset()
+        self._box_cache = None
+        state = self._read_state(track_items=True)
+        self._seed_episode_progress(state)
+        self._episode_history.reset(str(state.get("room_id", "")), step=0)
+        return state
+
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         super().reset(seed=seed)
         opts = dict(options or {})
@@ -2756,13 +2784,33 @@ class RE1Env(gym.Env):
                     apply_episode_sidecar(self, sidecar, reset_softlock=True)
                     state = self._read_state(track_items=True)
                     self._seed_episode_hp(state)
-                    rooms = sorted(self._progress.visited_rooms)
-                    print(
-                        f"[pb] reset applied sidecar visited={rooms} "
-                        f"bundle_id={sidecar.get('bundle_id')} "
-                        f"state={pb_bundle.get('state_path')}",
-                        flush=True,
-                    )
+                    try:
+                        graft_hp = int(state.get("hp", 0) or 0)
+                    except (TypeError, ValueError):
+                        graft_hp = 0
+                    if not bundle_room_matches_sidecar(
+                        state.get("room_id"), sidecar
+                    ) or graft_hp <= 0:
+                        # Poisoned graft (degenerate mint decodes room 0/100 +
+                        # hp 0): refuse to train on it; fresh start instead.
+                        print(
+                            f"[pb] graft still mismatched after sidecar "
+                            f"ram={state.get('room_id')!r} hp={graft_hp} "
+                            f"captured={sidecar.get('captured_room_id')!r}; "
+                            f"refusing poisoned graft, "
+                            f"reloading fresh init_savestate",
+                            flush=True,
+                        )
+                        state = self._reload_fresh_init_savestate()
+                        pb_bundle = None
+                    else:
+                        rooms = sorted(self._progress.visited_rooms)
+                        print(
+                            f"[pb] reset applied sidecar visited={rooms} "
+                            f"bundle_id={sidecar.get('bundle_id')} "
+                            f"state={pb_bundle.get('state_path')}",
+                            flush=True,
+                        )
                 else:
                     print(
                         f"[pb] State/sidecar room mismatch "
@@ -2771,25 +2819,7 @@ class RE1Env(gym.Env):
                         f"reloading fresh init_savestate",
                         flush=True,
                     )
-                    state_path = self.project_root / self._stage["init_savestate"]
-                    # C-RE1 only loads .pst; BizHawk .State fallback would
-                    # NotImplemented and kill the actor.
-                    state_path = self._recomp_loadable_savestate(state_path)
-                    self.bridge.load_savestate(str(state_path))
-                    self._sticky_input.reset()
-                    self._prev_action = None
-                    self.bridge.clear_latched_input()
-                    self.bridge.frameadvance(1)
-                    if self._ram_skip.use_engine_patches:
-                        self._ram_skip.install_engine_patches()
-                    self._skip_uncontrolled()
-                    self.bridge.clear_latched_input()
-                    self._progress = ProgressTracker(leg_span=self._leg_span)
-                    self._visited.reset()
-                    self._box_cache = None
-                    state = self._read_state(track_items=True)
-                    self._seed_episode_progress(state)
-                    self._episode_history.reset(str(state.get("room_id", "")), step=0)
+                    state = self._reload_fresh_init_savestate()
                     pb_bundle = None
             else:
                 apply_episode_sidecar(self, sidecar, reset_softlock=True)

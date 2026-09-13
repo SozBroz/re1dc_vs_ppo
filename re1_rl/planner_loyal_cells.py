@@ -1181,6 +1181,36 @@ def _nearest_predecessor_slot(root: Path, slot: int) -> int | None:
     return None
 
 
+def live_graft_matches_claim(env: Any, state: dict[str, Any]) -> bool:
+    """True when live RAM still shows the claimed mint room with live HP.
+
+    Degenerate mints (2026-09-12 pl01/pl04/pl08) snapshot the emulator while
+    RAM reads room 0/``100`` + hp 0 (door-fade/death transient) even though
+    the completed-step observation claims the real room. Installing that
+    graft poisons the link: every reset loads a boot-state start and the
+    worker trains on garbage. Fail open when RAM is unreadable (bridge
+    hiccup must not change mint behavior); the load path re-verifies.
+    """
+    try:
+        read_state = getattr(env, "_read_state", None)
+        if not callable(read_state):
+            return True
+        live = read_state(track_items=False)
+    except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+        return True
+    if not isinstance(live, dict):
+        return True
+    want_room = str((state or {}).get("room_id") or "").upper()
+    got_room = str(live.get("room_id") or "").upper()
+    try:
+        hp = int(live.get("hp", 0) or 0)
+    except (TypeError, ValueError):
+        return True
+    if want_room and got_room != want_room:
+        return False
+    return hp > 0
+
+
 def capture_planner_loyal_cell(
     env: Any,
     state: dict[str, Any],
@@ -1288,6 +1318,16 @@ def capture_planner_loyal_cell(
         sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
     except Exception as exc:  # noqa: BLE001 — capture must not kill the env
         print(f"[planner_loyal] sidecar dump failed: {exc}", flush=True)
+        shutil.rmtree(staging, ignore_errors=True)
+        return None
+
+    if not live_graft_matches_claim(env, state):
+        print(
+            f"[planner_loyal] reject graft_decode_mismatch "
+            f"{cell_dir_name(slot)} claimed_room={state.get('room_id')}; "
+            f"graft snapshot does not show it live — refusing to poison the link",
+            flush=True,
+        )
         shutil.rmtree(staging, ignore_errors=True)
         return None
 
