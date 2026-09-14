@@ -67,6 +67,7 @@ set RE1_PLANNER_CHUNK=$Rl\data\planner_chunks\cp05_shield_key.json
 set RE1_PLANNER_RESET_PIN_FILE=$Rl\data\planner_loyal_reset_pin.env
 set RE1_PLANNER_HOP_SCORE_V1=1
 set RE1_PL_PER_TIP_CAP=1
+set RE1_PL_ADAPTIVE_CAP=1
 set N_ENVS=$NEnvs
 set BASE_PORT=$BasePort
 set WORKER_ID=$WorkerId

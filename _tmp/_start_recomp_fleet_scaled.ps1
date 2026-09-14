@@ -108,6 +108,7 @@ $env:RE1_GRID_MONITOR = 'right'
 $env:RE1_PLANNER_RESET_PIN_FILE = 'D:\re1_rl\data\planner_loyal_reset_pin.env'
 $env:RE1_PLANNER_HOP_SCORE_V1 = '1'
 $env:RE1_PL_PER_TIP_CAP = '1'
+$env:RE1_PL_ADAPTIVE_CAP = '1'
 New-Item -ItemType Directory -Force -Path (Join-Path $ROOT 'data\logs') | Out-Null
 # Rotate prior log so crash-loop detection is for this boot only.
 $logPath = Join-Path $ROOT 'data\logs\worker_pking-recomp.log'
