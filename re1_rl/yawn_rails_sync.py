@@ -782,6 +782,7 @@ def build_capture_proposal(
     sidecar_path: Path,
     worker_id: str | None = None,
     capacity: dict[str, Any] | None = None,
+    mint_policy: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Pack a local cell capture into a rollout proposal dict."""
     state_bytes = Path(state_path).read_bytes()
@@ -818,6 +819,8 @@ def build_capture_proposal(
         "room_id": str(room_id),
         "quality": q,
     }
+    if isinstance(mint_policy, dict) and mint_policy:
+        meta["mint_policy"] = dict(mint_policy)
     if worker_id:
         meta["worker_id"] = str(worker_id)
     capacity_meta = {
@@ -1269,6 +1272,19 @@ class YawnRailsCellStore:
         try:
             with zipfile.ZipFile(io.BytesIO(bundle_bytes)) as zf:
                 zf.extractall(incoming)
+            # Preserve capture-time extras (mint_policy pointer, kills,
+            # hop_score) that live in the bundled meta but not in the
+            # proposal fields. Validated bundle fields below always win.
+            try:
+                raw_bundled = (incoming / CELL_META_NAME).read_text(
+                    encoding="utf-8-sig"
+                )
+                parsed_bundled = json.loads(raw_bundled)
+                bundled_meta = (
+                    dict(parsed_bundled) if isinstance(parsed_bundled, dict) else {}
+                )
+            except (OSError, ValueError, UnicodeDecodeError):
+                bundled_meta = {}
             meta = {
                 "checkpoint_index": int(checkpoint_index),
                 "checkpoint_id": prop.get("checkpoint_id"),
@@ -1280,6 +1296,9 @@ class YawnRailsCellStore:
                 "bytes": len(bundle_bytes),
                 "route_id": prop.get("route_id") or self.route_id,
             }
+            for bkey, bval in bundled_meta.items():
+                if bkey not in meta:
+                    meta[bkey] = bval
             for key in (
                 "inventory_free_slots",
                 "next_checkpoint_id",

@@ -1668,6 +1668,7 @@ class RE1Env(gym.Env):
                 state_path=Path(state_path),
                 sidecar_path=Path(sidecar_path),
                 worker_id=os.environ.get("MACHINE_NAME"),
+                mint_policy=rec.get("mint_policy"),
             )
         except (OSError, ValueError, TypeError, KeyError) as exc:
             print(f"[planner_loyal] fat bundle pack failed: {exc}", flush=True)

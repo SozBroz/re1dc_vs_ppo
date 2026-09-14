@@ -191,3 +191,75 @@ def test_recompute_script_missing_artifacts(tmp_path) -> None:
         cwd=str(ROOT),
     )
     assert proc.returncode == 1
+
+
+def test_mint_pointer_survives_bundle_install(tmp_path) -> None:
+    """Sync-install path must keep the capture-time mint_policy pointer.
+
+    Regression: pl12's 404f mint lost its pointer because the installed
+    meta was rebuilt from proposal fields only.
+    """
+    import hashlib
+    import io
+    import zipfile
+
+    from re1_rl.go_explore_merge import CELL_META_NAME
+    from re1_rl.yawn_rails_sync import (
+        YawnRailsCellStore,
+        _sha256_bytes,
+        build_capture_proposal,
+        cell_slot_dir,
+    )
+
+    cell = tmp_path / "pl12src"
+    cell.mkdir()
+    (cell / "cell.pst").write_bytes(b"fake-state-bytes")
+    (cell / "cell.sidecar.json").write_text("{}", encoding="utf-8")
+    pointer = {
+        "policy_version": 33,
+        "inference_temperature": 1.0,
+        "mod_drop": False,
+        "machine": "wh9",
+        "minted_at_unix": 1.0,
+    }
+    prop = build_capture_proposal(
+        route_id="planner_loyal_v1",
+        checkpoint_index=12,
+        checkpoint_id="cp05_shield_key_step06",
+        room_id="10F",
+        quality=[96, 0, 0, 0, 0, 0, 0, 0, -404, 0, 726],
+        state_path=cell / "cell.pst",
+        sidecar_path=cell / "cell.sidecar.json",
+        worker_id="wh9",
+        mint_policy=pointer,
+    )
+    blob = __import__("base64").b64decode(prop["bundle_b64"])
+    with zipfile.ZipFile(io.BytesIO(blob)) as zf:
+        bundled = json.loads(zf.read(CELL_META_NAME).decode("utf-8"))
+    assert bundled["mint_policy"]["policy_version"] == 33
+
+    store = YawnRailsCellStore(root=tmp_path / "cells")
+    store.route_id = "planner_loyal_v1"
+    store._write_bundle_unlocked(
+        12,
+        blob,
+        {
+            "checkpoint_id": "cp05_shield_key_step06",
+            "room_id": "10F",
+            "quality": [96, 0, 0, 0, 0, 0, 0, 0, -404, 0, 726],
+        },
+        _sha256_bytes(blob),
+        hashlib.sha256(b"fake-state-bytes").hexdigest(),
+        hashlib.sha256(b"{}").hexdigest(),
+    )
+    installed = json.loads(
+        (cell_slot_dir(tmp_path / "cells", 12) / CELL_META_NAME).read_text(
+            encoding="utf-8"
+        )
+    )
+    # Pointer preserved from the bundle...
+    assert installed["mint_policy"]["policy_version"] == 33
+    assert installed["mint_policy"]["machine"] == "wh9"
+    # ...while validated install fields win.
+    assert installed["quality"] == [96, 0, 0, 0, 0, 0, 0, 0, -404, 0, 726]
+    assert installed["bundle_sha256"] == _sha256_bytes(blob)

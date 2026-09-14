@@ -1407,6 +1407,7 @@ def capture_planner_loyal_cell(
         if queue.chunk_id
         else f"planner_step_{completed + 1:02d}"
     )
+    mint_pointer = _mint_policy_pointer(env)
     meta = {
         "route_id": ROUTE_ID,
         "checkpoint_index": slot,
@@ -1420,7 +1421,7 @@ def capture_planner_loyal_cell(
         "chunk_final": bool(is_final),
         "kills": kill_audit,
         "hop_score": hop_s,
-        "mint_policy": _mint_policy_pointer(env),
+        "mint_policy": mint_pointer,
         "state_sha256": _sha256_file(state_path),
         "sidecar_sha256": _sha256_file(sidecar_path),
         "bytes": state_path.stat().st_size,
@@ -1489,6 +1490,7 @@ def capture_planner_loyal_cell(
         "quality": quality,
         "kills": kill_audit,
         "planner_step": step,
+        "mint_policy": mint_pointer,
         "state_path": str(dest / cell_state_filename()),
         "sidecar_path": str(dest / CELL_SIDECAR_NAME),
         "meta_path": str(dest / CELL_META_NAME),
