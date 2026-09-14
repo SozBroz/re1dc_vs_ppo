@@ -1,4 +1,4 @@
-"""Planner-loyal tape march: hard-grind 100% on one PL until champion quality.
+"""Planner-loyal tape march: hard-grind 100% on one PL until cell qualifies.
 
 When ``RE1_PLANNER_MARCH=1`` (pin-file key or launcher env), each reset
 evaluates one march tick (throttled per process). The exclusive INDEX pin is
@@ -8,23 +8,24 @@ ALL of:
 * the pin has sat on N for ``RE1_PLANNER_MARCH_MIN_S`` (default 600s: minimum
   10 minutes of grind per PL, even if the target falls early),
 * the learner mirror admits N+1 AND this box holds those exact bytes,
-* live ``pl(N+1)`` meta ``quality`` beats the pre-march champion row for N+1
-  (``data/planner_march_champions.json``, minted from the thin cells) on
-  HP[0], kills[1], ammo_dmg_weighted[2], and -frames[8] — equal-or-greater
-  HP/kills/ammo, equal-or-less frames. Rolled equal counts (keep grinding
-  better frames). Short quality on either side never qualifies.
+* live ``pl(N+1)`` meta ``quality`` meets the kit bar: HP[0]/kills[1]/
+  ammo_dmg_weighted[2] equal-or-greater than the pre-march champion row
+  (``data/planner_march_champions.json``), and hop frames[8] within
+  ``RE1_PLANNER_MARCH_FRAMES_FACTOR`` (default **1.1**) of the Frames column
+  in ``docs/planner_loyal_resources.md``. Short quality / missing resources
+  Frames never qualifies.
 
-On advance: crystalize N+1 into Crystals_in_time, rewrite the pin INDEX to
-N+1, and request an NN weight reset on the learner (POST
+On advance **or any INDEX pin move** (manual edit included): crystalize only
+on advance; always request an NN weight reset on the learner (POST
 ``/march/reset_weights``) so training restarts each leg from the base weights
-that could run ~99% of the stretches instead of specializing on one hunt.
-Reset requests are idempotent per advance id and retried on later ticks until
-the learner reports them applied.
+instead of carrying an overfit hunt into the next tip. Reset requests are
+idempotent per advance id and retried on later ticks until the learner
+reports them applied.
 
 Fail-closed everywhere: flag unset, non-exclusive pin, env-sourced INDEX
-(nothing to rewrite), short grind time, missing champion row, missing
-rows/live dirs, stale bytes, stop bound, lock contention, crystal failure,
-unreachable learner -> no-op (pin holds, grind continues).
+(nothing to rewrite), short grind time, missing champion/resources row,
+missing rows/live dirs, stale bytes, stop bound, lock contention, crystal
+failure, unreachable learner -> no-op (pin holds, grind continues).
 """
 
 from __future__ import annotations
@@ -37,17 +38,21 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-# HP / kills / ammo_dmg_weighted / -frames dims of the 11-dim quality.
+# HP / kills / ammo_dmg_weighted dims vs champion; frames vs resources.md.
 # quality[2] is the mint-time damage-weighted ammo scalar, so pistol-vs-shotgun
 # weighting is already settled at capture; the gate just compares scalars.
-_MARCH_DIMS = (0, 1, 2, 8)
+_MARCH_KIT_DIMS = (0, 1, 2)
+_MARCH_FRAMES_DIM = 8
 _MARCH_ENV = "RE1_PLANNER_MARCH"
 _MARCH_STOP_ENV = "RE1_PLANNER_MARCH_STOP"
 _MARCH_MIN_S_ENV = "RE1_PLANNER_MARCH_MIN_S"
-_MARCH_KEYS = (_MARCH_ENV, _MARCH_STOP_ENV, _MARCH_MIN_S_ENV)
+_MARCH_FRAMES_FACTOR_ENV = "RE1_PLANNER_MARCH_FRAMES_FACTOR"
+_MARCH_KEYS = (_MARCH_ENV, _MARCH_STOP_ENV, _MARCH_MIN_S_ENV, _MARCH_FRAMES_FACTOR_ENV)
 _PIN_INDEX_KEY = "RE1_PLANNER_RESET_PIN_INDEX"
 _DEFAULT_MIN_S = 600.0
+_DEFAULT_FRAMES_FACTOR = 1.1
 _CHAMPIONS_REL = Path("data/planner_march_champions.json")
+_RESOURCES_REL = Path("docs/planner_loyal_resources.md")
 _STATE_REL = Path("data/planner_march_state.json")
 _CRYSTAL_REL = Path("backups/Crystals_in_time/planner_rooms")
 _RESET_TIMEOUT_S = 10.0
@@ -55,6 +60,7 @@ _RESET_RETRY_S = 30.0
 
 _LAST_TICK: dict[str, float] = {}
 _CHAMPIONS_CACHE: dict[str, Any] = {}
+_RESOURCES_CACHE: dict[str, Any] = {}
 
 
 def _march_flag(project_root: Path | str | None) -> bool:
@@ -168,21 +174,91 @@ def _champions(project_root: Path | str) -> dict[int, list[int]]:
     return cells
 
 
-def _champion_qualifies(live_q: Any, champ_q: Any) -> bool:
-    """Live mint meets the champion row: HP/kills/ammo >=, frames <=.
+def _march_frames_factor(project_root: Path | str | None) -> float:
+    """Max live hop frames as a multiple of resources.md Frames (default 1.1)."""
+    from re1_rl.planner_loyal_cells import _pin_raw
 
-    Short quality on either side never qualifies.
+    raw = _pin_raw(_MARCH_FRAMES_FACTOR_ENV, project_root)
+    if raw is None:
+        return float(_DEFAULT_FRAMES_FACTOR)
+    try:
+        return max(1.0, float(raw.strip()))
+    except ValueError:
+        return float(_DEFAULT_FRAMES_FACTOR)
+
+
+def _resources_frames(project_root: Path | str) -> dict[int, int]:
+    """``{slot: Frames}`` from ``docs/planner_loyal_resources.md`` Kit-by-PL table."""
+    path = Path(project_root) / _RESOURCES_REL
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return {}
+    cached = _RESOURCES_CACHE.get(str(path))
+    if isinstance(cached, dict) and cached.get("mtime") == mtime:
+        return cached["frames"]
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    frames: dict[int, int] = {}
+    in_kit = False
+    for ln in text.splitlines():
+        s = ln.strip()
+        if s == "## Kit by PL":
+            in_kit = True
+            continue
+        if in_kit and s.startswith("## "):
+            break
+        if not in_kit or not s.startswith("|") or s.startswith("| :") or s.startswith("| PL"):
+            continue
+        parts = [p.strip() for p in s.strip("|").split("|")]
+        if len(parts) < 8:
+            continue
+        name = parts[0].strip("`")
+        if not name.startswith("pl") or not name[2:].isdigit():
+            continue
+        raw = parts[7].strip()
+        if not raw:
+            continue
+        try:
+            frames[int(name[2:])] = int(raw)
+        except ValueError:
+            continue
+    _RESOURCES_CACHE[str(path)] = {"mtime": mtime, "frames": frames}
+    return frames
+
+
+def _champion_qualifies(
+    live_q: Any, champ_q: Any, *, resources_frames: int = 0, frames_factor: float = 1.1
+) -> bool:
+    """Live mint meets kit bar: HP/kills/ammo >= champion, frames <= factor×resources.
+
+    ``resources_frames`` is the docs Frames column (policy decisions, same unit
+    as ``-quality[8]``). Short quality or missing/non-positive resources Frames
+    never qualifies. ``frames_factor`` defaults to 1.1.
     """
+    import math
+
     from re1_rl.planner_loyal_cells import lift_planner_loyal_quality
 
     if len(live_q or []) < 11 or len(champ_q or []) < 11:
+        return False
+    rec = int(resources_frames)
+    if rec <= 0:
         return False
     try:
         live = lift_planner_loyal_quality(live_q)
         champ = lift_planner_loyal_quality(champ_q)
     except (TypeError, ValueError):
         return False
-    return all(live[d] >= champ[d] for d in _MARCH_DIMS)
+    if not all(live[d] >= champ[d] for d in _MARCH_KIT_DIMS):
+        return False
+    live_frames = -int(live[_MARCH_FRAMES_DIM])
+    if live_frames <= 0:
+        return False
+    budget = int(math.ceil(float(rec) * float(frames_factor)))
+    return int(live_frames) <= int(budget)
 
 
 def _mirror_rows(project_root: Path | str) -> dict[int, dict[str, Any]]:
@@ -291,6 +367,32 @@ def _learner_reset_applied(host: str, port: int) -> str | None:
         return None
     applied = block.get("last_applied_advance_id")
     return str(applied) if applied else None
+
+
+def _queue_pin_reset(
+    project_root: Path | str,
+    *,
+    advance_id: str,
+    pin_idx: int,
+    wall_now: float,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    """Persist pending NN reset + pin clock; pump once."""
+    state = _read_march_state(project_root)
+    payload = {
+        **state,
+        "pin_idx": int(pin_idx),
+        "pin_since_unix": wall_now,
+        "pending_reset": {
+            "advance_id": str(advance_id),
+            "requested_unix": wall_now,
+            "last_attempt_unix": 0.0,
+        },
+    }
+    if extra:
+        payload.update(extra)
+    _write_march_state(project_root, payload)
+    _pump_pending_reset(project_root, wall_now)
 
 
 def _pump_pending_reset(project_root: Path | str, now: float) -> None:
@@ -457,12 +559,33 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
     # Keep the outstanding NN reset moving even while grinding.
     _pump_pending_reset(project_root, wall_now)
     # Minimum grind time per PL: first sighting of this pin starts the clock.
+    # Any INDEX move (manual or prior advance on another box) also queues an
+    # NN base reset so overfit weights do not carry into the new tip.
     state = _read_march_state(project_root)
+    prev_pin = state.get("pin_idx")
     pin_since = state.get("pin_idx") == pin and state.get("pin_since_unix") or None
     try:
         pin_since_f = float(pin_since) if pin_since is not None else 0.0
     except (TypeError, ValueError):
         pin_since_f = 0.0
+    try:
+        prev_pin_i = int(prev_pin) if prev_pin is not None else None
+    except (TypeError, ValueError):
+        prev_pin_i = None
+    if prev_pin_i is not None and prev_pin_i != pin:
+        advance_id = f"pin-move-{prev_pin_i:02d}-to-{pin:02d}"
+        print(
+            f"[planner_march] pin moved {prev_pin_i} -> {pin}; "
+            f"requesting NN reset {advance_id}",
+            flush=True,
+        )
+        _queue_pin_reset(
+            project_root,
+            advance_id=advance_id,
+            pin_idx=pin,
+            wall_now=wall_now,
+        )
+        return None
     if state.get("pin_idx") != pin or pin_since_f <= 0:
         _write_march_state(
             project_root,
@@ -476,6 +599,14 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
     if champ is None:
         print(f"[planner_march] no champion row for pl{nxt:02d}; holding pin {pin}", flush=True)
         return None
+    rec_frames = int(_resources_frames(project_root).get(nxt) or 0)
+    if rec_frames <= 0:
+        print(
+            f"[planner_march] no resources Frames for pl{nxt:02d}; holding pin {pin}",
+            flush=True,
+        )
+        return None
+    frames_factor = _march_frames_factor(project_root)
     rows = _mirror_rows(project_root)
     next_row = rows.get(nxt)
     if next_row is None:
@@ -492,7 +623,9 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
     except (OSError, TypeError, ValueError):
         return None
     live_q = _live_quality(Path(project_root), nxt)
-    if live_q is None or not _champion_qualifies(live_q, champ):
+    if live_q is None or not _champion_qualifies(
+        live_q, champ, resources_frames=rec_frames, frames_factor=frames_factor
+    ):
         return None
     advance_id = f"pl{pin:02d}->pl{nxt:02d}@{int(wall_now)}"
     # Serialize march decisions across envs on this box; recheck under lock.
@@ -506,7 +639,12 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
             if pin_now != pin:
                 return None
             live_now = _live_quality(Path(project_root), nxt)
-            if live_now is None or not _champion_qualifies(live_now, champ):
+            if live_now is None or not _champion_qualifies(
+                live_now,
+                champ,
+                resources_frames=rec_frames,
+                frames_factor=frames_factor,
+            ):
                 return None
             try:
                 crystal_dir = _crystalize(Path(project_root), nxt)
@@ -535,7 +673,8 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
         return None
     print(
         f"[planner_march] rolled forward pin {pin} -> {nxt} "
-        f"({cell_dir_name(nxt)} crystal: {crystal_dir.name}); "
+        f"({cell_dir_name(nxt)} crystal: {crystal_dir.name}; "
+        f"frames<={frames_factor:g}x{rec_frames}); "
         f"requesting NN reset {advance_id}",
         flush=True,
     )

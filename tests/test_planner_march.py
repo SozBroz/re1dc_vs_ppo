@@ -1,4 +1,4 @@
-"""Planner-loyal auto march: grind one PL until it beats the champion row."""
+"""Planner-loyal auto march: grind one PL until cell meets resources frames bar."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import pytest
 from re1_rl.planner_march import (
     _champion_qualifies,
     _champions,
+    _resources_frames,
     maybe_advance_planner_march,
 )
 
@@ -46,7 +47,9 @@ def _write_manifest(root: Path, rows: dict[int, list[int]]) -> None:
     cells = []
     for idx, q in rows.items():
         state_b = b"STATE_%02d" % idx
-        side_b = (root / "states" / "planner_loyal" / "cells" / f"pl{idx:02d}" / "cell.sidecar.json").read_bytes()
+        side_b = (
+            root / "states" / "planner_loyal" / "cells" / f"pl{idx:02d}" / "cell.sidecar.json"
+        ).read_bytes()
         cells.append(
             {
                 "checkpoint_index": idx,
@@ -77,22 +80,42 @@ def _write_champions(root: Path, rows: dict[int, list[int]]) -> None:
     )
 
 
-def _write_state(root: Path, state: dict) -> None:
-    import time
+def _write_resources(root: Path, frames_by_slot: dict[int, int]) -> None:
+    p = root / "docs" / "planner_loyal_resources.md"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "## Kit by PL",
+        "",
+        "| PL | HP | Kills | Pistol bullets | Shotgun bullets | Bazooka bullets | Magnum bullets | Frames |",
+        "| :------ | --: | ----: | -------------: | --------------: | --------------: | -------------: | -----: |",
+    ]
+    for slot, frames in sorted(frames_by_slot.items()):
+        lines.append(
+            f"| `pl{slot:02d}` | 96 | 0 | 45 | 0 | 0 | 0 | {int(frames)} |"
+        )
+    p.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+
+def _write_state(root: Path, state: dict) -> None:
     p = root / "data" / "planner_march_state.json"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(state) + "\n", encoding="utf-8")
 
 
 def _setup(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, q_next: list[int], march: str = "1"
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    q_next: list[int],
+    march: str = "1",
+    resources_frames: int = 49,
 ) -> None:
     monkeypatch.delenv("RE1_YAWN_CELL_PREFIX", raising=False)
     monkeypatch.delenv("RE1_YAWN_RAILS_ROOT", raising=False)
     monkeypatch.delenv("RE1_PLANNER_MARCH", raising=False)
     monkeypatch.delenv("RE1_PLANNER_MARCH_STOP", raising=False)
     monkeypatch.delenv("RE1_PLANNER_MARCH_MIN_S", raising=False)
+    monkeypatch.delenv("RE1_PLANNER_MARCH_FRAMES_FACTOR", raising=False)
     monkeypatch.delenv("RE1_LEARNER_HOST", raising=False)
     monkeypatch.delenv("FLEET_LEARNER_HOST", raising=False)
     monkeypatch.setenv("RE1_PLANNER_LOYAL", "1")
@@ -100,6 +123,7 @@ def _setup(
     _write_cell(tmp_path, 3, q_next)
     _write_manifest(tmp_path, {2: Q_CHAMP, 3: q_next})
     _write_champions(tmp_path, {3: Q_CHAMP})
+    _write_resources(tmp_path, {3: resources_frames})
     _write_pin(
         tmp_path,
         "# March mode: 100% starts on pl02.\nRE1_PLANNER_RESET_PIN_INDEX=2\n",
@@ -110,25 +134,60 @@ def _setup(
 
 
 def test_champion_gate_dims() -> None:
-    assert _champion_qualifies(Q_FAT, Q_CHAMP) is True
-    assert _champion_qualifies(Q_CHAMP, Q_CHAMP) is True  # rolled equal counts
+    # resources Frames=49 -> 1.1x budget = 54.
+    assert (
+        _champion_qualifies(Q_FAT, Q_CHAMP, resources_frames=49, frames_factor=1.1)
+        is True
+    )
+    assert (
+        _champion_qualifies(Q_CHAMP, Q_CHAMP, resources_frames=49, frames_factor=1.1)
+        is True
+    )
     worse_hp = list(Q_FAT)
     worse_hp[0] = 95
-    assert _champion_qualifies(worse_hp, Q_CHAMP) is False
+    assert (
+        _champion_qualifies(worse_hp, Q_CHAMP, resources_frames=49, frames_factor=1.1)
+        is False
+    )
     worse_kills = list(Q_FAT)
     worse_kills[1] = -1
-    assert _champion_qualifies(worse_kills, Q_CHAMP) is False
+    assert (
+        _champion_qualifies(worse_kills, Q_CHAMP, resources_frames=49, frames_factor=1.1)
+        is False
+    )
     worse_ammo = list(Q_FAT)
     worse_ammo[2] = 44
-    assert _champion_qualifies(worse_ammo, Q_CHAMP) is False
-    slower = list(Q_FAT)
-    slower[8] = -50
-    assert _champion_qualifies(slower, Q_CHAMP) is False
-    # Better kit in every dim still passes (strictly-better mint).
-    better = [96, 1, 46, 100, 4, 1, 0, -30, -36, 0, 735]
-    assert _champion_qualifies(better, Q_CHAMP) is True
-    assert _champion_qualifies([96, 0, 45], Q_CHAMP) is False  # short never qualifies
-    assert _champion_qualifies(Q_FAT, [96, 0, 45]) is False
+    assert (
+        _champion_qualifies(worse_ammo, Q_CHAMP, resources_frames=49, frames_factor=1.1)
+        is False
+    )
+    # Within 1.1x of resources (50 <= 54) even if slower than champion 49.
+    within = list(Q_FAT)
+    within[8] = -50
+    assert (
+        _champion_qualifies(within, Q_CHAMP, resources_frames=49, frames_factor=1.1)
+        is True
+    )
+    # Over 1.1x resources budget.
+    too_slow = list(Q_FAT)
+    too_slow[8] = -55
+    assert (
+        _champion_qualifies(too_slow, Q_CHAMP, resources_frames=49, frames_factor=1.1)
+        is False
+    )
+    assert (
+        _champion_qualifies(Q_FAT, Q_CHAMP, resources_frames=0, frames_factor=1.1)
+        is False
+    )
+    assert _champion_qualifies([96, 0, 45], Q_CHAMP, resources_frames=49) is False
+    assert _champion_qualifies(Q_FAT, [96, 0, 45], resources_frames=49) is False
+
+
+def test_resources_frames_loader(tmp_path: Path) -> None:
+    _write_resources(tmp_path, {3: 49, 13: 37})
+    got = _resources_frames(tmp_path)
+    assert got[3] == 49 and got[13] == 37
+    assert _resources_frames(tmp_path / "missing") == {}
 
 
 def test_champions_loader(tmp_path: Path) -> None:
@@ -193,6 +252,31 @@ def test_advance_crystalizes_rewrites_pin_and_queues_reset(
     assert state["pending_reset"]["advance_id"] == rec["advance_id"]
 
 
+def test_manual_pin_move_queues_weight_reset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _setup(tmp_path, monkeypatch, q_next=Q_FAT)
+    import time
+
+    monkeypatch.setenv("RE1_PLANNER_MARCH_MIN_S", "5")
+    _write_state(
+        tmp_path,
+        {"pin_idx": 2, "pin_since_unix": time.time() - 100.0},
+    )
+    # Human rolls the tip forward without waiting for auto-march.
+    text = (tmp_path / "data" / "planner_loyal_reset_pin.env").read_text(encoding="utf-8")
+    (tmp_path / "data" / "planner_loyal_reset_pin.env").write_text(
+        text.replace("RE1_PLANNER_RESET_PIN_INDEX=2", "RE1_PLANNER_RESET_PIN_INDEX=3"),
+        encoding="utf-8",
+    )
+    assert maybe_advance_planner_march(tmp_path) is None
+    state = json.loads(
+        (tmp_path / "data" / "planner_march_state.json").read_text(encoding="utf-8")
+    )
+    assert state["pin_idx"] == 3
+    assert state["pending_reset"]["advance_id"] == "pin-move-02-to-03"
+
+
 def test_no_advance_when_below_champion(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -203,6 +287,16 @@ def test_no_advance_when_below_champion(
     assert maybe_advance_planner_march(tmp_path) is None
     text = (tmp_path / "data" / "planner_loyal_reset_pin.env").read_text(encoding="utf-8")
     assert "RE1_PLANNER_RESET_PIN_INDEX=2" in text
+
+
+def test_no_advance_when_frames_over_resources_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    slow = list(Q_FAT)
+    slow[8] = -100  # way over 1.1x of 49
+    _setup(tmp_path, monkeypatch, q_next=slow, resources_frames=49)
+    _grind_elapsed(tmp_path, monkeypatch, age_s=3600.0)
+    assert maybe_advance_planner_march(tmp_path) is None
 
 
 def test_no_advance_without_champion_row(
@@ -229,7 +323,9 @@ def test_no_advance_when_hunted_bytes_missing(
     _setup(tmp_path, monkeypatch, q_next=Q_FAT)
     _grind_elapsed(tmp_path, monkeypatch, age_s=3600.0)
     # Row exists but live bytes differ -> stale row, hold pin.
-    (tmp_path / "states" / "planner_loyal" / "cells" / "pl03" / "cell.pst").write_bytes(b"OTHER")
+    (tmp_path / "states" / "planner_loyal" / "cells" / "pl03" / "cell.pst").write_bytes(
+        b"OTHER"
+    )
     assert maybe_advance_planner_march(tmp_path) is None
 
 
@@ -249,33 +345,5 @@ def test_stop_bound_holds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     _setup(tmp_path, monkeypatch, q_next=Q_FAT)
     with open(tmp_path / "data" / "planner_loyal_reset_pin.env", "a", encoding="utf-8") as f:
         f.write("RE1_PLANNER_MARCH_STOP=2\n")
+    _grind_elapsed(tmp_path, monkeypatch, age_s=3600.0)
     assert maybe_advance_planner_march(tmp_path) is None
-
-
-def test_per_frame_dwell_scales_with_target(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from re1_rl.planner_march import _march_min_s_for_pin
-
-    _setup(tmp_path, monkeypatch, q_next=Q_FAT)  # target pl03, 36 recorded frames
-    monkeypatch.delenv("RE1_PLANNER_MARCH_MIN_S_PER_FRAME", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_LOYAL_CELLS_ROOT", raising=False)
-    assert _march_min_s_for_pin(2, tmp_path) == 600.0  # flat default
-    with open(tmp_path / "data" / "planner_loyal_reset_pin.env", "a", encoding="utf-8") as f:
-        f.write("RE1_PLANNER_MARCH_MIN_S_PER_FRAME=1.2\n")
-    assert _march_min_s_for_pin(2, tmp_path) == pytest.approx(1.2 * 36)
-    # Unknown target (first mint) falls back to the flat MIN_S.
-    assert _march_min_s_for_pin(9, tmp_path) == 600.0
-
-
-def test_per_frame_dwell_floor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from re1_rl.planner_march import _march_min_s_for_pin
-
-    tiny = list(Q_FAT)
-    tiny[8] = -4
-    _setup(tmp_path, monkeypatch, q_next=tiny)  # target pl03, 4 recorded frames
-    monkeypatch.delenv("RE1_PLANNER_MARCH_MIN_S_PER_FRAME", raising=False)
-    monkeypatch.delenv("RE1_PLANNER_LOYAL_CELLS_ROOT", raising=False)
-    with open(tmp_path / "data" / "planner_loyal_reset_pin.env", "a", encoding="utf-8") as f:
-        f.write("RE1_PLANNER_MARCH_MIN_S_PER_FRAME=1.2\n")
-    assert _march_min_s_for_pin(2, tmp_path) == 5.0  # 4.8s -> 5s floor
