@@ -249,6 +249,17 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     ap.add_argument(
+        "--adaptive-cap",
+        action="store_true",
+        help=(
+            "adaptive episode wall: full planner timeout until a new mint lands "
+            "for the target PL this run, then ~1.2x the fresh cell's frames "
+            "floored at the per-tip static value (RE1_PL_ADAPTIVE_CAP=1 for local "
+            "workers; set the same env on remote launch cmds). "
+            "Revert = relaunch without --adaptive-cap."
+        ),
+    )
+    ap.add_argument(
         "--n-steps",
         type=int,
         default=int(DISTRIBUTED_EPOCH_HYPERPARAMS["n_steps"]),
@@ -359,6 +370,13 @@ def _apply_grind_defaults(args: argparse.Namespace) -> None:
             "per-tip cap ON (RE1_PL_PER_TIP_CAP=1 for local workers; "
             "set the same env on remote worker launch cmds)",
         )
+    if bool(getattr(args, "adaptive_cap", False)):
+        os.environ["RE1_PL_ADAPTIVE_CAP"] = "1"
+        log(
+            getattr(args, "machine_name", "learner"),
+            "adaptive cap ON (RE1_PL_ADAPTIVE_CAP=1 for local workers; "
+            "set the same env on remote worker launch cmds)",
+        )
     if not bool(getattr(args, "grind", False)):
         return
     # Faster cadence only when the flag is still at its full-game default;
@@ -464,7 +482,8 @@ def _build_learner_model(args: argparse.Namespace, device: str):
         f"target_kl={getattr(model, 'target_kl', None)} "
         f"max_grad_norm={epoch_hyper.get('max_grad_norm')} "
         f"per_tip_cap={os.environ.get('RE1_PL_PER_TIP_CAP', '0')} "
-        "(revert: relaunch without --grind/--per-tip-cap)",
+        f"adaptive_cap={os.environ.get('RE1_PL_ADAPTIVE_CAP', '0')} "
+        "(revert: relaunch without --grind/--per-tip-cap/--adaptive-cap)",
     )
     return model, ckpt_dir
 

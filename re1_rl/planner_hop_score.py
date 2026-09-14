@@ -386,6 +386,171 @@ def per_tip_cap_frames(recorded_frames: int, *, boss: bool = False) -> int:
     return int(cap_steps * 8)
 
 
+# Adaptive episode cap: full planner wall until a NEW mint lands this run,
+# then ~1.2x the fresh cell's frames floored at the per-tip static value.
+# Opt-in via RE1_PL_ADAPTIVE_CAP=1 (default off; revert = relaunch without it).
+# Rationale: early exploration gets the full budget; once we know the hop is
+# solvable in F frames, stop paying for 6-minute wander episodes.
+ADAPTIVE_CAP_ENV = "RE1_PL_ADAPTIVE_CAP"
+ADAPTIVE_CAP_FACTOR = 1.2
+
+
+def adaptive_cap_enabled() -> bool:
+    return str(os.environ.get(ADAPTIVE_CAP_ENV, "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def adaptive_cap_factor() -> float:
+    return float(ADAPTIVE_CAP_FACTOR)
+
+
+def _adaptive_cell_fingerprint(
+    cells_root: Any, target_slot: int
+) -> dict[str, Any] | None:
+    """``(frames, identity)`` for target ``plNN``; None on any read error.
+
+    Fail-open helper: missing/corrupt meta, bad quality dims, or unreadable
+    files all return None so the caller keeps the full planner wall.
+    Frames come from ``quality[8]`` (same index ``recorded_frames_for_pl``
+    uses — dim 7 is a constant, not frames). Identity prefers
+    ``state_sha256`` / ``sidecar_sha256`` and falls back to file mtimes.
+    """
+    try:
+        import json
+        from pathlib import Path
+
+        slot = int(target_slot)
+        cell_dir = Path(cells_root) / "cells" / f"pl{slot:02d}"
+        meta_p = cell_dir / "meta.json"
+        if not meta_p.is_file():
+            return None
+        meta = json.loads(meta_p.read_text(encoding="utf-8")) or {}
+        if not isinstance(meta, dict):
+            return None
+        quality = meta.get("quality")
+        if not isinstance(quality, (list, tuple)) or len(quality) <= 8:
+            return None
+        frames = -int(quality[8])
+        if frames <= 0 or frames >= 99_999_999:
+            return None
+        ident = str(meta.get("state_sha256") or meta.get("sidecar_sha256") or "")
+        if not ident:
+            try:
+                st = meta_p.stat()
+                ident = f"mtime:{st.st_mtime_ns}:{st.st_size}"
+                for cand in ("cell.pst", "cell.State"):
+                    payload = cell_dir / cand
+                    if payload.is_file():
+                        pst = payload.stat()
+                        ident += f"|{cand}:{pst.st_mtime_ns}:{pst.st_size}"
+                        break
+            except OSError:
+                ident = ""
+        return {"frames": int(frames), "id": str(ident)}
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def snapshot_adaptive_baseline(
+    cells_root: Any, targets: Any | None = None
+) -> dict[int, dict[str, Any] | None]:
+    """Snapshot incumbent fingerprints per target PL. Never raises.
+
+    ``targets`` defaults to a full ``range(0, 256)`` scan (cheap ``is_file``
+    probes for missing slots). A ``None`` entry means "no incumbent cell".
+    """
+    baseline: dict[int, dict[str, Any] | None] = {}
+    try:
+        slots = [int(t) for t in targets] if targets is not None else list(range(256))
+    except (TypeError, ValueError):
+        return baseline
+    for slot in slots:
+        try:
+            baseline[int(slot)] = _adaptive_cell_fingerprint(cells_root, int(slot))
+        except (OSError, ValueError, TypeError):
+            baseline[int(slot)] = None
+    return baseline
+
+
+def adaptive_mint_observed(
+    baseline: Any, target_slot: int, cells_root: Any
+) -> tuple[bool, int]:
+    """``(observed, best_frames)`` for target ``plNN``. Fail open on error.
+
+    A mint counts when the on-disk cell differs from the startup snapshot:
+    different leg frames (quality[8]) or a changed state identity (sha /
+    mtime). Identical rewrites do not count. ``baseline`` must be a dict from
+    ``snapshot_adaptive_baseline``; a non-dict snapshot fails open
+    ``(False, 0)`` (full wall). A ``None`` incumbent entry means the cell
+    appeared this run, which counts as a new mint.
+    """
+    try:
+        slot = int(target_slot)
+        cur = _adaptive_cell_fingerprint(cells_root, slot)
+        if cur is None or int(cur.get("frames", 0)) <= 0:
+            return False, 0
+        if not isinstance(baseline, dict):
+            return False, 0
+        base = baseline.get(int(slot))
+        if base is None:
+            return True, int(cur["frames"])
+        if int(base.get("frames", 0)) <= 0:
+            return True, int(cur["frames"])
+        if int(cur["frames"]) != int(base.get("frames")) or str(
+            cur.get("id")
+        ) != str(base.get("id")):
+            return True, int(cur["frames"])
+        return False, 0
+    except (OSError, ValueError, TypeError):
+        return False, 0
+
+
+def adaptive_cap_frames(
+    best_cell_frames: int, recorded_frames: int, *, boss: bool = False
+) -> int:
+    """Episode wall (emulated frames) after a new mint.
+
+    ``max(ceil(1.2 * best / 8) * 8, per_tip_cap_frames(recorded))`` capped at
+    the full planner wall. ``best_cell_frames`` is the freshly minted cell's
+    leg frames (quality[8]); the floor is the existing per-tip static value
+    (1.5x factor + combat slack + floor steps, capped at the planner max
+    extension), so the per-tip floor always applies as the bottom.
+    """
+    import math
+
+    wall = int(planner_timeout_frames(boss=boss))
+    floor = int(per_tip_cap_frames(recorded_frames, boss=boss))
+    best = max(0, int(best_cell_frames))
+    if best <= 0:
+        return int(min(int(floor), wall))
+    tight_steps = int(math.ceil((float(best) * float(ADAPTIVE_CAP_FACTOR)) / 8.0))
+    tight = int(tight_steps * 8)
+    return int(min(max(int(tight), int(floor)), wall))
+
+
+def adaptive_cap_frames_for_target(
+    target_slot: int,
+    cells_root: Any,
+    baseline: Any,
+    *,
+    boss: bool = False,
+) -> int:
+    """Full planner wall until a qualifying new mint; tightened cap after."""
+    wall = int(planner_timeout_frames(boss=boss))
+    try:
+        observed, best = adaptive_mint_observed(baseline, int(target_slot), cells_root)
+    except (OSError, ValueError, TypeError):
+        return wall
+    if not observed or int(best) <= 0:
+        return int(wall)
+    recorded = int(recorded_frames_for_pl(int(target_slot), cells_root))
+    return int(adaptive_cap_frames(int(best), recorded, boss=boss))
+
+
 def _clip01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
 

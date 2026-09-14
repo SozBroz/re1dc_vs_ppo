@@ -388,6 +388,28 @@ class RE1Env(gym.Env):
         self._box_opened_this_step = False
         self._box_closed_this_step = False
         self._maybe_enable_planner_loyal()
+        # Adaptive episode cap: snapshot incumbent cells once at env/worker
+        # startup. The dict persists across resets (never cleared); march
+        # advances to new target PLs simply miss the snapshot, so their first
+        # mint counts as new. Non-dict / None = snapshot failed -> fail open.
+        self._adaptive_cap_baseline: dict | None = None
+        try:
+            from re1_rl.planner_hop_score import (
+                adaptive_cap_enabled as _adaptive_on,
+            )
+            from re1_rl.planner_hop_score import (
+                snapshot_adaptive_baseline as _adaptive_snap,
+            )
+            from re1_rl.planner_loyal_cells import (
+                planner_loyal_root as _adaptive_root,
+            )
+
+            if _adaptive_on():
+                self._adaptive_cap_baseline = _adaptive_snap(
+                    _adaptive_root(self.project_root)
+                )
+        except Exception:
+            self._adaptive_cap_baseline = None
 
         self.graph = RoomGraph(
             self.project_root / "data" / "doors_empirical.json",
@@ -3123,6 +3145,55 @@ class RE1Env(gym.Env):
                                 flush=True,
                             )
                             frames = capped
+                # Adaptive cap: full planner wall until a NEW mint for the
+                # target lands this run, then ~1.2x the fresh cell's frames
+                # floored at the per-tip static value. Wins over --per-tip-cap
+                # when both are on and a mint was observed (same floor either
+                # way). Mid-segment hops keep their shared budget (above).
+                from re1_rl.planner_hop_score import (
+                    adaptive_cap_enabled,
+                    adaptive_cap_frames,
+                    adaptive_mint_observed,
+                    snapshot_adaptive_baseline,
+                )
+
+                if adaptive_cap_enabled() and tip_slot is not None and tip_slot >= 0:
+                    try:
+                        if not isinstance(
+                            getattr(self, "_adaptive_cap_baseline", None), dict
+                        ):
+                            self._adaptive_cap_baseline = snapshot_adaptive_baseline(
+                                planner_loyal_root(self.project_root)
+                            )
+                        _ad_target = int(tip_slot) + 1
+                        _ad_root = planner_loyal_root(self.project_root)
+                        _observed, _best = adaptive_mint_observed(
+                            self._adaptive_cap_baseline,
+                            _ad_target,
+                            _ad_root,
+                        )
+                        if _observed and int(_best) > 0:
+                            _recorded = int(
+                                recorded_frames_for_pl(_ad_target, _ad_root)
+                            )
+                            _ad_capped = int(
+                                adaptive_cap_frames(
+                                    int(_best),
+                                    _recorded,
+                                    boss=current_step_is_boss(queue),
+                                )
+                            )
+                            if _ad_capped < int(frames):
+                                print(
+                                    f"[adaptive_cap] tip=pl{tip_slot:02d} "
+                                    f"target=pl{_ad_target:02d} "
+                                    f"best={int(_best)}f recorded={_recorded}f "
+                                    f"wall {frames}f->{_ad_capped}f",
+                                    flush=True,
+                                )
+                                frames = _ad_capped
+                    except (OSError, ValueError, TypeError):
+                        pass
         elif flat_cell_timeout_enabled():
             # Flat-12m yawn: plain 12 min — ignore yawn_cell_timeouts.json.
             frames = int(FLAT_CELL_TIMEOUT_FRAMES)
