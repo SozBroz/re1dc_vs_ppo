@@ -68,15 +68,20 @@ def test_recorded_frames_uses_dim_8_not_dim_7(tmp_path):
     assert recorded_frames_for_pl(1, tmp_path) == 42
 
 
-def test_grind_preset_overfits_but_keeps_gamma():
+def test_grind_preset_soft_but_keeps_gamma():
     grind = async_fleet.GRIND_EPOCH_HYPERPARAMS
     base = async_fleet.DISTRIBUTED_EPOCH_HYPERPARAMS
-    assert grind["ent_coef"] == 0.0
-    assert grind["clip_range"] > base["clip_range"]
-    assert grind["target_kl"] is None
-    assert grind["n_epochs"] > base["n_epochs"]
-    assert grind["batch_size"] < base["batch_size"]
+    # Soft-grind: between full overfit and distributed baseline.
+    assert 0.0 < float(grind["ent_coef"]) < float(base["ent_coef"])
+    assert float(base["clip_range"]) < float(grind["clip_range"]) < 0.30
+    assert grind["target_kl"] is not None
+    assert float(grind["target_kl"]) >= float(base["target_kl"])
+    assert int(grind["n_epochs"]) >= int(base["n_epochs"])
+    assert int(grind["batch_size"]) <= int(base["batch_size"])
     assert grind["gamma"] == 1.0 == base["gamma"]
+    assert async_fleet.GRIND_SYNC_INTERVAL_S == 180.0
+    assert async_fleet.GRIND_WORKER_BUFFER_STEPS == 16000
+    assert async_fleet.GRIND_EPOCH_GRACE_S == 60.0
     # Full-game defaults untouched.
     assert base["ent_coef"] == 0.005
     assert base["clip_range"] == 0.10

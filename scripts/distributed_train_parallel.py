@@ -233,10 +233,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--grind",
         action="store_true",
         help=(
-            "single-PL recording preset: overfit hyperparams "
-            "(ent 0, clip 0.3, no KL stop, 6 epochs x batch 2048, lr 5e-5) "
-            "plus faster cadence (sync 90s, buffer 8000, grace 30s) when those "
-            "flags are still at defaults. Revert = relaunch without --grind."
+            "single-PL recording preset: soft-grind hyperparams "
+            "(ent 0.003, clip 0.15, target_kl 0.010, 3 epochs x batch 4096, "
+            "lr 3e-5) plus cadence (sync 180s, buffer 16000, grace 60s) when "
+            "those flags are still at defaults. Revert = relaunch without --grind."
         ),
     )
     ap.add_argument(

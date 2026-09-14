@@ -64,26 +64,25 @@ DEFAULT_SYNC_INTERVAL_S = 360.0
 
 # Grind preset for single-PL recording runs (opt-in `--grind`; full-game
 # defaults above are untouched — revert = relaunch without --grind).
-# Overfit levers: no entropy (single-tip resets need no exploration),
-# wide clip + no KL early-stop (let the update move), more epochs over
-# smaller minibatches (memorize the hop), slightly higher LR, relaxed grad
-# clip. gamma/gae_lambda stay at 1.0 (hop-score MC identity returns).
+# Soft-grind (pl19 interact drought): keep mild specialization but restore
+# entropy + KL so failure-dominated updates cannot fully collapse the policy.
+# gamma/gae_lambda stay at 1.0 (hop-score MC identity returns).
 GRIND_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     n_steps=_DISTRIBUTED_N_STEPS,
-    batch_size=2048,
-    n_epochs=6,
-    learning_rate=5e-5,
+    batch_size=4096,
+    n_epochs=3,
+    learning_rate=3e-5,
     gamma=1.0,
-    ent_coef=0.0,
-    clip_range=0.30,
-    target_kl=None,
-    max_grad_norm=0.50,
+    ent_coef=0.003,
+    clip_range=0.15,
+    target_kl=0.010,
+    max_grad_norm=0.30,
 )
 # Grind-implied wall-clock cadence (only when the matching CLI flag is still
 # at its full-game default; explicit flags always win).
-GRIND_SYNC_INTERVAL_S = 90.0
-GRIND_WORKER_BUFFER_STEPS = 8000
-GRIND_EPOCH_GRACE_S = 30.0
+GRIND_SYNC_INTERVAL_S = 180.0
+GRIND_WORKER_BUFFER_STEPS = 16000
+GRIND_EPOCH_GRACE_S = 60.0
 
 _LEGACY_45_ACTION_NAMES = (
     "noop",

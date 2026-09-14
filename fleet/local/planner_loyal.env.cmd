@@ -6,6 +6,10 @@ call "%~dp0obs_raw.env.cmd"
 
 set RE1_PLANNER_LOYAL=1
 
+REM Mild softmax broaden for interact hops (pl19 soft-grind). Workers that do
+REM not call this file must set the same env in their launch path.
+if "%RE1_INFERENCE_TEMPERATURE%"=="" set RE1_INFERENCE_TEMPERATURE=1.10
+
 REM Live ±1 hop-score settlement (S_base + B_kill; divert -0.5 / death -1 / timeout -1.25).
 set RE1_PLANNER_HOP_SCORE_V1=1
 

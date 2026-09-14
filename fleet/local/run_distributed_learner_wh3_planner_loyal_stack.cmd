@@ -5,12 +5,12 @@ cd /d C:\Users\sshuser\re1_rl
 call "%~dp0..\fleet_hosts.cmd"
 set MACHINE=workhorse3
 set LEARNER_PORT=%FLEET_LEARNER_PORT%
-REM Grind trial (recording-quality PLs): 90s cadence via --grind (buffer 8000,
-REM grace 30s implied); batch 2048 x 6 epochs; adaptive cap uses the full wall
+REM Soft-grind (interact drought): 180s cadence via --grind (buffer 16000,
+REM grace 60s implied); batch 4096 x 3 epochs; adaptive cap uses the full wall
 REM until this run mints, then 3x the best measured emulated-frame duration.
 REM Revert: drop --grind --per-tip-cap --adaptive-cap, restore SYNC 360 / BATCH 8192.
-set SYNC_INTERVAL_S=90
-set BATCH_SIZE=2048
+set SYNC_INTERVAL_S=180
+set BATCH_SIZE=4096
 set MAX_PENDING_STEPS=220000
 set MIN_HOST_FREE_GB=16
 
