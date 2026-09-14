@@ -1386,6 +1386,19 @@ def capture_planner_loyal_cell(
         leg_frames = int(getattr(env, "_step_count", 0) or 0)
     except (TypeError, ValueError):
         leg_frames = 0
+    progress = getattr(env, "_progress", None)
+    meters = getattr(progress, "hop_meters", None)
+    try:
+        leg_emulated_frames = int(getattr(meters, "frames", 0) or 0)
+    except (TypeError, ValueError):
+        leg_emulated_frames = 0
+    if leg_emulated_frames <= 0:
+        try:
+            leg_emulated_frames = int(
+                getattr(progress, "leg_emulated_frames", 0) or 0
+            )
+        except (TypeError, ValueError):
+            leg_emulated_frames = 0
     quality8 = list(attach_leg_frames(quality, leg_frames))
     hop_s = resolve_mint_hop_score(breakdown, getattr(env, "_progress", None))
     quality = assemble_planner_loyal_quality(
@@ -1417,6 +1430,7 @@ def capture_planner_loyal_cell(
         "planner_step_index": completed,
         "planner_step": step,
         "quality": quality,
+        "leg_emulated_frames": leg_emulated_frames,
         "training_start": True,
         "chunk_final": bool(is_final),
         "kills": kill_audit,
@@ -1488,6 +1502,7 @@ def capture_planner_loyal_cell(
         "chunk_final": bool(is_final),
         "training_start": True,
         "quality": quality,
+        "leg_emulated_frames": leg_emulated_frames,
         "kills": kill_audit,
         "planner_step": step,
         "mint_policy": mint_pointer,

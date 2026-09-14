@@ -232,11 +232,13 @@ def test_mint_pointer_survives_bundle_install(tmp_path) -> None:
         sidecar_path=cell / "cell.sidecar.json",
         worker_id="wh9",
         mint_policy=pointer,
+        leg_emulated_frames=4002,
     )
     blob = __import__("base64").b64decode(prop["bundle_b64"])
     with zipfile.ZipFile(io.BytesIO(blob)) as zf:
         bundled = json.loads(zf.read(CELL_META_NAME).decode("utf-8"))
     assert bundled["mint_policy"]["policy_version"] == 33
+    assert bundled["leg_emulated_frames"] == 4002
 
     store = YawnRailsCellStore(root=tmp_path / "cells")
     store.route_id = "planner_loyal_v1"
@@ -260,6 +262,7 @@ def test_mint_pointer_survives_bundle_install(tmp_path) -> None:
     # Pointer preserved from the bundle...
     assert installed["mint_policy"]["policy_version"] == 33
     assert installed["mint_policy"]["machine"] == "wh9"
+    assert installed["leg_emulated_frames"] == 4002
     # ...while validated install fields win.
     assert installed["quality"] == [96, 0, 0, 0, 0, 0, 0, 0, -404, 0, 726]
     assert installed["bundle_sha256"] == _sha256_bytes(blob)

@@ -388,12 +388,12 @@ def per_tip_cap_frames(recorded_frames: int, *, boss: bool = False) -> int:
 
 
 # Adaptive episode cap: full planner wall until a NEW mint lands this run,
-# then ~1.2x the fresh cell's frames floored at the per-tip static value.
+# then 1.7x the fresh cell's measured emulated frames.
 # Opt-in via RE1_PL_ADAPTIVE_CAP=1 (default off; revert = relaunch without it).
 # Rationale: early exploration gets the full budget; once we know the hop is
 # solvable in F frames, stop paying for 6-minute wander episodes.
 ADAPTIVE_CAP_ENV = "RE1_PL_ADAPTIVE_CAP"
-ADAPTIVE_CAP_FACTOR = 1.2
+ADAPTIVE_CAP_FACTOR = 1.7
 
 
 def adaptive_cap_enabled() -> bool:
@@ -416,9 +416,11 @@ def _adaptive_cell_fingerprint(
 
     Fail-open helper: missing/corrupt meta, bad quality dims, or unreadable
     files all return None so the caller keeps the full planner wall.
-    Frames come from ``quality[8]`` (same index ``recorded_frames_for_pl``
-    uses — dim 7 is a constant, not frames). Identity prefers
-    ``state_sha256`` / ``sidecar_sha256`` and falls back to file mtimes.
+    Frames come from capture-time ``leg_emulated_frames``. ``quality[8]`` is
+    the number of policy decisions, not emulated frames; using it directly
+    made the timer roughly 3x shorter than the fastest successful pl11->pl12
+    attempt. Legacy cells without the new field fail open to the full wall.
+    Identity prefers state/sidecar hashes and falls back to file mtimes.
     """
     try:
         import json
@@ -432,10 +434,7 @@ def _adaptive_cell_fingerprint(
         meta = json.loads(meta_p.read_text(encoding="utf-8")) or {}
         if not isinstance(meta, dict):
             return None
-        quality = meta.get("quality")
-        if not isinstance(quality, (list, tuple)) or len(quality) <= 8:
-            return None
-        frames = -int(quality[8])
+        frames = int(meta.get("leg_emulated_frames") or 0)
         if frames <= 0 or frames >= 99_999_999:
             return None
         ident = str(meta.get("state_sha256") or meta.get("sidecar_sha256") or "")
@@ -483,11 +482,11 @@ def adaptive_mint_observed(
     """``(observed, best_frames)`` for target ``plNN``. Fail open on error.
 
     A mint counts when the on-disk cell differs from the startup snapshot:
-    different leg frames (quality[8]) or a changed state identity (sha /
+    different measured emulated frames or a changed state identity (sha /
     mtime). Identical rewrites do not count. ``baseline`` must be a dict from
-    ``snapshot_adaptive_baseline``; a non-dict snapshot fails open
-    ``(False, 0)`` (full wall). A ``None`` incumbent entry means the cell
-    appeared this run, which counts as a new mint.
+    ``snapshot_adaptive_baseline``; a non-dict snapshot fails open ``(False,
+    0)`` (full wall). A ``None`` incumbent entry means the cell appeared this
+    run, which counts as a new mint.
     """
     try:
         slot = int(target_slot)
@@ -515,19 +514,19 @@ def adaptive_cap_frames(
 ) -> int:
     """Episode wall (emulated frames) after a new mint.
 
-    ``max(ceil(1.2 * best / 8) * 8, per_tip_cap_frames(recorded))`` capped at
-    the full planner wall. ``best_cell_frames`` is the freshly minted cell's
-    leg frames (quality[8]); the floor is the existing per-tip static value
-    (1.5x factor + combat slack + floor steps, capped at the planner max
-    extension), so the per-tip floor always applies as the bottom.
+    ``ceil(1.7 * best_emulated_frames / 8) * 8``, with the existing 1200-frame
+    safety floor and the full planner wall as the ceiling. ``recorded_frames``
+    remains in the signature for compatibility but is intentionally not used:
+    it is ``quality[8]`` policy-decision count, a different unit.
     """
     import math
 
     wall = int(planner_timeout_frames(boss=boss))
-    floor = int(per_tip_cap_frames(recorded_frames, boss=boss))
+    del recorded_frames
+    floor = int(_per_tip_cap_floor_steps() * 8)
     best = max(0, int(best_cell_frames))
     if best <= 0:
-        return int(min(int(floor), wall))
+        return wall
     tight_steps = int(math.ceil((float(best) * float(ADAPTIVE_CAP_FACTOR)) / 8.0))
     tight = int(tight_steps * 8)
     return int(min(max(int(tight), int(floor)), wall))
@@ -548,8 +547,7 @@ def adaptive_cap_frames_for_target(
         return wall
     if not observed or int(best) <= 0:
         return int(wall)
-    recorded = int(recorded_frames_for_pl(int(target_slot), cells_root))
-    return int(adaptive_cap_frames(int(best), recorded, boss=boss))
+    return int(adaptive_cap_frames(int(best), 0, boss=boss))
 
 
 def _clip01(x: float) -> float:

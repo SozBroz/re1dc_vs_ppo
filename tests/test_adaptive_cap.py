@@ -1,4 +1,4 @@
-"""Adaptive episode cap: full wall until a new mint lands, then ~1.2x best.
+"""Adaptive episode cap: full wall until a new mint lands, then 1.7x best.
 
 Gated by RE1_PL_ADAPTIVE_CAP=1 (default off); --adaptive-cap on
 scripts/distributed_train_parallel.py mirrors the --per-tip-cap pattern.
@@ -21,20 +21,31 @@ from re1_rl.planner_hop_score import (
 )
 
 
-def _write_cell(root, idx, frames, sha="state-sha"):
+def _write_cell(
+    root,
+    idx,
+    frames,
+    sha="state-sha",
+    *,
+    emulated_frames=None,
+    include_emulated=True,
+):
     cell = root / "cells" / f"pl{idx:02d}"
     cell.mkdir(parents=True, exist_ok=True)
     (cell / "cell.pst").write_bytes(b"STATE_%02d" % idx)
+    meta = {
+        "checkpoint_index": idx,
+        # quality[8] is policy decisions, not emulated frames.
+        "quality": [96, 0, 45, 100, 4, 1, 0, -30, -int(frames), 0, 0],
+        "state_sha256": sha,
+        "sidecar_sha256": "side-%s" % sha,
+    }
+    if include_emulated:
+        meta["leg_emulated_frames"] = int(
+            emulated_frames if emulated_frames is not None else int(frames) * 10
+        )
     (cell / "meta.json").write_text(
-        json.dumps(
-            {
-                "checkpoint_index": idx,
-                # dim 7 is a constant (-30); leg frames live at dim 8.
-                "quality": [96, 0, 45, 100, 4, 1, 0, -30, -int(frames), 0, 0],
-                "state_sha256": sha,
-                "sidecar_sha256": "side-%s" % sha,
-            }
-        ),
+        json.dumps(meta),
         encoding="utf-8",
     )
 
@@ -50,30 +61,26 @@ def test_flag_defaults_off(monkeypatch):
         assert adaptive_cap_enabled()
 
 
-def test_cap_math_floor_binds_when_best_equals_recorded():
-    # best == recorded -> 1.2x tight end can never beat the 1.5x+slack floor.
-    assert adaptive_cap_frames(1000, 1000, boss=False) == per_tip_cap_frames(
-        1000, boss=False
-    )
-    assert adaptive_cap_frames(449, 449, boss=False) == 150 * 8
+def test_cap_math_uses_emulated_frames_not_policy_decisions():
+    # Real pl12 evidence: quality[8]=404 decisions, but the successful hop
+    # consumed 4002 emulated frames. The old bug returned the 1200f floor.
+    tight = int(math.ceil(1.7 * 4002 / 8.0) * 8)
+    assert tight == 6808
+    assert adaptive_cap_frames(4002, 404, boss=False) == tight
 
 
 def test_cap_math_tight_binds_when_best_exceeds_recorded():
-    # 1.2*2000 = 2400f tight vs 1.5x floor of a 449f record (1200f).
-    tight = int(math.ceil(1.2 * 2000 / 8.0) * 8)
-    assert tight == 2400
-    assert adaptive_cap_frames(2000, 449, boss=False) == 2400
+    tight = int(math.ceil(1.7 * 2000 / 8.0) * 8)
+    assert tight == 3400
+    assert adaptive_cap_frames(2000, 449, boss=False) == 3400
 
 
 def test_cap_math_boss_variant():
     wall = PLANNER_BOSS_TIMEOUT_FRAMES
     assert planner_timeout_frames(boss=True) == wall
-    # Tight end binds over the 2.0x boss floor.
-    assert adaptive_cap_frames(2000, 449, boss=True) == 2400
-    # Floor binds for a fast hop under the boss factor.
-    assert adaptive_cap_frames(100, 100, boss=True) == per_tip_cap_frames(
-        100, boss=True
-    )
+    assert adaptive_cap_frames(2000, 449, boss=True) == 3400
+    # Safety floor still prevents an instant timeout on tiny hops.
+    assert adaptive_cap_frames(100, 100, boss=True) == 150 * 8
 
 
 def test_cap_never_exceeds_wall():
@@ -83,10 +90,8 @@ def test_cap_never_exceeds_wall():
     assert adaptive_cap_frames(99_000, 99_000, boss=True) == (
         PLANNER_BOSS_TIMEOUT_FRAMES
     )
-    # Unknown best -> static floor (which itself never exceeds the wall).
-    assert adaptive_cap_frames(0, 1000, boss=False) == per_tip_cap_frames(
-        1000, boss=False
-    )
+    # Unknown best fails open to the full wall.
+    assert adaptive_cap_frames(0, 1000, boss=False) == PLANNER_DEFAULT_TIMEOUT_FRAMES
     assert adaptive_cap_frames(0, 0, boss=False) == PLANNER_DEFAULT_TIMEOUT_FRAMES
 
 
@@ -102,33 +107,50 @@ def test_no_mint_keeps_full_wall(tmp_path):
 
 
 def test_new_mint_with_better_frames_tightens(tmp_path):
-    _write_cell(tmp_path, 23, 449, sha="incumbent")
+    _write_cell(tmp_path, 23, 449, sha="incumbent", emulated_frames=4490)
     baseline = snapshot_adaptive_baseline(tmp_path)
-    # Simulated remint this run: fewer leg frames + changed sha.
-    _write_cell(tmp_path, 23, 400, sha="fresh")
+    # Simulated remint this run: fewer decisions and measured emulated frames.
+    _write_cell(tmp_path, 23, 400, sha="fresh", emulated_frames=4002)
     observed, best = adaptive_mint_observed(baseline, 23, tmp_path)
     assert observed is True
-    assert best == 400
+    assert best == 4002
     assert recorded_frames_for_pl(23, tmp_path) == 400
     capped = adaptive_cap_frames_for_target(23, tmp_path, baseline, boss=False)
-    assert capped == adaptive_cap_frames(400, 400, boss=False)
+    assert capped == adaptive_cap_frames(4002, 400, boss=False)
+    assert capped == 6808
     assert capped < PLANNER_DEFAULT_TIMEOUT_FRAMES
 
 
-def test_mint_uses_dim_8_not_dim_7(tmp_path):
-    _write_cell(tmp_path, 1, 42, sha="incumbent")
+def test_mint_uses_measured_emulated_frames_not_quality_dim_8(tmp_path):
+    _write_cell(tmp_path, 1, 42, sha="incumbent", emulated_frames=420)
     baseline = snapshot_adaptive_baseline(tmp_path)
-    _write_cell(tmp_path, 1, 36, sha="fresh")
+    _write_cell(tmp_path, 1, 36, sha="fresh", emulated_frames=400)
     observed, best = adaptive_mint_observed(baseline, 1, tmp_path)
-    assert (observed, best) == (True, 36)
+    assert (observed, best) == (True, 400)
 
 
 def test_appearing_cell_counts_as_mint(tmp_path):
     baseline = snapshot_adaptive_baseline(tmp_path)
     assert baseline.get(24) is None
-    _write_cell(tmp_path, 24, 300, sha="first")
+    _write_cell(tmp_path, 24, 300, sha="first", emulated_frames=3000)
     observed, best = adaptive_mint_observed(baseline, 24, tmp_path)
-    assert (observed, best) == (True, 300)
+    assert (observed, best) == (True, 3000)
+
+
+def test_legacy_cell_without_emulated_frames_fails_open(tmp_path):
+    baseline = snapshot_adaptive_baseline(tmp_path)
+    _write_cell(
+        tmp_path,
+        24,
+        300,
+        sha="legacy",
+        include_emulated=False,
+    )
+    assert adaptive_mint_observed(baseline, 24, tmp_path) == (False, 0)
+    assert (
+        adaptive_cap_frames_for_target(24, tmp_path, baseline, boss=False)
+        == PLANNER_DEFAULT_TIMEOUT_FRAMES
+    )
 
 
 def test_corrupt_meta_fails_open_to_full_wall(tmp_path):
@@ -164,7 +186,7 @@ def test_grind_default_isolation(monkeypatch, tmp_path):
     assert not adaptive_cap_enabled()
     assert planner_timeout_frames(boss=False) == PLANNER_DEFAULT_TIMEOUT_FRAMES
     assert planner_timeout_frames(boss=True) == PLANNER_BOSS_TIMEOUT_FRAMES
-    assert ADAPTIVE_CAP_FACTOR == 1.2
+    assert ADAPTIVE_CAP_FACTOR == 1.7
     _write_cell(tmp_path, 23, 449, sha="incumbent")
     baseline = snapshot_adaptive_baseline(tmp_path)
     # Pure helpers: mint math does not depend on the flag; gating lives in

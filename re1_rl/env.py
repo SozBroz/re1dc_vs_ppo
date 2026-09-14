@@ -1669,6 +1669,7 @@ class RE1Env(gym.Env):
                 sidecar_path=Path(sidecar_path),
                 worker_id=os.environ.get("MACHINE_NAME"),
                 mint_policy=rec.get("mint_policy"),
+                leg_emulated_frames=rec.get("leg_emulated_frames"),
             )
         except (OSError, ValueError, TypeError, KeyError) as exc:
             print(f"[planner_loyal] fat bundle pack failed: {exc}", flush=True)
@@ -1681,6 +1682,7 @@ class RE1Env(gym.Env):
             "training_start": rec.get("training_start"),
             "planner_step": rec.get("planner_step"),
             "kills": rec.get("kills"),
+            "leg_emulated_frames": rec.get("leg_emulated_frames"),
             "leg_replay_path": rec.get("leg_replay_path"),
             "leg_policy_path": rec.get("leg_policy_path"),
             "room_segment_id": rec.get("room_segment_id"),
@@ -3115,16 +3117,23 @@ class RE1Env(gym.Env):
                 else:
                     self._progress.room_segment = None
             if getattr(self._progress, "room_segment", None) is None:
-                # Grind: shrink the wall to ~1.5x the target's recorded hop.
+                # Legacy static cap. Adaptive mode owns its wall independently
+                # because quality[8] is policy decisions, not emulated frames.
                 # Segments keep their shared budget; unset = flat 6/12min wall.
                 from re1_rl.planner_hop_score import (
+                    adaptive_cap_enabled,
                     per_tip_cap_enabled,
                     per_tip_cap_frames,
                     recorded_frames_for_pl,
                 )
                 from re1_rl.planner_loyal_cells import planner_loyal_root
 
-                if per_tip_cap_enabled() and tip_slot is not None and tip_slot >= 0:
+                if (
+                    per_tip_cap_enabled()
+                    and not adaptive_cap_enabled()
+                    and tip_slot is not None
+                    and tip_slot >= 0
+                ):
                     recorded = int(
                         recorded_frames_for_pl(
                             int(tip_slot) + 1,
@@ -3147,12 +3156,9 @@ class RE1Env(gym.Env):
                             )
                             frames = capped
                 # Adaptive cap: full planner wall until a NEW mint for the
-                # target lands this run, then ~1.2x the fresh cell's frames
-                # floored at the per-tip static value. Wins over --per-tip-cap
-                # when both are on and a mint was observed (same floor either
-                # way). Mid-segment hops keep their shared budget (above).
+                # target lands this run, then 1.7x its measured emulated frames.
+                # Mid-segment hops keep their shared budget (above).
                 from re1_rl.planner_hop_score import (
-                    adaptive_cap_enabled,
                     adaptive_cap_frames,
                     adaptive_mint_observed,
                     snapshot_adaptive_baseline,
@@ -3188,7 +3194,8 @@ class RE1Env(gym.Env):
                                 print(
                                     f"[adaptive_cap] tip=pl{tip_slot:02d} "
                                     f"target=pl{_ad_target:02d} "
-                                    f"best={int(_best)}f recorded={_recorded}f "
+                                    f"best_emulated={int(_best)}f "
+                                    f"best_steps={_recorded} "
                                     f"wall {frames}f->{_ad_capped}f",
                                     flush=True,
                                 )

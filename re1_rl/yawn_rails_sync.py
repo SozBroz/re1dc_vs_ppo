@@ -783,6 +783,7 @@ def build_capture_proposal(
     worker_id: str | None = None,
     capacity: dict[str, Any] | None = None,
     mint_policy: dict[str, Any] | None = None,
+    leg_emulated_frames: int | None = None,
 ) -> dict[str, Any]:
     """Pack a local cell capture into a rollout proposal dict."""
     state_bytes = Path(state_path).read_bytes()
@@ -821,6 +822,8 @@ def build_capture_proposal(
     }
     if isinstance(mint_policy, dict) and mint_policy:
         meta["mint_policy"] = dict(mint_policy)
+    if leg_emulated_frames is not None and int(leg_emulated_frames) > 0:
+        meta["leg_emulated_frames"] = int(leg_emulated_frames)
     if worker_id:
         meta["worker_id"] = str(worker_id)
     capacity_meta = {
