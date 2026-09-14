@@ -89,7 +89,8 @@ HEAL_UNITS: dict[str, float] = {
 
 FAIL_SCORE_DIVERT = -0.90
 FAIL_SCORE_DEATH = -0.90
-FAIL_SCORE_TIMEOUT = -1.00
+# Unified 2026-09-14: every failure pays the same (-0.90), including timeouts.
+FAIL_SCORE_TIMEOUT = -0.90
 # Back-compat aliases for older call sites / tests.
 FAIL_SCORE_DEFAULT = FAIL_SCORE_DIVERT
 

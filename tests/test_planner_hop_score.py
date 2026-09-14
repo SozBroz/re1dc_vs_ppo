@@ -268,8 +268,8 @@ def test_fail_ladder() -> None:
     assert meters.fail_score("hp_death") == FAIL_SCORE_DEATH
     assert FAIL_SCORE_DIVERT == pytest.approx(-0.90)
     assert FAIL_SCORE_DEATH == pytest.approx(-0.90)
-    assert FAIL_SCORE_TIMEOUT == pytest.approx(-1.00)
-    assert FAIL_SCORE_TIMEOUT < FAIL_SCORE_DEATH <= FAIL_SCORE_DIVERT < 0
+    assert FAIL_SCORE_TIMEOUT == pytest.approx(-0.90)
+    assert FAIL_SCORE_TIMEOUT <= FAIL_SCORE_DEATH <= FAIL_SCORE_DIVERT < 0
 
 
 def test_raw_quality_logged_when_overshoot() -> None:
