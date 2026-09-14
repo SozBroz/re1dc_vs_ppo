@@ -47,9 +47,11 @@ if (-not $SkipTeardown) {
   Write-Host '=== TEARDOWN ===' -ForegroundColor Yellow
   & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $ROOT '_tmp\_stop_fleet_procs.ps1')
   # taskkill exits 128 when the image is not running; do not fail the restart.
-  Invoke-FleetSsh $WH2 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul & exit 0'
-  Invoke-FleetSsh $WH1 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul & exit 0'
-  Invoke-FleetSsh $WH3 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul & exit 0'
+  # Kill python + C-RE1 (not just EmuHawk). Orphan Resident_Evil on WH2 is a
+  # classic source of next-boot attach rc=1 / LISTEN ghosts on 6700-6727.
+  Invoke-FleetSsh $WH2 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul & taskkill /F /IM Resident_Evil_Director_s_Cut_Recompiled.exe 2>nul & exit 0'
+  Invoke-FleetSsh $WH1 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul & taskkill /F /IM Resident_Evil_Director_s_Cut_Recompiled.exe 2>nul & exit 0'
+  Invoke-FleetSsh $WH3 'taskkill /F /IM python.exe 2>nul & taskkill /F /IM EmuHawk.exe 2>nul & taskkill /F /IM Resident_Evil_Director_s_Cut_Recompiled.exe 2>nul & exit 0'
   Start-Sleep -Seconds 3
 }
 
@@ -88,7 +90,7 @@ while ((Get-Date) -lt $gateDeadline) {
       $need = switch ($wid) {
         'pking-recomp' { 20 }
         'wh1-recomp' { 8 }
-        'wh2-recomp' { 28 }
+        'wh2-recomp' { 24 }
         'wh3-recomp' { 24 }
         default { 1 }
       }

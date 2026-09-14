@@ -131,7 +131,7 @@ if (-not $PkingOnly) {
 
   $remotes = @(
     @{ Ssh=$WH1; Rl='D:\re1_rl'; Recomp='D:\re1_recomp'; Wid='wh1-recomp'; Machine='workhorse1'; NEnvs='8'; BasePort='6600'; Ranks='0-7' },
-    @{ Ssh=$WH2; Rl='C:\Users\sshuser\re1_rl'; Recomp='C:\re1_recomp'; Wid='wh2-recomp'; Machine='workhorse2'; NEnvs='28'; BasePort='6700'; Ranks='0-27' },
+    @{ Ssh=$WH2; Rl='C:\Users\sshuser\re1_rl'; Recomp='C:\re1_recomp'; Wid='wh2-recomp'; Machine='workhorse2'; NEnvs='24'; BasePort='6700'; Ranks='0-23' },
     @{ Ssh=$WH3; Rl='C:\Users\sshuser\re1_rl'; Recomp='C:\re1_recomp'; Wid='wh3-recomp'; Machine='workhorse3'; NEnvs='24'; BasePort='6800'; Ranks='0-23' }
   )
 
