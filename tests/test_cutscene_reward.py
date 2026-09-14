@@ -326,7 +326,7 @@ def test_illegal_main_hall_gate_irreversibly_disables_positive_rewards() -> None
     _, bd = compute_reward(
         prev, cur, make_planner(), progress=progress, return_breakdown=True
     )
-    assert bd[ILLEGAL_MAIN_HALL_FAILURE_REASON] == -0.05
+    assert bd[ILLEGAL_MAIN_HALL_FAILURE_REASON] == MAIN_HALL_BEFORE_KENNETH_PENALTY
     assert bd["new_room"] == 0.0
     assert "106" not in progress.visited_rooms
     assert progress.kenneth_gate_breached
@@ -338,7 +338,7 @@ def test_illegal_main_hall_gate_irreversibly_disables_positive_rewards() -> None
     _, bounce_bd = compute_reward(
         prev, bounce_cur, make_planner(), progress=bounce, return_breakdown=True
     )
-    assert bounce_bd[ILLEGAL_MAIN_HALL_FAILURE_REASON] == -0.05
+    assert bounce_bd[ILLEGAL_MAIN_HALL_FAILURE_REASON] == MAIN_HALL_BEFORE_KENNETH_PENALTY
     assert "106" not in bounce.visited_rooms
     assert bounce.kenneth_gate_breached
 
@@ -388,4 +388,4 @@ def test_real_death_owns_penalty_not_kenneth_gate() -> None:
     )
     assert bd["death"] == DEATH_PENALTY
     assert bd[ILLEGAL_MAIN_HALL_FAILURE_REASON] == 0.0
-    assert MAIN_HALL_BEFORE_KENNETH_PENALTY == -0.05
+    assert MAIN_HALL_BEFORE_KENNETH_PENALTY == -4.0

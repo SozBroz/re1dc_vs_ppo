@@ -56,8 +56,8 @@ def _step(
 
 
 def test_softlock_budget_is_independent_static():
-    assert CONTEMPT_BUDGET_SCALED == pytest.approx(4.0 / 15.0)  # |death|/5
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-(4.0 / 15.0))
+    assert CONTEMPT_BUDGET_SCALED == pytest.approx(4.0 / 5.0)  # |death|/5
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-(4.0 / 5.0))
     assert DEATH_PENALTY_SCALED == pytest.approx(4.0 / 3.0)
     assert CONTEMPT_BUDGET_SCALED < SURVIVAL_BUDGET_SCALED
 
@@ -88,7 +88,7 @@ def test_new_room_floors_softlock_cap_at_twelve_minutes():
 
 
 def test_kenneth_gate_breach_revokes_and_blocks_softlock_extensions():
-    from re1_rl.reward import SOFTLOCK_EXTENSION_FRAMES
+    from re1_rl.reward import MAIN_HALL_BEFORE_KENNETH_PENALTY, SOFTLOCK_EXTENSION_FRAMES
 
     progress = ProgressTracker()
     progress.first_visit("105")
@@ -98,7 +98,7 @@ def test_kenneth_gate_breach_revokes_and_blocks_softlock_extensions():
     prev = make_state(room="105", step=0)
     hall = make_state(room="106", step=1)
     _, breach = _step(progress, prev, hall)
-    assert breach["main_hall_before_kenneth"] == -0.05
+    assert breach["main_hall_before_kenneth"] == MAIN_HALL_BEFORE_KENNETH_PENALTY
     assert progress.kenneth_gate_breached
     assert progress.softlock_cap_frames == 0
     assert softlock_frame_threshold(progress) == SOFTLOCK_PRE_KENNETH_FRAMES

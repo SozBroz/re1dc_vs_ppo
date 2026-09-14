@@ -261,6 +261,7 @@ def test_explain_obs_names_every_slot():
 def test_damage_and_death_calibrated_to_waypoint():
     from re1_rl.reward import (
         CONTEMPT_BUDGET_SCALED,
+        DEATH_PENALTY,
         DEATH_PENALTY_SCALED,
         HP_GAIN_SCALE,
         HP_LOSS_SCALE,
@@ -284,8 +285,8 @@ def test_damage_and_death_calibrated_to_waypoint():
     assert SURVIVAL_BUDGET_SCALED == pytest.approx(4.0)
     assert NEAR_DEATH_DAMAGE_SCALED == pytest.approx(8.0 / 3.0)
     assert DEATH_PENALTY_SCALED == pytest.approx(4.0 / 3.0)
-    assert CONTEMPT_BUDGET_SCALED == pytest.approx(4.0 / 15.0)  # |death|/5
-    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-(4.0 / 15.0))
+    assert CONTEMPT_BUDGET_SCALED == pytest.approx(4.0 / 5.0)  # |death|/5
+    assert SOFTLOCK_TIMEOUT_PENALTY == pytest.approx(-(4.0 / 5.0))
     assert HP_LOSS_SCALE == pytest.approx((8.0 / 3.0) / (JILL_FINE_HP - 1))
     assert HP_GAIN_SCALE == pytest.approx(HP_LOSS_SCALE)
 
@@ -302,7 +303,7 @@ def test_damage_and_death_calibrated_to_waypoint():
         dead_prev, dead_now, planner, progress=ProgressTracker(),
         return_breakdown=True,
     )
-    assert bd_death["death"] * REWARD_SCALE == pytest.approx(-DEATH_PENALTY_SCALED)
+    assert bd_death["death"] * REWARD_SCALE == pytest.approx(DEATH_PENALTY)
     assert bd_death["hp"] * REWARD_SCALE == pytest.approx(
         -NEAR_DEATH_DAMAGE_SCALED * JILL_FINE_HP / (JILL_FINE_HP - 1)
     )
