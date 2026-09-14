@@ -253,7 +253,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "adaptive episode wall: full planner timeout until a new mint lands "
-            "for the target PL this run, then 1.7x the fresh cell's measured "
+            "for the target PL this run, then 3x the fresh cell's measured "
             "emulated frames (RE1_PL_ADAPTIVE_CAP=1 for local workers; set the "
             "same env on remote launch cmds). "
             "Revert = relaunch without --adaptive-cap."

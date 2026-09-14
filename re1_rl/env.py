@@ -3156,7 +3156,7 @@ class RE1Env(gym.Env):
                             )
                             frames = capped
                 # Adaptive cap: full planner wall until a NEW mint for the
-                # target lands this run, then 1.7x its measured emulated frames.
+                # target lands this run, then 3x its measured emulated frames.
                 # Mid-segment hops keep their shared budget (above).
                 from re1_rl.planner_hop_score import (
                     adaptive_cap_frames,

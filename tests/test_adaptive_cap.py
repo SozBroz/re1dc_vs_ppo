@@ -1,4 +1,4 @@
-"""Adaptive episode cap: full wall until a new mint lands, then 1.7x best.
+"""Adaptive episode cap: full wall until a new mint lands, then 3x best.
 
 Gated by RE1_PL_ADAPTIVE_CAP=1 (default off); --adaptive-cap on
 scripts/distributed_train_parallel.py mirrors the --per-tip-cap pattern.
@@ -64,21 +64,21 @@ def test_flag_defaults_off(monkeypatch):
 def test_cap_math_uses_emulated_frames_not_policy_decisions():
     # Real pl12 evidence: quality[8]=404 decisions, but the successful hop
     # consumed 4002 emulated frames. The old bug returned the 1200f floor.
-    tight = int(math.ceil(1.7 * 4002 / 8.0) * 8)
-    assert tight == 6808
+    tight = int(math.ceil(3.0 * 4002 / 8.0) * 8)
+    assert tight == 12008
     assert adaptive_cap_frames(4002, 404, boss=False) == tight
 
 
 def test_cap_math_tight_binds_when_best_exceeds_recorded():
-    tight = int(math.ceil(1.7 * 2000 / 8.0) * 8)
-    assert tight == 3400
-    assert adaptive_cap_frames(2000, 449, boss=False) == 3400
+    tight = int(math.ceil(3.0 * 2000 / 8.0) * 8)
+    assert tight == 6000
+    assert adaptive_cap_frames(2000, 449, boss=False) == 6000
 
 
 def test_cap_math_boss_variant():
     wall = PLANNER_BOSS_TIMEOUT_FRAMES
     assert planner_timeout_frames(boss=True) == wall
-    assert adaptive_cap_frames(2000, 449, boss=True) == 3400
+    assert adaptive_cap_frames(2000, 449, boss=True) == 6000
     # Safety floor still prevents an instant timeout on tiny hops.
     assert adaptive_cap_frames(100, 100, boss=True) == 150 * 8
 
@@ -117,7 +117,7 @@ def test_new_mint_with_better_frames_tightens(tmp_path):
     assert recorded_frames_for_pl(23, tmp_path) == 400
     capped = adaptive_cap_frames_for_target(23, tmp_path, baseline, boss=False)
     assert capped == adaptive_cap_frames(4002, 400, boss=False)
-    assert capped == 6808
+    assert capped == 12008
     assert capped < PLANNER_DEFAULT_TIMEOUT_FRAMES
 
 
@@ -186,7 +186,7 @@ def test_grind_default_isolation(monkeypatch, tmp_path):
     assert not adaptive_cap_enabled()
     assert planner_timeout_frames(boss=False) == PLANNER_DEFAULT_TIMEOUT_FRAMES
     assert planner_timeout_frames(boss=True) == PLANNER_BOSS_TIMEOUT_FRAMES
-    assert ADAPTIVE_CAP_FACTOR == 1.7
+    assert ADAPTIVE_CAP_FACTOR == 3.0
     _write_cell(tmp_path, 23, 449, sha="incumbent")
     baseline = snapshot_adaptive_baseline(tmp_path)
     # Pure helpers: mint math does not depend on the flag; gating lives in

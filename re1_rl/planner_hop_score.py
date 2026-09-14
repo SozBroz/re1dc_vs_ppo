@@ -388,12 +388,12 @@ def per_tip_cap_frames(recorded_frames: int, *, boss: bool = False) -> int:
 
 
 # Adaptive episode cap: full planner wall until a NEW mint lands this run,
-# then 1.7x the fresh cell's measured emulated frames.
+# then 3x the fresh cell's measured emulated frames.
 # Opt-in via RE1_PL_ADAPTIVE_CAP=1 (default off; revert = relaunch without it).
 # Rationale: early exploration gets the full budget; once we know the hop is
 # solvable in F frames, stop paying for 6-minute wander episodes.
 ADAPTIVE_CAP_ENV = "RE1_PL_ADAPTIVE_CAP"
-ADAPTIVE_CAP_FACTOR = 1.7
+ADAPTIVE_CAP_FACTOR = 3.0
 
 
 def adaptive_cap_enabled() -> bool:
@@ -514,8 +514,9 @@ def adaptive_cap_frames(
 ) -> int:
     """Episode wall (emulated frames) after a new mint.
 
-    ``ceil(1.7 * best_emulated_frames / 8) * 8``, with the existing 1200-frame
-    safety floor and the full planner wall as the ceiling. ``recorded_frames``
+    ``ceil(3.0 * best_emulated_frames / 8) * 8``, with the existing 1200-frame
+    safety floor and the normal 6/12-minute planner wall as a hard ceiling.
+    ``recorded_frames``
     remains in the signature for compatibility but is intentionally not used:
     it is ``quality[8]`` policy-decision count, a different unit.
     """
