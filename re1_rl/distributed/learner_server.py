@@ -152,6 +152,10 @@ class LearnerState:
             "last_applied_unix": 0,
             "base_ckpt": "",
         }
+        # Fleet master pin (INDEX + knobs). Workers pull/publish via /march/pin.
+        from re1_rl.distributed.march_pin import MarchPinStore
+
+        self.march_pin_store = MarchPinStore()
 
     def check_rollout_identity(self, rollout: WorkerRollout) -> tuple[bool, str]:
         """Fail closed when curriculum/schema does not match the learner."""
@@ -672,6 +676,15 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                         "bytes_total": bytes_total,
                         "archive_version": int(merge.archive_version),
                     }
+            march_pin_status: dict[str, Any] | None = None
+            pin_store = getattr(self.state, "march_pin_store", None)
+            if pin_store is not None:
+                snap = pin_store.snapshot()
+                march_pin_status = {
+                    "version": snap.get("version"),
+                    "index": snap.get("index"),
+                    "updated_unix": snap.get("updated_unix"),
+                }
             with self.state.lock:
                 payload = {
                     "policy_version": version,
@@ -717,6 +730,7 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                             else None
                         ),
                     },
+                    "march_pin": march_pin_status,
                     "go_explore_accepted": self.state.go_explore_accepted,
                     "yawn_rails_accepted": self.state.yawn_rails_accepted,
                     "pitch": pitch,
@@ -791,6 +805,14 @@ class _LearnerHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(blob)))
             self.end_headers()
             self.wfile.write(blob)
+            return
+
+        if path == "/march/pin":
+            store = getattr(self.state, "march_pin_store", None)
+            if store is None:
+                self._send_json(503, {"error": "march pin store not configured"})
+                return
+            self._send_json(200, store.snapshot())
             return
 
         self._send_json(404, {"error": "not found"})
@@ -915,6 +937,49 @@ class _LearnerHandler(BaseHTTPRequestHandler):
                         "requested_unix": time.time(),
                     }
             self._send_json(200, {"ok": True, "advance_id": advance_id})
+            return
+
+        if path == "/march/pin":
+            store = getattr(self.state, "march_pin_store", None)
+            if store is None:
+                self._send_json(503, {"error": "march pin store not configured"})
+                return
+            try:
+                payload = json.loads(self._read_body().decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                self._send_json(400, {"error": "invalid json"})
+                return
+            if not isinstance(payload, dict):
+                self._send_json(400, {"error": "invalid json"})
+                return
+            text = payload.get("text")
+            index = payload.get("index")
+            expected_version = payload.get("expected_version")
+            expected_index = payload.get("expected_index")
+            force = bool(payload.get("force"))
+            try:
+                index_i = int(index) if index is not None else None
+            except (TypeError, ValueError):
+                self._send_json(400, {"error": "bad index"})
+                return
+            try:
+                ev = int(expected_version) if expected_version is not None else None
+            except (TypeError, ValueError):
+                self._send_json(400, {"error": "bad expected_version"})
+                return
+            try:
+                ei = int(expected_index) if expected_index is not None else None
+            except (TypeError, ValueError):
+                self._send_json(400, {"error": "bad expected_index"})
+                return
+            ok, result = store.publish(
+                text=str(text) if isinstance(text, str) else None,
+                index=index_i,
+                expected_version=ev,
+                expected_index=ei,
+                force=force,
+            )
+            self._send_json(200 if ok else 409, result)
             return
 
         self._send_json(404, {"error": "not found"})

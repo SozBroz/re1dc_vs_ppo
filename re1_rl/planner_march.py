@@ -539,6 +539,13 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
     _LAST_TICK[root_key] = now
     if not _march_flag(project_root):
         return None
+    # Fleet master pin: pull learner authority before reading local INDEX.
+    try:
+        from re1_rl.distributed.march_pin import sync_pin_from_learner
+
+        sync_pin_from_learner(project_root)
+    except Exception as exc:  # noqa: BLE001 — never block the hunt on pin sync
+        print(f"[planner_march] pin sync skipped: {exc}", flush=True)
     from re1_rl.planner_loyal_cells import (
         _pin_file_path,
         cell_dir_name,
@@ -579,6 +586,13 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
             f"requesting NN reset {advance_id}",
             flush=True,
         )
+        # Manual / synced pin move: publish local truth so the fleet converges.
+        try:
+            from re1_rl.distributed.march_pin import publish_local_pin
+
+            publish_local_pin(project_root, force=True)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[planner_march] pin publish skipped: {exc}", flush=True)
         _queue_pin_reset(
             project_root,
             advance_id=advance_id,
@@ -651,7 +665,43 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
             except (OSError, ValueError, KeyError) as exc:
                 print(f"[planner_march] crystal failed, holding pin {pin}: {exc}", flush=True)
                 return None
-            _rewrite_pin_index(pin_file, nxt)
+            # Publish INDEX to learner first so the whole fleet sees the move;
+            # local rewrite follows from the returned master text (or offline).
+            try:
+                from re1_rl.distributed.march_pin import (
+                    fetch_master_pin,
+                    publish_index_advance,
+                )
+
+                expected_version = None
+                snap = fetch_master_pin()
+                if snap and snap.get("version") is not None:
+                    try:
+                        expected_version = int(snap["version"])
+                    except (TypeError, ValueError):
+                        expected_version = None
+                pub = publish_index_advance(
+                    project_root,
+                    new_idx=nxt,
+                    expected_index=pin,
+                    expected_version=expected_version,
+                )
+                if pub is None or pub.get("ok") is not True:
+                    print(
+                        f"[planner_march] master pin CAS failed, holding pin {pin}: "
+                        f"{pub!r}",
+                        flush=True,
+                    )
+                    return None
+            except Exception as exc:  # noqa: BLE001
+                print(
+                    f"[planner_march] master pin publish failed, holding pin {pin}: {exc}",
+                    flush=True,
+                )
+                return None
+            # Ensure local INDEX matches even if publish returned offline/no text.
+            if _file_pin_index(pin_file) != nxt:
+                _rewrite_pin_index(pin_file, nxt)
             _write_march_state(
                 project_root,
                 {
