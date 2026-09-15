@@ -171,6 +171,17 @@ def test_champion_gate_dims() -> None:
         _champion_qualifies(worse_ammo, Q_CHAMP, resources_frames=49, frames_factor=1.1)
         is False
     )
+    # Nav hops skip ammo: same shortfall still advances.
+    assert (
+        _champion_qualifies(
+            worse_ammo,
+            Q_CHAMP,
+            resources_frames=49,
+            frames_factor=1.1,
+            require_ammo=False,
+        )
+        is True
+    )
     # Within 1.1x of resources (50 <= 54) even if slower than champion 49.
     within = list(Q_FAT)
     within[8] = -50

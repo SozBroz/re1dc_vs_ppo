@@ -9,9 +9,10 @@ ALL of:
   10 minutes of grind per PL, even if the target falls early),
 * the learner mirror admits N+1 AND this box holds those exact bytes,
 * live ``pl(N+1)`` meta ``quality`` meets the kit bar: HP[0]/kills[1]
-  equal-or-greater than the pre-march champion row, ammo_dmg_weighted[2]
-  within ``MARCH_AMMO_SLACK`` (default **3**) of champion
-  (``data/planner_march_champions.json``), and hop frames[8] within
+  equal-or-greater than the pre-march champion row; on **fighting** hops
+  ammo_dmg_weighted[2] within ``MARCH_AMMO_SLACK`` (default **3**) of champion
+  (``data/planner_march_champions.json``); **nav** hops skip the ammo bar so
+  the tape can auto-roll until the next fight; and hop frames[8] within
   ``RE1_PLANNER_MARCH_FRAMES_FACTOR`` (default **1.1**) of the Frames column
   in ``docs/planner_loyal_resources.md``. Short quality / missing resources
   Frames never qualifies.
@@ -234,10 +235,17 @@ def _resources_frames(project_root: Path | str) -> dict[int, int]:
 
 
 def _champion_qualifies(
-    live_q: Any, champ_q: Any, *, resources_frames: int = 0, frames_factor: float = 1.1
+    live_q: Any,
+    champ_q: Any,
+    *,
+    resources_frames: int = 0,
+    frames_factor: float = 1.1,
+    require_ammo: bool = True,
 ) -> bool:
-    """Live mint meets kit bar: HP/kills/ammo >= champion, frames <= factor×resources.
+    """Live mint meets kit bar: HP/kills/(ammo) vs champion, frames vs resources.
 
+    ``require_ammo`` is True for fighting hops; nav hops skip ammo so a sticky
+    HG-eq shortfall cannot strand the march between fights.
     ``resources_frames`` is the docs Frames column (policy decisions, same unit
     as ``-quality[8]``). Short quality or missing/non-positive resources Frames
     never qualifies. ``frames_factor`` defaults to 1.1.
@@ -256,10 +264,10 @@ def _champion_qualifies(
         champ = lift_planner_loyal_quality(champ_q)
     except (TypeError, ValueError):
         return False
-    # HP + kills must meet champion; ammo may trail by MARCH_AMMO_SLACK.
+    # HP + kills must meet champion; ammo (with slack) only on fighting hops.
     if int(live[0]) < int(champ[0]) or int(live[1]) < int(champ[1]):
         return False
-    if int(live[2]) < int(champ[2]) - int(MARCH_AMMO_SLACK):
+    if require_ammo and int(live[2]) < int(champ[2]) - int(MARCH_AMMO_SLACK):
         return False
     live_frames = -int(live[_MARCH_FRAMES_DIM])
     if live_frames <= 0:
@@ -629,15 +637,19 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
         return None
     frames_factor = _march_frames_factor(project_root)
     try:
-        from re1_rl.fight_pl_policy import march_frames_factor_for_target
+        from re1_rl.fight_pl_policy import (
+            is_fighting_hop,
+            march_frames_factor_for_target,
+        )
 
         frames_factor = float(
             march_frames_factor_for_target(
                 nxt, project_root, base_factor=float(frames_factor)
             )
         )
+        require_ammo = bool(is_fighting_hop(pin, nxt, project_root))
     except Exception:  # noqa: BLE001 — never block march on policy import
-        pass
+        require_ammo = True
     rows = _mirror_rows(project_root)
     next_row = rows.get(nxt)
     if next_row is None:
@@ -655,7 +667,11 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
         return None
     live_q = _live_quality(Path(project_root), nxt)
     if live_q is None or not _champion_qualifies(
-        live_q, champ, resources_frames=rec_frames, frames_factor=frames_factor
+        live_q,
+        champ,
+        resources_frames=rec_frames,
+        frames_factor=frames_factor,
+        require_ammo=require_ammo,
     ):
         return None
     advance_id = f"pl{pin:02d}->pl{nxt:02d}@{int(wall_now)}"
@@ -675,6 +691,7 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
                 champ,
                 resources_frames=rec_frames,
                 frames_factor=frames_factor,
+                require_ammo=require_ammo,
             ):
                 return None
             try:
