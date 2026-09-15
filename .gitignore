@@ -68,6 +68,7 @@ data/probe_*.png
 data/benchmark_results/
 data/determinism_trace_*.json
 data/planner_march_pin_master.json
+data/planner_fight_cap_state.json
 data/rdt_raw/
 data/rdt_extracted.json
 

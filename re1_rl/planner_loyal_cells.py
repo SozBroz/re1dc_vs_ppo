@@ -1479,6 +1479,28 @@ def capture_planner_loyal_cell(
     # Sync proposal is packed in env AFTER leg_replay/leg_policy land on disk
     # (_repack_planner_loyal_sync_proposal). Packing here would ship a thin zip.
     close_planner_loyal_stretch(getattr(env, "_progress", None))
+    try:
+        tip_slot = int(slot) - 1
+        if tip_slot >= 0:
+            from re1_rl.fight_pl_policy import (
+                live_kit_meets_champion,
+                note_kit_qualified_success,
+            )
+
+            if live_kit_meets_champion(int(slot), root, env.project_root):
+                note_kit_qualified_success(
+                    tip_slot,
+                    int(slot),
+                    project_root=env.project_root,
+                    emulated_frames=int(leg_emulated_frames),
+                    worker_id=str(
+                        getattr(env, "worker_id", None)
+                        or os.environ.get("RE1_WORKER_ID", "")
+                        or ""
+                    ),
+                )
+    except Exception:  # noqa: BLE001 — never fail a mint on fight-cap bookkeeping
+        pass
     print(
         f"[planner_loyal] minted {cell_dir_name(slot)} "
         f"chunk={queue.chunk_id} step={completed} room={room_id} "

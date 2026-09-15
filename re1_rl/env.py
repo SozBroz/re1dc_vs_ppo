@@ -3122,9 +3122,12 @@ class RE1Env(gym.Env):
                 # Segments keep their shared budget; unset = flat 6/12min wall.
                 from re1_rl.planner_hop_score import (
                     adaptive_cap_enabled,
+                    adaptive_cap_frames_for_target,
+                    adaptive_mint_observed,
                     per_tip_cap_enabled,
                     per_tip_cap_frames,
                     recorded_frames_for_pl,
+                    snapshot_adaptive_baseline,
                 )
                 from re1_rl.planner_loyal_cells import planner_loyal_root
 
@@ -3174,32 +3177,53 @@ class RE1Env(gym.Env):
                             )
                         _ad_target = int(tip_slot) + 1
                         _ad_root = planner_loyal_root(self.project_root)
-                        _observed, _best = adaptive_mint_observed(
-                            self._adaptive_cap_baseline,
-                            _ad_target,
-                            _ad_root,
+                        from re1_rl.planner_hop_score import adaptive_cap_frames_for_target
+
+                        _ad_capped = int(
+                            adaptive_cap_frames_for_target(
+                                _ad_target,
+                                _ad_root,
+                                self._adaptive_cap_baseline,
+                                boss=current_step_is_boss(queue),
+                                tip_slot=int(tip_slot),
+                                project_root=self.project_root,
+                            )
                         )
-                        if _observed and int(_best) > 0:
-                            _recorded = int(
-                                recorded_frames_for_pl(_ad_target, _ad_root)
+                        if _ad_capped < int(frames):
+                            _observed, _best = adaptive_mint_observed(
+                                self._adaptive_cap_baseline,
+                                _ad_target,
+                                _ad_root,
                             )
-                            _ad_capped = int(
-                                adaptive_cap_frames(
-                                    int(_best),
-                                    _recorded,
-                                    boss=current_step_is_boss(queue),
-                                )
+                            print(
+                                f"[adaptive_cap] tip=pl{tip_slot:02d} "
+                                f"target=pl{_ad_target:02d} "
+                                f"best_emulated={int(_best)}f "
+                                f"wall {frames}f->{_ad_capped}f",
+                                flush=True,
                             )
-                            if _ad_capped < int(frames):
-                                print(
-                                    f"[adaptive_cap] tip=pl{tip_slot:02d} "
-                                    f"target=pl{_ad_target:02d} "
-                                    f"best_emulated={int(_best)}f "
-                                    f"best_steps={_recorded} "
-                                    f"wall {frames}f->{_ad_capped}f",
-                                    flush=True,
+                            frames = _ad_capped
+                        else:
+                            # Fighting hops often keep the full wall; log once-ish.
+                            from re1_rl.fight_pl_policy import is_fighting_hop
+
+                            if is_fighting_hop(
+                                int(tip_slot), _ad_target, self.project_root
+                            ):
+                                _observed, _best = adaptive_mint_observed(
+                                    self._adaptive_cap_baseline,
+                                    _ad_target,
+                                    _ad_root,
                                 )
-                                frames = _ad_capped
+                                if _observed and int(_best) > 0:
+                                    print(
+                                        f"[adaptive_cap] tip=pl{tip_slot:02d} "
+                                        f"target=pl{_ad_target:02d} "
+                                        f"fight_hold full_wall={frames}f "
+                                        f"(best_emulated={int(_best)}f; "
+                                        f"kit unlock not reached)",
+                                        flush=True,
+                                    )
                     except (OSError, ValueError, TypeError):
                         pass
         elif flat_cell_timeout_enabled():

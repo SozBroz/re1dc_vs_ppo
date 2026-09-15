@@ -621,6 +621,16 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
         )
         return None
     frames_factor = _march_frames_factor(project_root)
+    try:
+        from re1_rl.fight_pl_policy import march_frames_factor_for_target
+
+        frames_factor = float(
+            march_frames_factor_for_target(
+                nxt, project_root, base_factor=float(frames_factor)
+            )
+        )
+    except Exception:  # noqa: BLE001 — never block march on policy import
+        pass
     rows = _mirror_rows(project_root)
     next_row = rows.get(nxt)
     if next_row is None:

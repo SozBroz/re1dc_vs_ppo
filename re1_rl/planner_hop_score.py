@@ -539,8 +539,15 @@ def adaptive_cap_frames_for_target(
     baseline: Any,
     *,
     boss: bool = False,
+    tip_slot: int | None = None,
+    project_root: Any | None = None,
 ) -> int:
-    """Full planner wall until a qualifying new mint; tightened cap after."""
+    """Full planner wall until a qualifying new mint; tightened cap after.
+
+    Fighting hops (HP/ammo/kills resource deltas) stay on the full wall until
+    the live target meets champion kit *and* sticky kit-qualified clears
+    unlock staged 5x/4x/3x tighten — a single non-kit mint must not strangle.
+    """
     wall = int(planner_timeout_frames(boss=boss))
     try:
         observed, best = adaptive_mint_observed(baseline, int(target_slot), cells_root)
@@ -548,6 +555,38 @@ def adaptive_cap_frames_for_target(
         return wall
     if not observed or int(best) <= 0:
         return int(wall)
+    # Without an explicit tip, keep legacy 3x mint tighten (tests / callers).
+    if tip_slot is None:
+        return int(adaptive_cap_frames(int(best), 0, boss=boss))
+    tip = int(tip_slot)
+    try:
+        from re1_rl.fight_pl_policy import (
+            fight_adaptive_cap_frames,
+            is_fighting_hop,
+        )
+
+        root = project_root
+        if root is None:
+            from pathlib import Path as _Path
+
+            root = (
+                _Path(cells_root).resolve().parents[1]
+                if cells_root
+                else _Path.cwd()
+            )
+        if tip >= 0 and is_fighting_hop(tip, int(target_slot), root):
+            return int(
+                fight_adaptive_cap_frames(
+                    tip_slot=tip,
+                    target_slot=int(target_slot),
+                    best_emulated_frames=int(best),
+                    cells_root=cells_root,
+                    project_root=root,
+                    boss=boss,
+                )
+            )
+    except (OSError, ValueError, TypeError, ImportError):
+        pass
     return int(adaptive_cap_frames(int(best), 0, boss=boss))
 
 
