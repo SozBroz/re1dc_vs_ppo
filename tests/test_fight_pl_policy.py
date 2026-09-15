@@ -128,6 +128,12 @@ def test_fight_holds_full_wall_until_kit_and_quals(tmp_path):
     # Kit met but 0 sticky quals → still full wall.
     _write_cell(cells, 23, [96, 2, 77, 0, 0, 0, 0, 0, -380, 0, 0], frames=3800)
     assert live_kit_meets_champion(23, cells, root) is True
+    # Ammo two below champ still unlocks kit (MARCH_AMMO_SLACK).
+    _write_cell(cells, 23, [96, 2, 75, 0, 0, 0, 0, 0, -380, 0, 0], frames=3800)
+    assert live_kit_meets_champion(23, cells, root) is True
+    _write_cell(cells, 23, [96, 2, 74, 0, 0, 0, 0, 0, -380, 0, 0], frames=3800)
+    assert live_kit_meets_champion(23, cells, root) is False
+    _write_cell(cells, 23, [96, 2, 77, 0, 0, 0, 0, 0, -380, 0, 0], frames=3800)
     assert (
         fight_adaptive_cap_frames(
             tip_slot=22,

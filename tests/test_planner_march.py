@@ -156,7 +156,17 @@ def test_champion_gate_dims() -> None:
         is False
     )
     worse_ammo = list(Q_FAT)
-    worse_ammo[2] = 44
+    worse_ammo[2] = 44  # within MARCH_AMMO_SLACK=2 of champ 45
+    assert (
+        _champion_qualifies(worse_ammo, Q_CHAMP, resources_frames=49, frames_factor=1.1)
+        is True
+    )
+    worse_ammo[2] = 43  # exactly at slack floor
+    assert (
+        _champion_qualifies(worse_ammo, Q_CHAMP, resources_frames=49, frames_factor=1.1)
+        is True
+    )
+    worse_ammo[2] = 42  # one below slack
     assert (
         _champion_qualifies(worse_ammo, Q_CHAMP, resources_frames=49, frames_factor=1.1)
         is False

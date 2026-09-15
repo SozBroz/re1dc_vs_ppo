@@ -8,8 +8,9 @@ ALL of:
 * the pin has sat on N for ``RE1_PLANNER_MARCH_MIN_S`` (default 600s: minimum
   10 minutes of grind per PL, even if the target falls early),
 * the learner mirror admits N+1 AND this box holds those exact bytes,
-* live ``pl(N+1)`` meta ``quality`` meets the kit bar: HP[0]/kills[1]/
-  ammo_dmg_weighted[2] equal-or-greater than the pre-march champion row
+* live ``pl(N+1)`` meta ``quality`` meets the kit bar: HP[0]/kills[1]
+  equal-or-greater than the pre-march champion row, ammo_dmg_weighted[2]
+  within ``MARCH_AMMO_SLACK`` (default **2**) of champion
   (``data/planner_march_champions.json``), and hop frames[8] within
   ``RE1_PLANNER_MARCH_FRAMES_FACTOR`` (default **1.1**) of the Frames column
   in ``docs/planner_loyal_resources.md``. Short quality / missing resources
@@ -39,6 +40,9 @@ from pathlib import Path
 from typing import Any
 
 # HP / kills / ammo_dmg_weighted dims vs champion; frames vs resources.md.
+# quality[2] may trail resources.md pistol counts by a couple rounds (RNG /
+# pickup timing); accept that slack instead of blocking the march.
+MARCH_AMMO_SLACK = 2
 # quality[2] is the mint-time damage-weighted ammo scalar, so pistol-vs-shotgun
 # weighting is already settled at capture; the gate just compares scalars.
 _MARCH_KIT_DIMS = (0, 1, 2)
@@ -252,7 +256,10 @@ def _champion_qualifies(
         champ = lift_planner_loyal_quality(champ_q)
     except (TypeError, ValueError):
         return False
-    if not all(live[d] >= champ[d] for d in _MARCH_KIT_DIMS):
+    # HP + kills must meet champion; ammo may trail by MARCH_AMMO_SLACK.
+    if int(live[0]) < int(champ[0]) or int(live[1]) < int(champ[1]):
+        return False
+    if int(live[2]) < int(champ[2]) - int(MARCH_AMMO_SLACK):
         return False
     live_frames = -int(live[_MARCH_FRAMES_DIM])
     if live_frames <= 0:

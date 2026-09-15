@@ -167,7 +167,12 @@ def live_kit_meets_champion(
     cells_root: Path | str,
     project_root: Path | str | None = None,
 ) -> bool:
-    """True when live cell HP/kills/ammo (dims 0/1/2) meet champion bars."""
+    """True when live cell HP/kills/ammo (dims 0/1/2) meet champion bars.
+
+    Ammo may trail champion by ``MARCH_AMMO_SLACK`` (same as march advance).
+    """
+    from re1_rl.planner_march import MARCH_AMMO_SLACK
+
     live = live_quality_for_pl(target_slot, cells_root)
     champ = _champions(project_root).get(int(target_slot))
     if live is None or champ is None or len(champ) < 3:
@@ -175,7 +180,7 @@ def live_kit_meets_champion(
     return (
         int(live[0]) >= int(champ[0])
         and int(live[1]) >= int(champ[1])
-        and int(live[2]) >= int(champ[2])
+        and int(live[2]) >= int(champ[2]) - int(MARCH_AMMO_SLACK)
     )
 
 
