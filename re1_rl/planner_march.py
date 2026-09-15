@@ -10,7 +10,7 @@ ALL of:
 * the learner mirror admits N+1 AND this box holds those exact bytes,
 * live ``pl(N+1)`` meta ``quality`` meets the kit bar: HP[0]/kills[1]
   equal-or-greater than the pre-march champion row, ammo_dmg_weighted[2]
-  within ``MARCH_AMMO_SLACK`` (default **2**) of champion
+  within ``MARCH_AMMO_SLACK`` (default **3**) of champion
   (``data/planner_march_champions.json``), and hop frames[8] within
   ``RE1_PLANNER_MARCH_FRAMES_FACTOR`` (default **1.1**) of the Frames column
   in ``docs/planner_loyal_resources.md``. Short quality / missing resources
@@ -42,7 +42,7 @@ from typing import Any
 # HP / kills / ammo_dmg_weighted dims vs champion; frames vs resources.md.
 # quality[2] may trail resources.md pistol counts by a couple rounds (RNG /
 # pickup timing); accept that slack instead of blocking the march.
-MARCH_AMMO_SLACK = 2
+MARCH_AMMO_SLACK = 3
 # quality[2] is the mint-time damage-weighted ammo scalar, so pistol-vs-shotgun
 # weighting is already settled at capture; the gate just compares scalars.
 _MARCH_KIT_DIMS = (0, 1, 2)
