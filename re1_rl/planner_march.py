@@ -9,13 +9,13 @@ ALL of:
   10 minutes of grind per PL, even if the target falls early),
 * the learner mirror admits N+1 AND this box holds those exact bytes,
 * live ``pl(N+1)`` meta ``quality`` meets the kit bar: HP[0]/kills[1]
-  equal-or-greater than the pre-march champion row; on **fighting** hops
-  ammo_dmg_weighted[2] within ``MARCH_AMMO_SLACK`` (default **3**) of champion
-  (``data/planner_march_champions.json``); **nav** hops skip the ammo bar so
-  the tape can auto-roll until the next fight; and hop frames[8] within
-  ``RE1_PLANNER_MARCH_FRAMES_FACTOR`` (default **1.1**) of the Frames column
-  in ``docs/planner_loyal_resources.md``. Short quality / missing resources
-  Frames never qualifies.
+  equal-or-greater than the pre-march champion row. **Fighting** hops also
+  need ammo_dmg_weighted[2] within ``MARCH_AMMO_SLACK`` (default **3**) of
+  champion and hop frames[8] within ``RE1_PLANNER_MARCH_FRAMES_FACTOR`` of
+  the resources.md Frames column. **Nav** hops skip ammo *and* the frames
+  bar so gallery / crest-walk mints can auto-roll until the next fight
+  (e.g. ``place_star_crest``). Short quality never qualifies. Fighting hops
+  with missing resources Frames still fail closed.
 
 On advance **or any INDEX pin move** (manual edit included): crystalize only
 on advance; always request an NN weight reset on the learner (POST
@@ -244,11 +244,12 @@ def _champion_qualifies(
 ) -> bool:
     """Live mint meets kit bar: HP/kills/(ammo) vs champion, frames vs resources.
 
-    ``require_ammo`` is True for fighting hops; nav hops skip ammo so a sticky
-    HG-eq shortfall cannot strand the march between fights.
+    ``require_ammo`` is True for fighting hops (ammo slack + frames budget).
+    Nav hops skip ammo *and* frames so a sticky HG-eq shortfall or a slow
+    gallery mint cannot strand the march before the next fight.
     ``resources_frames`` is the docs Frames column (policy decisions, same unit
-    as ``-quality[8]``). Short quality or missing/non-positive resources Frames
-    never qualifies. ``frames_factor`` defaults to 1.1.
+    as ``-quality[8]``). Fighting hops with missing/non-positive resources
+    Frames never qualify. ``frames_factor`` defaults to 1.1.
     """
     import math
 
@@ -257,7 +258,7 @@ def _champion_qualifies(
     if len(live_q or []) < 11 or len(champ_q or []) < 11:
         return False
     rec = int(resources_frames)
-    if rec <= 0:
+    if require_ammo and rec <= 0:
         return False
     try:
         live = lift_planner_loyal_quality(live_q)
@@ -272,6 +273,8 @@ def _champion_qualifies(
     live_frames = -int(live[_MARCH_FRAMES_DIM])
     if live_frames <= 0:
         return False
+    if not require_ammo:
+        return True
     budget = int(math.ceil(float(rec) * float(frames_factor)))
     return int(live_frames) <= int(budget)
 

@@ -182,6 +182,29 @@ def test_champion_gate_dims() -> None:
         )
         is True
     )
+    # Nav hops also skip the frames bar (gallery enter 97f vs champ 23f).
+    slow_nav = list(Q_FAT)
+    slow_nav[8] = -97
+    assert (
+        _champion_qualifies(
+            slow_nav,
+            Q_CHAMP,
+            resources_frames=23,
+            frames_factor=1.1,
+            require_ammo=False,
+        )
+        is True
+    )
+    assert (
+        _champion_qualifies(
+            slow_nav,
+            Q_CHAMP,
+            resources_frames=23,
+            frames_factor=1.1,
+            require_ammo=True,
+        )
+        is False
+    )
     # Within 1.1x of resources (50 <= 54) even if slower than champion 49.
     within = list(Q_FAT)
     within[8] = -50
