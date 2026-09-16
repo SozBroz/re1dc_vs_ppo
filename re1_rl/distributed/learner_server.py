@@ -929,14 +929,35 @@ class _LearnerHandler(BaseHTTPRequestHandler):
             if not advance_id:
                 self._send_json(400, {"error": "advance_id required"})
                 return
+            archive_ver = None
+            if isinstance(payload, dict):
+                for key in ("mint_policy_version", "archive_version", "policy_version"):
+                    raw = payload.get(key)
+                    if raw is None or raw == "":
+                        continue
+                    try:
+                        archive_ver = int(raw)
+                    except (TypeError, ValueError):
+                        self._send_json(400, {"error": f"bad {key}"})
+                        return
+                    if archive_ver <= 0:
+                        self._send_json(400, {"error": f"bad {key}"})
+                        return
+                    break
             with self.state.lock:
                 cur = self.state.pending_march_reset
                 if not (isinstance(cur, dict) and cur.get("advance_id") == advance_id):
-                    self.state.pending_march_reset = {
+                    req: dict[str, Any] = {
                         "advance_id": advance_id,
                         "requested_unix": time.time(),
                     }
-            self._send_json(200, {"ok": True, "advance_id": advance_id})
+                    if archive_ver is not None:
+                        req["mint_policy_version"] = int(archive_ver)
+                    self.state.pending_march_reset = req
+            out: dict[str, Any] = {"ok": True, "advance_id": advance_id}
+            if archive_ver is not None:
+                out["mint_policy_version"] = int(archive_ver)
+            self._send_json(200, out)
             return
 
         if path == "/march/pin":

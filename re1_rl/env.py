@@ -2679,6 +2679,12 @@ class RE1Env(gym.Env):
                     self.bridge.tape_enable(True)
                 except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
                     pass
+                try:
+                    from re1_rl.rng_seed import snapshot_leg_rng_seed
+
+                    snapshot_leg_rng_seed(self)
+                except (ImportError, AttributeError, TypeError):
+                    pass
                 from re1_rl.footage_trace import new_footage_trace_buffer
 
                 self._footage_trace = new_footage_trace_buffer()

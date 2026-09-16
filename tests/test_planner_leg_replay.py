@@ -49,7 +49,28 @@ def _env(tmp_path: Path, *, packed: str = "") -> types.SimpleNamespace:
     )
 
 
-def test_flag_off_by_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_arm_snapshots_rng_seed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("RE1_PLANNER_LEG_REPLAY", "1")
+
+    class _SeedBridge(_Bridge):
+        def read_ram(self, fields):
+            from re1_rl.rng_seed import RNG_SEED
+
+            out = {}
+            for name, addr, _kind in fields:
+                out[name] = 0xDEADBEEF if int(addr) == RNG_SEED else 0
+            return out
+
+        def write_ram(self, fields):
+            return None
+
+    env = _env(tmp_path)
+    env.bridge = _SeedBridge()
+    env._leg_replay = None
+    assert plr.arm_planner_leg_replay(env) is True
+    assert env._leg_replay is not None
+    assert env._leg_replay.rng_seed == 0xDEADBEEF
+
     monkeypatch.delenv("RE1_PLANNER_LEG_REPLAY", raising=False)
     assert plr.planner_leg_replay_enabled_from_env() is False
     env = _env(tmp_path)

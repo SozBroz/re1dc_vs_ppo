@@ -9,6 +9,10 @@ the live model *in place* — same object, so callbacks and the weight store
 keep working — then publishes a new policy version so the whole fleet pulls
 the base weights on its next sync epoch.
 
+Optional ``mint_policy_version`` on the pending request loads
+``data/mint_policies/weights/v<V>.pt`` instead of the base zip (recover a
+known mint/hunt snapshot without a full SB3 checkpoint).
+
 In-place means: policy state dict swapped strict, optimizer state restored
 best-effort, ``num_timesteps`` keeps counting (checkpoint filenames keep
 increasing). Stale in-flight rollouts from the specialized policy must be
@@ -26,7 +30,11 @@ from pathlib import Path
 from typing import Any
 
 from re1_rl.distributed.log_util import log
-from re1_rl.distributed.weights import export_policy_state_dict, load_policy_weights
+from re1_rl.distributed.weights import (
+    export_policy_state_dict,
+    load_policy_weights,
+    state_dict_from_policy_bytes,
+)
 
 _BASE_CKPT_ENV = "RE1_PLANNER_MARCH_BASE_CKPT"
 _BASE_CKPT_NAME = "planner_march_base_weights.zip"
@@ -56,6 +64,34 @@ def resolve_base_ckpt() -> Path | None:
     return None
 
 
+def _pending_archive_version(req: dict[str, Any]) -> int | None:
+    for key in ("mint_policy_version", "archive_version", "policy_version"):
+        raw = req.get(key)
+        if raw is None or raw == "":
+            continue
+        try:
+            ver = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if ver > 0:
+            return ver
+    return None
+
+
+def _load_archive_state_dict(version: int) -> dict[str, Any] | None:
+    try:
+        from re1_rl.distributed.weight_archive import find_weight_file
+    except ImportError:
+        return None
+    path = find_weight_file(_project_root(), int(version))
+    if path is None:
+        return None
+    try:
+        return state_dict_from_policy_bytes(path.read_bytes())
+    except (OSError, RuntimeError, ValueError, TypeError):
+        return None
+
+
 def apply_march_reset(
     *,
     model: Any,
@@ -80,45 +116,62 @@ def apply_march_reset(
     if now - last_try < _RETRY_S:
         return False
     learner_state.march_reset_last_attempt_unix = now
-    ckpt = resolve_base_ckpt()
-    if ckpt is None:
-        log(machine_name, "[march_reset] no base checkpoint found; reset stays pending")
-        return False
-    if loader is None:
-        from re1_rl.async_fleet import load_async_learner
 
-        loader = load_async_learner
+    archive_ver = _pending_archive_version(req)
+    source_label = ""
     try:
-        device = str(getattr(model, "device", "cpu") or "cpu")
-        fresh = loader(device=device, resume=ckpt, tb_log=None)
-        try:
-            load_policy_weights(model, export_policy_state_dict(fresh))
-            try:
-                model.policy.optimizer.load_state_dict(
-                    fresh.policy.optimizer.state_dict()
+        if archive_ver is not None:
+            state_dict = _load_archive_state_dict(archive_ver)
+            if state_dict is None:
+                log(
+                    machine_name,
+                    f"[march_reset] mint archive v{archive_ver} missing; "
+                    "reset stays pending",
                 )
-            except (AttributeError, TypeError, ValueError) as exc:
-                log(machine_name, f"[march_reset] optimizer restore skipped: {exc}")
-        finally:
+                return False
+            load_policy_weights(model, state_dict)
+            source_label = f"mint_policies/v{archive_ver}.pt"
+        else:
+            ckpt = resolve_base_ckpt()
+            if ckpt is None:
+                log(machine_name, "[march_reset] no base checkpoint found; reset stays pending")
+                return False
+            if loader is None:
+                from re1_rl.async_fleet import load_async_learner
+
+                loader = load_async_learner
+            device = str(getattr(model, "device", "cpu") or "cpu")
+            fresh = loader(device=device, resume=ckpt, tb_log=None)
             try:
-                del fresh
-            except NameError:
-                pass
-            gc.collect()
+                load_policy_weights(model, export_policy_state_dict(fresh))
+                try:
+                    model.policy.optimizer.load_state_dict(
+                        fresh.policy.optimizer.state_dict()
+                    )
+                except (AttributeError, TypeError, ValueError) as exc:
+                    log(machine_name, f"[march_reset] optimizer restore skipped: {exc}")
+            finally:
+                try:
+                    del fresh
+                except NameError:
+                    pass
+                gc.collect()
+            source_label = ckpt.name
     except Exception as exc:
-        log(machine_name, f"[march_reset] base reload failed ({ckpt.name}): {exc}")
+        log(machine_name, f"[march_reset] reload failed ({source_label or 'unknown'}): {exc}")
         return False
     version = weight_store.publish(export_policy_state_dict(model))
     learner_state.set_current_version(version)
     learner_state.march_reset_applied = {
         "last_applied_advance_id": advance_id,
         "last_applied_unix": int(now),
-        "base_ckpt": ckpt.name,
+        "base_ckpt": source_label,
+        "mint_policy_version": int(archive_ver) if archive_ver is not None else None,
     }
     learner_state.pending_march_reset = None
     log(
         machine_name,
-        f"[march_reset] {advance_id} applied from {ckpt.name} "
+        f"[march_reset] {advance_id} applied from {source_label} "
         f"-> policy_version={version} (fleet reverts on next sync)",
     )
     return True

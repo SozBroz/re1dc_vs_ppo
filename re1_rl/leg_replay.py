@@ -84,6 +84,7 @@ class LegReplayBuffer:
         "reward_only_frames",
         "rewards",
         "reward_events",
+        "rng_seed",
     )
 
     def __init__(self) -> None:
@@ -93,6 +94,8 @@ class LegReplayBuffer:
         self.reward_only_frames = array.array("H")
         self.rewards = array.array("d")
         self.reward_events: list[dict[str, float]] = []
+        # LCG u32@0x800AE690 at tape arm (None until snapshot_leg_rng_seed).
+        self.rng_seed: int | None = None
 
     def append(
         self,
@@ -556,6 +559,18 @@ def build_leg_replay_payload(
     root = getattr(env, "project_root", None)
     n_actions = int(getattr(getattr(env, "action_space", None), "n", 45) or 45)
     joypad_payload = _joypad_payload_from_env(env)
+    rng_seed = getattr(buf, "rng_seed", None)
+    try:
+        rng_seed_i = int(rng_seed) & 0xFFFFFFFF if rng_seed is not None else None
+    except (TypeError, ValueError):
+        rng_seed_i = None
+    rng_seed_end: int | None = None
+    try:
+        from re1_rl.rng_seed import read_rng_seed
+
+        rng_seed_end = read_rng_seed(getattr(env, "bridge", None))
+    except (ImportError, TypeError, ValueError, AttributeError):
+        rng_seed_end = None
     payload = {
         "schema_version": SCHEMA_VERSION,
         "from_checkpoint_index": from_index,
@@ -579,6 +594,7 @@ def build_leg_replay_payload(
             "combat_leg": any(int(v or 0) > 0 for v in kills.values())
             or any(int(a) in ATTACK_ACTION_IDS for a in actions),
             "frame_channels": True,
+            "rng_seed": rng_seed_i is not None,
         },
         "actions": actions,
         "emu_frames_per_step": emu_frames,
@@ -603,6 +619,10 @@ def build_leg_replay_payload(
             "leg_kills_by_room": kills,
         },
     }
+    if rng_seed_i is not None:
+        payload["rng_seed"] = rng_seed_i
+    if rng_seed_end is not None:
+        payload["rng_seed_end"] = int(rng_seed_end) & 0xFFFFFFFF
     payload.update(joypad_payload)
     if len(buf.rewards) > 0:
         rewards, events = buf.aligned_rewards()

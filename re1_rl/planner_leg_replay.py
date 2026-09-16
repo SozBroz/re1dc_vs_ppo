@@ -93,6 +93,12 @@ def arm_planner_leg_replay(env: Any) -> bool:
     except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
         pass
     try:
+        from re1_rl.rng_seed import snapshot_leg_rng_seed
+
+        snapshot_leg_rng_seed(env)
+    except (ImportError, AttributeError, TypeError):
+        pass
+    try:
         from re1_rl.footage_trace import new_footage_trace_buffer
 
         env._footage_trace = new_footage_trace_buffer()
@@ -175,6 +181,19 @@ def build_planner_leg_replay_payload(
     joypad_payload = _joypad_payload_from_env(env)
     from re1_rl.leg_replay import ATTACK_ACTION_IDS
 
+    rng_seed = getattr(buf, "rng_seed", None)
+    try:
+        rng_seed_i = int(rng_seed) & 0xFFFFFFFF if rng_seed is not None else None
+    except (TypeError, ValueError):
+        rng_seed_i = None
+    rng_seed_end: int | None = None
+    try:
+        from re1_rl.rng_seed import read_rng_seed
+
+        rng_seed_end = read_rng_seed(getattr(env, "bridge", None))
+    except (ImportError, TypeError, ValueError, AttributeError):
+        rng_seed_end = None
+
     payload = {
         "schema_version": SCHEMA_VERSION,
         "from_checkpoint_index": int(from_slot) if from_slot is not None else -1,
@@ -206,6 +225,7 @@ def build_planner_leg_replay_payload(
             or any(int(a) in ATTACK_ACTION_IDS for a in actions),
             "frame_channels": True,
             "planner_loyal": True,
+            "rng_seed": rng_seed_i is not None,
         },
         "actions": actions,
         "emu_frames_per_step": emu_frames,
@@ -230,6 +250,10 @@ def build_planner_leg_replay_payload(
             "leg_kills_by_room": kills,
         },
     }
+    if rng_seed_i is not None:
+        payload["rng_seed"] = rng_seed_i
+    if rng_seed_end is not None:
+        payload["rng_seed_end"] = int(rng_seed_end) & 0xFFFFFFFF
     payload.update(joypad_payload)
     if len(buf.rewards) > 0:
         rewards, events = buf.aligned_rewards()

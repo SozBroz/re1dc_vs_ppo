@@ -101,7 +101,37 @@ def test_apply_swaps_policy_and_publishes(tmp_path, monkeypatch) -> None:
     assert learner.pending_march_reset is None
 
 
-def test_apply_no_pending_is_noop() -> None:
+def test_apply_archive_version_swaps_without_zip(tmp_path, monkeypatch) -> None:
+    """Recover a mint/hunt snapshot from data/mint_policies/weights/vN.pt."""
+    import io
+
+    from re1_rl.distributed.weights import policy_bytes_from_state_dict
+
+    monkeypatch.setenv("RE1_RL_ROOT", str(tmp_path))
+    wdir = tmp_path / "data" / "mint_policies" / "weights"
+    wdir.mkdir(parents=True)
+    blob = policy_bytes_from_state_dict({"w": torch.tensor([9.0, 9.0])})
+    (wdir / "v90.pt").write_bytes(blob)
+
+    live = _FakeModel("specialized")
+    store = _FakeStore()
+    learner = _make_learner("restore-v90")
+    assert isinstance(learner.pending_march_reset, dict)
+    learner.pending_march_reset["mint_policy_version"] = 90
+
+    assert apply_march_reset(
+        model=live,
+        weight_store=store,
+        learner_state=learner,
+        machine_name="test",
+        loader=_loader,
+    ) is True
+    assert live.policy.loaded is not None
+    assert float(live.policy.loaded["w"][0]) == 9.0
+    assert store.version == 42
+    assert learner.march_reset_applied["mint_policy_version"] == 90
+    assert "v90.pt" in str(learner.march_reset_applied["base_ckpt"])
+
     live = _FakeModel("specialized")
     store = _FakeStore()
     assert apply_march_reset(
