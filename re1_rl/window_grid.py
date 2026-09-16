@@ -100,6 +100,89 @@ def claim_emu_port(pid: int, port: int, *, project_root: Path | None = None) -> 
     return path
 
 
+def _grid_env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return int(default)
+    try:
+        return int(raw)
+    except ValueError:
+        return int(default)
+
+
+def place_pid_in_grid(
+    pid: int,
+    port: int,
+    *,
+    project_root: Path | None = None,
+    cols: int | None = None,
+    rows: int | None = None,
+    gap: int = 8,
+    monitor: str | None = None,
+    base_port: int | None = None,
+    expected: int | None = None,
+) -> bool:
+    """Move one claimed C-RE1/EmuHawk window onto its grid slot now.
+
+    Used at process spawn so visible pking windows never sit full-size on the
+    primary monitor until the tiler poll catches up.
+    """
+    cols = int(cols if cols is not None else _grid_env_int("GRID_COLS", 5))
+    rows = int(rows if rows is not None else _grid_env_int("GRID_ROWS", 4))
+    base = int(
+        base_port
+        if base_port is not None
+        else _grid_env_int("BASE_PORT", 6500)
+    )
+    n_envs = _grid_env_int("N_ENVS", cols * rows)
+    expected = int(expected if expected is not None else max(n_envs, cols * rows))
+    which = (monitor or os.environ.get("RE1_GRID_MONITOR", "right") or "right").strip()
+    monitors = prepare_grid_monitors(list_monitors(), which)
+    if not monitors:
+        return False
+    slots = build_slots(expected, monitors, cols=cols, rows=rows, gap=int(gap))
+    slot_idx = slot_index_for_port(int(port), base_port=base, expected=expected)
+    if slot_idx is None:
+        return False
+    target = slots[slot_idx]
+    hwnd = _best_hwnd_for_pid(int(pid), port=int(port), target=target)
+    if hwnd is None:
+        return False
+    _place_window(hwnd, *target)
+    _set_window_title(hwnd, format_emu_title(int(port)))
+    return True
+
+
+def start_immediate_grid_place(
+    pid: int,
+    port: int,
+    *,
+    project_root: Path | None = None,
+    retries: int = 40,
+    delay_s: float = 0.05,
+) -> threading.Thread:
+    """Retry ``place_pid_in_grid`` until the HWND exists or retries run out."""
+
+    def _run() -> None:
+        for _ in range(max(1, int(retries))):
+            try:
+                if place_pid_in_grid(
+                    int(pid), int(port), project_root=project_root
+                ):
+                    return
+            except (OSError, RuntimeError, ValueError, TypeError):
+                pass
+            time.sleep(max(0.0, float(delay_s)))
+
+    thread = threading.Thread(
+        target=_run,
+        name=f"place-p{int(port)}",
+        daemon=True,
+    )
+    thread.start()
+    return thread
+
+
 def release_emu_port(pid: int, *, project_root: Path | None = None) -> None:
     path = port_map_dir(project_root) / str(int(pid))
     try:
@@ -200,7 +283,7 @@ def grid_lock_interval_s() -> float:
     """How often the tiler re-checks HWND geometry when lock is on."""
     raw = os.environ.get("RE1_GRID_LOCK_INTERVAL_S", "1.5").strip()
     try:
-        return max(0.25, float(raw))
+        return max(0.1, float(raw))
     except ValueError:
         return 1.5
 
