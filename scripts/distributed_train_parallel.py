@@ -526,9 +526,35 @@ def _run_async_worker_with_restarts(
     on_restart: Callable[[], None] | None = None,
     initial_delay_s: float = 5.0,
     max_delay_s: float = 60.0,
+    max_attempts: int | None = None,
+    attempt_window_s: float | None = None,
 ) -> None:
-    """Keep an async worker alive across startup or fleet-wide actor failures."""
+    """Keep an async worker alive across startup or fleet-wide actor failures.
+
+    Soft-restarts used to loop forever in one Python process while orphan C-RE1
+    processes piled up (WH2: 40 restarts / 4.5h then vanish from /status). Cap
+    attempts in a rolling window; after the breaker trips, exit cleanly so the
+    host shows a hole instead of a zombie spiral. Override via env:
+    ``RE1_ASYNC_WORKER_MAX_RESTARTS`` (default 8),
+    ``RE1_ASYNC_WORKER_RESTART_WINDOW_S`` (default 1200).
+    """
     attempt = 0
+    window_t0 = time.monotonic()
+    if max_attempts is None:
+        try:
+            max_attempts = int(os.environ.get("RE1_ASYNC_WORKER_MAX_RESTARTS", "8"))
+        except ValueError:
+            max_attempts = 8
+    if attempt_window_s is None:
+        try:
+            attempt_window_s = float(
+                os.environ.get("RE1_ASYNC_WORKER_RESTART_WINDOW_S", "1200")
+            )
+        except ValueError:
+            attempt_window_s = 1200.0
+    max_attempts = max(1, int(max_attempts))
+    attempt_window_s = max(1.0, float(attempt_window_s))
+
     while not stop_event.is_set():
         failure: Exception | None = None
         try:
@@ -540,14 +566,25 @@ def _run_async_worker_with_restarts(
         if stop_event.is_set():
             return
 
+        now = time.monotonic()
+        if (now - window_t0) > attempt_window_s:
+            attempt = 0
+            window_t0 = now
         attempt += 1
         if on_restart is not None:
             on_restart()
+        reason = repr(failure) if failure is not None else "loop exited unexpectedly"
+        if attempt >= max_attempts:
+            log(
+                machine_name,
+                f"async worker circuit breaker: {attempt} restarts within "
+                f"{attempt_window_s:.0f}s ({reason}); exiting",
+            )
+            return
         delay_s = min(
             float(max_delay_s),
             float(initial_delay_s) * (2 ** min(attempt - 1, 4)),
         )
-        reason = repr(failure) if failure is not None else "loop exited unexpectedly"
         log(
             machine_name,
             f"async worker restart attempt={attempt} in {delay_s:.0f}s: {reason}",
@@ -633,12 +670,24 @@ def _run_local_worker(
                 health_callback=_report_health,
             )
 
+        def _on_local_restart() -> None:
+            from re1_rl.distributed.async_worker_runtime import (
+                _cleanup_worker_port_emuhawks,
+            )
+
+            _cleanup_worker_port_emuhawks(
+                int(args.base_port),
+                int(args.n_envs),
+                project_root=PROJECT_ROOT,
+            )
+            _report_health(0)
+
         try:
             _run_async_worker_with_restarts(
                 _run_once,
                 stop_event=stop_event,
                 machine_name=args.machine_name,
-                on_restart=lambda: _report_health(0),
+                on_restart=_on_local_restart,
             )
         finally:
             if learner_state is not None:
@@ -737,10 +786,28 @@ def _run_remote_worker(args: argparse.Namespace, *, device: str) -> int:
                     eval_only=bool(getattr(args, "eval_only", False)),
                 )
 
+            def _on_remote_restart() -> None:
+                from re1_rl.distributed.async_worker_runtime import (
+                    _cleanup_worker_port_emuhawks,
+                )
+
+                # Soft restart must match canonical fleet kill: reap orphan
+                # C-RE1 on this host before the next attach stampede.
+                _cleanup_worker_port_emuhawks(
+                    int(args.base_port),
+                    int(args.n_envs),
+                    project_root=PROJECT_ROOT,
+                )
+                try:
+                    client.heartbeat(worker_id, 0)
+                except Exception:
+                    pass
+
             _run_async_worker_with_restarts(
                 _run_once,
                 stop_event=stop_event,
                 machine_name=args.machine_name,
+                on_restart=_on_remote_restart,
             )
     except KeyboardInterrupt:
         log(args.machine_name, "remote worker interrupted")

@@ -43,6 +43,34 @@ def _actor_startup_stagger_s(rank: int) -> float:
     return max(0.0, per_rank_s) * max(0, int(rank))
 
 
+def _hook_recomp_immediate_tile(bridge, port: int) -> None:
+    """Claim + snap the C-RE1 window as soon as Popen returns, not after READY."""
+    client = getattr(bridge, "client", None)
+    orig = getattr(client, "_wait_ready", None)
+    if client is None or orig is None:
+        return
+
+    def _wait_ready(timeout_s: float, _orig=orig, _client=client):
+        proc = getattr(_client, "proc", None)
+        pid = getattr(proc, "pid", None)
+        if pid:
+            try:
+                from re1_rl.window_grid import (
+                    claim_emu_port,
+                    start_immediate_grid_place,
+                )
+
+                claim_emu_port(int(pid), int(port), project_root=PROJECT_ROOT)
+                start_immediate_grid_place(
+                    int(pid), int(port), project_root=PROJECT_ROOT
+                )
+            except (OSError, ValueError, TypeError):
+                pass
+        return _orig(timeout_s)
+
+    client._wait_ready = _wait_ready
+
+
 def _stop_owned_emuhawk(proc, bridge, *, timeout_s: float = 5.0) -> None:
     """Idempotently close the bridge and reap its exact EmuHawk child."""
     if bool(getattr(proc, "_re1_cleanup_done", False)):
@@ -334,20 +362,39 @@ def make_env(
                 _phase(f"stagger {stagger_s:.0f}s")
             time.sleep(stagger_s)
             _phase("launching C-RE1 recomp")
-            bridge.wait_for_client(progress=_phase, headless=headless)
-            _phase("connected; set_speed")
-            bridge.set_speed(training_speed)
-            proc = getattr(getattr(bridge, "client", None), "proc", None)
-            if proc is not None and getattr(proc, "pid", None):
-                try:
-                    from re1_rl.window_grid import claim_emu_port
+            proc = None
+            try:
+                # Claim/tile as soon as Popen returns; reap on any attach failure
+                # (BizHawk path already does this — recomp used to leak orphans).
+                _hook_recomp_immediate_tile(bridge, port)
+                bridge.wait_for_client(progress=_phase, headless=headless)
+                _phase("connected; set_speed")
+                bridge.set_speed(training_speed)
+                proc = getattr(getattr(bridge, "client", None), "proc", None)
+                if proc is not None and getattr(proc, "pid", None):
+                    try:
+                        from re1_rl.window_grid import claim_emu_port
 
-                    claim_emu_port(int(proc.pid), int(port), project_root=PROJECT_ROOT)
-                    _phase(f"recomp pid={proc.pid} claimed for tiler")
-                except (OSError, ValueError, TypeError) as exc:
-                    _phase(f"port claim skipped: {exc!r}")
-            else:
-                proc = None
+                        claim_emu_port(
+                            int(proc.pid), int(port), project_root=PROJECT_ROOT
+                        )
+                        _phase(f"recomp pid={proc.pid} claimed for tiler")
+                    except (OSError, ValueError, TypeError) as exc:
+                        _phase(f"port claim skipped: {exc!r}")
+                else:
+                    proc = None
+            except BaseException:
+                proc = proc or getattr(
+                    getattr(bridge, "client", None), "proc", None
+                )
+                if proc is not None:
+                    _stop_owned_emuhawk(proc, bridge)
+                else:
+                    try:
+                        bridge.close()
+                    except Exception:
+                        pass
+                raise
         else:
             from re1_rl.bizhawk_bridge import BizHawkClient
 

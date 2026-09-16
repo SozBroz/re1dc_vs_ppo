@@ -109,6 +109,7 @@ $env:RE1_PLANNER_RESET_PIN_FILE = 'D:\re1_rl\data\planner_loyal_reset_pin.env'
 $env:RE1_PLANNER_HOP_SCORE_V1 = '1'
 $env:RE1_PL_PER_TIP_CAP = '1'
 $env:RE1_PL_ADAPTIVE_CAP = '1'
+$env:RE1_INFERENCE_TEMPERATURE = '1.10'
 New-Item -ItemType Directory -Force -Path (Join-Path $ROOT 'data\logs') | Out-Null
 # Rotate prior log so crash-loop detection is for this boot only.
 $logPath = Join-Path $ROOT 'data\logs\worker_pking-recomp.log'
@@ -155,7 +156,7 @@ if (-not $PkingOnly) {
   $startJobs = @()
   # WH2 has the most envs and historically attaches mid-boot (rc=1).
   # Old knobs (batch=2, stagger=1.25*rank) made a ~9 min all-or-nothing boot
-  # and retries re-paid 25-34s sleeps. Prefer batch=4, stagger=0, short cooldown.
+  # and retries re-paid 25-34s sleeps. Prefer batch=4, light stagger, short cooldown.
   $wh2 = $remotes | Where-Object { $_.Wid -eq 'wh2-recomp' } | Select-Object -First 1
   $others = @($remotes | Where-Object { $_.Wid -ne 'wh2-recomp' })
 
@@ -163,7 +164,8 @@ if (-not $PkingOnly) {
     return Start-Job -ScriptBlock {
       param($Ssh, $Rl, $Recomp, $Wid, $Machine, $NEnvs, $BasePort, $Ranks, $BatchMax, $Stagger)
       $batchCap = if ($Wid -eq 'wh2-recomp') { 4 } else { [int]$BatchMax }
-      $staggerS = if ($Wid -eq 'wh2-recomp') { '0' } else { $Stagger }
+      # stagger=0 stampeded attach rc=1; 0.35s/rank spreads Popen without the old 9min tax
+      $staggerS = if ($Wid -eq 'wh2-recomp') { '0.35' } else { $Stagger }
       $cooldownAfter = if ($Wid -eq 'wh2-recomp') { 4 } else { 20 }
       $cooldownS = if ($Wid -eq 'wh2-recomp') { '2' } else { '0' }
       $retries = if ($Wid -eq 'wh2-recomp') { 3 } else { 2 }

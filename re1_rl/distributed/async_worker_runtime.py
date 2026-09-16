@@ -688,14 +688,32 @@ def _cleanup_worker_port_emuhawks(
         _kill_local_recomp_exes()
 
 
+def _waitable_parent_conns(
+    parent_conns: list[Connection | None],
+) -> list[Connection]:
+    """Drop None / already-closed pipe ends so wait() cannot raise handle-closed."""
+    live: list[Connection] = []
+    for index, conn in enumerate(parent_conns):
+        if conn is None:
+            continue
+        closed = getattr(conn, "closed", False)
+        if closed:
+            parent_conns[index] = None
+            continue
+        live.append(conn)
+    return live
+
+
 def _shutdown_actors(
     stop_flag: mp.synchronize.Synchronized,
-    parent_conns: list[Connection],
+    parent_conns: list[Connection | None],
     processes: list[mp.Process],
     emuhawk_pids: list[int | None] | None = None,
 ) -> None:
     stop_flag.value = True
     for conn in parent_conns:
+        if conn is None:
+            continue
         try:
             conn.send({"t": "stop"})
         except (BrokenPipeError, OSError):
@@ -1131,9 +1149,11 @@ def run_async_worker_loop(
             )
             for index in indices:
                 try:
-                    parent_conns[index].close()
+                    if parent_conns[index] is not None:
+                        parent_conns[index].close()
                 except OSError:
                     pass
+                parent_conns[index] = None  # type: ignore[assignment]
                 _terminate_actor_process(
                     processes[index], emuhawk_pid=actor_emu_pids[index]
                 )
@@ -1184,7 +1204,10 @@ def run_async_worker_loop(
                             pass
                         _terminate_actor_process(proc)
                         processes[index] = proc
-                        parent_conns[index] = conn
+                        # Never put a closed Connection back into parent_conns —
+                        # multiprocessing.wait() raises OSError('handle is closed')
+                        # and kills the whole worker loop (WH2 death spiral).
+                        parent_conns[index] = None  # type: ignore[assignment]
                         actor_emu_pids[index] = None
                     if attempt < 2:
                         time.sleep(5.0 * attempt)
@@ -1294,7 +1317,18 @@ def run_async_worker_loop(
                     last_actor_activity, time.monotonic() - blocked_at
                 )
 
-            ready = wait(parent_conns, timeout=1.0)
+            live_conns = _waitable_parent_conns(parent_conns)
+            try:
+                ready = wait(live_conns, timeout=1.0) if live_conns else []
+            except OSError as exc:
+                # Defensive: a closed handle slipped past closed-flag checks.
+                log(machine_name, f"actor wait dropped closed handle: {exc}")
+                for index, conn in enumerate(parent_conns):
+                    if conn is None:
+                        continue
+                    if getattr(conn, "closed", False):
+                        parent_conns[index] = None
+                continue
             if not ready:
                 if not any(p.is_alive() for p in processes):
                     log(machine_name, "all async actors exited")
@@ -1303,10 +1337,14 @@ def run_async_worker_loop(
 
             needs, rollouts, failed_conns = _drain_actor_messages(
                 ready,
-                parent_conns,
+                [c for c in parent_conns if c is not None],
                 max_need_batch=inference_batch_max,
             )
-            conn_to_index = {id(conn): index for index, conn in enumerate(parent_conns)}
+            conn_to_index = {
+                id(conn): index
+                for index, conn in enumerate(parent_conns)
+                if conn is not None
+            }
             failed_conn_ids = {id(conn) for conn in failed_conns}
             safe_needs = [
                 (conn, msg) for conn, msg in needs if id(conn) not in failed_conn_ids
