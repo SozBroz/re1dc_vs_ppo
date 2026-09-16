@@ -2688,16 +2688,9 @@ class RE1Env(gym.Env):
                 from re1_rl.footage_trace import new_footage_trace_buffer
 
                 self._footage_trace = new_footage_trace_buffer()
-        if getattr(self, "_planner_loyal_queue", None) is not None:
-            # Room/solo tape capture (RE1_PLANNER_LEG_REPLAY=1, off by default).
-            # Armed per episode; a room segment shares one episode so one
-            # continuous tape covers the whole room visit (dumped on exit).
-            try:
-                from re1_rl.planner_leg_replay import arm_planner_leg_replay
-
-                arm_planner_leg_replay(self)
-            except (ImportError, AttributeError, TypeError):
-                pass
+        # Planner tape/RNG arm happens AFTER recomp tip settle below — arming
+        # here recorded settle frames onto the joypad and snapped rng_seed
+        # before the first policy step (combat desync).
         self._frame_stack = []
         self.bridge.frame_ring.clear()
         self.bridge.attack_pins.clear()
@@ -2881,6 +2874,13 @@ class RE1Env(gym.Env):
             self._planner_loyal_queue.note_start_inventory(state)
             if os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower() == "recomp":
                 state = self._settle_recomp_planner_start(state)
+            # Arm AFTER settle so tape frame 0 / rng_seed match policy action 0.
+            try:
+                from re1_rl.planner_leg_replay import arm_planner_leg_replay
+
+                arm_planner_leg_replay(self)
+            except (ImportError, AttributeError, TypeError):
+                pass
         cell_minted = None
         if str(self._stage.get("mode") or "") == "yawn_rails":
             from re1_rl.yawn_rails_sync import (
@@ -4958,6 +4958,7 @@ class RE1Env(gym.Env):
                 step_emulated_frames=max(frames, self.frame_skip),
                 magic_report=report,
                 died=bool(died),
+                guest_advanced=True,
             )
 
         if phase == BOX_PHASE_CHOOSE:
@@ -5054,6 +5055,7 @@ class RE1Env(gym.Env):
                     step_emulated_frames=max(int(frames), self.frame_skip),
                     magic_report=report,
                     died=bool(died),
+                    guest_advanced=True,
                 )
             return self._submenu_step(
                 a,
@@ -5125,6 +5127,7 @@ class RE1Env(gym.Env):
                 step_emulated_frames=max(int(frames), self.frame_skip),
                 magic_report=report,
                 died=bool(died),
+                guest_advanced=True,
             )
 
         if phase == BOX_PHASE_DEPOSIT_SLOT:
@@ -5217,6 +5220,7 @@ class RE1Env(gym.Env):
                 step_emulated_frames=max(int(frames), self.frame_skip),
                 magic_report=report,
                 died=bool(died),
+                guest_advanced=True,
             )
 
         self._box_ui_step_pending = False
@@ -5336,6 +5340,9 @@ class RE1Env(gym.Env):
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, self.frame_skip
                 magic_report = {"ok": False, "reason": f"error:{exc}"}
+                guest_advanced = False
+            else:
+                guest_advanced = True
         finally:
             self._macro_active = False
         return self._submenu_step(
@@ -5343,6 +5350,7 @@ class RE1Env(gym.Env):
             step_emulated_frames=frames,
             magic_report=magic_report,
             died=died,
+            guest_advanced=guest_advanced,
         )
 
     def _handle_equip_action(
@@ -5440,6 +5448,9 @@ class RE1Env(gym.Env):
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, self.frame_skip
                 magic_report = {"ok": False, "reason": f"error:{exc}"}
+                guest_advanced = False
+            else:
+                guest_advanced = True
         finally:
             self._macro_active = False
         return self._submenu_step(
@@ -5447,6 +5458,7 @@ class RE1Env(gym.Env):
             step_emulated_frames=frames,
             magic_report=magic_report,
             died=died,
+            guest_advanced=guest_advanced,
         )
 
     def _handle_combine_action(
@@ -5556,6 +5568,9 @@ class RE1Env(gym.Env):
             except (OSError, RuntimeError, ValueError) as exc:
                 died, frames = False, self.frame_skip
                 magic_report = {"ok": False, "reason": f"error:{exc}", "product": None}
+                guest_advanced = False
+            else:
+                guest_advanced = True
         finally:
             self._macro_active = False
         return self._submenu_step(
@@ -5563,6 +5578,7 @@ class RE1Env(gym.Env):
             step_emulated_frames=frames,
             magic_report=magic_report,
             died=died,
+            guest_advanced=guest_advanced,
         )
 
     def _submenu_step(
@@ -5572,8 +5588,15 @@ class RE1Env(gym.Env):
         step_emulated_frames: int,
         magic_report: dict[str, Any] | None,
         died: bool = False,
+        guest_advanced: bool = False,
     ) -> tuple[dict[str, np.ndarray], float, bool, bool, dict[str, Any]]:
-        """Inventory submenu step; contempt scales with ``step_emulated_frames``."""
+        """Inventory submenu step; contempt scales with ``step_emulated_frames``.
+
+        Phase-only transitions (open/abort/illegal) do not advance the guest;
+        bill those as ``reward_only_frames`` so joypad length matches physical
+        emu time. Pass ``guest_advanced=True`` after a real menu macro that
+        already drove taped frames.
+        """
         if died:
             death = self._death_step(
                 action, died_during_skip=False, died_during_step=True
@@ -5582,7 +5605,13 @@ class RE1Env(gym.Env):
                 return death
         assert self._planner is not None
         self._step_count += 1
-        self._record_leg_replay_step(action, int(step_emulated_frames))
+        billed = max(0, int(step_emulated_frames))
+        if guest_advanced:
+            self._record_leg_replay_step(action, policy_frames=billed)
+        else:
+            self._record_leg_replay_step(
+                action, policy_frames=0, reward_only_frames=billed
+            )
         frame_obs = self._capture_step_obs()
         state = self._read_state()
         macro_pins = self._refresh_anim_history_before_obs(state)
@@ -5592,6 +5621,7 @@ class RE1Env(gym.Env):
         state = dict(state)
         state["step_emulated_frames"] = int(step_emulated_frames)
         state["reference_step_frames"] = self.frame_skip
+        state["submenu_guest_advanced"] = bool(guest_advanced)
         report_pre = magic_report or {}
         if bool(getattr(self, "_box_ui_step_pending", False)):
             state["box_ui_step"] = True

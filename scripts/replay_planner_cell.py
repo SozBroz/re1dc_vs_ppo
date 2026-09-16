@@ -18,11 +18,10 @@ Notes:
 
 Modes (``--mode``):
 - ``actions`` (default): steps ``tape['actions']`` through ``env.step`` —
-  the exact capture path including feedback-driven item-menu dismissal.
-  This is the verifier: PASS means tape + cells are deterministic.
-- ``joypad``: open-loop TAS playback of raw pad bits. Best-effort around
-  frame-precise item menus (a 1-frame turbo-poke phase difference vs capture
-  can break a menu flow); good for footage, not for verification.
+  feedback-driven menus (macro regression). Use ``--loose`` tolerances.
+- ``joypad``: open-loop TAS of raw pad bits + patch spans. Default ``--strict``
+  (exact pose/HP/facing/inventory + rng_seed_end). Pass ``--loose`` for old
+  ± tolerances.
 """
 from __future__ import annotations
 
@@ -124,7 +123,22 @@ def main() -> int:
     )
     ap.add_argument("--settle", action="store_true", help="Run capture settle before the end-pose compare")
     ap.add_argument("--force-stale", action="store_true", help="Play even when pred State SHA != tape from_state_sha256")
+    ap.add_argument(
+        "--strict",
+        action="store_true",
+        default=None,
+        help="Exact end pose/HP/facing/inventory + rng_seed_end (default on for joypad)",
+    )
+    ap.add_argument(
+        "--loose",
+        action="store_true",
+        help="Legacy tolerances (HP±12, xz±256, facing±64); ignore inventory/seed",
+    )
     args = ap.parse_args()
+    if args.loose:
+        args.strict = False
+    elif args.strict is None:
+        args.strict = str(args.mode) == "joypad"
 
     cells_root = ((Path(args.cells_root) if args.cells_root else ROOT / "states" / "planner_loyal") / "cells").resolve()
     tape, tape_path, slot_n = _load_tape(args.slot, args.tape, cells_root)
@@ -268,6 +282,49 @@ def main() -> int:
             async_cutscene_skip=False,
             camera_whiten=False,
         )
+        # Combat tapes: two eras —
+        # 1) Legacy: rng_seed snapped pre-settle AND settle frames were taped
+        #    (joypad_frames > policy+skip). Poke then skip env settle.
+        # 2) Current: arm after settle (joypad ≈ policy). Settle first, poke after.
+        from re1_rl.rng_seed import apply_tape_rng_seed, tape_rng_seed
+
+        has_seed = tape_rng_seed(tape) is not None
+        joypad_mode = str(args.mode) == "joypad"
+        try:
+            policy_phys = int(tape.get("policy_leg_frames") or tape.get("leg_frames") or 0)
+            skip_phys = int(tape.get("skip_leg_frames") or 0)
+            joy_n = int(tape.get("joypad_frames") or 0)
+        except (TypeError, ValueError):
+            policy_phys, skip_phys, joy_n = 0, 0, 0
+        legacy_settle_on_tape = bool(
+            joypad_mode and has_seed and joy_n > (policy_phys + skip_phys)
+        )
+        _orig_settle = env._settle_recomp_planner_start
+        pre_settle_poked = False
+
+        def _settle_for_replay(state):
+            nonlocal pre_settle_poked
+            if legacy_settle_on_tape:
+                st = apply_tape_rng_seed(bridge, tape)
+                pre_settle_poked = bool(st.get("applied"))
+                if st.get("applied"):
+                    print(
+                        f"[replay] rng_seed poked pre-settle "
+                        f"0x{int(st['requested']):08X} "
+                        f"(before=0x{int(st.get('before') or 0):08X})",
+                        flush=True,
+                    )
+                else:
+                    print(f"[replay] WARN pre-settle rng poke: {st}", flush=True)
+                print(
+                    "[replay] skip env tip-settle "
+                    f"(legacy joypad {joy_n} > policy+skip {policy_phys + skip_phys})",
+                    flush=True,
+                )
+                return state
+            return _orig_settle(state)
+
+        env._settle_recomp_planner_start = _settle_for_replay  # type: ignore[method-assign]
         env.reset(options={"pb_bundle": pb_bundle, "allow_capture": False})
         # Never mint / freeze while replaying someone else's inputs.
         env._arm_checkpoint_freeze = lambda: None  # type: ignore[method-assign]
@@ -278,29 +335,23 @@ def main() -> int:
             bridge.tape_enable(False)
         except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
             pass
-        # Combat determinism: re-arm the LCG recorded at tape capture (08c).
-        # Must run after tip load/settle and before actions/joypad play.
-        try:
-            from re1_rl.rng_seed import apply_tape_rng_seed
-
+        if has_seed and not pre_settle_poked:
             rng_status = apply_tape_rng_seed(bridge, tape)
             if rng_status.get("applied"):
                 print(
-                    f"[replay] rng_seed poked "
+                    f"[replay] rng_seed poked post-settle "
                     f"0x{int(rng_status['requested']):08X} "
                     f"(before=0x{int(rng_status.get('before') or 0):08X})",
                     flush=True,
                 )
-            elif str(rng_status.get("reason") or "") == "no_rng_seed_in_tape":
-                print(
-                    "[replay] WARN tape has no rng_seed — relying on .pst LCG only "
-                    "(remint after this build for frame-perfect combat)",
-                    flush=True,
-                )
             else:
                 print(f"[replay] WARN rng_seed poke failed: {rng_status}", flush=True)
-        except (ImportError, OSError, RuntimeError, TypeError, ValueError) as exc:
-            print(f"[replay] WARN rng_seed poke skipped: {exc}", flush=True)
+        elif not has_seed:
+            print(
+                "[replay] WARN tape has no rng_seed — relying on .pst LCG only "
+                "(remint after this build for frame-perfect combat)",
+                flush=True,
+            )
         st = getattr(env, "_prev_state", {}) or {}
         print(
             f"[replay] start room={st.get('room_id')} pos=({st.get('x')},{st.get('z')}) "
@@ -399,6 +450,7 @@ def main() -> int:
         inv = last_state.get("inventory_slots") or last_state.get("inventory")
         print("[replay] end " + json.dumps({
             "leg": label, "segment": seg, "mode": str(args.mode),
+            "strict": bool(args.strict),
             "room": str(last_state.get("room_id", "") or ""),
             "hp": int(last_state.get("hp", 0) or 0),
             "x": int(last_state.get("x", 0) or 0),
@@ -416,20 +468,58 @@ def main() -> int:
         if want_room and str(last_state.get("room_id", "") or "").upper() != want_room.upper():
             fail.append(f"room {last_state.get('room_id')!r} != {want_room!r}")
         want_hp = int(end.get("hp", 0) or 0)
-        if want_hp and abs(int(last_state.get("hp", 0) or 0) - want_hp) > 12:
-            fail.append(f"hp {last_state.get('hp')} != {want_hp} (±12)")
+        got_hp = int(last_state.get("hp", 0) or 0)
+        if want_hp:
+            if args.strict:
+                if got_hp != want_hp:
+                    fail.append(f"hp {got_hp} != {want_hp}")
+            elif abs(got_hp - want_hp) > 12:
+                fail.append(f"hp {got_hp} != {want_hp} (±12)")
         for axis in ("x", "z"):
             g = int(last_state.get(axis, 0) or 0)
             w = int(end.get(axis, 0) or 0)
-            if abs(g - w) > 256:
+            if args.strict:
+                if g != w:
+                    fail.append(f"{axis} {g} != {w}")
+            elif abs(g - w) > 256:
                 fail.append(f"{axis} {g} != {w} (±256)")
         want_facing = int(end.get("facing", 0) or 0)
         if want_facing:
             from re1_rl.attack_macro import facing_signed_delta
 
             got_facing = int(last_state.get("facing", 0) or 0)
-            if abs(facing_signed_delta(got_facing, want_facing)) > FACING_RESTORE_TOL:
+            if args.strict:
+                if got_facing != want_facing:
+                    fail.append(f"facing {got_facing} != {want_facing}")
+            elif abs(facing_signed_delta(got_facing, want_facing)) > FACING_RESTORE_TOL:
                 fail.append(f"facing {got_facing} != {want_facing} (±{FACING_RESTORE_TOL})")
+        if args.strict:
+            want_inv = end.get("inventory_slots") or end.get("inventory")
+            if want_inv is not None:
+                def _norm_inv(raw: Any) -> list[list[Any]]:
+                    out: list[list[Any]] = []
+                    for row in raw or []:
+                        if isinstance(row, (list, tuple)) and len(row) >= 2:
+                            out.append([str(row[0]), int(row[1])])
+                        elif row:
+                            out.append([str(row), 1])
+                    return out
+
+                got_n = _norm_inv(inv)
+                want_n = _norm_inv(want_inv)
+                if got_n != want_n:
+                    fail.append(f"inventory {got_n} != {want_n}")
+            want_seed_end = tape.get("rng_seed_end")
+            if want_seed_end is not None:
+                from re1_rl.rng_seed import read_rng_seed
+
+                got_seed = read_rng_seed(bridge)
+                want_s = int(want_seed_end) & 0xFFFFFFFF
+                if got_seed is None or (int(got_seed) & 0xFFFFFFFF) != want_s:
+                    fail.append(
+                        f"rng_seed_end {got_seed} != {want_s} "
+                        f"(0x{(got_seed or 0):08X} vs 0x{want_s:08X})"
+                    )
         if fail:
             print("[replay] FAIL")
             for row in fail:
