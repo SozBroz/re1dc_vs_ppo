@@ -119,6 +119,32 @@ def is_fighting_hop(
     return False
 
 
+def march_requires_kit_bar(
+    tip_slot: int, target_slot: int, project_root: Path | str | None = None
+) -> bool:
+    """True when march advance must enforce ammo + frames (combat outcome).
+
+    Kills-up or HP-down hops keep the full kit bar. Ammo-only drips (e.g.
+    ``pl52→pl53`` pistol −1 on a traverse) use nav qualify so a soft tip kit
+    cannot strand the tape before the next real fight. Fail-closed to True
+    when either resources row is missing.
+    """
+    tip = int(tip_slot)
+    target = int(target_slot)
+    if target != tip + 1:
+        return True
+    kit = parse_resources_kit(project_root)
+    a = kit.get(tip)
+    b = kit.get(target)
+    if a is None or b is None:
+        return True
+    if int(b.get("kills", 0)) > int(a.get("kills", 0)):
+        return True
+    if int(b.get("hp", 0)) < int(a.get("hp", 0)):
+        return True
+    return False
+
+
 def _champions(project_root: Path | str | None = None) -> dict[int, list[int]]:
     root = _project_root(project_root)
     path = root / _CHAMPIONS_REL

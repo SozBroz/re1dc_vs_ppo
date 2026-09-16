@@ -13,6 +13,7 @@ from re1_rl.fight_pl_policy import (
     is_fighting_hop,
     live_kit_meets_champion,
     march_frames_factor_for_target,
+    march_requires_kit_bar,
     note_kit_qualified_success,
     parse_resources_kit,
 )
@@ -92,6 +93,11 @@ def test_parse_and_classify_fight_vs_nav(tmp_path):
     assert is_fighting_hop(23, 24, root) is False
     assert is_fighting_hop(24, 25, root) is True
     assert is_fighting_hop(25, 26, root) is True
+    # March kit bar: kills/HP only — ammo drip alone is nav-qualify.
+    assert march_requires_kit_bar(22, 23, root) is True
+    assert march_requires_kit_bar(23, 24, root) is False
+    assert march_requires_kit_bar(24, 25, root) is True
+    assert march_requires_kit_bar(25, 26, root) is False
 
 
 def test_march_factor_fight_raises_nav_keeps_base(tmp_path):

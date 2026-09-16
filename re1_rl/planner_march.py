@@ -9,13 +9,14 @@ ALL of:
   10 minutes of grind per PL, even if the target falls early),
 * the learner mirror admits N+1 AND this box holds those exact bytes,
 * live ``pl(N+1)`` meta ``quality`` meets the kit bar: HP[0]/kills[1]
-  equal-or-greater than the pre-march champion row. **Fighting** hops also
-  need ammo_dmg_weighted[2] within ``MARCH_AMMO_SLACK`` (default **3**) of
-  champion and hop frames[8] within ``RE1_PLANNER_MARCH_FRAMES_FACTOR`` of
-  the resources.md Frames column. **Nav** hops skip ammo *and* the frames
-  bar so gallery / crest-walk mints can auto-roll until the next fight
-  (e.g. ``place_star_crest``). Short quality never qualifies. Fighting hops
-  with missing resources Frames still fail closed.
+  equal-or-greater than the pre-march champion row. **Combat-outcome** hops
+  (kills up or HP down) also need ammo_dmg_weighted[2] within
+  ``MARCH_AMMO_SLACK`` (default **3**) of champion and hop frames[8] within
+  ``RE1_PLANNER_MARCH_FRAMES_FACTOR`` of the resources.md Frames column.
+  **Nav / ammo-only** hops skip ammo *and* the frames bar so gallery,
+  crest-exit, and one-bullet drips can auto-roll until the next real fight
+  (e.g. dogs after ``place_star_crest``). Short quality never qualifies.
+  Combat-outcome hops with missing resources Frames still fail closed.
 
 On advance **or any INDEX pin move** (manual edit included): crystalize only
 on advance; always request an NN weight reset on the learner (POST
@@ -244,12 +245,13 @@ def _champion_qualifies(
 ) -> bool:
     """Live mint meets kit bar: HP/kills/(ammo) vs champion, frames vs resources.
 
-    ``require_ammo`` is True for fighting hops (ammo slack + frames budget).
-    Nav hops skip ammo *and* frames so a sticky HG-eq shortfall or a slow
-    gallery mint cannot strand the march before the next fight.
-    ``resources_frames`` is the docs Frames column (policy decisions, same unit
-    as ``-quality[8]``). Fighting hops with missing/non-positive resources
-    Frames never qualify. ``frames_factor`` defaults to 1.1.
+    ``require_ammo`` is True for combat-outcome hops (ammo slack + frames
+    budget). Nav / ammo-only hops skip ammo *and* frames so a sticky HG-eq
+    shortfall or a slow gallery mint cannot strand the march before the next
+    real fight. ``resources_frames`` is the docs Frames column (policy
+    decisions, same unit as ``-quality[8]``). Combat-outcome hops with
+    missing/non-positive resources Frames never qualify. ``frames_factor``
+    defaults to 1.1.
     """
     import math
 
@@ -641,8 +643,8 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
     frames_factor = _march_frames_factor(project_root)
     try:
         from re1_rl.fight_pl_policy import (
-            is_fighting_hop,
             march_frames_factor_for_target,
+            march_requires_kit_bar,
         )
 
         frames_factor = float(
@@ -650,7 +652,8 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
                 nxt, project_root, base_factor=float(frames_factor)
             )
         )
-        require_ammo = bool(is_fighting_hop(pin, nxt, project_root))
+        # Ammo-only drips stay nav-qualify; kills/HP changes keep the full bar.
+        require_ammo = bool(march_requires_kit_bar(pin, nxt, project_root))
     except Exception:  # noqa: BLE001 — never block march on policy import
         require_ammo = True
     rows = _mirror_rows(project_root)
