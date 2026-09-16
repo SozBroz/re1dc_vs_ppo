@@ -491,6 +491,10 @@ def _build_learner_model(args: argparse.Namespace, device: str):
 def _maybe_start_grid_tiler(args: argparse.Namespace) -> threading.Event | None:
     if not args.tile_windows:
         return None
+    # Headless remotes (WH1/WH2/WH3) must stay invisible. The tiler uses
+    # SetWindowPos(..., SWP_SHOWWINDOW) and will un-hide --headless windows.
+    if bool(getattr(args, "headless", True)):
+        return None
     from re1_rl.window_grid import start_grid_tiler
 
     actor_ranks = getattr(args, "actor_ranks", None)

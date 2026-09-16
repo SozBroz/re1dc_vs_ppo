@@ -366,7 +366,10 @@ def make_env(
             try:
                 # Claim/tile as soon as Popen returns; reap on any attach failure
                 # (BizHawk path already does this — recomp used to leak orphans).
-                _hook_recomp_immediate_tile(bridge, port)
+                # Never immediate-tile when headless: SetWindowPos(SWP_SHOWWINDOW)
+                # would un-hide C-RE1 on WH1/WH2/WH3.
+                if not headless:
+                    _hook_recomp_immediate_tile(bridge, port)
                 bridge.wait_for_client(progress=_phase, headless=headless)
                 _phase("connected; set_speed")
                 bridge.set_speed(training_speed)
