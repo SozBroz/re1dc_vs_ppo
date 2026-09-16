@@ -85,6 +85,7 @@ class LegReplayBuffer:
         "rewards",
         "reward_events",
         "rng_seed",
+        "rng_seed_end",
     )
 
     def __init__(self) -> None:
@@ -96,6 +97,8 @@ class LegReplayBuffer:
         self.reward_events: list[dict[str, float]] = []
         # LCG u32@0x800AE690 at tape arm (None until snapshot_leg_rng_seed).
         self.rng_seed: int | None = None
+        # Seed at joypad stop — before settle / savestate side effects.
+        self.rng_seed_end: int | None = None
 
     def append(
         self,
@@ -356,7 +359,12 @@ def joypad_replay_spans(tape: dict[str, Any]) -> list[tuple[list[int], str]]:
             j = i + 1
             while j < n and bool(turbo[j]) == on:
                 j += 1
-            spans.append((bits[i:j], "force" if on else "off"))
+            # ``step`` (not ``force``): match capture ``bridge.step`` which
+            # uses turbo_if_uncontrolled(game_mode). Stamping force turbo from
+            # the tape channel desyncs combat/menu legs when one frame of
+            # game_mode slips — open-loop force then plays inventory pads in
+            # the field (pl23 → room 109). ``off`` still disables turbo.
+            spans.append((bits[i:j], "step" if on else "off"))
             i = j
         return _merge_joypad_spans(spans)
     spans = []
@@ -564,12 +572,19 @@ def build_leg_replay_payload(
         rng_seed_i = int(rng_seed) & 0xFFFFFFFF if rng_seed is not None else None
     except (TypeError, ValueError):
         rng_seed_i = None
-    rng_seed_end: int | None = None
-    try:
-        from re1_rl.rng_seed import read_rng_seed
+    rng_seed_end: int | None = getattr(buf, "rng_seed_end", None)
+    if rng_seed_end is None:
+        try:
+            from re1_rl.rng_seed import read_rng_seed
 
-        rng_seed_end = read_rng_seed(getattr(env, "bridge", None))
-    except (ImportError, TypeError, ValueError, AttributeError):
+            rng_seed_end = read_rng_seed(getattr(env, "bridge", None))
+        except (ImportError, TypeError, ValueError, AttributeError):
+            rng_seed_end = None
+    try:
+        rng_seed_end = (
+            int(rng_seed_end) & 0xFFFFFFFF if rng_seed_end is not None else None
+        )
+    except (TypeError, ValueError):
         rng_seed_end = None
     payload = {
         "schema_version": SCHEMA_VERSION,

@@ -124,6 +124,12 @@ def main() -> int:
     ap.add_argument("--settle", action="store_true", help="Run capture settle before the end-pose compare")
     ap.add_argument("--force-stale", action="store_true", help="Play even when pred State SHA != tape from_state_sha256")
     ap.add_argument(
+        "--max-joypad-frames",
+        type=int,
+        default=0,
+        help="Stop joypad TAS after N frames (0 = full tape). Probe truncations.",
+    )
+    ap.add_argument(
         "--strict",
         action="store_true",
         default=None,
@@ -296,8 +302,17 @@ def main() -> int:
             joy_n = int(tape.get("joypad_frames") or 0)
         except (TypeError, ValueError):
             policy_phys, skip_phys, joy_n = 0, 0, 0
+        # ``settled: true`` (schema ≥3 / arm-after-settle) means rng_seed is
+        # post-settle — never skip tip settle just because joypad > policy
+        # (reward_only / turbo pads inflate joypad without settle on tape).
+        # Legacy pre-settle tapes omit ``settled`` or set it false and also
+        # carry settle pads so joypad >> policy+skip.
+        settled_meta = tape.get("settled")
         legacy_settle_on_tape = bool(
-            joypad_mode and has_seed and joy_n > (policy_phys + skip_phys)
+            joypad_mode
+            and has_seed
+            and settled_meta is not True
+            and joy_n > (policy_phys + skip_phys)
         )
         _orig_settle = env._settle_recomp_planner_start
         pre_settle_poked = False
@@ -346,6 +361,16 @@ def main() -> int:
                 )
             else:
                 print(f"[replay] WARN rng_seed poke failed: {rng_status}", flush=True)
+            # Match capture's 08i pad pipeline: one uncounted PAD_RELEASED
+            # after the seed poke so the first taped word sees the same latch
+            # state as action-0 during mint/retape.
+            try:
+                from recomp_client import PAD_RELEASED
+
+                bridge.client.step(PAD_RELEASED, 0)
+                print("[replay] pad pipeline flush PAD_RELEASED n=0", flush=True)
+            except (OSError, RuntimeError, ValueError, AttributeError, TypeError, ImportError) as exc:
+                print(f"[replay] WARN pad flush skipped: {exc}", flush=True)
         elif not has_seed:
             print(
                 "[replay] WARN tape has no rng_seed — relying on .pst LCG only "
@@ -402,31 +427,51 @@ def main() -> int:
             played = 0
             since_shot = 0
             chunk = 120
-            for span_bits, patch_mode in spans:
-                print(f"[replay] {label} span {len(span_bits)} frames patch_mode={patch_mode} at {played}/{total}", flush=True)
-                for start in range(0, len(span_bits), chunk):
-                    sl = span_bits[start:start + chunk]
-                    got = bridge.tape_play(sl, patch_mode=patch_mode)
-                    played += int(got)
-                    since_shot += int(got)
-                    try:
-                        last_state = dict(env._read_state(track_items=True))  # noqa: SLF001
-                    except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
-                        last_state = dict(getattr(env, "_prev_state", {}) or {})
-                    if writer is not None and since_shot >= int(args.record_every):
+            max_jp = int(args.max_joypad_frames or 0)
+            # Play every taped word through the same path as capture
+            # ``bridge.step`` (stage_only patches + turbo_if_uncontrolled),
+            # not force/off spans — inventory combat legs desync under
+            # open-loop force turbo.
+            from recomp_client import PAD_RELEASED
+            from tape import psx_from_tape_bits
+            from re1_rl.leg_replay import _joypad_lists_from_tape
+
+            all_bits, _turbo = _joypad_lists_from_tape(tape)
+            if max_jp > 0:
+                all_bits = all_bits[:max_jp]
+            total = len(all_bits)
+            print(
+                f"[replay] mode=joypad via bridge.step path ({total} frames)",
+                flush=True,
+            )
+            for start in range(0, total, chunk):
+                sl = all_bits[start : start + chunk]
+                for b in sl:
+                    if bridge._patches_always or bridge._patches_turbo:
+                        bridge._apply_patches(force=False, stage_only=True)
+                    word = psx_from_tape_bits(int(b))
+                    bridge.client.step(word, 1, timeout_s=max(30.0, bridge.timeout))
+                    played += 1
+                try:
+                    last_state = dict(env._read_state(track_items=True))  # noqa: SLF001
+                except (OSError, RuntimeError, ValueError, AttributeError, TypeError):
+                    last_state = dict(getattr(env, "_prev_state", {}) or {})
+                if writer is not None:
+                    since_shot += len(sl)
+                    if since_shot >= int(args.record_every):
                         since_shot = 0
                         try:
                             rgb = np.ascontiguousarray(bridge.screenshot())
                             writer.append_rgb(rgb)
                         except (OSError, RuntimeError, ValueError):
                             pass
-                    if played == total or played % 360 == 0 or start == 0:
-                        print(
-                            f"[replay] {label} joypad {played}/{total} "
-                            f"room={last_state.get('room_id')} hp={last_state.get('hp')} "
-                            f"pos=({last_state.get('x')},{last_state.get('z')})",
-                            flush=True,
-                        )
+                if played == total or played % 360 == 0 or start == 0:
+                    print(
+                        f"[replay] {label} joypad {played}/{total} "
+                        f"room={last_state.get('room_id')} hp={last_state.get('hp')} "
+                        f"pos=({last_state.get('x')},{last_state.get('z')})",
+                        flush=True,
+                    )
         if args.settle:
             from re1_rl.yawn_rails import _settle_state_for_capture
 
@@ -510,7 +555,10 @@ def main() -> int:
                 if got_n != want_n:
                     fail.append(f"inventory {got_n} != {want_n}")
             want_seed_end = tape.get("rng_seed_end")
-            if want_seed_end is not None:
+            # Actions mode re-runs env.step, which may burn post-success
+            # item-menu dismiss frames after the capture snap of rng_seed_end.
+            # Joypad TAS is the seed-authoritative path.
+            if want_seed_end is not None and str(args.mode) == "joypad":
                 from re1_rl.rng_seed import read_rng_seed
 
                 got_seed = read_rng_seed(bridge)
