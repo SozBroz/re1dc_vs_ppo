@@ -1,0 +1,293 @@
+{
+  "schema_version": 1,
+  "slots": {
+    "12": {
+      "inference_temperature": 1.0,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789380397.0828495,
+      "mod_drop": false,
+      "policy_version": 42
+    },
+    "13": {
+      "inference_temperature": 1.0,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789380572.266703,
+      "mod_drop": false,
+      "policy_version": 45
+    },
+    "14": {
+      "inference_temperature": 1.0,
+      "machine": "workhorse2",
+      "minted_at_unix": 1789395055.9637816,
+      "mod_drop": false,
+      "policy_version": 113
+    },
+    "15": {
+      "inference_temperature": 1.0,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789397217.8810997,
+      "mod_drop": false,
+      "policy_version": 4
+    },
+    "16": {
+      "inference_temperature": 1.0,
+      "machine": "pking",
+      "minted_at_unix": 1789398584.3481386,
+      "mod_drop": false,
+      "policy_version": 12
+    },
+    "17": {
+      "inference_temperature": 1.0,
+      "machine": "pking",
+      "minted_at_unix": 1789401429.1452968,
+      "mod_drop": false,
+      "policy_version": 36
+    },
+    "18": {
+      "inference_temperature": 1.0,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789420299.0594308,
+      "mod_drop": false,
+      "policy_version": 196
+    },
+    "19": {
+      "inference_temperature": 1.0,
+      "machine": "pking",
+      "minted_at_unix": 1789421013.6202128,
+      "mod_drop": false,
+      "policy_version": 201
+    },
+    "20": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse1",
+      "minted_at_unix": 1789425628.933304,
+      "mod_drop": false,
+      "policy_version": 6
+    },
+    "21": {
+      "inference_temperature": 1.1,
+      "machine": "pking",
+      "minted_at_unix": 1789426991.0464873,
+      "mod_drop": false,
+      "policy_version": 11
+    },
+    "22": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789436798.2662323,
+      "mod_drop": false,
+      "policy_version": 57
+    },
+    "23": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse2",
+      "minted_at_unix": 1789479514.6427946,
+      "mod_drop": false,
+      "policy_version": 117
+    },
+    "24": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789480210.0222168,
+      "mod_drop": false,
+      "policy_version": 1
+    },
+    "25": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789480271.7726703,
+      "mod_drop": false,
+      "policy_version": 2
+    },
+    "26": {
+      "inference_temperature": 1.1,
+      "machine": "pking",
+      "minted_at_unix": 1789481309.384591,
+      "mod_drop": false,
+      "policy_version": 9
+    },
+    "27": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse2",
+      "minted_at_unix": 1789483483.4335165,
+      "mod_drop": false,
+      "policy_version": 21
+    },
+    "28": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789486158.592961,
+      "mod_drop": false,
+      "policy_version": 35
+    },
+    "29": {
+      "inference_temperature": 1.1,
+      "machine": "pking",
+      "minted_at_unix": 1789499547.648116,
+      "mod_drop": false,
+      "policy_version": 95
+    },
+    "30": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse2",
+      "minted_at_unix": 1789499953.3035533,
+      "mod_drop": false,
+      "policy_version": 2
+    },
+    "31": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse2",
+      "minted_at_unix": 1789500029.7554553,
+      "mod_drop": false,
+      "policy_version": 4
+    },
+    "32": {
+      "inference_temperature": 1.1,
+      "machine": "pking",
+      "minted_at_unix": 1789500020.294017,
+      "mod_drop": false,
+      "policy_version": 4
+    },
+    "33": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse2",
+      "minted_at_unix": 1789500061.8857286,
+      "mod_drop": false,
+      "policy_version": 5
+    },
+    "34": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789501668.226521,
+      "mod_drop": false,
+      "policy_version": 15
+    },
+    "35": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789501971.5639732,
+      "mod_drop": false,
+      "policy_version": 17
+    },
+    "36": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789502093.4085736,
+      "mod_drop": false,
+      "policy_version": 19
+    },
+    "37": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse2",
+      "minted_at_unix": 1789502603.3899758,
+      "mod_drop": false,
+      "policy_version": 4
+    },
+    "38": {
+      "inference_temperature": 1.1,
+      "machine": "pking",
+      "minted_at_unix": 1789502758.138991,
+      "mod_drop": false,
+      "policy_version": 6
+    },
+    "39": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789503014.4867685,
+      "mod_drop": false,
+      "policy_version": 10
+    },
+    "40": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789503063.982852,
+      "mod_drop": false,
+      "policy_version": 12
+    },
+    "41": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse2",
+      "minted_at_unix": 1789508331.657613,
+      "mod_drop": false,
+      "policy_version": 36
+    },
+    "42": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse2",
+      "minted_at_unix": 1789508554.3003252,
+      "mod_drop": false,
+      "policy_version": 2
+    },
+    "43": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789508590.5513613,
+      "mod_drop": false,
+      "policy_version": 3
+    },
+    "44": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789508663.4769926,
+      "mod_drop": false,
+      "policy_version": 5
+    },
+    "45": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789508691.6637053,
+      "mod_drop": false,
+      "policy_version": 5
+    },
+    "46": {
+      "inference_temperature": 1.1,
+      "machine": "pking",
+      "minted_at_unix": 1789508882.4210827,
+      "mod_drop": false,
+      "policy_version": 9
+    },
+    "47": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse2",
+      "minted_at_unix": 1789508980.5977907,
+      "mod_drop": false,
+      "policy_version": 11
+    },
+    "48": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789509050.537471,
+      "mod_drop": false,
+      "policy_version": 12
+    },
+    "49": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789509106.8571372,
+      "mod_drop": false,
+      "policy_version": 13
+    },
+    "50": {
+      "inference_temperature": 1.1,
+      "machine": "pking",
+      "minted_at_unix": 1789509362.3669765,
+      "mod_drop": false,
+      "policy_version": 17
+    },
+    "51": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse3",
+      "minted_at_unix": 1789509409.672397,
+      "mod_drop": false,
+      "policy_version": 18
+    },
+    "52": {
+      "inference_temperature": 1.1,
+      "machine": "workhorse2",
+      "minted_at_unix": 1789530276.4518414,
+      "mod_drop": false,
+      "policy_version": 20
+    }
+  },
+  "updated_unix": 1789532562.439623
+}

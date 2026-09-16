@@ -1443,6 +1443,12 @@ def capture_planner_loyal_cell(
     (staging / CELL_META_NAME).write_text(
         json.dumps(meta, indent=2) + "\n", encoding="utf-8"
     )
+    try:
+        from re1_rl.mint_policy_map import note_mint
+
+        note_mint(int(slot), mint_pointer, project_root=env.project_root)
+    except Exception:  # noqa: BLE001 — never fail a mint on map I/O
+        pass
 
     from re1_rl.yawn_rails_sync import yawn_cells_locked
 

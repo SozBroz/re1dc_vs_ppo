@@ -20,10 +20,11 @@ ALL of:
 
 On advance **or any INDEX pin move** (manual edit included): crystalize only
 on advance; always request an NN weight reset on the learner (POST
-``/march/reset_weights``) so training restarts each leg from the base weights
-instead of carrying an overfit hunt into the next tip. Reset requests are
-idempotent per advance id and retried on later ticks until the learner
-reports them applied.
+``/march/reset_weights``). When ``data/planner_mint_policy_map.json`` (or a
+still-live cell meta) names a ``policy_version`` for the hunt target
+``pl(N+1)`` *and* ``data/mint_policies/weights/v<V>.pt`` exists, the reset
+loads that mint archive; otherwise it falls back to the march base zip.
+Idempotent per advance id; retried until the learner reports applied.
 
 Fail-closed everywhere: flag unset, non-exclusive pin, env-sourced INDEX
 (nothing to rewrite), short grind time, missing champion/resources row,
@@ -350,9 +351,18 @@ def _learner_addr() -> tuple[str, int] | None:
         return None
 
 
-def _request_learner_reset(host: str, port: int, advance_id: str) -> bool:
+def _request_learner_reset(
+    host: str,
+    port: int,
+    advance_id: str,
+    *,
+    mint_policy_version: int | None = None,
+) -> bool:
     """POST /march/reset_weights. True only on an explicit ok."""
-    body = json.dumps({"advance_id": advance_id}).encode("utf-8")
+    payload: dict[str, Any] = {"advance_id": advance_id}
+    if mint_policy_version is not None and int(mint_policy_version) > 0:
+        payload["mint_policy_version"] = int(mint_policy_version)
+    body = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         f"http://{host}:{port}/march/reset_weights",
         data=body,
@@ -361,13 +371,16 @@ def _request_learner_reset(host: str, port: int, advance_id: str) -> bool:
     )
     try:
         with urllib.request.urlopen(req, timeout=_RESET_TIMEOUT_S) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+            response = json.loads(resp.read().decode("utf-8"))
     except (OSError, ValueError) as exc:
         print(f"[planner_march] reset request {advance_id} failed: {exc}", flush=True)
         return False
-    ok = isinstance(payload, dict) and payload.get("ok") is True
+    ok = isinstance(response, dict) and response.get("ok") is True
     if not ok:
-        print(f"[planner_march] reset request {advance_id} refused: {payload!r}", flush=True)
+        print(
+            f"[planner_march] reset request {advance_id} refused: {response!r}",
+            flush=True,
+        )
     return ok
 
 
@@ -389,6 +402,16 @@ def _learner_reset_applied(host: str, port: int) -> str | None:
     return str(applied) if applied else None
 
 
+def _hunt_mint_version(project_root: Path | str, pin_idx: int) -> int | None:
+    """Archive version for hunting ``pl(pin+1)``, or None → base ckpt."""
+    try:
+        from re1_rl.mint_policy_map import resolve_hunt_mint_version
+
+        return resolve_hunt_mint_version(int(pin_idx), project_root=project_root)
+    except Exception:  # noqa: BLE001 — never block march on map I/O
+        return None
+
+
 def _queue_pin_reset(
     project_root: Path | str,
     *,
@@ -396,18 +419,35 @@ def _queue_pin_reset(
     pin_idx: int,
     wall_now: float,
     extra: dict[str, Any] | None = None,
+    mint_policy_version: int | None = None,
 ) -> None:
     """Persist pending NN reset + pin clock; pump once."""
     state = _read_march_state(project_root)
+    if mint_policy_version is None:
+        mint_policy_version = _hunt_mint_version(project_root, int(pin_idx))
+    pending: dict[str, Any] = {
+        "advance_id": str(advance_id),
+        "requested_unix": wall_now,
+        "last_attempt_unix": 0.0,
+    }
+    if mint_policy_version is not None and int(mint_policy_version) > 0:
+        pending["mint_policy_version"] = int(mint_policy_version)
+        print(
+            f"[planner_march] NN reset {advance_id} will load mint "
+            f"v{int(mint_policy_version)} (hunt pl{int(pin_idx) + 1:02d})",
+            flush=True,
+        )
+    else:
+        print(
+            f"[planner_march] NN reset {advance_id} will load march base "
+            f"(no mint archive for hunt pl{int(pin_idx) + 1:02d})",
+            flush=True,
+        )
     payload = {
         **state,
         "pin_idx": int(pin_idx),
         "pin_since_unix": wall_now,
-        "pending_reset": {
-            "advance_id": str(advance_id),
-            "requested_unix": wall_now,
-            "last_attempt_unix": 0.0,
-        },
+        "pending_reset": pending,
     }
     if extra:
         payload.update(extra)
@@ -450,8 +490,23 @@ def _pump_pending_reset(project_root: Path | str, now: float) -> None:
         due = True
     if not due:
         return
-    if _request_learner_reset(host, port, advance_id):
-        print(f"[planner_march] reset {advance_id} (re)sent to learner", flush=True)
+    mint_ver = None
+    raw_ver = pending.get("mint_policy_version")
+    if raw_ver is not None and raw_ver != "":
+        try:
+            mint_ver = int(raw_ver)
+        except (TypeError, ValueError):
+            mint_ver = None
+        if mint_ver is not None and mint_ver <= 0:
+            mint_ver = None
+    if _request_learner_reset(
+        host, port, advance_id, mint_policy_version=mint_ver
+    ):
+        print(
+            f"[planner_march] reset {advance_id} (re)sent to learner"
+            + (f" mint_v={mint_ver}" if mint_ver is not None else ""),
+            flush=True,
+        )
     pending["last_attempt_unix"] = now
     state["pending_reset"] = pending
     _write_march_state(project_root, state)
@@ -742,6 +797,14 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
             # Ensure local INDEX matches even if publish returned offline/no text.
             if _file_pin_index(pin_file) != nxt:
                 _rewrite_pin_index(pin_file, nxt)
+            mint_ver = _hunt_mint_version(project_root, int(nxt))
+            pending_reset: dict[str, Any] = {
+                "advance_id": advance_id,
+                "requested_unix": wall_now,
+                "last_attempt_unix": 0.0,
+            }
+            if mint_ver is not None:
+                pending_reset["mint_policy_version"] = int(mint_ver)
             _write_march_state(
                 project_root,
                 {
@@ -749,11 +812,7 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
                     "pin_since_unix": wall_now,
                     "last_advance_unix": wall_now,
                     "last_advance_id": advance_id,
-                    "pending_reset": {
-                        "advance_id": advance_id,
-                        "requested_unix": wall_now,
-                        "last_attempt_unix": 0.0,
-                    },
+                    "pending_reset": pending_reset,
                 },
             )
     except TimeoutError:
