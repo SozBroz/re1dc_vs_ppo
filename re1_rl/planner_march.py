@@ -46,6 +46,10 @@ from typing import Any
 # quality[2] may trail resources.md pistol counts by a couple rounds (RNG /
 # pickup timing); accept that slack instead of blocking the march.
 MARCH_AMMO_SLACK = 3
+# Optional raise on the ammo floor (pin ``RE1_PLANNER_MARCH_AMMO_EXTRA``).
+# EXTRA=10 means "end with ~10 more rounds / use ~10 fewer bullets" vs the
+# champion bar after slack: live[2] >= champ[2] - SLACK + EXTRA.
+_MARCH_AMMO_EXTRA_ENV = "RE1_PLANNER_MARCH_AMMO_EXTRA"
 # quality[2] is the mint-time damage-weighted ammo scalar, so pistol-vs-shotgun
 # weighting is already settled at capture; the gate just compares scalars.
 _MARCH_KIT_DIMS = (0, 1, 2)
@@ -54,7 +58,13 @@ _MARCH_ENV = "RE1_PLANNER_MARCH"
 _MARCH_STOP_ENV = "RE1_PLANNER_MARCH_STOP"
 _MARCH_MIN_S_ENV = "RE1_PLANNER_MARCH_MIN_S"
 _MARCH_FRAMES_FACTOR_ENV = "RE1_PLANNER_MARCH_FRAMES_FACTOR"
-_MARCH_KEYS = (_MARCH_ENV, _MARCH_STOP_ENV, _MARCH_MIN_S_ENV, _MARCH_FRAMES_FACTOR_ENV)
+_MARCH_KEYS = (
+    _MARCH_ENV,
+    _MARCH_STOP_ENV,
+    _MARCH_MIN_S_ENV,
+    _MARCH_FRAMES_FACTOR_ENV,
+    _MARCH_AMMO_EXTRA_ENV,
+)
 _PIN_INDEX_KEY = "RE1_PLANNER_RESET_PIN_INDEX"
 _DEFAULT_MIN_S = 600.0
 _DEFAULT_FRAMES_FACTOR = 1.1
@@ -194,6 +204,34 @@ def _march_frames_factor(project_root: Path | str | None) -> float:
         return float(_DEFAULT_FRAMES_FACTOR)
 
 
+def _march_ammo_extra(project_root: Path | str | None = None) -> int:
+    """Extra rounds required above (champ − slack). Pin/env; default 0."""
+    from re1_rl.planner_loyal_cells import _pin_raw
+
+    raw = _pin_raw(_MARCH_AMMO_EXTRA_ENV, project_root)
+    if raw is None:
+        raw = (os.environ.get(_MARCH_AMMO_EXTRA_ENV) or "").strip() or None
+    if raw is None:
+        return 0
+    try:
+        return max(0, int(float(str(raw).strip())))
+    except (TypeError, ValueError):
+        return 0
+
+
+def march_ammo_floor(
+    champ_ammo: int,
+    *,
+    project_root: Path | str | None = None,
+    slack: int | None = None,
+    extra: int | None = None,
+) -> int:
+    """Minimum live quality[2] to pass the fighting-hop ammo bar."""
+    s = int(MARCH_AMMO_SLACK if slack is None else slack)
+    e = int(_march_ammo_extra(project_root) if extra is None else extra)
+    return int(champ_ammo) - int(s) + int(e)
+
+
 def _resources_frames(project_root: Path | str) -> dict[int, int]:
     """``{slot: Frames}`` from ``docs/planner_loyal_resources.md`` Kit-by-PL table."""
     path = Path(project_root) / _RESOURCES_REL
@@ -243,6 +281,7 @@ def _champion_qualifies(
     resources_frames: int = 0,
     frames_factor: float = 1.1,
     require_ammo: bool = True,
+    project_root: Path | str | None = None,
 ) -> bool:
     """Live mint meets kit bar: HP/kills/(ammo) vs champion, frames vs resources.
 
@@ -252,7 +291,8 @@ def _champion_qualifies(
     real fight. ``resources_frames`` is the docs Frames column (policy
     decisions, same unit as ``-quality[8]``). Combat-outcome hops with
     missing/non-positive resources Frames never qualify. ``frames_factor``
-    defaults to 1.1.
+    defaults to 1.1. ``RE1_PLANNER_MARCH_AMMO_EXTRA`` raises the ammo floor
+    (use fewer bullets / keep more rounds than champ−slack).
     """
     import math
 
@@ -268,10 +308,12 @@ def _champion_qualifies(
         champ = lift_planner_loyal_quality(champ_q)
     except (TypeError, ValueError):
         return False
-    # HP + kills must meet champion; ammo (with slack) only on fighting hops.
+    # HP + kills must meet champion; ammo (with slack/extra) only on fighting hops.
     if int(live[0]) < int(champ[0]) or int(live[1]) < int(champ[1]):
         return False
-    if require_ammo and int(live[2]) < int(champ[2]) - int(MARCH_AMMO_SLACK):
+    if require_ammo and int(live[2]) < march_ammo_floor(
+        int(champ[2]), project_root=project_root
+    ):
         return False
     live_frames = -int(live[_MARCH_FRAMES_DIM])
     if live_frames <= 0:
@@ -733,6 +775,7 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
         resources_frames=rec_frames,
         frames_factor=frames_factor,
         require_ammo=require_ammo,
+        project_root=project_root,
     ):
         return None
     advance_id = f"pl{pin:02d}->pl{nxt:02d}@{int(wall_now)}"
@@ -753,6 +796,7 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
                 resources_frames=rec_frames,
                 frames_factor=frames_factor,
                 require_ammo=require_ammo,
+                project_root=project_root,
             ):
                 return None
             try:

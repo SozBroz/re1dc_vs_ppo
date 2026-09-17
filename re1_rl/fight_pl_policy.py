@@ -195,9 +195,10 @@ def live_kit_meets_champion(
 ) -> bool:
     """True when live cell HP/kills/ammo (dims 0/1/2) meet champion bars.
 
-    Ammo may trail champion by ``MARCH_AMMO_SLACK`` (same as march advance).
+    Ammo may trail champion by ``MARCH_AMMO_SLACK`` (same as march advance),
+    then ``RE1_PLANNER_MARCH_AMMO_EXTRA`` raises the floor again.
     """
-    from re1_rl.planner_march import MARCH_AMMO_SLACK
+    from re1_rl.planner_march import march_ammo_floor
 
     live = live_quality_for_pl(target_slot, cells_root)
     champ = _champions(project_root).get(int(target_slot))
@@ -206,7 +207,7 @@ def live_kit_meets_champion(
     return (
         int(live[0]) >= int(champ[0])
         and int(live[1]) >= int(champ[1])
-        and int(live[2]) >= int(champ[2]) - int(MARCH_AMMO_SLACK)
+        and int(live[2]) >= march_ammo_floor(int(champ[2]), project_root=project_root)
     )
 
 
