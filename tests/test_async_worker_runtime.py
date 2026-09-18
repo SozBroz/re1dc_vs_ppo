@@ -14,10 +14,12 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from re1_rl.distributed.async_worker_runtime import (
+    RECOMP_EXE_NAME,
     _credit_parent_block,
     _flush_local_epoch,
     _hung_actor_indices,
     _pack_and_deliver_rollouts,
+    _reap_orphan_recomp_exes,
     _serve_need,
     _stale_actor_indices,
     _startup_rank_batches,
@@ -654,3 +656,54 @@ def test_distributed_epoch_hyperparams_gentler_than_monolithic() -> None:
     assert DISTRIBUTED_EPOCH_HYPERPARAMS["batch_size"] == 8192
     assert DISTRIBUTED_EPOCH_HYPERPARAMS["n_epochs"] == 2
     assert DISTRIBUTED_EPOCH_HYPERPARAMS["gamma"] == 1.0
+
+
+def test_reap_orphan_recomp_kills_dead_parent_only() -> None:
+    killed: list[int] = []
+    rows = [
+        (10, 1, "python.exe"),
+        (20, 10, RECOMP_EXE_NAME),  # live parent actor
+        (30, 9999, RECOMP_EXE_NAME),  # dead parent
+        (40, 1, "notepad.exe"),
+    ]
+    out = _reap_orphan_recomp_exes(
+        processes=rows,
+        kill_pid=killed.append,
+    )
+    assert out == [30]
+    assert killed == [30]
+
+
+def test_reap_orphan_recomp_respects_keep_parent_pids() -> None:
+    killed: list[int] = []
+    rows = [
+        (10, 1, "python.exe"),
+        (11, 1, "python.exe"),
+        (20, 10, RECOMP_EXE_NAME),
+        (21, 11, RECOMP_EXE_NAME),
+        (22, 11, RECOMP_EXE_NAME),
+    ]
+    out = _reap_orphan_recomp_exes(
+        keep_parent_pids={10},
+        processes=rows,
+        kill_pid=killed.append,
+    )
+    assert out == [21, 22]
+    assert killed == [21, 22]
+
+
+def test_reap_orphan_recomp_empty_keep_kills_all() -> None:
+    """Host soft-restart path: keep=set() means every recomp is unowned."""
+    killed: list[int] = []
+    rows = [
+        (10, 1, "python.exe"),
+        (20, 10, RECOMP_EXE_NAME),
+        (21, 10, RECOMP_EXE_NAME),
+    ]
+    out = _reap_orphan_recomp_exes(
+        keep_parent_pids=set(),
+        processes=rows,
+        kill_pid=killed.append,
+    )
+    assert out == [20, 21]
+    assert killed == [20, 21]

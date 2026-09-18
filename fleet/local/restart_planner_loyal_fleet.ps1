@@ -90,7 +90,7 @@ while ((Get-Date) -lt $gateDeadline) {
       $need = switch ($wid) {
         'pking-recomp' { 20 }
         'wh1-recomp' { 8 }
-        'wh2-recomp' { 24 }
+        'wh2-recomp' { 28 }
         'wh3-recomp' { 24 }
         default { 1 }
       }

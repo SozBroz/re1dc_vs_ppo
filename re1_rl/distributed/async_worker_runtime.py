@@ -626,6 +626,149 @@ def _flush_local_epoch(
     return retained, capacity_full
 
 
+RECOMP_EXE_NAME = "Resident_Evil_Director_s_Cut_Recompiled.exe"
+
+
+def _taskkill_pid(pid: int, *, timeout_s: float = 5.0) -> None:
+    if os.name != "nt" or int(pid) <= 0:
+        return
+    try:
+        subprocess.run(
+            ["taskkill", "/PID", str(int(pid)), "/T", "/F"],
+            check=False,
+            capture_output=True,
+            timeout=max(1.0, float(timeout_s)),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+def _iter_windows_processes() -> list[tuple[int, int, str]]:
+    """Return ``(pid, ppid, exe_name)`` via Toolhelp (no WMI / psutil)."""
+    if os.name != "nt":
+        return []
+    import ctypes
+    from ctypes import wintypes
+
+    TH32CS_SNAPPROCESS = 0x00000002
+    INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+
+    class PROCESSENTRY32W(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", wintypes.DWORD),
+            ("cntUsage", wintypes.DWORD),
+            ("th32ProcessID", wintypes.DWORD),
+            ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+            ("th32ModuleID", wintypes.DWORD),
+            ("cntThreads", wintypes.DWORD),
+            ("th32ParentProcessID", wintypes.DWORD),
+            ("pcPriClassBase", ctypes.c_long),
+            ("dwFlags", wintypes.DWORD),
+            ("szExeFile", wintypes.WCHAR * 260),
+        ]
+
+    kernel32 = ctypes.windll.kernel32
+    snap = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snap == INVALID_HANDLE_VALUE:
+        return []
+    rows: list[tuple[int, int, str]] = []
+    try:
+        entry = PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+        if not kernel32.Process32FirstW(snap, ctypes.byref(entry)):
+            return []
+        while True:
+            rows.append(
+                (
+                    int(entry.th32ProcessID),
+                    int(entry.th32ParentProcessID),
+                    str(entry.szExeFile),
+                )
+            )
+            if not kernel32.Process32NextW(snap, ctypes.byref(entry)):
+                break
+    finally:
+        kernel32.CloseHandle(snap)
+    return rows
+
+
+def _pid_alive(pid: int, *, live_pids: set[int] | None = None) -> bool:
+    if int(pid) <= 0:
+        return False
+    if live_pids is not None:
+        return int(pid) in live_pids
+    if os.name != "nt":
+        try:
+            os.kill(int(pid), 0)
+        except OSError:
+            return False
+        return True
+    # OpenProcess is cheaper than another Toolhelp pass when live_pids absent.
+    import ctypes
+    from ctypes import wintypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    handle = ctypes.windll.kernel32.OpenProcess(
+        PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid)
+    )
+    if handle:
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return True
+    return False
+
+
+def _reap_orphan_recomp_exes(
+    *,
+    keep_parent_pids: set[int] | None = None,
+    processes: list[tuple[int, int, str]] | None = None,
+    kill_pid: Callable[[int], None] | None = None,
+) -> list[int]:
+    """Kill C-RE1 recomps not owned by a live keep-parent.
+
+    WH2's soft-restart / warmup failures leave ``Resident_Evil_*Recompiled.exe``
+    with a dead actor parent; those orphans hold ~1GB commit each and push the
+    box into WinError 1455. Full ``taskkill /IM`` is only safe on host-wide
+    restart; mid-loop we must only cut orphans.
+
+    A recomp is orphan when:
+    - its parent PID is dead, or
+    - ``keep_parent_pids`` is set and the parent is not in that set.
+    """
+    if os.name != "nt":
+        return []
+    rows = list(processes) if processes is not None else _iter_windows_processes()
+    if not rows:
+        return []
+    live_pids = {pid for pid, _ppid, _name in rows}
+    keep = {int(p) for p in keep_parent_pids} if keep_parent_pids is not None else None
+    killer = kill_pid or (lambda pid: _taskkill_pid(pid))
+    killed: list[int] = []
+    for pid, ppid, name in rows:
+        if name.lower() != RECOMP_EXE_NAME.lower():
+            continue
+        parent_dead = not _pid_alive(ppid, live_pids=live_pids)
+        parent_not_kept = keep is not None and int(ppid) not in keep
+        if not (parent_dead or parent_not_kept):
+            continue
+        killer(int(pid))
+        killed.append(int(pid))
+    return killed
+
+
+def _live_process_pids(processes: list[mp.Process]) -> set[int]:
+    pids: set[int] = set()
+    for proc in processes:
+        try:
+            if proc is None or not proc.is_alive():
+                continue
+            pid = getattr(proc, "pid", None)
+            if pid:
+                pids.add(int(pid))
+        except (OSError, ValueError):
+            continue
+    return pids
+
+
 def _kill_local_recomp_exes() -> None:
     """Drop leftover C-RE1 windows on this box (one recomp worker per host)."""
     if os.name != "nt":
@@ -635,7 +778,7 @@ def _kill_local_recomp_exes() -> None:
             [
                 "taskkill",
                 "/IM",
-                "Resident_Evil_Director_s_Cut_Recompiled.exe",
+                RECOMP_EXE_NAME,
                 "/F",
             ],
             check=False,
@@ -644,6 +787,9 @@ def _kill_local_recomp_exes() -> None:
         )
     except (OSError, subprocess.TimeoutExpired):
         pass
+    # Belt-and-suspenders: /IM can miss elevated/stuck procs; Toolhelp sweep
+    # still removes any dead-parent leftovers.
+    _reap_orphan_recomp_exes(keep_parent_pids=set())
 
 
 def _cleanup_worker_port_emuhawks(
@@ -671,21 +817,16 @@ def _cleanup_worker_port_emuhawks(
         except (ValueError, OSError):
             continue
         if port_lo <= port <= port_hi:
-            try:
-                subprocess.run(
-                    ["taskkill", "/PID", str(pid), "/T", "/F"],
-                    check=False,
-                    capture_output=True,
-                    timeout=5.0,
-                )
-            except (OSError, subprocess.TimeoutExpired):
-                pass
+            _taskkill_pid(pid)
             try:
                 path.unlink(missing_ok=True)
             except OSError:
                 pass
     if os.environ.get("RE1_ECOSYSTEM_BRIDGE", "").strip().lower() == "recomp":
         _kill_local_recomp_exes()
+    else:
+        # Stray C-RE1 from a prior recomp run is still commit poison on this host.
+        _reap_orphan_recomp_exes()
 
 
 def _waitable_parent_conns(
@@ -1016,6 +1157,16 @@ def run_async_worker_loop(
                         except OSError:
                             pass
                         _terminate_actor_process(proc)
+                    # Failed warmup often leaves C-RE1 with a dead parent (WH2).
+                    orphan_pids = _reap_orphan_recomp_exes(
+                        keep_parent_pids=_live_process_pids(processes)
+                    )
+                    if orphan_pids:
+                        log(
+                            machine_name,
+                            f"reaped {len(orphan_pids)} orphan recomp after "
+                            f"startup batch {batch_number} failure",
+                        )
                     if attempt < batch_attempts:
                         time.sleep(3.0 * attempt)
             if last_exc is not None:
@@ -1050,6 +1201,14 @@ def run_async_worker_loop(
         hung_since: list[float | None] = [None] * actor_count
         healthy_indices: set[int] = set()
         _set_healthy_actor_count(0)
+        last_orphan_reap = 0.0
+        try:
+            orphan_reap_interval_s = float(
+                os.environ.get("RE1_RECOMP_ORPHAN_REAP_S", "60")
+            )
+        except ValueError:
+            orphan_reap_interval_s = 60.0
+        orphan_reap_interval_s = max(5.0, orphan_reap_interval_s)
 
         def _maybe_pull_local_weights() -> None:
             if policy is None or weight_store is None:
@@ -1159,6 +1318,15 @@ def run_async_worker_loop(
                 )
                 actor_emu_pids[index] = None
                 hung_since[index] = None
+            orphan_pids = _reap_orphan_recomp_exes(
+                keep_parent_pids=_live_process_pids(processes)
+            )
+            if orphan_pids:
+                log(
+                    machine_name,
+                    f"reaped {len(orphan_pids)} orphan recomp before "
+                    f"watchdog respawn ranks={stale_ranks}",
+                )
 
             for attempt in range(1, 3):
                 replacements: list[tuple[int, mp.Process, Connection]] = []
@@ -1209,6 +1377,15 @@ def run_async_worker_loop(
                         # and kills the whole worker loop (WH2 death spiral).
                         parent_conns[index] = None  # type: ignore[assignment]
                         actor_emu_pids[index] = None
+                    orphan_pids = _reap_orphan_recomp_exes(
+                        keep_parent_pids=_live_process_pids(processes)
+                    )
+                    if orphan_pids:
+                        log(
+                            machine_name,
+                            f"reaped {len(orphan_pids)} orphan recomp after "
+                            f"watchdog attempt {attempt}/2 failed",
+                        )
                     if attempt < 2:
                         time.sleep(5.0 * attempt)
             log(
@@ -1233,6 +1410,16 @@ def run_async_worker_loop(
                     pass
 
             now = time.monotonic()
+            if now - last_orphan_reap >= orphan_reap_interval_s:
+                last_orphan_reap = now
+                orphan_pids = _reap_orphan_recomp_exes(
+                    keep_parent_pids=_live_process_pids(processes)
+                )
+                if orphan_pids:
+                    log(
+                        machine_name,
+                        f"periodic reap removed {len(orphan_pids)} orphan recomp",
+                    )
             hung_indices = set(
                 _hung_actor_indices(
                     actor_emu_pids,
