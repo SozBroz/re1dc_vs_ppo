@@ -654,15 +654,17 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
     if now - _LAST_TICK.get(root_key, 0.0) < _march_min_s(project_root):
         return None
     _LAST_TICK[root_key] = now
-    if not _march_flag(project_root):
-        return None
-    # Fleet master pin: pull learner authority before reading local INDEX.
+    # Always pull fleet master pin *before* reading MARCH/INDEX. Hosts stuck on
+    # a stale local MARCH=0 previously skipped sync forever and kept grinding a
+    # divergent INDEX (fleet desync: pl58/59 while master hunted pl57).
     try:
         from re1_rl.distributed.march_pin import sync_pin_from_learner
 
         sync_pin_from_learner(project_root)
     except Exception as exc:  # noqa: BLE001 — never block the hunt on pin sync
         print(f"[planner_march] pin sync skipped: {exc}", flush=True)
+    if not _march_flag(project_root):
+        return None
     from re1_rl.planner_loyal_cells import (
         _pin_file_path,
         cell_dir_name,

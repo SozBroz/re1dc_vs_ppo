@@ -2374,6 +2374,14 @@ class RE1Env(gym.Env):
             and caller_pb is None
         ):
             try:
+                # Pull fleet master pin before tip sample even when MARCH=0 so
+                # stale local INDEX files cannot desync which PL we grind.
+                from re1_rl.distributed.march_pin import sync_pin_from_learner
+
+                sync_pin_from_learner(self.project_root)
+            except Exception:
+                pass
+            try:
                 from re1_rl.planner_march import maybe_advance_planner_march
 
                 maybe_advance_planner_march(self.project_root)
