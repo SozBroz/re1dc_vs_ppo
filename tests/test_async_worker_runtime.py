@@ -64,6 +64,18 @@ def test_stale_actor_indices_detect_dead_and_silent_ranks() -> None:
     assert stale == [0, 1]
 
 
+def test_stale_actor_indices_exempt_skips_dead_abandoned_ranks() -> None:
+    processes = [_FakeProcess(False), _FakeProcess(True)]
+    stale = _stale_actor_indices(
+        processes,
+        [0.0, 99.0],
+        now=100.0,
+        timeout_s=10.0,
+        exempt_indices={0},
+    )
+    assert stale == []
+
+
 def test_hung_actor_indices_require_grace_then_mark_stale() -> None:
     hung_since: list[float | None] = [None, None]
     pids: list[int | None] = [11, 22]

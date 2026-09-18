@@ -59,6 +59,11 @@ def _archive_policy_weights(version: int, policy_bytes: bytes | None) -> None:
 DEFAULT_ACTOR_STALE_TIMEOUT_S = 720.0
 DEFAULT_EMUHAWK_HUNG_S = 30.0
 DEFAULT_ACTOR_RECOVER_COOLDOWN_S = 45.0
+# After this many exhausted watchdog passes (2 spawn attempts each), stop
+# retrying a rank for the rest of the worker lifetime. WH2 was death-spiraling
+# on ranks 11/15 (recomp attach 0xE06D7363): each failed recover blocks the
+# parent inference/flush loop for minutes, so the healthy envs stop feeding.
+DEFAULT_ACTOR_ABANDON_AFTER_FAILS = 1
 
 
 def _pid_not_responding(pid: int | None) -> bool:
@@ -140,16 +145,22 @@ def _stale_actor_indices(
     exempt_indices: set[int] | None = None,
     hung_indices: set[int] | None = None,
 ) -> list[int]:
-    """Return dead ranks immediately and live ranks silent past the deadline."""
+    """Return dead ranks immediately and live ranks silent past the deadline.
+
+    ``exempt_indices`` skips the rank entirely (used for abandoned ranks that
+    should not block the parent loop with endless respawn attempts).
+    """
     exempt = exempt_indices or set()
     hung = hung_indices or set()
     stale: list[int] = []
     for index, (proc, last) in enumerate(zip(processes, last_activity)):
+        if index in exempt:
+            continue
         if not proc.is_alive():
             stale.append(index)
         elif index in hung:
             stale.append(index)
-        elif index not in exempt and now - float(last) >= float(timeout_s):
+        elif now - float(last) >= float(timeout_s):
             stale.append(index)
     return stale
 
@@ -996,6 +1007,16 @@ def run_async_worker_loop(
             )
         ),
     )
+    try:
+        abandon_after_fails = int(
+            os.environ.get(
+                "RE1_ACTOR_ABANDON_AFTER_FAILS",
+                str(DEFAULT_ACTOR_ABANDON_AFTER_FAILS),
+            )
+        )
+    except ValueError:
+        abandon_after_fails = DEFAULT_ACTOR_ABANDON_AFTER_FAILS
+    abandon_after_fails = max(1, abandon_after_fails)
     health_lock = threading.Lock()
     healthy_actor_count = 0
 
@@ -1214,6 +1235,8 @@ def run_async_worker_loop(
                 time.sleep(start_stagger_s)
         last_actor_activity = [time.monotonic()] * actor_count
         last_recover_at = [0.0] * actor_count
+        recover_fail_counts = [0] * actor_count
+        abandoned_indices: set[int] = set()
         hung_since: list[float | None] = [None] * actor_count
         healthy_indices: set[int] = set()
         _set_healthy_actor_count(0)
@@ -1225,6 +1248,35 @@ def run_async_worker_loop(
         except ValueError:
             orphan_reap_interval_s = 60.0
         orphan_reap_interval_s = max(5.0, orphan_reap_interval_s)
+
+        def _abandon_indices(indices: list[int], *, why: str) -> None:
+            for index in indices:
+                abandoned_indices.add(index)
+                healthy_indices.discard(index)
+                last_actor_activity[index] = float("-inf")
+                try:
+                    if parent_conns[index] is not None:
+                        parent_conns[index].close()
+                except OSError:
+                    pass
+                parent_conns[index] = None  # type: ignore[assignment]
+                actor_emu_pids[index] = None
+                hung_since[index] = None
+            _set_healthy_actor_count(len(healthy_indices))
+            orphan_pids = _reap_orphan_recomp_exes(
+                keep_parent_pids=_live_process_pids(processes)
+            )
+            log(
+                machine_name,
+                f"actor watchdog abandoned ranks="
+                f"{[ranks[i] for i in indices]} ({why}); "
+                f"healthy={len(healthy_indices)}/{actor_count}"
+                + (
+                    f"; reaped {len(orphan_pids)} orphan recomp"
+                    if orphan_pids
+                    else ""
+                ),
+            )
 
         def _maybe_pull_local_weights() -> None:
             if policy is None or weight_store is None:
@@ -1311,7 +1363,7 @@ def run_async_worker_loop(
                     f"cohort reopens or policy_version > {pause_until_policy_gt}",
                 )
 
-        def _recover_actor_indices(indices: list[int]) -> None:
+        def _recover_actor_indices(indices: list[int]) -> bool:
             stale_ranks = [ranks[index] for index in indices]
             for index in indices:
                 healthy_indices.discard(index)
@@ -1369,12 +1421,13 @@ def run_async_worker_loop(
                         parent_conns[index] = conn
                         actor_emu_pids[index] = replacement_pids.get(ranks[index])
                         last_actor_activity[index] = now
+                        recover_fail_counts[index] = 0
                     log(
                         machine_name,
                         f"actor watchdog restarted ranks={stale_ranks}; "
                         "awaiting first post-reset activity",
                     )
-                    return
+                    return True
                 except Exception as exc:
                     log(
                         machine_name,
@@ -1404,11 +1457,14 @@ def run_async_worker_loop(
                         )
                     if attempt < 2:
                         time.sleep(5.0 * attempt)
+            for index in indices:
+                recover_fail_counts[index] += 1
             log(
                 machine_name,
                 f"actor watchdog left ranks={stale_ranks} degraded; "
                 "retrying on the next watchdog pass",
             )
+            return False
 
         while not stop_event.is_set() and not stop_flag.value:
             if eval_only:
@@ -1449,6 +1505,7 @@ def run_async_worker_loop(
                 last_actor_activity,
                 now=now,
                 timeout_s=stale_timeout_s,
+                exempt_indices=abandoned_indices,
                 hung_indices=hung_indices,
             )
             if stale_indices:
@@ -1471,10 +1528,24 @@ def run_async_worker_loop(
                             f"(>{hung_timeout_s:.0f}s Not Responding)",
                         )
                     blocked_at = time.monotonic()
-                    _recover_actor_indices(target)
+                    ok = _recover_actor_indices(target)
                     _credit_parent_block(
                         last_actor_activity, time.monotonic() - blocked_at
                     )
+                    if not ok:
+                        give_up = [
+                            index
+                            for index in target
+                            if recover_fail_counts[index] >= abandon_after_fails
+                        ]
+                        if give_up:
+                            _abandon_indices(
+                                give_up,
+                                why=(
+                                    f"recover failed "
+                                    f"{recover_fail_counts[give_up[0]]}x"
+                                ),
+                            )
                     continue
 
             if policy.policy_version <= 0:
