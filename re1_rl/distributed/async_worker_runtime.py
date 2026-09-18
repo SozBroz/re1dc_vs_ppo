@@ -1194,8 +1194,24 @@ def run_async_worker_loop(
                     )
                     time.sleep(cooldown_s)
         log(machine_name, f"async worker fleet ready ({actor_count} actors)")
-        for conn in parent_conns:
+        # Stagger ``start`` so all actors do not allocate rollout buffers at once
+        # (WH2 commit-limit crash right after fleet ready).
+        try:
+            start_stagger_s = float(
+                os.environ.get("RE1_ACTOR_START_STAGGER_S", "0.25")
+            )
+        except ValueError:
+            start_stagger_s = 0.25
+        start_stagger_s = max(0.0, start_stagger_s)
+        try:
+            start_wave = int(os.environ.get("RE1_ACTOR_START_WAVE", "4"))
+        except ValueError:
+            start_wave = 4
+        start_wave = max(1, start_wave)
+        for i, conn in enumerate(parent_conns):
             conn.send({"t": "start"})
+            if start_stagger_s > 0 and (i + 1) % start_wave == 0 and (i + 1) < actor_count:
+                time.sleep(start_stagger_s)
         last_actor_activity = [time.monotonic()] * actor_count
         last_recover_at = [0.0] * actor_count
         hung_since: list[float | None] = [None] * actor_count
