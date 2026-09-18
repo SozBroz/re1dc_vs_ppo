@@ -452,6 +452,21 @@ class LearnerState:
                 self.steps_rejected_ingest += steps
                 self.steps_rejected_identity += steps
             return False, identity_reason
+        try:
+            from re1_rl.planner_hop_score import (
+                rollout_ends_finished,
+                train_finished_episodes_only,
+            )
+
+            if train_finished_episodes_only() and not rollout_ends_finished(
+                rollout.dones
+            ):
+                with self.lock:
+                    self.rollouts_rejected += 1
+                    self.steps_rejected_ingest += steps
+                return False, "unfinished_episode"
+        except Exception:
+            pass
         with self.lock:
             # Host RAM floor: stop admitting before the box pages.
             if self.host_memory_pressure():

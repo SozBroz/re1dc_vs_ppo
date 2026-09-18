@@ -21,6 +21,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
+
 from re1_rl.enemy_combat import (
     combat_reward_denied,
     enemy_combat_events,
@@ -280,6 +282,45 @@ def compose_hop_learning_target(
 
 def hop_score_live_enabled() -> bool:
     return hop_score_mode() == "live"
+
+
+def train_finished_episodes_only() -> bool:
+    """Whether actors/learner may only train completed episodes.
+
+    Default **on** under live hop-score (design §5.3: buffer until terminal
+    ``S``/``Y_t``; never train an unresolved prefix). Override with
+    ``RE1_TRAIN_FINISHED_EPISODES_ONLY=0|1``.
+    """
+    raw = os.environ.get("RE1_TRAIN_FINISHED_EPISODES_ONLY", "").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    return hop_score_live_enabled()
+
+
+def actor_max_episode_buffer_steps() -> int:
+    """Hard cap for finished-episode actor buffers (boss wall + slack)."""
+    raw = os.environ.get("RE1_ACTOR_MAX_EPISODE_STEPS", "").strip()
+    if raw:
+        try:
+            return max(int(PLANNER_DEFAULT_MAX_STEPS), int(raw))
+        except ValueError:
+            pass
+    return int(PLANNER_BOSS_MAX_STEPS) + 64
+
+
+def rollout_ends_finished(dones: Any) -> bool:
+    """True when every env's last buffered step is terminal (done|trunc)."""
+    arr = np.asarray(dones, dtype=bool)
+    if arr.size == 0:
+        return False
+    if arr.ndim == 1:
+        return bool(arr[-1])
+    if arr.ndim >= 2:
+        return bool(np.all(arr[-1]))
+    return False
+
 
 
 def current_step_is_boss(queue: Any) -> bool:

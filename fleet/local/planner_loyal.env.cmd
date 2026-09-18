@@ -13,6 +13,9 @@ if "%RE1_INFERENCE_TEMPERATURE%"=="" set RE1_INFERENCE_TEMPERATURE=1.10
 REM Live ±1 hop-score settlement (S_base + B_kill; divert -0.5 / death -1 / timeout -1.25).
 set RE1_PLANNER_HOP_SCORE_V1=1
 
+REM Buffer until terminal S/Y_t; never train unfinished episode prefixes (hop §5.3).
+set RE1_TRAIN_FINISHED_EPISODES_ONLY=1
+
 if "%RE1_PLANNER_CHUNK%"=="" set RE1_PLANNER_CHUNK=data\planner_chunks\cp05_shield_key.json
 
 set RE1_PLANNER_LOYAL_CELLS_ROOT=states\planner_loyal

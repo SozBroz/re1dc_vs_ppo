@@ -2,7 +2,8 @@ param(
   [switch]$PkingOnly
 )
 
-# Start C-RE1 fleet at full BizHawk scale: pking20 / wh1 8 / wh2 28 / wh3 24.
+# Start C-RE1 fleet at full BizHawk scale: pking20 / wh1 8 / wh2 20 / wh3 24.
+# WH2 stays at 20 — 24/28 slam the ~103GB commit ceiling and death-spiral.
 # Remotes start in parallel. Pking is VISIBLE and must not batch-spawn all 20
 # at once (READY attach timeouts → crash-loop / "sperging").
 $ErrorActionPreference = 'Stop'
@@ -23,7 +24,7 @@ $PkingReadyTimeoutSec = 240
 if ($PkingOnly) {
   Write-Host '=== START PKING ONLY (staggered visible boot) ===' -ForegroundColor Green
 } else {
-  Write-Host '=== START C-RE1 WORKERS (20/8/28/24) ===' -ForegroundColor Green
+  Write-Host '=== START C-RE1 WORKERS (20/8/20/24) ===' -ForegroundColor Green
 }
 
 function Stop-PkingRecomp {
@@ -132,7 +133,7 @@ if (-not $PkingOnly) {
 
   $remotes = @(
     @{ Ssh=$WH1; Rl='D:\re1_rl'; Recomp='D:\re1_recomp'; Wid='wh1-recomp'; Machine='workhorse1'; NEnvs='8'; BasePort='6600'; Ranks='0-7' },
-    @{ Ssh=$WH2; Rl='C:\Users\sshuser\re1_rl'; Recomp='C:\re1_recomp'; Wid='wh2-recomp'; Machine='workhorse2'; NEnvs='24'; BasePort='6700'; Ranks='0-23' },
+    @{ Ssh=$WH2; Rl='C:\Users\sshuser\re1_rl'; Recomp='C:\re1_recomp'; Wid='wh2-recomp'; Machine='workhorse2'; NEnvs='20'; BasePort='6700'; Ranks='0-19' },
     @{ Ssh=$WH3; Rl='C:\Users\sshuser\re1_rl'; Recomp='C:\re1_recomp'; Wid='wh3-recomp'; Machine='workhorse3'; NEnvs='24'; BasePort='6800'; Ranks='0-23' }
   )
 
@@ -182,7 +183,7 @@ if (-not $PkingOnly) {
   }
 
   if ($null -ne $wh2) {
-    Write-Host 'Starting WH2 first (28-env attach-sensitive)...' -ForegroundColor Yellow
+    Write-Host 'Starting WH2 first (20-env commit-safe)...' -ForegroundColor Yellow
     $startJobs += Start-RemoteWorkerJob $wh2 $RemoteBatchMax $RemoteStaggerS
     Start-Sleep -Seconds 15
   }

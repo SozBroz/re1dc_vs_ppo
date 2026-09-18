@@ -41,11 +41,13 @@ PPO_HYPERPARAMS: dict[str, Any] = dict(
 #
 # n_steps vs sync_interval_s (wall) vs emulated time:
 #   - sync_interval_s=360 is WALL clock (upload burst + weight pull cadence).
-#   - Actors cut MC/bootstrap rollouts at n_steps, then buffer until the wall flush.
+#   - Default: actors cut MC/bootstrap rollouts at n_steps, then buffer until wall flush.
+#   - Live hop-score (finished-episodes-only): buffer until env done|trunc so terminal
+#     S is rewritten into every step's Y_t before emit (design §5.3); do not train prefixes.
 #   - Env step ≈ 8 frames @ 60fps ⇒ 8/60 s emulated; γ half-life ≈ 25s
 #     emulated (RAILS_CREDIT_HALF_LIFE_S). n_steps targets 6 half-lives
-#     (≈1125 steps ≈ 150s emulated).
-#   - Credit assignment is per n_steps segment, not the whole sync window.
+#     (≈1125 steps ≈ 150s emulated) for non-hop / bootstrap cuts.
+#   - Under hop live, credit is per complete episode, not per n_steps segment.
 DISTRIBUTED_EPOCH_HYPERPARAMS: dict[str, Any] = dict(
     n_steps=_DISTRIBUTED_N_STEPS,
     batch_size=8192,  # mandate expansion: use 5090 VRAM headroom
@@ -833,9 +835,16 @@ def _actor_process(
     pending_fire_steps: list[int] = []
     memlog_control = None
     memlog_telemetry = None
+    buf_cap = int(n_steps)
 
     from re1_rl.modality_config import mod_drop_enabled
+    from re1_rl.planner_hop_score import (
+        actor_max_episode_buffer_steps,
+        train_finished_episodes_only,
+    )
 
+    finished_only = bool(train_finished_episodes_only())
+    max_episode_steps = int(actor_max_episode_buffer_steps())
     use_mod_drop = mod_drop_enabled()
     mod_drop_state = None
     MOD_DROP_DIM = 0
@@ -844,18 +853,85 @@ def _actor_process(
 
         mod_drop_state = ModDropEpisodeState(1)
 
-    def _reset_bufs() -> None:
-        nonlocal obs_bufs, mask_bufs, mod_drop_bufs, step_i, episode_infos, horizon_policy_version
+    def _alloc_capacity(cap: int) -> None:
+        nonlocal obs_bufs, mask_bufs, mod_drop_bufs
+        nonlocal actions, rewards, dones, values, log_probs, push_override, buf_cap
+        cap = int(cap)
         obs_bufs = {
-            k: np.zeros((n_steps, *env.observation_space[k].shape), dtype=env.observation_space[k].dtype)
+            k: np.zeros(
+                (cap, *env.observation_space[k].shape),
+                dtype=env.observation_space[k].dtype,
+            )
             for k in env.observation_space.spaces
         }
         n_actions = int(env.action_space.n)
-        mask_bufs = np.zeros((n_steps, n_actions), dtype=np.bool_)
+        mask_bufs = np.zeros((cap, n_actions), dtype=np.bool_)
         mod_drop_bufs = (
-            np.ones((n_steps, MOD_DROP_DIM), dtype=np.float32) if use_mod_drop else None
+            np.ones((cap, MOD_DROP_DIM), dtype=np.float32) if use_mod_drop else None
         )
-        push_override.fill(False)
+        actions = np.zeros(cap, dtype=np.int64)
+        rewards = np.zeros(cap, dtype=np.float32)
+        dones = np.zeros(cap, dtype=np.bool_)
+        values = np.zeros(cap, dtype=np.float32)
+        log_probs = np.zeros(cap, dtype=np.float32)
+        push_override = np.zeros(cap, dtype=np.bool_)
+        buf_cap = cap
+
+    def _ensure_capacity(need: int) -> bool:
+        """Grow buffers to fit ``need`` steps. False if over max episode cap."""
+        nonlocal obs_bufs, mask_bufs, mod_drop_bufs
+        nonlocal actions, rewards, dones, values, log_probs, push_override, buf_cap
+        need = int(need)
+        if need <= buf_cap:
+            return True
+        if need > max_episode_steps:
+            return False
+        new_cap = min(max(need, buf_cap * 2), max_episode_steps)
+        assert obs_bufs is not None and mask_bufs is not None
+        old_n = int(step_i)
+        new_obs = {
+            k: np.zeros(
+                (new_cap, *env.observation_space[k].shape),
+                dtype=env.observation_space[k].dtype,
+            )
+            for k in env.observation_space.spaces
+        }
+        for k, arr in obs_bufs.items():
+            new_obs[k][:old_n] = arr[:old_n]
+        n_actions = int(env.action_space.n)
+        new_masks = np.zeros((new_cap, n_actions), dtype=np.bool_)
+        new_masks[:old_n] = mask_bufs[:old_n]
+        new_mod = None
+        if mod_drop_bufs is not None:
+            new_mod = np.ones((new_cap, MOD_DROP_DIM), dtype=np.float32)
+            new_mod[:old_n] = mod_drop_bufs[:old_n]
+        new_actions = np.zeros(new_cap, dtype=np.int64)
+        new_rewards = np.zeros(new_cap, dtype=np.float32)
+        new_dones = np.zeros(new_cap, dtype=np.bool_)
+        new_values = np.zeros(new_cap, dtype=np.float32)
+        new_log_probs = np.zeros(new_cap, dtype=np.float32)
+        new_push = np.zeros(new_cap, dtype=np.bool_)
+        new_actions[:old_n] = actions[:old_n]
+        new_rewards[:old_n] = rewards[:old_n]
+        new_dones[:old_n] = dones[:old_n]
+        new_values[:old_n] = values[:old_n]
+        new_log_probs[:old_n] = log_probs[:old_n]
+        new_push[:old_n] = push_override[:old_n]
+        obs_bufs = new_obs
+        mask_bufs = new_masks
+        mod_drop_bufs = new_mod
+        actions = new_actions
+        rewards = new_rewards
+        dones = new_dones
+        values = new_values
+        log_probs = new_log_probs
+        push_override = new_push
+        buf_cap = new_cap
+        return True
+
+    def _reset_bufs() -> None:
+        nonlocal step_i, episode_infos, horizon_policy_version
+        _alloc_capacity(n_steps)
         step_i = 0
         episode_infos = []
         horizon_policy_version = 0
@@ -1075,6 +1151,16 @@ def _actor_process(
             if is_armed_attack(action, info):
                 pending_fire_steps.append(int(step_i))
 
+            if finished_only and not _ensure_capacity(step_i + 1):
+                # Episode exceeded hard buffer cap without terminating — discard.
+                _reset_bufs()
+                if mod_drop_state is not None:
+                    mod_drop_state.on_dones([True])
+                if _wait_for_control():
+                    break
+                obs, _ = env.reset()
+                continue
+
             assert obs_bufs is not None and mask_bufs is not None
             for key in obs_bufs:
                 obs_bufs[key][step_i] = obs_before[key]
@@ -1162,13 +1248,19 @@ def _actor_process(
                 if _wait_for_control():
                     break
                 obs, _ = env.reset()
-            elif step_i >= n_steps:
+            elif (not finished_only) and step_i >= n_steps:
                 _emit_rollout(n_steps)
                 _reset_bufs()
     finally:
         if step_i > 0:
             try:
-                _emit_rollout(step_i)
+                # Finished-episodes-only: never ship an unresolved prefix
+                # (missing terminal S / Y_t rewrite).
+                if finished_only:
+                    if bool(dones[step_i - 1]):
+                        _emit_rollout(step_i)
+                else:
+                    _emit_rollout(step_i)
             except (BrokenPipeError, EOFError, OSError):
                 pass
         try:

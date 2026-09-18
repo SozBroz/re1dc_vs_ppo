@@ -183,7 +183,8 @@ def compute_episode_mc_returns(
     reward buffer to per-step learning targets
     ``Y_t = compose_hop_learning_target(S, L_t)`` before emit. Those segments
     use identity returns (not γ-discounted sums). Incomplete horizon tails still
-    use standard MC + bootstrap.
+    use standard MC + bootstrap when finished-episodes-only is off; with it on,
+    unfinished packets are rejected at ingest so the bootstrap branch is unused.
     """
     from re1_rl.planner_hop_score import hop_score_live_enabled
 
