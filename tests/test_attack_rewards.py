@@ -35,7 +35,6 @@ from re1_rl.reward import (
     compute_reward,
     heavy_weapon_fodder_hit_penalty,
     shotgun_dog_hit_penalty,
-    SHOTGUN_DOG_HIT_PENALTY,
 )
 from tests.test_scaffolding import make_planner, make_state
 
@@ -52,12 +51,12 @@ def test_miss_tax_formula_handgun_and_shotgun() -> None:
 
 def test_ammo_spend_tax_tiers() -> None:
     assert AMMO_SPEND_TAX_PER_ROUND[0x02] == pytest.approx(0.04)
-    assert AMMO_SPEND_TAX_PER_ROUND[0x03] == pytest.approx(0.25)
+    assert AMMO_SPEND_TAX_PER_ROUND[0x03] == pytest.approx(0.40)
     assert AMMO_SPEND_TAX_PER_ROUND[0x05] == pytest.approx(0.40)
     assert AMMO_SPEND_TAX_PER_ROUND[0x0A] == pytest.approx(0.75)
     assert ammo_spend_per_round(0x01) == 0.0
     assert ammo_spend_per_round(0x06) == 0.0
-    assert ammo_spend_penalty(0x03, 2) == pytest.approx(-0.50)
+    assert ammo_spend_penalty(0x03, 2) == pytest.approx(-0.80)
 
 
 def test_miss_tax_clip_table_matches_validated_sizes() -> None:
@@ -205,9 +204,9 @@ def test_shotgun_hit_spend_still_leaves_kill_positive() -> None:
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["ammo_spend"] == pytest.approx(-0.25)
+    assert bd["ammo_spend"] == pytest.approx(-0.40)
     combat_net = bd["enemy_damage"] + bd["enemy_kill"] + bd["ammo_spend"]
-    assert combat_net == pytest.approx(ENEMY_DAMAGE_REWARD * 20 + ENEMY_KILL_REWARD - 0.25)
+    assert combat_net == pytest.approx(ENEMY_DAMAGE_REWARD * 20 + ENEMY_KILL_REWARD - 0.40)
     assert combat_net > 1.5
 
 
@@ -286,9 +285,7 @@ def test_breakdown_keys_present() -> None:
 
 
 def test_shotgun_dog_hit_penalty_per_event() -> None:
-    assert SHOTGUN_DOG_HIT_PENALTY == pytest.approx(
-        0.5 * ammo_waste_per_missed_round(0x03)
-    )
+    """Shotgun fodder hits pay heavy_weapon_fodder; dog-only channel is retired."""
     planner = make_planner()
     prev = make_state(hp=96, step=1)
     cur = make_state(hp=96, step=2)
@@ -305,15 +302,18 @@ def test_shotgun_dog_hit_penalty_per_event() -> None:
             "active_byte": 0x90,
         }
     ]
-    assert shotgun_dog_hit_penalty(cur) == pytest.approx(SHOTGUN_DOG_HIT_PENALTY)
+    assert shotgun_dog_hit_penalty(cur) == 0.0
+    sg_half = 0.5 * float(ammo_waste_per_missed_round(0x03))
+    assert heavy_weapon_fodder_hit_penalty(cur) == pytest.approx(sg_half)
     _, bd = compute_reward(
         prev, cur, planner, progress=ProgressTracker(), return_breakdown=True,
     )
-    assert bd["shotgun_dog_hit"] == pytest.approx(SHOTGUN_DOG_HIT_PENALTY)
+    assert bd["shotgun_dog_hit"] == 0.0
+    assert bd["heavy_weapon_fodder_hit"] == pytest.approx(sg_half)
     assert bd["enemy_damage"] == pytest.approx(40 * ENEMY_DAMAGE_REWARD)
 
 
-def test_shotgun_zombie_hit_no_dog_penalty() -> None:
+def test_shotgun_zombie_hit_pays_heavy_fodder_penalty() -> None:
     cur = make_state(hp=96, step=2)
     cur["equipped_weapon_id"] = 0x03
     cur["combat_events"] = [
@@ -323,11 +323,14 @@ def test_shotgun_zombie_hit_no_dog_penalty() -> None:
             "killed": False,
             "reward_denied": False,
             "is_cerberus": False,
+            "is_zombie": True,
             "type_id": 0x0F,
             "active_byte": 0,
         }
     ]
     assert shotgun_dog_hit_penalty(cur) == 0.0
+    sg_half = 0.5 * float(ammo_waste_per_missed_round(0x03))
+    assert heavy_weapon_fodder_hit_penalty(cur) == pytest.approx(sg_half)
 
 
 def test_magnum_zombie_hit_pays_heavy_fodder_penalty() -> None:

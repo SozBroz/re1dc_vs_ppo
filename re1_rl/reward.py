@@ -120,11 +120,14 @@ BERETTA_BOSS_DAMAGE_SCALE = 0.1
 # 0.5 stays under the cheapest repeat dump (10 beretta misses to go 15→5:
 # spend 0.40 + base miss-waste ~0.267). Hits are not this farm — they are combat.
 WEAPON_RELOAD_REWARD = 0.5
-# Magnum / bazooka on fodder (dog or zombie) — keep heavy ammo for bosses.
+# Shotgun / magnum / bazooka on fodder (dog or zombie) — keep heavy ammo for
+# bosses. Shotgun on early fighting hops (e.g. pl56→57) burns HG-eq quality
+# so fast the march ammo bar can never clear; tax it like other heavies.
 # Per-hit tax is half that weapon's base missed-round tax (set below after
 # MISS_TAX_CLIP_SIZE / ATTACK_MISS_TAX_SCALE).
 HEAVY_WEAPON_FODDER_IDS: frozenset[int] = frozenset(
     {
+        0x03,  # shotgun
         0x04,  # colt python dumdum
         0x05,  # colt python magnum
         0x07,  # bazooka acid
@@ -155,7 +158,7 @@ AMMO_WASTE_PENALTY = 0.0  # legacy stub; not read by compute_reward
 # ``pending_combat_expired`` so fire-step already paid once.
 AMMO_SPEND_TAX_PER_ROUND: dict[int, float] = {
     0x02: 0.04,  # beretta / handgun
-    0x03: 0.25,  # shotgun
+    0x03: 0.40,  # shotgun (match magnum; must replace ≫6 HG rounds)
     0x04: 0.40,  # colt python dumdum
     0x05: 0.40,  # colt python magnum
     0x07: 0.40,  # grenade launcher / bazooka acid
@@ -470,30 +473,16 @@ def combat_overkill_penalty(state: dict[str, Any]) -> float:
 
 
 def shotgun_dog_hit_penalty(state: dict[str, Any]) -> float:
-    """Half-miss tax per shotgun shell that damages a cerberus."""
-    from re1_rl.attack_macro import SHOTGUN_WEAPON_ID
+    """Deprecated: shotgun fodder hits use ``heavy_weapon_fodder_hit_penalty``.
 
-    wid = _combat_ammo_weapon_id(state)
-    if int(wid) != int(SHOTGUN_WEAPON_ID):
-        return 0.0
-    events = state.get("combat_events")
-    if not events:
-        return 0.0
-    hits = 0
-    for ev in events:
-        if ev.get("reward_denied"):
-            continue
-        if int(ev.get("damage", 0) or 0) <= 0:
-            continue
-        if ev.get("is_cerberus"):
-            hits += 1
-    if hits <= 0:
-        return 0.0
-    return float(SHOTGUN_DOG_HIT_PENALTY) * float(hits)
+    Kept as a zero stub so breakdown keys / hop-score channel lists stay stable.
+    """
+    del state
+    return 0.0
 
 
 def heavy_weapon_fodder_hit_penalty(state: dict[str, Any]) -> float:
-    """Half-miss tax per magnum/bazooka hit on a dog or zombie."""
+    """Half-miss tax per shotgun/magnum/bazooka hit on a dog or zombie."""
     wid = _combat_ammo_weapon_id(state)
     if int(wid) not in HEAVY_WEAPON_FODDER_IDS:
         return 0.0

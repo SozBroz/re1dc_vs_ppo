@@ -63,7 +63,7 @@ HP_DENOM = 95.0
 AMMO_COST_PER_ROUND: dict[int, float] = {
     0x01: 0.0,  # knife
     0x02: 0.04,  # handgun
-    0x03: 0.25,  # shotgun
+    0x03: 0.40,  # shotgun (match reward.py spend; HG-eq aware)
     0x04: 0.40,  # dumdum
     0x05: 0.40,  # magnum
     0x06: 0.0,  # flamethrower

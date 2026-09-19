@@ -1407,6 +1407,32 @@ def capture_planner_loyal_cell(
         stretch_kills=int(kill_audit.get("almanac_stretch") or 0),
         hop_score=hop_s,
     )
+    # Fighting hops: refuse mints that cannot clear the march ammo bar.
+    # Otherwise shotgun spray installs a sticky low-ammo cell (pl56→57 at
+    # quality[2]=46 vs champ floor ~59) and the fleet tip_ok-loops forever.
+    try:
+        tip_slot = int(slot) - 1
+        if tip_slot >= 0:
+            from re1_rl.fight_pl_policy import march_requires_kit_bar
+            from re1_rl.planner_march import _champions, march_ammo_floor
+
+            if march_requires_kit_bar(tip_slot, int(slot), env.project_root):
+                champ = _champions(env.project_root).get(int(slot))
+                if champ is not None and len(champ) >= 3 and len(quality) >= 3:
+                    floor = march_ammo_floor(
+                        int(champ[2]), project_root=env.project_root
+                    )
+                    if int(quality[2]) < int(floor):
+                        print(
+                            f"[planner_loyal] reject ammo_floor "
+                            f"{cell_dir_name(slot)} ammo={quality[2]} "
+                            f"floor={floor} champ={champ[2]}",
+                            flush=True,
+                        )
+                        shutil.rmtree(staging, ignore_errors=True)
+                        return None
+    except Exception:  # noqa: BLE001 — never fail a mint on gate I/O
+        pass
 
     last = getattr(env, "_planner_loyal_last_success", None) or {}
     step = None

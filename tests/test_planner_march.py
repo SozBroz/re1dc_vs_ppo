@@ -172,7 +172,10 @@ def test_champion_gate_dims(monkeypatch) -> None:
         is False
     )
     # EXTRA=10 raises the floor (champ 45 - 3 + 10 = 52).
-    monkeypatch.setenv("RE1_PLANNER_MARCH_AMMO_EXTRA", "10")
+    # Pin may set EXTRA=0 and wins over setenv; stub the helper for this case.
+    monkeypatch.setattr(
+        "re1_rl.planner_march._march_ammo_extra", lambda _root=None: 10
+    )
     rich = list(Q_FAT)
     rich[2] = 52
     assert (
@@ -184,7 +187,9 @@ def test_champion_gate_dims(monkeypatch) -> None:
         _champion_qualifies(rich, Q_CHAMP, resources_frames=49, frames_factor=1.1)
         is False
     )
-    monkeypatch.delenv("RE1_PLANNER_MARCH_AMMO_EXTRA", raising=False)
+    monkeypatch.setattr(
+        "re1_rl.planner_march._march_ammo_extra", lambda _root=None: 0
+    )
     # Nav hops skip ammo: same shortfall still advances.
     assert (
         _champion_qualifies(
