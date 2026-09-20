@@ -733,7 +733,7 @@
     "57": [
       96,
       10,
-      52,
+      60,
       0,
       13,
       1,
@@ -2526,6 +2526,7 @@
     ]
   },
   "notes": [
-    "2026-09-19: pl57 ammo 62->52 to match source backup meta (pre_march_20260911)"
+    "2026-09-19: pl57 ammo 62->52 to match source backup meta (pre_march_20260911)",
+    "2026-09-19: pl57 ammo 52->60 so floor=57 (pl56 tip 78 minus 21 HG-eq budget)"
   ]
 }
