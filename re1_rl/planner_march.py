@@ -293,8 +293,11 @@ def _champion_qualifies(
     frames budget). Nav / ammo-only hops skip kills, ammo, *and* frames so a
     richer-path champion (extra zombies / HG-eq / slow gallery) cannot strand
     the march before the next real fight. HP still must meet champion on every
-    hop. When ``tip_q`` is the pinned cell, kills and ammo floors cannot exceed
+    hop.     When ``tip_q`` is the pinned cell, kills and ammo floors cannot exceed
     that cell — the tape's actual kit is the bar, not an older richer route.
+    A fight mint that raises kills above the tip skips the ammo floor: the
+    bullets were spent to get the kill, and a cleaner champion end-ammo
+    cannot strand the tape.
     ``resources_frames`` is the docs Frames column (policy decisions, same unit
     as ``-quality[8]``). Combat hops with no Frames row still qualify once the
     tip kit is known. ``frames_factor`` defaults to 1.1.
@@ -316,6 +319,7 @@ def _champion_qualifies(
     kills_floor = int(champ[1])
     ammo_floor = march_ammo_floor(int(champ[2]), project_root=project_root)
     capped = False
+    tip = None
     if tip_q is not None and len(tip_q) >= 11:
         try:
             tip = lift_planner_loyal_quality(tip_q)
@@ -332,7 +336,8 @@ def _champion_qualifies(
         return False
     if require_ammo and int(live[1]) < kills_floor:
         return False
-    if require_ammo and int(live[2]) < ammo_floor:
+    kills_gained = tip is not None and int(live[1]) > int(tip[1])
+    if require_ammo and not kills_gained and int(live[2]) < ammo_floor:
         return False
     live_frames = -int(live[_MARCH_FRAMES_DIM])
     if live_frames <= 0:

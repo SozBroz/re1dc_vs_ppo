@@ -287,7 +287,7 @@ def test_champion_gate_dims(monkeypatch) -> None:
         )
         is True
     )
-    # Still fail if the mint drops below the tape's own kit.
+    # Still fail if the mint drops below the tape's own kit without a kill.
     broke = list(live_tip)
     broke[2] = 104
     assert (
@@ -298,6 +298,43 @@ def test_champion_gate_dims(monkeypatch) -> None:
             frames_factor=1.5,
             require_ammo=True,
             tip_q=tip,
+        )
+        is False
+    )
+    # A fight that raises kills may spend below the champion ammo floor.
+    # pl74 tip 163/13 kills → pl75 live 130/16 kills, champ end 145/17.
+    fight_tip = list(Q_FAT)
+    fight_tip[1] = 13
+    fight_tip[2] = 163
+    fight_tip[8] = -30
+    fight_champ = list(Q_CHAMP)
+    fight_champ[1] = 17
+    fight_champ[2] = 145
+    fight_live = list(fight_tip)
+    fight_live[1] = 16
+    fight_live[2] = 130
+    fight_live[8] = -254
+    assert (
+        _champion_qualifies(
+            fight_live,
+            fight_champ,
+            resources_frames=254,
+            frames_factor=1.5,
+            require_ammo=True,
+            tip_q=fight_tip,
+        )
+        is True
+    )
+    no_kill = list(fight_live)
+    no_kill[1] = 13
+    assert (
+        _champion_qualifies(
+            no_kill,
+            fight_champ,
+            resources_frames=254,
+            frames_factor=1.5,
+            require_ammo=True,
+            tip_q=fight_tip,
         )
         is False
     )
