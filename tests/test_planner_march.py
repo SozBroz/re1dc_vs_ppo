@@ -201,6 +201,29 @@ def test_champion_gate_dims(monkeypatch) -> None:
         )
         is True
     )
+    # Nav hops also skip kills (richer-path champ cannot strand armor_key etc.).
+    soft_kills = list(Q_FAT)
+    soft_kills[1] = int(Q_CHAMP[1]) - 2
+    assert (
+        _champion_qualifies(
+            soft_kills,
+            Q_CHAMP,
+            resources_frames=49,
+            frames_factor=1.1,
+            require_ammo=False,
+        )
+        is True
+    )
+    assert (
+        _champion_qualifies(
+            soft_kills,
+            Q_CHAMP,
+            resources_frames=49,
+            frames_factor=1.1,
+            require_ammo=True,
+        )
+        is False
+    )
     # Nav hops also skip the frames bar (gallery enter 97f vs champ 23f).
     slow_nav = list(Q_FAT)
     slow_nav[8] = -97

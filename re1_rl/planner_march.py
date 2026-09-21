@@ -8,15 +8,16 @@ ALL of:
 * the pin has sat on N for ``RE1_PLANNER_MARCH_MIN_S`` (default 600s: minimum
   10 minutes of grind per PL, even if the target falls early),
 * the learner mirror admits N+1 AND this box holds those exact bytes,
-* live ``pl(N+1)`` meta ``quality`` meets the kit bar: HP[0]/kills[1]
-  equal-or-greater than the pre-march champion row. **Combat-outcome** hops
-  (kills up or HP down) also need ammo_dmg_weighted[2] within
-  ``MARCH_AMMO_SLACK`` (default **3**) of champion and hop frames[8] within
+* live ``pl(N+1)`` meta ``quality`` meets the kit bar: HP[0] equal-or-greater
+  than the pre-march champion row. **Combat-outcome** hops (kills up or HP
+  down) also need kills[1], ammo_dmg_weighted[2] within ``MARCH_AMMO_SLACK``
+  (default **3**) of champion, and hop frames[8] within
   ``RE1_PLANNER_MARCH_FRAMES_FACTOR`` of the resources.md Frames column.
-  **Nav / ammo-only** hops skip ammo *and* the frames bar so gallery,
-  crest-exit, and one-bullet drips can auto-roll until the next real fight
-  (e.g. dogs after ``place_star_crest``). Short quality never qualifies.
-  Combat-outcome hops with missing resources Frames still fail closed.
+  **Nav / ammo-only** hops skip kills, ammo, *and* the frames bar so a
+  richer-path champion (extra zombies / HG-eq / slow gallery) cannot strand
+  crest-exit and armor_key drips until the next real fight. Short quality
+  never qualifies. Combat-outcome hops with missing resources Frames still
+  fail closed.
 
 On advance **or any INDEX pin move** (manual edit included): crystalize only
 on advance; always request an NN weight reset on the learner (POST
@@ -285,14 +286,15 @@ def _champion_qualifies(
 ) -> bool:
     """Live mint meets kit bar: HP/kills/(ammo) vs champion, frames vs resources.
 
-    ``require_ammo`` is True for combat-outcome hops (ammo slack + frames
-    budget). Nav / ammo-only hops skip ammo *and* frames so a sticky HG-eq
-    shortfall or a slow gallery mint cannot strand the march before the next
-    real fight. ``resources_frames`` is the docs Frames column (policy
-    decisions, same unit as ``-quality[8]``). Combat-outcome hops with
-    missing/non-positive resources Frames never qualify. ``frames_factor``
-    defaults to 1.1. ``RE1_PLANNER_MARCH_AMMO_EXTRA`` raises the ammo floor
-    (use fewer bullets / keep more rounds than champ−slack).
+    ``require_ammo`` is True for combat-outcome hops (kills + ammo slack +
+    frames budget). Nav / ammo-only hops skip kills, ammo, *and* frames so a
+    richer-path champion (extra zombies / HG-eq / slow gallery) cannot strand
+    the march before the next real fight. HP still must meet champion on every
+    hop. ``resources_frames`` is the docs Frames column (policy decisions,
+    same unit as ``-quality[8]``). Combat-outcome hops with missing/non-positive
+    resources Frames never qualify. ``frames_factor`` defaults to 1.1.
+    ``RE1_PLANNER_MARCH_AMMO_EXTRA`` raises the ammo floor (use fewer bullets /
+    keep more rounds than champ−slack).
     """
     import math
 
@@ -308,8 +310,10 @@ def _champion_qualifies(
         champ = lift_planner_loyal_quality(champ_q)
     except (TypeError, ValueError):
         return False
-    # HP + kills must meet champion; ammo (with slack/extra) only on fighting hops.
-    if int(live[0]) < int(champ[0]) or int(live[1]) < int(champ[1]):
+    # HP always; kills + ammo (slack/extra) only on fighting hops.
+    if int(live[0]) < int(champ[0]):
+        return False
+    if require_ammo and int(live[1]) < int(champ[1]):
         return False
     if require_ammo and int(live[2]) < march_ammo_floor(
         int(champ[2]), project_root=project_root
@@ -761,11 +765,23 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
         return None
     # The box must actually hold the hunted bytes (stale rows carry no bundle).
     slot = planner_loyal_root(project_root) / "cells" / cell_dir_name(nxt)
+    want_state = str(next_row.get("state_sha256") or "").strip()
+    want_side = str(next_row.get("sidecar_sha256") or "").strip()
+    if not want_state:
+        # Incomplete mirror row (no hashes) — verify against on-disk cell meta.
+        try:
+            meta = json.loads((slot / "meta.json").read_text(encoding="utf-8"))
+            want_state = str(meta.get("state_sha256") or "").strip()
+            want_side = str(meta.get("sidecar_sha256") or "").strip()
+        except (OSError, ValueError, TypeError):
+            return None
+        if not want_state:
+            return None
     try:
         if not slot_matches_content(
             slot,
-            state_sha256=str(next_row.get("state_sha256") or ""),
-            sidecar_sha256=str(next_row.get("sidecar_sha256") or ""),
+            state_sha256=want_state,
+            sidecar_sha256=want_side,
         ):
             return None
     except (OSError, TypeError, ValueError):
