@@ -13,11 +13,13 @@ ALL of:
   down) also need kills[1], ammo_dmg_weighted[2] within ``MARCH_AMMO_SLACK``
   (default **3**) of champion, and hop frames[8] within
   ``RE1_PLANNER_MARCH_FRAMES_FACTOR`` of the resources.md Frames column.
+  Kills and ammo floors are capped at the pinned cell's live kit, so a
+  richer-path champion cannot demand more than this tape already holds.
   **Nav / ammo-only** hops skip kills, ammo, *and* the frames bar so a
   richer-path champion (extra zombies / HG-eq / slow gallery) cannot strand
   crest-exit and armor_key drips until the next real fight. Short quality
-  never qualifies. Combat-outcome hops with missing resources Frames still
-  fail closed.
+  never qualifies. A missing resources Frames row does not veto once the
+  tip kit is known (the table lags the tape).
 
 On advance **or any INDEX pin move** (manual edit included): crystalize only
 on advance; always request an NN weight reset on the learner (POST
@@ -283,6 +285,7 @@ def _champion_qualifies(
     frames_factor: float = 1.1,
     require_ammo: bool = True,
     project_root: Path | str | None = None,
+    tip_q: Any = None,
 ) -> bool:
     """Live mint meets kit bar: HP/kills/(ammo) vs champion, frames vs resources.
 
@@ -290,11 +293,13 @@ def _champion_qualifies(
     frames budget). Nav / ammo-only hops skip kills, ammo, *and* frames so a
     richer-path champion (extra zombies / HG-eq / slow gallery) cannot strand
     the march before the next real fight. HP still must meet champion on every
-    hop. ``resources_frames`` is the docs Frames column (policy decisions,
-    same unit as ``-quality[8]``). Combat-outcome hops with missing/non-positive
-    resources Frames never qualify. ``frames_factor`` defaults to 1.1.
+    hop. When ``tip_q`` is the pinned cell, kills and ammo floors cannot exceed
+    that cell — the tape's actual kit is the bar, not an older richer route.
+    ``resources_frames`` is the docs Frames column (policy decisions, same unit
+    as ``-quality[8]``). Combat hops with no Frames row still qualify once the
+    tip kit is known. ``frames_factor`` defaults to 1.1.
     ``RE1_PLANNER_MARCH_AMMO_EXTRA`` raises the ammo floor (use fewer bullets /
-    keep more rounds than champ−slack).
+    keep more rounds than champ−slack) but never above the tip's ammo.
     """
     import math
 
@@ -303,26 +308,36 @@ def _champion_qualifies(
     if len(live_q or []) < 11 or len(champ_q or []) < 11:
         return False
     rec = int(resources_frames)
-    if require_ammo and rec <= 0:
-        return False
     try:
         live = lift_planner_loyal_quality(live_q)
         champ = lift_planner_loyal_quality(champ_q)
     except (TypeError, ValueError):
         return False
-    # HP always; kills + ammo (slack/extra) only on fighting hops.
+    kills_floor = int(champ[1])
+    ammo_floor = march_ammo_floor(int(champ[2]), project_root=project_root)
+    capped = False
+    if tip_q is not None and len(tip_q) >= 11:
+        try:
+            tip = lift_planner_loyal_quality(tip_q)
+        except (TypeError, ValueError):
+            tip = None
+        if tip is not None:
+            kills_floor = min(kills_floor, int(tip[1]))
+            ammo_floor = min(ammo_floor, int(tip[2]))
+            capped = True
+    if require_ammo and rec <= 0 and not capped:
+        return False
+    # HP always; kills + ammo (slack/extra, capped at the tip) only on fights.
     if int(live[0]) < int(champ[0]):
         return False
-    if require_ammo and int(live[1]) < int(champ[1]):
+    if require_ammo and int(live[1]) < kills_floor:
         return False
-    if require_ammo and int(live[2]) < march_ammo_floor(
-        int(champ[2]), project_root=project_root
-    ):
+    if require_ammo and int(live[2]) < ammo_floor:
         return False
     live_frames = -int(live[_MARCH_FRAMES_DIM])
     if live_frames <= 0:
         return False
-    if not require_ammo:
+    if not require_ammo or rec <= 0:
         return True
     budget = int(math.ceil(float(rec) * float(frames_factor)))
     return int(live_frames) <= int(budget)
@@ -736,8 +751,9 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
     if champ is None:
         print(f"[planner_march] no champion row for pl{nxt:02d}; holding pin {pin}", flush=True)
         return None
+    tip_q = _live_quality(Path(project_root), pin)
     rec_frames = int(_resources_frames(project_root).get(nxt) or 0)
-    if rec_frames <= 0:
+    if rec_frames <= 0 and tip_q is None:
         print(
             f"[planner_march] no resources Frames for pl{nxt:02d}; holding pin {pin}",
             flush=True,
@@ -794,6 +810,7 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
         frames_factor=frames_factor,
         require_ammo=require_ammo,
         project_root=project_root,
+        tip_q=tip_q,
     ):
         return None
     advance_id = f"pl{pin:02d}->pl{nxt:02d}@{int(wall_now)}"
@@ -815,6 +832,7 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
                 frames_factor=frames_factor,
                 require_ammo=require_ammo,
                 project_root=project_root,
+                tip_q=tip_q,
             ):
                 return None
             try:

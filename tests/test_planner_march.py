@@ -265,6 +265,42 @@ def test_champion_gate_dims(monkeypatch) -> None:
         _champion_qualifies(Q_FAT, Q_CHAMP, resources_frames=0, frames_factor=1.1)
         is False
     )
+    # Richer-path champ cannot demand more kills/ammo than the pinned tape.
+    # Live matches the tip (13 kills, 105 ammo); champ wants 15 / floor 117.
+    # Missing resources Frames does not veto once the tip kit is known.
+    tip = list(Q_FAT)
+    tip[1] = 13
+    tip[2] = 105
+    rich_champ = list(Q_CHAMP)
+    rich_champ[1] = 15
+    rich_champ[2] = 120
+    live_tip = list(tip)
+    live_tip[8] = -7
+    assert (
+        _champion_qualifies(
+            live_tip,
+            rich_champ,
+            resources_frames=0,
+            frames_factor=1.5,
+            require_ammo=True,
+            tip_q=tip,
+        )
+        is True
+    )
+    # Still fail if the mint drops below the tape's own kit.
+    broke = list(live_tip)
+    broke[2] = 104
+    assert (
+        _champion_qualifies(
+            broke,
+            rich_champ,
+            resources_frames=0,
+            frames_factor=1.5,
+            require_ammo=True,
+            tip_q=tip,
+        )
+        is False
+    )
     assert _champion_qualifies([96, 0, 45], Q_CHAMP, resources_frames=49) is False
     assert _champion_qualifies(Q_FAT, [96, 0, 45], resources_frames=49) is False
 
