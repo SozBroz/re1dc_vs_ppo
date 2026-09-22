@@ -686,7 +686,12 @@ def test_reap_orphan_recomp_kills_dead_parent_only() -> None:
     assert killed == [30]
 
 
-def test_reap_orphan_recomp_respects_keep_parent_pids() -> None:
+def test_reap_orphan_recomp_spares_live_non_actor_parents() -> None:
+    """Recorder / probe guests have a live python parent outside the actor set.
+
+    keep_parent_pids is the worker's actor PIDs; a live parent not in that set
+    must NOT be reaped (2026-09-22 harness wipe regression).
+    """
     killed: list[int] = []
     rows = [
         (10, 1, "python.exe"),
@@ -700,22 +705,23 @@ def test_reap_orphan_recomp_respects_keep_parent_pids() -> None:
         processes=rows,
         kill_pid=killed.append,
     )
-    assert out == [21, 22]
-    assert killed == [21, 22]
+    assert out == []
+    assert killed == []
 
 
-def test_reap_orphan_recomp_empty_keep_kills_all() -> None:
-    """Host soft-restart path: keep=set() means every recomp is unowned."""
+def test_reap_orphan_recomp_empty_keep_still_dead_parent_only() -> None:
+    """Soft-restart uses taskkill /IM; empty keep must not murder live parents."""
     killed: list[int] = []
     rows = [
         (10, 1, "python.exe"),
         (20, 10, RECOMP_EXE_NAME),
         (21, 10, RECOMP_EXE_NAME),
+        (30, 9999, RECOMP_EXE_NAME),
     ]
     out = _reap_orphan_recomp_exes(
         keep_parent_pids=set(),
         processes=rows,
         kill_pid=killed.append,
     )
-    assert out == [20, 21]
-    assert killed == [20, 21]
+    assert out == [30]
+    assert killed == [30]

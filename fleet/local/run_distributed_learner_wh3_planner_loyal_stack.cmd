@@ -15,16 +15,12 @@ set MAX_PENDING_STEPS=220000
 set MIN_HOST_FREE_GB=16
 
 call "%~dp0planner_loyal.env.cmd"
-REM Human BC demos DISABLED (2026-09-10): demos archived under
-REM backups\demos_planner_loyal_bc_off_*. Do NOT default RE1_BC_DEMO_DIR here —
-REM unset DEMO_DIR means DemoBCAux stays off. To re-enable, point RE1_BC_DEMO_DIR
-REM at a restored demo folder and set RE1_BC_COEF.
-if defined RE1_BC_DEMO_DIR (
-  echo [%DATE% %TIME%] WARNING: RE1_BC_DEMO_DIR=%RE1_BC_DEMO_DIR% still set — BC active
-)
-REM Explicitly clear inherited BC knobs so a parent shell cannot leave BC on.
-set RE1_BC_DEMO_DIR=
-set RE1_BC_COEF=
+REM Human BC for pl83->pl84 armor_vent_far: only open-loop-verified demos
+REM under data\demos\planner_loyal (4x Sep-6 tapes that pay far on live pl83).
+set RE1_BC_DEMO_DIR=data\demos\planner_loyal
+set RE1_BC_COEF=0.5
+set RE1_BC_RELOAD_EVERY=20
+echo [%DATE% %TIME%] BC ON dir=%RE1_BC_DEMO_DIR% coef=%RE1_BC_COEF% >> data\logs\learner_wh3_planner_loyal.log
 if not exist data\logs mkdir data\logs
 if not exist data\checkpoints mkdir data\checkpoints
 

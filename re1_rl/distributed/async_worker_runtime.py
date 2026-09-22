@@ -741,9 +741,14 @@ def _reap_orphan_recomp_exes(
     box into WinError 1455. Full ``taskkill /IM`` is only safe on host-wide
     restart; mid-loop we must only cut orphans.
 
-    A recomp is orphan when:
-    - its parent PID is dead, or
-    - ``keep_parent_pids`` is set and the parent is not in that set.
+    A recomp is orphan when its parent PID is dead.
+
+    We intentionally do **not** kill recomps whose parent is alive but outside
+    ``keep_parent_pids``. That list is the worker's actor set; a live parent
+    outside it is usually a human recorder / probe on the same box (pl83bc,
+    play-c, etc.). Killing those every ``RE1_RECOMP_ORPHAN_REAP_S`` seconds
+    was wiping harness guests mid-push (2026-09-22). WH2 warmup orphans still
+    match: their actor parent is dead.
     """
     if os.name != "nt":
         return []
@@ -751,15 +756,14 @@ def _reap_orphan_recomp_exes(
     if not rows:
         return []
     live_pids = {pid for pid, _ppid, _name in rows}
-    keep = {int(p) for p in keep_parent_pids} if keep_parent_pids is not None else None
+    _ = keep_parent_pids  # API compat; dead-parent-only (see docstring)
     killer = kill_pid or (lambda pid: _taskkill_pid(pid))
     killed: list[int] = []
     for pid, ppid, name in rows:
         if name.lower() != RECOMP_EXE_NAME.lower():
             continue
         parent_dead = not _pid_alive(ppid, live_pids=live_pids)
-        parent_not_kept = keep is not None and int(ppid) not in keep
-        if not (parent_dead or parent_not_kept):
+        if not parent_dead:
             continue
         killer(int(pid))
         killed.append(int(pid))

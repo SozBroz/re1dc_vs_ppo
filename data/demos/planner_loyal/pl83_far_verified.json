@@ -1,0 +1,11 @@
+﻿{
+  "pl": "pl83->pl84",
+  "beat": "armor_vent_far",
+  "verified_on_pl83_open_loop": [
+    "pl82_20260906_153437_ok.npz",
+    "pl82_20260906_153508_ok.npz",
+    "pl82_20260906_153758_ok.npz",
+    "pl82_20260906_153831_ok.npz"
+  ],
+  "note": "Only open-loop far=true demos retained for DemoBCAux. Filenames keep pl82 stamp from original tip numbering."
+}

@@ -55,12 +55,16 @@ ARMOR_WEST_LATERAL_APPROACH_XZ: tuple[int, int] = (9617, 7179)
 ARMOR_WEST_LATERAL_PUSH_ENDPOINT_XZ: tuple[int, int] = (5717, 7136)
 
 # ROOM2050 object-work coordinates at the demonstrated QS0/QS9 seats.
-# East (pl79) stays pixel-tight. West mint gate is a human-validated AABB
-# (2026-09-01): X 4845..5195, Z 7086..7336 — covers QS (4895, 7186),
-# button+no-gas (4945, 7136), and live seat (4895, 7336).
+# East (door leg) stays pixel-tight (±8). Far leg only needs east *already
+# seated as a prerequisite*; reminted tips can settle one 50-unit shove past
+# the vent (Z=7390 vs 7340), so far completion uses the relaxed east tol.
+# West mint gate is a human-validated AABB (2026-09-01): X 4845..5195,
+# Z 7086..7336 — covers QS (4895, 7186), button+no-gas (4945, 7136), and
+# live seat (4895, 7336).
 ARMOR_EAST_SCRIPT_TARGET: tuple[int, int] = ARMOR_VENT_DOOR
 ARMOR_WEST_SCRIPT_TARGET: tuple[int, int] = ARMOR_VENT_FAR
 ARMOR_EAST_SCRIPT_TARGET_TOLERANCE = 8
+ARMOR_EAST_SCRIPT_TARGET_TOLERANCE_RELAXED = 56
 ARMOR_WEST_SEAT_X_MIN = 4845
 ARMOR_WEST_SEAT_X_MAX = 5195
 ARMOR_WEST_SEAT_Z_MIN = 7086
@@ -248,16 +252,25 @@ def armor_west_depth_aligned(west_xz: tuple[float, float] | None) -> bool:
     return ARMOR_WEST_SEAT_Z_MIN <= float(west_xz[1]) <= ARMOR_WEST_SEAT_Z_MAX
 
 
-def armor_stable_statues_seated(state: dict[str, Any] | None) -> tuple[bool, bool]:
+def armor_stable_statues_seated(
+    state: dict[str, Any] | None,
+    *,
+    east_tolerance: int | None = None,
+) -> tuple[bool, bool]:
     """Placement truth from stable ROOM2050 object-work mirrors: (east, west)."""
     if not state or str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
         return False, False
+    east_tol = (
+        ARMOR_EAST_SCRIPT_TARGET_TOLERANCE
+        if east_tolerance is None
+        else int(east_tolerance)
+    )
     return (
         _stable_statue_at_target(
             state,
             "east",
             ARMOR_EAST_SCRIPT_TARGET,
-            tolerance=ARMOR_EAST_SCRIPT_TARGET_TOLERANCE,
+            tolerance=east_tol,
         ),
         _stable_statue_in_box(
             state,
@@ -368,8 +381,15 @@ def armor_vent_step_complete(step: dict[str, Any] | None, state: dict[str, Any] 
         return False
     if str(state.get("room_id", "") or "") != ARMOR_ROOM_ID:
         return False
-    east_seated, west_seated = armor_stable_statues_seated(state)
-    return east_seated if idx == 0 else east_seated and west_seated
+    if idx == 0:
+        east_seated, _west = armor_stable_statues_seated(state)
+        return bool(east_seated)
+    # Far leg: east is a prerequisite only — allow one-shove overshoot on
+    # reminted tips so a correct west seat can still pay.
+    east_seated, west_seated = armor_stable_statues_seated(
+        state, east_tolerance=ARMOR_EAST_SCRIPT_TARGET_TOLERANCE_RELAXED
+    )
+    return bool(east_seated and west_seated)
 
 
 def armor_vent_physically_seated(
