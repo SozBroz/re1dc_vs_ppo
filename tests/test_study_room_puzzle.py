@@ -72,6 +72,28 @@ def test_phase_mega_acquire():
     )
 
 
+def test_cupboard_done_rejects_east_wall_wander():
+    """Softlocked pl158 sat at x≈6458 — past real cupboard endpoint."""
+    from re1_rl.study_room_puzzle import study_cupboard_push_done
+
+    assert study_cupboard_push_done(
+        {
+            "room_id": "20A",
+            "x": 5103,
+            "z": 7203,
+            "study_tank_drained_flag": 0x20,
+        }
+    )
+    assert not study_cupboard_push_done(
+        {
+            "room_id": "20A",
+            "x": 6458,
+            "z": 7530,
+            "study_tank_drained_flag": 0x20,
+        }
+    )
+
+
 def test_compass_targets():
     q = _Q({"op": "acquire", "pickup_id": "20A:explosive_rounds:1"})
     insect = study_room_goal_target(

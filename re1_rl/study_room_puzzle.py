@@ -55,7 +55,10 @@ STUDY_APPROACH_RADIUS = 384.0
 STUDY_TANK_DONE_Z_MAX = 6200.0
 STUDY_TANK_DONE_X_MIN = 6800.0
 # Cupboard finished when Jill has driven far enough east on the north run.
+# Cap X so walking past the cupboard into the east-wall tank lane cannot
+# false-mint (softlocked pl158 sat at x≈6458 with ammo still blocked).
 STUDY_CUPBOARD_DONE_X_MIN = 4800.0
+STUDY_CUPBOARD_DONE_X_MAX = 5600.0
 STUDY_CUPBOARD_DONE_Z_MIN = 6800.0
 STUDY_CUPBOARD_DONE_Z_MAX = 7600.0
 
@@ -115,7 +118,7 @@ def study_on_cupboard_run(state: dict[str, Any] | None) -> bool:
     return (
         float(STUDY_CUPBOARD_APPROACH_XZ[0]) - 400.0
         <= jx
-        <= STUDY_CUPBOARD_DONE_X_MIN + 200.0
+        <= STUDY_CUPBOARD_DONE_X_MAX + 200.0
         and STUDY_CUPBOARD_DONE_Z_MIN <= jz <= STUDY_CUPBOARD_DONE_Z_MAX
     )
 
@@ -123,14 +126,14 @@ def study_on_cupboard_run(state: dict[str, Any] | None) -> bool:
 def study_cupboard_push_done(state: dict[str, Any] | None) -> bool:
     """Cupboard shoved far enough east on the north run (after drain).
 
-    Exclude the east-wall tank lane (high X) — that pose is tank work, not
-    cupboard-complete.
+    Band is tight around the demo endpoint (x≈5103): past
+    ``STUDY_CUPBOARD_DONE_X_MAX`` is east-wall wander, not a finished shove.
     """
     if not state or not study_tank_drained_from_state(state):
         return False
     jx, jz = _jill_xz(state)
     return (
-        STUDY_CUPBOARD_DONE_X_MIN <= jx < STUDY_TANK_DONE_X_MIN
+        STUDY_CUPBOARD_DONE_X_MIN <= jx <= STUDY_CUPBOARD_DONE_X_MAX
         and STUDY_CUPBOARD_DONE_Z_MIN <= jz <= STUDY_CUPBOARD_DONE_Z_MAX
     )
 
