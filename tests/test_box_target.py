@@ -305,6 +305,21 @@ def test_go_to_box_skipped_when_episode_starts_in_box() -> None:
     assert result["step_success"] is False
 
 
+def test_muse_box_before_20a_go_to_box_is_capture_false() -> None:
+    """pl150 tip: go_to_box must not consume a slot (use_box mints as pl151)."""
+    from re1_rl.planner_loyal import load_chunk
+    from re1_rl.planner_loyal_cells import slot_index_for_completed_step
+
+    steps = load_chunk()["steps"]
+    idx = next(
+        i
+        for i, step in enumerate(steps)
+        if step.get("op") == "go_to_box" and step.get("n") == 146
+    )
+    assert steps[idx].get("capture") is False
+    assert slot_index_for_completed_step(idx + 1, steps) == 151  # use_box
+
+
 def test_live_chunk_use_box_unlocks_shield_key_bank() -> None:
     from re1_rl.item_box import box_pollution_reason, can_deposit
 

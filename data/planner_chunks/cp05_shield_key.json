@@ -1107,7 +1107,8 @@
       "n": 146,
       "op": "go_to_box",
       "room_id": "118",
-      "note": "box before 20A (inv was full after 209)"
+      "note": "box before 20A (inv was full after 209)",
+      "capture": false
     },
     {
       "n": 147,
