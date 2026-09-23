@@ -52,12 +52,16 @@ STUDY_AMMO_XZ: tuple[int, int] = (3902, 7530)
 
 STUDY_APPROACH_RADIUS = 384.0
 # After a finished tank shove Jill sits near the south end of the east wall.
+# Require a band around the demo endpoint (z≈5592): too far south (pl157 at
+# z≈4308) wedges Jill immovable against geometry.
 STUDY_TANK_DONE_Z_MAX = 6200.0
+STUDY_TANK_DONE_Z_MIN = 5000.0
 STUDY_TANK_DONE_X_MIN = 6800.0
 # Cupboard finished when Jill has driven far enough east on the north run.
-# Cap X so walking past the cupboard into the east-wall tank lane cannot
-# false-mint (softlocked pl158 sat at x≈6458 with ammo still blocked).
-STUDY_CUPBOARD_DONE_X_MIN = 4800.0
+# Live shove ends near x≈4303 (object stop); demo endpoint was ~5103 after a
+# fuller run. Cap X so east-wall wander (softlocked pl158 at x≈6458) cannot
+# false-mint while still accepting the real object stop.
+STUDY_CUPBOARD_DONE_X_MIN = 4200.0
 STUDY_CUPBOARD_DONE_X_MAX = 5600.0
 STUDY_CUPBOARD_DONE_Z_MIN = 6800.0
 STUDY_CUPBOARD_DONE_Z_MAX = 7600.0
@@ -107,7 +111,10 @@ def study_tank_push_done(state: dict[str, Any] | None) -> bool:
     if not state or not study_tank_drained_from_state(state):
         return False
     jx, jz = _jill_xz(state)
-    return jx >= STUDY_TANK_DONE_X_MIN and jz <= STUDY_TANK_DONE_Z_MAX
+    return (
+        jx >= STUDY_TANK_DONE_X_MIN
+        and STUDY_TANK_DONE_Z_MIN <= jz <= STUDY_TANK_DONE_Z_MAX
+    )
 
 
 def study_on_cupboard_run(state: dict[str, Any] | None) -> bool:

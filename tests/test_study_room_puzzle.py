@@ -72,10 +72,39 @@ def test_phase_mega_acquire():
     )
 
 
+def test_tank_done_rejects_overshoot_wedge():
+    from re1_rl.study_room_puzzle import study_tank_push_done
+
+    assert study_tank_push_done(
+        {
+            "room_id": "20A",
+            "x": 7359,
+            "z": 5592,
+            "study_tank_drained_flag": 0x20,
+        }
+    )
+    assert not study_tank_push_done(
+        {
+            "room_id": "20A",
+            "x": 7350,
+            "z": 4308,
+            "study_tank_drained_flag": 0x20,
+        }
+    )
+
+
 def test_cupboard_done_rejects_east_wall_wander():
     """Softlocked pl158 sat at x≈6458 — past real cupboard endpoint."""
     from re1_rl.study_room_puzzle import study_cupboard_push_done
 
+    assert study_cupboard_push_done(
+        {
+            "room_id": "20A",
+            "x": 4303,
+            "z": 7123,
+            "study_tank_drained_flag": 0x20,
+        }
+    )
     assert study_cupboard_push_done(
         {
             "room_id": "20A",
