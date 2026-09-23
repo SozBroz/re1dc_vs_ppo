@@ -542,7 +542,13 @@ def write_inventory_box_curation(
     inventory: list[tuple[int, int]],
     box: list[tuple[int, int]],
 ) -> None:
-    """Curation-only RAM write for cell repair scripts (not live training)."""
+    """Curation-only MainRAM poke (not live training).
+
+    **Do not save tip / ITEM-visible cells after this alone.** Writing
+    ``INVENTORY_BASE`` updates id/qty text but leaves ITEM-grid icons stale
+    (GPURAM). For use_box / bank edits that humans or ITEM screens will see,
+    deposit via ``execute_box_deposit_ui`` (authentic box UI) then save.
+    """
     inv = list(inventory)[:INVENTORY_SLOTS]
     bx = list(box)[:BOX_SLOTS]
     while len(inv) < INVENTORY_SLOTS:
