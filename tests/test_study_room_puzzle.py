@@ -91,6 +91,14 @@ def test_tank_done_rejects_overshoot_wedge():
             "study_tank_drained_flag": 0x20,
         }
     )
+    assert not study_tank_push_done(
+        {
+            "room_id": "20A",
+            "x": 7350,
+            "z": 5058,
+            "study_tank_drained_flag": 0x20,
+        }
+    )
 
 
 def test_cupboard_done_rejects_east_wall_wander():

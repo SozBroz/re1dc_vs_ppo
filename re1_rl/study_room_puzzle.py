@@ -52,10 +52,10 @@ STUDY_AMMO_XZ: tuple[int, int] = (3902, 7530)
 
 STUDY_APPROACH_RADIUS = 384.0
 # After a finished tank shove Jill sits near the south end of the east wall.
-# Require a band around the demo endpoint (z≈5592): too far south (pl157 at
-# z≈4308) wedges Jill immovable against geometry.
-STUDY_TANK_DONE_Z_MAX = 6200.0
-STUDY_TANK_DONE_Z_MIN = 5000.0
+# Require a tight band around the demo endpoint (z≈5592). Overshoot wedges:
+# z≈4308 (first softlock) and z≈5058 (remint still frozen) — both immovable.
+STUDY_TANK_DONE_Z_MAX = 5800.0
+STUDY_TANK_DONE_Z_MIN = 5400.0
 STUDY_TANK_DONE_X_MIN = 6800.0
 # Cupboard finished when Jill has driven far enough east on the north run.
 # Live shove ends near x≈4303 (object stop); demo endpoint was ~5103 after a
