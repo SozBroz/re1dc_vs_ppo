@@ -1127,8 +1127,8 @@
           "slot": 2
         },
         {
-          "item": "shield_key",
-          "qty": 1,
+          "item": "handgun_bullets",
+          "qty": 10,
           "slot": 3
         },
         {
@@ -1142,8 +1142,8 @@
           "slot": 5
         },
         {
-          "item": "handgun_bullets",
-          "qty": 10,
+          "item": "shield_key",
+          "qty": 1,
           "slot": 6
         },
         {
