@@ -145,6 +145,52 @@ def march_requires_kit_bar(
     return False
 
 
+# Kit-table ammo columns → weapon ids for HG-eq spend (match quality[2]).
+_AMMO_KEY_WEAPON_ID = {
+    "pistol": 0x02,
+    "shotgun": 0x03,
+    "bazooka": 0x08,  # explosive round; docs use one bazooka column
+    "magnum": 0x05,
+}
+
+
+def resources_hop_fight_deltas(
+    tip_slot: int,
+    target_slot: int,
+    project_root: Path | str | None = None,
+) -> tuple[int, int]:
+    """``(min_kill_gain, min_ammo_hg_spend)`` from resources.md Kit-by-PL.
+
+    Used by march qualify so a combat hop cannot soft-advance on tip-matching
+    kit (no kill / no ammo burn). Missing rows → ``(0, 0)`` (caller keeps
+    champ floors only).
+    """
+    tip = int(tip_slot)
+    target = int(target_slot)
+    kit = parse_resources_kit(project_root)
+    a = kit.get(tip)
+    b = kit.get(target)
+    if a is None or b is None:
+        return 0, 0
+    kill_gain = max(0, int(b.get("kills", 0)) - int(a.get("kills", 0)))
+    from re1_rl.weapon_damage import nominal_max_damage
+
+    ref = max(1, int(nominal_max_damage(0x02)))
+    spend = 0
+    for key in _AMMO_KEYS:
+        drop = max(0, int(a.get(key, 0)) - int(b.get(key, 0)))
+        if drop <= 0:
+            continue
+        wid = _AMMO_KEY_WEAPON_ID.get(key)
+        if wid is None:
+            continue
+        max_dmg = int(nominal_max_damage(wid))
+        if max_dmg <= 0:
+            continue
+        spend += int(drop) * max_dmg // ref
+    return int(kill_gain), int(spend)
+
+
 def _champions(project_root: Path | str | None = None) -> dict[int, list[int]]:
     root = _project_root(project_root)
     path = root / _CHAMPIONS_REL

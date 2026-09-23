@@ -338,6 +338,62 @@ def test_champion_gate_dims(monkeypatch) -> None:
         )
         is False
     )
+    # Resources combat deltas: must raise kills and burn documented HG-eq.
+    # pl109→110 tiger: +1 kill, 11 pistol + 4 shells ≈ 36 HG-eq.
+    tiger_tip = list(Q_FAT)
+    tiger_tip[1] = 17
+    tiger_tip[2] = 126
+    tiger_tip[8] = -105
+    tiger_champ = list(Q_CHAMP)
+    tiger_champ[1] = 19
+    tiger_champ[2] = 123
+    tiger_ok = list(tiger_tip)
+    tiger_ok[1] = 18
+    tiger_ok[2] = 90  # spent 36
+    tiger_ok[8] = -106
+    assert (
+        _champion_qualifies(
+            tiger_ok,
+            tiger_champ,
+            resources_frames=106,
+            frames_factor=1.5,
+            require_ammo=True,
+            tip_q=tiger_tip,
+            min_kill_gain=1,
+            min_ammo_spend=36,
+        )
+        is True
+    )
+    soft_no_kill = list(tiger_tip)
+    soft_no_kill[8] = -106
+    assert (
+        _champion_qualifies(
+            soft_no_kill,
+            tiger_champ,
+            resources_frames=106,
+            frames_factor=1.5,
+            require_ammo=True,
+            tip_q=tiger_tip,
+            min_kill_gain=1,
+            min_ammo_spend=36,
+        )
+        is False
+    )
+    soft_low_spend = list(tiger_ok)
+    soft_low_spend[2] = 120  # spent only 6
+    assert (
+        _champion_qualifies(
+            soft_low_spend,
+            tiger_champ,
+            resources_frames=106,
+            frames_factor=1.5,
+            require_ammo=True,
+            tip_q=tiger_tip,
+            min_kill_gain=1,
+            min_ammo_spend=36,
+        )
+        is False
+    )
     assert _champion_qualifies([96, 0, 45], Q_CHAMP, resources_frames=49) is False
     assert _champion_qualifies(Q_FAT, [96, 0, 45], resources_frames=49) is False
 

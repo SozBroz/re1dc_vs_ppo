@@ -15,6 +15,8 @@ ALL of:
   ``RE1_PLANNER_MARCH_FRAMES_FACTOR`` of the resources.md Frames column.
   Kills and ammo floors are capped at the pinned cell's live kit, so a
   richer-path champion cannot demand more than this tape already holds.
+  Resources kit deltas also require the hop's kill gain and HG-eq ammo
+  spend (soft tip-matching mints do not advance).
   **Nav / ammo-only** hops skip kills, ammo, *and* the frames bar so a
   richer-path champion (extra zombies / HG-eq / slow gallery) cannot strand
   crest-exit and armor_key drips until the next real fight. Short quality
@@ -286,6 +288,8 @@ def _champion_qualifies(
     require_ammo: bool = True,
     project_root: Path | str | None = None,
     tip_q: Any = None,
+    min_kill_gain: int = 0,
+    min_ammo_spend: int = 0,
 ) -> bool:
     """Live mint meets kit bar: HP/kills/(ammo) vs champion, frames vs resources.
 
@@ -298,6 +302,10 @@ def _champion_qualifies(
     A fight mint that raises kills above the tip skips the ammo floor: the
     bullets were spent to get the kill, and a cleaner champion end-ammo
     cannot strand the tape.
+    ``min_kill_gain`` / ``min_ammo_spend`` (from resources.md kit deltas) block
+    soft tip-matching advances: combat hops must actually raise kills and burn
+    the documented HG-eq ammo (e.g. pl109→110 tiger: +1 kill, 11 pistol + 4
+    shells ≈ 36 HG-eq). Spend allows ``MARCH_AMMO_SLACK``.
     ``resources_frames`` is the docs Frames column (policy decisions, same unit
     as ``-quality[8]``). Combat hops with no Frames row still qualify once the
     tip kit is known. ``frames_factor`` defaults to 1.1.
@@ -334,11 +342,19 @@ def _champion_qualifies(
     # HP always; kills + ammo (slack/extra, capped at the tip) only on fights.
     if int(live[0]) < int(champ[0]):
         return False
-    if require_ammo and int(live[1]) < kills_floor:
+    if require_ammo and tip is not None and int(min_kill_gain) > 0:
+        if int(live[1]) < int(tip[1]) + int(min_kill_gain):
+            return False
+    elif require_ammo and int(live[1]) < kills_floor:
         return False
     kills_gained = tip is not None and int(live[1]) > int(tip[1])
     if require_ammo and not kills_gained and int(live[2]) < ammo_floor:
         return False
+    if require_ammo and tip is not None and int(min_ammo_spend) > 0:
+        spent = int(tip[2]) - int(live[2])
+        need = max(0, int(min_ammo_spend) - int(MARCH_AMMO_SLACK))
+        if spent < need:
+            return False
     live_frames = -int(live[_MARCH_FRAMES_DIM])
     if live_frames <= 0:
         return False
@@ -765,10 +781,13 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
         )
         return None
     frames_factor = _march_frames_factor(project_root)
+    min_kill_gain = 0
+    min_ammo_spend = 0
     try:
         from re1_rl.fight_pl_policy import (
             march_frames_factor_for_target,
             march_requires_kit_bar,
+            resources_hop_fight_deltas,
         )
 
         frames_factor = float(
@@ -778,6 +797,10 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
         )
         # Ammo-only drips stay nav-qualify; kills/HP changes keep the full bar.
         require_ammo = bool(march_requires_kit_bar(pin, nxt, project_root))
+        if require_ammo:
+            min_kill_gain, min_ammo_spend = resources_hop_fight_deltas(
+                pin, nxt, project_root
+            )
     except Exception:  # noqa: BLE001 — never block march on policy import
         require_ammo = True
     rows = _mirror_rows(project_root)
@@ -816,6 +839,8 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
         require_ammo=require_ammo,
         project_root=project_root,
         tip_q=tip_q,
+        min_kill_gain=min_kill_gain,
+        min_ammo_spend=min_ammo_spend,
     ):
         return None
     advance_id = f"pl{pin:02d}->pl{nxt:02d}@{int(wall_now)}"
@@ -838,6 +863,8 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
                 require_ammo=require_ammo,
                 project_root=project_root,
                 tip_q=tip_q,
+                min_kill_gain=min_kill_gain,
+                min_ammo_spend=min_ammo_spend,
             ):
                 return None
             try:
