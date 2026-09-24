@@ -1,6 +1,6 @@
 {
   "source": "backups/planner_loyal_cells_pre_march_20260911_180533",
-  "generated_at": "2026-09-23",
+  "generated_at": "2026-09-24",
   "cells": {
     "1": [
       96,
@@ -1990,12 +1990,26 @@
       -33,
       0,
       713
+    ],
+    "154": [
+      92,
+      22,
+      140,
+      0,
+      22,
+      1,
+      0,
+      0,
+      -18,
+      0,
+      727
     ]
   },
   "notes": [
     "2026-09-19: pl57 ammo 62->52 to match source backup meta (pre_march_20260911)",
     "2026-09-19: pl57 ammo 52->60 so floor=57 (pl56 tip 78 minus 21 HG-eq budget)",
     "2026-09-23: pl152 champion = live exit mint (HP92 post authentic box-UI pl151); purged stale HP68 pl152+ rows",
-    "2026-09-23: refresh pl152+ champions from live HP92 cells post box-UI; drop backup HP68"
+    "2026-09-23: refresh pl152+ champions from live HP92 cells post box-UI; drop backup HP68",
+    "2026-09-24: add pl154+ champions from live so march can roll past 153"
   ]
 }

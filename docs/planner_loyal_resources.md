@@ -6,7 +6,7 @@ Companion to [`planner_loyal_cells.md`](planner_loyal_cells.md),
 [`planner_loyal_ammo.md`](planner_loyal_ammo.md), and
 [`planner_loyal_kills.md`](planner_loyal_kills.md).
 
-Generated **2026-09-23**. Highest minted cell is `pl153`.
+Generated **2026-09-24**. Highest minted cell is `pl154`.
 
 Consecutive rows are **independent champion mints**, not one episode.
 `Δ` is vs the previous installed cell. Box columns are the 100/118 item
@@ -178,6 +178,7 @@ On-person totals only (boxed ammo ignored).
 | `pl151` | 92 |    22 |             25 |               4 |               6 |              0 |     52 |
 | `pl152` | 92 |    22 |             25 |               4 |               6 |              0 |     11 |
 | `pl153` | 92 |    22 |             25 |               4 |               6 |              0 |     33 |
+| `pl154` | 92 |    22 |             25 |               4 |               6 |              0 |     18 |
 
 ## Worst hops (top 5)
 
@@ -221,11 +222,11 @@ Most worrying tips from the fleet log sweep: `window_fail` (starts, zero hop suc
 
 | Rank | Tip     | Flag  | Starts | Last ok age |
 | ---: | :------ | :---- | -----: | ----------: |
-|    1 | `pl150` | stale |      0 |       12.6d |
-|    2 | `pl82`  | stale |      0 |       12.0d |
-|    3 | `pl02`  | stale |      0 |       12.0d |
-|    4 | `pl04`  | stale |      0 |       12.0d |
-|    5 | `pl05`  | stale |      0 |       12.0d |
+|    1 | `pl151` | stale |     11 |        7.9h |
+|    2 | `pl154` | stale |      1 |       15.0h |
+|    3 | `pl150` | stale |      0 |       12.9d |
+|    4 | `pl82`  | stale |      0 |       12.3d |
+|    5 | `pl02`  | stale |      0 |       12.3d |
 
 ## Handgun ammo by PL
 
@@ -384,6 +385,7 @@ Most worrying tips from the fleet log sweep: `window_fail` (starts, zero hop suc
 | `pl151` | `use_box`               | `118` |     15 |      10 | **25** |  +0 |      0 |
 | `pl152` | `118->10B`              | `10B` |     15 |      10 | **25** |  +0 |      0 |
 | `pl153` | `10B->207`              | `207` |     15 |      10 | **25** |  +0 |      0 |
+| `pl154` | `207->208`              | `208` |     15 |      10 | **25** |  +0 |      0 |
 
 ## HP by PL
 
@@ -542,6 +544,7 @@ Most worrying tips from the fleet log sweep: `window_fail` (starts, zero hop suc
 | `pl151` | `use_box`               | `118` | **92** |  +0 | Fine |
 | `pl152` | `118->10B`              | `10B` | **92** |  +0 | Fine |
 | `pl153` | `10B->207`              | `207` | **92** |  +0 | Fine |
+| `pl154` | `207->208`              | `208` | **92** |  +0 | Fine |
 
 ## Shotgun ammo by PL
 
@@ -700,6 +703,7 @@ Most worrying tips from the fleet log sweep: `window_fail` (starts, zero hop suc
 | `pl151` | `use_box`               | `118` |      4 |       0 |  **4** | +0 |      0 |
 | `pl152` | `118->10B`              | `10B` |      4 |       0 |  **4** | +0 |      0 |
 | `pl153` | `10B->207`              | `207` |      4 |       0 |  **4** | +0 |      0 |
+| `pl154` | `207->208`              | `208` |      4 |       0 |  **4** | +0 |      0 |
 
 ## How to regenerate
 
@@ -715,34 +719,8 @@ Unadorned command auto-picks the latest pre-march backup when live
 
 | PL      | Change   | PST age |
 | :------ | :------- | ------: |
-| `pl13`  | updated  |    6.2h |
-| `pl32`  | updated  |    4.7h |
-| `pl34`  | updated  |    6.2h |
-| `pl37`  | updated  |    6.3h |
-| `pl40`  | updated  |    4.6h |
-| `pl42`  | updated  |    6.3h |
-| `pl49`  | updated  |    4.6h |
-| `pl53`  | updated  |    4.6h |
-| `pl54`  | updated  |    6.4h |
-| `pl71`  | updated  |    5.3h |
-| `pl72`  | updated  |    6.4h |
-| `pl80`  | updated  |    6.2h |
-| `pl81`  | updated  |    6.6h |
-| `pl93`  | updated  |    5.2h |
-| `pl100` | updated  |    6.3h |
-| `pl107` | updated  |    6.4h |
-| `pl119` | updated  |    6.4h |
-| `pl126` | updated  |    6.5h |
-| `pl129` | updated  |    6.3h |
-| `pl135` | updated  |    6.3h |
-| `pl146` | updated  |    4.2h |
-| `pl147` | updated  |    4.2h |
-| `pl148` | updated  |    4.2h |
-| `pl149` | updated  |    4.2h |
-| `pl150` | updated  |    4.2h |
-| `pl151` | new_cell |    3.8h |
-| `pl152` | updated  |    1.7h |
-| `pl153` | updated  |      0m |
+| `pl153` | updated  |    7.9h |
+| `pl154` | new_cell |    4.6h |
 
 ## Fleet hop completions (log window)
 
@@ -751,17 +729,19 @@ Scanned newest `worker*-recomp*.log` on pking + WH1/2/3 (last ~12MB each).
 
 | Host  | tip_ok | tip starts | mints |
 | :---- | -----: | ---------: | ----: |
-| pking |     50 |      17609 |     4 |
-| wh1   |     59 |      17376 |     2 |
-| wh2   |     43 |      17097 |     2 |
-| wh3   |     62 |      17084 |     3 |
+| pking |   5100 |       7632 |     1 |
+| wh1   |   4207 |       7290 |     2 |
+| wh2   |   5460 |       7701 |     0 |
+| wh3   |   6170 |       8060 |     0 |
 
 ### Completions by tip (this log window)
 
 | Tip     | Hunts   | Starts | tip_ok |  Rate | Last ok age | Mints@dest |
 | :------ | :------ | -----: | -----: | ----: | ----------: | ---------: |
-| `pl151` | `pl152` |  68752 |    155 |  0.2% |          0m |          1 |
-| `pl152` | `pl153` |    414 |     59 | 14.3% |          0m |         10 |
+| `pl151` | `pl152` |     11 |      0 |  0.0% |        7.9h |          0 |
+| `pl152` | `pl153` |     31 |     10 | 32.3% |          0m |          1 |
+| `pl153` | `pl154` |  30640 |  20927 | 68.3% |          0m |          2 |
+| `pl154` | `pl155` |      1 |      0 |  0.0% |       15.0h |          0 |
 
 ## Stale tips (no hop success ≥ 6h)
 
@@ -772,154 +752,155 @@ Tips never seen in logs are omitted until the fleet attempts them.
 
 | Tip     | Last ok age | Starts (window) | tip_ok (window) | Flag  |
 | :------ | ----------: | --------------: | --------------: | :---- |
-| `pl00`  |       11.7d |               0 |               0 | stale |
-| `pl01`  |       19.7h |               0 |               0 | stale |
-| `pl02`  |       12.0d |               0 |               0 | stale |
-| `pl03`  |        7.1h |               0 |               0 | stale |
-| `pl04`  |       12.0d |               0 |               0 | stale |
-| `pl05`  |       12.0d |               0 |               0 | stale |
-| `pl06`  |        7.1h |               0 |               0 | stale |
-| `pl07`  |        7.1h |               0 |               0 | stale |
-| `pl08`  |       12.0d |               0 |               0 | stale |
-| `pl09`  |        7.1h |               0 |               0 | stale |
-| `pl10`  |        7.1h |               0 |               0 | stale |
-| `pl11`  |       12.0d |               0 |               0 | stale |
-| `pl12`  |       12.0d |               0 |               0 | stale |
-| `pl13`  |       12.0d |               0 |               0 | stale |
-| `pl14`  |        7.1h |               0 |               0 | stale |
-| `pl15`  |        7.1h |               0 |               0 | stale |
-| `pl16`  |       12.0d |               0 |               0 | stale |
-| `pl17`  |       12.0d |               0 |               0 | stale |
-| `pl18`  |       12.0d |               0 |               0 | stale |
-| `pl19`  |        7.1h |               0 |               0 | stale |
-| `pl20`  |       12.0d |               0 |               0 | stale |
-| `pl21`  |       12.0d |               0 |               0 | stale |
-| `pl22`  |        6.2d |               0 |               0 | stale |
-| `pl23`  |        7.1h |               0 |               0 | stale |
-| `pl24`  |       12.0d |               0 |               0 | stale |
-| `pl25`  |       19.7h |               0 |               0 | stale |
-| `pl26`  |       12.0d |               0 |               0 | stale |
-| `pl27`  |        7.1h |               0 |               0 | stale |
-| `pl28`  |        7.1h |               0 |               0 | stale |
-| `pl29`  |        7.1h |               0 |               0 | stale |
-| `pl30`  |       12.0d |               0 |               0 | stale |
-| `pl31`  |       19.7h |               0 |               0 | stale |
-| `pl32`  |        7.1h |               0 |               0 | stale |
-| `pl33`  |        7.1h |               0 |               0 | stale |
-| `pl34`  |        7.1h |               0 |               0 | stale |
-| `pl35`  |        7.1h |               0 |               0 | stale |
-| `pl36`  |       12.0d |               0 |               0 | stale |
-| `pl37`  |        7.1h |               0 |               0 | stale |
-| `pl38`  |       19.7h |               0 |               0 | stale |
-| `pl39`  |       12.0d |               0 |               0 | stale |
-| `pl40`  |        7.1h |               0 |               0 | stale |
-| `pl41`  |       12.0d |               0 |               0 | stale |
-| `pl42`  |        7.1h |               0 |               0 | stale |
-| `pl43`  |        7.1h |               0 |               0 | stale |
-| `pl44`  |       12.0d |               0 |               0 | stale |
-| `pl45`  |       12.0d |               0 |               0 | stale |
-| `pl46`  |       12.0d |               0 |               0 | stale |
-| `pl47`  |        7.1h |               0 |               0 | stale |
-| `pl48`  |        7.1h |               0 |               0 | stale |
-| `pl49`  |        7.1h |               0 |               0 | stale |
-| `pl50`  |        7.1h |               0 |               0 | stale |
-| `pl51`  |       19.7h |               0 |               0 | stale |
-| `pl52`  |       12.0d |               0 |               0 | stale |
-| `pl53`  |       19.7h |               0 |               0 | stale |
-| `pl54`  |        7.1h |               0 |               0 | stale |
-| `pl55`  |        7.1h |               0 |               0 | stale |
-| `pl56`  |        7.1h |               0 |               0 | stale |
-| `pl57`  |        4.6d |               0 |               0 | stale |
-| `pl58`  |        4.0d |               0 |               0 | stale |
-| `pl59`  |        3.8d |               0 |               0 | stale |
-| `pl60`  |        2.8d |               0 |               0 | stale |
-| `pl61`  |        2.8d |               0 |               0 | stale |
-| `pl62`  |        7.1h |               0 |               0 | stale |
-| `pl63`  |        2.8d |               0 |               0 | stale |
-| `pl64`  |       19.7h |               0 |               0 | stale |
-| `pl65`  |        7.1h |               0 |               0 | stale |
-| `pl66`  |        7.1h |               0 |               0 | stale |
-| `pl67`  |        7.1h |               0 |               0 | stale |
-| `pl68`  |        7.1h |               0 |               0 | stale |
-| `pl69`  |        7.1h |               0 |               0 | stale |
-| `pl70`  |        7.1h |               0 |               0 | stale |
-| `pl71`  |        7.1h |               0 |               0 | stale |
-| `pl72`  |        7.1h |               0 |               0 | stale |
-| `pl73`  |        7.1h |               0 |               0 | stale |
-| `pl74`  |        2.3d |               0 |               0 | stale |
-| `pl75`  |       12.0d |               0 |               0 | stale |
-| `pl76`  |       19.7h |               0 |               0 | stale |
-| `pl77`  |       12.0d |               0 |               0 | stale |
-| `pl78`  |       12.0d |               0 |               0 | stale |
-| `pl79`  |        7.1h |               0 |               0 | stale |
-| `pl80`  |        7.1h |               0 |               0 | stale |
-| `pl81`  |       12.0d |               0 |               0 | stale |
-| `pl82`  |       12.0d |               0 |               0 | stale |
-| `pl83`  |       20.1h |               0 |               0 | stale |
-| `pl84`  |       19.7h |               0 |               0 | stale |
-| `pl85`  |       19.7h |               0 |               0 | stale |
-| `pl86`  |        7.1h |               0 |               0 | stale |
-| `pl87`  |       19.7h |               0 |               0 | stale |
-| `pl88`  |       19.7h |               0 |               0 | stale |
-| `pl89`  |        7.1h |               0 |               0 | stale |
-| `pl90`  |       19.7h |               0 |               0 | stale |
-| `pl91`  |        7.1h |               0 |               0 | stale |
-| `pl92`  |        7.1h |               0 |               0 | stale |
-| `pl93`  |        7.1h |               0 |               0 | stale |
-| `pl94`  |        7.1h |               0 |               0 | stale |
-| `pl95`  |        7.1h |               0 |               0 | stale |
-| `pl96`  |        7.1h |               0 |               0 | stale |
-| `pl97`  |       19.7h |               0 |               0 | stale |
-| `pl98`  |       19.7h |               0 |               0 | stale |
-| `pl99`  |        7.1h |               0 |               0 | stale |
-| `pl100` |       19.7h |               0 |               0 | stale |
-| `pl101` |       19.7h |               0 |               0 | stale |
-| `pl102` |       19.7h |               0 |               0 | stale |
-| `pl103` |       19.7h |               0 |               0 | stale |
-| `pl104` |       19.7h |               0 |               0 | stale |
-| `pl105` |       19.7h |               0 |               0 | stale |
-| `pl106` |        7.1h |               0 |               0 | stale |
-| `pl107` |       19.7h |               0 |               0 | stale |
-| `pl108` |       19.7h |               0 |               0 | stale |
-| `pl109` |       19.7h |               0 |               0 | stale |
-| `pl110` |        7.1h |               0 |               0 | stale |
-| `pl111` |       19.7h |               0 |               0 | stale |
-| `pl112` |        7.1h |               0 |               0 | stale |
-| `pl113` |       19.7h |               0 |               0 | stale |
-| `pl114` |       19.7h |               0 |               0 | stale |
-| `pl115` |       19.7h |               0 |               0 | stale |
-| `pl116` |       19.7h |               0 |               0 | stale |
-| `pl117` |       19.7h |               0 |               0 | stale |
-| `pl118` |       19.7h |               0 |               0 | stale |
-| `pl119` |       12.0d |               0 |               0 | stale |
-| `pl120` |       12.0d |               0 |               0 | stale |
-| `pl121` |       12.0d |               0 |               0 | stale |
-| `pl122` |       12.0d |               0 |               0 | stale |
-| `pl123` |       12.0d |               0 |               0 | stale |
-| `pl124` |        7.1h |               0 |               0 | stale |
-| `pl125` |       12.0d |               0 |               0 | stale |
-| `pl126` |        7.1h |               0 |               0 | stale |
-| `pl127` |        7.1h |               0 |               0 | stale |
-| `pl128` |       12.0d |               0 |               0 | stale |
-| `pl129` |        7.1h |               0 |               0 | stale |
-| `pl130` |       12.0d |               0 |               0 | stale |
-| `pl131` |       12.0d |               0 |               0 | stale |
-| `pl132` |        7.1h |               0 |               0 | stale |
-| `pl133` |       12.0d |               0 |               0 | stale |
-| `pl134` |        7.1h |               0 |               0 | stale |
-| `pl135` |        7.1h |               0 |               0 | stale |
-| `pl136` |        7.1h |               0 |               0 | stale |
-| `pl137` |        7.1h |               0 |               0 | stale |
-| `pl139` |        7.1h |               0 |               0 | stale |
-| `pl140` |       12.0d |               0 |               0 | stale |
-| `pl141` |       12.0d |               0 |               0 | stale |
-| `pl142` |        7.1h |               0 |               0 | stale |
-| `pl143` |       12.0d |               0 |               0 | stale |
-| `pl144` |        7.1h |               0 |               0 | stale |
-| `pl145` |       12.0d |               0 |               0 | stale |
-| `pl146` |        7.1h |               0 |               0 | stale |
-| `pl147` |        7.1h |               0 |               0 | stale |
-| `pl148` |       12.0d |               0 |               0 | stale |
-| `pl149` |        7.1h |               0 |               0 | stale |
-| `pl150` |       12.6d |               0 |               0 | stale |
-| `pl153` |        7.1h |               0 |               0 | stale |
+| `pl00`  |       12.0d |               0 |               0 | stale |
+| `pl01`  |       27.6h |               0 |               0 | stale |
+| `pl02`  |       12.3d |               0 |               0 | stale |
+| `pl03`  |       15.0h |               0 |               0 | stale |
+| `pl04`  |       12.3d |               0 |               0 | stale |
+| `pl05`  |       12.3d |               0 |               0 | stale |
+| `pl06`  |       15.0h |               0 |               0 | stale |
+| `pl07`  |       15.0h |               0 |               0 | stale |
+| `pl08`  |       12.3d |               0 |               0 | stale |
+| `pl09`  |       15.0h |               0 |               0 | stale |
+| `pl10`  |       15.0h |               0 |               0 | stale |
+| `pl11`  |       12.3d |               0 |               0 | stale |
+| `pl12`  |       12.3d |               0 |               0 | stale |
+| `pl13`  |       12.3d |               0 |               0 | stale |
+| `pl14`  |       15.0h |               0 |               0 | stale |
+| `pl15`  |       15.0h |               0 |               0 | stale |
+| `pl16`  |       12.3d |               0 |               0 | stale |
+| `pl17`  |       12.3d |               0 |               0 | stale |
+| `pl18`  |       12.3d |               0 |               0 | stale |
+| `pl19`  |       15.0h |               0 |               0 | stale |
+| `pl20`  |       12.3d |               0 |               0 | stale |
+| `pl21`  |       12.3d |               0 |               0 | stale |
+| `pl22`  |        6.5d |               0 |               0 | stale |
+| `pl23`  |       15.0h |               0 |               0 | stale |
+| `pl24`  |       12.3d |               0 |               0 | stale |
+| `pl25`  |       27.6h |               0 |               0 | stale |
+| `pl26`  |       12.3d |               0 |               0 | stale |
+| `pl27`  |       15.0h |               0 |               0 | stale |
+| `pl28`  |       15.0h |               0 |               0 | stale |
+| `pl29`  |       15.0h |               0 |               0 | stale |
+| `pl30`  |       12.3d |               0 |               0 | stale |
+| `pl31`  |       27.6h |               0 |               0 | stale |
+| `pl32`  |       15.0h |               0 |               0 | stale |
+| `pl33`  |       15.0h |               0 |               0 | stale |
+| `pl34`  |       15.0h |               0 |               0 | stale |
+| `pl35`  |       15.0h |               0 |               0 | stale |
+| `pl36`  |       12.3d |               0 |               0 | stale |
+| `pl37`  |       15.0h |               0 |               0 | stale |
+| `pl38`  |       27.6h |               0 |               0 | stale |
+| `pl39`  |       12.3d |               0 |               0 | stale |
+| `pl40`  |       15.0h |               0 |               0 | stale |
+| `pl41`  |       12.3d |               0 |               0 | stale |
+| `pl42`  |       15.0h |               0 |               0 | stale |
+| `pl43`  |       15.0h |               0 |               0 | stale |
+| `pl44`  |       12.3d |               0 |               0 | stale |
+| `pl45`  |       12.3d |               0 |               0 | stale |
+| `pl46`  |       12.3d |               0 |               0 | stale |
+| `pl47`  |       15.0h |               0 |               0 | stale |
+| `pl48`  |       15.0h |               0 |               0 | stale |
+| `pl49`  |       15.0h |               0 |               0 | stale |
+| `pl50`  |       15.0h |               0 |               0 | stale |
+| `pl51`  |       27.6h |               0 |               0 | stale |
+| `pl52`  |       12.3d |               0 |               0 | stale |
+| `pl53`  |       27.6h |               0 |               0 | stale |
+| `pl54`  |       15.0h |               0 |               0 | stale |
+| `pl55`  |       15.0h |               0 |               0 | stale |
+| `pl56`  |       15.0h |               0 |               0 | stale |
+| `pl57`  |        4.9d |               0 |               0 | stale |
+| `pl58`  |        4.4d |               0 |               0 | stale |
+| `pl59`  |        4.2d |               0 |               0 | stale |
+| `pl60`  |        3.1d |               0 |               0 | stale |
+| `pl61`  |        3.1d |               0 |               0 | stale |
+| `pl62`  |       15.0h |               0 |               0 | stale |
+| `pl63`  |        3.1d |               0 |               0 | stale |
+| `pl64`  |       27.6h |               0 |               0 | stale |
+| `pl65`  |       15.0h |               0 |               0 | stale |
+| `pl66`  |       15.0h |               0 |               0 | stale |
+| `pl67`  |       15.0h |               0 |               0 | stale |
+| `pl68`  |       15.0h |               0 |               0 | stale |
+| `pl69`  |       15.0h |               0 |               0 | stale |
+| `pl70`  |       15.0h |               0 |               0 | stale |
+| `pl71`  |       15.0h |               0 |               0 | stale |
+| `pl72`  |       15.0h |               0 |               0 | stale |
+| `pl73`  |       15.0h |               0 |               0 | stale |
+| `pl74`  |        2.6d |               0 |               0 | stale |
+| `pl75`  |       12.3d |               0 |               0 | stale |
+| `pl76`  |       27.6h |               0 |               0 | stale |
+| `pl77`  |       12.3d |               0 |               0 | stale |
+| `pl78`  |       12.3d |               0 |               0 | stale |
+| `pl79`  |       15.0h |               0 |               0 | stale |
+| `pl80`  |       15.0h |               0 |               0 | stale |
+| `pl81`  |       12.3d |               0 |               0 | stale |
+| `pl82`  |       12.3d |               0 |               0 | stale |
+| `pl83`  |       27.9h |               0 |               0 | stale |
+| `pl84`  |       27.6h |               0 |               0 | stale |
+| `pl85`  |       27.6h |               0 |               0 | stale |
+| `pl86`  |       15.0h |               0 |               0 | stale |
+| `pl87`  |       27.6h |               0 |               0 | stale |
+| `pl88`  |       27.6h |               0 |               0 | stale |
+| `pl89`  |       15.0h |               0 |               0 | stale |
+| `pl90`  |       27.6h |               0 |               0 | stale |
+| `pl91`  |       15.0h |               0 |               0 | stale |
+| `pl92`  |       15.0h |               0 |               0 | stale |
+| `pl93`  |       15.0h |               0 |               0 | stale |
+| `pl94`  |       15.0h |               0 |               0 | stale |
+| `pl95`  |       15.0h |               0 |               0 | stale |
+| `pl96`  |       15.0h |               0 |               0 | stale |
+| `pl97`  |       27.6h |               0 |               0 | stale |
+| `pl98`  |       27.6h |               0 |               0 | stale |
+| `pl99`  |       15.0h |               0 |               0 | stale |
+| `pl100` |       27.6h |               0 |               0 | stale |
+| `pl101` |       27.6h |               0 |               0 | stale |
+| `pl102` |       27.6h |               0 |               0 | stale |
+| `pl103` |       27.6h |               0 |               0 | stale |
+| `pl104` |       27.6h |               0 |               0 | stale |
+| `pl105` |       27.6h |               0 |               0 | stale |
+| `pl106` |       15.0h |               0 |               0 | stale |
+| `pl107` |       27.6h |               0 |               0 | stale |
+| `pl108` |       27.6h |               0 |               0 | stale |
+| `pl109` |       27.6h |               0 |               0 | stale |
+| `pl110` |       15.0h |               0 |               0 | stale |
+| `pl111` |       27.6h |               0 |               0 | stale |
+| `pl112` |       15.0h |               0 |               0 | stale |
+| `pl113` |       27.6h |               0 |               0 | stale |
+| `pl114` |       27.6h |               0 |               0 | stale |
+| `pl115` |       27.6h |               0 |               0 | stale |
+| `pl116` |       27.6h |               0 |               0 | stale |
+| `pl117` |       27.6h |               0 |               0 | stale |
+| `pl118` |       27.6h |               0 |               0 | stale |
+| `pl119` |       12.3d |               0 |               0 | stale |
+| `pl120` |       12.3d |               0 |               0 | stale |
+| `pl121` |       12.3d |               0 |               0 | stale |
+| `pl122` |       12.3d |               0 |               0 | stale |
+| `pl123` |       12.3d |               0 |               0 | stale |
+| `pl124` |       15.0h |               0 |               0 | stale |
+| `pl125` |       12.3d |               0 |               0 | stale |
+| `pl126` |       15.0h |               0 |               0 | stale |
+| `pl127` |       15.0h |               0 |               0 | stale |
+| `pl128` |       12.3d |               0 |               0 | stale |
+| `pl129` |       15.0h |               0 |               0 | stale |
+| `pl130` |       12.3d |               0 |               0 | stale |
+| `pl131` |       12.3d |               0 |               0 | stale |
+| `pl132` |       15.0h |               0 |               0 | stale |
+| `pl133` |       12.3d |               0 |               0 | stale |
+| `pl134` |       15.0h |               0 |               0 | stale |
+| `pl135` |       15.0h |               0 |               0 | stale |
+| `pl136` |       15.0h |               0 |               0 | stale |
+| `pl137` |       15.0h |               0 |               0 | stale |
+| `pl139` |       15.0h |               0 |               0 | stale |
+| `pl140` |       12.3d |               0 |               0 | stale |
+| `pl141` |       12.3d |               0 |               0 | stale |
+| `pl142` |       15.0h |               0 |               0 | stale |
+| `pl143` |       12.3d |               0 |               0 | stale |
+| `pl144` |       15.0h |               0 |               0 | stale |
+| `pl145` |       12.3d |               0 |               0 | stale |
+| `pl146` |       15.0h |               0 |               0 | stale |
+| `pl147` |       15.0h |               0 |               0 | stale |
+| `pl148` |       12.3d |               0 |               0 | stale |
+| `pl149` |       15.0h |               0 |               0 | stale |
+| `pl150` |       12.9d |               0 |               0 | stale |
+| `pl151` |        7.9h |              11 |               0 | stale |
+| `pl154` |       15.0h |               1 |               0 | stale |
