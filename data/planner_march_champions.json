@@ -2029,6 +2029,32 @@
       -36,
       0,
       726
+    ],
+    "185": [
+      96,
+      23,
+      93,
+      0,
+      26,
+      1,
+      0,
+      -68,
+      -1,
+      0,
+      735
+    ],
+    "186": [
+      96,
+      23,
+      93,
+      0,
+      26,
+      1,
+      0,
+      -68,
+      -7,
+      0,
+      736
     ]
   },
   "notes": [
@@ -2038,6 +2064,8 @@
     "2026-09-23: refresh pl152+ champions from live HP92 cells post box-UI; drop backup HP68",
     "2026-09-24: add pl154+ champions from live so march can roll past 153",
     "2026-09-24: auto-seed pl160 champion from live mint (march roll)",
-    "2026-09-24: auto-seed pl164 champion from live mint (march roll)"
+    "2026-09-24: auto-seed pl164 champion from live mint (march roll)",
+    "2026-09-24: auto-seed pl185 champion from live mint (march roll)",
+    "2026-09-24: auto-seed pl186 champion from live mint (march roll)"
   ]
 }
