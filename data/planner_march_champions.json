@@ -1955,15 +1955,15 @@
     "138": [
       92,
       22,
-      173,
+      156,
       33,
       21,
       1,
       0,
-      -105,
+      -90,
+      -1,
       0,
-      0,
-      726
+      713
     ],
     "152": [
       92,
@@ -2082,6 +2082,7 @@
     "2026-09-24: auto-seed pl186 champion from live mint (march roll)",
     "2026-09-24: auto-seed pl197 champion from live mint (march roll)",
     "pl125_refine: wardrobe zombie max 11 HG-eq (champ ammo 160).",
-    "2026-09-24: pl125 champ ammo 160->159 (floor 156, max spend 12) so 2-shell zombie kill can auto-roll"
+    "2026-09-24: pl125 champ ammo 160->159 (floor 156, max spend 12) so 2-shell zombie kill can auto-roll",
+    "2026-09-24: pl138 go_to_box skip placeholder (already in 118 after pl137)"
   ]
 }
