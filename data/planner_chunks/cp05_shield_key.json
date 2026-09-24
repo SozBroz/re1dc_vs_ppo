@@ -1274,16 +1274,16 @@
     {
       "op": "use_box",
       "room_id": "118",
-      "note": "leave with 3 empty slots for GL + 2 greens; keep handgun_bullets so Richard corpse clip stacks. Hold shotgun (terrace + shells after Yawn); armor_key for 204->20D; shield for attic. Bank beretta + explosive + red (GL+acid is Yawn primary)",
+      "note": "leave with 3 empty slots for GL + 2 greens; keep handgun_bullets. Hold shotgun (live tip has SG4 not 7); armor_key for 204->20D; shield for attic. Bank beretta + explosive + red (GL+acid is Yawn primary). qty aligned to pl163 RAM.",
       "held_on_exit": [
         {
           "item": "shotgun",
-          "qty": 7,
+          "qty": 4,
           "slot": 1
         },
         {
           "item": "handgun_bullets",
-          "qty": 13,
+          "qty": 10,
           "slot": 2
         },
         {
