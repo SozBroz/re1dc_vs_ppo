@@ -1604,28 +1604,28 @@
     "124": [
       60,
       21,
-      183,
+      168,
       0,
       21,
       1,
       0,
-      -105,
-      -54,
+      -90,
+      -46,
       0,
-      654
+      655
     ],
     "125": [
       60,
       22,
-      173,
+      160,
       33,
       21,
       1,
       0,
-      -105,
-      -1228,
+      -90,
+      -483,
       1,
-      552
+      118
     ],
     "126": [
       92,
@@ -2055,6 +2055,19 @@
       -7,
       0,
       736
+    ],
+    "197": [
+      96,
+      23,
+      93,
+      0,
+      26,
+      1,
+      0,
+      -68,
+      -514,
+      0,
+      721
     ]
   },
   "notes": [
@@ -2066,6 +2079,8 @@
     "2026-09-24: auto-seed pl160 champion from live mint (march roll)",
     "2026-09-24: auto-seed pl164 champion from live mint (march roll)",
     "2026-09-24: auto-seed pl185 champion from live mint (march roll)",
-    "2026-09-24: auto-seed pl186 champion from live mint (march roll)"
+    "2026-09-24: auto-seed pl186 champion from live mint (march roll)",
+    "2026-09-24: auto-seed pl197 champion from live mint (march roll)",
+    "pl125_refine: wardrobe zombie max 11 HG-eq (champ ammo 160)."
   ]
 }

@@ -150,7 +150,7 @@ On-person totals only (boxed ammo ignored). GL column is **all ammo types combin
 | `pl122` | 60 |    20 |             15 |               4 |             0 |              0 |     21 |
 | `pl123` | 60 |    21 |             10 |              11 |             0 |              0 |    842 |
 | `pl124` | 60 |    21 |             10 |              11 |             0 |              0 |     46 |
-| `pl125` | 60 |    22 |             10 |               4 |             0 |              0 |    483 |
+| `pl125` | 60 |    22 |             10 |               9 |             0 |              0 |    483 |
 | `pl126` | 92 |    22 |             10 |               4 |             0 |              0 |     34 |
 | `pl127` | 92 |    22 |             10 |               4 |             0 |              0 |     48 |
 | `pl128` | 92 |    22 |             10 |               4 |             0 |              0 |    125 |
@@ -255,11 +255,10 @@ Only 3 hop(s) dump this resource on the champion path.
 
 | Rank | Cell    | Beat               | Room  | Total SG | Used |  Δ | Pickup |
 | ---: | :------ | :----------------- | :---- | -------: | ---: | --: | -----: |
-|    1 | `pl125` | `112:green_herb:1` | `112` |        4 |    7 | -7 |        |
-|    2 | `pl182` | `moon_crest`       | `210` |        0 |    7 | -7 |        |
-|    3 | `pl110` | `tiger_room_enter` | `10D` |        0 |    4 | -4 |        |
-|    4 | `pl180` | `attic_enter`      | `210` |        0 |    4 | -4 |        |
-|    5 | `pl59`  | `202->201`         | `201` |        3 |    3 | -3 |        |
+|    1 | `pl182` | `moon_crest`       | `210` |        0 |    7 | -7 |        |
+|    2 | `pl110` | `tiger_room_enter` | `10D` |        0 |    4 | -4 |        |
+|    3 | `pl180` | `attic_enter`      | `210` |        0 |    4 | -4 |        |
+|    4 | `pl59`  | `202->201`         | `201` |        3 |    3 | -3 |        |
 
 ### Grenade launcher (combined)
 
@@ -847,7 +846,7 @@ Most worrying tips from the fleet log sweep: `window_fail` (starts, zero hop suc
 | `pl122` | `111:handgun_bullets:1`  | `111` |      4 |       0 |  **4** | +0 |      0 |
 | `pl123` | `111:shotgun_shells:2`   | `111` |      4 |       7 | **11** | +7 |      0 |
 | `pl124` | `111->112`               | `112` |      7 |       4 | **11** | +0 |      0 |
-| `pl125` | `112:green_herb:1`       | `112` |      4 |       0 |  **4** | -7 |      0 |
+| `pl125` | `112:green_herb:1`       | `112` |      7 |       2 |  **9** | -2 |      0 |
 | `pl126` | `112:green_herb:2`       | `112` |      4 |       0 |  **4** | +0 |      0 |
 | `pl127` | `112->111`               | `111` |      4 |       0 |  **4** | +0 |      0 |
 | `pl128` | `111->106`               | `106` |      4 |       0 |  **4** | +0 |      0 |

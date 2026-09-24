@@ -359,9 +359,10 @@ def _champion_qualifies(
     the march before the next real fight. HP still must meet champion on every
     hop.     When ``tip_q`` is the pinned cell, kills and ammo floors cannot exceed
     that cell — the tape's actual kit is the bar, not an older richer route.
-    A fight mint that raises kills above the tip skips the ammo floor: the
-    bullets were spent to get the kill, and a cleaner champion end-ammo
-    cannot strand the tape.
+    A fight mint that raises kills above the tip skips the ammo floor when
+    tip-capping leaves zero spend budget (richer-than-tip champion) or when
+    resources ``min_ammo_spend`` exceeds that budget (forced combat burn);
+    otherwise the floor still applies so wasteful-ammo refines can hold.
     ``min_kill_gain`` / ``min_ammo_spend`` (from resources.md kit deltas) block
     soft tip-matching advances: combat hops must actually raise kills and burn
     the documented HG-eq ammo (e.g. pl109→110 tiger: +1 kill, 11 pistol + 4
@@ -408,8 +409,15 @@ def _champion_qualifies(
     elif require_ammo and int(live[1]) < kills_floor:
         return False
     kills_gained = tip is not None and int(live[1]) > int(tip[1])
-    if require_ammo and not kills_gained and int(live[2]) < ammo_floor:
-        return False
+    if require_ammo and int(live[2]) < ammo_floor:
+        # Tip-capping can leave zero spend budget (richer-than-tip champ), and
+        # resources min_ammo_spend can demand more burn than the champ budget
+        # (e.g. tiger 36 HG-eq). Skip the end-ammo floor only then. A champ
+        # *below* tip with a real budget (wasteful-ammo refine) still holds.
+        budget = 0 if tip is None else max(0, int(tip[2]) - int(ammo_floor))
+        min_need = max(0, int(min_ammo_spend) - int(MARCH_AMMO_SLACK))
+        if not (kills_gained and (budget <= 0 or min_need > budget)):
+            return False
     if require_ammo and tip is not None and int(min_ammo_spend) > 0:
         spent = int(tip[2]) - int(live[2])
         need = max(0, int(min_ammo_spend) - int(MARCH_AMMO_SLACK))

@@ -301,23 +301,51 @@ def test_champion_gate_dims(monkeypatch) -> None:
         )
         is False
     )
-    # A fight that raises kills may spend below the champion ammo floor.
-    # pl74 tip 163/13 kills → pl75 live 130/16 kills, champ end 145/17.
+    # A fight that raises kills may spend below a *richer-than-tip* champion
+    # (tip-capped floor == tip ammo ⇒ zero budget). It may NOT overspend a
+    # champ that still leaves a spend budget (wasteful-ammo refine holds).
     fight_tip = list(Q_FAT)
     fight_tip[1] = 13
     fight_tip[2] = 163
     fight_tip[8] = -30
     fight_champ = list(Q_CHAMP)
     fight_champ[1] = 17
-    fight_champ[2] = 145
+    fight_champ[2] = 145  # floor 142 ⇒ budget 21 vs tip
     fight_live = list(fight_tip)
     fight_live[1] = 16
-    fight_live[2] = 130
+    fight_live[2] = 130  # spent 33 > budget
     fight_live[8] = -254
     assert (
         _champion_qualifies(
             fight_live,
             fight_champ,
+            resources_frames=254,
+            frames_factor=1.5,
+            require_ammo=True,
+            tip_q=fight_tip,
+        )
+        is False
+    )
+    fight_ok = list(fight_live)
+    fight_ok[2] = 150  # spent 13 <= budget
+    assert (
+        _champion_qualifies(
+            fight_ok,
+            fight_champ,
+            resources_frames=254,
+            frames_factor=1.5,
+            require_ammo=True,
+            tip_q=fight_tip,
+        )
+        is True
+    )
+    # Richer-than-tip champ: floor caps to tip ammo (zero budget) → kill may spend.
+    rich_fight_champ = list(fight_champ)
+    rich_fight_champ[2] = 200
+    assert (
+        _champion_qualifies(
+            fight_live,
+            rich_fight_champ,
             resources_frames=254,
             frames_factor=1.5,
             require_ammo=True,
@@ -526,16 +554,21 @@ def test_no_advance_when_frames_over_resources_budget(
     assert maybe_advance_planner_march(tmp_path) is None
 
 
-def test_no_advance_without_champion_row(
+def test_seeds_champion_and_advances_when_row_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """After a tip burn, missing champ rows auto-seed from the live remint."""
+    from re1_rl.planner_march import _champions
+
     _setup(tmp_path, monkeypatch, q_next=Q_FAT)
     (tmp_path / "data" / "planner_march_champions.json").write_text(
         json.dumps({"cells": {}}) + "\n", encoding="utf-8"
     )
     _grind_elapsed(tmp_path, monkeypatch, age_s=3600.0)
-    assert maybe_advance_planner_march(tmp_path) is None
-
+    got = maybe_advance_planner_march(tmp_path)
+    assert got is not None and got.get("advanced") is True
+    assert got.get("to_pin") == 3
+    assert _champions(tmp_path).get(3) == list(Q_FAT)
 
 def test_no_advance_when_disabled(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
