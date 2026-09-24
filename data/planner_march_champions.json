@@ -2098,7 +2098,7 @@
     "180": [
       90,
       23,
-      266,
+      290,
       0,
       24,
       1,
@@ -2151,6 +2151,7 @@
     "2026-09-24: pl138 go_to_box skip placeholder (already in 118 after pl137)",
     "2026-09-24: auto-seed pl158 champion from live mint (march roll)",
     "2026-09-24: auto-seed pl179 champion from live mint (march roll)",
-    "2026-09-24: Yawn refine \u2014 champ180 ammo249 (~6 GL), champ181 HP70/ammo221, champ182 HP60/ammo205 (retreat fight, not death spray)"
+    "2026-09-24: Yawn refine \u2014 champ180 ammo249 (~6 GL), champ181 HP70/ammo221, champ182 HP60/ammo205 (retreat fight, not death spray)",
+    "2026-09-24: pl180 attic-enter max 11 HG-eq (was ~40 spray before fight settles)"
   ]
 }
