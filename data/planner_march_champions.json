@@ -2068,6 +2068,71 @@
       -514,
       0,
       721
+    ],
+    "158": [
+      92,
+      22,
+      140,
+      0,
+      22,
+      1,
+      0,
+      0,
+      -46,
+      0,
+      726
+    ],
+    "179": [
+      92,
+      22,
+      298,
+      68,
+      24,
+      1,
+      0,
+      -68,
+      -31,
+      0,
+      726
+    ],
+    "180": [
+      90,
+      23,
+      266,
+      0,
+      24,
+      1,
+      0,
+      -68,
+      -238,
+      1,
+      278
+    ],
+    "181": [
+      70,
+      23,
+      221,
+      0,
+      25,
+      1,
+      0,
+      -68,
+      -250,
+      0,
+      0
+    ],
+    "182": [
+      60,
+      23,
+      205,
+      0,
+      26,
+      1,
+      0,
+      -68,
+      -250,
+      0,
+      -83
     ]
   },
   "notes": [
@@ -2083,6 +2148,9 @@
     "2026-09-24: auto-seed pl197 champion from live mint (march roll)",
     "pl125_refine: wardrobe zombie max 11 HG-eq (champ ammo 160).",
     "2026-09-24: pl125 champ ammo 160->159 (floor 156, max spend 12) so 2-shell zombie kill can auto-roll",
-    "2026-09-24: pl138 go_to_box skip placeholder (already in 118 after pl137)"
+    "2026-09-24: pl138 go_to_box skip placeholder (already in 118 after pl137)",
+    "2026-09-24: auto-seed pl158 champion from live mint (march roll)",
+    "2026-09-24: auto-seed pl179 champion from live mint (march roll)",
+    "2026-09-24: Yawn refine \u2014 champ180 ammo249 (~6 GL), champ181 HP70/ammo221, champ182 HP60/ammo205 (retreat fight, not death spray)"
   ]
 }
