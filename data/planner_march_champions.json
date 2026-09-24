@@ -1617,7 +1617,7 @@
     "125": [
       60,
       22,
-      160,
+      159,
       33,
       21,
       1,
@@ -2081,6 +2081,7 @@
     "2026-09-24: auto-seed pl185 champion from live mint (march roll)",
     "2026-09-24: auto-seed pl186 champion from live mint (march roll)",
     "2026-09-24: auto-seed pl197 champion from live mint (march roll)",
-    "pl125_refine: wardrobe zombie max 11 HG-eq (champ ammo 160)."
+    "pl125_refine: wardrobe zombie max 11 HG-eq (champ ammo 160).",
+    "2026-09-24: pl125 champ ammo 160->159 (floor 156, max spend 12) so 2-shell zombie kill can auto-roll"
   ]
 }
