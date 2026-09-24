@@ -412,6 +412,18 @@ def test_champions_loader(tmp_path: Path) -> None:
     assert _champions(tmp_path / "nonexistent") == {}
 
 
+def test_seed_champion_from_live(tmp_path: Path) -> None:
+    from re1_rl.planner_march import _seed_champion_from_live
+
+    _write_champions(tmp_path, {3: Q_CHAMP})
+    seeded = _seed_champion_from_live(tmp_path, 4, Q_FAT)
+    assert seeded == Q_FAT
+    assert _champions(tmp_path)[4] == Q_FAT
+    # Idempotent: existing row wins over a different live_q.
+    again = _seed_champion_from_live(tmp_path, 4, Q_CHAMP)
+    assert again == Q_FAT
+
+
 def _grind_elapsed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, age_s: float) -> None:
     import time
 

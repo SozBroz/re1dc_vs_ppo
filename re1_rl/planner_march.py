@@ -32,9 +32,11 @@ loads that mint archive; otherwise it falls back to the march base zip.
 Idempotent per advance id; retried until the learner reports applied.
 
 Fail-closed everywhere: flag unset, non-exclusive pin, env-sourced INDEX
-(nothing to rewrite), short grind time, missing champion/resources row,
-missing rows/live dirs, stale bytes, stop bound, lock contention, crystal
-failure, unreachable learner -> no-op (pin holds, grind continues).
+(nothing to rewrite), short grind time, missing live next cell (no
+champion can be seeded), missing rows/live dirs, stale bytes, stop bound,
+lock contention, crystal failure, unreachable learner -> no-op (pin holds,
+grind continues). A missing champions.json row for an already-minted next
+cell is auto-seeded from that live quality so remints after a burn can roll.
 """
 
 from __future__ import annotations
@@ -194,6 +196,64 @@ def _champions(project_root: Path | str) -> dict[int, list[int]]:
                 cells[idx] = q[:11]
     _CHAMPIONS_CACHE[str(path)] = {"mtime": mtime, "cells": cells}
     return cells
+
+
+def _seed_champion_from_live(
+    project_root: Path | str, idx: int, live_q: Any
+) -> list[int] | None:
+    """Persist ``live_q`` as the pl{idx} champion when the row is missing.
+
+    After a tip burn the champions file often lags the reminted cell; without
+    a row march holds forever. First live mint becomes the floor.
+    """
+    if live_q is None or len(live_q) < 11:
+        return None
+    try:
+        q = [int(x) for x in list(live_q)[:11]]
+    except (TypeError, ValueError):
+        return None
+    path = Path(project_root) / _CHAMPIONS_REL
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        doc = {
+            "source": "auto_seed",
+            "generated_at": time.strftime("%Y-%m-%d"),
+            "cells": {},
+            "notes": [],
+        }
+    if not isinstance(doc, dict):
+        return None
+    cells = doc.get("cells")
+    if not isinstance(cells, dict):
+        cells = {}
+        doc["cells"] = cells
+    key = str(int(idx))
+    if key in cells:
+        try:
+            existing = [int(x) for x in list(cells[key])[:11]]
+        except (TypeError, ValueError):
+            existing = []
+        if len(existing) >= 11:
+            _CHAMPIONS_CACHE.pop(str(path), None)
+            return existing
+    cells[key] = q
+    notes = doc.setdefault("notes", [])
+    if isinstance(notes, list):
+        notes.append(
+            f"{time.strftime('%Y-%m-%d')}: auto-seed pl{int(idx):02d} champion "
+            f"from live mint (march roll)"
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+    _CHAMPIONS_CACHE.pop(str(path), None)
+    print(
+        f"[planner_march] seeded champion pl{int(idx):02d} from live mint {q}",
+        flush=True,
+    )
+    return q
 
 
 def _march_frames_factor(project_root: Path | str | None) -> float:
@@ -768,12 +828,23 @@ def maybe_advance_planner_march(project_root: Path | str | None) -> dict[str, An
     if wall_now - pin_since_f < _march_min_s_for_pin(pin, project_root):
         return None
     nxt = pin + 1
+    tip_q = _live_quality(Path(project_root), pin)
+    live_q_nxt = _live_quality(Path(project_root), nxt)
     champ = _champions(project_root).get(nxt)
+    if champ is None:
+        # Remints after a burn often land before champions.json is updated;
+        # seed from the live cell so march can roll instead of wedging forever.
+        champ = _seed_champion_from_live(project_root, nxt, live_q_nxt)
     if champ is None:
         print(f"[planner_march] no champion row for pl{nxt:02d}; holding pin {pin}", flush=True)
         return None
-    tip_q = _live_quality(Path(project_root), pin)
     rec_frames = int(_resources_frames(project_root).get(nxt) or 0)
+    if rec_frames <= 0 and live_q_nxt is not None and len(live_q_nxt) > _MARCH_FRAMES_DIM:
+        # Docs lag remints; use live hop frames as the budget seed.
+        try:
+            rec_frames = max(0, -int(live_q_nxt[_MARCH_FRAMES_DIM]))
+        except (TypeError, ValueError):
+            rec_frames = 0
     if rec_frames <= 0 and tip_q is None:
         print(
             f"[planner_march] no resources Frames for pl{nxt:02d}; holding pin {pin}",
